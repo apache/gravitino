@@ -68,7 +68,7 @@ public class GravitinoConnectorPluginManager {
       pluginLoaderClass = appClassloader.loadClass(PLUGIN_CLASSLOADER_CLASS_NAME);
     } catch (ClassNotFoundException e) {
       throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Can not load Plugin class loader", e);
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Cannot load plugin class loader", e);
     }
 
     if (GravitinoConfig.trinoConfig.contains(TRINO_PLUGIN_BUNDLES)) {
@@ -95,7 +95,7 @@ public class GravitinoConnectorPluginManager {
         if (!APP_CLASS_LOADER_NAME.equals(classLoader.getName())) {
           throw new TrinoException(
               GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-              "Can not initialize GravitinoConnectorPluginManager when classLoader is not appClassLoader");
+              "Cannot initialize GravitinoConnectorPluginManager when classLoader is not appClassLoader");
         }
         instance = new GravitinoConnectorPluginManager(classLoader);
       }
@@ -149,7 +149,7 @@ public class GravitinoConnectorPluginManager {
     File directory = new File(dirName);
     File[] pluginFiles = directory.listFiles();
     if (pluginFiles == null || pluginFiles.length == 0) {
-      LOG.warn("Can not load plugin {} from empty directory {}", pluginName, dirName);
+      LOG.warn("Cannot load plugin {} from empty directory {}", pluginName, dirName);
       return;
     }
     List<URL> files =
@@ -191,13 +191,13 @@ public class GravitinoConnectorPluginManager {
           ServiceLoader.load(Plugin.class, (ClassLoader) pluginClassLoader);
       List<Plugin> pluginList = ImmutableList.copyOf(serviceLoader);
       if (pluginList.isEmpty()) {
-        LOG.warn("The {} plugin directory does not found connector SIP interface", pluginName);
+        LOG.warn("The {} plugin directory does not contain a connector SPI interface", pluginName);
         return;
       }
       Plugin plugin = pluginList.get(0);
       if (plugin.getConnectorFactories() == null
           || !plugin.getConnectorFactories().iterator().hasNext()) {
-        LOG.warn("The {} plugin does not contains any ConnectorFactories ", pluginName);
+        LOG.warn("The {} plugin does not contain any ConnectorFactories", pluginName);
         return;
       }
       connectorPlugins.put(pluginName, pluginList.get(0));
@@ -286,7 +286,7 @@ public class GravitinoConnectorPluginManager {
       if (plugin == null) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-            "Can not found plugin for connector " + connectorName);
+            "Cannot find plugin for connector " + connectorName);
       }
       try (ThreadContextClassLoader ignored =
           new ThreadContextClassLoader(plugin.getClass().getClassLoader())) {
@@ -318,7 +318,7 @@ public class GravitinoConnectorPluginManager {
     if (plugin == null) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-          "Can not found class loader for " + classLoaderName);
+          "Cannot find class loader for " + classLoaderName);
     }
     return plugin.getClass().getClassLoader();
   }

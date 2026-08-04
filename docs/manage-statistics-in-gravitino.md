@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Gravitino introduces statistics of tables and partitions.
+Gravitino provides statistics of tables and partitions.
 
 This document provides a brief introduction using both Gravitino Java client and
 REST APIs. If you want to know more about the statistics system in Gravitino, refer to the
@@ -234,9 +234,9 @@ table.dropPartitionStatistics(statisticsToDrop);
 
 ### Server Configuration
 
-| Configuration item                              | Description                                                                                                                                                                                                                          | Default value                                                            | Required  | Since version |
-|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|-----------|---------------|
-| `gravitino.stats.partition.storageFactoryClass` | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for testing. | `org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory` |  No       | 1.0.0         |
+| Configuration item                              | Description                                                                                                                                                                                                                          | Default value                                                             | Required |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|----------|
+| `gravitino.stats.partition.storageFactoryClass` | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for testing. | `org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory` | No       |
 
 
 #### JDBC Storage (Default)
@@ -250,16 +250,16 @@ This provides a reliable, production-ready solution that supports multiple datab
 
 To use JDBC storage, configure the following options by adding the prefix `gravitino.stats.partition.storageOption.`:
 
-| Configuration item                                              | Description                                                        | Default value              | Required | Since version |
-|-----------------------------------------------------------------|--------------------------------------------------------------------|----------------------------|----------|---------------|
-| `gravitino.stats.partition.storageOption.jdbcUrl`               | JDBC connection URL (e.g., jdbc:mysql://localhost:3306/gravitino) | None                       | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbcUser`              | Database username                                                  | None                       | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbcPassword`          | Database password                                                  | None                       | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbcDriver`            | JDBC driver class name                                             | `com.mysql.cj.jdbc.Driver` | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.poolMaxSize`           | Maximum connection pool size                                       | `10`                       | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.poolMinIdle`           | Minimum idle connections in pool                                   | `2`                        | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.connectionTimeoutMs`   | Connection timeout in milliseconds                                 | `30000`                    | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.testOnBorrow`          | Test connections before use                                        | `true`                     | No       | 1.2.0         |
+| Configuration item                                            | Description                                                       | Default value              | Required |
+|---------------------------------------------------------------|-------------------------------------------------------------------|----------------------------|----------|
+| `gravitino.stats.partition.storageOption.jdbcUrl`             | JDBC connection URL (e.g., jdbc:mysql://localhost:3306/gravitino) | None                       | Yes      |
+| `gravitino.stats.partition.storageOption.jdbcUser`            | Database username                                                 | None                       | Yes      |
+| `gravitino.stats.partition.storageOption.jdbcPassword`        | Database password                                                 | None                       | Yes      |
+| `gravitino.stats.partition.storageOption.jdbcDriver`          | JDBC driver class name                                            | `com.mysql.cj.jdbc.Driver` | No       |
+| `gravitino.stats.partition.storageOption.poolMaxSize`         | Maximum connection pool size                                      | `10`                       | No       |
+| `gravitino.stats.partition.storageOption.poolMinIdle`         | Minimum idle connections in pool                                  | `2`                        | No       |
+| `gravitino.stats.partition.storageOption.connectionTimeoutMs` | Connection timeout in milliseconds                                | `30000`                    | No       |
+| `gravitino.stats.partition.storageOption.testOnBorrow`        | Test connections before use                                       | `true`                     | No       |
 
 **Example MySQL Configuration:**
 
@@ -307,17 +307,17 @@ For example, if you set an extra property `foo` to `bar` for Lance storage optio
 For Lance remote storage, you can refer to the document [here](https://lancedb.github.io/lance/usage/storage/).
 
 
-| Configuration item                                                   | Description                                                | Default value                        | Required | Since version |
-|----------------------------------------------------------------------|------------------------------------------------------------|--------------------------------------|----------|---------------|
-| `gravitino.stats.partition.storageOption.location`                   | The location of Lance files                                | `${GRAVITINO_HOME}/data/lance`       | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerFile`             | The maximum rows per file                                  | `1000000`                            | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file                                 | `104857600`                          | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group                                 | `1000000`                            | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading                       | `10000`                              | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                            | `0`, It means we don't use the cache | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                       | `102400`                             | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                               | `102400`                             | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation  | `100`                                | No       | 1.2.0         |
+| Configuration item                                                   | Description                                               | Default value                        | Required |
+|----------------------------------------------------------------------|-----------------------------------------------------------|--------------------------------------|----------|
+| `gravitino.stats.partition.storageOption.location`                   | The location of Lance files                               | `${GRAVITINO_HOME}/data/lance`       | No       |
+| `gravitino.stats.partition.storageOption.maxRowsPerFile`             | The maximum rows per file                                 | `1000000`                            | No       |
+| `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file                                | `104857600`                          | No       |
+| `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group                                | `1000000`                            | No       |
+| `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading                      | `10000`                              | No       |
+| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                           | `0`, It means we don't use the cache | No       |
+| `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                      | `102400`                             | No       |
+| `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                              | `102400`                             | No       |
+| `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation | `100`                                | No       |
 
 If you have many tables with a small number of partitions, you should set a smaller metadataFileCacheSizeBytes and indexCacheSizeBytes.
 

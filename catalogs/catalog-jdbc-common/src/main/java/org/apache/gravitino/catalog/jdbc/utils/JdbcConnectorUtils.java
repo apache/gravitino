@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableList;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.sql.Statement;
+import javax.annotation.Nullable;
 
 public final class JdbcConnectorUtils {
   public static final ImmutableList<String> TABLE_TYPES = ImmutableList.of("TABLE");
@@ -41,6 +42,66 @@ public final class JdbcConnectorUtils {
     try (final Statement statement = connection.createStatement()) {
       return statement.executeUpdate(sql);
     }
+  }
+
+  /**
+   * Escapes a value for inclusion in a quoted SQL string literal.
+   *
+   * <p>This method escapes both backslashes and the selected quote character. Callers are
+   * responsible for adding the surrounding quote characters and any dialect-specific literal
+   * prefix.
+   *
+   * @param value the literal value to escape; {@code null} is represented as the text {@code null}
+   * @param quote the quote character used by the SQL dialect
+   * @return the escaped literal value
+   * @throws IllegalArgumentException if {@code quote} is neither a single nor double quote
+   */
+  public static String escapeSqlLiteral(@Nullable String value, char quote) {
+    if (quote != '\'' && quote != '"') {
+      throw new IllegalArgumentException("SQL literal quote must be a single or double quote");
+    }
+
+    String literalValue = String.valueOf(value);
+    String quoteString = String.valueOf(quote);
+    return literalValue.replace("\\", "\\\\").replace(quoteString, quoteString + quoteString);
+  }
+
+  /**
+   * Reverses {@link #escapeSqlLiteral(String, char)} for text captured from a quoted SQL string
+   * literal, e.g. when parsing {@code SHOW CREATE} output.
+   *
+   * <p>Both doubled-quote ({@code ""} or {@code ''}) and backslash ({@code \"}, {@code \\}) escape
+   * styles are unescaped, since dialects differ in which form they emit. Any other character is
+   * kept as is, so text that was never escaped passes through unchanged.
+   *
+   * @param value the captured literal text without the surrounding quote characters
+   * @param quote the quote character used by the SQL dialect
+   * @return the unescaped literal value
+   * @throws IllegalArgumentException if {@code quote} is neither a single nor double quote
+   */
+  public static String unescapeSqlLiteral(String value, char quote) {
+    if (quote != '\'' && quote != '"') {
+      throw new IllegalArgumentException("SQL literal quote must be a single or double quote");
+    }
+
+    StringBuilder result = new StringBuilder(value.length());
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (current == '\\' && i + 1 < value.length()) {
+        char next = value.charAt(i + 1);
+        if (next == '\\' || next == quote) {
+          result.append(next);
+          i++;
+          continue;
+        }
+      } else if (current == quote && i + 1 < value.length() && value.charAt(i + 1) == quote) {
+        result.append(quote);
+        i++;
+        continue;
+      }
+      result.append(current);
+    }
+    return result.toString();
   }
 
   public static String[] getTableTypes() {

@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.postgresql.operation;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
@@ -65,7 +67,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
   public static final String NEW_LINE = "\n";
   public static final String ALTER_TABLE = "ALTER TABLE ";
   public static final String ALTER_COLUMN = "ALTER COLUMN ";
-  public static final String IS = " IS '";
+  public static final String IS = " IS E'";
   public static final String COLUMN_COMMENT = "COMMENT ON COLUMN ";
   public static final String TABLE_COMMENT = "COMMENT ON TABLE ";
 
@@ -204,7 +206,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
           .append(tableName)
           .append(PG_QUOTE)
           .append(IS)
-          .append(comment)
+          .append(escapeSqlLiteral(comment, '\''))
           .append("';");
     }
     Arrays.stream(columns)
@@ -222,7 +224,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
                     .append(jdbcColumn.name())
                     .append(PG_QUOTE)
                     .append(IS)
-                    .append(jdbcColumn.comment())
+                    .append(escapeSqlLiteral(jdbcColumn.comment(), '\''))
                     .append("';"));
 
     // Return the generated SQL statement
@@ -510,7 +512,13 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         }
       }
     }
-    return TABLE_COMMENT + PG_QUOTE + jdbcTable.name() + PG_QUOTE + IS + newComment + "';";
+    return TABLE_COMMENT
+        + PG_QUOTE
+        + jdbcTable.name()
+        + PG_QUOTE
+        + IS
+        + escapeSqlLiteral(newComment, '\'')
+        + "';";
   }
 
   private String deleteColumnFieldDefinition(
@@ -689,7 +697,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
               + col
               + PG_QUOTE
               + IS
-              + addColumn.getComment()
+              + escapeSqlLiteral(addColumn.getComment(), '\'')
               + "';");
     }
     return result;
@@ -711,7 +719,7 @@ public class PostgreSqlTableOperations extends JdbcTableOperations
         + col
         + PG_QUOTE
         + IS
-        + newComment
+        + escapeSqlLiteral(newComment, '\'')
         + "';";
   }
 

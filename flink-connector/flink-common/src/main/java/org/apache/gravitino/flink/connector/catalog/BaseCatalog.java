@@ -63,6 +63,7 @@ import org.apache.flink.table.catalog.stats.CatalogColumnStatistics;
 import org.apache.flink.table.catalog.stats.CatalogTableStatistics;
 import org.apache.flink.table.expressions.Expression;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -98,6 +99,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -126,6 +128,18 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   protected abstract AbstractCatalog realCatalog();
+
+  /**
+   * Converts a Flink logical type to a Gravitino type. Subclasses may override this to special-case
+   * types whose default mapping does not fit a particular catalog (e.g. Oracle has no pure date
+   * type, so its catalog maps Flink's {@code DATE} to a Gravitino timestamp instead).
+   *
+   * @param logicalType the Flink logical type
+   * @return the corresponding Gravitino type
+   */
+  protected Type toGravitinoType(LogicalType logicalType) {
+    return TypeUtils.toGravitinoType(logicalType);
+  }
 
   @Override
   public void open() throws CatalogException {
@@ -404,7 +418,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     ResolvedCatalogBaseTable<?> resolvedTable = (ResolvedCatalogBaseTable<?>) table;
     Column[] columns =
         resolvedTable.getResolvedSchema().getColumns().stream()
-            .map(BaseCatalog::toGravitinoColumn)
+            .map(this::toGravitinoColumn)
             .toArray(Column[]::new);
     String comment = table.getComment();
     Map<String, String> flinkOptions = table.getOptions();
@@ -852,10 +866,10 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return Optional.of(primaryKeyFieldList);
   }
 
-  private static Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
+  private Column toGravitinoColumn(org.apache.flink.table.catalog.Column column) {
     return Column.of(
         column.getName(),
-        TypeUtils.toGravitinoType(column.getDataType().getLogicalType()),
+        toGravitinoType(column.getDataType().getLogicalType()),
         column.getComment().orElse(null),
         column.getDataType().getLogicalType().isNullable(),
         false,
@@ -877,17 +891,17 @@ public abstract class BaseCatalog extends AbstractCatalog {
     changes.add(TableChange.deleteColumn(new String[] {change.getColumnName()}, true));
   }
 
-  private static void addColumn(
+  private void addColumn(
       org.apache.flink.table.catalog.TableChange.AddColumn change, List<TableChange> changes) {
     changes.add(
         TableChange.addColumn(
             new String[] {change.getColumn().getName()},
-            TypeUtils.toGravitinoType(change.getColumn().getDataType().getLogicalType()),
+            toGravitinoType(change.getColumn().getDataType().getLogicalType()),
             change.getColumn().getComment().orElse(null),
             TableUtils.toGravitinoColumnPosition(change.getPosition())));
   }
 
-  private static void modifyColumn(
+  private void modifyColumn(
       org.apache.flink.table.catalog.TableChange change, List<TableChange> changes) {
     if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnName) {
       org.apache.flink.table.catalog.TableChange.ModifyColumnName modifyColumnName =
@@ -903,7 +917,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
       changes.add(
           TableChange.updateColumnType(
               new String[] {modifyColumnType.getOldColumn().getName()},
-              TypeUtils.toGravitinoType(modifyColumnType.getNewType().getLogicalType())));
+              toGravitinoType(modifyColumnType.getNewType().getLogicalType())));
     } else if (change instanceof org.apache.flink.table.catalog.TableChange.ModifyColumnPosition) {
       org.apache.flink.table.catalog.TableChange.ModifyColumnPosition modifyColumnPosition =
           (org.apache.flink.table.catalog.TableChange.ModifyColumnPosition) change;
@@ -937,7 +951,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  static TableChange[] getGravitinoTableChanges(
+  TableChange[] getGravitinoTableChanges(
       List<org.apache.flink.table.catalog.TableChange> tableChanges) {
     List<TableChange> changes = Lists.newArrayList();
     for (org.apache.flink.table.catalog.TableChange change : tableChanges) {
@@ -1046,14 +1060,14 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  static ViewChange[] toReplaceViewChange(
+  ViewChange[] toReplaceViewChange(
       CatalogBaseTable existingView, ResolvedCatalogView newView, String dialect) {
     return toReplaceViewChange(
         existingView, newView, buildSqlRepresentation(dialect, newView.getExpandedQuery()));
   }
 
   @VisibleForTesting
-  static ViewChange[] toReplaceViewChange(
+  ViewChange[] toReplaceViewChange(
       CatalogBaseTable existingView,
       ResolvedCatalogView newView,
       Representation[] representations) {
@@ -1064,7 +1078,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  static ViewChange[] toReplaceViewChange(
+  ViewChange[] toReplaceViewChange(
       List<org.apache.flink.table.catalog.TableChange> tableChanges,
       ResolvedCatalogView newView,
       String dialect) {
@@ -1073,7 +1087,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
   }
 
   @VisibleForTesting
-  static ViewChange[] toReplaceViewChange(
+  ViewChange[] toReplaceViewChange(
       List<org.apache.flink.table.catalog.TableChange> tableChanges,
       ResolvedCatalogView newView,
       Representation[] representations) {
@@ -1106,9 +1120,9 @@ public abstract class BaseCatalog extends AbstractCatalog {
     return changes.toArray(new ViewChange[0]);
   }
 
-  private static Column[] toGravitinoColumns(ResolvedCatalogView view) {
+  private Column[] toGravitinoColumns(ResolvedCatalogView view) {
     return view.getResolvedSchema().getColumns().stream()
-        .map(BaseCatalog::toGravitinoColumn)
+        .map(this::toGravitinoColumn)
         .toArray(Column[]::new);
   }
 

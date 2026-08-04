@@ -20,6 +20,7 @@ package org.apache.gravitino;
 
 import com.google.common.collect.Lists;
 import java.io.File;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
@@ -29,6 +30,7 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
+import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
@@ -186,8 +188,10 @@ public class Configs {
           .createWithDefault(60 * 60 * 1000L);
 
   public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
-  public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 24 * 60 * 60L;
-  public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 60 * 60L;
+  public static final int DEFAULT_ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES = 10;
+  public static final String DEFAULT_ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION = "EXIT";
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 30 * 24 * 60 * 60L;
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 24 * 60 * 60L;
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.pollIntervalSecs")
@@ -196,6 +200,31 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS);
+
+  public static final ConfigEntry<Integer> ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES =
+      new ConfigBuilder("gravitino.entityChangeLog.listenerMaxRetries")
+          .doc(
+              "The number of times the poller retries a change log batch for a failing listener"
+                  + " before applying gravitino.entityChangeLog.listenerFailureAction")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES);
+
+  public static final ConfigEntry<String> ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION =
+      new ConfigBuilder("gravitino.entityChangeLog.listenerFailureAction")
+          .doc(
+              "What the poller does when a listener exhausted its retries: EXIT stops this server"
+                  + " because its local caches are known to be stale, SKIP drops the batch for that"
+                  + " listener and keeps serving")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              value ->
+                  Arrays.stream(EntityChangeLogPoller.ListenerFailureAction.values())
+                      .anyMatch(action -> action.name().equalsIgnoreCase(value)),
+              "The value must be either EXIT or SKIP")
+          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION);
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
@@ -207,7 +236,9 @@ public class Configs {
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.cleanupIntervalSecs")
-          .doc("The interval in seconds for pruning expired entity change logs")
+          .doc(
+              "The interval in seconds for independently cleaning expired entity change logs on a"
+                  + " dedicated thread")
           .version(ConfigConstants.VERSION_1_3_0)
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -217,6 +248,18 @@ public class Configs {
       new ConfigBuilder("gravitino.catalog.classloader.isolated")
           .doc("Whether to load the catalog in an isolated classloader")
           .version(ConfigConstants.VERSION_0_1_0)
+          .booleanConf()
+          .createWithDefault(true);
+
+  public static final ConfigEntry<Boolean> CATALOG_CLASSLOADER_SHARING_ENABLED =
+      new ConfigBuilder("gravitino.catalog.classloader.sharing.enabled")
+          .doc(
+              "Whether to share ClassLoaders across catalogs with identical isolation-relevant "
+                  + "properties. When true (default), catalogs with the same isolation key reuse "
+                  + "a single ClassLoader, significantly reducing Metaspace memory usage. When "
+                  + "false, each catalog gets its own dedicated ClassLoader as in previous "
+                  + "releases.")
+          .version(ConfigConstants.VERSION_2_0_0)
           .booleanConf()
           .createWithDefault(true);
 

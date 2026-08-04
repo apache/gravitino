@@ -19,6 +19,7 @@ package org.apache.gravitino.authorization;
 
 import java.io.Closeable;
 import java.security.Principal;
+import java.util.Collections;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Entity;
@@ -140,6 +141,27 @@ public interface GravitinoAuthorizer extends Closeable {
   }
 
   /**
+   * Returns the declared active-role names that the given principal does not hold (directly or via
+   * a group) in the metalake; empty when the caller holds all of them.
+   *
+   * <p>The default returns an empty set, so authorizers without role membership never reject role
+   * assumption.
+   *
+   * @param principal the user principal
+   * @param metalake the metalake
+   * @param declaredRoleNames the active-role names the caller declared
+   * @param requestContext authorization request context
+   * @return the declared role names the caller does not hold; empty when all are held
+   */
+  default Set<String> findUnheldRoles(
+      Principal principal,
+      String metalake,
+      Set<String> declaredRoleNames,
+      AuthorizationRequestContext requestContext) {
+    return Collections.emptySet();
+  }
+
+  /**
    * Determine whether the user can set owner
    *
    * @param metalake metalake
@@ -189,7 +211,7 @@ public interface GravitinoAuthorizer extends Closeable {
                   RoleEntity.class);
       handleRolePrivilegeChange(entity.id());
     } catch (Exception e) {
-      throw new RuntimeException("Can not get Role Entity", e);
+      throw new RuntimeException("Cannot get role entity", e);
     }
   }
 

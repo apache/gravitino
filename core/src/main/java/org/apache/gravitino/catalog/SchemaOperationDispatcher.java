@@ -415,7 +415,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
-      throw new RuntimeException("Fail to import schema entity to the store.", e);
+      throw new RuntimeException("Failed to import schema entity to the store", e);
     }
   }
 

@@ -44,163 +44,17 @@ from gravitino.dto.responses.partition_name_list_response import (
 from gravitino.dto.responses.partition_response import PartitionResponse
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient, Response
+from tests.unittests.fixtures.table_fixtures import (
+    IDENTITY_PARTITION_JSON_STRING,
+    TABLE_DTO_JSON_STRING,
+)
 
 
 class TestRelationalTable(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.TABLE_DTO_JSON_STRING = """
-        {
-            "name": "example_table",
-            "comment": "This is an example table",
-            "audit": {
-                "creator": "Apache Gravitino",
-                "createTime":"2025-10-10T00:00:00"
-            },
-            "columns": [
-                {
-                    "name": "id",
-                    "type": "integer",
-                    "comment": "id column comment",
-                    "nullable": false,
-                    "autoIncrement": true,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "-1"
-                    }
-                },
-                {
-                    "name": "name",
-                    "type": "varchar(500)",
-                    "comment": "name column comment",
-                    "nullable": true,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "literal",
-                        "dataType": "null",
-                        "value": "null"
-                    }
-                },
-                {
-                    "name": "StartingDate",
-                    "type": "timestamp",
-                    "comment": "StartingDate column comment",
-                    "nullable": false,
-                    "autoIncrement": false,
-                    "defaultValue": {
-                        "type": "function",
-                        "funcName": "current_timestamp",
-                        "funcArgs": []
-                    }
-                },
-                {
-                    "name": "info",
-                    "type": {
-                        "type": "struct",
-                        "fields": [
-                            {
-                                "name": "position",
-                                "type": "string",
-                                "nullable": true,
-                                "comment": "position field comment"
-                            },
-                            {
-                                "name": "contact",
-                                "type": {
-                                "type": "list",
-                                "elementType": "integer",
-                                "containsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "contact field comment"
-                            },
-                            {
-                                "name": "rating",
-                                "type": {
-                                "type": "map",
-                                "keyType": "string",
-                                "valueType": "integer",
-                                "valueContainsNull": false
-                                },
-                                "nullable": true,
-                                "comment": "rating field comment"
-                            }
-                        ]
-                    },
-                    "comment": "info column comment",
-                    "nullable": true
-                },
-                {
-                    "name": "dt",
-                    "type": "date",
-                    "comment": "dt column comment",
-                    "nullable": true
-                }
-            ],
-            "partitioning": [
-                {
-                    "strategy": "identity",
-                    "fieldName": [ "dt" ]
-                }
-            ],
-            "distribution": {
-                "strategy": "hash",
-                "number": 32,
-                "funcArgs": [
-                    {
-                        "type": "field",
-                        "fieldName": [ "id" ]
-                    }
-                ]
-            },
-            "sortOrders": [
-                {
-                    "sortTerm": {
-                        "type": "field",
-                        "fieldName": [ "age" ]
-                    },
-                    "direction": "asc",
-                    "nullOrdering": "nulls_first"
-                }
-            ],
-            "indexes": [
-                {
-                    "indexType": "primary_key",
-                    "name": "PRIMARY",
-                    "fieldNames": [["id"]]
-                }
-            ],
-            "properties": {
-                "format": "ORC"
-            }
-        }
-        """
-
-        cls.PARTITION_JSON_STRING = """
-            {
-                "type": "identity",
-                "name": "test_identity_partition",
-                "fieldNames": [
-                    [
-                        "column_name"
-                    ]
-                ],
-                "values": [
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "0"
-                    },
-                    {
-                        "type": "literal",
-                        "dataType": "integer",
-                        "value": "100"
-                    }
-                ]
-            }
-        """
-
+        cls.TABLE_DTO_JSON_STRING = TABLE_DTO_JSON_STRING
+        cls.PARTITION_JSON_STRING = IDENTITY_PARTITION_JSON_STRING
         cls.table_dto = TableDTO.from_json(cls.TABLE_DTO_JSON_STRING)
         cls.namespace = Namespace.of("metalake_demo", "test_catalog", "test_schema")
         cls.rest_client = HTTPClient("http://localhost:8090")

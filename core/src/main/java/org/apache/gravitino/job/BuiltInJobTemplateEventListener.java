@@ -269,7 +269,12 @@ public class BuiltInJobTemplateEventListener implements EventListenerPlugin {
           } else {
             int existingVersion = version(existing.templateContent().customFields());
             int newVersion = version(newTemplate.customFields());
-            if (newVersion > existingVersion) {
+            // The version field only tracks changes to job logic, but fields like `executable`
+            // can drift independently (e.g. the jar path changes with the Gravitino release
+            // version even though the job logic version stays the same), so also refresh the
+            // persisted template whenever its content no longer matches, regardless of version.
+            boolean contentChanged = !existing.toJobTemplate().equals(newTemplate);
+            if (newVersion > existingVersion || contentChanged) {
               updateBuiltInJobTemplate(metalake, existing, newTemplate);
             } else {
               LOG.info("Built-in job template {} under metalake {} is up to date", name, metalake);

@@ -30,16 +30,16 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
 
-| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Default value   | Required | Since version    |
-|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.8.0-incubating |
-| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                    | `builtin-local` | No       | 0.8.0-incubating |
-| `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | (none)          | Yes      | 0.8.0-incubating |
-| `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | (none)          | Yes      | 0.8.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       | 0.8.0-incubating |
+| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Default value   | Required |
+|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|
+| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      |
+| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                    | `builtin-local` | No       |
+| `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | (none)          | Yes      |
+| `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | (none)          | Yes      |
+| `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       |
 
 :::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
+`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
 :::
 
 ### Schema Configuration
@@ -237,10 +237,10 @@ catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema
 
 To access fileset with Azure Blob Storage(ADLS) using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
-| Configuration item           | Description                             | Default value | Required | Since version    |
-|------------------------------|-----------------------------------------|---------------|----------|------------------|
-| `azure-storage-account-name` | The account name of Azure Blob Storage. | (none)        | Yes      | 0.8.0-incubating |
-| `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes      | 0.8.0-incubating |
+| Configuration item           | Description                             | Default value | Required |
+|------------------------------|-----------------------------------------|---------------|----------|
+| `azure-storage-account-name` | The account name of Azure Blob Storage. | (none)        | Yes      |
+| `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes      |
 
 :::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
@@ -285,7 +285,7 @@ If you want to custom your hadoop version or there is already a hadoop version i
 ```
 
 :::note
-Since version 1.1.0, the `gravitino-azure` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
+The `gravitino-azure` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
 :::
 
 Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
@@ -437,10 +437,10 @@ For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-vers
 
 To access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
 
-| Configuration item           | Description                            | Default value | Required | Since version    |
-|------------------------------|----------------------------------------|---------------|----------|------------------|
-| `azure_storage_account_name` | The account name of Azure Blob Storage | (none)        | Yes      | 0.8.0-incubating |
-| `azure_storage_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      | 0.8.0-incubating |
+| Configuration item           | Description                            | Default value | Required |
+|------------------------------|----------------------------------------|---------------|----------|
+| `azure_storage_account_name` | The account name of Azure Blob Storage | (none)        | Yes      |
+| `azure_storage_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      |
 
 :::note
 If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
@@ -490,7 +490,7 @@ For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-g
 
 ## Fileset with Credential Vending
 
-Since 0.8.0-incubating, Gravitino supports credential vending for ADLS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access ADLS fileset without providing authentication information like `azure-storage-account-name` and `azure-storage-account-key` in the properties.
+Gravitino supports credential vending for ADLS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access ADLS fileset without providing authentication information like `azure-storage-account-name` and `azure-storage-account-key` in the properties.
 
 ### Create an ADLS Fileset Catalog with Credential Vending
 

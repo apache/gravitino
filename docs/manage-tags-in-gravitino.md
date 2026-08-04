@@ -11,7 +11,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 0.6.0, Gravitino introduces a new tag system that allows you to manage tags for
+Gravitino provides a tag system that allows you to manage tags for
 metadata objects. Tags are a way to categorize and organize metadata objects in Gravitino.
 
 This document briefly introduces how to use tags in Gravitino by both Gravitino Java client and
@@ -23,12 +23,13 @@ the future versions.
 
 :::info
 1. Metadata objects are objects that are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
-   `COLUMN`, `FILESET`, `TOPIC`, `COLUMN`, `MODEL`, etc. A metadata object is combined by a `type` and a
-   dot-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
+   `VIEW`, `FUNCTION`, `FILESET`, `TOPIC`, `COLUMN`, `MODEL`, etc. A metadata object is combined by a
+   `type` and a dot-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
    "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
    object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name 
    "catalog1.schema1.table1.column1" with type "COLUMN".
-2`CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` objects can be tagged.
+2. `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `FUNCTION`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN`
+   objects can be tagged.
 3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
    tags of its parent metadata objects. For example, listing tags of a `Table` will also list
    the tags of its parent `Schema` and `Catalog`. For catalogs that support multi-level
@@ -207,7 +208,8 @@ client.deleteTag("tag2");
 
 ## Tag Associations
 
-Gravitino lets you associate and disassociate tags with metadata objects. The `CATALOG`, `SCHEMA`, `TABLE`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` object types can be tagged.
+Gravitino lets you associate and disassociate tags with metadata objects. The `CATALOG`, `SCHEMA`,
+`TABLE`, `VIEW`, `FUNCTION`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` object types can be tagged.
 
 ### Associate and Disassociate Tags with a Metadata Object
 

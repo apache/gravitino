@@ -67,7 +67,7 @@ public class EntityChangeLogSQLProviderFactory {
     return getProvider().insertEntityChange(metalakeName, entityType, fullName, operateType);
   }
 
-  public static String pruneOldEntityChanges(@Param("before") long before) {
-    return getProvider().pruneOldEntityChanges(before);
+  public static String pruneOldEntityChanges(@Param("retentionMs") long retentionMs) {
+    return getProvider().pruneOldEntityChanges(retentionMs);
   }
 }

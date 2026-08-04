@@ -416,10 +416,11 @@ public class TestBuiltInJobTemplateEventListener {
     String metalakeName = "test_metalake";
     Map<String, JobTemplate> builtInTemplates = new HashMap<>();
 
+    // Same version and identical content as the entity created by createJobTemplateEntity(...)
     ShellJobTemplate template =
         ShellJobTemplate.builder()
             .withName("builtin-existing")
-            .withComment("same version")
+            .withComment("test")
             .withExecutable("/bin/echo")
             .withCustomFields(Collections.singletonMap("version", "v1"))
             .build();
@@ -444,6 +445,50 @@ public class TestBuiltInJobTemplateEventListener {
             Entity.EntityType.JOB_TEMPLATE,
             JobTemplateEntity.class);
     Assertions.assertEquals("v1", result.templateContent().customFields().get("version"));
+
+    // Verify no update actually happened: an update would stamp lastModifier/lastModifiedTime,
+    // which createJobTemplateEntity(...) leaves null, so these staying null proves the entity
+    // was left untouched rather than merely ending up with the same version by coincidence.
+    Assertions.assertNull(result.auditInfo().lastModifier());
+    Assertions.assertNull(result.auditInfo().lastModifiedTime());
+  }
+
+  @Test
+  public void testReconcileBuiltInJobTemplatesUpdateWhenExecutableChangedButVersionSame()
+      throws IOException {
+    String metalakeName = "test_metalake";
+    Map<String, JobTemplate> builtInTemplates = new HashMap<>();
+
+    // Same version as the persisted entity, but a different executable path, e.g. because the
+    // Gravitino release version (and thus the jar filename) changed while the job logic did not.
+    ShellJobTemplate template =
+        ShellJobTemplate.builder()
+            .withName("builtin-existing")
+            .withComment("test")
+            .withExecutable("/opt/gravitino/auxlib/gravitino-jobs-2.0.0-SNAPSHOT.jar")
+            .withCustomFields(Collections.singletonMap("version", "v1"))
+            .build();
+    builtInTemplates.put("builtin-existing", template);
+
+    // Existing entity was persisted with the old jar path.
+    JobTemplateEntity existingEntity = createJobTemplateEntity("builtin-existing", "v1");
+    entityStore.put(existingEntity, false);
+
+    when(jobManager.listJobTemplates(metalakeName))
+        .thenReturn(Collections.singletonList(existingEntity));
+
+    listener.reconcileBuiltInJobTemplates(metalakeName, builtInTemplates);
+
+    // Verify the entity's executable path was refreshed despite the version staying at v1
+    JobTemplateEntity result =
+        entityStore.get(
+            existingEntity.nameIdentifier(),
+            Entity.EntityType.JOB_TEMPLATE,
+            JobTemplateEntity.class);
+    Assertions.assertEquals("v1", result.templateContent().customFields().get("version"));
+    Assertions.assertEquals(
+        "/opt/gravitino/auxlib/gravitino-jobs-2.0.0-SNAPSHOT.jar",
+        result.templateContent().executable());
   }
 
   @Test
@@ -552,6 +597,11 @@ public class TestBuiltInJobTemplateEventListener {
         .withId(1L)
         .withName(name)
         .withNamespace(NamespaceUtil.ofJobTemplate("test_metalake"))
+        // TemplateContent does not carry comment (see JobTemplateEntity#toJobTemplate(), which
+        // reads comment from the entity itself), so it must be set explicitly here to match what
+        // registerNewBuiltInJobTemplate(...) does in production and keep entity.toJobTemplate()
+        // consistent with `template` above.
+        .withComment(template.comment())
         .withTemplateContent(JobTemplateEntity.TemplateContent.fromJobTemplate(template))
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())

@@ -131,12 +131,13 @@ public class IcebergHiveCachedClientPool
               .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
               .removalListener(
                   (key, value, cause) -> {
+                    Key cacheKey = (Key) key;
+                    LOG.debug(
+                        "Removing HiveClientPool from cache: key={}, cause={}",
+                        cacheKey == null ? null : cacheKey.elements(),
+                        cause);
                     HiveClientPool hiveClientPool = (HiveClientPool) value;
                     if (hiveClientPool != null) {
-                      LOG.info(
-                          "Removing an expired HiveClientPool instance: {} for Key: {}",
-                          hiveClientPool,
-                          key);
                       hiveClientPool.close();
                     }
                   })

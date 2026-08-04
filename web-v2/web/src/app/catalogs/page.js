@@ -253,6 +253,7 @@ const CatalogsListPage = () => {
               case 'fileset':
                 store.filesets.length === 0 &&
                   (await dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema })))
+                await dispatch(resetActivatedDetails())
                 await dispatch(setActivatedDetailsLoading(true))
                 await dispatch(getFilesetDetails({ init: true, metalake, catalog, schema, fileset }))
                 await dispatch(setActivatedDetailsLoading(false))
