@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -269,6 +270,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+          Optional<TableEntity> tableEntityBeforeRename =
+              isRenameTable && !isManagedTable
+                  ? getTableEntityBeforeRename(ident)
+                  : Optional.empty();
           Table alteredTable =
               doWithCatalog(
                   catalogIdent,
@@ -278,7 +284,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
           if (isManagedTable) {
             return EntityCombinedTable.of(alteredTable)
                 .withHiddenProperties(
@@ -290,9 +295,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.
-          TableEntity te = null;
+          TableEntity te = tableEntityBeforeRename.orElse(null);
           if (stringId == null) {
-            te = getEntity(ident, TABLE, TableEntity.class);
+            if (te == null) {
+              te = getEntity(ident, TABLE, TableEntity.class);
+            }
             if (te == null) {
               return EntityCombinedTable.of(alteredTable)
                   .withHiddenProperties(
@@ -441,21 +448,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return droppedFromCatalog;
           }
 
-          // For unmanaged table, it could happen that the table:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the table from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, TABLE);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
-            return false;
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result can mean that a concurrent rename already moved the external table.
+          // Only remove the stored registration after the catalog confirms that this purge deleted
+          // the table.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, TABLE);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
           // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -480,6 +483,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     ((TableChange.RenameTable) c).getNewSchemaName().get()))
         .reduce((c1, c2) -> c2)
         .orElse(tableIdent.namespace());
+  }
+
+  private Optional<TableEntity> getTableEntityBeforeRename(NameIdentifier ident) {
+    try {
+      return Optional.of(store.get(ident, TABLE, TableEntity.class));
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    } catch (Exception e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to read the stored registration for table %s before renaming it", ident);
+    }
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {
