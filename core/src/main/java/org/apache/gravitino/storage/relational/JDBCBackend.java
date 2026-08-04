@@ -41,6 +41,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -313,6 +314,69 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().getUserByExternalId(ident);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().getGroupByExternalId(ident);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().updateUserByExternalId(ident, updater);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update enabled by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getById(
+      NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        AuthorizationUtils.checkUserId(ident);
+        return (E)
+            UserMetaService.getInstance()
+                .getUserById(ident.namespace().level(0), Long.parseLong(ident.name()));
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get by id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        AuthorizationUtils.checkUserId(ident);
+        return (E)
+            UserMetaService.getInstance()
+                .updateUserById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update by id operation", entityType);
+    }
+  }
+
+  @Override
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> identifiers, Entity.EntityType entityType) {
     if (identifiers == null || identifiers.isEmpty()) {

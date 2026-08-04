@@ -85,6 +85,7 @@ public class TestUserEvent {
     User mockUser = getMockUser("mock_user", ImmutableList.of("admin"));
     UserInfo info = new UserInfo(mockUser);
 
+    Assertions.assertEquals(1L, info.id());
     Assertions.assertEquals("mock_user", info.name());
     Assertions.assertEquals(ImmutableList.of("admin"), info.roles());
   }
@@ -472,6 +473,61 @@ public class TestUserEvent {
     Assertions.assertEquals(revokedRoles, revokeUserRolesFailureEvent.roles());
   }
 
+<<<<<<< HEAD
+=======
+  @Test
+  void testAddUserWithExternalIdEvent() {
+    dispatcher.addUser(METALAKE, userName, USER_EXT_ID, true);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(AddUserPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.ADD_USER, preEvent.operationType());
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(AddUserEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.ADD_USER, event.operationType());
+  }
+
+  @Test
+  void testGetUserByExternalIdEvent() {
+    dispatcher.getUserByExternalId(METALAKE, USER_EXT_ID);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetUserByExternalIdPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(
+        AuthorizationUtils.ofUserExternalId(METALAKE, USER_EXT_ID), preEvent.identifier());
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetUserByExternalIdEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.GET_USER_BY_EXTERNAL_ID, event.operationType());
+  }
+
+  @Test
+  void testRemoveUserByExternalIdEvent() {
+    dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(RemoveUserByExternalIdPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationType.REMOVE_USER_BY_EXTERNAL_ID, preEvent.operationType());
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(RemoveUserByExternalIdEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.REMOVE_USER_BY_EXTERNAL_ID, event.operationType());
+  }
+
+  @Test
+  void testGetUserByExternalIdFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getUserByExternalId(METALAKE, USER_EXT_ID));
+
+    dummyEventListener.popPreEvent();
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetUserByExternalIdFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationType.GET_USER_BY_EXTERNAL_ID, event.operationType());
+  }
+
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   private AccessControlEventDispatcher mockUserDispatcher() {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
     when(dispatcher.addUser(METALAKE, userName)).thenReturn(user);
@@ -484,6 +540,10 @@ public class TestUserEvent {
     when(dispatcher.listUserNames(METALAKE)).thenReturn(new String[] {userName, otherUserName});
 
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
+<<<<<<< HEAD
+=======
+    when(dispatcher.getUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(externalIdUser);
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
     when(dispatcher.getUser(METALAKE, inExistUserName))
         .thenThrow(new NoSuchUserException("user not found"));
     when(dispatcher.getUser(INEXIST_METALAKE, userName))
@@ -505,13 +565,30 @@ public class TestUserEvent {
 
   private User getMockUser(String name, List<String> roles) {
     User user = mock(User.class);
+    when(user.id()).thenReturn(1L);
     when(user.name()).thenReturn(name);
     when(user.roles()).thenReturn(roles);
 
     return user;
   }
 
+<<<<<<< HEAD
+=======
+  private User getMockUserWithExtId(
+      String name, String externalId, boolean enabled, List<String> roles) {
+    User user = mock(User.class);
+    when(user.id()).thenReturn(1L);
+    when(user.name()).thenReturn(name);
+    when(user.externalId()).thenReturn(externalId);
+    when(user.enabled()).thenReturn(enabled);
+    when(user.roles()).thenReturn(roles);
+
+    return user;
+  }
+
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   private void validateUserInfo(UserInfo userInfo, User expectedUser) {
+    Assertions.assertEquals(expectedUser.id(), userInfo.id());
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
   }

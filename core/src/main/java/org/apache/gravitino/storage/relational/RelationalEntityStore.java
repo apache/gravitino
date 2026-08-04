@@ -40,6 +40,11 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.SupportsExternalIdOperations;
+import org.apache.gravitino.SupportsIdOperations;
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.cache.CacheFactory;
@@ -65,7 +70,15 @@ import org.slf4j.LoggerFactory;
  * RelationalBackend} interface. The default JDBC backend is {@link JDBCBackend}.
  */
 public class RelationalEntityStore
+<<<<<<< HEAD
     implements EntityStore, SupportsRelationOperations, SupportsEntityChangeLog {
+=======
+    implements EntityStore,
+        SupportsRelationOperations,
+        SupportsExternalIdOperations,
+        SupportsIdOperations,
+        SupportsEntityChangeLog {
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   private static final Logger LOGGER = LoggerFactory.getLogger(RelationalEntityStore.class);
   public static final ImmutableMap<String, String> RELATIONAL_BACKENDS =
       ImmutableMap.of(
@@ -182,6 +195,87 @@ public class RelationalEntityStore
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public SupportsExternalIdOperations externalIdOperations() {
+    return this;
+  }
+
+  @Override
+  public SupportsIdOperations idOperations() {
+    return this;
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
+      throws NoSuchEntityException, IOException {
+    return backend.getByExternalId(ident, entityType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    E updatedEntity = backend.updateByExternalId(ident, entityType, updater);
+    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+    return updatedEntity;
+  }
+
+  @Override
+  public boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
+      throws IOException {
+    NameIdentifier nameIdent = null;
+    try {
+      HasIdentifier entity = backend.getByExternalId(ident, entityType);
+      nameIdent = entity.nameIdentifier();
+      return backend.delete(nameIdent, entityType, false);
+    } catch (NoSuchEntityException e) {
+      LOGGER.warn(
+          "The entity to be deleted by external id does not exist in the store: {}", ident, e);
+      return false;
+    } finally {
+      if (nameIdent != null) {
+        cache.invalidate(nameIdent, entityType);
+      }
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
+      throws NoSuchEntityException, IOException {
+    return backend.getById(ident, entityType);
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    E updatedEntity = backend.updateById(ident, entityType, updater);
+    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+    return updatedEntity;
+  }
+
+  @Override
+  public boolean deleteById(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
+    NameIdentifier nameIdent = null;
+    try {
+      HasIdentifier entity = backend.getById(ident, entityType);
+      nameIdent = entity.nameIdentifier();
+      return backend.delete(nameIdent, entityType, false);
+    } catch (NoSuchEntityException e) {
+      LOGGER.warn("The entity to be deleted by id does not exist in the store: {}", ident, e);
+      return false;
+    } finally {
+      if (nameIdent != null) {
+        cache.invalidate(nameIdent, entityType);
+      }
+    }
+  }
+
+  @Override
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> idents, Entity.EntityType entityType, Class<E> clazz) {
     List<E> allEntities = new ArrayList<>();

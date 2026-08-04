@@ -35,6 +35,44 @@ public interface User extends Auditable {
   String name();
 
   /**
+<<<<<<< HEAD
+=======
+   * The unique id assigned by Gravitino.
+   *
+   * <p>This id is server-assigned and immutable. Upstream systems may also supply an optional
+   * {@link #externalId()}.
+   *
+   * @return The unique id of the user.
+   */
+  Long id();
+
+  /**
+   * The stable identifier assigned by an upstream identity system (for example, SCIM, LDAP, or
+   * IAM), or null if not set.
+   *
+   * <p>Gravitino {@link User#name() user names} may differ from upstream ids or be unknown at sync
+   * time. External id lets integrators look up and correlate users without relying on the Gravitino
+   * user name. Mutable attributes such as {@link #enabled()} and {@code externalId} are updated via
+   * {@code alterUserById}.
+   *
+   * @return The upstream external identifier, or null if not set.
+   */
+  @Nullable
+  default String externalId() {
+    return null;
+  }
+
+  /**
+   * Whether the user is enabled.
+   *
+   * @return True if the user is enabled, false otherwise.
+   */
+  default boolean enabled() {
+    return true;
+  }
+
+  /**
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
    * The roles of the user. A user can have multiple roles. Every role binds several privileges.
    *
    * @return The roles of the user.

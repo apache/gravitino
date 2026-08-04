@@ -53,6 +53,63 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+<<<<<<< HEAD
+=======
+  public String selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.external_id = #{externalId}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String selectUserMetaByMetalakeNameAndId(
+      @Param("metalakeName") String metalakeName, @Param("userId") Long userId) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.user_id = #{userId}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String updateUserMetaByExternalId(
+      @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO) {
+    return "UPDATE "
+        + USER_TABLE_NAME
+        + " SET user_name = #{newUserMeta.userName},"
+        + " metalake_id = #{newUserMeta.metalakeId},"
+        + " audit_info = #{newUserMeta.auditInfo},"
+        + " external_id = #{newUserMeta.externalId},"
+        + " enabled = #{newUserMeta.enabled},"
+        + " current_version = #{newUserMeta.currentVersion},"
+        + " last_version = #{newUserMeta.lastVersion},"
+        + " deleted_at = #{newUserMeta.deletedAt}"
+        + " WHERE external_id = #{oldUserMeta.externalId}"
+        + " AND metalake_id = #{oldUserMeta.metalakeId}"
+        + " AND audit_info = #{oldUserMeta.auditInfo}"
+        + " AND current_version = #{oldUserMeta.currentVersion}"
+        + " AND last_version = #{oldUserMeta.lastVersion}"
+        + " AND deleted_at = 0";
+  }
+
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME

@@ -114,4 +114,22 @@ public class UserMetaSQLProviderFactory {
       @Param("groupNames") List<String> groupNames) {
     return getProvider().batchGetAuthSubjectsForUser(metalakeName, userName, groupNames);
   }
+<<<<<<< HEAD
+=======
+
+  public static String selectUserMetaByMetalakeNameAndExternalId(
+      @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
+    return getProvider().selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
+  }
+
+  public static String selectUserMetaByMetalakeNameAndId(
+      @Param("metalakeName") String metalakeName, @Param("userId") Long userId) {
+    return getProvider().selectUserMetaByMetalakeNameAndId(metalakeName, userId);
+  }
+
+  public static String updateUserMetaByExternalId(
+      @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO) {
+    return getProvider().updateUserMetaByExternalId(newUserPO, oldUserPO);
+  }
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
 }

@@ -47,6 +47,11 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 public class AccessControlManager implements AccessControlDispatcher {
 
   private final UserGroupManager userGroupManager;
+<<<<<<< HEAD
+=======
+  private final UserGroupExternalManager userGroupExternalManager;
+  private final UserGroupIdManager userGroupIdManager;
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   private final RoleManager roleManager;
   private final PermissionManager permissionManager;
   private final List<String> serviceAdmins;
@@ -54,6 +59,11 @@ public class AccessControlManager implements AccessControlDispatcher {
   public AccessControlManager(EntityStore store, IdGenerator idGenerator, Config config) {
     this.roleManager = new RoleManager(store, idGenerator);
     this.userGroupManager = new UserGroupManager(store, idGenerator);
+<<<<<<< HEAD
+=======
+    this.userGroupExternalManager = new UserGroupExternalManager(store, idGenerator);
+    this.userGroupIdManager = new UserGroupIdManager(store, idGenerator);
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
     this.permissionManager = new PermissionManager(store, roleManager);
     this.serviceAdmins = config.get(Configs.SERVICE_ADMINS);
   }
@@ -85,6 +95,44 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public User getUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserExternalId(metalake, externalId),
+        LockType.READ,
+        () -> userGroupExternalManager.getUserByExternalId(metalake, externalId));
+  }
+
+  @Override
+  public User getUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.READ,
+        () -> userGroupIdManager.getUserById(metalake, userId));
+  }
+
+  @Override
+  public boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.WRITE,
+        () -> userGroupIdManager.removeUserById(metalake, userId));
+  }
+
+  @Override
+  public User alterUserById(String metalake, long userId, UserChange... changes)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        AuthorizationUtils.ofUserId(metalake, userId),
+        LockType.WRITE,
+        () -> userGroupIdManager.alterUserById(metalake, userId, changes));
+  }
+
+  @Override
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),

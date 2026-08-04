@@ -41,6 +41,30 @@ public interface Entity extends Serializable {
   /** The user schema name in the system catalog. */
   String USER_SCHEMA_NAME = "user";
 
+<<<<<<< HEAD
+=======
+  /**
+   * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
+   * when operating on users by Gravitino-assigned id (for example, get/alter/delete-by-id).
+   *
+   * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
+   * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system, user-id, <id>}}
+   * so that concurrent operations on the same user id are serialized.
+   */
+  String USER_ID_SCHEMA_NAME = "user-id";
+
+  /**
+   * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
+   * when operating on users by external id (for example, get/delete-by-external-id).
+   *
+   * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
+   * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system, user-external-id,
+   * <externalId>}} so that concurrent operations on the same external id are serialized without
+   * requiring the Gravitino user name.
+   */
+  String USER_EXTERNAL_ID_SCHEMA_NAME = "user-external-id";
+
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   /** The group schema name in the system catalog. */
   String GROUP_SCHEMA_NAME = "group";
 

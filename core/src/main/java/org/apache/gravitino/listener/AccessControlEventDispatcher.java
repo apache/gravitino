@@ -29,6 +29,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.UserChange;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -50,6 +51,12 @@ import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
 import org.apache.gravitino.listener.api.event.DeleteRoleEvent;
 import org.apache.gravitino.listener.api.event.DeleteRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.DeleteRolePreEvent;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.listener.api.event.GetGroupByExternalIdEvent;
+import org.apache.gravitino.listener.api.event.GetGroupByExternalIdFailureEvent;
+import org.apache.gravitino.listener.api.event.GetGroupByExternalIdPreEvent;
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
 import org.apache.gravitino.listener.api.event.GetGroupEvent;
 import org.apache.gravitino.listener.api.event.GetGroupFailureEvent;
 import org.apache.gravitino.listener.api.event.GetGroupPreEvent;
@@ -182,6 +189,49 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+<<<<<<< HEAD
+=======
+  public User getUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetUserByExternalIdPreEvent(initiator, metalake, externalId));
+    try {
+      User userObject = dispatcher.getUserByExternalId(metalake, externalId);
+      eventBus.dispatchEvent(
+          new GetUserByExternalIdEvent(initiator, metalake, new UserInfo(userObject)));
+
+      return userObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new GetUserByExternalIdFailureEvent(initiator, metalake, e, externalId));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public User getUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.getUserById(metalake, userId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException {
+    return dispatcher.removeUserById(metalake, userId);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public User alterUserById(String metalake, long userId, UserChange... changes)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.alterUserById(metalake, userId, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   public User[] listUsers(String metalake) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 

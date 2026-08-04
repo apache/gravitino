@@ -34,6 +34,7 @@ import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.authorization.UserChange;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -81,6 +82,32 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public User getUserByExternalId(String metalake, String externalId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.getUserByExternalId(metalake, externalId);
+  }
+
+  @Override
+  public User getUserById(String metalake, long userId)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.getUserById(metalake, userId);
+  }
+
+  @Override
+  public boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException {
+    return dispatcher.removeUserById(metalake, userId);
+  }
+
+  @Override
+  public User alterUserById(String metalake, long userId, UserChange... changes)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.alterUserById(metalake, userId, changes);
+  }
+
+  @Override
+>>>>>>> 5f418566c ([#12330] feat(core): Add user by-id APIs and alterUserById via UserChange (#12332))
   public User[] listUsers(String metalake) throws NoSuchMetalakeException {
     return dispatcher.listUsers(metalake);
   }
