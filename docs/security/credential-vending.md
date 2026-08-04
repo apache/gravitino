@@ -364,6 +364,10 @@ GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 
 The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed.
 
+### Read or Write Scope
+
+Over the IRC, a credential is vended for writing when the caller is entitled to modify the table, and for reading otherwise. Narrowing the caller's roles with the `X-Gravitino-Active-Roles` header narrows this as well, so a caller whose active roles no longer carry `MODIFY_TABLE` is vended a read-only credential. See [Narrowing Access with Active Roles](access-control.md#narrowing-access-with-active-roles).
+
 ## Custom Credentials
 
 Gravitino supports custom credentials. You can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar in the classpath of the IRC or the Fileset catalog.
