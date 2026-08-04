@@ -41,10 +41,12 @@ import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
@@ -132,9 +134,18 @@ public class UserMetaService {
     try {
       AuthorizationUtils.checkUser(userEntity.nameIdentifier());
 
-      Long metalakeId =
-          MetalakeMetaService.getInstance().getMetalakeIdByName(userEntity.namespace().level(0));
-      UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakeId);
+      String metalakeName = userEntity.namespace().level(0);
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
+      }
+
+      UserPO.Builder builder = UserPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       UserPO userPO = POConverters.initializeUserPOWithVersion(userEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(userEntity.roleIds()).orElse(Lists.newArrayList());
@@ -142,6 +153,7 @@ public class UserMetaService {
           POConverters.initializeUserRoleRelsPOWithVersion(userEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
+          () -> fenceMetalakeForUserCreate(metalakePO),
           () ->
               SessionUtils.doWithoutCommit(
                   UserMetaMapper.class,
@@ -229,10 +241,6 @@ public class UserMetaService {
 
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
-
-    if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
-      return newEntity;
-    }
 
     try {
       SessionUtils.doMultipleWithCommit(
@@ -509,5 +517,19 @@ public class UserMetaService {
   private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
     return new OptimisticLockException(
         "The user %s was modified concurrently; retry the operation", identifier);
+  }
+
+  private void fenceMetalakeForUserCreate(MetalakePO metalakePO) {
+    int fenced =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper ->
+                mapper.fenceMetalakeMeta(
+                    metalakePO.getMetalakeId(), metalakePO.getCurrentVersion()));
+    if (fenced == 0) {
+      throw new OptimisticLockException(
+          "The parent metalake %s was modified concurrently; retry the operation",
+          metalakePO.getMetalakeName());
+    }
   }
 }
