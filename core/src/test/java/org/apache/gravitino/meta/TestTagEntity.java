@@ -18,22 +18,28 @@
  */
 package org.apache.gravitino.meta;
 
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.stream.Collectors;
+import org.apache.gravitino.Namespace;
+import org.apache.gravitino.tag.TagAssignment;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 public class TestTagEntity {
 
   @Test
-  public void testTagEntityDoesNotCarryAssignmentValues() {
-    Set<String> builderMethodNames =
-        Arrays.stream(TagEntity.Builder.class.getDeclaredMethods())
-            .map(Method::getName)
-            .collect(Collectors.toSet());
+  public void testTagEntityCarriesAssignmentContextOutsideFields() {
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(1L)
+            .withName("tag")
+            .withNamespace(Namespace.of("metalake"))
+            .withComment("comment")
+            .withAuditInfo(AuditInfo.EMPTY)
+            .withAssignment(TagAssignment.ofValues("dev", "prod"))
+            .build();
 
-    Assertions.assertFalse(builderMethodNames.contains("withAssignmentValues"));
+    Assertions.assertTrue(tagEntity.assignment().isPresent());
+    Assertions.assertArrayEquals(
+        new String[] {"dev", "prod"}, tagEntity.assignment().get().values());
+    Assertions.assertFalse(tagEntity.fields().values().contains(tagEntity.assignment().get()));
   }
 }

@@ -25,6 +25,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -32,6 +33,7 @@ import org.apache.gravitino.Field;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.tag.TagValueConstraint;
 
 public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
@@ -60,6 +62,7 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   private String comment;
   private Map<String, String> properties;
   private String[] allowedValues;
+  @Nullable private TagAssignment assignment;
   private Audit auditInfo;
 
   private TagEntity() {}
@@ -119,6 +122,11 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
   }
 
   @Override
+  public Optional<TagAssignment> assignment() {
+    return Optional.ofNullable(assignment);
+  }
+
+  @Override
   public Optional<Boolean> inherited() {
     return Optional.empty();
   }
@@ -144,14 +152,37 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
         && Objects.equals(comment, that.comment)
         && Objects.equals(properties, that.properties)
         && Arrays.equals(allowedValues, that.allowedValues)
+        && Objects.equals(assignment, that.assignment)
         && Objects.equals(auditInfo, that.auditInfo);
   }
 
   @Override
   public int hashCode() {
-    int result = Objects.hash(id, name, namespace, comment, properties, auditInfo);
+    int result = Objects.hash(id, name, namespace, comment, properties, assignment, auditInfo);
     result = 31 * result + Arrays.hashCode(allowedValues);
     return result;
+  }
+
+  /**
+   * Returns a copy of this tag entity with the given assignment context.
+   *
+   * <p>The assignment context is used only when the tag is returned for a metadata object relation;
+   * it is not part of the tag definition fields.
+   *
+   * @param assignment The assignment context, or null to clear it.
+   * @return The copied tag entity with the assignment context.
+   */
+  public TagEntity copyWithAssignment(@Nullable TagAssignment assignment) {
+    return TagEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withProperties(properties)
+        .withAllowedValues(allowedValues)
+        .withAssignment(assignment)
+        .withAuditInfo(auditInfo)
+        .build();
   }
 
   public static Builder builder() {
@@ -193,6 +224,18 @@ public class TagEntity implements Tag, Entity, Auditable, HasIdentifier {
 
     public Builder withAllowedValues(String[] allowedValues) {
       tagEntity.allowedValues = allowedValues == null ? null : allowedValues.clone();
+      return this;
+    }
+
+    /**
+     * Sets the assignment context for this tag entity. This is only used when the tag is returned
+     * for a metadata object relation.
+     *
+     * @param assignment The assignment context, or null to clear it.
+     * @return The builder instance.
+     */
+    public Builder withAssignment(@Nullable TagAssignment assignment) {
+      tagEntity.assignment = assignment;
       return this;
     }
 

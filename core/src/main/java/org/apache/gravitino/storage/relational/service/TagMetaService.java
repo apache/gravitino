@@ -46,7 +46,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.AssignedTagEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
@@ -57,6 +56,7 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagAssignment;
 import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -181,7 +181,7 @@ public class TagMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listTagsForMetadataObject")
-  public List<AssignedTagEntity> listTagsForMetadataObject(
+  public List<TagEntity> listTagsForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType)
       throws NoSuchTagException, IOException {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
@@ -202,13 +202,13 @@ public class TagMetaService {
       throw e;
     }
 
-    return tagPOsToAssignedTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
+    return tagPOsToTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
   }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getTagForMetadataObject")
-  public AssignedTagEntity getTagForMetadataObject(
+  public TagEntity getTagForMetadataObject(
       NameIdentifier objectIdent, Entity.EntityType objectType, NameIdentifier tagIdent)
       throws NoSuchEntityException, IOException {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
@@ -236,7 +236,7 @@ public class TagMetaService {
           tagIdent.name());
     }
 
-    return tagPOsToAssignedTagEntities(tagPOs, NamespaceUtil.ofTag(metalake)).get(0);
+    return tagPOsToTagEntities(tagPOs, NamespaceUtil.ofTag(metalake)).get(0);
   }
 
   @Monitored(
@@ -310,7 +310,7 @@ public class TagMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "associateTagsWithMetadataObject")
-  public List<AssignedTagEntity> associateTagsWithMetadataObject(
+  public List<TagEntity> associateTagsWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
       NameIdentifier[] tagsToAdd,
@@ -327,7 +327,7 @@ public class TagMetaService {
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "associateTagValuesWithMetadataObject")
-  public List<AssignedTagEntity> associateTagValuesWithMetadataObject(
+  public List<TagEntity> associateTagValuesWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
       TagValue[] tagsToAdd,
@@ -341,7 +341,7 @@ public class TagMetaService {
         false /* failOnDuplicateValuelessAssignment */);
   }
 
-  private List<AssignedTagEntity> associateTagValuesWithMetadataObject(
+  private List<TagEntity> associateTagValuesWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
       TagValue[] tagsToAdd,
@@ -484,7 +484,7 @@ public class TagMetaService {
                   mapper.listTagPOsByMetadataObjectIdAndType(
                       metadataObjectId, metadataObject.type().toString()));
 
-      return tagPOsToAssignedTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
+      return tagPOsToTagEntities(tagPOs, NamespaceUtil.ofTag(metalake));
 
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, objectIdent.toString());
@@ -514,20 +514,18 @@ public class TagMetaService {
     return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0];
   }
 
-  private static List<AssignedTagEntity> tagPOsToAssignedTagEntities(
-      List<TagPO> tagPOs, Namespace namespace) {
+  private static List<TagEntity> tagPOsToTagEntities(List<TagPO> tagPOs, Namespace namespace) {
     Map<Long, List<TagPO>> tagPOsByTagId = new LinkedHashMap<>();
     for (TagPO tagPO : tagPOs) {
       tagPOsByTagId.computeIfAbsent(tagPO.getTagId(), ignored -> new ArrayList<>()).add(tagPO);
     }
 
     return tagPOsByTagId.values().stream()
-        .map(tagPOGroup -> tagPOsToAssignedTagEntity(tagPOGroup, namespace))
+        .map(tagPOGroup -> tagPOsToTagEntity(tagPOGroup, namespace))
         .collect(Collectors.toList());
   }
 
-  private static AssignedTagEntity tagPOsToAssignedTagEntity(
-      List<TagPO> tagPOGroup, Namespace namespace) {
+  private static TagEntity tagPOsToTagEntity(List<TagPO> tagPOGroup, Namespace namespace) {
     TagPO firstTagPO = tagPOGroup.get(0);
     List<String> assignmentValues =
         tagPOGroup.stream()
@@ -536,8 +534,11 @@ public class TagMetaService {
             .distinct()
             .collect(Collectors.toList());
 
-    TagEntity tagEntity = POConverters.fromTagPO(firstTagPO, namespace);
-    return AssignedTagEntity.of(tagEntity, assignmentValues.toArray(new String[0]));
+    TagAssignment assignment =
+        assignmentValues.isEmpty()
+            ? TagAssignment.noValue()
+            : TagAssignment.ofValues(assignmentValues.toArray(new String[0]));
+    return POConverters.fromTagPO(firstTagPO, namespace).copyWithAssignment(assignment);
   }
 
   private static TagValue[] toValuelessTagValues(NameIdentifier[] tags) {

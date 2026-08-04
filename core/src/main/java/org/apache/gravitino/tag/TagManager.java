@@ -44,7 +44,6 @@ import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
-import org.apache.gravitino.meta.AssignedTagEntity;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -257,7 +256,7 @@ public class TagManager implements TagDispatcher {
         () -> {
           try {
             checkMetalake(NameIdentifier.of(metalake), entityStore);
-            List<AssignedTagEntity> tags =
+            List<TagEntity> tags =
                 entityStore
                     .relationOperations()
                     .listEntitiesByRelation(
@@ -291,7 +290,7 @@ public class TagManager implements TagDispatcher {
             checkMetalake(NameIdentifier.of(metalake), entityStore);
             return entityStore
                 .relationOperations()
-                .<AssignedTagEntity>getEntityByRelation(
+                .<TagEntity>getEntityByRelation(
                     SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
                     entityIdent,
                     entityType,
@@ -350,7 +349,7 @@ public class TagManager implements TagDispatcher {
                 LockType.WRITE,
                 () -> {
                   try {
-                    List<AssignedTagEntity> tags =
+                    List<TagEntity> tags =
                         entityStore
                             .relationOperations()
                             .updateEntityRelations(
