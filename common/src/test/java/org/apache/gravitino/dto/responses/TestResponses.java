@@ -285,7 +285,7 @@ public class TestResponses {
   void testUserResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    UserDTO user = UserDTO.builder().withName("user1").withAudit(audit).build();
+    UserDTO user = UserDTO.builder().withId(1L).withName("user1").withAudit(audit).build();
     UserResponse response = new UserResponse(user);
     response.validate(); // No exception thrown
   }
