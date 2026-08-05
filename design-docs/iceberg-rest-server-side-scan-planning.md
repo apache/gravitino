@@ -769,24 +769,97 @@ So the comparison is: redemption cost is the price this design pays for working
 across replicas and restarts, and the reference implementation pays the opposite
 price. Neither problem is solved for free by an existing implementation.
 
-### 8.5 Manifest-scoped plan tasks, if amplification needs a real fix
+### 8.5 Manifest entry-range plan tasks, the follow-up that removes re-planning
 
 The measures in §5.15 shrink the re-planning multiplier without removing it. The
-way to remove it is to change what a plan task *is*: instead of an offset range
-into a global task list, make it name the work directly - a data manifest, or a
-manifest plus an entry range. Redeeming it would then read that one manifest and
-the snapshot's delete manifests, instead of re-planning the whole snapshot, so the
-cost per redemption would be independent of the plan's size, on any replica, with
-no shared cache. It would also make §5.6 unnecessary: with no global index there
-is nothing for a total order to stabilise.
+way to remove it is to change what a plan task *is*: instead of a range of
+positions in a global task list, have it name the work directly, as manifest
+entry ranges. Redeeming it then reads those manifest slices rather than
+re-planning the snapshot, so the cost is proportional to the batch and not to the
+plan, on any replica, with no shared cache. It also retires §5.6: manifests are
+immutable and a position inside one is fixed, so there is no global order left to
+stabilise, and the duplicate-entry hazard §5.6 describes cannot arise.
 
-It is not proposed now because Iceberg does not expose it. `ManifestGroup` and
-`DeleteFileIndex`, which do residual evaluation and delete-file attachment, are
-package-private in `iceberg-core`; building tasks from `ManifestFiles.read` alone
-would mean reimplementing that logic and risking divergence from Iceberg's own
-scan semantics. The realistic paths are an upstream API request or a carefully
-scoped port, either of which is a change of its own, and the current design is
-correct in the meantime.
+@lasdf1234 proposed a payload for this on
+[#12241](https://github.com/apache/gravitino/pull/12241#issuecomment-5178530018),
+and the batching it describes is the model below. What follows records the payload
+this design would use, the reasons it keeps three fields that proposal dropped,
+and the one piece of work that makes it more than a refactor.
+
+#### 8.5.1 Batching model
+
+A batch is a run of manifest entries, which may span manifests. With a batch size
+of 100 over manifests holding 60, 60, 60 and 70 entries:
+
+```text
+Batch 0 (100):  m0[0,60) + m1[0,40)             → inline in the plan response
+Batch 1 (100):  m1[40,60) + m2[0,60) + m3[0,20) → plan task
+Batch 2 (50):   m3[20,70)                       → plan task
+```
+
+Ranges are half-open. `ManifestFile.existingFilesCount()` and
+`addedFilesCount()` give the per-manifest counts without reading a manifest,
+though they count entries before the scan filter is applied, so a batch of 100
+entries can yield fewer than 100 tasks. Batch size becomes a bound rather than an
+exact count.
+
+#### 8.5.2 Payload
+
+```json
+{
+  "table": "db.t",
+  "snapshot-id": 42,
+  "scan": { "filter": "…", "case-sensitive": true, "select": [], "stats-fields": [] },
+  "ranges": [
+    { "manifest": "s3://wh/db/t/metadata/snap-42-m1.avro", "entry-start": 40, "entry-end": 60 },
+    { "manifest": "s3://wh/db/t/metadata/snap-42-m2.avro", "entry-start": 0, "entry-end": 60 },
+    { "manifest": "s3://wh/db/t/metadata/snap-42-m3.avro", "entry-start": 0, "entry-end": 20 }
+  ]
+}
+```
+
+`ranges` is the new part. `table`, `snapshot-id` and `scan` are carried over from
+the current payload, and each earns its place:
+
+| Field | Why the ranges alone are not enough |
+| ----- | ----------------------------------- |
+| `snapshot-id` | Delete manifests are reachable only through a snapshot (`Snapshot.deleteManifests`); a manifest path does not say which snapshot referenced it. Entries also inherit their sequence numbers from the `ManifestFile` in the snapshot's manifest list, and `ManifestFiles.read` takes that `ManifestFile`, not a path. Without it, a merge-on-read table returns tasks with no deletes attached and the client reads deleted rows. |
+| `scan` | `ManifestReader.iterator()` yields entries *after* `filterRows`, `filterPartitions` and `caseSensitive` are applied, so an entry position means one thing with the client's filter and another without it. `residual-filter`, which the engine applies per data file, comes from the same filter through `ResidualEvaluator`; with no filter the server would have to emit always-true residuals. |
+| `table` | Authorization is evaluated from the table in the request path, but manifest paths arrive in the request body. Without binding the plan task to a table and checking each manifest against that snapshot's manifest list, a caller authorized on one table could name another table's manifest and receive its data file paths and column statistics. |
+
+#### 8.5.3 What it costs
+
+Plan tasks stop being a fixed size. One batch can name several manifests, at
+roughly 100 bytes of object-store path each, and tables written by frequent small
+commits have many small manifests, so a plan task can reach kilobytes and the plan
+response carries all of them. Today a plan task is a few hundred bytes whatever
+the plan size (§5.5.1). Capping the manifests named by one plan task bounds it, at
+the price of uneven batches.
+
+#### 8.5.4 The work that is not a refactor
+
+The data side is buildable on public API: `ManifestFiles.read`,
+`ManifestReader.filterRows`/`select`/`caseSensitive`, and `ResidualEvaluator`.
+
+Delete attachment is not. `DeleteFileIndex`, which matches delete files to data
+files by partition and sequence number, is package-private in `iceberg-core`, so
+this design would have to reimplement those rules - equality deletes, positional
+deletes, deletion vectors - where a subtle mistake means returning deleted rows.
+
+A staged first cut avoids that risk while taking most of the win: use entry ranges
+when the pinned snapshot has no delete manifests, and fall back to the re-planning
+path in §5.5 when it does. Copy-on-write tables, which are the common case and the
+ones with the largest plans, get redemption proportional to the batch immediately;
+merge-on-read keeps today's behaviour until Iceberg exposes delete indexing or the
+rules are ported deliberately, with tests.
+
+#### 8.5.5 Why this need not block the current change
+
+A plan task is opaque and nothing persists it: no client stores one, and none
+outlives the scan that produced it. Its encoding can therefore change in any later
+release without a migration or a compatibility flag, which is what makes the
+offset form a reasonable thing to ship first and this a follow-up rather than a
+prerequisite.
 
 ---
 
@@ -814,7 +887,7 @@ Follow-ups, each its own issue:
 
 - [ ] Decide whether the scan plan cache should be enabled by default (§8.1)
 - [ ] Coalesce concurrent redemptions of one plan on a replica, so the concurrent fetches of one scan cost one plan (§5.15)
-- [ ] Investigate manifest-scoped plan tasks, upstream API included, to remove re-planning entirely (§8.5)
+- [ ] Implement manifest entry-range plan tasks, copy-on-write first (§8.5), and raise the delete-indexing gap with Iceberg upstream
 - [ ] Integration test with pyiceberg `scan-planning-mode=server` against a multi-batch table
 - [ ] Honor `min-rows-requested` when sizing batches (Non-Goal 2)
 - [ ] Ship a shared `ScanPlanCache` implementation so plan task redemption avoids re-planning across replicas (Non-Goal 3)
