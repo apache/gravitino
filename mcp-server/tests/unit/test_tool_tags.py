@@ -56,8 +56,11 @@ class TestIncludeToolTags(unittest.TestCase):
 
     def test_no_tags_disables_filtering(self):
         unfiltered = self._names()
-        self.assertTrue(self._names({"view"}) < unfiltered)
-        self.assertTrue(self._names({"schema"}) < unfiltered)
+        by_tag = {tag: self._names({tag}) for tag in SUPPORTED_TOOL_TAGS}
+        self.assertEqual(set().union(*by_tag.values()), unfiltered)
+        # Equality alone holds if one tag no-ops, so require each to narrow.
+        for tag, subset in by_tag.items():
+            self.assertLess(subset, unfiltered, tag)
 
     def test_single_tag_exposes_only_matching_tools(self):
         tools = self._tools({"view"})
@@ -71,8 +74,6 @@ class TestIncludeToolTags(unittest.TestCase):
         self.assertEqual(
             combined, self._names({"view"}) | self._names({"schema"})
         )
-        # Guards against a no-op filter, under which the equality above holds.
-        self.assertTrue(combined < self._names())
 
     def test_unknown_tag_exposes_no_tools(self):
         self.assertEqual(self._names({"no_such_tag"}), set())
