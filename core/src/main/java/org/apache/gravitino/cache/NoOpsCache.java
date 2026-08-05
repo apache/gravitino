@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
@@ -72,13 +71,6 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <T, E extends Exception> T withMultipleKeyCacheLock(
-      List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E {
-    return opLock.withMultipleKeyLockAndThrow(keys, action);
-  }
-
-  /** {@inheritDoc} */
-  @Override
   public <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
       NameIdentifier ident, Entity.EntityType type) {
     return Optional.empty();
@@ -98,7 +90,7 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
-  public <E extends Entity & HasIdentifier> void put(E entity) {
+  protected <E extends Entity & HasIdentifier> void doPut(E entity) {
     // do nothing
   }
 

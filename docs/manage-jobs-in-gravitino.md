@@ -14,7 +14,7 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Apache Gravitino introduces a new submodule called the job system for users to
+Apache Gravitino provides a submodule called the job system for users to
 register, run, and manage jobs. This job system integrates with the existing metadata
 management, enabling users to execute the jobs or actions based on the metadata,
 known as metadata-driven actions. For instance, this allows users to run jobs for tasks such as
@@ -28,8 +28,8 @@ existing job executors (schedulers), such as Apache Airflow, Apache Livy, to exe
 Gravitino's job system provides an extensible way to connect to different job executors.
 
 :::note
-1. The job system is a new feature introduced in Gravitino 1.0.0, and it is still under
-   development, so some features may not be fully implemented yet.
+1. The job system is still under development, so some features may not be fully
+   implemented yet.
 2. The aim of the job system is not to replace the existing job executors. So, it can only
    support running a single job at a time, and it doesn't support job scheduling for now.
    :::
@@ -614,12 +614,12 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 Configure the job system through the `gravitino.conf` file. The following are the
 default configurations:
 
-| Property name                          | Description                                                                       | Default value                 | Required | Since Version |
-|----------------------------------------|-----------------------------------------------------------------------------------|-------------------------------|----------|---------------|
-| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs                        | `/tmp/gravitino/jobs/staging` | No       | 1.0.0         |
-| `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       | 1.0.0         |
-| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       | 1.0.0         |
-| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       | 1.0.0         |
+| Property name                          | Description                                                                       | Default value                 | Required |
+|----------------------------------------|-----------------------------------------------------------------------------------|-------------------------------|----------|
+| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs                        | `/tmp/gravitino/jobs/staging` | No       |
+| `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       |
+| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
+| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
 
 
 #### Configurations for Local Job Executor
@@ -627,12 +627,12 @@ default configurations:
 The local job executor is used for testing and development purposes, it runs the job in the local process.
 The following are the default configurations for the local job executor:
 
-| Property name                                       | Description                                                                                                                                       | Default value                          | Required | Since Version |
-|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|---------------|
-| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       | 1.0.0         |
-| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       | 1.0.1         |
+| Property name                                       | Description                                                                                                                                       | Default value                          | Required |
+|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
+| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       |
+| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
+| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
+| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
 
 ### Implement a Custom Job Executor
 
@@ -661,7 +661,7 @@ These properties will be passed to the airflow job executor when it is instantia
 
 ## Future Work
 
-The job system is a new feature introduced in Gravitino 1.0.0, and it still needs more work:
+The job system still needs more work:
 
 1. Support modification of job templates.
 2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job

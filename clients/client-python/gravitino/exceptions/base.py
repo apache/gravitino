@@ -217,6 +217,10 @@ class NoSuchTableException(NotFoundException):
     """An exception thrown when a table with specified name is not existed."""
 
 
+class NoSuchViewException(NotFoundException):
+    """An exception thrown when a view with specified name is not found."""
+
+
 class NoSuchPartitionException(NotFoundException):
     """An exception thrown when a partition with specified name is not existed."""
 
@@ -227,6 +231,10 @@ class PartitionAlreadyExistsException(AlreadyExistsException):
 
 class TableAlreadyExistsException(AlreadyExistsException):
     """An exception thrown when a table already exists."""
+
+
+class ViewAlreadyExistsException(AlreadyExistsException):
+    """An exception thrown when a view already exists."""
 
 
 class NoSuchFunctionException(NotFoundException):

@@ -253,7 +253,7 @@ public class SchemaOperations {
             if (dropped) {
               LOG.info("Schema dropped: {}.{}.{}", metalake, catalog, schema);
             } else {
-              LOG.warn("Fail to drop schema {} under namespace {}", schema, ident.namespace());
+              LOG.warn("Failed to drop schema {} under namespace {}", schema, ident.namespace());
             }
 
             Response response = Utils.ok(new DropResponse(dropped));

@@ -135,7 +135,7 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
             });
     Assertions.assertEquals("Blank token found", e.getMessage());
 
-    // case 4: Fail to validate the token
+    // case 4: Failed to validate the token
     String header = AuthConstants.AUTHORIZATION_NEGOTIATE_HEADER + "xxxx";
     byte[] bytes3 = header.getBytes(StandardCharsets.UTF_8);
     e =
@@ -144,7 +144,7 @@ public class TestKerberosAuthenticator extends KerberosSecurityTestcase {
             () -> {
               kerberosAuthenticator.authenticateToken(bytes3);
             });
-    Assertions.assertEquals("Fail to validate the token", e.getMessage());
+    Assertions.assertEquals("Failed to validate the token", e.getMessage());
   }
 
   @Test

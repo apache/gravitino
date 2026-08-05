@@ -56,6 +56,7 @@ import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.catalog.ViewNormalizeDispatcher;
 import org.apache.gravitino.catalog.ViewOperationDispatcher;
 import org.apache.gravitino.credential.CredentialOperationDispatcher;
+import org.apache.gravitino.encryption.kms.KmsClientRegistry;
 import org.apache.gravitino.hook.AccessControlHookDispatcher;
 import org.apache.gravitino.hook.CatalogHookDispatcher;
 import org.apache.gravitino.hook.FilesetHookDispatcher;
@@ -97,6 +98,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
@@ -153,6 +155,10 @@ public class GravitinoEnv {
   private MetalakeDispatcher metalakeDispatcher;
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
+
+  private KmsClientRegistry kmsClientRegistry;
+
+  private SecretProviderRegistry secretProviderRegistry;
 
   private TagDispatcher tagDispatcher;
 
@@ -419,6 +425,36 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the metadata-only KMS client registry associated with the Gravitino environment.
+   *
+   * <p>The environment owns this registry. Callers may inject it into dependent components but must
+   * not close it.
+   *
+   * @return The KMS client registry instance.
+   * @throws IllegalStateException if the environment has not been initialized
+   */
+  public KmsClientRegistry kmsClientRegistry() {
+    Preconditions.checkState(
+        kmsClientRegistry != null, "GravitinoEnv components are not initialized.");
+    return kmsClientRegistry;
+  }
+
+  /**
+   * Get the secrets-provider registry associated with the Gravitino environment.
+   *
+   * <p>The environment owns this registry. Callers may inject it into dependent components but must
+   * not close it.
+   *
+   * @return The secrets-provider registry instance.
+   * @throws IllegalStateException if the environment has not been initialized
+   */
+  public SecretProviderRegistry secretProviderRegistry() {
+    Preconditions.checkState(
+        secretProviderRegistry != null, "GravitinoEnv components are not initialized.");
+    return secretProviderRegistry;
+  }
+
+  /**
    * Get the IdGenerator associated with the Gravitino environment.
    *
    * @return The IdGenerator instance.
@@ -635,10 +671,21 @@ public class GravitinoEnv {
       }
     }
 
+    if (kmsClientRegistry != null) {
+      kmsClientRegistry.close();
+    }
+
+    if (secretProviderRegistry != null) {
+      secretProviderRegistry.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
   private void initBaseComponents() {
+    this.kmsClientRegistry = new KmsClientRegistry(config);
+    this.secretProviderRegistry = new SecretProviderRegistry(config);
+
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
 
@@ -711,7 +758,8 @@ public class GravitinoEnv {
         new TableNormalizeDispatcher(internalTableOperationDispatcher, catalogManager);
     TableEventDispatcher tableEventDispatcher =
         new TableEventDispatcher(eventBus, tableNormalizeDispatcher);
-    this.tableDispatcher = new TableHookDispatcher(tableEventDispatcher);
+    this.tableDispatcher =
+        new TableHookDispatcher(tableEventDispatcher, this::ownerDispatcher, catalogManager);
 
     // TODO: We can install hooks when we need, we only supports ownership post hook,
     //  partition doesn't have ownership, so we don't need it now.

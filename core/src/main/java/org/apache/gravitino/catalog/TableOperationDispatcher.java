@@ -523,7 +523,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
       throw e;
     } catch (Exception e) {
       LOG.error(FormattedErrorMessages.STORE_OP_FAILURE, "put", identifier, e);
-      throw new RuntimeException("Fail to import the table entity to the store.", e);
+      throw new RuntimeException("Failed to import the table entity to the store", e);
     }
 
     return EntityCombinedTable.of(table.tableFromCatalog(), tableEntity)

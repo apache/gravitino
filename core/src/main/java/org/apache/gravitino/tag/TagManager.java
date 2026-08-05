@@ -69,10 +69,12 @@ public class TagManager implements TagDispatcher {
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW,
           MetadataObject.Type.FILESET,
           MetadataObject.Type.TOPIC,
           MetadataObject.Type.COLUMN,
-          MetadataObject.Type.MODEL);
+          MetadataObject.Type.MODEL,
+          MetadataObject.Type.FUNCTION);
 
   public TagManager(IdGenerator idGenerator, EntityStore entityStore) {
     this.idGenerator = idGenerator;
@@ -294,7 +296,9 @@ public class TagManager implements TagDispatcher {
                     entityType,
                     tagIdent);
           } catch (NoSuchEntityException e) {
-            if (e.getMessage().contains("No such entity")) {
+            // The store reports a missing tag and a missing metadata object with the same
+            // exception type, so the message is the only thing that tells them apart.
+            if (isMissingEntity(e, Entity.EntityType.TAG, name)) {
               throw new NoSuchTagException(
                   e, "Tag %s does not exist for metadata object %s", name, metadataObject);
             } else {
@@ -415,5 +419,19 @@ public class TagManager implements TagDispatcher {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
+  }
+
+  /**
+   * Tells a "the related entity does not exist" failure apart from a "the metadata object does not
+   * exist" one. The store signals both with {@link NoSuchEntityException}, so the message built by
+   * the relational services is the only discriminator; it is rebuilt here from the same constant
+   * and the same lowercasing behavior they use.
+   */
+  private static boolean isMissingEntity(
+      NoSuchEntityException e, Entity.EntityType type, String name) {
+    String expected =
+        String.format(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, type.name().toLowerCase(), name);
+    return expected.equals(e.getMessage());
   }
 }

@@ -28,3 +28,6 @@ COMMENT ON COLUMN group_meta.external_id IS 'external identifier from an upstrea
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_ueid_del ON user_meta (metalake_id, external_id, deleted_at);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_geid_del ON group_meta (metalake_id, external_id, deleted_at);
+
+ALTER TABLE table_column_version_info
+    ALTER COLUMN column_comment TYPE VARCHAR(4096);

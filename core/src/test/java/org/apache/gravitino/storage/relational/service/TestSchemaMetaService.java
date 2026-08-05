@@ -23,6 +23,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.List;
@@ -31,13 +35,24 @@ import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.meta.ColumnEntity;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.FunctionEntity;
+import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.ViewEntity;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -324,6 +339,106 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteSchemaCascadeRemovesTagRelations() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_with_tags",
+            AUDIT_INFO);
+    SchemaMetaService.getInstance().insertSchema(schema, false);
+
+    Namespace objectNamespace = Namespace.of(metalakeName, catalogName, schema.name());
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column_with_tag")
+            .withPosition(0)
+            .withAutoIncrement(false)
+            .withNullable(false)
+            .withDataType(Types.IntegerType.get())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_with_tag")
+            .withNamespace(objectNamespace)
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(table, false);
+    TopicEntity topic =
+        createTopicEntity(
+            RandomIdGenerator.INSTANCE.nextId(), objectNamespace, "topic_with_tag", AUDIT_INFO);
+    TopicMetaService.getInstance().insertTopic(topic, false);
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(), objectNamespace, "fileset_with_tag", AUDIT_INFO);
+    FilesetMetaService.getInstance().insertFileset(fileset, false);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            objectNamespace,
+            "model_with_tag",
+            "comment",
+            1,
+            null,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), objectNamespace, "view_with_tag");
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), objectNamespace, "function_with_tag", AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag1")
+            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService.getInstance().insertTag(tag, false);
+    associateTag(tag, schema.nameIdentifier(), schema.type());
+    associateTag(tag, table.nameIdentifier(), table.type());
+    associateTag(
+        tag,
+        NameIdentifier.of(Namespace.fromString(table.nameIdentifier().toString()), column.name()),
+        column.type());
+    associateTag(tag, topic.nameIdentifier(), topic.type());
+    associateTag(tag, fileset.nameIdentifier(), fileset.type());
+    associateTag(tag, model.nameIdentifier(), model.type());
+    associateTag(tag, view.nameIdentifier(), view.type());
+    associateTag(tag, function.nameIdentifier(), function.type());
+
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(schema.id(), "SCHEMA"));
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(table.id(), "TABLE"));
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(column.id(), "COLUMN"));
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(topic.id(), "TOPIC"));
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(fileset.id(), "FILESET"));
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(model.id(), "MODEL"));
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(view.id(), "VIEW"));
+    Assertions.assertEquals(1, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
+
+    assertTrue(SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true));
+
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(schema.id(), "SCHEMA"));
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(table.id(), "TABLE"));
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(column.id(), "COLUMN"));
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(topic.id(), "TOPIC"));
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(fileset.id(), "FILESET"));
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(model.id(), "MODEL"));
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(view.id(), "VIEW"));
+    Assertions.assertEquals(0, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
+  }
+
+  @TestTemplate
   public void testDeleteHierarchicalSchemaCascadeEscapesLikeMetacharacters() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -422,5 +537,36 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         schemaMetaService
             .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorAB))
             .id());
+  }
+
+  private void associateTag(TagEntity tag, NameIdentifier ident, Entity.EntityType type)
+      throws IOException {
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            ident,
+            type,
+            new NameIdentifier[] {NameIdentifierUtil.ofTag(metalakeName, tag.name())},
+            new NameIdentifier[0]);
+  }
+
+  private int countActiveTagRelForMetadataObject(Long metadataObjectId, String metadataObjectType) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM tag_relation_meta"
+                        + " WHERE metadata_object_id = %d AND metadata_object_type = '%s'"
+                        + " AND deleted_at = 0",
+                    metadataObjectId, metadataObjectType))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("No result for countActiveTagRelForMetadataObject");
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 }

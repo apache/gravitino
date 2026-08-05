@@ -851,4 +851,256 @@ public class CatalogClickHouseClusterIT extends BaseIT {
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Shard key validation IT tests
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Creating a distributed table with a nullable shard key column should fail with a clear error
+   * message from Gravitino, rather than an opaque ClickHouse server error.
+   */
+  @Test
+  public void testDistributedTableNullableShardKeyRejected() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_nullable");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_nullable");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a non-nullable sorting key (id) and a nullable shard column.
+    // The sorting key must be non-nullable because ClickHouse rejects nullable sorting keys
+    // by default (allow_nullable_key is disabled).
+    Column idCol = Column.of("id", Types.LongType.get(), "pk", false, false, DEFAULT_VALUE_NOT_SET);
+    Column nullableCol =
+        Column.of(
+            "shard_col", Types.IntegerType.get(), "shard", true, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {idCol, nullableCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"),
+        Indexes.EMPTY_INDEXES);
+
+    // Attempt to create a distributed table with the nullable column as shard key
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.createTable(
+                distIdent,
+                new Column[] {},
+                tableComment,
+                distProps,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                null),
+        "Distributed table with nullable shard key column should be rejected");
+  }
+
+  /**
+   * Creating a distributed table with a non-integer shard key column should fail with a clear error
+   * message from Gravitino.
+   */
+  @Test
+  public void testDistributedTableNonIntegerShardKeyRejected() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_str");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_str");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a String column
+    Column stringCol =
+        Column.of(
+            "shard_col", Types.StringType.get(), "shard", false, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {stringCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("shard_col"),
+        Indexes.EMPTY_INDEXES);
+
+    // Attempt to create a distributed table with the String column as shard key
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tableCatalog.createTable(
+                distIdent,
+                new Column[] {},
+                tableComment,
+                distProps,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                null),
+        "Distributed table with non-integer shard key column should be rejected");
+  }
+
+  /** Creating a distributed table with a valid integer shard key column should succeed. */
+  @Test
+  public void testDistributedTableIntegerShardKeyAccepted() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_int");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_int");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a non-nullable Int32 column
+    Column intCol =
+        Column.of(
+            "shard_col", Types.IntegerType.get(), "shard", false, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {intCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("shard_col"),
+        Indexes.EMPTY_INDEXES);
+
+    // Create a distributed table with the Int32 column as shard key — should succeed
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    Table distTable =
+        tableCatalog.createTable(
+            distIdent,
+            new Column[] {},
+            tableComment,
+            distProps,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            null);
+
+    Assertions.assertNotNull(distTable);
+    Assertions.assertEquals(distTbl, distTable.name());
+
+    Table loaded = tableCatalog.loadTable(distIdent);
+    Assertions.assertEquals(
+        ENGINE.DISTRIBUTED.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+  }
+
+  /**
+   * Creating a distributed table with an Int128 shard key column should succeed. Int128 is a valid
+   * ClickHouse integer type that maps to ExternalType in Gravitino's type system, but should still
+   * be recognized as an integer by the shard key validation logic.
+   */
+  @Test
+  public void testDistributedTableWideIntegerShardKeyAccepted() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_i128");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_i128");
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with Int128 column via raw SQL (Gravitino API may not support Int128
+    // directly)
+    clickHouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ON CLUSTER `%s` "
+                + "(shard_col Int128, val String) "
+                + "ENGINE = MergeTree ORDER BY shard_col",
+            schemaName, localTbl, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+
+    // Create a distributed table with the Int128 column as shard key
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "shard_col");
+
+    try {
+      Table distTable =
+          tableCatalog.createTable(
+              distIdent,
+              new Column[] {},
+              tableComment,
+              distProps,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              null);
+
+      Assertions.assertNotNull(distTable);
+      Assertions.assertEquals(distTbl, distTable.name());
+
+      Table loaded = tableCatalog.loadTable(distIdent);
+      Assertions.assertEquals(
+          ENGINE.DISTRIBUTED.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+    } finally {
+      tableCatalog.dropTable(distIdent);
+      clickHouseService.executeQuery(
+          String.format(
+              "DROP TABLE `%s`.`%s` ON CLUSTER `%s` SYNC",
+              schemaName, localTbl, ClickHouseContainer.DEFAULT_CLUSTER_NAME));
+    }
+  }
+
+  /**
+   * Creating a distributed table with a function-wrapped shard key (e.g. cityHash64(string_col))
+   * should succeed regardless of the inner column type, because the function returns a valid
+   * integer.
+   */
+  @Test
+  public void testDistributedTableFunctionShardKeyAccepted() {
+    String localTbl = GravitinoITUtils.genRandomName("ck_shard_local_func");
+    String distTbl = GravitinoITUtils.genRandomName("ck_shard_dist_func");
+    NameIdentifier localIdent = NameIdentifier.of(schemaName, localTbl);
+    NameIdentifier distIdent = NameIdentifier.of(schemaName, distTbl);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    // Create a local table with a String column
+    Column strCol =
+        Column.of("user_name", Types.StringType.get(), "user", false, false, DEFAULT_VALUE_NOT_SET);
+    Column[] cols = new Column[] {strCol};
+
+    tableCatalog.createTable(
+        localIdent,
+        cols,
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("user_name"),
+        Indexes.EMPTY_INDEXES);
+
+    // Create a distributed table with cityHash64(string_col) as shard key — should succeed
+    Map<String, String> distProps = distributedProperties(localTbl);
+    distProps.put(SHARDING_KEY, "cityHash64(user_name)");
+
+    try {
+      Table distTable =
+          tableCatalog.createTable(
+              distIdent,
+              new Column[] {},
+              tableComment,
+              distProps,
+              Transforms.EMPTY_TRANSFORM,
+              Distributions.NONE,
+              null);
+
+      Assertions.assertNotNull(distTable);
+      Assertions.assertEquals(distTbl, distTable.name());
+
+      Table loaded = tableCatalog.loadTable(distIdent);
+      Assertions.assertEquals(
+          ENGINE.DISTRIBUTED.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+    } finally {
+      tableCatalog.dropTable(distIdent);
+      tableCatalog.dropTable(localIdent);
+    }
+  }
 }

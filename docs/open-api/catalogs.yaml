@@ -61,6 +61,10 @@ paths:
             examples:
               CatalogCreate:
                 $ref: "#/components/examples/CatalogCreate"
+              CatalogCreateIcebergStorageBackend:
+                $ref: "#/components/examples/CatalogCreateIcebergStorageBackend"
+              CatalogCreateIcebergRestBackend:
+                $ref: "#/components/examples/CatalogCreateIcebergRestBackend"
 
       responses:
         "200":
@@ -93,6 +97,10 @@ paths:
             examples:
               CatalogCreate:
                 $ref: "#/components/examples/CatalogCreate"
+              CatalogCreateIcebergStorageBackend:
+                $ref: "#/components/examples/CatalogCreateIcebergStorageBackend"
+              CatalogCreateIcebergRestBackend:
+                $ref: "#/components/examples/CatalogCreateIcebergRestBackend"
       responses:
         "200":
           description: Test connection completed
@@ -577,6 +585,47 @@ components:
         "properties": {
           "metastore.uris": "thrift://127.0.0.1:9083",
           "key1": "value1"
+        }
+      }
+
+    # Iceberg with a storage backend (hive/jdbc): `warehouse` is a physical storage LOCATION.
+    CatalogCreateIcebergStorageBackend:
+      summary: "Iceberg catalog (hive/jdbc backend): warehouse is a storage location"
+      description: >-
+        For the `lakehouse-iceberg` provider with `catalog-backend` set to `hive` or `jdbc`,
+        the `warehouse` property is a physical storage location (e.g. `s3a://bucket/path` or
+        `hdfs://ns/path`) and is required.
+      value: {
+        "name": "my_iceberg_catalog",
+        "type": "relational",
+        "provider": "lakehouse-iceberg",
+        "comment": "Iceberg catalog backed by a Hive metastore",
+        "properties": {
+          "catalog-backend": "hive",
+          "uri": "thrift://127.0.0.1:9083",
+          "warehouse": "s3a://my-bucket/warehouse"
+        }
+      }
+
+    # Iceberg with the REST backend: `warehouse` is a CATALOG SELECTOR, not a storage location.
+    CatalogCreateIcebergRestBackend:
+      summary: "Iceberg catalog (REST backend): warehouse selects a catalog, or omit for the default"
+      description: >-
+        For the `lakehouse-iceberg` provider with `catalog-backend` set to `rest`, the
+        `warehouse` property is NOT a storage location. It is forwarded to the Iceberg REST
+        server (`GET /v1/config?warehouse=...`) as a catalog selector: a catalog name for
+        Gravitino's Iceberg REST server (omit it to use the default catalog), or a
+        server-defined identifier such as an Amazon S3 Tables bucket ARN. A storage URI like
+        `s3://...` here is a common mistake copied from hive/jdbc examples and will fail to
+        resolve.
+      value: {
+        "name": "my_iceberg_rest_catalog",
+        "type": "relational",
+        "provider": "lakehouse-iceberg",
+        "comment": "Iceberg catalog backed by a remote Iceberg REST server",
+        "properties": {
+          "catalog-backend": "rest",
+          "uri": "http://127.0.0.1:9001/iceberg"
         }
       }
 

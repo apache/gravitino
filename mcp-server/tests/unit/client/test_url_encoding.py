@@ -34,6 +34,9 @@ from mcp_server.client.plain.plain_rest_client_job_operation import (
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
 )
+from mcp_server.client.plain.plain_rest_client_partition_operation import (
+    PlainRESTClientPartitionOperation,
+)
 from mcp_server.client.plain.plain_rest_client_policy_operation import (
     PlainRESTClientPolicyOperation,
 )
@@ -51,6 +54,9 @@ from mcp_server.client.plain.plain_rest_client_tag_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_topic_operation import (
     PlainRESTClientTopicOperation,
+)
+from mcp_server.client.plain.plain_rest_client_view_operation import (
+    PlainRESTClientViewOperation,
 )
 
 
@@ -517,3 +523,49 @@ class TestStatisticOperationUrlEncoding(unittest.TestCase):
         self.assertNotIn("../../", url)
         self.assertIn("from", params)
         self.assertIn("to", params)
+
+
+class TestPartitionOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_partitions_encodes_table_name(self):
+        client = _make_mock_client({"names": []})
+        op = PlainRESTClientPartitionOperation(METALAKE, client)
+        asyncio.run(op.list_of_partitions("catalog", "schema", _PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_list_of_partitions_passes_details_as_query_param(self):
+        client = _make_mock_client({"partitions": []})
+        op = PlainRESTClientPartitionOperation(METALAKE, client)
+        asyncio.run(
+            op.list_of_partitions("catalog", "schema", "table", details=True)
+        )
+        self.assertTrue(_called_params(client.get)["details"])
+
+    def test_get_partition_encodes_partition_name(self):
+        client = _make_mock_client({"partition": {}})
+        op = PlainRESTClientPartitionOperation(METALAKE, client)
+        asyncio.run(
+            op.get_partition("catalog", "schema", "table", _QUERY_INJECTION)
+        )
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+
+class TestViewOperationUrlEncoding(unittest.TestCase):
+    def test_list_of_views_encodes_schema_name(self):
+        client = _make_mock_client({"identifiers": []})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.list_of_views("catalog", _PATH_TRAVERSAL))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
+
+    def test_load_view_encodes_view_name(self):
+        client = _make_mock_client({"view": {}})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.load_view("catalog", "schema", _QUERY_INJECTION))
+        url = _called_url(client.get)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)

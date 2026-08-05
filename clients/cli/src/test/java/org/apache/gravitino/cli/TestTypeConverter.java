@@ -50,6 +50,7 @@ public class TestTypeConverter {
     assertEquals(Types.UUIDType.get(), TypeConverter.convert("uuid"));
     assertEquals(Types.StringType.get(), TypeConverter.convert("string"));
     assertEquals(Types.BinaryType.get(), TypeConverter.convert("binary"));
+    assertEquals(Types.VariantType.get(), TypeConverter.convert("variant"));
   }
 
   @Test

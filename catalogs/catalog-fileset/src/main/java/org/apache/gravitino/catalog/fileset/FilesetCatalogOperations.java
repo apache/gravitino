@@ -104,7 +104,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -280,7 +279,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           Caffeine.newBuilder()
               .expireAfterAccess(1, TimeUnit.HOURS)
               .removalListener(
-                  (ignored, value, cause) -> {
+                  (key, value, cause) -> {
+                    FileSystemCacheKey cacheKey = (FileSystemCacheKey) key;
+                    LOG.debug(
+                        "Removing FileSystem from cache: scheme={}, authority={}, user={}, cause={}",
+                        cacheKey == null ? null : cacheKey.scheme,
+                        cacheKey == null ? null : cacheKey.authority,
+                        cacheKey == null ? null : cacheKey.currentUser,
+                        cause);
                     try {
                       ((FileSystem) value).close();
                     } catch (IOException e) {
@@ -986,8 +992,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
     }
-
-    ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
   }
 
   private void validateLocationHierarchy(

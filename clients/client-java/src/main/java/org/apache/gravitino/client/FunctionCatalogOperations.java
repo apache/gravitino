@@ -110,7 +110,9 @@ class FunctionCatalogOperations implements FunctionCatalog {
             Collections.emptyMap(),
             ErrorHandlers.functionErrorHandler());
     resp.validate();
-    return resp.getFunctions();
+    return Arrays.stream(resp.getFunctions())
+        .map(function -> new GenericFunction(function, restClient, fullNamespace))
+        .toArray(Function[]::new);
   }
 
   /**
@@ -134,7 +136,7 @@ class FunctionCatalogOperations implements FunctionCatalog {
             ErrorHandlers.functionErrorHandler());
     resp.validate();
 
-    return resp.getFunction();
+    return new GenericFunction(resp.getFunction(), restClient, fullNamespace);
   }
 
   /**
@@ -180,7 +182,7 @@ class FunctionCatalogOperations implements FunctionCatalog {
             ErrorHandlers.functionErrorHandler());
     resp.validate();
 
-    return resp.getFunction();
+    return new GenericFunction(resp.getFunction(), restClient, fullNamespace);
   }
 
   /**
@@ -214,7 +216,7 @@ class FunctionCatalogOperations implements FunctionCatalog {
             ErrorHandlers.functionErrorHandler());
     resp.validate();
 
-    return resp.getFunction();
+    return new GenericFunction(resp.getFunction(), restClient, fullNamespace);
   }
 
   /**
