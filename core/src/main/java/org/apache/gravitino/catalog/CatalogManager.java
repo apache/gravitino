@@ -359,7 +359,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Nullable private final CatalogChangeLogListener catalogChangeLogListener;
 
   private final IdGenerator idGenerator;
+
+  // Held for create-time secret writes; consumed by the entity-secrets create follow-up.
+  @SuppressWarnings("UnusedVariable")
   private final SecretManager secretManager;
+
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
@@ -438,15 +442,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
     catalogCache.invalidateAll();
     classLoaderPool.close();
-  }
-
-  /**
-   * Returns the secret manager used by this catalog manager.
-   *
-   * @return the secret manager
-   */
-  public SecretManager secretManager() {
-    return secretManager;
   }
 
   /**

@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForAlter;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.util.Map;
 import java.util.Set;
@@ -68,13 +69,17 @@ public abstract class OperationDispatcher {
    * @param catalogManager The CatalogManager instance to be used for catalog operations.
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   protected OperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
     this.catalogManager = catalogManager;
     this.store = store;
     this.idGenerator = idGenerator;
-    this.secretManager = catalogManager.secretManager();
+    this.secretManager = Preconditions.checkNotNull(secretManager, "secretManager cannot be null");
   }
 
   protected <R, E extends Throwable> R doWithTable(

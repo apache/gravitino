@@ -78,6 +78,8 @@ public abstract class TestOperationDispatcher {
 
   protected static CatalogManager catalogManager;
 
+  protected static SecretManager secretManager;
+
   private static Config config;
 
   @BeforeAll
@@ -98,8 +100,8 @@ public abstract class TestOperationDispatcher {
             .build();
     entityStore.put(metalakeEntity, true);
 
-    catalogManager =
-        new CatalogManager(config, entityStore, idGenerator, new SecretManager(config));
+    secretManager = new SecretManager(config);
+    catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     Config config = mock(Config.class);
