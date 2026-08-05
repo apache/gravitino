@@ -72,8 +72,8 @@ public class CatalogCreateRequest implements RESTRequest {
    * @param provider The provider of the catalog.
    * @param comment The comment for the catalog.
    * @param properties The properties for the catalog.
-   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code plaintext})
-   *     for write-through secrets.
+   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code
+   *     plaintext}) for write-through secrets.
    * @param secretReferences Optional property key → secret locator DTO ({@code provider} plus
    *     provider-specific attributes).
    */

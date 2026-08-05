@@ -66,8 +66,8 @@ public class SchemaCreateRequest implements RESTRequest {
    * @param name The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
-   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code plaintext})
-   *     for write-through secrets.
+   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code
+   *     plaintext}) for write-through secrets.
    * @param secretReferences Optional property key → secret locator DTO ({@code provider} plus
    *     provider-specific attributes).
    */
