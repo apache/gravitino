@@ -360,12 +360,45 @@ export const clickHouseMergeTreeEngines = [
   'AggregatingMergeTree',
   'CollapsingMergeTree',
   'VersionedCollapsingMergeTree',
-  'GraphiteMergeTree',
-  'ReplicatedMergeTree',
-  'ReplicatedReplacingMergeTree',
-  'ReplicatedSummingMergeTree',
-  'ReplicatedAggregatingMergeTree',
-  'ReplicatedCollapsingMergeTree',
-  'ReplicatedVersionedCollapsingMergeTree',
-  'ReplicatedGraphiteMergeTree'
+  'GraphiteMergeTree'
+]
+
+export const clickHouseLogEngines = ['TinyLog', 'StripeLog', 'Log']
+
+export const clickHouseIntegrationEngines = [
+  'ODBC',
+  'JDBC',
+  'MySQL',
+  'MongoDB',
+  'Redis',
+  'HDFS',
+  'S3',
+  'Kafka',
+  'EmbeddedRocksDB',
+  'RabbitMQ',
+  'PostgreSQL',
+  'S3Queue',
+  'TimeSeries'
+]
+
+export const clickHouseSpecialEngines = [
+  'Distributed',
+  'Dictionary',
+  'Merge',
+  'File',
+  'Null',
+  'Set',
+  'Join',
+  'URL',
+  'View',
+  'Memory',
+  'Buffer',
+  'KeeperMap'
+]
+
+export const clickHouseEngineGroups = [
+  { label: 'MergeTree Family', options: clickHouseMergeTreeEngines },
+  { label: 'Log Family', options: clickHouseLogEngines },
+  { label: 'Integration Engines', options: clickHouseIntegrationEngines },
+  { label: 'Special Engines', options: clickHouseSpecialEngines }
 ]

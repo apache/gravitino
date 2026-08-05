@@ -41,7 +41,21 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
 
 import { PlusOutlined } from '@ant-design/icons'
-import { Button, Flex, Form, Input, InputNumber, Modal, Pagination, Select, Spin, Switch, Tabs, Typography } from 'antd'
+import {
+  Button,
+  Flex,
+  Form,
+  Input,
+  InputNumber,
+  Modal,
+  Pagination,
+  Popconfirm,
+  Select,
+  Spin,
+  Switch,
+  Tabs,
+  Typography
+} from 'antd'
 import { useScrolling } from 'react-use'
 import { TreeRefContext } from '../page'
 import Icons from '@/components/Icons'
@@ -101,6 +115,9 @@ export default function CreateTableDialog({ ...props }) {
   const [bottomShadow, setBottomShadow] = useState(false)
   const [topShadow, setTopShadow] = useState(false)
   const [columnTypes, setColumnTypes] = useState([])
+  const prevEngineRef = useRef()
+  const [engineConfirmOpen, setEngineConfirmOpen] = useState(false)
+  const pendingEngineRef = useRef()
 
   const [tabOptions, setTabOptions] = useState([
     {
@@ -116,34 +133,27 @@ export default function CreateTableDialog({ ...props }) {
   const [form] = Form.useForm()
   const values = Form.useWatch([], form)
 
-  const getClickHouseEngine = () => {
-    if (provider !== 'jdbc-clickhouse') return undefined
+  const engineFromProperties = values?.properties?.find(item => item?.key?.toLowerCase?.() === 'engine')?.value
+  const engineFromTopLevel = values?.engine
+  const engineFromDefaultProps = tableDefaultProps[provider]?.find(item => item?.key === 'engine')?.defaultValue
+  const effectiveEngine = engineFromTopLevel || engineFromProperties || engineFromDefaultProps
+  const confirmedEngine = engineConfirmOpen ? prevEngineRef.current : effectiveEngine
 
-    return (
-      form.getFieldValue('engine') || form.getFieldValue('properties')?.find(item => item?.key === 'engine')?.value
-    )?.toLowerCase()
-  }
+  const allowEmptyColumns =
+    provider === 'jdbc-clickhouse' && String(confirmedEngine || '').toLowerCase() === 'distributed'
+  const requireOrderByEngines = clickHouseMergeTreeEngines.map(e => e.toLowerCase())
 
-  const isClickHouseDistributedEngine =
+  const isMergeTreeEngine =
     provider === 'jdbc-clickhouse' &&
-    (values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value)?.toLowerCase?.() ===
-      'distributed'
-
-  const clickHouseEngine =
-    provider === 'jdbc-clickhouse'
-      ? (values?.engine || values?.properties?.find(item => item?.key === 'engine')?.value)?.toLowerCase()
-      : undefined
-
-  const isClickHouseMergeTreeEngine =
-    provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.map(e => e.toLowerCase()).includes(clickHouseEngine)
-  const isColumnsRequired = !isClickHouseDistributedEngine
+    !!confirmedEngine &&
+    requireOrderByEngines.includes(String(confirmedEngine).toLowerCase())
+  const isSortOrdersRequired = isMergeTreeEngine
+  const isColumnsRequired = !allowEmptyColumns
 
   const defaultValues = {
     name: '',
     comment: '',
-    columns: isClickHouseDistributedEngine
-      ? []
-      : [{ id: '', name: '', typeObj: { type: '' }, required: false, comment: '' }],
+    columns: allowEmptyColumns ? [] : [{ id: '', name: '', typeObj: { type: '' }, required: false, comment: '' }],
     properties: []
   }
   const supportProperties = getPropInfo(provider).allowAdd
@@ -157,22 +167,34 @@ export default function CreateTableDialog({ ...props }) {
 
   const getActiveTableDefaultProps = () => {
     const props = tableDefaultProps[provider] || []
-    if (provider !== 'glue') {
-      return props
-    }
-
-    const tableFormat = values?.['table-format']?.toLowerCase()
 
     return props.filter(prop => {
-      if (!prop.hide?.length) {
-        return true
+      // If the prop has a "show" list, only show it when the parentField value matches
+      if (prop.show?.length) {
+        if (prop.parentField === 'engine') {
+          const currentEngine = form.getFieldValue('engine')
+
+          return prop.show.includes(currentEngine)
+        }
+        const parentValue = values?.[prop.parentField]?.toLowerCase()
+        if (!parentValue) {
+          return false
+        }
+
+        return prop.show.map(item => item.toLowerCase()).includes(parentValue)
       }
 
-      if (!tableFormat) {
-        return false
+      // If the prop has a "hide" list, hide it when the parentField value matches
+      if (prop.hide?.length) {
+        const parentValue = values?.[prop.parentField]?.toLowerCase()
+        if (!parentValue) {
+          return false
+        }
+
+        return !prop.hide.map(item => item.toLowerCase()).includes(parentValue)
       }
 
-      return !prop.hide.map(item => item.toLowerCase()).includes(tableFormat)
+      return true
     })
   }
 
@@ -215,14 +237,12 @@ export default function CreateTableDialog({ ...props }) {
         key: 'partitions'
       })
     }
-    if (sortOredsInfo) {
-      ;``
+    if (sortOredsInfo && isSortOrdersRequired) {
       tabs.push({
         label: (
           <span
             className={cn('font-normal text-[rgb(0,0,0,0.88)]', {
-              'before:mr-0.5 before:font-["SimSun"] before:text-[#ff4d4f] before:content-["*"]':
-                isClickHouseMergeTreeEngine
+              'before:mr-0.5 before:font-["SimSun"] before:text-[#ff4d4f] before:content-["*"]': isSortOrdersRequired
             })}
           >
             Sort Orders
@@ -254,8 +274,8 @@ export default function CreateTableDialog({ ...props }) {
     }
     setTabOptions(tabs)
   }, [
-    isColumnsRequired,
-    isClickHouseMergeTreeEngine,
+    allowEmptyColumns,
+    isSortOrdersRequired,
     provider,
     partitioningInfo,
     sortOredsInfo,
@@ -280,28 +300,27 @@ export default function CreateTableDialog({ ...props }) {
   }, [values?.distribution?.strategy, provider, values?.partitions, values?.sortOrders])
 
   useEffect(() => {
-    if (!open || editTable || isLoading) {
-      return
-    }
+    if (provider === 'jdbc-clickhouse') {
+      const sortOrdersErrors = form.getFieldError('sortOrders')
+      if (sortOrdersErrors?.length > 0) {
+        const sortOrders = form.getFieldValue('sortOrders')
+        const columns = form.getFieldValue('columns') || []
+        const hasSortOrders = Array.isArray(sortOrders) && sortOrders.length > 0
 
-    if (!isClickHouseMergeTreeEngine) {
-      if (values?.sortOrders?.length > 0) {
-        form.setFieldValue('sortOrders', [])
-      }
-      form.setFields([{ name: 'sortOrders', errors: [] }])
-    } else {
-      // Re-validate sortOrders when switching to MergeTree engine
-      const sortOrders = form.getFieldValue('sortOrders')
-      if (!sortOrders?.length) {
-        form.setFields([
-          {
-            name: 'sortOrders',
-            errors: ['Sort orders are required for MergeTree family engines']
-          }
-        ])
+        const hasNullableSortField =
+          isMergeTreeEngine &&
+          hasSortOrders &&
+          sortOrders.some(s => {
+            const col = columns.find(c => c?.name === s?.fieldName)
+
+            return col && !col.required
+          })
+        if ((isSortOrdersRequired && hasSortOrders && !hasNullableSortField) || !isSortOrdersRequired) {
+          form.setFields([{ name: 'sortOrders', errors: [] }])
+        }
       }
     }
-  }, [open, editTable, isLoading, isClickHouseMergeTreeEngine])
+  }, [confirmedEngine, provider, values?.sortOrders, values?.columns])
 
   useEffect(() => {
     values?.columns?.forEach((col, index) => {
@@ -546,6 +565,9 @@ export default function CreateTableDialog({ ...props }) {
             let idxProperty = 0
             if (table.properties && Object.keys(table.properties).length) {
               Object.entries(table.properties).forEach(([key, value]) => {
+                if (key.toLowerCase() === 'engine') {
+                  prevEngineRef.current = value
+                }
                 form.setFieldValue(['properties', idxProperty, 'key'], key)
                 form.setFieldValue(['properties', idxProperty, 'value'], value)
                 form.setFieldValue(['properties', idxProperty, 'isEdit'], true)
@@ -565,7 +587,16 @@ export default function CreateTableDialog({ ...props }) {
         if (tableDefaultProps[provider]) {
           tableDefaultProps[provider].forEach(item => {
             form.setFieldValue(item.key, item.defaultValue)
+            if (item.key === 'engine') {
+              prevEngineRef.current = item.defaultValue
+            }
           })
+        }
+        const currentColumns = form.getFieldValue('columns') || []
+        if (allowEmptyColumns) {
+          form.setFieldValue('columns', [])
+        } else if (currentColumns.length === 0) {
+          form.setFieldValue('columns', [{ id: '', name: '', typeObj: { type: '' }, required: false, comment: '' }])
         }
       }
       if (provider) {
@@ -603,16 +634,10 @@ export default function CreateTableDialog({ ...props }) {
 
     const columns = form.getFieldValue('columns') || []
 
-    if (isClickHouseDistributedEngine && columns.length === 1 && !columns[0]?.name && !columns[0]?.typeObj?.type) {
-      form.setFieldValue('columns', [])
-
-      return
-    }
-
-    if (!isClickHouseDistributedEngine && columns.length === 0) {
+    if (!allowEmptyColumns && columns.length === 0) {
       form.setFieldValue('columns', [{ id: '', name: '', typeObj: { type: '' }, required: false, comment: '' }])
     }
-  }, [open, editTable, isClickHouseDistributedEngine, form])
+  }, [open, editTable, allowEmptyColumns, form])
 
   const getColumnType = typeObj => {
     const { type } = typeObj
@@ -664,55 +689,9 @@ export default function CreateTableDialog({ ...props }) {
   const handleSubmit = e => {
     e.preventDefault()
 
-    const currentEngine = getClickHouseEngine()
-
-    const isCurrentMergeTree =
-      provider === 'jdbc-clickhouse' && clickHouseMergeTreeEngines.map(e => e.toLowerCase()).includes(currentEngine)
-
-    // For non-MergeTree ClickHouse engines, clear sortOrders errors before validating
-    if (sortOredsInfo && !isCurrentMergeTree) {
-      form.setFields([{ name: 'sortOrders', errors: [] }])
-    }
-
     form
       .validateFields()
       .then(async () => {
-        // Additional check: for MergeTree engines, sortOrders must not be empty
-        if (sortOredsInfo && isCurrentMergeTree) {
-          const sortOrders = form.getFieldValue('sortOrders')
-          if (!sortOrders?.length) {
-            form.setFields([
-              {
-                name: 'sortOrders',
-                errors: ['Sort orders are required for MergeTree family engines']
-              }
-            ])
-
-            return Promise.reject({ errorFields: [{ name: ['sortOrders'] }] })
-          }
-          const columns = form.getFieldValue('columns') || []
-
-          const nullableFields = sortOrders
-            .filter(s => {
-              if (!s?.fieldName) return false
-              const col = columns.find(c => c?.name === s.fieldName)
-
-              return col && !col?.required
-            })
-            .map(s => s.fieldName)
-          if (nullableFields.length > 0) {
-            form.setFields([
-              {
-                name: 'sortOrders',
-                errors: [
-                  `Nullable columns cannot be used in ORDER BY for MergeTree engines: ${nullableFields.join(', ')}`
-                ]
-              }
-            ])
-
-            return Promise.reject({ errorFields: [{ name: ['sortOrders'] }] })
-          }
-        }
         setConfirmLoading(true)
 
         let submitted = false
@@ -802,7 +781,7 @@ export default function CreateTableDialog({ ...props }) {
               }
             })
           }
-          if (sortOredsInfo) {
+          if (sortOredsInfo && isSortOrdersRequired) {
             submitData['sortOrders'] = values.sortOrders?.map(s => {
               const field = {
                 sortTerm: {}
@@ -1631,7 +1610,46 @@ export default function CreateTableDialog({ ...props }) {
                   </Form.Item>
                 )}
                 {sortOredsInfo && (
-                  <Form.Item className={tabKey !== 'sortOrders' ? 'hidden' : ''} label='' name='sortOrders'>
+                  <Form.Item
+                    className={tabKey !== 'sortOrders' ? 'hidden' : ''}
+                    label=''
+                    name='sortOrders'
+                    validateTrigger='onSubmit'
+                    rules={[
+                      {
+                        validator: (_, val) => {
+                          if (isSortOrdersRequired) {
+                            if (Array.isArray(val) && val.length > 0) {
+                              if (isMergeTreeEngine) {
+                                const columns = form.getFieldValue('columns') || []
+
+                                const nullableSortFields = val
+                                  ?.filter(s => {
+                                    const col = columns.find(c => c?.name === s?.fieldName)
+
+                                    return col && !col.required
+                                  })
+                                  ?.map(s => s?.fieldName)
+                                if (nullableSortFields?.length > 0) {
+                                  return Promise.reject(
+                                    new Error(
+                                      `Nullable columns cannot be used in ORDER BY for MergeTree engines: ${nullableSortFields.join(', ')}`
+                                    )
+                                  )
+                                }
+                              }
+
+                              return Promise.resolve()
+                            }
+
+                            return Promise.reject(new Error('Sort orders are required for MergeTree family engines'))
+                          }
+
+                          return Promise.resolve()
+                        }
+                      }
+                    ]}
+                  >
                     <Form.List name='sortOrders'>{(fields, subOpt) => renderTableSortOrders(fields, subOpt)}</Form.List>
                   </Form.Item>
                 )}
@@ -1789,33 +1807,107 @@ export default function CreateTableDialog({ ...props }) {
                           return (
                             <Flex gap='small' align='start' className='align-items-center mb-1' key={idx}>
                               <Input disabled value={prop.key} />
-                              <Form.Item
-                                className='mb-0 w-full grow'
-                                name={prop.key}
-                                label=''
-                                rules={
-                                  isLocationRequired
-                                    ? [
-                                        {
-                                          required: true,
-                                          message: 'Location is required when not set in catalog or schema'
+                              <div className='relative mb-0 w-full min-w-0 grow'>
+                                <Form.Item
+                                  className='mb-0'
+                                  name={prop.key}
+                                  label=''
+                                  noStyle
+                                  rules={
+                                    isLocationRequired
+                                      ? [
+                                          {
+                                            required: true,
+                                            message: 'Location is required when not set in catalog or schema'
+                                          }
+                                        ]
+                                      : []
+                                  }
+                                >
+                                  {prop.selectGroups ? (
+                                    <Select
+                                      className='flex-none'
+                                      disabled={prop.disabled}
+                                      onChange={value => {
+                                        if (prop.key === 'engine' && provider === 'jdbc-clickhouse') {
+                                          const newEngine = value.toLowerCase()
+                                          const previousEngine = (prevEngineRef.current || '').toLowerCase()
+                                          const currentSortOrders = form.getFieldValue('sortOrders')
+
+                                          const hasSortOrders =
+                                            Array.isArray(currentSortOrders) && currentSortOrders.length > 0
+                                          const fromRequireOrderBy = requireOrderByEngines.includes(previousEngine)
+                                          const toRequireOrderBy = requireOrderByEngines.includes(newEngine)
+                                          if (fromRequireOrderBy && !toRequireOrderBy && hasSortOrders) {
+                                            pendingEngineRef.current = value
+                                            setEngineConfirmOpen(true)
+                                          } else {
+                                            prevEngineRef.current = value
+                                            setEngineConfirmOpen(false)
+                                          }
                                         }
-                                      ]
-                                    : []
-                                }
-                              >
-                                {prop.select ? (
-                                  <Select className='flex-none' disabled={prop.disabled}>
-                                    {prop.select?.map(item => (
-                                      <Select.Option value={item} key={item}>
-                                        {item}
-                                      </Select.Option>
-                                    ))}
-                                  </Select>
-                                ) : (
-                                  <Input placeholder={prop.description} disabled={prop.disabled} />
+                                      }}
+                                    >
+                                      {prop.selectGroups.map(group => (
+                                        <Select.OptGroup key={group.label} label={group.label}>
+                                          {group.options.map(item => (
+                                            <Select.Option value={item} key={item}>
+                                              {item}
+                                            </Select.Option>
+                                          ))}
+                                        </Select.OptGroup>
+                                      ))}
+                                    </Select>
+                                  ) : prop.select ? (
+                                    <Select className='flex-none' disabled={prop.disabled}>
+                                      {prop.select?.map(item => (
+                                        <Select.Option value={item} key={item}>
+                                          {item}
+                                        </Select.Option>
+                                      ))}
+                                    </Select>
+                                  ) : (
+                                    <Input placeholder={prop.description} disabled={prop.disabled} />
+                                  )}
+                                </Form.Item>
+                                {prop.key === 'engine' && provider === 'jdbc-clickhouse' && (
+                                  <Popconfirm
+                                    title='Engine Switch Confirmation'
+                                    description='The selected engine does not support sort orders. Switching will remove all existing sort order configurations. Continue?'
+                                    open={engineConfirmOpen}
+                                    onOpenChange={visible => {
+                                      if (!visible) {
+                                        form.setFieldValue(['engine'], prevEngineRef.current)
+                                        pendingEngineRef.current = undefined
+                                        setEngineConfirmOpen(false)
+                                      }
+                                    }}
+                                    onConfirm={() => {
+                                      prevEngineRef.current = pendingEngineRef.current
+                                      pendingEngineRef.current = undefined
+                                      setEngineConfirmOpen(false)
+                                    }}
+                                    onCancel={() => {
+                                      form.setFieldValue(['engine'], prevEngineRef.current)
+                                      pendingEngineRef.current = undefined
+                                      setEngineConfirmOpen(false)
+                                    }}
+                                    okText='Confirm'
+                                    cancelText='Cancel'
+                                  >
+                                    <div
+                                      style={{
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: 0,
+                                        width: '100%',
+                                        height: '100%',
+                                        display: engineConfirmOpen ? 'block' : 'none'
+                                      }}
+                                    />
+                                  </Popconfirm>
                                 )}
-                              </Form.Item>
+                              </div>
                               <Icons.Minus className={'cursor-not-allowed text-gray-100 hover:text-gray-200'} />
                             </Flex>
                           )
