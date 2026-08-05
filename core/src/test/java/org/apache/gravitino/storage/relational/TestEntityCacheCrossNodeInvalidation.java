@@ -26,7 +26,6 @@ import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -96,8 +95,7 @@ public class TestEntityCacheCrossNodeInvalidation extends TestJDBCBackend {
     createParentEntities(METALAKE, CATALOG, SCHEMA, AUDIT_INFO);
     Namespace tableNamespace = Namespace.of(METALAKE, CATALOG, SCHEMA);
     SchemaEntity schema =
-        SchemaMetaService.getInstance()
-            .getSchemaByIdentifier(NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA));
+        backend.get(NameIdentifierUtil.ofSchema(METALAKE, CATALOG, SCHEMA), EntityType.SCHEMA);
     TableEntity table =
         createTableEntity(
             RandomIdGenerator.INSTANCE.nextId(), tableNamespace, "table1", AUDIT_INFO);
@@ -112,8 +110,7 @@ public class TestEntityCacheCrossNodeInvalidation extends TestJDBCBackend {
     EntityChangeLogPoller nodeBPoller = newIdlePoller(nodeBCache);
     try {
       // Node A drops the schema with cascade, emitting a single SCHEMA DROP row.
-      Assertions.assertTrue(
-          SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), true));
+      Assertions.assertTrue(backend.delete(schema.nameIdentifier(), EntityType.SCHEMA, true));
 
       nodeBPoller.pollChanges();
 

@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -42,12 +41,10 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -127,33 +124,14 @@ public class TagMetaService {
           updatedTagEntity.id(),
           oldTagEntity.id());
 
-      // Write the update and its change-log row (for cross-node cache invalidation) in the same
-      // transaction, so another node's poller never sees the ALTER without the committed change.
-      AtomicInteger updateResult = new AtomicInteger(0);
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            Integer result =
-                SessionUtils.getWithoutCommit(
-                    TagMetaMapper.class,
-                    mapper ->
-                        mapper.updateTagMeta(
-                            POConverters.updateTagPOWithVersion(tagPO, updatedTagEntity), tagPO));
-            updateResult.set(result == null ? 0 : result);
-          },
-          () -> {
-            if (updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.TAG.name(),
-                          identifier.toString(),
-                          OperateType.ALTER));
-            }
-          });
+      Integer result =
+          SessionUtils.doWithCommitAndFetchResult(
+              TagMetaMapper.class,
+              mapper ->
+                  mapper.updateTagMeta(
+                      POConverters.updateTagPOWithVersion(tagPO, updatedTagEntity), tagPO));
 
-      if (updateResult.get() == 0) {
+      if (result == null || result == 0) {
         throw new IOException("Failed to update the entity: " + identifier);
       }
 
@@ -185,21 +163,7 @@ public class TagMetaService {
                     TagMetadataObjectRelMapper.class,
                     mapper ->
                         mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
-                            metalakeName, identifier.name())),
-        () -> {
-          // Emit a DROP change-log row in the same transaction so other nodes drop their cached
-          // copy of this tag within one poll interval.
-          if (tagDeletedCount[0] > 0) {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.TAG.name(),
-                        identifier.toString(),
-                        OperateType.DROP));
-          }
-        });
+                            metalakeName, identifier.name())));
 
     return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] > 0;
   }

@@ -37,7 +37,6 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -66,7 +65,6 @@ import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -177,9 +175,6 @@ public class MetalakeMetaService {
     MetalakePO newMetalakePO =
         POConverters.updateMetalakePOWithVersion(oldMetalakePO, newMetalakeEntity);
 
-    String oldFullName = oldMetalakeEntity.name();
-    boolean isRenamed = !Objects.equals(oldMetalakeEntity.name(), newMetalakeEntity.name());
-
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
@@ -187,19 +182,7 @@ public class MetalakeMetaService {
               updateResult.set(
                   SessionUtils.getWithoutCommit(
                       MetalakeMetaMapper.class,
-                      mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO))),
-          () -> {
-            if (isRenamed && updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          oldMetalakeEntity.name(),
-                          Entity.EntityType.METALAKE.name(),
-                          oldFullName,
-                          OperateType.ALTER));
-            }
-          });
+                      mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO))));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, newMetalakeEntity.nameIdentifier().toString());
@@ -333,17 +316,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     ViewMetaMapper.class,
-                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)),
-            () -> {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          ident.name(),
-                          Entity.EntityType.METALAKE.name(),
-                          ident.name(),
-                          OperateType.DROP));
-            });
+                    mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)));
       } else {
         List<CatalogEntity> catalogEntities =
             CatalogMetaService.getInstance()
@@ -404,17 +377,7 @@ public class MetalakeMetaService {
             () ->
                 SessionUtils.doWithoutCommit(
                     JobMetaMapper.class,
-                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)),
-            () -> {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          ident.name(),
-                          Entity.EntityType.METALAKE.name(),
-                          ident.name(),
-                          OperateType.DROP));
-            });
+                    mapper -> mapper.softDeleteJobMetasByMetalakeId(metalakeId)));
       }
     }
     return true;

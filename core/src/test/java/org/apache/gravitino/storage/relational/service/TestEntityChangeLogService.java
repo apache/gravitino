@@ -75,20 +75,20 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
       Entity.EntityType entityType,
       String fullName,
       OperateType operateType) {
-    Assertions.assertTrue(
-        listEntityChanges(lastConsumedId).stream()
-            .anyMatch(
-                record ->
-                    record.getMetalakeName().equals(metalakeName)
-                        && record.getEntityType().equals(entityType.name())
-                        && record.getFullName().equals(fullName)
-                        && record.getOperateType() == operateType),
-        String.format("Missing %s %s changelog for %s", entityType, operateType, fullName));
+    List<EntityChangeRecord> entityChanges = listEntityChanges(lastConsumedId);
+    Assertions.assertEquals(1, entityChanges.size());
+    EntityChangeRecord entityChange = entityChanges.get(0);
+    Assertions.assertEquals(metalakeName, entityChange.getMetalakeName());
+    Assertions.assertEquals(entityType.name(), entityChange.getEntityType());
+    Assertions.assertEquals(fullName, entityChange.getFullName());
+    Assertions.assertEquals(operateType, entityChange.getOperateType());
   }
 
   @TestTemplate
   void testMetalakeChangeLogOnRenameAndDrop() throws IOException {
+    long maxIdBeforeCreate = maxEntityChangeId();
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    Assertions.assertEquals(maxIdBeforeCreate, maxEntityChangeId());
 
     long maxIdBeforeRename = maxEntityChangeId();
     BaseMetalake renamedMetalake =
@@ -107,7 +107,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
     long maxIdBeforeDrop = maxEntityChangeId();
     Assertions.assertTrue(
-        MetalakeMetaService.getInstance().deleteMetalake(renamedMetalake.nameIdentifier(), false));
+        backend.delete(renamedMetalake.nameIdentifier(), Entity.EntityType.METALAKE, false));
     assertEntityChange(
         maxIdBeforeDrop,
         renamedMetalake.name(),
@@ -120,7 +120,9 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   void testCatalogAndSchemaChangeLogOnRenameAndDrop() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
 
+    long maxIdBeforeCatalogCreate = maxEntityChangeId();
     CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    Assertions.assertEquals(maxIdBeforeCatalogCreate, maxEntityChangeId());
     long maxIdBeforeCatalogAlter = maxEntityChangeId();
     CatalogEntity alteredCatalog =
         backend.update(
@@ -164,7 +166,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
     long maxIdBeforeCatalogDrop = maxEntityChangeId();
     Assertions.assertTrue(
-        CatalogMetaService.getInstance().deleteCatalog(renamedCatalog.nameIdentifier(), false));
+        backend.delete(renamedCatalog.nameIdentifier(), Entity.EntityType.CATALOG, false));
     assertEntityChange(
         maxIdBeforeCatalogDrop,
         METALAKE_NAME,
@@ -173,7 +175,9 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         OperateType.DROP);
 
     CatalogEntity schemaCatalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME + "_schema");
+    long maxIdBeforeSchemaCreate = maxEntityChangeId();
     SchemaEntity schema = createAndInsertSchema(METALAKE_NAME, schemaCatalog.name(), SCHEMA_NAME);
+    Assertions.assertEquals(maxIdBeforeSchemaCreate, maxEntityChangeId());
     long maxIdBeforeSchemaRename = maxEntityChangeId();
     SchemaEntity renamedSchema =
         backend.update(
@@ -191,7 +195,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
     long maxIdBeforeSchemaDrop = maxEntityChangeId();
     Assertions.assertTrue(
-        SchemaMetaService.getInstance().deleteSchema(renamedSchema.nameIdentifier(), false));
+        backend.delete(renamedSchema.nameIdentifier(), Entity.EntityType.SCHEMA, false));
     assertEntityChange(
         maxIdBeforeSchemaDrop,
         METALAKE_NAME,
@@ -202,20 +206,46 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testEntityAndChangeLogRollbackTogether() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    long maxIdBeforeUpdate = maxEntityChangeId();
+
+    SessionUtils.beginTransaction();
+    try {
+      backend.update(
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          entity ->
+              createCatalog(
+                  catalog.id(), catalog.namespace(), CATALOG_NAME + "_rolled_back", AUDIT_INFO));
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+
+    CatalogEntity persistedCatalog =
+        backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertEquals(CATALOG_NAME, persistedCatalog.name());
+    Assertions.assertEquals(maxIdBeforeUpdate, maxEntityChangeId());
+  }
+
+  @TestTemplate
   void testLeafEntityChangeLogOnRenameAndDrop() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Namespace namespace = Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
 
     TableEntity table =
         createTableEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "table1", AUDIT_INFO);
+    long maxIdBeforeTableCreate = maxEntityChangeId();
     backend.insert(table, false);
+    Assertions.assertEquals(maxIdBeforeTableCreate, maxEntityChangeId());
     long maxIdBeforeTableRename = maxEntityChangeId();
     TableEntity renamedTable =
-        TableMetaService.getInstance()
-            .updateTable(
-                table.nameIdentifier(),
-                entity ->
-                    createTableEntity(table.id(), table.namespace(), "table2", table.auditInfo()));
+        backend.update(
+            table.nameIdentifier(),
+            Entity.EntityType.TABLE,
+            entity ->
+                createTableEntity(table.id(), table.namespace(), "table2", table.auditInfo()));
     assertEntityChange(
         maxIdBeforeTableRename,
         METALAKE_NAME,
@@ -225,7 +255,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
     long maxIdBeforeTableDrop = maxEntityChangeId();
     Assertions.assertTrue(
-        TableMetaService.getInstance().deleteTable(renamedTable.nameIdentifier()));
+        backend.delete(renamedTable.nameIdentifier(), Entity.EntityType.TABLE, false));
     assertEntityChange(
         maxIdBeforeTableDrop,
         METALAKE_NAME,
@@ -239,7 +269,9 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             NamespaceUtil.ofTopic(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "topic1",
             AUDIT_INFO);
+    long maxIdBeforeTopicCreate = maxEntityChangeId();
     backend.insert(topic, false);
+    Assertions.assertEquals(maxIdBeforeTopicCreate, maxEntityChangeId());
     long maxIdBeforeTopicRename = maxEntityChangeId();
     TopicEntity renamedTopic =
         backend.update(
@@ -255,7 +287,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
     long maxIdBeforeTopicDrop = maxEntityChangeId();
     Assertions.assertTrue(
-        TopicMetaService.getInstance().deleteTopic(renamedTopic.nameIdentifier()));
+        backend.delete(renamedTopic.nameIdentifier(), Entity.EntityType.TOPIC, false));
     assertEntityChange(
         maxIdBeforeTopicDrop,
         METALAKE_NAME,
@@ -268,21 +300,23 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             RandomIdGenerator.INSTANCE.nextId(),
             NamespaceUtil.ofView(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "view1");
-    ViewMetaService.getInstance().insertView(view, false);
+    long maxIdBeforeViewCreate = maxEntityChangeId();
+    backend.insert(view, false);
+    Assertions.assertEquals(maxIdBeforeViewCreate, maxEntityChangeId());
     long maxIdBeforeViewRename = maxEntityChangeId();
     ViewEntity renamedView =
-        ViewMetaService.getInstance()
-            .updateView(
-                view.nameIdentifier(),
-                entity ->
-                    ViewEntity.builder()
-                        .withId(view.id())
-                        .withName("view2")
-                        .withNamespace(view.namespace())
-                        .withColumns(view.columns())
-                        .withRepresentations(view.representations())
-                        .withAuditInfo(view.auditInfo())
-                        .build());
+        backend.update(
+            view.nameIdentifier(),
+            Entity.EntityType.VIEW,
+            entity ->
+                ViewEntity.builder()
+                    .withId(view.id())
+                    .withName("view2")
+                    .withNamespace(view.namespace())
+                    .withColumns(view.columns())
+                    .withRepresentations(view.representations())
+                    .withAuditInfo(view.auditInfo())
+                    .build());
     assertEntityChange(
         maxIdBeforeViewRename,
         METALAKE_NAME,
@@ -291,7 +325,8 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         OperateType.ALTER);
 
     long maxIdBeforeViewDrop = maxEntityChangeId();
-    Assertions.assertTrue(ViewMetaService.getInstance().deleteView(renamedView.nameIdentifier()));
+    Assertions.assertTrue(
+        backend.delete(renamedView.nameIdentifier(), Entity.EntityType.VIEW, false));
     assertEntityChange(
         maxIdBeforeViewDrop,
         METALAKE_NAME,
@@ -305,14 +340,16 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             NamespaceUtil.ofFileset(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
             "fileset1",
             AUDIT_INFO);
-    FilesetMetaService.getInstance().insertFileset(fileset, false);
+    long maxIdBeforeFilesetCreate = maxEntityChangeId();
+    backend.insert(fileset, false);
+    Assertions.assertEquals(maxIdBeforeFilesetCreate, maxEntityChangeId());
     long maxIdBeforeFilesetRename = maxEntityChangeId();
     FilesetEntity renamedFileset =
-        FilesetMetaService.getInstance()
-            .updateFileset(
-                fileset.nameIdentifier(),
-                entity ->
-                    createFilesetEntity(fileset.id(), fileset.namespace(), "fileset2", AUDIT_INFO));
+        backend.update(
+            fileset.nameIdentifier(),
+            Entity.EntityType.FILESET,
+            entity ->
+                createFilesetEntity(fileset.id(), fileset.namespace(), "fileset2", AUDIT_INFO));
     assertEntityChange(
         maxIdBeforeFilesetRename,
         METALAKE_NAME,
@@ -323,7 +360,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
 
     long maxIdBeforeFilesetDrop = maxEntityChangeId();
     Assertions.assertTrue(
-        FilesetMetaService.getInstance().deleteFileset(renamedFileset.nameIdentifier()));
+        backend.delete(renamedFileset.nameIdentifier(), Entity.EntityType.FILESET, false));
     assertEntityChange(
         maxIdBeforeFilesetDrop,
         METALAKE_NAME,
@@ -377,21 +414,23 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   @TestTemplate
   void testTagChangeLogOnAlterAndDrop() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
+    long maxIdBeforeCreate = maxEntityChangeId();
     TagEntity tag = createAndInsertTagEntity("tag1", "tag comment", METALAKE_NAME);
+    Assertions.assertEquals(maxIdBeforeCreate, maxEntityChangeId());
 
     long maxIdBeforeTagAlter = maxEntityChangeId();
-    TagMetaService.getInstance()
-        .updateTag(
-            tag.nameIdentifier(),
-            entity ->
-                TagEntity.builder()
-                    .withId(tag.id())
-                    .withName(tag.name())
-                    .withNamespace(tag.namespace())
-                    .withComment("tag comment updated")
-                    .withProperties(ImmutableMap.of())
-                    .withAuditInfo(AUDIT_INFO)
-                    .build());
+    backend.update(
+        tag.nameIdentifier(),
+        Entity.EntityType.TAG,
+        entity ->
+            TagEntity.builder()
+                .withId(tag.id())
+                .withName(tag.name())
+                .withNamespace(tag.namespace())
+                .withComment("tag comment updated")
+                .withProperties(ImmutableMap.of())
+                .withAuditInfo(AUDIT_INFO)
+                .build());
     assertEntityChange(
         maxIdBeforeTagAlter,
         METALAKE_NAME,
@@ -400,7 +439,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         OperateType.ALTER);
 
     long maxIdBeforeTagDrop = maxEntityChangeId();
-    Assertions.assertTrue(TagMetaService.getInstance().deleteTag(tag.nameIdentifier()));
+    Assertions.assertTrue(backend.delete(tag.nameIdentifier(), Entity.EntityType.TAG, false));
     assertEntityChange(
         maxIdBeforeTagDrop,
         METALAKE_NAME,
@@ -415,24 +454,26 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     PolicyContent content =
         PolicyContents.custom(
             ImmutableMap.of("field1", 1), ImmutableSet.of(MetadataObject.Type.TABLE), null);
+    long maxIdBeforeCreate = maxEntityChangeId();
     PolicyEntity policy =
         createAndInsertPolicyEntity("policy1", "policy comment", content, METALAKE_NAME);
+    Assertions.assertEquals(maxIdBeforeCreate, maxEntityChangeId());
 
     long maxIdBeforePolicyAlter = maxEntityChangeId();
-    PolicyMetaService.getInstance()
-        .updatePolicy(
-            policy.nameIdentifier(),
-            entity ->
-                PolicyEntity.builder()
-                    .withId(policy.id())
-                    .withName(policy.name())
-                    .withNamespace(policy.namespace())
-                    .withPolicyType(Policy.BuiltInType.CUSTOM)
-                    .withComment("policy comment updated")
-                    .withEnabled(true)
-                    .withContent(content)
-                    .withAuditInfo(AUDIT_INFO)
-                    .build());
+    backend.update(
+        policy.nameIdentifier(),
+        Entity.EntityType.POLICY,
+        entity ->
+            PolicyEntity.builder()
+                .withId(policy.id())
+                .withName(policy.name())
+                .withNamespace(policy.namespace())
+                .withPolicyType(Policy.BuiltInType.CUSTOM)
+                .withComment("policy comment updated")
+                .withEnabled(true)
+                .withContent(content)
+                .withAuditInfo(AUDIT_INFO)
+                .build());
     assertEntityChange(
         maxIdBeforePolicyAlter,
         METALAKE_NAME,
@@ -441,7 +482,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         OperateType.ALTER);
 
     long maxIdBeforePolicyDrop = maxEntityChangeId();
-    Assertions.assertTrue(PolicyMetaService.getInstance().deletePolicy(policy.nameIdentifier()));
+    Assertions.assertTrue(backend.delete(policy.nameIdentifier(), Entity.EntityType.POLICY, false));
     assertEntityChange(
         maxIdBeforePolicyDrop,
         METALAKE_NAME,
@@ -465,7 +506,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     // A plain insert (create) must not emit a change-log row: list bypasses the cache and there is
     // no negative caching.
     long maxIdBeforeCreate = maxEntityChangeId();
-    JobMetaService.getInstance().insertJob(job, false);
+    backend.insert(job, false);
     Assertions.assertEquals(maxIdBeforeCreate, maxEntityChangeId());
 
     // An overwrite is an in-place status update, so it emits an ALTER row.
@@ -479,7 +520,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             .withStatus(JobHandle.Status.STARTED)
             .withAuditInfo(AUDIT_INFO)
             .build();
-    JobMetaService.getInstance().insertJob(runningJob, true);
+    backend.insert(runningJob, true);
     assertEntityChange(
         maxIdBeforeOverwrite,
         METALAKE_NAME,
@@ -488,7 +529,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         OperateType.ALTER);
 
     long maxIdBeforeJobDrop = maxEntityChangeId();
-    Assertions.assertTrue(JobMetaService.getInstance().deleteJob(job.nameIdentifier()));
+    Assertions.assertTrue(backend.delete(job.nameIdentifier(), Entity.EntityType.JOB, false));
     assertEntityChange(
         maxIdBeforeJobDrop,
         METALAKE_NAME,

@@ -23,7 +23,6 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -33,10 +32,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.po.JobPO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -114,30 +111,13 @@ public class JobMetaService {
       JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(metalakeId);
       JobPO jobPO = JobPO.initializeJobPO(jobEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  JobMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertJobMetaOnDuplicateKeyUpdate(jobPO);
-                    } else {
-                      mapper.insertJobMeta(jobPO);
-                    }
-                  }),
-          () -> {
-            // An overwrite is an in-place status update of an existing job, so emit an ALTER row in
-            // the same transaction to invalidate other nodes' cached copies. A plain insert
-            // (create) needs no row: list bypasses the cache and there is no negative caching.
+      SessionUtils.doWithCommit(
+          JobMetaMapper.class,
+          mapper -> {
             if (overwrite) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.JOB.name(),
-                          jobEntity.nameIdentifier().toString(),
-                          OperateType.ALTER));
+              mapper.insertJobMetaOnDuplicateKeyUpdate(jobPO);
+            } else {
+              mapper.insertJobMeta(jobPO);
             }
           });
     } catch (RuntimeException e) {
@@ -147,31 +127,11 @@ public class JobMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteJob")
   public boolean deleteJob(NameIdentifier jobIdent) {
-    String metalakeName = jobIdent.namespace().level(0);
     long jobRunIdLong = parseJobRunId(jobIdent.name());
-    AtomicInteger deleteResult = new AtomicInteger(0);
-    SessionUtils.doMultipleWithCommit(
-        () -> {
-          Integer result =
-              SessionUtils.getWithoutCommit(
-                  JobMetaMapper.class, mapper -> mapper.softDeleteJobMetaByRunId(jobRunIdLong));
-          deleteResult.set(result == null ? 0 : result);
-        },
-        () -> {
-          // Emit a DROP change-log row in the same transaction so other nodes drop their cached
-          // copy of this job within one poll interval.
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.JOB.name(),
-                        jobIdent.toString(),
-                        OperateType.DROP));
-          }
-        });
-    return deleteResult.get() > 0;
+    int result =
+        SessionUtils.doWithCommitAndFetchResult(
+            JobMetaMapper.class, mapper -> mapper.softDeleteJobMetaByRunId(jobRunIdLong));
+    return result > 0;
   }
 
   @Monitored(
