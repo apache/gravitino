@@ -47,6 +47,12 @@ public interface MetalakeMetaMapper {
   @SelectProvider(type = MetalakeMetaSQLProviderFactory.class, method = "selectMetalakeMetaById")
   MetalakePO selectMetalakeMetaById(@Param("metalakeId") Long metalakeId);
 
+  /** Selects and locks an active metalake by ID for the current transaction. */
+  @SelectProvider(
+      type = MetalakeMetaSQLProviderFactory.class,
+      method = "selectMetalakeMetaByIdForUpdate")
+  MetalakePO selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "listMetalakePOsByMetalakeIds")
@@ -69,15 +75,6 @@ public interface MetalakeMetaMapper {
   Integer updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
-
-  /**
-   * Advances the metalake version when the expected OCC version still matches.
-   *
-   * @return the number of updated rows
-   */
-  @UpdateProvider(type = MetalakeMetaSQLProviderFactory.class, method = "fenceMetalakeMeta")
-  Integer fenceMetalakeMeta(
-      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = MetalakeMetaSQLProviderFactory.class,

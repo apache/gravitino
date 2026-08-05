@@ -140,22 +140,6 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteSchemaMetasByMetalakeId(Long metalakeId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
-  @Override
-  public String softDeleteSchemaMetasByCatalogId(Long catalogId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
-  }
-
-  @Override
   public String deleteSchemaMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

@@ -65,6 +65,11 @@ public class MetalakeMetaSQLProviderFactory {
     return getProvider().selectMetalakeMetaById(metalakeId);
   }
 
+  /** Returns SQL that selects and locks an active metalake by ID. */
+  public static String selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return getProvider().selectMetalakeMetaByIdForUpdate(metalakeId);
+  }
+
   public static String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
     return getProvider().selectMetalakeIdMetaByName(metalakeName);
   }
@@ -86,12 +91,6 @@ public class MetalakeMetaSQLProviderFactory {
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO) {
     return getProvider().updateMetalakeMeta(newMetalakePO, oldMetalakePO);
-  }
-
-  /** Returns SQL that advances a metalake OCC version conditionally. */
-  public static String fenceMetalakeMeta(
-      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().fenceMetalakeMeta(metalakeId, currentVersion);
   }
 
   public static String softDeleteMetalakeMetaByMetalakeId(

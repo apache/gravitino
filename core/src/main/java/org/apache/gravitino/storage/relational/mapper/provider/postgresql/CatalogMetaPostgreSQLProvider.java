@@ -50,14 +50,6 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteCatalogMetasByMetalakeId(Long metalakeId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
-  @Override
   public String deleteCatalogMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

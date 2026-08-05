@@ -67,6 +67,7 @@ import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -235,11 +236,8 @@ public class MetalakeMetaService {
             () -> {
               deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
               deleteCatalogsWithVersions(ident, metalakeId);
+              deleteSchemasWithVersions(ident, listSchemaPOsForCascade(metalakeId));
             },
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     TableMetaMapper.class,
@@ -439,7 +437,8 @@ public class MetalakeMetaService {
   private void deleteCatalogsWithVersions(NameIdentifier metalakeIdentifier, Long metalakeId) {
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class, mapper -> mapper.listCatalogPOsByMetalakeId(metalakeId));
+            CatalogMetaMapper.class,
+            mapper -> mapper.listCatalogPOsByMetalakeIdForUpdate(metalakeId));
     if (catalogPOs.isEmpty()) {
       return;
     }
@@ -450,6 +449,26 @@ public class MetalakeMetaService {
     if (deleted != catalogPOs.size()) {
       throw new OptimisticLockException(
           "A catalog under metalake %s was modified concurrently; retry the operation",
+          metalakeIdentifier);
+    }
+  }
+
+  List<SchemaPO> listSchemaPOsForCascade(Long metalakeId) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByMetalakeId(metalakeId));
+  }
+
+  private void deleteSchemasWithVersions(
+      NameIdentifier metalakeIdentifier, List<SchemaPO> schemaPOs) {
+    if (schemaPOs.isEmpty()) {
+      return;
+    }
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
+    if (deleted != schemaPOs.size()) {
+      throw new OptimisticLockException(
+          "A schema under metalake %s was modified concurrently; retry the operation",
           metalakeIdentifier);
     }
   }

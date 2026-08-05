@@ -196,7 +196,7 @@ public class CatalogMetaService {
       }
 
       SessionUtils.doMultipleWithCommit(
-          () -> fenceMetalakeForCatalogCreate(metalakePO),
+          () -> lockMetalakeForCatalogCreate(metalakePO),
           () ->
               SessionUtils.doWithoutCommit(
                   CatalogMetaMapper.class,
@@ -437,17 +437,17 @@ public class CatalogMetaService {
     }
   }
 
-  private void fenceMetalakeForCatalogCreate(MetalakePO metalakePO) {
-    int fenced =
+  private void lockMetalakeForCatalogCreate(MetalakePO observedMetalakePO) {
+    MetalakePO currentMetalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class,
-            mapper ->
-                mapper.fenceMetalakeMeta(
-                    metalakePO.getMetalakeId(), metalakePO.getCurrentVersion()));
-    if (fenced == 0) {
+            mapper -> mapper.selectMetalakeMetaByIdForUpdate(observedMetalakePO.getMetalakeId()));
+    if (currentMetalakePO == null
+        || !Objects.equals(
+            currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
       throw new OptimisticLockException(
           "The parent metalake %s was modified concurrently; retry the operation",
-          metalakePO.getMetalakeName());
+          observedMetalakePO.getMetalakeName());
     }
   }
 

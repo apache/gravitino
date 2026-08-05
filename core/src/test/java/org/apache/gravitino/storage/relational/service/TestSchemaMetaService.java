@@ -28,9 +28,16 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -90,7 +97,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testInsertSchemaFencesCatalogAndRollsBackFenceOnFailure() throws IOException {
+  public void testInsertSchemaLocksCatalogWithoutChangingVersion() throws IOException {
     createAndInsertMakeLake(metalakeName);
     CatalogEntity catalog = createAndInsertCatalog(metalakeName, catalogName);
     CatalogPO beforeInsert =
@@ -107,8 +114,8 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     CatalogPO afterInsert =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
-    Assertions.assertEquals(beforeInsert.getCurrentVersion() + 1, afterInsert.getCurrentVersion());
-    Assertions.assertEquals(afterInsert.getCurrentVersion(), afterInsert.getLastVersion());
+    Assertions.assertEquals(beforeInsert.getCurrentVersion(), afterInsert.getCurrentVersion());
+    Assertions.assertEquals(beforeInsert.getLastVersion(), afterInsert.getLastVersion());
 
     SchemaEntity duplicate =
         createSchemaEntity(
@@ -123,6 +130,54 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
     Assertions.assertEquals(afterInsert.getCurrentVersion(), afterFailure.getCurrentVersion());
     Assertions.assertEquals(afterInsert.getLastVersion(), afterFailure.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testConcurrentSameNameSchemaCreateReportsAlreadyExists() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity first =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "concurrent_schema",
+            AUDIT_INFO);
+    SchemaEntity second =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            first.name(),
+            AUDIT_INFO);
+
+    List<Throwable> results = insertSchemasConcurrently(first, second);
+    Assertions.assertEquals(1, results.stream().filter(Objects::isNull).count());
+    Throwable failure = results.stream().filter(Objects::nonNull).findFirst().orElseThrow();
+    Assertions.assertTrue(
+        failure instanceof EntityAlreadyExistsException,
+        () -> "Expected EntityAlreadyExistsException, but got " + failure);
+  }
+
+  @TestTemplate
+  public void testConcurrentDifferentSchemaCreatesBothSucceed() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity first =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "concurrent_schema_1",
+            AUDIT_INFO);
+    SchemaEntity second =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "concurrent_schema_2",
+            AUDIT_INFO);
+
+    List<Throwable> results = insertSchemasConcurrently(first, second);
+    Assertions.assertTrue(
+        results.stream().allMatch(Objects::isNull),
+        () -> "Concurrent schema creates failed: " + results);
   }
 
   @TestTemplate
@@ -700,6 +755,46 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         ancestorAPOBefore.getCurrentVersion() + 1, ancestorAPOAfter.getCurrentVersion());
     Assertions.assertEquals(
         ancestorABPOBefore.getCurrentVersion() + 1, ancestorABPOAfter.getCurrentVersion());
+  }
+
+  private List<Throwable> insertSchemasConcurrently(SchemaEntity first, SchemaEntity second)
+      throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      Future<Throwable> firstResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  SchemaMetaService.getInstance().insertSchema(first, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Future<Throwable> secondResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  SchemaMetaService.getInstance().insertSchema(second, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(ready.await(30, TimeUnit.SECONDS));
+      start.countDown();
+      return Arrays.asList(
+          firstResult.get(30, TimeUnit.SECONDS), secondResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
   }
 
   private SchemaEntity copySchemaWithComment(SchemaEntity schema, String comment) {

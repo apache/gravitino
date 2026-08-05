@@ -29,7 +29,14 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -95,7 +102,7 @@ public class TestCatalogMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testInsertCatalogFencesMetalakeAndRollsBackFenceOnFailure() throws IOException {
+  public void testInsertCatalogLocksMetalakeWithoutChangingVersion() throws IOException {
     MetalakePO beforeInsert =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
@@ -110,8 +117,8 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     MetalakePO afterInsert =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
-    assertEquals(beforeInsert.getCurrentVersion() + 1, afterInsert.getCurrentVersion());
-    assertEquals(afterInsert.getCurrentVersion(), afterInsert.getLastVersion());
+    assertEquals(beforeInsert.getCurrentVersion(), afterInsert.getCurrentVersion());
+    assertEquals(beforeInsert.getLastVersion(), afterInsert.getLastVersion());
 
     CatalogEntity duplicate =
         createCatalog(
@@ -126,6 +133,50 @@ public class TestCatalogMetaService extends TestJDBCBackend {
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
     assertEquals(afterInsert.getCurrentVersion(), afterFailure.getCurrentVersion());
     assertEquals(afterInsert.getLastVersion(), afterFailure.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testConcurrentSameNameCatalogCreateReportsAlreadyExists() throws Exception {
+    CatalogEntity first =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "concurrent_catalog",
+            auditInfo);
+    CatalogEntity second =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            first.name(),
+            auditInfo);
+
+    List<Throwable> results = insertCatalogsConcurrently(first, second);
+    assertEquals(1, results.stream().filter(Objects::isNull).count());
+    Throwable failure = results.stream().filter(Objects::nonNull).findFirst().orElseThrow();
+    Assertions.assertTrue(
+        failure instanceof EntityAlreadyExistsException,
+        () -> "Expected EntityAlreadyExistsException, but got " + failure);
+  }
+
+  @TestTemplate
+  public void testConcurrentDifferentCatalogCreatesBothSucceed() throws Exception {
+    CatalogEntity first =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "concurrent_catalog_1",
+            auditInfo);
+    CatalogEntity second =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "concurrent_catalog_2",
+            auditInfo);
+
+    List<Throwable> results = insertCatalogsConcurrently(first, second);
+    Assertions.assertTrue(
+        results.stream().allMatch(Objects::isNull),
+        () -> "Concurrent catalog creates failed: " + results);
   }
 
   @TestTemplate
@@ -456,6 +507,46 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     assertEquals(0, countActiveTagRelForMetadataObject(model.id(), "MODEL"));
     assertEquals(0, countActiveTagRelForMetadataObject(view.id(), "VIEW"));
     assertEquals(0, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
+  }
+
+  private List<Throwable> insertCatalogsConcurrently(CatalogEntity first, CatalogEntity second)
+      throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      Future<Throwable> firstResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  CatalogMetaService.getInstance().insertCatalog(first, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Future<Throwable> secondResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  CatalogMetaService.getInstance().insertCatalog(second, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(ready.await(30, TimeUnit.SECONDS));
+      start.countDown();
+      return Arrays.asList(
+          firstResult.get(30, TimeUnit.SECONDS), secondResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
   }
 
   private CatalogEntity copyCatalogWithComment(CatalogEntity catalog, String comment) {

@@ -171,7 +171,7 @@ public class SchemaMetaService {
       }
 
       SessionUtils.doMultipleWithCommit(
-          () -> fenceCatalogForSchemaCreate(catalogPO),
+          () -> lockCatalogForSchemaCreate(catalogPO),
           () ->
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
@@ -471,16 +471,17 @@ public class SchemaMetaService {
         mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.SCHEMA));
   }
 
-  private void fenceCatalogForSchemaCreate(CatalogPO catalogPO) {
-    int fenced =
+  private void lockCatalogForSchemaCreate(CatalogPO observedCatalogPO) {
+    CatalogPO currentCatalogPO =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
-            mapper ->
-                mapper.fenceCatalogMeta(catalogPO.getCatalogId(), catalogPO.getCurrentVersion()));
-    if (fenced == 0) {
+            mapper -> mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId()));
+    if (currentCatalogPO == null
+        || !Objects.equals(currentCatalogPO.getCatalogName(), observedCatalogPO.getCatalogName())
+        || !Objects.equals(currentCatalogPO.getMetalakeId(), observedCatalogPO.getMetalakeId())) {
       throw new OptimisticLockException(
           "The parent catalog %s was modified concurrently; retry the operation",
-          catalogPO.getCatalogName());
+          observedCatalogPO.getCatalogName());
     }
   }
 

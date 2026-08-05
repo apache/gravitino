@@ -59,6 +59,11 @@ public class MetalakeMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that selects and locks an active metalake by ID. */
+  public String selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return selectMetalakeMetaById(metalakeId) + " FOR UPDATE";
+  }
+
   public String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
     return "SELECT metalake_id as metalakeId"
         + " FROM "
@@ -145,16 +150,6 @@ public class MetalakeMetaBaseSQLProvider {
         + " WHERE metalake_id = #{oldMetalakeMeta.metalakeId}"
         + " AND current_version = #{oldMetalakeMeta.currentVersion}"
         + " AND deleted_at = 0";
-  }
-
-  /** Returns SQL that advances a metalake OCC version conditionally. */
-  public String fenceMetalakeMeta(
-      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET last_version = current_version + 1, current_version = current_version + 1"
-        + " WHERE metalake_id = #{metalakeId}"
-        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteMetalakeMetaByMetalakeId(
