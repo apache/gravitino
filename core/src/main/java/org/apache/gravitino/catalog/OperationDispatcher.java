@@ -56,29 +56,29 @@ public abstract class OperationDispatcher {
 
   private final CatalogManager catalogManager;
 
-  protected final SecretManager secretManager;
-
   protected final EntityStore store;
 
   protected final IdGenerator idGenerator;
+
+  protected final SecretManager secretManager;
 
   /**
    * Creates a new CatalogOperationDispatcher instance.
    *
    * @param catalogManager The CatalogManager instance to be used for catalog operations.
-   * @param secretManager The SecretManager instance to be used for secret operations.
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   protected OperationDispatcher(
       CatalogManager catalogManager,
-      SecretManager secretManager,
       EntityStore store,
-      IdGenerator idGenerator) {
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
     this.catalogManager = catalogManager;
-    this.secretManager = secretManager;
     this.store = store;
     this.idGenerator = idGenerator;
+    this.secretManager = secretManager;
   }
 
   protected <R, E extends Throwable> R doWithTable(

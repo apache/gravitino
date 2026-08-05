@@ -57,18 +57,18 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
    * Creates a new FunctionOperationDispatcher instance.
    *
    * @param catalogManager The CatalogManager instance to be used for function operations.
-   * @param secretManager The SecretManager instance to be used for secret operations.
    * @param schemaOps The SchemaOperationDispatcher used to validate schema existence.
    * @param store The EntityStore instance to be used for function operations.
    * @param idGenerator The IdGenerator instance to be used for function operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public FunctionOperationDispatcher(
       CatalogManager catalogManager,
-      SecretManager secretManager,
       SchemaOperationDispatcher schemaOps,
       EntityStore store,
-      IdGenerator idGenerator) {
-    super(catalogManager, secretManager, store, idGenerator);
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
     this.schemaOps = schemaOps;
     this.managedFunctionOps = new ManagedFunctionOperations(store, idGenerator);
   }

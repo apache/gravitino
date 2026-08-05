@@ -52,10 +52,10 @@ public class ModelOperationDispatcher extends OperationDispatcher implements Mod
 
   public ModelOperationDispatcher(
       CatalogManager catalogManager,
-      SecretManager secretManager,
       EntityStore store,
-      IdGenerator idGenerator) {
-    super(catalogManager, secretManager, store, idGenerator);
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   @Override

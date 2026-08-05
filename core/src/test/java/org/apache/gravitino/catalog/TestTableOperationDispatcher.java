@@ -80,14 +80,14 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, secretManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     tableOperationDispatcher =
         new TableOperationDispatcher(
             catalogManager,
-            secretManager,
             entityStore,
             idGenerator,
-            () -> schemaOperationDispatcher);
+            () -> schemaOperationDispatcher,
+            secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -271,7 +271,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         NullPointerException.class,
         () ->
             new TableOperationDispatcher(
-                catalogManager, secretManager, entityStore, idGenerator, null));
+                catalogManager, entityStore, idGenerator, null, secretManager));
   }
 
   @Test
@@ -283,7 +283,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
     TableOperationDispatcher dispatcher =
         new TableOperationDispatcher(
-            catalogManager, secretManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
+            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier, secretManager);
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_dispatcher");
     Column[] columns =
         new Column[] {

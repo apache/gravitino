@@ -57,16 +57,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * Creates a new SchemaOperationDispatcher instance.
    *
    * @param catalogManager The CatalogManager instance to be used for schema operations.
-   * @param secretManager The SecretManager instance to be used for secret operations.
    * @param store The EntityStore instance to be used for schema operations.
    * @param idGenerator The IdGenerator instance to be used for schema operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public SchemaOperationDispatcher(
       CatalogManager catalogManager,
-      SecretManager secretManager,
       EntityStore store,
-      IdGenerator idGenerator) {
-    super(catalogManager, secretManager, store, idGenerator);
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   /**

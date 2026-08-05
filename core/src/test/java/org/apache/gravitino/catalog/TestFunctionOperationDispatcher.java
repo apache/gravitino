@@ -64,7 +64,7 @@ public class TestFunctionOperationDispatcher {
 
     dispatcher =
         new FunctionOperationDispatcher(
-            catalogManager, mock(SecretManager.class), schemaOps, store, idGenerator);
+            catalogManager, schemaOps, store, idGenerator, mock(SecretManager.class));
   }
 
   @Test
