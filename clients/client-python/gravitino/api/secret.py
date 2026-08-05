@@ -16,7 +16,7 @@
 # under the License.
 
 from dataclasses import dataclass, field
-from typing import Dict, Optional
+from typing import Dict
 
 
 @dataclass
@@ -35,7 +35,7 @@ class SecretReference:
     """External secret locator: provider instance name plus provider-specific attributes."""
 
     provider: str
-    attributes: Optional[Dict[str, str]] = field(default=None)
+    attributes: Dict[str, str] = field(default_factory=dict)
 
     def __repr__(self) -> str:
         return (

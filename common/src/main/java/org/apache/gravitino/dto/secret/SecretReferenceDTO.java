@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.secret;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.common.collect.ImmutableMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -53,7 +54,7 @@ public class SecretReferenceDTO {
    * @return the secret reference
    */
   public SecretReference toSecretReference() {
-    return new SecretReference(provider, attributes);
+    return new SecretReference(provider, attributes == null ? ImmutableMap.of() : attributes);
   }
 
   /**
