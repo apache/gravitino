@@ -30,6 +30,7 @@ import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
+import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -102,6 +103,11 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         LANCE_SPEC);
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
+    if (auxMode) {
+      server.addFilter(
+          new LanceServiceIdentityFilter(lanceConfig.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME)),
+          LANCE_SPEC);
+    }
 
     // Root-level aliases for health checks to improve compatibility with various monitoring
     // systems that expect a /health endpoint.
