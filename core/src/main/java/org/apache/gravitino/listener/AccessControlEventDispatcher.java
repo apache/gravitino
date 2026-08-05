@@ -49,6 +49,9 @@ import org.apache.gravitino.listener.api.event.AddUserPreEvent;
 import org.apache.gravitino.listener.api.event.AlterGroupEvent;
 import org.apache.gravitino.listener.api.event.AlterGroupFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterGroupPreEvent;
+import org.apache.gravitino.listener.api.event.AlterUserEvent;
+import org.apache.gravitino.listener.api.event.AlterUserFailureEvent;
+import org.apache.gravitino.listener.api.event.AlterUserPreEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
@@ -70,6 +73,9 @@ import org.apache.gravitino.listener.api.event.GetRolePreEvent;
 import org.apache.gravitino.listener.api.event.GetUserByExternalIdEvent;
 import org.apache.gravitino.listener.api.event.GetUserByExternalIdFailureEvent;
 import org.apache.gravitino.listener.api.event.GetUserByExternalIdPreEvent;
+import org.apache.gravitino.listener.api.event.GetUserByIdEvent;
+import org.apache.gravitino.listener.api.event.GetUserByIdFailureEvent;
+import org.apache.gravitino.listener.api.event.GetUserByIdPreEvent;
 import org.apache.gravitino.listener.api.event.GetUserEvent;
 import org.apache.gravitino.listener.api.event.GetUserFailureEvent;
 import org.apache.gravitino.listener.api.event.GetUserPreEvent;
@@ -112,6 +118,9 @@ import org.apache.gravitino.listener.api.event.RemoveGroupPreEvent;
 import org.apache.gravitino.listener.api.event.RemoveUserByExternalIdEvent;
 import org.apache.gravitino.listener.api.event.RemoveUserByExternalIdFailureEvent;
 import org.apache.gravitino.listener.api.event.RemoveUserByExternalIdPreEvent;
+import org.apache.gravitino.listener.api.event.RemoveUserByIdEvent;
+import org.apache.gravitino.listener.api.event.RemoveUserByIdFailureEvent;
+import org.apache.gravitino.listener.api.event.RemoveUserByIdPreEvent;
 import org.apache.gravitino.listener.api.event.RemoveUserEvent;
 import org.apache.gravitino.listener.api.event.RemoveUserFailureEvent;
 import org.apache.gravitino.listener.api.event.RemoveUserPreEvent;
@@ -265,20 +274,54 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
   @Override
   public User getUserById(String metalake, long userId)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.getUserById(metalake, userId);
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetUserByIdPreEvent(initiator, metalake, userId));
+    try {
+      User userObject = dispatcher.getUserById(metalake, userId);
+      eventBus.dispatchEvent(new GetUserByIdEvent(initiator, metalake, new UserInfo(userObject)));
+
+      return userObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new GetUserByIdFailureEvent(initiator, metalake, e, userId));
+      throw e;
+    }
   }
 
   /** {@inheritDoc} */
   @Override
   public boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException {
-    return dispatcher.removeUserById(metalake, userId);
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new RemoveUserByIdPreEvent(initiator, metalake, userId));
+    try {
+      boolean isExists = dispatcher.removeUserById(metalake, userId);
+      eventBus.dispatchEvent(new RemoveUserByIdEvent(initiator, metalake, userId, isExists));
+
+      return isExists;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new RemoveUserByIdFailureEvent(initiator, metalake, e, userId));
+      throw e;
+    }
   }
 
   /** {@inheritDoc} */
   @Override
   public User alterUserById(String metalake, long userId, UserChange... changes)
       throws NoSuchUserException, NoSuchMetalakeException {
-    return dispatcher.alterUserById(metalake, userId, changes);
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new AlterUserPreEvent(initiator, metalake, userId, changes));
+    try {
+      User userObject = dispatcher.alterUserById(metalake, userId, changes);
+      eventBus.dispatchEvent(
+          new AlterUserEvent(initiator, metalake, changes, new UserInfo(userObject)));
+
+      return userObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new AlterUserFailureEvent(initiator, metalake, userId, changes, e));
+      throw e;
+    }
   }
 
   /** {@inheritDoc} */
