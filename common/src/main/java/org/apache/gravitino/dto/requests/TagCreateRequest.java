@@ -35,8 +35,6 @@ import org.apache.gravitino.tag.TagValueConstraint;
 @ToString
 public class TagCreateRequest implements RESTRequest {
 
-  private static final int MAX_ALLOWED_VALUE_LENGTH = 256;
-
   @JsonProperty("name")
   private final String name;
 
@@ -113,10 +111,6 @@ public class TagCreateRequest implements RESTRequest {
       for (String value : allowedValues) {
         Preconditions.checkArgument(
             StringUtils.isNotBlank(value), "allowedValues cannot contain null or empty values");
-        Preconditions.checkArgument(
-            value.length() <= MAX_ALLOWED_VALUE_LENGTH,
-            "allowedValues cannot contain values longer than %s characters",
-            MAX_ALLOWED_VALUE_LENGTH);
       }
     }
   }

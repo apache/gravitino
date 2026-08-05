@@ -68,13 +68,11 @@ public class TestTagCreateRequest {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> new TagCreateRequest("tag_test", null, null, new String[] {""}).validate());
-    char[] tooLongValueChars = new char[257];
-    Arrays.fill(tooLongValueChars, 'a');
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
+    char[] longValueChars = new char[257];
+    Arrays.fill(longValueChars, 'a');
+    Assertions.assertDoesNotThrow(
         () ->
-            new TagCreateRequest(
-                    "tag_test", null, null, new String[] {new String(tooLongValueChars)})
+            new TagCreateRequest("tag_test", null, null, new String[] {new String(longValueChars)})
                 .validate());
   }
 }
