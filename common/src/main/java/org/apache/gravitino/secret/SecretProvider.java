@@ -86,7 +86,7 @@ public interface SecretProvider {
    * @throws UnsupportedOperationException if this provider does not support external references
    * @throws IllegalArgumentException if attributes are invalid for this provider
    */
-  default SecretUrn bindExternalReference(String propertyKey, Map<String, String> attributes) {
+  default SecretUrn buildReferenceUrn(String propertyKey, Map<String, String> attributes) {
     throw new UnsupportedOperationException(
         type() + " does not support external secret references");
   }

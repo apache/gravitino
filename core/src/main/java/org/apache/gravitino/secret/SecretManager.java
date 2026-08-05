@@ -86,7 +86,7 @@ public class SecretManager implements Closeable {
       String providerName = locator.provider();
       SecretProvider provider = registry.getProvider(providerName);
       try {
-        SecretUrn urn = provider.bindExternalReference(key, locator.attributes());
+        SecretUrn urn = provider.buildReferenceUrn(key, locator.attributes());
         validateUrnEndsWithPropertyKey(urn, key);
         urns.add(urn);
       } catch (UnsupportedOperationException e) {
