@@ -19,16 +19,15 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.List;
-import org.apache.gravitino.Entity;
-
 /**
  * {@code EntityCache} is a cache interface in Gravitino designed to accelerate metadata access for
- * entities. It maintains a bidirectional mapping between an {@link Entity} and its {@code
- * NameIdentifier}. The cache also supports cascading removal of entries, ensuring related
- * sub-entities are cleared together.
+ * individual entities keyed by their {@code NameIdentifier} and type. The cache supports cascading
+ * removal of entries, ensuring cached sub-entities are cleared together with their parent.
+ *
+ * <p>Relation query results (e.g. role bindings of a metadata object) are intentionally NOT part of
+ * this SPI; relation and list operations always fall back to the {@code EntityStore}.
  */
-public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationEntityCache {
+public interface EntityCache extends SupportsEntityStoreCache {
   /**
    * Clears all entries from the cache, including data and index, resetting it to an empty state.
    */
@@ -61,20 +60,6 @@ public interface EntityCache extends SupportsEntityStoreCache, SupportsRelationE
    */
   <T, E extends Exception> T withCacheLock(EntityCacheKey key, ThrowingSupplier<T, E> action)
       throws E;
-
-  /**
-   * Acquires locks for multiple cache keys and executes the action, returning the result. Keys are
-   * locked in a consistent order to avoid deadlocks.
-   *
-   * @param keys The cache keys to lock
-   * @param action The action to execute while holding all locks
-   * @param <T> The type of the result
-   * @param <E> The type of exception that may be thrown
-   * @return The result of the action
-   * @throws E if the action throws an exception of type E
-   */
-  <T, E extends Exception> T withMultipleKeyCacheLock(
-      List<EntityCacheKey> keys, ThrowingSupplier<T, E> action) throws E;
 
   /**
    * A functional interface that represents a supplier that may throw an exception.

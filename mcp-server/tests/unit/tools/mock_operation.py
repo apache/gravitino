@@ -29,6 +29,7 @@ from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
 from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.statistic_operation import StatisticOperation
+from mcp_server.client.view_operation import ViewOperation
 
 
 class MockOperation(GravitinoOperation):
@@ -67,6 +68,9 @@ class MockOperation(GravitinoOperation):
 
     def as_partition_operation(self) -> PartitionOperation:
         return MockPartitionOperation()
+
+    def as_view_operation(self) -> ViewOperation:
+        return MockViewOperation()
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -470,3 +474,13 @@ class MockPartitionOperation(PartitionOperation):
             f"mock_partition: {catalog_name}, {schema_name}, {table_name}, "
             f"{partition_name}"
         )
+
+
+class MockViewOperation(ViewOperation):
+    async def list_of_views(self, catalog_name: str, schema_name: str) -> str:
+        return f"mock_views: {catalog_name}, {schema_name}"
+
+    async def load_view(
+        self, catalog_name: str, schema_name: str, view_name: str
+    ) -> str:
+        return f"mock_view: {catalog_name}, {schema_name}, {view_name}"
