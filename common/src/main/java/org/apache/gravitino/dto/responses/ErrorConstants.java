@@ -57,6 +57,9 @@ public class ErrorConstants {
   /** Error codes for unauthorized access. */
   public static final int UNAUTHORIZED_CODE = 1011;
 
+  /** Error codes for optimistic-lock conflicts. */
+  public static final int OPTIMISTIC_LOCK_CONFLICT_CODE = 1012;
+
   /** Error codes for invalid state. */
   public static final int UNKNOWN_ERROR_CODE = 1100;
 

@@ -235,6 +235,20 @@ public class ErrorResponse extends BaseResponse {
   }
 
   /**
+   * Create a new optimistic-lock conflict error instance of {@link ErrorResponse}.
+   *
+   * @param type The type of the error.
+   * @param message The message of the error.
+   * @param throwable The throwable that caused the error.
+   * @return The new instance.
+   */
+  public static ErrorResponse optimisticLockConflict(
+      String type, String message, Throwable throwable) {
+    return new ErrorResponse(
+        ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, type, message, getStackTrace(throwable));
+  }
+
+  /**
    * Create a new not in use error instance of {@link ErrorResponse}.
    *
    * @param type The type of the error.

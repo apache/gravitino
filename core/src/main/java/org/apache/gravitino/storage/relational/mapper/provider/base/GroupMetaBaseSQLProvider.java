@@ -106,6 +106,23 @@ public class GroupMetaBaseSQLProvider {
         + " AND gt.deleted_at = 0 AND mt.deleted_at = 0";
   }
 
+  public String selectGroupMetaByMetalakeNameAndId(
+      @Param("metalakeName") String metalakeName, @Param("groupId") Long groupId) {
+    return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
+        + " gt.audit_info as auditInfo, gt.current_version as currentVersion,"
+        + " gt.last_version as lastVersion, gt.deleted_at as deletedAt"
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " gt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON gt.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND gt.group_id = #{groupId}"
+        + " AND gt.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
   public String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return "<script>"
