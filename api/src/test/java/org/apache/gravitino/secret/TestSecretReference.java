@@ -33,12 +33,6 @@ public class TestSecretReference {
     Assertions.assertEquals("secret/data/x", reference.attributes().get("path"));
 
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            new SecretReference(
-                "vault", Map.of("path", "urn:gravitino-secret:memory:catalog:1:jdbc-password")));
-
-    Assertions.assertThrows(
         IllegalArgumentException.class, () -> new SecretReference("vault", null));
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new SecretReference("vault", Map.of()));

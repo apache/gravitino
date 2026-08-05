@@ -81,12 +81,6 @@ public class TestSecretManager {
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () ->
-              new SecretReference(
-                  "memory", Map.of("path", "urn:gravitino-secret:memory:catalog:1:x")));
-
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
               secretManager.getSecretReferenceUrns(
                   Map.of(
                       "jdbc-password",

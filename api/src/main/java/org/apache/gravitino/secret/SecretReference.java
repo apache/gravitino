@@ -19,11 +19,8 @@
 
 package org.apache.gravitino.secret;
 
-import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
-
 import com.google.common.base.Preconditions;
-import java.util.Collections;
-import java.util.LinkedHashMap;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
@@ -50,13 +47,7 @@ public final class SecretReference {
     Preconditions.checkArgument(
         attributes != null && !attributes.isEmpty(), "attributes must not be null or empty");
     this.provider = provider;
-    Map<String, String> copy = new LinkedHashMap<>(attributes);
-    for (Map.Entry<String, String> entry : copy.entrySet()) {
-      Preconditions.checkArgument(
-          entry.getValue() == null || !entry.getValue().startsWith(URN_PREFIX),
-          "attributes must not contain a raw gravitino secret URN");
-    }
-    this.attributes = Collections.unmodifiableMap(copy);
+    this.attributes = ImmutableMap.copyOf(attributes);
   }
 
   /**
