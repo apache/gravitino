@@ -128,6 +128,9 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 | `get_partition`                     | Retrieve a partition's metadata. Only for catalogs with a partition API.       | `partition`  |
 | `list_of_views`                     | Retrieve a list of views for a schema. Only for catalogs supporting views.     | `view`       |
 | `load_view`                         | Retrieve a view's metadata. Only for catalogs supporting views.                | `view`       |
+| `create_view`                       | Create a new view. Only for catalogs supporting views.                         | `view`       |
+| `alter_view`                        | Alter an existing view. Only for catalogs supporting views.                    | `view`       |
+| `drop_view`                         | Drop a view. Only for catalogs supporting views.                               | `view`       |
 
 
 ## Configuration
