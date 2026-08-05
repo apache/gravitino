@@ -165,7 +165,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     }
     if (secretBindings != null) {
       for (Map.Entry<String, SecretBinding> entry : secretBindings.entrySet()) {
-        propertiesForCreate.put(entry.getKey(), entry.getValue().value());
+        propertiesForCreate.put(entry.getKey(), entry.getValue().plaintext());
       }
     }
     // Preserve skip-on-null validation when caller passed null properties and no secrets.

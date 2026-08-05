@@ -42,6 +42,8 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -135,7 +137,7 @@ class FilesetCatalog extends BaseSchemaCatalog
    * @param type The type of the fileset.
    * @param storageLocations The location names and storage locations of the fileset.
    * @param properties The properties of the fileset.
-   * @param secretBindings Optional property key → binding ({ provider} + { value}) for
+   * @param secretBindings Optional property key → binding ({ provider} + { plaintext}) for
    *     write-through.
    * @param secretReferences Optional property key → secret locator ({@code provider} plus
    *     provider-specific attributes).
@@ -163,8 +165,8 @@ class FilesetCatalog extends BaseSchemaCatalog
             .type(type)
             .storageLocations(storageLocations)
             .properties(properties)
-            .secretBindings(secretBindings)
-            .secretReferences(secretReferences)
+            .secretBindings(SecretBindingDTO.fromSecretBindings(secretBindings))
+            .secretReferences(SecretReferenceDTO.fromSecretReferences(secretReferences))
             .build();
     req.validate();
 

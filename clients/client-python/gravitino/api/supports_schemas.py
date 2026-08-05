@@ -93,7 +93,7 @@ class SupportsSchemas(ABC):
             schema_name: The name of the schema.
             comment: The comment of the schema.
             properties: The properties of the schema.
-            secret_bindings: Optional property key → binding (provider + value) for write-through.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
             secret_references: Optional property key → locator attributes.
 
         Raises:

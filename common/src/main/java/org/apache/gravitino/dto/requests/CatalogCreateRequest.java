@@ -29,9 +29,9 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.rest.RESTRequest;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 
 /** Represents a request to create a catalog. */
 @Getter
@@ -58,11 +58,11 @@ public class CatalogCreateRequest implements RESTRequest {
 
   @Nullable
   @JsonProperty("secretBindings")
-  private final Map<String, SecretBinding> secretBindings;
+  private final Map<String, SecretBindingDTO> secretBindings;
 
   @Nullable
   @JsonProperty("secretReferences")
-  private final Map<String, SecretReference> secretReferences;
+  private final Map<String, SecretReferenceDTO> secretReferences;
 
   /**
    * Constructor for CatalogCreateRequest.
@@ -72,9 +72,9 @@ public class CatalogCreateRequest implements RESTRequest {
    * @param provider The provider of the catalog.
    * @param comment The comment for the catalog.
    * @param properties The properties for the catalog.
-   * @param secretBindings Optional property key → binding ({@code provider} + {@code value}) for
-   *     write-through secrets.
-   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code plaintext})
+   *     for write-through secrets.
+   * @param secretReferences Optional property key → secret locator DTO ({@code provider} plus
    *     provider-specific attributes).
    */
   @JsonCreator
@@ -84,8 +84,8 @@ public class CatalogCreateRequest implements RESTRequest {
       @JsonProperty("provider") String provider,
       @JsonProperty("comment") String comment,
       @JsonProperty("properties") Map<String, String> properties,
-      @JsonProperty("secretBindings") Map<String, SecretBinding> secretBindings,
-      @JsonProperty("secretReferences") Map<String, SecretReference> secretReferences) {
+      @JsonProperty("secretBindings") Map<String, SecretBindingDTO> secretBindings,
+      @JsonProperty("secretReferences") Map<String, SecretReferenceDTO> secretReferences) {
     this.name = name;
     this.type = type;
     this.comment = comment;

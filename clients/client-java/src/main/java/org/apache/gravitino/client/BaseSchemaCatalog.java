@@ -42,6 +42,8 @@ import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -174,7 +176,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
    * @param schemaName The name identifier of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
-   * @param secretBindings Optional property key → binding ({ provider} + { value}) for
+   * @param secretBindings Optional property key → binding ({ provider} + { plaintext}) for
    *     write-through.
    * @param secretReferences Optional property key → secret locator ({@code provider} plus
    *     provider-specific attributes).
@@ -192,7 +194,12 @@ abstract class BaseSchemaCatalog extends CatalogDTO
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
     SchemaCreateRequest req =
-        new SchemaCreateRequest(schemaName, comment, properties, secretBindings, secretReferences);
+        new SchemaCreateRequest(
+            schemaName,
+            comment,
+            properties,
+            SecretBindingDTO.fromSecretBindings(secretBindings),
+            SecretReferenceDTO.fromSecretReferences(secretReferences));
     req.validate();
 
     SchemaResponse resp =

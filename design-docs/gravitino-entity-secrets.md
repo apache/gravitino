@@ -650,12 +650,12 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 | `@type`              | Fields (flat; not nested under `value`)                                                  | Behavior                                                                                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `setProperty`        | `value` (**string** plaintext)                                                           | Today’s plaintext set. If the **current** value matches the URN recognition rule, in-place `writeSecret` via provider in the current URN; persist new URN |
-| `setSecretBinding`   | `provider` (instance name) + `value` (plaintext string)                                  | Write-through bind/re-bind (`writeSecret`); persist returned URN                                                                                          |
+| `setSecretBinding`   | `provider` (instance name) + `plaintext` (plaintext string)                              | Write-through bind/re-bind (`writeSecret`); persist returned URN                                                                                          |
 | `setSecretReference` | `provider` (instance name) + `attributes` (`map<string,string>`; same locator as §5.9.2) | External ref; server builds URN from locator (must end with the property key). Required `attributes` keys are provider-defined.                           |
 
 | Rule                                                                               | Behavior                                                                                                                                                                                                                                           |
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setSecretBinding` missing `provider` / string `value`, or `value` is `******`     | **Reject**                                                                                                                                                                                                                                         |
+| `setSecretBinding` missing `provider` / string `plaintext`, or `plaintext` is `******` | **Reject**                                                                                                                                                                                                                                         |
 | `setSecretReference` missing `provider`                                            | **Reject**                                                                                                                                                                                                                                         |
 | `setSecretReference` `attributes` value is a raw `urn:gravitino-secret:...` string | **Reject** — use locator attributes, not a client-built URN                                                                                                                                                                                        |
 | `setSecretReference` missing attributes required by the selected provider          | **Reject**                                                                                                                                                                                                                                         |
@@ -749,7 +749,7 @@ DB `properties` (plaintext):
 
 **TC-3 — Alter: write-through via `setSecretBinding` (200)**
 
-Request (flat `provider` + plaintext `value`):
+Request (flat `provider` + `plaintext`):
 
 ```json
 {
@@ -758,7 +758,7 @@ Request (flat `provider` + plaintext `value`):
       "@type": "setSecretBinding",
       "property": "jdbc-password",
       "provider": "memory",
-      "value": "S3cret!Passw0rd"
+      "plaintext": "S3cret!Passw0rd"
     }
   ]
 }

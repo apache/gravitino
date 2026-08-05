@@ -98,7 +98,7 @@ public interface SupportsSchemas {
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
-   * @param secretBindings optional property key → binding ({@code provider} + {@code value}) for
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext}) for
    *     write-through
    * @param secretReferences optional property key → secret locator ({@code provider} plus
    *     provider-specific attributes)

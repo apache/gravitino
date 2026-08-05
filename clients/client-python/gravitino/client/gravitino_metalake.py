@@ -231,7 +231,7 @@ class GravitinoMetalake(
             None provider. For the details, please refer to the Catalog.Type.
             comment: The comment of the catalog.
             properties: The properties of the catalog.
-            secret_bindings: Optional property key → binding (provider + value) for write-through.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
             secret_references: Optional property key → locator attributes.
 
         Raises:

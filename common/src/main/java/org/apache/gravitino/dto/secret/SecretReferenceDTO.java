@@ -1,0 +1,106 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.dto.secret;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import javax.annotation.Nullable;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.EqualsAndHashCode;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import org.apache.gravitino.secret.SecretReference;
+
+/** Data transfer object for an external {@link SecretReference}. */
+@Getter
+@EqualsAndHashCode
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@AllArgsConstructor
+@Builder(setterPrefix = "with")
+@ToString
+public class SecretReferenceDTO {
+
+  @JsonProperty("provider")
+  private String provider;
+
+  @Nullable
+  @JsonProperty("attributes")
+  private Map<String, String> attributes;
+
+  /**
+   * Converts this DTO to a {@link SecretReference}.
+   *
+   * @return the secret reference
+   */
+  public SecretReference toSecretReference() {
+    return new SecretReference(provider, attributes);
+  }
+
+  /**
+   * Creates a DTO from a {@link SecretReference}.
+   *
+   * @param reference the secret reference
+   * @return the secret reference DTO
+   */
+  public static SecretReferenceDTO fromSecretReference(SecretReference reference) {
+    return new SecretReferenceDTO(reference.provider(), reference.attributes());
+  }
+
+  /**
+   * Converts a property-key map of DTOs to {@link SecretReference}s.
+   *
+   * @param dtos property key → reference DTO; {@code null} returns {@code null}
+   * @return property key → reference, or {@code null}
+   */
+  @Nullable
+  public static Map<String, SecretReference> toSecretReferences(
+      @Nullable Map<String, SecretReferenceDTO> dtos) {
+    if (dtos == null) {
+      return null;
+    }
+    Map<String, SecretReference> references = new LinkedHashMap<>(dtos.size());
+    for (Map.Entry<String, SecretReferenceDTO> entry : dtos.entrySet()) {
+      references.put(entry.getKey(), entry.getValue().toSecretReference());
+    }
+    return references;
+  }
+
+  /**
+   * Converts a property-key map of {@link SecretReference}s to DTOs.
+   *
+   * @param references property key → reference; {@code null} returns {@code null}
+   * @return property key → reference DTO, or {@code null}
+   */
+  @Nullable
+  public static Map<String, SecretReferenceDTO> fromSecretReferences(
+      @Nullable Map<String, SecretReference> references) {
+    if (references == null) {
+      return null;
+    }
+    Map<String, SecretReferenceDTO> dtos = new LinkedHashMap<>(references.size());
+    for (Map.Entry<String, SecretReference> entry : references.entrySet()) {
+      dtos.put(entry.getKey(), fromSecretReference(entry.getValue()));
+    }
+    return dtos;
+  }
+}

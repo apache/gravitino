@@ -26,9 +26,9 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.rest.RESTRequest;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 
 /** Represents a request to create a schema. */
 @Getter
@@ -49,11 +49,11 @@ public class SchemaCreateRequest implements RESTRequest {
 
   @Nullable
   @JsonProperty("secretBindings")
-  private final Map<String, SecretBinding> secretBindings;
+  private final Map<String, SecretBindingDTO> secretBindings;
 
   @Nullable
   @JsonProperty("secretReferences")
-  private final Map<String, SecretReference> secretReferences;
+  private final Map<String, SecretReferenceDTO> secretReferences;
 
   /** Default constructor for Jackson deserialization. */
   public SchemaCreateRequest() {
@@ -66,17 +66,17 @@ public class SchemaCreateRequest implements RESTRequest {
    * @param name The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
-   * @param secretBindings Optional property key → binding ({@code provider} + {@code value}) for
-   *     write-through secrets.
-   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code plaintext})
+   *     for write-through secrets.
+   * @param secretReferences Optional property key → secret locator DTO ({@code provider} plus
    *     provider-specific attributes).
    */
   public SchemaCreateRequest(
       String name,
       String comment,
       Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences) {
+      Map<String, SecretBindingDTO> secretBindings,
+      Map<String, SecretReferenceDTO> secretReferences) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;

@@ -95,6 +95,8 @@ import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
 import org.apache.gravitino.dto.responses.UserResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
@@ -246,7 +248,7 @@ public class GravitinoMetalake extends MetalakeDTO
    * @param provider The provider of the catalog.
    * @param comment The comment of the catalog.
    * @param properties The properties of the catalog.
-   * @param secretBindings Optional property key → binding ({ provider} + { value}) for
+   * @param secretBindings Optional property key → binding ({ provider} + { plaintext}) for
    *     write-through.
    * @param secretReferences Optional property key → secret locator ({@code provider} plus
    *     provider-specific attributes).
@@ -266,7 +268,13 @@ public class GravitinoMetalake extends MetalakeDTO
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
-            catalogName, type, provider, comment, properties, secretBindings, secretReferences);
+            catalogName,
+            type,
+            provider,
+            comment,
+            properties,
+            SecretBindingDTO.fromSecretBindings(secretBindings),
+            SecretReferenceDTO.fromSecretReferences(secretReferences));
     req.validate();
 
     CatalogResponse resp =

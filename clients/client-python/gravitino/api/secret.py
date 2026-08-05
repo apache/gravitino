@@ -21,13 +21,13 @@ from typing import Dict, Optional
 
 @dataclass
 class SecretBinding:
-    """Write-through secret binding: provider instance name plus plaintext value."""
+    """Write-through secret binding: provider instance name plus plaintext."""
 
     provider: str
-    value: str
+    plaintext: str
 
     def __repr__(self) -> str:
-        return f"SecretBinding(provider={self.provider!r}, value=***)"
+        return f"SecretBinding(provider={self.provider!r}, plaintext=***)"
 
 
 @dataclass

@@ -52,6 +52,8 @@ import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -155,8 +157,8 @@ public class CatalogOperations {
                     request.getProvider(),
                     request.getComment(),
                     request.getProperties(),
-                    request.getSecretBindings(),
-                    request.getSecretReferences());
+                    SecretBindingDTO.toSecretBindings(request.getSecretBindings()),
+                    SecretReferenceDTO.toSecretReferences(request.getSecretReferences()));
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
             LOG.info("Catalog created: {}.{}", metalake, catalog.name());
             return response;
