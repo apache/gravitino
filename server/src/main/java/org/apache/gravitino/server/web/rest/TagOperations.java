@@ -44,6 +44,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
@@ -157,7 +158,11 @@ public class TagOperations {
             request.validate();
             Tag tag =
                 tagDispatcher.createTag(
-                    metalake, request.getName(), request.getComment(), request.getProperties());
+                    metalake,
+                    request.getName(),
+                    request.getComment(),
+                    request.getProperties(),
+                    request.valueConstraint());
 
             LOG.info("Created tag: {} under metalake: {}", tag.name(), metalake);
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
@@ -268,14 +273,20 @@ public class TagOperations {
   public Response listMetadataObjectsForTag(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName) {
-    LOG.info("Received list objects for tag: {} under metalake: {}", tagName, metalake);
+      @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String tagName,
+      @QueryParam("value") String value) {
+    LOG.info(
+        "Received list objects for tag: {} and value: {} under metalake: {}",
+        tagName,
+        value,
+        metalake);
 
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetadataObject[] objects = tagDispatcher.listMetadataObjectsForTag(metalake, tagName);
+            MetadataObject[] objects =
+                tagDispatcher.listMetadataObjectsForTag(metalake, tagName, value);
             objects = objects == null ? new MetadataObject[0] : objects;
 
             LOG.info(
@@ -364,5 +375,37 @@ public class TagOperations {
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.associateTagsForObject(metalake, type, fullName, request);
+  }
+
+  /**
+   * Associates tag values with a metadata object using the v2 request representation.
+   *
+   * @param metalake The metalake name.
+   * @param type The metadata object type.
+   * @param fullName The metadata object full name.
+   * @param request The tag values association request.
+   * @return The response containing associated tag names.
+   * @deprecated This API has moved to {@code
+   *     /api/metalakes/{metalake}/objects/{type}/{fullName}/tags}.
+   */
+  @Deprecated
+  @POST
+  @Path("{type}/{fullName}")
+  @Produces("application/vnd.gravitino.v2+json")
+  @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "associate-object-tags", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+  public Response associateTagValuesForObject(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+          TagValuesAssociateRequest request) {
+    MetadataObjectTagOperations metadataObjectTagOperations =
+        new MetadataObjectTagOperations(tagDispatcher);
+    metadataObjectTagOperations.setHttpRequest(httpRequest);
+    return metadataObjectTagOperations.associateTagValuesForObject(
+        metalake, type, fullName, request);
   }
 }

@@ -23,12 +23,11 @@ import static org.apache.gravitino.server.authorization.expression.Authorization
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.Sets;
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.DefaultValue;
@@ -44,6 +43,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
@@ -52,6 +52,7 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -62,6 +63,7 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -183,14 +185,12 @@ public class MetadataObjectTagOperations {
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
 
-            Set<TagDTO> tags = Sets.newHashSet();
+            Map<String, TagDTO> tags = new LinkedHashMap<>();
             Tag[] nonInheritedTags = tagDispatcher.listTagsInfoForMetadataObject(metalake, object);
             if (ArrayUtils.isNotEmpty(nonInheritedTags)) {
-              Collections.addAll(
-                  tags,
-                  Arrays.stream(nonInheritedTags)
-                      .map(t -> DTOConverters.toDTO(t, Optional.of(false)))
-                      .toArray(TagDTO[]::new));
+              Arrays.stream(nonInheritedTags)
+                  .map(t -> DTOConverters.toDTO(t, Optional.of(false)))
+                  .forEach(tag -> tags.putIfAbsent(tag.name(), tag));
             }
 
             for (MetadataObject parentObject :
@@ -198,11 +198,9 @@ public class MetadataObjectTagOperations {
               Tag[] inheritedTags =
                   tagDispatcher.listTagsInfoForMetadataObject(metalake, parentObject);
               if (ArrayUtils.isNotEmpty(inheritedTags)) {
-                Collections.addAll(
-                    tags,
-                    Arrays.stream(inheritedTags)
-                        .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
-                        .toArray(TagDTO[]::new));
+                Arrays.stream(inheritedTags)
+                    .map(t -> DTOConverters.toDTO(t, Optional.of(true)))
+                    .forEach(tag -> tags.putIfAbsent(tag.name(), tag));
               }
             }
 
@@ -213,7 +211,7 @@ public class MetadataObjectTagOperations {
                   type,
                   fullName,
                   metalake);
-              TagDTO[] tagDTOS = tags.toArray(new TagDTO[0]);
+              TagDTO[] tagDTOS = tags.values().toArray(new TagDTO[0]);
               tagDTOS =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
@@ -224,8 +222,7 @@ public class MetadataObjectTagOperations {
               return Utils.ok(new TagListResponse(tagDTOS));
 
             } else {
-              // We have used Set to avoid duplicate tag names
-              String[] tagNames = tags.stream().map(TagDTO::name).toArray(String[]::new);
+              String[] tagNames = tags.keySet().toArray(new String[0]);
               tagNames =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
@@ -260,6 +257,35 @@ public class MetadataObjectTagOperations {
       @PathParam("fullName") @AuthorizationFullName String fullName,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
           TagsAssociateRequest request) {
+    return associateTagsForObjectInternal(metalake, type, fullName, request);
+  }
+
+  /**
+   * Associates tag values with a metadata object using the v2 request representation.
+   *
+   * @param metalake The metalake name.
+   * @param type The metadata object type.
+   * @param fullName The metadata object full name.
+   * @param request The tag values association request.
+   * @return The response containing associated tag names.
+   */
+  @POST
+  @Produces("application/vnd.gravitino.v2+json")
+  @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "associate-object-tags", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+  public Response associateTagValuesForObject(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+          TagValuesAssociateRequest request) {
+    return associateTagsForObjectInternal(metalake, type, fullName, request);
+  }
+
+  private Response associateTagsForObjectInternal(
+      String metalake, String type, String fullName, RESTRequest request) {
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,
@@ -270,12 +296,24 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             request.validate();
+            TagValue[] tagsToAdd;
+            TagValue[] tagsToRemove;
+            if (request instanceof TagsAssociateRequest) {
+              TagsAssociateRequest tagsAssociateRequest = (TagsAssociateRequest) request;
+              tagsToAdd = toNoValue(tagsAssociateRequest.getTagsToAdd());
+              tagsToRemove = toNoValue(tagsAssociateRequest.getTagsToRemove());
+            } else {
+              TagValuesAssociateRequest tagValuesAssociateRequest =
+                  (TagValuesAssociateRequest) request;
+              tagsToAdd = tagValuesAssociateRequest.getTagsToAdd();
+              tagsToRemove = tagValuesAssociateRequest.getTagsToRemove();
+            }
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             String[] tagNames =
                 tagDispatcher.associateTagsForMetadataObject(
-                    metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
+                    metalake, object, tagsToAdd, tagsToRemove);
             tagNames = tagNames == null ? new String[0] : tagNames;
             LOG.info(
                 "Associated tags: {} for object type: {}, full name: {} under metalake: {}",
@@ -288,6 +326,13 @@ public class MetadataObjectTagOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, "", fullName, e);
     }
+  }
+
+  private static TagValue[] toNoValue(String[] tags) {
+    if (tags == null) {
+      return null;
+    }
+    return Arrays.stream(tags).map(TagValue::noValue).toArray(TagValue[]::new);
   }
 
   private Optional<Tag> getTagForObject(String metalake, MetadataObject object, String tagName) {
