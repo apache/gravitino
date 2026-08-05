@@ -106,6 +106,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -358,6 +359,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Nullable private final CatalogChangeLogListener catalogChangeLogListener;
 
   private final IdGenerator idGenerator;
+  private final SecretManager secretManager;
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
@@ -373,11 +375,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param config The configuration for the manager.
    * @param store The entity store to use.
    * @param idGenerator The id generator to use.
+   * @param secretManager The secret manager used by catalog operations.
    */
-  public CatalogManager(Config config, EntityStore store, IdGenerator idGenerator) {
+  public CatalogManager(
+      Config config, EntityStore store, IdGenerator idGenerator, SecretManager secretManager) {
     this.config = config;
     this.store = store;
     this.idGenerator = idGenerator;
+    this.secretManager = secretManager;
     this.classLoaderSharingEnabled = config.get(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED);
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
@@ -433,6 +438,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
     catalogCache.invalidateAll();
     classLoaderPool.close();
+  }
+
+  /**
+   * Returns the secret manager used by this catalog manager.
+   *
+   * @return the secret manager
+   */
+  public SecretManager secretManager() {
+    return secretManager;
   }
 
   /**

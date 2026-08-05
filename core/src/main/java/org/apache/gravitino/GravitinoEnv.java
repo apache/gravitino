@@ -98,6 +98,7 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
@@ -158,7 +159,7 @@ public class GravitinoEnv {
 
   private KmsClientRegistry kmsClientRegistry;
 
-  private SecretProviderRegistry secretProviderRegistry;
+  private SecretManager secretManager;
 
   private TagDispatcher tagDispatcher;
 
@@ -440,18 +441,26 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the {@link SecretManager} associated with the Gravitino environment.
+   *
+   * @return The SecretManager instance.
+   * @throws IllegalStateException if the environment has not been initialized
+   */
+  public SecretManager secretManager() {
+    Preconditions.checkState(secretManager != null, "GravitinoEnv components are not initialized.");
+    return secretManager;
+  }
+
+  /**
    * Get the secrets-provider registry associated with the Gravitino environment.
    *
-   * <p>The environment owns this registry. Callers may inject it into dependent components but must
-   * not close it.
+   * <p>Owned by {@link #secretManager()}. Callers may use it for discovery but must not close it.
    *
    * @return The secrets-provider registry instance.
    * @throws IllegalStateException if the environment has not been initialized
    */
   public SecretProviderRegistry secretProviderRegistry() {
-    Preconditions.checkState(
-        secretProviderRegistry != null, "GravitinoEnv components are not initialized.");
-    return secretProviderRegistry;
+    return secretManager().getRegistry();
   }
 
   /**
@@ -675,8 +684,8 @@ public class GravitinoEnv {
       kmsClientRegistry.close();
     }
 
-    if (secretProviderRegistry != null) {
-      secretProviderRegistry.close();
+    if (secretManager != null) {
+      secretManager.close();
     }
 
     LOG.info("Gravitino Environment is shut down.");
@@ -684,7 +693,7 @@ public class GravitinoEnv {
 
   private void initBaseComponents() {
     this.kmsClientRegistry = new KmsClientRegistry(config);
-    this.secretProviderRegistry = new SecretProviderRegistry(config);
+    this.secretManager = new SecretManager(config);
 
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
@@ -724,7 +733,7 @@ public class GravitinoEnv {
     // CatalogManager
     // CatalogManager registers its own change-log listener with the entity store (when the store
     // supports it), so no poller wiring is needed here.
-    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    this.catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
     this.internalCatalogDispatcher = catalogManager;
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);

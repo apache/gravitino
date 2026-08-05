@@ -75,6 +75,23 @@ public interface SecretProvider {
   void deleteSecret(SecretUrn urn);
 
   /**
+   * Builds a URN for an external secret reference without writing secret material.
+   *
+   * <p>Providers that only support write-through must leave the default implementation, which
+   * rejects external references.
+   *
+   * @param propertyKey the entity property key that will store the URN
+   * @param attributes provider-specific locator attributes
+   * @return the external-reference secret URN (must end with {@code propertyKey})
+   * @throws UnsupportedOperationException if this provider does not support external references
+   * @throws IllegalArgumentException if attributes are invalid for this provider
+   */
+  default SecretUrn bindExternalReference(String propertyKey, Map<String, String> attributes) {
+    throw new UnsupportedOperationException(
+        type() + " does not support external secret references");
+  }
+
+  /**
    * Releases resources owned by this provider.
    *
    * <p>Implementations must override this method and explicitly release any held resources. An
