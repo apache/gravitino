@@ -43,8 +43,6 @@ public final class SecretBinding {
   public SecretBinding(String provider, String plaintext) {
     Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
     Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
-    Preconditions.checkArgument(
-        !"******".equals(plaintext), "plaintext must not be the masked placeholder");
     this.provider = provider;
     this.plaintext = plaintext;
   }

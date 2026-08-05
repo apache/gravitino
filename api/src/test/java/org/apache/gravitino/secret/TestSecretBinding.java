@@ -31,8 +31,8 @@ public class TestSecretBinding {
     Assertions.assertEquals("s3cr3t", binding.plaintext());
     Assertions.assertFalse(binding.toString().contains("s3cr3t"));
 
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> new SecretBinding("memory", "******"));
     Assertions.assertThrows(IllegalArgumentException.class, () -> new SecretBinding("", "x"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new SecretBinding("memory", null));
   }
 }
