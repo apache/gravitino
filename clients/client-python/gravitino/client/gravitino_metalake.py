@@ -16,6 +16,7 @@
 # under the License.
 # pylint: disable=too-many-lines
 import logging
+from gravitino.api.secret import SecretBinding, SecretReference
 from typing import Dict, List, Optional
 
 from gravitino.api.authorization.group import Group
@@ -217,6 +218,8 @@ class GravitinoMetalake(
         provider: str,
         comment: str,
         properties: Dict[str, str],
+        secret_bindings: Dict[str, SecretBinding] = None,
+        secret_references: Dict[str, SecretReference] = None,
     ) -> Catalog:
         """Create a new catalog with specified name, catalog type, comment and properties.
 
@@ -228,6 +231,8 @@ class GravitinoMetalake(
             None provider. For the details, please refer to the Catalog.Type.
             comment: The comment of the catalog.
             properties: The properties of the catalog.
+            secret_bindings: Optional property key → binding (provider + value) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchMetalakeException if the metalake does not exist.
@@ -243,6 +248,8 @@ class GravitinoMetalake(
             provider=provider,
             comment=comment,
             properties=properties,
+            secret_bindings=secret_bindings,
+            secret_references=secret_references,
         )
         catalog_create_request.validate()
 

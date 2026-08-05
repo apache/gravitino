@@ -27,6 +27,8 @@ import lombok.Getter;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /** Represents a request to create a schema. */
 @Getter
@@ -45,9 +47,17 @@ public class SchemaCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
+  @Nullable
+  @JsonProperty("secretBindings")
+  private final Map<String, SecretBinding> secretBindings;
+
+  @Nullable
+  @JsonProperty("secretReferences")
+  private final Map<String, SecretReference> secretReferences;
+
   /** Default constructor for Jackson deserialization. */
   public SchemaCreateRequest() {
-    this(null, null, null);
+    this(null, null, null, null, null);
   }
 
   /**
@@ -56,11 +66,22 @@ public class SchemaCreateRequest implements RESTRequest {
    * @param name The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code value}) for
+   *     write-through secrets.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
    */
-  public SchemaCreateRequest(String name, String comment, Map<String, String> properties) {
+  public SchemaCreateRequest(
+      String name,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;
+    this.secretBindings = secretBindings;
+    this.secretReferences = secretReferences;
   }
 
   /**

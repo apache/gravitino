@@ -96,7 +96,9 @@ public class TestFunctionCatalog extends TestBase {
             CatalogDTO.Type.RELATIONAL,
             provider,
             "comment",
-            ImmutableMap.of("k1", "k2"));
+            ImmutableMap.of("k1", "k2"),
+            null,
+            null);
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,

@@ -53,6 +53,8 @@ import org.apache.gravitino.listener.api.event.LoadCatalogEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogPreEvent;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -135,14 +137,18 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     CatalogInfo catalogInfo =
         new CatalogInfo(ident.name(), type, provider, comment, properties, null);
     eventBus.dispatchEvent(
         new CreateCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident, catalogInfo));
     try {
-      Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
+      Catalog catalog =
+          dispatcher.createCatalog(
+              ident, type, provider, comment, properties, secretBindings, secretReferences);
       eventBus.dispatchEvent(
           new CreateCatalogEvent(
               PrincipalUtils.getCurrentUserName(), ident, new CatalogInfo(catalog)));

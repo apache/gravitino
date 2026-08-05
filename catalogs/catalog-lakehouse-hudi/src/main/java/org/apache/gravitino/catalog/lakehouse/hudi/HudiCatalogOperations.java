@@ -49,6 +49,8 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -143,7 +145,12 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    * @throws SchemaAlreadyExistsException if the schema already exists.
    */
   @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+  public Schema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     return hudiCatalogBackendOps.createSchema(ident, comment, properties);
   }

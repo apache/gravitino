@@ -66,6 +66,8 @@ import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -404,7 +406,12 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+  public Schema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     // It appears that the "default" schema suffices, so there is no need to support creating schema
     // currently

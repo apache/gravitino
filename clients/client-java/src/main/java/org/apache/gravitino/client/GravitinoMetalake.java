@@ -128,6 +128,8 @@ import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -236,13 +238,18 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Create a new catalog with specified identifier, type, comment and properties.
+   * Create a new catalog with specified identifier, type, comment, properties, and optional secret
+   * maps.
    *
    * @param catalogName The identifier of the catalog.
    * @param type The type of the catalog.
    * @param provider The provider of the catalog.
    * @param comment The comment of the catalog.
    * @param properties The properties of the catalog.
+   * @param secretBindings Optional property key → binding ({ provider} + { value}) for
+   *     write-through.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
    * @return The created {@link Catalog}.
    * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
    * @throws CatalogAlreadyExistsException if the catalog with specified identifier already exists.
@@ -253,10 +260,13 @@ public class GravitinoMetalake extends MetalakeDTO
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     CatalogCreateRequest req =
-        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
+        new CatalogCreateRequest(
+            catalogName, type, provider, comment, properties, secretBindings, secretReferences);
     req.validate();
 
     CatalogResponse resp =
@@ -405,7 +415,7 @@ public class GravitinoMetalake extends MetalakeDTO
       Map<String, String> properties)
       throws Exception {
     CatalogCreateRequest req =
-        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
+        new CatalogCreateRequest(catalogName, type, provider, comment, properties, null, null);
     req.validate();
 
     // The response maybe a `BaseResponse` (test successfully)  or an `ErrorResponse` (test failed),

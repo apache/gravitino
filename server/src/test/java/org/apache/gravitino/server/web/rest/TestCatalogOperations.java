@@ -226,10 +226,13 @@ public class TestCatalogOperations extends BaseOperationsTest {
             Catalog.Type.RELATIONAL,
             "test",
             "comment",
-            ImmutableMap.of("key", "value"));
+            ImmutableMap.of("key", "value"),
+            null,
+            null);
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
-    when(manager.createCatalog(any(), any(), any(), any(), any())).thenReturn(catalog);
+    when(manager.createCatalog(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(catalog);
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -253,7 +256,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -270,7 +273,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw CatalogAlreadyExistsException
     doThrow(new CatalogAlreadyExistsException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp2 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -287,7 +290,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -309,7 +312,9 @@ public class TestCatalogOperations extends BaseOperationsTest {
             Catalog.Type.RELATIONAL,
             "test",
             "comment",
-            ImmutableMap.of("key", "value"));
+            ImmutableMap.of("key", "value"),
+            null,
+            null);
     doNothing().when(manager).testConnection(any(), any(), any(), any(), any());
     Response resp =
         target("/metalakes/metalake1/catalogs/testConnection")

@@ -42,6 +42,8 @@ import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 public abstract class ManagedSchemaOperations implements SupportsSchemas {
@@ -89,7 +91,12 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
   }
 
   @Override
-  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+  public Schema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       if (store().exists(ident, Entity.EntityType.SCHEMA)) {

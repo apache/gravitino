@@ -37,7 +37,9 @@ public class TestCatalogCreateRequest {
             Catalog.Type.MODEL,
             "provider_test",
             "catalog comment",
-            ImmutableMap.of("key", "value"));
+            ImmutableMap.of("key", "value"),
+            null,
+            null);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
     CatalogCreateRequest deserRequest =
@@ -52,7 +54,7 @@ public class TestCatalogCreateRequest {
 
     // Test with null provider, comment and properties
     CatalogCreateRequest request1 =
-        new CatalogCreateRequest("catalog_test", Catalog.Type.MODEL, null, null, null);
+        new CatalogCreateRequest("catalog_test", Catalog.Type.MODEL, null, null, null, null, null);
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
     CatalogCreateRequest deserRequest1 =
@@ -70,7 +72,9 @@ public class TestCatalogCreateRequest {
     // Test using null provider with catalog type doesn't support managed catalog
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new CatalogCreateRequest("catalog_test", Catalog.Type.RELATIONAL, null, null, null));
+        () ->
+            new CatalogCreateRequest(
+                "catalog_test", Catalog.Type.RELATIONAL, null, null, null, null, null));
 
     String json1 = "{\"name\":\"catalog_test\",\"type\":\"relational\"}";
     Assertions.assertThrows(
@@ -85,7 +89,7 @@ public class TestCatalogCreateRequest {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> new CatalogCreateRequest("catalog_test", null, "hadoop", null, null));
+            () -> new CatalogCreateRequest("catalog_test", null, "hadoop", null, null, null, null));
 
     // Verify the exception message
     Assertions.assertEquals(

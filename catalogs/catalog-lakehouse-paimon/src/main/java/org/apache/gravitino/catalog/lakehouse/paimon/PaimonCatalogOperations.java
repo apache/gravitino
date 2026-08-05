@@ -70,6 +70,8 @@ import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.paimon.catalog.Catalog;
@@ -183,6 +185,29 @@ public class PaimonCatalogOperations
   @Override
   public PaimonSchema createSchema(
       NameIdentifier identifier, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(identifier, comment, properties, null, null);
+  }
+
+  /**
+   * Creates a new schema with the provided identifier, comment, metadata, and secret options.
+   *
+   * @param identifier The identifier of the schema to create.
+   * @param comment The comment for the new schema.
+   * @param properties The properties for the new schema.
+   * @param secretBindings The secret bindings for the schema.
+   * @param secretReferences The secret references for the schema.
+   * @return The newly created {@link PaimonSchema} instance.
+   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
+   * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
+   */
+  @Override
+  public PaimonSchema createSchema(
+      NameIdentifier identifier,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     String currentUser = currentUser();
     PaimonSchema createdSchema =

@@ -31,6 +31,8 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /** Represents a request to create a fileset. */
 @Getter
@@ -63,6 +65,14 @@ public class FilesetCreateRequest implements RESTRequest {
   @Nullable
   @JsonProperty("properties")
   private Map<String, String> properties;
+
+  @Nullable
+  @JsonProperty("secretBindings")
+  private Map<String, SecretBinding> secretBindings;
+
+  @Nullable
+  @JsonProperty("secretReferences")
+  private Map<String, SecretReference> secretReferences;
 
   /**
    * Validates the request.

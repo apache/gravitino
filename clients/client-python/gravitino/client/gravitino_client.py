@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+from gravitino.api.secret import SecretBinding, SecretReference
 from typing import Dict, List, Optional
 
 from gravitino.api.authorization.group import Group
@@ -103,9 +104,17 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         provider: str,
         comment: str,
         properties: Dict[str, str],
+        secret_bindings: Dict[str, SecretBinding] = None,
+        secret_references: Dict[str, SecretReference] = None,
     ) -> Catalog:
         return self.get_metalake().create_catalog(
-            name, catalog_type, provider, comment, properties
+            name,
+            catalog_type,
+            provider,
+            comment,
+            properties,
+            secret_bindings,
+            secret_references,
         )
 
     def alter_catalog(self, name: str, *changes: CatalogChange):

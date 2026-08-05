@@ -21,7 +21,10 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -38,7 +41,11 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
@@ -143,45 +150,78 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       String comment,
       Fileset.Type type,
       Map<String, String> storageLocations,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    long uid = idGenerator.nextId();
+    Map<String, String> propertiesForCreate =
+        properties == null ? new HashMap<>() : new HashMap<>(properties);
+    SecretPropertyUtils.checkNoOverlap(secretBindings, secretReferences);
+    if (secretReferences != null && !secretReferences.isEmpty()) {
+      SecretPropertyUtils.applySecretUrns(
+          propertiesForCreate, secretManager.getSecretReferenceUrns(secretReferences));
+    }
+    if (secretBindings != null) {
+      for (Map.Entry<String, SecretBinding> entry : secretBindings.entrySet()) {
+        propertiesForCreate.put(entry.getKey(), entry.getValue().value());
+      }
+    }
+    // Preserve skip-on-null validation when caller passed null properties and no secrets.
+    Map<String, String> propertiesToValidate =
+        properties == null
+                && (secretBindings == null || secretBindings.isEmpty())
+                && (secretReferences == null || secretReferences.isEmpty())
+            ? null
+            : propertiesForCreate;
     doWithCatalog(
         catalogIdent,
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  validatePropertyForCreate(p.filesetPropertiesMetadata(), properties);
+                  validatePropertyForCreate(p.filesetPropertiesMetadata(), propertiesToValidate);
                   return null;
                 }),
         IllegalArgumentException.class);
-    long uid = idGenerator.nextId();
+    final List<SecretUrn> secretUrns = new ArrayList<>();
+    if (secretBindings != null && !secretBindings.isEmpty()) {
+      secretUrns.addAll(secretManager.getSecretBindingUrns("fileset", uid, secretBindings));
+      secretManager.writeSecrets(secretBindings, secretUrns);
+      SecretPropertyUtils.applySecretUrns(propertiesForCreate, secretUrns);
+    }
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Map<String, String> updatedProperties =
-        StringIdentifier.newPropertiesWithId(stringId, properties);
+        StringIdentifier.newPropertiesWithId(stringId, propertiesForCreate);
 
-    Fileset createdFileset =
-        TreeLockUtils.doWithTreeLock(
-            // Lock at fileset level (not schema level) to allow concurrent fileset creation.
-            // Trade-off: listFilesets() may temporarily miss in-progress creations until complete.
-            ident,
-            LockType.WRITE,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c ->
-                        c.doWithFilesetOps(
-                            f ->
-                                f.createMultipleLocationFileset(
-                                    ident, comment, type, storageLocations, updatedProperties)),
-                    NoSuchSchemaException.class,
-                    FilesetAlreadyExistsException.class));
-    return EntityCombinedFileset.of(createdFileset)
-        .withHiddenProperties(
-            getHiddenPropertyNames(
-                catalogIdent,
-                HasPropertyMetadata::filesetPropertiesMetadata,
-                createdFileset.properties()));
+    try {
+      Fileset createdFileset =
+          TreeLockUtils.doWithTreeLock(
+              // Lock at fileset level (not schema level) to allow concurrent fileset creation.
+              // Trade-off: listFilesets() may temporarily miss in-progress creations until
+              // complete.
+              ident,
+              LockType.WRITE,
+              () ->
+                  doWithCatalog(
+                      catalogIdent,
+                      c ->
+                          c.doWithFilesetOps(
+                              f ->
+                                  f.createMultipleLocationFileset(
+                                      ident, comment, type, storageLocations, updatedProperties)),
+                      NoSuchSchemaException.class,
+                      FilesetAlreadyExistsException.class));
+      return EntityCombinedFileset.of(createdFileset)
+          .withHiddenProperties(
+              getHiddenPropertyNames(
+                  catalogIdent,
+                  HasPropertyMetadata::filesetPropertiesMetadata,
+                  createdFileset.properties()));
+    } catch (RuntimeException e) {
+      secretManager.rollbackWritten(secretUrns);
+      throw e;
+    }
   }
 
   /**

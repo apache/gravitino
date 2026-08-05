@@ -106,7 +106,11 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -379,7 +383,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param config The configuration for the manager.
    * @param store The entity store to use.
    * @param idGenerator The id generator to use.
-   * @param secretManager The secret manager used by catalog operations.
+   * @param secretManager The secret manager to use for create-time secret bindings/references.
    */
   public CatalogManager(
       Config config, EntityStore store, IdGenerator idGenerator, SecretManager secretManager) {
@@ -593,12 +597,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
-    Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+    final Map<String, String> mergedConfig = new HashMap<>(buildCatalogConf(provider, properties));
     long uid = idGenerator.nextId();
+
+    SecretPropertyUtils.checkNoOverlap(secretBindings, secretReferences);
+    if (secretReferences != null && !secretReferences.isEmpty()) {
+      SecretPropertyUtils.applySecretUrns(
+          mergedConfig, secretManager.getSecretReferenceUrns(secretReferences));
+    }
+    final List<SecretUrn> secretUrns = new ArrayList<>();
+    if (secretBindings != null && !secretBindings.isEmpty()) {
+      secretUrns.addAll(secretManager.getSecretBindingUrns("catalog", uid, secretBindings));
+      secretManager.writeSecrets(secretBindings, secretUrns);
+      SecretPropertyUtils.applySecretUrns(mergedConfig, secretUrns);
+    }
+
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Instant now = Instant.now();
     String creator = PrincipalUtils.getCurrentPrincipal().getName();
@@ -626,12 +645,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         () -> {
           checkMetalake(metalakeIdent, store);
           boolean needClean = true;
+          boolean needSecretClean = true;
           try {
             store.put(e, false /* overwrite */);
             CatalogWrapper wrapper =
                 catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 
             needClean = false;
+            needSecretClean = false;
             return wrapper.catalog;
 
           } catch (EntityAlreadyExistsException e1) {
@@ -651,6 +672,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw new RuntimeException(e3);
 
           } finally {
+            if (needSecretClean) {
+              secretManager.rollbackWritten(secretUrns);
+            }
             if (needClean) {
               // since we put the catalog entity into the store but failed to create the catalog
               // instance,

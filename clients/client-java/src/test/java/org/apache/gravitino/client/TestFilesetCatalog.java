@@ -102,7 +102,13 @@ public class TestFilesetCatalog extends TestBase {
 
     CatalogCreateRequest catalogCreateRequest =
         new CatalogCreateRequest(
-            catalogName, CatalogDTO.Type.FILESET, provider, "comment", ImmutableMap.of("k1", "k2"));
+            catalogName,
+            CatalogDTO.Type.FILESET,
+            provider,
+            "comment",
+            ImmutableMap.of("k1", "k2"),
+            null,
+            null);
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,

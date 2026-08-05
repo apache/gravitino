@@ -66,6 +66,8 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
@@ -200,9 +202,42 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     return result.toArray(new NameIdentifier[0]);
   }
 
+  /**
+   * Creates a new schema with the provided identifier, comment, and properties.
+   *
+   * @param ident The identifier of the schema to create.
+   * @param comment The comment for the schema.
+   * @param properties The properties for the schema.
+   * @return The created {@link GlueSchema}.
+   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
+   * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
+   */
   @Override
   public GlueSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, null, null);
+  }
+
+  /**
+   * Creates a new schema with the provided identifier, comment, properties, and secret options.
+   *
+   * @param ident The identifier of the schema to create.
+   * @param comment The comment for the schema.
+   * @param properties The properties for the schema.
+   * @param secretBindings The secret bindings for the schema.
+   * @param secretReferences The secret references for the schema.
+   * @return The created {@link GlueSchema}.
+   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
+   * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
+   */
+  @Override
+  public GlueSchema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
     Map<String, String> params = properties != null ? properties : Collections.emptyMap();

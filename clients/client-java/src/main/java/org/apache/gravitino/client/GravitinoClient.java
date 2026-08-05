@@ -67,6 +67,8 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
@@ -137,9 +139,13 @@ public class GravitinoClient extends GravitinoClientBase
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return getMetalake().createCatalog(catalogName, type, provider, comment, properties);
+    return getMetalake()
+        .createCatalog(
+            catalogName, type, provider, comment, properties, secretBindings, secretReferences);
   }
 
   @Override

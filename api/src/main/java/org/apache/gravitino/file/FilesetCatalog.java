@@ -30,6 +30,8 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.file.FilesetChange.RenameFileset;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * The FilesetCatalog interface defines the public API for managing fileset objects in a schema. If
@@ -113,6 +115,34 @@ public interface FilesetCatalog {
    * @param type The type of the fileset.
    * @param storageLocations The location names and storage locations of the fileset.
    * @param properties The properties of the fileset.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code value}) for
+   *     write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created fileset metadata
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FilesetAlreadyExistsException If the fileset already exists.
+   */
+  default Fileset createMultipleLocationFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      Map<String, String> storageLocations,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
+
+  /**
+   * Create a fileset metadata with multiple storage locations in the catalog.
+   *
+   * @param ident A fileset identifier.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocations The location names and storage locations of the fileset.
+   * @param properties The properties of the fileset.
    * @return The created fileset metadata
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws FilesetAlreadyExistsException If the fileset already exists.
@@ -124,7 +154,8 @@ public interface FilesetCatalog {
       Map<String, String> storageLocations,
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented");
+    return createMultipleLocationFileset(
+        ident, comment, type, storageLocations, properties, null, null);
   }
 
   /**

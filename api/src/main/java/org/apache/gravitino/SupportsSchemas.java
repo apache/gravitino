@@ -26,6 +26,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * The client interface to support schema operations. The server side should use the other one with
@@ -96,12 +98,40 @@ public interface SupportsSchemas {
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code value}) for
+   *     write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes)
    * @return The schema as defined by the caller, without all default values.
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */
-  Schema createSchema(String schemaName, String comment, Map<String, String> properties)
+  Schema createSchema(
+      String schemaName,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException;
+
+  /**
+   * Creates a schema in the catalog based on the provided details.
+   *
+   * <p>This method returns the schema as defined by the user without applying all defaults. If you
+   * need the schema with default values applied, use the {@link #loadSchema(String)} method after
+   * creation.
+   *
+   * @param schemaName The name of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @return The schema as defined by the caller, without all default values.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws SchemaAlreadyExistsException If the schema already exists.
+   */
+  default Schema createSchema(String schemaName, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(schemaName, comment, properties, null, null);
+  }
 
   /**
    * Load metadata properties for a schema.

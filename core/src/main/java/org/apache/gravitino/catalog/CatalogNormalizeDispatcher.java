@@ -34,6 +34,8 @@ import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   private static final Set<String> RESERVED_WORDS =
@@ -82,10 +84,13 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     validateCatalogName(ident.name());
-    return dispatcher.createCatalog(ident, type, provider, comment, properties);
+    return dispatcher.createCatalog(
+        ident, type, provider, comment, properties, secretBindings, secretReferences);
   }
 
   @Override

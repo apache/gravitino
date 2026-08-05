@@ -38,6 +38,8 @@ import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -77,9 +79,13 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       Catalog.Type type,
       String provider,
       String comment,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
+    Catalog catalog =
+        dispatcher.createCatalog(
+            ident, type, provider, comment, properties, secretBindings, secretReferences);
 
     try {
       // Set the creator as the owner of the catalog.

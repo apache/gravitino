@@ -30,6 +30,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /** Represents a request to create a catalog. */
 @Getter
@@ -54,6 +56,14 @@ public class CatalogCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
+  @Nullable
+  @JsonProperty("secretBindings")
+  private final Map<String, SecretBinding> secretBindings;
+
+  @Nullable
+  @JsonProperty("secretReferences")
+  private final Map<String, SecretReference> secretReferences;
+
   /**
    * Constructor for CatalogCreateRequest.
    *
@@ -62,6 +72,10 @@ public class CatalogCreateRequest implements RESTRequest {
    * @param provider The provider of the catalog.
    * @param comment The comment for the catalog.
    * @param properties The properties for the catalog.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code value}) for
+   *     write-through secrets.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
    */
   @JsonCreator
   public CatalogCreateRequest(
@@ -69,11 +83,15 @@ public class CatalogCreateRequest implements RESTRequest {
       @JsonProperty("type") Catalog.Type type,
       @JsonProperty("provider") String provider,
       @JsonProperty("comment") String comment,
-      @JsonProperty("properties") Map<String, String> properties) {
+      @JsonProperty("properties") Map<String, String> properties,
+      @JsonProperty("secretBindings") Map<String, SecretBinding> secretBindings,
+      @JsonProperty("secretReferences") Map<String, SecretReference> secretReferences) {
     this.name = name;
     this.type = type;
     this.comment = comment;
     this.properties = properties;
+    this.secretBindings = secretBindings;
+    this.secretReferences = secretReferences;
 
     if (StringUtils.isNotBlank(provider)) {
       this.provider = provider;

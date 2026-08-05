@@ -154,7 +154,9 @@ public class CatalogOperations {
                     request.getType(),
                     request.getProvider(),
                     request.getComment(),
-                    request.getProperties());
+                    request.getProperties(),
+                    request.getSecretBindings(),
+                    request.getSecretReferences());
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
             LOG.info("Catalog created: {}.{}", metalake, catalog.name());
             return response;

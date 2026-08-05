@@ -72,6 +72,8 @@ import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -235,6 +237,29 @@ public class IcebergCatalogOperations
   @Override
   public IcebergSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, null, null);
+  }
+
+  /**
+   * Creates a new schema with the provided identifier, comment, metadata, and secret options.
+   *
+   * @param ident The identifier of the schema to create.
+   * @param comment The comment for the schema.
+   * @param properties The properties for the schema.
+   * @param secretBindings The secret bindings for the schema.
+   * @param secretReferences The secret references for the schema.
+   * @return The created {@link IcebergSchema}.
+   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
+   * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
+   */
+  @Override
+  public IcebergSchema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       String currentUser = currentUser();
