@@ -66,26 +66,24 @@ object has or inherits from parent metadata objects. Tags themselves are not nes
 1. **Single Object-Side Attachment Point**: Metadata objects receive governance behavior only
    through tags, not through direct policy attachment.
 2. **Reusable Policy Lifecycle**: Policies remain first-class objects with typed content, enabled
-   state, audit information, and metalake-scoped lifecycle operations.
-3. **Immutable Policy Definitions**: Policy definitions are not modified in place. To change policy
-   behavior, administrators create a replacement policy and update policy-to-tag associations.
-4. **Policy-to-Tag Association**: Administrators can associate policies with tags and inspect which
+   state, audit information, and existing metalake-scoped lifecycle and mutation operations.
+3. **Policy-to-Tag Association**: Administrators can associate policies with tags and inspect which
    tags carry a policy.
-5. **Flat Tags**: Tags remain flat metalake-scoped objects. The design does not add parent tags,
+4. **Flat Tags**: Tags remain flat metalake-scoped objects. The design does not add parent tags,
    child tags, tag groups, or tag-to-tag inheritance.
-6. **Object Policy Resolution**: Gravitino can compute object policies for a metadata object from
+5. **Object Policy Resolution**: Gravitino can compute object policies for a metadata object from
    its effective tags, including inherited tags.
-7. **Read-Only Object Policies**: Object policies are derived results. Users cannot create, alter,
+6. **Read-Only Object Policies**: Object policies are derived results. Users cannot create, alter,
    enable, disable, delete, or associate policies directly on a metadata object.
-8. **Explicit Visibility Privileges**: Tag and policy visibility are controlled by read-only
+7. **Explicit Visibility Privileges**: Tag and policy visibility are controlled by read-only
    privileges that are separate from mutation privileges.
-9. **Secure Policy Enforcement**: Row filter and column mask enforcement does not depend on whether
+8. **Secure Policy Enforcement**: Row filter and column mask enforcement does not depend on whether
    the end user can view policy details.
-10. **TMS Integration**: TMS consumes the system iceberg compaction policy through object policy
+9. **TMS Integration**: TMS consumes the system iceberg compaction policy through object policy
     lookup, not through direct object policy relations.
-11. **ABAC Evolution Path**: The resolver boundary can later support tag-expression policies without
+10. **ABAC Evolution Path**: The resolver boundary can later support tag-expression policies without
     changing every policy consumer.
-12. **Explicit Breaking Migration**: Existing direct object policy relations are migrated or retired
+11. **Explicit Breaking Migration**: Existing direct object policy relations are migrated or retired
     explicitly; runtime behavior does not read direct object policy relations.
 
 ---
@@ -187,39 +185,42 @@ flat tag names without dot separators.
 5. The effective tag set is the de-duplicated result of walking from the object to its ancestors.
 6. Policies bound to effective tags become object policy candidates.
 
-### Policy Supported Object Types
-
-`PolicyContent.supportedObjectTypes()` should mean "the metadata object types on which this policy
-content can appear as an object policy." In the policy-on-tag model, the association target is
-always a tag, so `supportedObjectTypes()` no longer means "the metadata object types to which the
-policy can be directly attached."
-
-Example:
+For example:
 
 ```text
 policy iceberg_compaction_standard
   policyType: system_iceberg_compaction
-  supportedObjectTypes: [CATALOG, SCHEMA, TABLE]
-
-tag maintenance_standard
-  policies: [iceberg_compaction_standard]
 
 catalog iceberg
-  tags: [maintenance_standard]
+  direct tags: [maintenance_standard]
 
 table iceberg.db.orders
+  direct tags: []
+  inherited tags: [maintenance_standard]
   effective tags: [maintenance_standard]
   object policies: [iceberg_compaction_standard]
+  policy source: CATALOG iceberg through tag maintenance_standard
 ```
+
+### Policy Supported Object Types
+
+`PolicyContent.supportedObjectTypes()` is deprecated in the policy-on-tag model. Its current purpose
+is to restrict the metadata object types to which a policy can be directly attached. The target
+model associates policies with tags instead of metadata objects, so relation creation no longer has
+a metadata object type to validate.
+
+Object policy resolution therefore does not filter policies by `supportedObjectTypes()`. It returns
+enabled policies associated with the effective tags. Type-specific consumers decide whether and how
+to consume a policy type. For example, TMS requests object policies for tables and consumes only the
+system iceberg compaction policy type. The deprecated field should be removed from the public API in
+a compatible release according to the project's API evolution policy.
 
 ### Policy Mutability
 
-Policy definitions are immutable after creation. Users can create, view, delete, enable, disable,
-and associate policies according to authorization rules, but they cannot update an existing policy
-definition in place.
-
-If policy behavior needs to change, administrators create a new policy and update the relevant
-policy-to-tag association.
+Policy-on-tag does not change the existing policy lifecycle or mutation APIs. Users can continue to
+create, alter, enable, disable, delete, and view policy objects according to authorization rules.
+Existing operations such as `PolicyOperations.alterPolicy()` and `PolicyChange.updateContent()`
+remain supported. Only object policies, which are derived from effective tags, are read-only.
 
 ### Object Policy Mutability
 
@@ -239,7 +240,8 @@ disassociate object policy
 
 To change the object policy result, users must change one of the source inputs:
 
-1. create a replacement policy and update the policy-to-tag relation;
+1. alter the policy definition, or create a replacement policy and update the policy-to-tag
+   relation;
 2. enable or disable the policy object;
 3. associate or disassociate the policy with a tag;
 4. assign or remove the tag from the metadata object or one of its ancestors.
@@ -349,9 +351,11 @@ does not exist.
 }
 ```
 
-**Behavior:** Updates policy associations for one tag. The tag and all added policies must exist in
-the same metalake. Adding an already associated policy returns a duplicate association error.
-Removing a missing association is ignored. A policy listed in both arrays is ignored.
+**Behavior:** Atomically updates policy associations for one tag. The request supports adding and
+removing multiple policies so callers can change the complete relation set without issuing one
+request per policy or exposing an intermediate partial state. The tag and all added policies must
+exist in the same metalake. Adding an already associated policy returns a duplicate association
+error. Removing a missing association is ignored. A policy listed in both arrays is ignored.
 
 #### New: `GET /api/metalakes/{metalake}/policies/{policy}/tags`
 
@@ -398,7 +402,10 @@ or deleting a policy. Returns `404 Not Found` if the policy does not exist.
 }
 ```
 
-**Old behavior:** This API lists policies directly associated with a metadata object.
+**Current behavior:** This API loads policies directly associated with the requested metadata object
+and its parent metadata objects. Policies loaded from a parent are marked as inherited. The API
+returns policy names by default and policy details when `details=true`; detailed results are
+filtered by the current policy authorization expression. It does not derive policies through tags.
 
 **New behavior:** This API becomes a read-only derived object policy lookup API. It resolves object
 policies from effective tags and policy-to-tag relations. It does not read direct policy relations
@@ -417,7 +424,11 @@ GET  /api/metalakes/{metalake}/objects/{type}/{fullName}/policies/{policy}
 POST /api/metalakes/{metalake}/objects/{type}/{fullName}/policies
 ```
 
-**Old behavior:** These APIs get or associate policies directly on metadata objects.
+**Current behavior:** The GET API first checks the policy relation on the requested metadata object.
+If no direct relation exists, it searches parent metadata objects and marks a parent result as
+inherited. The POST API atomically adds and removes direct policy relations on the requested
+metadata object using `policiesToAdd` and `policiesToRemove`. Neither API modifies the policy
+definition itself.
 
 **New behavior:** Object policies are derived from tags and are only exposed through the object
 policy lookup API.
@@ -451,20 +462,27 @@ Algorithm:
 2. Load effective tags for the object using current inheritance semantics.
 3. Load policies associated with those tags in batch.
 4. Drop disabled policies.
-5. Drop policies whose `supportedObjectTypes()` does not contain the requested metadata object type.
-6. Return the object policies and their source tag information.
+5. Return the object policies and their source tag information.
 
 ### Authorization, Visibility, and Audit
 
 Policy-on-tag makes tags part of the governance control plane. Assigning a high-impact tag can
 change security, maintenance, or retention behavior.
 
-Add two read-only visibility privileges:
+The current authorization model does not define dedicated read-only tag or policy privileges.
+Detailed tag and policy reads currently rely on ownership or the corresponding `APPLY_TAG` or
+`APPLY_POLICY` privilege.
+
+This design proposes two new read-only visibility privileges:
 
 ```text
 VIEW_TAG
 VIEW_POLICY
 ```
+
+For backward compatibility, `APPLY_TAG` implies `VIEW_TAG`, and `APPLY_POLICY` implies
+`VIEW_POLICY`. Existing roles with mutation privileges therefore retain their current visibility.
+The new `VIEW_*` privileges allow read-only access without granting mutation permission.
 
 Existing mutation privileges keep their current semantics:
 
@@ -494,6 +512,8 @@ Recommended authorization rules:
    to the metadata object.
 6. Object policy lookup requires access to the metadata object.
 7. Detailed policy content requires `VIEW_POLICY`; source tag details require `VIEW_TAG`.
+8. `APPLY_POLICY` satisfies policy visibility checks, and `APPLY_TAG` satisfies tag visibility
+   checks, preserving existing role behavior.
 
 Policy enforcement must be independent from policy visibility. A user does not need `VIEW_POLICY`
 for row filters or column masks to take effect. The trusted server-side enforcement path must always
@@ -571,10 +591,11 @@ Rules:
 2. The administrator creates or reuses a tag, such as `maintenance_standard`.
 3. The administrator associates the policy with the tag.
 4. A data owner assigns the tag to a catalog, schema, table, or column.
-5. Gravitino resolves object policies from the object's effective tags.
+5. Gravitino resolves object policies from the object's effective tags according to the
+   [effective tag semantics](#effective-tag-semantics), including tags inherited from ancestors.
 6. TMS or another consumer reads object policies through a read-only lookup API.
-7. To change the object policy result, the administrator creates a replacement policy, changes a
-   policy-to-tag relation, changes a tag assignment, or changes policy enabled state.
+7. To change the object policy result, the administrator alters or replaces a policy, changes a
+   policy-to-tag relation, changes a tag assignment, or changes the policy enabled state.
 
 ### Implementation Process
 
@@ -596,7 +617,7 @@ Metadata Object
   -> effective tags
   -> policy-tag relations
   -> policy metadata
-  -> enabled + supported object type filtering
+  -> enabled policy filtering
   -> object policy response
 ```
 
@@ -650,6 +671,8 @@ Recommended evolution:
 - [ ] Add `policy_tag_relation_meta` storage schema and entity store operations.
 - [ ] Add core API and DTO contracts for policy-to-tag association and object policy source
       information.
+- [ ] Deprecate `PolicyContent.supportedObjectTypes()`, stop using it during object policy
+      resolution, and plan its removal according to the API evolution policy.
 - [ ] Implement `ObjectPolicyResolver` to resolve object policies from effective tags.
 - [ ] Add REST endpoints for tag policy association and policy tag listing.
 - [ ] Change object policy REST APIs to read-only derived lookup and remove direct object policy
