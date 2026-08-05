@@ -37,6 +37,7 @@ ALTER TABLE `tag_relation_meta`
     DROP INDEX `uk_ti_mi_mo_del`;
 
 ALTER TABLE `tag_relation_meta`
-    ADD COLUMN `tag_value` VARCHAR(256) DEFAULT NULL COMMENT 'tag assignment value' AFTER `metadata_object_type`;
+    ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
 
+CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);

@@ -49,12 +49,7 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
         + " AND ("
         + "<foreach item='item' collection='tagRels' separator=' OR '>"
-        + "(tag_id = #{item.tagId}"
-        + "<choose>"
-        + "<when test='item.tagValue == null'> AND tag_value IS NULL</when>"
-        + "<otherwise> AND tag_value = #{item.tagValue}</otherwise>"
-        + "</choose>"
-        + ")"
+        + "(tag_id = #{item.tagId} AND tag_value = #{item.tagValue})"
         + "</foreach>"
         + ")"
         + "</script>";

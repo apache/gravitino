@@ -693,6 +693,30 @@ public class TestTagMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testRejectDuplicateValuelessTagAssignment() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_unique_value");
+
+    TagEntity tagEntity =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("unique_value")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("unique value comment")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    tagMetaService.insertTag(tagEntity, false);
+    tagMetaService.associateTagValuesWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new TagValue[] {TagValue.noValue(tagEntity.name())},
+        new TagValue[0]);
+
+    Assertions.assertThrows(SQLException.class, () -> insertDuplicateActiveTagRel(tagEntity.id()));
+  }
+
+  @TestTemplate
   public void testListTagsForMetadataObject() throws IOException {
     testAssociateAndDisassociateTagsWithMetadataObject();
 
@@ -1298,6 +1322,20 @@ public class TestTagMetaService extends TestJDBCBackend {
       }
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
+  private void insertDuplicateActiveTagRel(Long tagId) throws SQLException {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format(
+              "INSERT INTO tag_relation_meta (tag_id, metadata_object_id, metadata_object_type, tag_value, audit_info, current_version, last_version, deleted_at) "
+                  + "SELECT tag_id, metadata_object_id, metadata_object_type, tag_value, audit_info, current_version, last_version, deleted_at "
+                  + "FROM tag_relation_meta WHERE tag_id = %d AND deleted_at = 0",
+              tagId));
     }
   }
 

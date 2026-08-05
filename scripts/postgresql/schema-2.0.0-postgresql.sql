@@ -525,12 +525,13 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
     tag_id BIGINT NOT NULL,
     metadata_object_id BIGINT NOT NULL,
     metadata_object_type VARCHAR(64) NOT NULL,
-    tag_value VARCHAR(256) DEFAULT NULL,
+    tag_value VARCHAR(256) NOT NULL DEFAULT '',
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
-    PRIMARY KEY (id)
+    PRIMARY KEY (id),
+    CONSTRAINT uk_ti_mi_mo_tv_del UNIQUE (tag_id, metadata_object_id, metadata_object_type, tag_value, deleted_at)
 );
 
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id ON tag_relation_meta (tag_id);
@@ -541,7 +542,7 @@ COMMENT ON COLUMN tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN tag_relation_meta.tag_id IS 'tag id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_id IS 'metadata object id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_type IS 'metadata object type';
-COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value';
+COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value, empty string means no value';
 COMMENT ON COLUMN tag_relation_meta.audit_info IS 'tag relation audit info';
 COMMENT ON COLUMN tag_relation_meta.current_version IS 'tag relation current version';
 COMMENT ON COLUMN tag_relation_meta.last_version IS 'tag relation last version';

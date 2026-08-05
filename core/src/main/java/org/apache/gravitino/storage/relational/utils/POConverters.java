@@ -1512,7 +1512,7 @@ public class POConverters {
           .withTagId(tagId)
           .withMetadataObjectId(metadataObjectId)
           .withMetadataObjectType(metadataObjectType)
-          .withTagValue(tagValue)
+          .withTagValue(tagValue == null ? "" : tagValue)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
