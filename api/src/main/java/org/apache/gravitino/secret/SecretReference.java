@@ -22,7 +22,6 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -44,23 +43,20 @@ public final class SecretReference {
    * Creates an external secret reference.
    *
    * @param provider registered provider instance name
-   * @param attributes provider-specific locator keys; empty means no attributes
+   * @param attributes provider-specific locator keys; must be non-null and non-empty
    */
   public SecretReference(String provider, Map<String, String> attributes) {
     Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
-    Preconditions.checkArgument(attributes != null, "attributes must not be null");
+    Preconditions.checkArgument(
+        attributes != null && !attributes.isEmpty(), "attributes must not be null or empty");
     this.provider = provider;
-    if (attributes.isEmpty()) {
-      this.attributes = ImmutableMap.of();
-    } else {
-      Map<String, String> copy = new LinkedHashMap<>(attributes);
-      for (Map.Entry<String, String> entry : copy.entrySet()) {
-        Preconditions.checkArgument(
-            entry.getValue() == null || !entry.getValue().startsWith(URN_PREFIX),
-            "attributes must not contain a raw gravitino secret URN");
-      }
-      this.attributes = Collections.unmodifiableMap(copy);
+    Map<String, String> copy = new LinkedHashMap<>(attributes);
+    for (Map.Entry<String, String> entry : copy.entrySet()) {
+      Preconditions.checkArgument(
+          entry.getValue() == null || !entry.getValue().startsWith(URN_PREFIX),
+          "attributes must not contain a raw gravitino secret URN");
     }
+    this.attributes = Collections.unmodifiableMap(copy);
   }
 
   /**
@@ -73,7 +69,7 @@ public final class SecretReference {
   }
 
   /**
-   * Returns provider-specific locator attributes (never {@code null}).
+   * Returns provider-specific locator attributes (never {@code null} or empty).
    *
    * @return an unmodifiable attributes map
    */
