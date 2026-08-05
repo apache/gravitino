@@ -95,8 +95,8 @@ public interface SupportsCatalogs {
    * @param comment the comment of the catalog.
    * @param provider the provider of the catalog.
    * @param properties the properties of the catalog.
-   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext}) for
-   *     write-through
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
    * @param secretReferences optional property key → secret locator ({@code provider} plus
    *     provider-specific attributes).
    * @return The created catalog.

@@ -115,8 +115,8 @@ public interface FilesetCatalog {
    * @param type The type of the fileset.
    * @param storageLocations The location names and storage locations of the fileset.
    * @param properties The properties of the fileset.
-   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext}) for
-   *     write-through
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
    * @param secretReferences optional property key → secret locator ({@code provider} plus
    *     provider-specific attributes).
    * @return The created fileset metadata
