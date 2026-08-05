@@ -21,6 +21,7 @@ import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
 from mcp_server.server import GravitinoMCPServer
+from mcp_server.tools import SUPPORTED_TOOL_TAGS
 
 
 def do_main():
@@ -86,8 +87,7 @@ def _parse_args():
         type=_comma_separated_set,
         default=set(),
         help="The tool tags to include, separated by commas, support tags:"
-        "[catalog, fileset, job, model, partition, policy, schema, "
-        "statistic, table, tag, topic, view]. default: empty, "
+        f"[{', '.join(sorted(SUPPORTED_TOOL_TAGS))}]. default: empty, "
         "all tools will be included.",
     )
 

@@ -31,6 +31,24 @@ from mcp_server.tools.tag import load_tag_tool
 from mcp_server.tools.topic import load_topic_tools
 from mcp_server.tools.view import load_view_tools
 
+# Mirrors the tags the tools declare; enforced by tests/unit/test_tool_tags.py.
+SUPPORTED_TOOL_TAGS = frozenset(
+    {
+        "catalog",
+        "fileset",
+        "job",
+        "model",
+        "partition",
+        "policy",
+        "schema",
+        "statistic",
+        "table",
+        "tag",
+        "topic",
+        "view",
+    }
+)
+
 
 def load_tools(mcp: FastMCP):
     load_job_tool(mcp)
