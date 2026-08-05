@@ -45,9 +45,9 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(catalogManager, secretManager, entityStore, idGenerator);
     filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new FilesetOperationDispatcher(catalogManager, secretManager, entityStore, idGenerator);
   }
 
   public static FilesetOperationDispatcher getFilesetOperationDispatcher() {

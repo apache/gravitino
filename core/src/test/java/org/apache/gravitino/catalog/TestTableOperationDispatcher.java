@@ -80,13 +80,13 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(catalogManager, secretManager, entityStore, idGenerator);
     tableOperationDispatcher =
         new TableOperationDispatcher(
             catalogManager,
+            secretManager,
             entityStore,
             idGenerator,
-            secretManager,
             () -> schemaOperationDispatcher);
 
     Config config = mock(Config.class);
@@ -271,7 +271,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
         NullPointerException.class,
         () ->
             new TableOperationDispatcher(
-                catalogManager, entityStore, idGenerator, secretManager, null));
+                catalogManager, secretManager, entityStore, idGenerator, null));
   }
 
   @Test
@@ -283,7 +283,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
     TableOperationDispatcher dispatcher =
         new TableOperationDispatcher(
-            catalogManager, entityStore, idGenerator, secretManager, nullSchemaDispatcherSupplier);
+            catalogManager, secretManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_null_dispatcher");
     Column[] columns =
         new Column[] {

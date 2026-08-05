@@ -47,10 +47,10 @@ public class CredentialOperationDispatcher extends OperationDispatcher {
 
   public CredentialOperationDispatcher(
       CatalogManager catalogManager,
+      SecretManager secretManager,
       EntityStore store,
-      IdGenerator idGenerator,
-      SecretManager secretManager) {
-    super(catalogManager, store, idGenerator, secretManager);
+      IdGenerator idGenerator) {
+    super(catalogManager, secretManager, store, idGenerator);
   }
 
   public List<Credential> getCredentials(NameIdentifier identifier, CredentialPrivilege privilege) {

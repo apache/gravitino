@@ -65,9 +65,9 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     modelOperationDispatcher =
-        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new ModelOperationDispatcher(catalogManager, secretManager, entityStore, idGenerator);
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(catalogManager, secretManager, entityStore, idGenerator);
   }
 
   @Test

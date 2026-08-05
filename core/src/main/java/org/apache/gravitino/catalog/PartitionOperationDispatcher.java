@@ -37,16 +37,16 @@ public class PartitionOperationDispatcher extends OperationDispatcher
    * Creates a new PartitionOperationDispatcher.
    *
    * @param catalogManager The CatalogManager instance to be used for partition operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    * @param store The EntityStore instance to be used for partition operations.
    * @param idGenerator The IdGenerator instance to be used for partition operations.
-   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public PartitionOperationDispatcher(
       CatalogManager catalogManager,
+      SecretManager secretManager,
       EntityStore store,
-      IdGenerator idGenerator,
-      SecretManager secretManager) {
-    super(catalogManager, store, idGenerator, secretManager);
+      IdGenerator idGenerator) {
+    super(catalogManager, secretManager, store, idGenerator);
   }
 
   @Override

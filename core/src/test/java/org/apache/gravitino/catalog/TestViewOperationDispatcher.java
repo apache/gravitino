@@ -72,13 +72,13 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(catalogManager, secretManager, entityStore, idGenerator);
     viewOperationDispatcher =
         new ViewOperationDispatcher(
             catalogManager,
+            secretManager,
             entityStore,
             idGenerator,
-            secretManager,
             () -> schemaOperationDispatcher);
 
     Config config = mock(Config.class);
@@ -213,7 +213,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         NullPointerException.class,
         () ->
             new ViewOperationDispatcher(
-                catalogManager, entityStore, idGenerator, secretManager, null));
+                catalogManager, secretManager, entityStore, idGenerator, null));
   }
 
   @Test
@@ -225,7 +225,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
     ViewOperationDispatcher dispatcher =
         new ViewOperationDispatcher(
-            catalogManager, entityStore, idGenerator, secretManager, nullSchemaDispatcherSupplier);
+            catalogManager, secretManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
     NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_null_dispatcher");
     Representation[] representations =
         new Representation[] {
