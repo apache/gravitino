@@ -18,13 +18,21 @@
 """Tests for the tool filtering driven by --include-tool-tags."""
 
 import asyncio
+import contextlib
+import io
+import os
+import re
+import sys
 import unittest
+from typing import Optional, Set
+from unittest.mock import patch
 
 from mcp_server.client.factory import RESTClientFactory
 from mcp_server.client.plain.plain_rest_client_operation import (
     PlainRESTClientOperation,
 )
 from mcp_server.core.setting import Setting
+from mcp_server.main import _parse_args
 from mcp_server.server import GravitinoMCPServer
 from tests.unit.tools import MockOperation
 
@@ -38,20 +46,40 @@ class TestIncludeToolTags(unittest.TestCase):
     def tearDown(self):
         RESTClientFactory.set_rest_client(PlainRESTClientOperation)
 
-    def _tools(self, tags=None):
+    def _tools(self, tags: Optional[Set[str]] = None) -> list:
         setting = Setting(metalake="ml", tags=tags or set())
         server = GravitinoMCPServer(setting)
         return asyncio.run(server.mcp.list_tools())
 
-    def _names(self, tags=None):
+    def _names(self, tags: Optional[Set[str]] = None) -> Set[str]:
         return {tool.name for tool in self._tools(tags)}
 
-    def test_no_tags_exposes_every_tool(self):
-        registered = set()
+    def _registered_tags(self) -> Set[str]:
+        tags = set()
         for tool in self._tools():
-            registered.update(tool.tags)
-        self.assertIn("view", registered)
-        self.assertIn("schema", registered)
+            tags.update(tool.tags)
+        return tags
+
+    def _documented_tags(self) -> Set[str]:
+        """The tags listed in the --include-tool-tags help text."""
+        buffer = io.StringIO()
+        # argparse wraps on terminal width; pin it so the output is stable.
+        with patch.dict(os.environ, {"COLUMNS": "200"}):
+            with patch.object(sys, "argv", ["mcp_server", "--help"]):
+                with contextlib.redirect_stdout(buffer):
+                    with self.assertRaises(SystemExit):
+                        _parse_args()
+        listed = re.search(
+            r"support tags: ?\[([^\]]*)\]",
+            " ".join(buffer.getvalue().split()),
+        )
+        self.assertIsNotNone(listed, "help text no longer lists the tags")
+        return {tag.strip() for tag in listed.group(1).split(",")}
+
+    def test_no_tags_disables_filtering(self):
+        unfiltered = self._names()
+        self.assertTrue(self._names({"view"}) < unfiltered)
+        self.assertTrue(self._names({"schema"}) < unfiltered)
 
     def test_single_tag_exposes_only_matching_tools(self):
         tools = self._tools({"view"})
@@ -61,10 +89,15 @@ class TestIncludeToolTags(unittest.TestCase):
         self.assertLess(len(tools), len(self._tools()))
 
     def test_multiple_tags_are_unioned(self):
+        combined = self._names({"view", "schema"})
         self.assertEqual(
-            self._names({"view", "schema"}),
-            self._names({"view"}) | self._names({"schema"}),
+            combined, self._names({"view"}) | self._names({"schema"})
         )
+        # Guards against a no-op filter, under which the equality above holds.
+        self.assertTrue(combined < self._names())
 
     def test_unknown_tag_exposes_no_tools(self):
         self.assertEqual(self._names({"no_such_tag"}), set())
+
+    def test_help_documents_exactly_the_registered_tags(self):
+        self.assertEqual(self._documented_tags(), self._registered_tags())
