@@ -21,37 +21,48 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.UserChange;
 
-/** Represents an event triggered when enabling a user by external id fails. */
+/** Represents an event triggered before altering a user by Gravitino-assigned id. */
 @DeveloperApi
-public class EnableUserFailureEvent extends UserFailureEvent {
-  private final String externalId;
+public class AlterUserPreEvent extends UserPreEvent {
+  private final long userId;
+  private final UserChange[] changes;
 
   /**
-   * Creates a new {EnableUserFailureEvent}.
+   * Creates a new {@link AlterUserPreEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param exception The exception that caused the failure.
-   * @param externalId The external identifier of the user.
+   * @param userId The Gravitino-assigned id of the user.
+   * @param changes The changes being applied to the user.
    */
-  public EnableUserFailureEvent(
-      String initiator, String metalake, Exception exception, String externalId) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId), exception);
-    this.externalId = externalId;
+  public AlterUserPreEvent(String initiator, String metalake, long userId, UserChange[] changes) {
+    super(initiator, AuthorizationUtils.ofUserId(metalake, userId));
+    this.userId = userId;
+    this.changes = changes;
   }
 
   /**
-   * Returns the external identifier of the user.
+   * Returns the Gravitino-assigned id of the user being altered.
    *
-   * @return The external identifier.
+   * @return The user id.
    */
-  public String externalId() {
-    return externalId;
+  public long userId() {
+    return userId;
+  }
+
+  /**
+   * Returns the changes being applied to the user.
+   *
+   * @return An array of {@link UserChange}.
+   */
+  public UserChange[] changes() {
+    return changes;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ENABLE_USER;
+    return OperationType.ALTER_USER;
   }
 }

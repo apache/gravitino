@@ -22,36 +22,46 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 
-/** Represents an event triggered when disabling a user by external id fails. */
+/** Represents an event triggered after removing a user by Gravitino-assigned id. */
 @DeveloperApi
-public class DisableUserFailureEvent extends UserFailureEvent {
-  private final String externalId;
+public class RemoveUserByIdEvent extends UserEvent {
+  private final long userId;
+  private final boolean isExists;
 
   /**
-   * Creates a new {DisableUserFailureEvent}.
+   * Creates a new {@link RemoveUserByIdEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param exception The exception that caused the failure.
-   * @param externalId The external identifier of the user.
+   * @param userId The Gravitino-assigned id of the user.
+   * @param isExists Whether the user existed and was removed.
    */
-  public DisableUserFailureEvent(
-      String initiator, String metalake, Exception exception, String externalId) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId), exception);
-    this.externalId = externalId;
+  public RemoveUserByIdEvent(String initiator, String metalake, long userId, boolean isExists) {
+    super(initiator, AuthorizationUtils.ofUserId(metalake, userId));
+    this.userId = userId;
+    this.isExists = isExists;
   }
 
   /**
-   * Returns the external identifier of the user.
+   * Returns the Gravitino-assigned id of the removed user.
    *
-   * @return The external identifier.
+   * @return The user id.
    */
-  public String externalId() {
-    return externalId;
+  public long userId() {
+    return userId;
+  }
+
+  /**
+   * Returns whether the user existed and was removed.
+   *
+   * @return {@code true} if the user was removed.
+   */
+  public boolean isExists() {
+    return isExists;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DISABLE_USER;
+    return OperationType.REMOVE_USER_BY_ID;
   }
 }

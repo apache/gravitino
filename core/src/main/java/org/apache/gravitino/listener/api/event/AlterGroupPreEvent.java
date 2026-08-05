@@ -21,45 +21,49 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.listener.api.info.UserInfo;
+import org.apache.gravitino.authorization.GroupChange;
 
-/** Represents an event triggered after successfully enabling a user by external id. */
+/** Represents an event triggered before altering a group by Gravitino-assigned id. */
 @DeveloperApi
-public class EnableUserEvent extends UserEvent {
-  private final UserInfo updatedUserInfo;
+public class AlterGroupPreEvent extends GroupPreEvent {
+  private final long groupId;
+  private final GroupChange[] changes;
 
   /**
-   * Creates a new {EnableUserEvent}.
+   * Creates a new {@link AlterGroupPreEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param updatedUserInfo The updated user information.
+   * @param groupId The Gravitino-assigned id of the group.
+   * @param changes The changes being applied to the group.
    */
-  public EnableUserEvent(String initiator, String metalake, UserInfo updatedUserInfo) {
-    super(
-        initiator,
-        AuthorizationUtils.ofUserExternalId(
-            metalake,
-            updatedUserInfo
-                .externalId()
-                .orElseThrow(
-                    () ->
-                        new IllegalStateException(
-                            "User external id is required for EnableUserEvent"))));
-    this.updatedUserInfo = updatedUserInfo;
+  public AlterGroupPreEvent(
+      String initiator, String metalake, long groupId, GroupChange[] changes) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, groupId));
+    this.groupId = groupId;
+    this.changes = changes;
   }
 
   /**
-   * Returns the updated user information.
+   * Returns the Gravitino-assigned id of the group being altered.
    *
-   * @return The user information.
+   * @return The group id.
    */
-  public UserInfo updatedUserInfo() {
-    return updatedUserInfo;
+  public long groupId() {
+    return groupId;
+  }
+
+  /**
+   * Returns the changes being applied to the group.
+   *
+   * @return An array of {@link GroupChange}.
+   */
+  public GroupChange[] changes() {
+    return changes;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ENABLE_USER;
+    return OperationType.ALTER_GROUP;
   }
 }

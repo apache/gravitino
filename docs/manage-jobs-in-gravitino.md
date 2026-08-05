@@ -18,6 +18,13 @@ the job as a process on the Gravitino server and is intended for testing. Runnin
 means implementing an executor. See
 [Custom job executor](./development/custom-job-executor.md).
 
+:::note
+1. The job system is still under development, so some features may not be fully
+   implemented yet.
+2. The aim of the job system is not to replace the existing job executors. So, it can only
+   support running a single job at a time, and it doesn't support job scheduling for now.
+   :::
+
 ## Job Template Operations
 
 ### Register a Shell Template
@@ -215,3 +222,41 @@ cancelling = client.cancel_job(job_id)
 
 Cancelling is a request rather than an instant. The job moves to `CANCELLING` and then to
 `CANCELLED`, and one that finishes first keeps the status it finished with.
+
+### Job System Configuration
+
+Configure the job system through the `gravitino.conf` file. The following are the
+default configurations:
+
+| Property name                          | Description                                                                       | Default value                 | Required |
+|----------------------------------------|-----------------------------------------------------------------------------------|-------------------------------|----------|
+| `gravitino.job.stagingDir`             | Directory for managing the staging files when running jobs                        | `/tmp/gravitino/jobs/staging` | No       |
+| `gravitino.job.executor`               | The job executor to use for running jobs                                          | `local`                       | No       |
+| `gravitino.job.stagingDirKeepTimeInMs` | The time in milliseconds to keep the staging directory after the job is completed | `604800000` (7 days)          | No       |
+| `gravitino.job.statusPullIntervalInMs` | The interval in milliseconds to pull the job status from the job executor         | `300000` (5 minutes)          | No       |
+
+
+#### Configurations for Local Job Executor
+
+The local job executor is used for testing and development purposes, it runs the job in the local process.
+The following are the default configurations for the local job executor:
+
+| Property name                                       | Description                                                                                                                                       | Default value                          | Required |
+|-----------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------|----------|
+| `gravitino.jobExecutor.local.waitingQueueSize`      | The size of the waiting queue for queued jobs in the local job executor                                                                           | `100`                                  | No       |
+| `gravitino.jobExecutor.local.maxRunningJobs`        | The maximum number of running jobs in the local job executor                                                                                      | `max(1, min(available cores / 2, 10))` | No       |
+| `gravitino.jobExecutor.local.jobStatusKeepTimeInMs` | The time in milliseconds to keep the job status in the local job executor                                                                         | `3600000` (1 hour)                     | No       |
+| `gravitino.jobExecutor.local.sparkHome`             | The home directory of Spark, Gravitino checks this configuration firstly and then `SPARK_HOME` env. Either of them should be set to run Spark job | `None`                                 | No       |
+
+## Future Work
+
+The job system still needs more work:
+
+1. Support modification of job templates.
+2. Support running Spark jobs (Java and PySpark) based on the Spark job template in the local job
+   executor.
+3. Support more job templates, like Python, SQL, etc.
+4. Support more job executors, like Apache Airflow, Apache Livy, etc.
+5. Support uploading job template related artifacts to the Gravitino server, also support
+   downloading the artifacts from more distributed file systems like HDFS, S3, etc.
+6. Support job scheduling, like running jobs periodically, or based on some events.

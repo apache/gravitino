@@ -21,35 +21,36 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.listener.api.info.GroupInfo;
 
-/** Represents an event triggered before enabling a user by external id. */
+/** Represents an event triggered after successfully retrieving a group by Gravitino-assigned id. */
 @DeveloperApi
-public class EnableUserPreEvent extends UserPreEvent {
-  private final String externalId;
+public class GetGroupByIdEvent extends GroupEvent {
+  private final GroupInfo loadedGroupInfo;
 
   /**
-   * Creates a new {@link EnableUserPreEvent}.
+   * Creates a new {@link GetGroupByIdEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param externalId The external identifier of the user.
+   * @param loadedGroupInfo The retrieved group information.
    */
-  public EnableUserPreEvent(String initiator, String metalake, String externalId) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId));
-    this.externalId = externalId;
+  public GetGroupByIdEvent(String initiator, String metalake, GroupInfo loadedGroupInfo) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, loadedGroupInfo.id()));
+    this.loadedGroupInfo = loadedGroupInfo;
   }
 
   /**
-   * Returns the external identifier of the user.
+   * Returns the retrieved group information.
    *
-   * @return The external identifier.
+   * @return The group information.
    */
-  public String externalId() {
-    return externalId;
+  public GroupInfo loadedGroupInfo() {
+    return loadedGroupInfo;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.ENABLE_USER;
+    return OperationType.GET_GROUP_BY_ID;
   }
 }

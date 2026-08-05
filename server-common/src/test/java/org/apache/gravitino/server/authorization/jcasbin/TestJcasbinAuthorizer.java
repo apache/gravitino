@@ -20,6 +20,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 import static org.apache.gravitino.authorization.Privilege.Name.SELECT_TABLE;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -51,6 +52,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -1456,6 +1458,99 @@ public class TestJcasbinAuthorizer {
         doAuthorizeWithActiveRoles(
             currentPrincipal, ActiveRoles.of(ImmutableList.of("roleTheUserDoesNotHold"))));
 
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** All declared active roles are held (directly), so nothing is unheld. */
+  @Test
+  public void testFindUnheldRolesEmptyWhenAllRolesHeld() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal principal = setCurrentPrincipalWithGroup(null);
+    RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
+    mockDirectUserRoles(held);
+    Mockito.clearInvocations(userMetaMapper);
+    metadataIdConverterMockedStatic.clearInvocations();
+
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            principal, METALAKE, ImmutableSet.of("heldRole"), requestContext);
+
+    assertTrue(unheld.isEmpty());
+    metadataIdConverterMockedStatic.verify(
+        () -> MetadataIdConverter.getID(any(), eq(METALAKE)), Mockito.never());
+    jcasbinAuthorizer.authorize(
+        principal,
+        METALAKE,
+        MetadataObjects.of(null, "testCatalog", MetadataObject.Type.CATALOG),
+        USE_CATALOG,
+        requestContext);
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A declared role that exists but is not assigned to the caller is reported as unheld. */
+  @Test
+  public void testFindUnheldRolesReturnsRolesNotAssigned() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal principal = setCurrentPrincipalWithGroup(null);
+    RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
+    mockDirectUserRoles(held);
+
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            principal,
+            METALAKE,
+            ImmutableSet.of("heldRole", "otherRole"),
+            new AuthorizationRequestContext());
+
+    assertEquals(ImmutableSet.of("otherRole"), unheld);
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A declared role that does not exist (no id) is treated as unheld. */
+  @Test
+  public void testFindUnheldRolesTreatsNonExistentRoleAsUnheld() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    Principal principal = setCurrentPrincipalWithGroup(null);
+    RoleEntity held = mockRoleInStore(ALLOW_ROLE_ID, "heldRole", ImmutableList.of());
+    mockDirectUserRoles(held);
+
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            principal, METALAKE, ImmutableSet.of("ghostRole"), new AuthorizationRequestContext());
+
+    assertEquals(ImmutableSet.of("ghostRole"), unheld);
+    restoreDefaultPrincipal();
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+  }
+
+  /** A group-inherited role counts as held, so it is not reported as unheld. */
+  @Test
+  public void testFindUnheldRolesCoversGroupInheritedRole() throws Exception {
+    getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
+    UserPrincipal groupPrincipal = setCurrentPrincipalWithGroup(GROUP_NAME);
+    Long groupRoleId = 31L;
+    mockRoleInStore(groupRoleId, "groupRole", ImmutableList.of());
+    mockNoDirectUserRoles();
+    mockGroupWithRoles(GROUP_NAME, ImmutableList.of(groupRoleId), ImmutableList.of("groupRole"));
+    Mockito.clearInvocations(userMetaMapper);
+    metadataIdConverterMockedStatic.clearInvocations();
+
+    Set<String> unheld =
+        jcasbinAuthorizer.findUnheldRoles(
+            groupPrincipal,
+            METALAKE,
+            ImmutableSet.of("groupRole"),
+            new AuthorizationRequestContext());
+
+    assertTrue(unheld.isEmpty());
+    verify(userMetaMapper).batchGetAuthSubjectsForUser(eq(METALAKE), eq(USERNAME), anyList());
+    metadataIdConverterMockedStatic.verify(
+        () -> MetadataIdConverter.getID(any(), eq(METALAKE)), Mockito.never());
     restoreDefaultPrincipal();
     getLoadedRolesCache(jcasbinAuthorizer).invalidateAll();
   }

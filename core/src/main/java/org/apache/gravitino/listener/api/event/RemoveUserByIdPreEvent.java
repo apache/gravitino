@@ -21,45 +21,35 @@ package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.listener.api.info.UserInfo;
 
-/** Represents an event triggered after successfully disabling a user by external id. */
+/** Represents an event triggered before removing a user by Gravitino-assigned id. */
 @DeveloperApi
-public class DisableUserEvent extends UserEvent {
-  private final UserInfo updatedUserInfo;
+public class RemoveUserByIdPreEvent extends UserPreEvent {
+  private final long userId;
 
   /**
-   * Creates a new {DisableUserEvent}.
+   * Creates a new {@link RemoveUserByIdPreEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param updatedUserInfo The updated user information.
+   * @param userId The Gravitino-assigned id of the user.
    */
-  public DisableUserEvent(String initiator, String metalake, UserInfo updatedUserInfo) {
-    super(
-        initiator,
-        AuthorizationUtils.ofUserExternalId(
-            metalake,
-            updatedUserInfo
-                .externalId()
-                .orElseThrow(
-                    () ->
-                        new IllegalStateException(
-                            "User external id is required for DisableUserEvent"))));
-    this.updatedUserInfo = updatedUserInfo;
+  public RemoveUserByIdPreEvent(String initiator, String metalake, long userId) {
+    super(initiator, AuthorizationUtils.ofUserId(metalake, userId));
+    this.userId = userId;
   }
 
   /**
-   * Returns the updated user information.
+   * Returns the Gravitino-assigned id of the user being removed.
    *
-   * @return The user information.
+   * @return The user id.
    */
-  public UserInfo updatedUserInfo() {
-    return updatedUserInfo;
+  public long userId() {
+    return userId;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DISABLE_USER;
+    return OperationType.REMOVE_USER_BY_ID;
   }
 }

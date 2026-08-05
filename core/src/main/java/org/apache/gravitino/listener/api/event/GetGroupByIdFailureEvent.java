@@ -22,34 +22,36 @@ package org.apache.gravitino.listener.api.event;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 
-/** Represents an event triggered before disabling a user by external id. */
+/** Represents an event triggered when retrieving a group by Gravitino-assigned id fails. */
 @DeveloperApi
-public class DisableUserPreEvent extends UserPreEvent {
-  private final String externalId;
+public class GetGroupByIdFailureEvent extends GroupFailureEvent {
+  private final long groupId;
 
   /**
-   * Creates a new {DisableUserPreEvent}.
+   * Creates a new {@link GetGroupByIdFailureEvent}.
    *
    * @param initiator The user who initiated the request.
    * @param metalake The metalake name.
-   * @param externalId The external identifier of the user.
+   * @param exception The exception that caused the failure.
+   * @param groupId The Gravitino-assigned id of the group.
    */
-  public DisableUserPreEvent(String initiator, String metalake, String externalId) {
-    super(initiator, AuthorizationUtils.ofUserExternalId(metalake, externalId));
-    this.externalId = externalId;
+  public GetGroupByIdFailureEvent(
+      String initiator, String metalake, Exception exception, long groupId) {
+    super(initiator, AuthorizationUtils.ofGroupId(metalake, groupId), exception);
+    this.groupId = groupId;
   }
 
   /**
-   * Returns the external identifier of the user.
+   * Returns the Gravitino-assigned id of the group.
    *
-   * @return The external identifier.
+   * @return The group id.
    */
-  public String externalId() {
-    return externalId;
+  public long groupId() {
+    return groupId;
   }
 
   @Override
   public OperationType operationType() {
-    return OperationType.DISABLE_USER;
+    return OperationType.GET_GROUP_BY_ID;
   }
 }
