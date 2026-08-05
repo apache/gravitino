@@ -29,7 +29,7 @@ public class TestSecretBindingAndReference {
   void testSecretBinding() {
     SecretBinding binding = new SecretBinding("memory", "s3cr3t");
     Assertions.assertEquals("memory", binding.provider());
-    Assertions.assertEquals("s3cr3t", binding.value());
+    Assertions.assertEquals("s3cr3t", binding.plaintext());
     Assertions.assertFalse(binding.toString().contains("s3cr3t"));
 
     Assertions.assertThrows(

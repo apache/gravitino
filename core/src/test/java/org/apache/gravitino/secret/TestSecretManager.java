@@ -91,7 +91,7 @@ public class TestSecretManager {
   }
 
   @Test
-  void testSecretBindingToStringRedactsValue() {
+  void testSecretBindingToStringRedactsPlaintext() {
     SecretBinding binding = new SecretBinding("memory", "s3cr3t");
     Assertions.assertFalse(binding.toString().contains("s3cr3t"));
     Assertions.assertTrue(binding.toString().contains("***"));

@@ -21,8 +21,6 @@ package org.apache.gravitino.secret;
 
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
@@ -31,13 +29,13 @@ import java.util.Map;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.annotation.Evolving;
 
 /**
  * External secret locator for create/alter requests: a registered provider instance name plus
  * provider-specific attributes. The server builds the URN; clients must not send a raw URN.
  */
-@DeveloperApi
+@Evolving
 public final class SecretReference {
 
   private final String provider;
@@ -49,10 +47,7 @@ public final class SecretReference {
    * @param provider registered provider instance name
    * @param attributes provider-specific locator keys; {@code null} or empty means no attributes
    */
-  @JsonCreator
-  public SecretReference(
-      @JsonProperty("provider") String provider,
-      @JsonProperty("attributes") @Nullable Map<String, String> attributes) {
+  public SecretReference(String provider, @Nullable Map<String, String> attributes) {
     Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
     this.provider = provider;
     if (attributes == null || attributes.isEmpty()) {
@@ -73,7 +68,6 @@ public final class SecretReference {
    *
    * @return the provider name
    */
-  @JsonProperty("provider")
   public String provider() {
     return provider;
   }
@@ -83,7 +77,6 @@ public final class SecretReference {
    *
    * @return an unmodifiable attributes map
    */
-  @JsonProperty("attributes")
   public Map<String, String> attributes() {
     return attributes;
   }

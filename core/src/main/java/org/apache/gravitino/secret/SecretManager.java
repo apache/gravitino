@@ -173,7 +173,7 @@ public class SecretManager implements Closeable {
         SecretBinding binding = secretBindings.get(propertyKey);
         Preconditions.checkArgument(
             binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
-        String plaintext = binding.value();
+        String plaintext = binding.plaintext();
         Map<String, String> attributes =
             ImmutableMap.of(
                 ATTR_ENTITY_TYPE, entityType,

@@ -19,38 +19,34 @@
 
 package org.apache.gravitino.secret;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.annotation.Evolving;
 
 /**
  * Write-through secret binding for create/alter requests: a registered provider instance name plus
  * plaintext to store.
  */
-@DeveloperApi
+@Evolving
 public final class SecretBinding {
 
   private final String provider;
-  private final String value;
+  private final String plaintext;
 
   /**
    * Creates a write-through binding.
    *
    * @param provider registered provider instance name
-   * @param value plaintext secret value
+   * @param plaintext plaintext secret to write through
    */
-  @JsonCreator
-  public SecretBinding(
-      @JsonProperty("provider") String provider, @JsonProperty("value") String value) {
+  public SecretBinding(String provider, String plaintext) {
     Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
-    Preconditions.checkArgument(value != null, "value must not be null");
+    Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
     Preconditions.checkArgument(
-        !"******".equals(value), "value must not be the masked placeholder");
+        !"******".equals(plaintext), "plaintext must not be the masked placeholder");
     this.provider = provider;
-    this.value = value;
+    this.plaintext = plaintext;
   }
 
   /**
@@ -58,19 +54,17 @@ public final class SecretBinding {
    *
    * @return the provider name
    */
-  @JsonProperty("provider")
   public String provider() {
     return provider;
   }
 
   /**
-   * Returns the plaintext secret value.
+   * Returns the plaintext secret to write through.
    *
-   * @return the plaintext value
+   * @return the plaintext secret
    */
-  @JsonProperty("value")
-  public String value() {
-    return value;
+  public String plaintext() {
+    return plaintext;
   }
 
   @Override
@@ -82,16 +76,16 @@ public final class SecretBinding {
       return false;
     }
     SecretBinding that = (SecretBinding) o;
-    return Objects.equals(provider, that.provider) && Objects.equals(value, that.value);
+    return Objects.equals(provider, that.provider) && Objects.equals(plaintext, that.plaintext);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(provider, value);
+    return Objects.hash(provider, plaintext);
   }
 
   @Override
   public String toString() {
-    return "SecretBinding{provider='" + provider + "', value=***}";
+    return "SecretBinding{provider='" + provider + "', plaintext=***}";
   }
 }
