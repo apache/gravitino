@@ -290,7 +290,7 @@ public class TagManager implements TagDispatcher {
             checkMetalake(NameIdentifier.of(metalake), entityStore);
             return entityStore
                 .relationOperations()
-                .getEntityByRelation(
+                .<TagEntity>getEntityByRelation(
                     SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
                     entityIdent,
                     entityType,
