@@ -24,7 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -79,6 +81,20 @@ public class TestJcasbinChangePoller {
     Assertions.assertEquals(
         key("ml1", "METALAKE", ""),
         JcasbinAuthorizationCacheKeys.metadataIdCacheKey("ml1", metalake));
+  }
+
+  @Test
+  void testChangeLogFullNamePreservesDotsInsideNameLevels() {
+    NameIdentifier ident =
+        NameIdentifier.of("ml1", "cat.with.dot", "schema.with.dot", "table.with.dot");
+
+    MetadataObject metadataObject =
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", EntityChangeLogNameIdentifierCodec.encode(ident), MetadataObject.Type.TABLE);
+
+    Assertions.assertEquals("cat.with.dot.schema.with.dot", metadataObject.parent());
+    Assertions.assertEquals("table.with.dot", metadataObject.name());
+    Assertions.assertEquals(MetadataObject.Type.TABLE, metadataObject.type());
   }
 
   @Test

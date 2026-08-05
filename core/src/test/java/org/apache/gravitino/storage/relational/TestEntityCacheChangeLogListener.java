@@ -113,6 +113,22 @@ public class TestEntityCacheChangeLogListener {
   }
 
   @Test
+  void testInvalidatesIdentifierWithDotsInsideLevels() {
+    EntityCache cache = mock(EntityCache.class);
+    NameIdentifier ident = NameIdentifier.of("meta.lake", "cat.alog", "sche.ma", "tab.le");
+    EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache);
+
+    listener.onEntityChange(
+        List.of(
+            record(
+                EntityType.TABLE,
+                EntityChangeLogNameIdentifierCodec.encode(ident),
+                OperateType.ALTER)));
+
+    verify(cache).invalidate(ident, EntityType.TABLE);
+  }
+
+  @Test
   void testReplaysEveryCacheableTypeAsInvalidate() {
     EntityCache cache = mock(EntityCache.class);
     EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache);
@@ -167,9 +183,9 @@ public class TestEntityCacheChangeLogListener {
   }
 
   @Test
-  void testCaffeineAndNoOpsCachesAreLocalPerNode() {
+  void testCacheCoherenceModes() {
     Assertions.assertEquals(
         Coherence.LOCAL_PER_NODE, new CaffeineEntityCache(new Config() {}).coherence());
-    Assertions.assertEquals(Coherence.LOCAL_PER_NODE, new NoOpsCache(new Config() {}).coherence());
+    Assertions.assertEquals(Coherence.NONE, new NoOpsCache(new Config() {}).coherence());
   }
 }

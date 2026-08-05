@@ -188,15 +188,20 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       return;
     }
 
-    SessionUtils.beginTransaction();
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
     boolean committed = false;
     try {
       insertEntity(e, true);
       insertEntityChange(e.nameIdentifier(), e.type(), OperateType.ALTER);
-      SessionUtils.commitTransaction();
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
       committed = true;
     } finally {
-      if (!committed) {
+      if (transactionOwner && !committed) {
         SessionUtils.rollbackTransaction();
       }
     }
@@ -210,16 +215,21 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       return updateEntity(ident, entityType, updater);
     }
 
-    SessionUtils.beginTransaction();
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
     boolean committed = false;
     try {
       E updatedEntity = updateEntity(ident, entityType, updater);
       insertEntityChange(ident, entityType, OperateType.ALTER);
-      SessionUtils.commitTransaction();
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
       committed = true;
       return updatedEntity;
     } finally {
-      if (!committed) {
+      if (transactionOwner && !committed) {
         SessionUtils.rollbackTransaction();
       }
     }
@@ -424,18 +434,23 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       return deleteEntity(ident, entityType, cascade);
     }
 
-    SessionUtils.beginTransaction();
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
     boolean committed = false;
     try {
       boolean deleted = deleteEntity(ident, entityType, cascade);
       if (deleted) {
         insertEntityChange(ident, entityType, OperateType.DROP);
       }
-      SessionUtils.commitTransaction();
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
       committed = true;
       return deleted;
     } finally {
-      if (!committed) {
+      if (transactionOwner && !committed) {
         SessionUtils.rollbackTransaction();
       }
     }
@@ -998,7 +1013,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             mapper.insertEntityChange(
                 NameIdentifierUtil.getMetalake(ident),
                 entityType.name(),
-                ident.toString(),
+                EntityChangeLogNameIdentifierCodec.encode(ident),
                 operateType));
   }
 

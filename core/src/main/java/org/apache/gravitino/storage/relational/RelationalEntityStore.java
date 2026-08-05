@@ -81,9 +81,8 @@ public class RelationalEntityStore
   private EntityChangeLogCleaner entityChangeLogCleaner;
   private EntityCache cache;
 
-  // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. A SHARED cache
-  // has a single cluster-wide copy, so there is nothing per-node to invalidate and no listener is
-  // registered.
+  // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
+  // caches have no per-node copy to invalidate, so no listener is registered.
   @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
 
   @VisibleForTesting
@@ -123,9 +122,9 @@ public class RelationalEntityStore
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)));
 
     // The coherence gate: a LOCAL_PER_NODE cache keeps its own copy per node, so changes made on
-    // other nodes must be replayed here through the change log. A SHARED cache (or a disabled
-    // NoOpsCache) has nothing per-node to invalidate, so no listener is registered.
-    if (cache.coherence() == Coherence.LOCAL_PER_NODE && !(cache instanceof NoOpsCache)) {
+    // other nodes must be replayed here through the change log. SHARED and NONE caches have
+    // nothing per-node to invalidate, so no listener is registered.
+    if (cache.coherence() == Coherence.LOCAL_PER_NODE) {
       this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache);
       this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
     }

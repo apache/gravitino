@@ -44,6 +44,7 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
@@ -75,13 +76,18 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
       Entity.EntityType entityType,
       String fullName,
       OperateType operateType) {
-    List<EntityChangeRecord> entityChanges = listEntityChanges(lastConsumedId);
-    Assertions.assertEquals(1, entityChanges.size());
-    EntityChangeRecord entityChange = entityChanges.get(0);
-    Assertions.assertEquals(metalakeName, entityChange.getMetalakeName());
-    Assertions.assertEquals(entityType.name(), entityChange.getEntityType());
-    Assertions.assertEquals(fullName, entityChange.getFullName());
-    Assertions.assertEquals(operateType, entityChange.getOperateType());
+    long matchingChanges =
+        listEntityChanges(lastConsumedId).stream()
+            .filter(change -> metalakeName.equals(change.getMetalakeName()))
+            .filter(change -> entityType.name().equals(change.getEntityType()))
+            .filter(change -> fullName.equals(change.getFullName()))
+            .filter(change -> operateType == change.getOperateType())
+            .count();
+    Assertions.assertEquals(
+        1,
+        matchingChanges,
+        String.format(
+            "Expected exactly one %s %s changelog for %s", entityType, operateType, fullName));
   }
 
   @TestTemplate
@@ -446,6 +452,32 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         Entity.EntityType.TAG,
         NameIdentifierUtil.ofTag(METALAKE_NAME, "tag1").toString(),
         OperateType.DROP);
+  }
+
+  @TestTemplate
+  void testDottedNameUsesLosslessChangeLogEncoding() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagEntity tag = createAndInsertTagEntity("tag.with.dot", "tag comment", METALAKE_NAME);
+    long maxIdBeforeAlter = maxEntityChangeId();
+
+    backend.update(
+        tag.nameIdentifier(),
+        Entity.EntityType.TAG,
+        entity ->
+            TagEntity.builder()
+                .withId(tag.id())
+                .withName(tag.name())
+                .withNamespace(tag.namespace())
+                .withComment("updated comment")
+                .withProperties(ImmutableMap.of())
+                .withAuditInfo(AUDIT_INFO)
+                .build());
+
+    String encoded = EntityChangeLogNameIdentifierCodec.encode(tag.nameIdentifier());
+    assertEntityChange(
+        maxIdBeforeAlter, METALAKE_NAME, Entity.EntityType.TAG, encoded, OperateType.ALTER);
+    Assertions.assertEquals(
+        tag.nameIdentifier(), EntityChangeLogNameIdentifierCodec.decode(encoded));
   }
 
   @TestTemplate

@@ -25,6 +25,9 @@ package org.apache.gravitino.cache;
  * propagated to the other nodes.
  */
 public enum Coherence {
+  /** The implementation does not retain entries, so it needs no coherence mechanism. */
+  NONE,
+
   /**
    * Each node keeps its own copy of the cache, so a change made on one node does not clear the
    * copies held by the other nodes. To stay correct across a cluster the write path must publish

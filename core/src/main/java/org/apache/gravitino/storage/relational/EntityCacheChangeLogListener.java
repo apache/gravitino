@@ -99,9 +99,6 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
       LOG.warn("Invalid full name in entity change log: {}", fullName);
       return null;
     }
-    // The change log stores the entity's NameIdentifier#toString(), a dot-joined full name. Split
-    // it back into levels the same way the catalog cache listener does; this is exact as long as
-    // no name segment contains a dot.
-    return NameIdentifier.of(fullName.split("\\."));
+    return EntityChangeLogNameIdentifierCodec.decode(fullName);
   }
 }

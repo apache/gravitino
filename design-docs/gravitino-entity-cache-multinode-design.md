@@ -221,7 +221,7 @@ With only self-contained metadata objects cached, "entity X changed" names exact
 - `CatalogChangeLogListener` → clears `CatalogManager`'s catalog cache;
 - `JcasbinChangeListener` → clears jcasbin's **id-mapping cache** (`metadataIdCache`).
 
-Each row is `{metalake, entity_type, full_name, operate_type (ALTER | DROP), created_at}`. The entity-store mutation boundary writes rows for all cacheable entity types, and the entity store cache is a **third consumer** of the same poller.
+Each row is `{metalake, entity_type, full_name, operate_type (ALTER | DROP), created_at}`. `full_name` retains the legacy dot-joined form for ordinary identifiers and uses a versioned, length-prefixed encoding when a name segment contains a dot, so consumers can reconstruct every `NameIdentifier` without ambiguity. The entity-store mutation boundary writes rows for all cacheable entity types, and the entity store cache is a **third consumer** of the same poller.
 
 ### Writer side
 
