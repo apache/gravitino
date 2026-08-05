@@ -57,7 +57,9 @@ public class TestSecretManager {
           IllegalArgumentException.class,
           () ->
               secretManager.getSecretReferenceUrns(
-                  Map.of("jdbc-password", new SecretReference("memory", Map.of()))));
+                  Map.of(
+                      "jdbc-password",
+                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
     }
   }
 
@@ -69,7 +71,9 @@ public class TestSecretManager {
           () ->
               SecretPropertyUtils.checkNoOverlap(
                   Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
-                  Map.of("jdbc-password", new SecretReference("memory", Map.of()))));
+                  Map.of(
+                      "jdbc-password",
+                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
 
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> new SecretBinding(" ", "s3cr3t"));
