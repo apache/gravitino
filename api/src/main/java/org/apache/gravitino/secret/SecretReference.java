@@ -27,7 +27,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
@@ -45,12 +44,13 @@ public final class SecretReference {
    * Creates an external secret reference.
    *
    * @param provider registered provider instance name
-   * @param attributes provider-specific locator keys; {@code null} or empty means no attributes
+   * @param attributes provider-specific locator keys; empty means no attributes
    */
-  public SecretReference(String provider, @Nullable Map<String, String> attributes) {
+  public SecretReference(String provider, Map<String, String> attributes) {
     Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
+    Preconditions.checkArgument(attributes != null, "attributes must not be null");
     this.provider = provider;
-    if (attributes == null || attributes.isEmpty()) {
+    if (attributes.isEmpty()) {
       this.attributes = ImmutableMap.of();
     } else {
       Map<String, String> copy = new LinkedHashMap<>(attributes);

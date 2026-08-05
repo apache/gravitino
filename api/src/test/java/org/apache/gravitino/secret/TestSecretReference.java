@@ -38,7 +38,10 @@ public class TestSecretReference {
             new SecretReference(
                 "vault", Map.of("path", "urn:gravitino-secret:memory:catalog:1:jdbc-password")));
 
-    SecretReference emptyAttrs = new SecretReference("vault", null);
+    SecretReference emptyAttrs = new SecretReference("vault", Map.of());
     Assertions.assertTrue(emptyAttrs.attributes().isEmpty());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new SecretReference("vault", null));
   }
 }
