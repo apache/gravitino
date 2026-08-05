@@ -496,12 +496,14 @@ public class TestTagManager {
     Assertions.assertEquals(ImmutableSet.of("tag2", "tag3"), ImmutableSet.copyOf(tags1));
 
     // Test associate and disassociate no tags for catalog
-    String[] tags2 = tagManager.associateTagsForMetadataObject(METALAKE, catalogObject, null, null);
+    String[] tags2 =
+        tagManager.associateTagsForMetadataObject(
+            METALAKE, catalogObject, (String[]) null, (String[]) null);
 
     Assertions.assertEquals(2, tags2.length);
     Assertions.assertEquals(ImmutableSet.of("tag2", "tag3"), ImmutableSet.copyOf(tags2));
 
-    // Test re-associate tags for catalog
+    // Test re-associate tags for catalog through the compatibility API.
     Throwable e =
         Assertions.assertThrows(
             TagAlreadyAssociatedException.class,
@@ -511,12 +513,13 @@ public class TestTagManager {
     Assertions.assertTrue(e.getMessage().contains("Failed to associate tags for metadata object"));
 
     // Test associate and disassociate non-existent tags for catalog
-    String[] tags3 =
+    String[] tagsAfterMissingUpdate =
         tagManager.associateTagsForMetadataObject(
             METALAKE, catalogObject, new String[] {"tag4", "tag5"}, new String[] {"tag6"});
 
-    Assertions.assertEquals(2, tags3.length);
-    Assertions.assertEquals(ImmutableSet.of("tag2", "tag3"), ImmutableSet.copyOf(tags3));
+    Assertions.assertEquals(2, tagsAfterMissingUpdate.length);
+    Assertions.assertEquals(
+        ImmutableSet.of("tag2", "tag3"), ImmutableSet.copyOf(tagsAfterMissingUpdate));
 
     // Test associate tags for non-existent metadata object
     MetadataObject nonExistentObject =
@@ -645,6 +648,111 @@ public class TestTagManager {
   }
 
   @Test
+  public void testAssociateTagValuesForMetadataObject() {
+    Tag tag =
+        tagManager.createTag(
+            METALAKE,
+            "data_domain",
+            null,
+            null,
+            TagValueConstraint.ofAllowedValues("finance", "risk", "finance"));
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    String[] tags =
+        tagManager.associateTagsForMetadataObject(
+            METALAKE,
+            tableObject,
+            new TagValue[] {TagValue.of(tag.name(), "finance"), TagValue.of(tag.name(), "risk")},
+            null);
+
+    Assertions.assertEquals(1, tags.length);
+    Assertions.assertEquals(ImmutableSet.of("data_domain"), ImmutableSet.copyOf(tags));
+
+    Tag[] tagInfos = tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject);
+    Assertions.assertEquals(1, tagInfos.length);
+    Assertions.assertTrue(tagInfos[0].assignment().isPresent());
+    Assertions.assertArrayEquals(
+        new String[] {"finance", "risk"}, tagInfos[0].assignment().get().values());
+
+    String[] repeatedTags =
+        tagManager.associateTagsForMetadataObject(
+            METALAKE, tableObject, new TagValue[] {TagValue.of(tag.name(), "finance")}, null);
+    Assertions.assertArrayEquals(new String[] {tag.name()}, repeatedTags);
+    Tag[] repeatedTagInfos = tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject);
+    Assertions.assertArrayEquals(
+        new String[] {"finance", "risk"}, repeatedTagInfos[0].assignment().get().values());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tagManager.associateTagsForMetadataObject(
+                METALAKE, tableObject, new TagValue[] {TagValue.of(tag.name(), "pii")}, null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tagManager.associateTagsForMetadataObject(
+                METALAKE, tableObject, new TagValue[] {TagValue.noValue(tag.name())}, null));
+
+    MetadataObject[] financeObjects =
+        tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "finance");
+    Assertions.assertArrayEquals(new MetadataObject[] {tableObject}, financeObjects);
+    Assertions.assertEquals(
+        0, tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "pii").length);
+
+    Tag ownerTag = tagManager.createTag(METALAKE, "owner", null, null);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, tableObject, new TagValue[] {TagValue.noValue(ownerTag.name())}, null);
+    Tag ownerInfoWithoutValue =
+        tagManager.getTagForMetadataObject(METALAKE, tableObject, ownerTag.name());
+    assertAssignmentValues(ownerInfoWithoutValue, new String[0]);
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, tableObject, new TagValue[] {TagValue.of(ownerTag.name(), "team-a")}, null);
+    Tag ownerInfo = tagManager.getTagForMetadataObject(METALAKE, tableObject, ownerTag.name());
+    Assertions.assertArrayEquals(new String[] {"team-a"}, ownerInfo.assignment().get().values());
+    Assertions.assertArrayEquals(
+        new MetadataObject[] {tableObject},
+        tagManager.listMetadataObjectsForTag(METALAKE, ownerTag.name(), "team-a"));
+
+    Assertions.assertTrue(
+        tagInfos[0].valueConstraint().type() == TagValueConstraint.Type.ALLOWED_VALUES);
+    Assertions.assertArrayEquals(
+        new String[] {"finance", "risk"}, tagInfos[0].valueConstraint().allowedValues());
+  }
+
+  @Test
+  public void testRejectMixedTagAdditionsWithAndWithoutValues() {
+    Tag noValueFirstTag = tagManager.createTag(METALAKE, "no_value_first", null, null);
+    Tag valuedFirstTag = tagManager.createTag(METALAKE, "valued_first", null, null);
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tagManager.associateTagsForMetadataObject(
+                METALAKE,
+                tableObject,
+                new TagValue[] {
+                  TagValue.noValue(noValueFirstTag.name()),
+                  TagValue.of(noValueFirstTag.name(), "finance")
+                },
+                null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            tagManager.associateTagsForMetadataObject(
+                METALAKE,
+                tableObject,
+                new TagValue[] {
+                  TagValue.of(valuedFirstTag.name(), "finance"),
+                  TagValue.noValue(valuedFirstTag.name())
+                },
+                null));
+  }
+
+  @Test
   public void testListMetadataObjectsForTag() {
     Tag tag1 = tagManager.createTag(METALAKE, "tag1", null, null);
     Tag tag2 = tagManager.createTag(METALAKE, "tag2", null, null);
@@ -757,7 +865,8 @@ public class TestTagManager {
 
     Tag[] tagsInfo = tagManager.listTagsInfoForMetadataObject(METALAKE, catalogObject);
     Assertions.assertEquals(3, tagsInfo.length);
-    Assertions.assertEquals(ImmutableSet.of(tag1, tag2, tag3), ImmutableSet.copyOf(tagsInfo));
+    Assertions.assertEquals(ImmutableSet.of("tag1", "tag2", "tag3"), tagNames(tagsInfo));
+    Arrays.stream(tagsInfo).forEach(tag -> assertAssignmentValues(tag, new String[0]));
 
     String[] tags1 = tagManager.listTagsForMetadataObject(METALAKE, schemaObject);
     Assertions.assertEquals(2, tags1.length);
@@ -765,7 +874,8 @@ public class TestTagManager {
 
     Tag[] tagsInfo1 = tagManager.listTagsInfoForMetadataObject(METALAKE, schemaObject);
     Assertions.assertEquals(2, tagsInfo1.length);
-    Assertions.assertEquals(ImmutableSet.of(tag1, tag2), ImmutableSet.copyOf(tagsInfo1));
+    Assertions.assertEquals(ImmutableSet.of("tag1", "tag2"), tagNames(tagsInfo1));
+    Arrays.stream(tagsInfo1).forEach(tag -> assertAssignmentValues(tag, new String[0]));
 
     String[] tags2 = tagManager.listTagsForMetadataObject(METALAKE, tableObject);
     Assertions.assertEquals(1, tags2.length);
@@ -773,7 +883,8 @@ public class TestTagManager {
 
     Tag[] tagsInfo2 = tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject);
     Assertions.assertEquals(1, tagsInfo2.length);
-    Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo2));
+    Assertions.assertEquals(ImmutableSet.of("tag1"), tagNames(tagsInfo2));
+    Arrays.stream(tagsInfo2).forEach(tag -> assertAssignmentValues(tag, new String[0]));
 
     String[] tags3 = tagManager.listTagsForMetadataObject(METALAKE, columnObject);
     Assertions.assertEquals(1, tags3.length);
@@ -781,7 +892,8 @@ public class TestTagManager {
 
     Tag[] tagsInfo3 = tagManager.listTagsInfoForMetadataObject(METALAKE, columnObject);
     Assertions.assertEquals(1, tagsInfo3.length);
-    Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo3));
+    Assertions.assertEquals(ImmutableSet.of("tag1"), tagNames(tagsInfo3));
+    Arrays.stream(tagsInfo3).forEach(tag -> assertAssignmentValues(tag, new String[0]));
 
     String[] tags4 = tagManager.listTagsForMetadataObject(METALAKE, viewObject);
     Assertions.assertEquals(1, tags4.length);
@@ -789,7 +901,8 @@ public class TestTagManager {
 
     Tag[] tagsInfo4 = tagManager.listTagsInfoForMetadataObject(METALAKE, viewObject);
     Assertions.assertEquals(1, tagsInfo4.length);
-    Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo4));
+    Assertions.assertEquals(ImmutableSet.of("tag1"), tagNames(tagsInfo4));
+    Arrays.stream(tagsInfo4).forEach(tag -> assertAssignmentValues(tag, new String[0]));
 
     String[] tags5 = tagManager.listTagsForMetadataObject(METALAKE, functionObject);
     Assertions.assertEquals(1, tags5.length);
@@ -797,7 +910,8 @@ public class TestTagManager {
 
     Tag[] tagsInfo5 = tagManager.listTagsInfoForMetadataObject(METALAKE, functionObject);
     Assertions.assertEquals(1, tagsInfo5.length);
-    Assertions.assertEquals(ImmutableSet.of(tag1), ImmutableSet.copyOf(tagsInfo5));
+    Assertions.assertEquals(ImmutableSet.of("tag1"), tagNames(tagsInfo5));
+    Arrays.stream(tagsInfo5).forEach(tag -> assertAssignmentValues(tag, new String[0]));
 
     // List tags for non-existent metadata object
     MetadataObject nonExistentObject =
@@ -853,25 +967,32 @@ public class TestTagManager {
         METALAKE, functionObject, new String[] {tag1.name()}, null);
 
     Tag result = tagManager.getTagForMetadataObject(METALAKE, catalogObject, tag1.name());
-    Assertions.assertEquals(tag1, result);
+    assertTagMetadataEquals(tag1, result);
+    assertAssignmentValues(result, new String[0]);
 
     Tag result1 = tagManager.getTagForMetadataObject(METALAKE, schemaObject, tag1.name());
-    Assertions.assertEquals(tag1, result1);
+    assertTagMetadataEquals(tag1, result1);
+    assertAssignmentValues(result1, new String[0]);
 
     Tag result2 = tagManager.getTagForMetadataObject(METALAKE, schemaObject, tag2.name());
-    Assertions.assertEquals(tag2, result2);
+    assertTagMetadataEquals(tag2, result2);
+    assertAssignmentValues(result2, new String[0]);
 
     Tag result3 = tagManager.getTagForMetadataObject(METALAKE, catalogObject, tag3.name());
-    Assertions.assertEquals(tag3, result3);
+    assertTagMetadataEquals(tag3, result3);
+    assertAssignmentValues(result3, new String[0]);
 
     Tag result4 = tagManager.getTagForMetadataObject(METALAKE, tableObject, tag1.name());
-    Assertions.assertEquals(tag1, result4);
+    assertTagMetadataEquals(tag1, result4);
+    assertAssignmentValues(result4, new String[0]);
 
     Tag result5 = tagManager.getTagForMetadataObject(METALAKE, viewObject, tag1.name());
-    Assertions.assertEquals(tag1, result5);
+    assertTagMetadataEquals(tag1, result5);
+    assertAssignmentValues(result5, new String[0]);
 
     Tag result6 = tagManager.getTagForMetadataObject(METALAKE, functionObject, tag1.name());
-    Assertions.assertEquals(tag1, result6);
+    assertTagMetadataEquals(tag1, result6);
+    assertAssignmentValues(result6, new String[0]);
 
     // Test get non-existent tag for metadata object
     Throwable e =
@@ -903,5 +1024,23 @@ public class TestTagManager {
             () -> tagManager.getTagForMetadataObject(METALAKE, nonExistentObject, tag1.name()));
     Assertions.assertTrue(
         e3.getMessage().contains("Failed to get tag for metadata object " + nonExistentObject));
+  }
+
+  private static Set<String> tagNames(Tag[] tags) {
+    return Arrays.stream(tags).map(Tag::name).collect(Collectors.toSet());
+  }
+
+  private static void assertTagMetadataEquals(Tag expected, Tag actual) {
+    Assertions.assertEquals(expected.name(), actual.name());
+    Assertions.assertEquals(expected.comment(), actual.comment());
+    Assertions.assertEquals(expected.properties(), actual.properties());
+    Assertions.assertEquals(expected.valueConstraint().type(), actual.valueConstraint().type());
+    Assertions.assertArrayEquals(
+        expected.valueConstraint().allowedValues(), actual.valueConstraint().allowedValues());
+  }
+
+  private static void assertAssignmentValues(Tag tag, String[] expectedValues) {
+    Assertions.assertTrue(tag.assignment().isPresent());
+    Assertions.assertArrayEquals(expectedValues, tag.assignment().get().values());
   }
 }
