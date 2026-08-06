@@ -26,6 +26,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -54,6 +55,8 @@ import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -296,6 +299,42 @@ public class TagIT extends BaseIT {
 
     Tag tag3 = metalake.getTag(tagName2);
     Assertions.assertEquals(tag2, tag3);
+  }
+
+  @Test
+  public void testAssignmentValues() {
+    String tagName = GravitinoITUtils.genRandomName("tag_it_assignment_value");
+    TagValueConstraint constraint = TagValueConstraint.ofAllowedValues("finance", "risk");
+    Tag tag = metalake.createTag(tagName, "comment", Collections.emptyMap(), constraint);
+    Assertions.assertEquals(constraint, tag.valueConstraint());
+
+    TagValue[] values =
+        new TagValue[] {TagValue.of(tagName, "finance"), TagValue.of(tagName, "risk")};
+    Assertions.assertArrayEquals(
+        new String[] {tagName}, table.supportsTags().associateTags(values, null));
+
+    Tag assignedTag = table.supportsTags().getTag(tagName);
+    Assertions.assertEquals(constraint, assignedTag.valueConstraint());
+    Assertions.assertTrue(assignedTag.assignment().isPresent());
+    Assertions.assertArrayEquals(valuesToStrings(values), assignedTag.assignment().get().values());
+    Assertions.assertFalse(assignedTag.inherited().get());
+
+    MetadataObject expectedTable =
+        MetadataObjects.of(
+            relationalCatalog.name() + "." + schema.name(),
+            table.name(),
+            MetadataObject.Type.TABLE);
+    MetadataObject[] financeObjects = tag.associatedObjects().objects("finance");
+    Assertions.assertEquals(1, financeObjects.length);
+    Assertions.assertEquals(expectedTable.fullName(), financeObjects[0].fullName());
+    Assertions.assertEquals(expectedTable.type(), financeObjects[0].type());
+    Assertions.assertEquals(0, tag.associatedObjects().objects("unknown").length);
+
+    Assertions.assertEquals(0, table.supportsTags().associateTags(null, values).length);
+  }
+
+  private static String[] valuesToStrings(TagValue[] values) {
+    return Arrays.stream(values).map(value -> value.value().get()).toArray(String[]::new);
   }
 
   @Test
