@@ -23,10 +23,8 @@ import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
@@ -34,7 +32,7 @@ import org.apache.commons.lang3.StringUtils;
  * Helpers for secret-related entity property handling and request validation.
  *
  * <p>This is intentionally separate from {@link SecretManager}, which owns secret lifecycle
- * (build/write/rollback) rather than property assembly and request-shape checks.
+ * (build/write/rollback) and secret-key uniqueness checks rather than property assembly.
  */
 public final class SecretPropertyUtils {
 
@@ -49,42 +47,6 @@ public final class SecretPropertyUtils {
    */
   public static boolean isSecretProperty(@Nullable String key, @Nullable String value) {
     return key != null && value != null && value.startsWith(URN_PREFIX) && value.endsWith(key);
-  }
-
-  /**
-   * Ensures each secret property key appears at most once across {@code properties}, {@code
-   * secretBindings}, and {@code secretReferences}.
-   *
-   * <p>{@code null} maps are treated as empty.
-   *
-   * @param properties entity properties from the create request (may be null)
-   * @param secretBindings property key → write-through binding (may be null)
-   * @param secretReferences property key → secret locator (may be null)
-   */
-  public static void checkSecretKeys(
-      @Nullable Map<String, String> properties,
-      @Nullable Map<String, SecretBinding> secretBindings,
-      @Nullable Map<String, SecretReference> secretReferences) {
-    Map<String, SecretBinding> bindings = emptyIfNull(secretBindings);
-    Map<String, SecretReference> references = emptyIfNull(secretReferences);
-
-    Set<String> overlap = new HashSet<>(bindings.keySet());
-    overlap.retainAll(references.keySet());
-    Preconditions.checkArgument(
-        overlap.isEmpty(),
-        "Property keys cannot appear in both secretBindings and secretReferences: %s",
-        overlap);
-
-    Set<String> secretKeys = new HashSet<>(bindings.keySet());
-    secretKeys.addAll(references.keySet());
-    if (properties != null && !secretKeys.isEmpty()) {
-      Set<String> withProperties = new HashSet<>(properties.keySet());
-      withProperties.retainAll(secretKeys);
-      Preconditions.checkArgument(
-          withProperties.isEmpty(),
-          "Property keys cannot appear in both properties and secretBindings/secretReferences: %s",
-          withProperties);
-    }
   }
 
   /**

@@ -70,12 +70,19 @@ public class TestSecretManager {
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () ->
-              SecretPropertyUtils.checkSecretKeys(
+              secretManager.checkSecretKeys(
                   Map.of(),
                   Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
                   Map.of(
                       "jdbc-password",
                       new SecretReference("memory", Map.of("path", "secret/data/x")))));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              secretManager.checkSecretKeys(
+                  Map.of("jdbc-password", "plain"),
+                  Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
+                  Map.of()));
 
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> new SecretBinding(" ", "s3cr3t"));

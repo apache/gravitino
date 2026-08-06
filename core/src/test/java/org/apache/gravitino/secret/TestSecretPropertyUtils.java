@@ -71,7 +71,7 @@ public class TestSecretPropertyUtils {
       Map<String, SecretBinding> secretBindings =
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
 
-      SecretPropertyUtils.checkSecretKeys(properties, secretBindings, Map.of());
+      secretManager.checkSecretKeys(properties, secretBindings, Map.of());
 
       Map<String, String> toValidate =
           SecretPropertyUtils.propertiesToValidate(
@@ -92,26 +92,6 @@ public class TestSecretPropertyUtils {
       Assertions.assertEquals(1, secretUrns.size());
       Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
     }
-  }
-
-  @Test
-  void testCheckSecretKeysRejectsOverlap() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            SecretPropertyUtils.checkSecretKeys(
-                Map.of(),
-                Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
-                Map.of(
-                    "jdbc-password",
-                    new SecretReference("memory", Map.of("path", "secret/data/x")))));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () ->
-            SecretPropertyUtils.checkSecretKeys(
-                Map.of("jdbc-password", "plain"),
-                Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
-                Map.of()));
   }
 
   @Test

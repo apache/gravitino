@@ -154,7 +154,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
-    SecretPropertyUtils.checkSecretKeys(properties, secretBindings, secretReferences);
+    secretManager.checkSecretKeys(properties, secretBindings, secretReferences);
     Map<String, String> propertiesToValidate =
         SecretPropertyUtils.propertiesToValidate(
             properties, secretBindings, secretReferences, secretManager);

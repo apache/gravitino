@@ -24,12 +24,13 @@ import static org.apache.gravitino.secret.SecretConstants.ATTR_PROPERTY_KEY;
 import static org.apache.gravitino.secret.SecretPropertyUtils.validateSecretBindings;
 import static org.apache.gravitino.secret.SecretPropertyUtils.validateSecretReferences;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
@@ -64,18 +65,56 @@ public class SecretManager implements Closeable {
   }
 
   /**
+   * Ensures each secret property key appears at most once across {@code properties}, {@code
+   * secretBindings}, and {@code secretReferences}.
+   *
+   * <p>{@code null} maps are treated as empty.
+   *
+   * @param properties entity properties from the create request (may be null)
+   * @param secretBindings property key → write-through binding (may be null)
+   * @param secretReferences property key → secret locator (may be null)
+   */
+  public void checkSecretKeys(
+      @Nullable Map<String, String> properties,
+      @Nullable Map<String, SecretBinding> secretBindings,
+      @Nullable Map<String, SecretReference> secretReferences) {
+    Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
+    Map<String, SecretReference> references =
+        secretReferences == null ? Map.of() : secretReferences;
+
+    Set<String> overlap = new HashSet<>(bindings.keySet());
+    overlap.retainAll(references.keySet());
+    if (!overlap.isEmpty()) {
+      throw new IllegalArgumentException(
+          "Property keys cannot appear in both secretBindings and secretReferences: " + overlap);
+    }
+
+    Set<String> secretKeys = new HashSet<>(bindings.keySet());
+    secretKeys.addAll(references.keySet());
+    if (properties != null && !secretKeys.isEmpty()) {
+      Set<String> withProperties = new HashSet<>(properties.keySet());
+      withProperties.retainAll(secretKeys);
+      if (!withProperties.isEmpty()) {
+        throw new IllegalArgumentException(
+            "Property keys cannot appear in both properties and secretBindings/secretReferences: "
+                + withProperties);
+      }
+    }
+  }
+
+  /**
    * Builds external-reference URNs from {@code secretReferences} without writing secret material.
    *
    * <p>Callers must put the returned URN strings into properties themselves (e.g. via {@link
    * SecretPropertyUtils#applySecretUrns}). External-ref URNs are owned outside Gravitino and must
    * not be passed to {@link #rollbackWritten}.
    *
-   * @param secretReferences property key → secret locator
+   * @param secretReferences property key → secret locator (null or empty returns an empty list)
    * @return external-reference URNs (insertion order)
    */
-  public List<SecretUrn> getSecretReferenceUrns(Map<String, SecretReference> secretReferences) {
-    Preconditions.checkArgument(secretReferences != null, "secretReferences must not be null");
-    if (secretReferences.isEmpty()) {
+  public List<SecretUrn> getSecretReferenceUrns(
+      @Nullable Map<String, SecretReference> secretReferences) {
+    if (secretReferences == null || secretReferences.isEmpty()) {
       return List.of();
     }
     validateSecretReferences(secretReferences);
@@ -88,7 +127,7 @@ public class SecretManager implements Closeable {
       SecretProvider provider = registry.getProvider(providerName);
       try {
         SecretUrn urn = provider.buildReferenceUrn(key, locator.attributes());
-        validateUrnEndsWithPropertyKey(urn, key);
+        ensureUrnEndsWithPropertyKey(urn, key);
         urns.add(urn);
       } catch (UnsupportedOperationException e) {
         throw new IllegalArgumentException(
@@ -112,14 +151,16 @@ public class SecretManager implements Closeable {
    *
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
-   * @param secretBindings property key → write-through binding
+   * @param secretBindings property key → write-through binding (null or empty returns an empty
+   *     list)
    * @return write-through URNs (insertion order)
    */
   public List<SecretUrn> getSecretBindingUrns(
-      String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
-    Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
-    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
-    if (secretBindings.isEmpty()) {
+      String entityType, long entityId, @Nullable Map<String, SecretBinding> secretBindings) {
+    if (StringUtils.isBlank(entityType)) {
+      throw new IllegalArgumentException("entityType must not be blank");
+    }
+    if (secretBindings == null || secretBindings.isEmpty()) {
       return List.of();
     }
     validateSecretBindings(secretBindings);
@@ -136,7 +177,7 @@ public class SecretManager implements Closeable {
               ATTR_ENTITY_ID, String.valueOf(entityId),
               ATTR_PROPERTY_KEY, key);
       SecretUrn urn = SecretUrn.buildWriteThrough(providerName, attributes);
-      validateUrnEndsWithPropertyKey(urn, key);
+      ensureUrnEndsWithPropertyKey(urn, key);
       urns.add(urn);
     }
     return List.copyOf(urns);
@@ -150,47 +191,50 @@ public class SecretManager implements Closeable {
    * URNs are rolled back. Callers must put URN strings into properties themselves (e.g. via {@link
    * SecretPropertyUtils#applySecretUrns}).
    *
-   * @param secretBindings property key → write-through binding
+   * @param secretBindings property key → write-through binding (null or empty is a no-op)
    * @param secretUrns write-through URNs from {@link #getSecretBindingUrns}
    */
-  public void writeSecrets(Map<String, SecretBinding> secretBindings, List<SecretUrn> secretUrns) {
-    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
-    Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
-    if (secretBindings.isEmpty()) {
-      Preconditions.checkArgument(
-          secretUrns.isEmpty(), "secretUrns must be empty when bindings are");
+  public void writeSecrets(
+      @Nullable Map<String, SecretBinding> secretBindings, @Nullable List<SecretUrn> secretUrns) {
+    if (secretBindings == null || secretBindings.isEmpty()) {
+      if (secretUrns != null && !secretUrns.isEmpty()) {
+        throw new IllegalArgumentException("secretUrns must be empty when bindings are empty");
+      }
       return;
     }
-    Preconditions.checkArgument(!secretUrns.isEmpty(), "secretUrns must not be empty");
+    if (secretUrns == null || secretUrns.isEmpty()) {
+      throw new IllegalArgumentException("secretUrns must not be null or empty");
+    }
     validateSecretBindings(secretBindings);
 
     List<SecretUrn> written = new ArrayList<>(secretUrns.size());
     try {
       for (SecretUrn urn : secretUrns) {
         List<String> segments = urn.identifierSegments();
-        Preconditions.checkArgument(
-            segments.size() == 3,
-            "Write-through secret URN must have entityType, entityId, propertyKey segments: %s",
-            urn);
+        if (segments.size() != 3) {
+          throw new IllegalArgumentException(
+              "Write-through secret URN must have entityType, entityId, propertyKey segments: "
+                  + urn);
+        }
         String entityType = segments.get(0);
         String entityId = segments.get(1);
         String propertyKey = segments.get(2);
         SecretBinding binding = secretBindings.get(propertyKey);
-        Preconditions.checkArgument(
-            binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
-        String plaintext = binding.plaintext();
+        if (binding == null) {
+          throw new IllegalArgumentException(
+              "No secretBindings entry for property key \"" + propertyKey + "\"");
+        }
         Map<String, String> attributes =
             ImmutableMap.of(
                 ATTR_ENTITY_TYPE, entityType,
                 ATTR_ENTITY_ID, entityId,
                 ATTR_PROPERTY_KEY, propertyKey);
         SecretUrn writtenUrn =
-            registry.getProvider(urn.providerName()).writeSecret(plaintext, attributes);
-        Preconditions.checkArgument(
-            urn.equals(writtenUrn),
-            "Provider returned unexpected URN: expected %s, got %s",
-            urn,
-            writtenUrn);
+            registry.getProvider(urn.providerName()).writeSecret(binding.plaintext(), attributes);
+        if (!urn.equals(writtenUrn)) {
+          throw new IllegalArgumentException(
+              "Provider returned unexpected URN: expected " + urn + ", got " + writtenUrn);
+        }
         written.add(writtenUrn);
       }
     } catch (RuntimeException e) {
@@ -227,7 +271,9 @@ public class SecretManager implements Closeable {
    * @return the secret plaintext
    */
   public String readSecret(SecretUrn urn) {
-    Preconditions.checkArgument(urn != null, "urn must not be null");
+    if (urn == null) {
+      throw new IllegalArgumentException("urn must not be null");
+    }
     return registry.getProvider(urn.providerName()).readSecret(urn);
   }
 
@@ -236,11 +282,10 @@ public class SecretManager implements Closeable {
     registry.close();
   }
 
-  private static void validateUrnEndsWithPropertyKey(SecretUrn urn, String propertyKey) {
-    Preconditions.checkArgument(
-        urn.toString().endsWith(propertyKey),
-        "Built secret URN must end with property key \"%s\": %s",
-        propertyKey,
-        urn);
+  private static void ensureUrnEndsWithPropertyKey(SecretUrn urn, String propertyKey) {
+    if (!urn.toString().endsWith(propertyKey)) {
+      throw new IllegalArgumentException(
+          "Built secret URN must end with property key \"" + propertyKey + "\": " + urn);
+    }
   }
 }
