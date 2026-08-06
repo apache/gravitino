@@ -64,7 +64,6 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;

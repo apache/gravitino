@@ -26,7 +26,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.PagedResult;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;

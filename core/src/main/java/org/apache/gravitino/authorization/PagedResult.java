@@ -16,14 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino;
+package org.apache.gravitino.authorization;
 
 import java.util.Collections;
 import java.util.List;
-import org.apache.gravitino.annotation.Evolving;
 
 /** A paginated query result containing the total count and a page of items. */
-@Evolving
 public final class PagedResult<T> {
 
   private final long totalCount;
