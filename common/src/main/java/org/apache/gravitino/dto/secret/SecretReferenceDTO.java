@@ -20,7 +20,6 @@ package org.apache.gravitino.dto.secret;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.collect.ImmutableMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
@@ -44,9 +43,9 @@ public class SecretReferenceDTO {
   @JsonProperty("provider")
   private String provider;
 
-  @Nullable
+  @Builder.Default
   @JsonProperty("attributes")
-  private Map<String, String> attributes;
+  private Map<String, String> attributes = ImmutableMap.of();
 
   /**
    * Converts this DTO to a {@link SecretReference}.
@@ -54,7 +53,8 @@ public class SecretReferenceDTO {
    * @return the secret reference
    */
   public SecretReference toSecretReference() {
-    return new SecretReference(provider, attributes == null ? ImmutableMap.of() : attributes);
+    Map<String, String> attrs = attributes == null ? ImmutableMap.of() : attributes;
+    return new SecretReference(provider, attrs);
   }
 
   /**
@@ -70,38 +70,36 @@ public class SecretReferenceDTO {
   /**
    * Converts a property-key map of DTOs to {@link SecretReference}s.
    *
-   * @param dtos property key → reference DTO; {@code null} returns {@code null}
-   * @return property key → reference, or {@code null}
+   * @param dtos property key → reference DTO; {@code null} or empty returns an empty map
+   * @return property key → reference (never {@code null})
    */
-  @Nullable
   public static Map<String, SecretReference> toSecretReferences(
       @Nullable Map<String, SecretReferenceDTO> dtos) {
-    if (dtos == null) {
-      return null;
+    if (dtos == null || dtos.isEmpty()) {
+      return ImmutableMap.of();
     }
-    Map<String, SecretReference> references = new LinkedHashMap<>(dtos.size());
+    ImmutableMap.Builder<String, SecretReference> references = ImmutableMap.builder();
     for (Map.Entry<String, SecretReferenceDTO> entry : dtos.entrySet()) {
       references.put(entry.getKey(), entry.getValue().toSecretReference());
     }
-    return references;
+    return references.build();
   }
 
   /**
    * Converts a property-key map of {@link SecretReference}s to DTOs.
    *
-   * @param references property key → reference; {@code null} returns {@code null}
-   * @return property key → reference DTO, or {@code null}
+   * @param references property key → reference; {@code null} or empty returns an empty map
+   * @return property key → reference DTO (never {@code null})
    */
-  @Nullable
   public static Map<String, SecretReferenceDTO> fromSecretReferences(
       @Nullable Map<String, SecretReference> references) {
-    if (references == null) {
-      return null;
+    if (references == null || references.isEmpty()) {
+      return ImmutableMap.of();
     }
-    Map<String, SecretReferenceDTO> dtos = new LinkedHashMap<>(references.size());
+    ImmutableMap.Builder<String, SecretReferenceDTO> dtos = ImmutableMap.builder();
     for (Map.Entry<String, SecretReference> entry : references.entrySet()) {
       dtos.put(entry.getKey(), fromSecretReference(entry.getValue()));
     }
-    return dtos;
+    return dtos.build();
   }
 }

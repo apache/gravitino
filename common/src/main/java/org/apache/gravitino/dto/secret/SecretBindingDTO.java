@@ -19,7 +19,7 @@
 package org.apache.gravitino.dto.secret;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import java.util.LinkedHashMap;
+import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
@@ -68,38 +68,36 @@ public class SecretBindingDTO {
   /**
    * Converts a property-key map of DTOs to {@link SecretBinding}s.
    *
-   * @param dtos property key → binding DTO; {@code null} returns {@code null}
-   * @return property key → binding, or {@code null}
+   * @param dtos property key → binding DTO; {@code null} or empty returns an empty map
+   * @return property key → binding (never {@code null})
    */
-  @Nullable
   public static Map<String, SecretBinding> toSecretBindings(
       @Nullable Map<String, SecretBindingDTO> dtos) {
-    if (dtos == null) {
-      return null;
+    if (dtos == null || dtos.isEmpty()) {
+      return ImmutableMap.of();
     }
-    Map<String, SecretBinding> bindings = new LinkedHashMap<>(dtos.size());
+    ImmutableMap.Builder<String, SecretBinding> bindings = ImmutableMap.builder();
     for (Map.Entry<String, SecretBindingDTO> entry : dtos.entrySet()) {
       bindings.put(entry.getKey(), entry.getValue().toSecretBinding());
     }
-    return bindings;
+    return bindings.build();
   }
 
   /**
    * Converts a property-key map of {@link SecretBinding}s to DTOs.
    *
-   * @param bindings property key → binding; {@code null} returns {@code null}
-   * @return property key → binding DTO, or {@code null}
+   * @param bindings property key → binding; {@code null} or empty returns an empty map
+   * @return property key → binding DTO (never {@code null})
    */
-  @Nullable
   public static Map<String, SecretBindingDTO> fromSecretBindings(
       @Nullable Map<String, SecretBinding> bindings) {
-    if (bindings == null) {
-      return null;
+    if (bindings == null || bindings.isEmpty()) {
+      return ImmutableMap.of();
     }
-    Map<String, SecretBindingDTO> dtos = new LinkedHashMap<>(bindings.size());
+    ImmutableMap.Builder<String, SecretBindingDTO> dtos = ImmutableMap.builder();
     for (Map.Entry<String, SecretBinding> entry : bindings.entrySet()) {
       dtos.put(entry.getKey(), fromSecretBinding(entry.getValue()));
     }
-    return dtos;
+    return dtos.build();
   }
 }
