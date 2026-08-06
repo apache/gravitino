@@ -81,8 +81,8 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
     } else {
       TagValuesAssociateRequest tagValuesAssociateRequest = (TagValuesAssociateRequest) request;
       tagValuesAssociateRequest.validate();
-      tagsToAdd = tagValuesAssociateRequest.getTagsToAdd();
-      tagsToRemove = tagValuesAssociateRequest.getTagsToRemove();
+      tagsToAdd = tagValuesAssociateRequest.tagValuesToAdd();
+      tagsToRemove = tagValuesAssociateRequest.tagValuesToRemove();
     }
 
     // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.

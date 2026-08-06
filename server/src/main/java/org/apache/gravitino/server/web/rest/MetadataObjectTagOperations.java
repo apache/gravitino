@@ -305,14 +305,14 @@ public class MetadataObjectTagOperations {
             } else {
               TagValuesAssociateRequest tagValuesAssociateRequest =
                   (TagValuesAssociateRequest) request;
-              tagsToAdd = tagValuesAssociateRequest.getTagsToAdd();
-              tagsToRemove = tagValuesAssociateRequest.getTagsToRemove();
+              tagsToAdd = tagValuesAssociateRequest.tagValuesToAdd();
+              tagsToRemove = tagValuesAssociateRequest.tagValuesToRemove();
             }
             MetadataObject object =
                 MetadataObjects.parse(
                     fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
             String[] tagNames =
-                tagDispatcher.associateTagsForMetadataObject(
+                tagDispatcher.associateTagValuesForMetadataObject(
                     metalake, object, tagsToAdd, tagsToRemove);
             tagNames = tagNames == null ? new String[0] : tagNames;
             LOG.info(

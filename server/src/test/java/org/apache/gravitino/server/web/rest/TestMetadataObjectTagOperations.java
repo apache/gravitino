@@ -976,7 +976,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
         Arrays.stream(tagsToRemove).map(TagValue::noValue).toArray(TagValue[]::new);
 
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
-    when(tagManager.associateTagsForMetadataObject(
+    when(tagManager.associateTagValuesForMetadataObject(
             metalake, catalog, tagValuesToAdd, tagValuesToRemove))
         .thenReturn(tagsToAdd);
 
@@ -999,7 +999,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertArrayEquals(tagsToAdd, nameListResponse.getNames());
 
     // Test throw null tags
-    when(tagManager.associateTagsForMetadataObject(
+    when(tagManager.associateTagValuesForMetadataObject(
             metalake, catalog, tagValuesToAdd, tagValuesToRemove))
         .thenReturn(null);
     Response response1 =
@@ -1021,7 +1021,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     // Test throw TagAlreadyAssociatedException
     doThrow(new TagAlreadyAssociatedException("mock error"))
         .when(tagManager)
-        .associateTagsForMetadataObject(metalake, catalog, tagValuesToAdd, tagValuesToRemove);
+        .associateTagValuesForMetadataObject(metalake, catalog, tagValuesToAdd, tagValuesToRemove);
     Response response2 =
         target(basePath(metalake))
             .path(catalog.type().toString())
@@ -1040,7 +1040,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
     // Test associate tags for view
     MetadataObject view = MetadataObjects.parse("object1.object2.view1", MetadataObject.Type.VIEW);
-    when(tagManager.associateTagsForMetadataObject(
+    when(tagManager.associateTagValuesForMetadataObject(
             metalake, view, tagValuesToAdd, tagValuesToRemove))
         .thenReturn(tagsToAdd);
 
@@ -1060,7 +1060,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     // Test associate tags for function
     MetadataObject function =
         MetadataObjects.parse("object1.object2.function1", MetadataObject.Type.FUNCTION);
-    when(tagManager.associateTagsForMetadataObject(
+    when(tagManager.associateTagValuesForMetadataObject(
             metalake, function, tagValuesToAdd, tagValuesToRemove))
         .thenReturn(tagsToAdd);
 
@@ -1080,7 +1080,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(tagManager)
-        .associateTagsForMetadataObject(
+        .associateTagValuesForMetadataObject(
             any(String.class),
             any(MetadataObject.class),
             any(TagValue[].class),
@@ -1108,7 +1108,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
     TagValue[] tagsToAdd = {TagValue.noValue("pii"), TagValue.of("data_domain", "finance")};
     TagValue[] tagsToRemove = {TagValue.of("data_domain", "old")};
-    when(tagManager.associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
+    when(tagManager.associateTagValuesForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
         .thenReturn(new String[] {"pii", "data_domain"});
 
     TagValuesAssociateRequest request = new TagValuesAssociateRequest(tagsToAdd, tagsToRemove);

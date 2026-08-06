@@ -964,7 +964,7 @@ public class TestTagOperations extends BaseOperationsTest {
         Arrays.stream(tagsToRemove).map(TagValue::noValue).toArray(TagValue[]::new);
 
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
-    when(tagManager.associateTagsForMetadataObject(
+    when(tagManager.associateTagValuesForMetadataObject(
             metalake, catalog, tagValuesToAdd, tagValuesToRemove))
         .thenReturn(tagsToAdd);
 
@@ -986,7 +986,7 @@ public class TestTagOperations extends BaseOperationsTest {
     Assertions.assertArrayEquals(tagsToAdd, nameListResponse.getNames());
 
     // Test throw null tags
-    when(tagManager.associateTagsForMetadataObject(
+    when(tagManager.associateTagValuesForMetadataObject(
             metalake, catalog, tagValuesToAdd, tagValuesToRemove))
         .thenReturn(null);
     Response response1 =
@@ -1007,7 +1007,7 @@ public class TestTagOperations extends BaseOperationsTest {
     // Test throw TagAlreadyAssociatedException
     doThrow(new TagAlreadyAssociatedException("mock error"))
         .when(tagManager)
-        .associateTagsForMetadataObject(metalake, catalog, tagValuesToAdd, tagValuesToRemove);
+        .associateTagValuesForMetadataObject(metalake, catalog, tagValuesToAdd, tagValuesToRemove);
     Response response2 =
         target(tagPath(metalake))
             .path(catalog.type().toString())
@@ -1026,7 +1026,7 @@ public class TestTagOperations extends BaseOperationsTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(tagManager)
-        .associateTagsForMetadataObject(
+        .associateTagValuesForMetadataObject(
             any(String.class),
             any(MetadataObject.class),
             any(TagValue[].class),
@@ -1053,7 +1053,7 @@ public class TestTagOperations extends BaseOperationsTest {
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
     TagValue[] tagsToAdd = {TagValue.noValue("pii"), TagValue.of("data_domain", "finance")};
     TagValue[] tagsToRemove = {TagValue.of("data_domain", "old")};
-    when(tagManager.associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
+    when(tagManager.associateTagValuesForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
         .thenReturn(new String[] {"pii", "data_domain"});
 
     TagValuesAssociateRequest request = new TagValuesAssociateRequest(tagsToAdd, tagsToRemove);
