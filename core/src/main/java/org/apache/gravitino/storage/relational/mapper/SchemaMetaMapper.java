@@ -42,6 +42,10 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByCatalogId")
   List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
+  /** Lists all active schemas in a metalake. */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByMetalakeId")
+  List<SchemaPO> listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "listSchemaPOsByFullQualifiedName")
@@ -102,6 +106,15 @@ public interface SchemaMetaMapper {
   Integer updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO);
 
+  /**
+   * Advances the schema version when the expected OCC version still matches.
+   *
+   * @return the number of updated rows
+   */
+  @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "fenceSchemaMeta")
+  Integer fenceSchemaMeta(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
+
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "softDeleteSchemaMetasBySchemaIds")
@@ -109,13 +122,19 @@ public interface SchemaMetaMapper {
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByMetalakeId")
-  Integer softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteSchemaMetaBySchemaIdAndVersion")
+  Integer softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
 
+  /**
+   * Soft-deletes schemas whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByCatalogId")
-  Integer softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId);
+      method = "softDeleteSchemaMetasWithVersion")
+  Integer softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs);
 
   @DeleteProvider(
       type = SchemaMetaSQLProviderFactory.class,

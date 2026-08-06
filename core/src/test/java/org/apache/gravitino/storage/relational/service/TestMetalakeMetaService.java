@@ -25,14 +25,30 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestMetalakeMetaService extends TestJDBCBackend {
 
@@ -90,6 +106,212 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
     Assertions.assertNotNull(updatedMetalake.comment());
 
     backend.delete(metalake.nameIdentifier(), Entity.EntityType.METALAKE, false);
+  }
+
+  @TestTemplate
+  public void testAlterAndDeleteUseCurrentVersion() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    MetalakePO oldPO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+    BaseMetalake updatedMetalake =
+        BaseMetalake.builder()
+            .withId(metalake.id())
+            .withName(metalake.name())
+            .withAuditInfo(metalake.auditInfo())
+            .withComment("updated")
+            .withProperties(metalake.properties())
+            .withVersion(metalake.getVersion())
+            .build();
+    MetalakePO newPO = POConverters.updateMetalakePOWithVersion(oldPO, updatedMetalake);
+
+    int updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            MetalakeMetaMapper.class, mapper -> mapper.updateMetalakeMeta(newPO, oldPO));
+    int staleUpdate =
+        SessionUtils.doWithCommitAndFetchResult(
+            MetalakeMetaMapper.class, mapper -> mapper.updateMetalakeMeta(newPO, oldPO));
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            MetalakeMetaMapper.class,
+            mapper ->
+                mapper.softDeleteMetalakeMetaByMetalakeId(
+                    metalake.id(), oldPO.getCurrentVersion()));
+    Assertions.assertEquals(1, updated);
+    Assertions.assertEquals(0, staleUpdate);
+    Assertions.assertEquals(0, staleDelete);
+    assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    int deleted =
+        SessionUtils.doWithCommitAndFetchResult(
+            MetalakeMetaMapper.class,
+            mapper ->
+                mapper.softDeleteMetalakeMetaByMetalakeId(
+                    metalake.id(), newPO.getCurrentVersion()));
+    Assertions.assertEquals(1, deleted);
+  }
+
+  @TestTemplate
+  public void testAlterReportsOptimisticLockConflict() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            MetalakeMetaService.getInstance()
+                .updateMetalake(
+                    metalake.nameIdentifier(),
+                    entity -> {
+                      BaseMetalake current = (BaseMetalake) entity;
+                      MetalakePO currentPO =
+                          SessionUtils.getWithoutCommit(
+                              MetalakeMetaMapper.class,
+                              mapper -> mapper.selectMetalakeMetaByName(current.name()));
+                      BaseMetalake competingUpdate =
+                          BaseMetalake.builder()
+                              .withId(current.id())
+                              .withName(current.name())
+                              .withAuditInfo(current.auditInfo())
+                              .withComment("competing update")
+                              .withProperties(current.properties())
+                              .withVersion(current.getVersion())
+                              .build();
+                      MetalakePO competingPO =
+                          POConverters.updateMetalakePOWithVersion(currentPO, competingUpdate);
+                      SessionUtils.doWithCommitAndFetchResult(
+                          MetalakeMetaMapper.class,
+                          mapper -> mapper.updateMetalakeMeta(competingPO, currentPO));
+                      return BaseMetalake.builder()
+                          .withId(current.id())
+                          .withName(current.name())
+                          .withAuditInfo(current.auditInfo())
+                          .withComment("requested update")
+                          .withProperties(current.properties())
+                          .withVersion(current.getVersion())
+                          .build();
+                    }));
+  }
+
+  @TestTemplate
+  public void testDeleteReportsOptimisticLockConflict() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    MetalakePO stalePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+    BaseMetalake competingUpdate =
+        BaseMetalake.builder()
+            .withId(metalake.id())
+            .withName(metalake.name())
+            .withAuditInfo(metalake.auditInfo())
+            .withComment("competing update")
+            .withProperties(metalake.properties())
+            .withVersion(metalake.getVersion())
+            .build();
+    MetalakePO competingPO = POConverters.updateMetalakePOWithVersion(stalePO, competingUpdate);
+    SessionUtils.doWithCommitAndFetchResult(
+        MetalakeMetaMapper.class, mapper -> mapper.updateMetalakeMeta(competingPO, stalePO));
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    MetalakeMetaService.getInstance()
+                        .deleteMetalakeWithVersion(
+                            metalake.nameIdentifier(),
+                            metalake.id(),
+                            stalePO.getCurrentVersion())));
+    assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+  }
+
+  @TestTemplate
+  public void testCascadeDeleteReportsConcurrentSchemaAlter() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog");
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(METALAKE_NAME, catalog.name()),
+            "schema",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+    SchemaPO schemaBeforeDelete =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    MetalakeMetaService service = Mockito.spy(MetalakeMetaService.getInstance());
+    try {
+      Mockito.doAnswer(
+              invocation -> {
+                Assertions.assertEquals(metalake.id(), invocation.getArgument(0));
+                List<SchemaPO> schemaPOs =
+                    SessionUtils.getWithoutCommit(
+                        SchemaMetaMapper.class,
+                        mapper -> mapper.listSchemaPOsByMetalakeId(metalake.id()));
+                SchemaPO observedSchemaPO =
+                    schemaPOs.stream()
+                        .filter(schemaPO -> schemaPO.getSchemaId().equals(schema.id()))
+                        .findFirst()
+                        .orElseThrow();
+                SchemaEntity competingSchema =
+                    SchemaEntity.builder()
+                        .withId(schema.id())
+                        .withName(schema.name())
+                        .withNamespace(schema.namespace())
+                        .withComment("competing update")
+                        .withProperties(schema.properties())
+                        .withAuditInfo(schema.auditInfo())
+                        .build();
+                SchemaPO competingSchemaPO =
+                    POConverters.updateSchemaPOWithVersion(observedSchemaPO, competingSchema);
+                Future<Integer> competingUpdate =
+                    executor.submit(
+                        () ->
+                            SessionUtils.doWithCommitAndFetchResult(
+                                SchemaMetaMapper.class,
+                                mapper ->
+                                    mapper.updateSchemaMeta(competingSchemaPO, observedSchemaPO)));
+                Assertions.assertEquals(1, competingUpdate.get(30, TimeUnit.SECONDS));
+                return schemaPOs;
+              })
+          .when(service)
+          .listSchemaPOsForCascade(metalake.id());
+
+      assertThrows(
+          OptimisticLockException.class,
+          () -> service.deleteMetalake(metalake.nameIdentifier(), true));
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    SchemaPO schemaAfterDelete =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+    Assertions.assertEquals(
+        schemaBeforeDelete.getCurrentVersion() + 1, schemaAfterDelete.getCurrentVersion());
+    Assertions.assertEquals("competing update", schemaAfterDelete.getSchemaComment());
+  }
+
+  @TestTemplate
+  public void testNonCascadeDeleteRollsBackMetalakeFence() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    createAndInsertCatalog(METALAKE_NAME, "catalog");
+    MetalakePO beforeDelete =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), false));
+
+    MetalakePO afterDelete =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+    Assertions.assertEquals(beforeDelete.getCurrentVersion(), afterDelete.getCurrentVersion());
+    assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
   }
 
   @TestTemplate

@@ -20,25 +20,33 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.CatalogMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   @Override
-  public String softDeleteCatalogMetasByCatalogId(Long catalogId) {
+  public String softDeleteCatalogMetasByCatalogId(Long catalogId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
+  /** {@inheritDoc} */
   @Override
-  public String softDeleteCatalogMetasByMetalakeId(Long metalakeId) {
-    return "UPDATE "
+  public String softDeleteCatalogMetasWithVersion(List<CatalogPO> catalogPOs) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   @Override
@@ -101,17 +109,7 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " last_version = #{newCatalogMeta.lastVersion},"
         + " deleted_at = #{newCatalogMeta.deletedAt}"
         + " WHERE catalog_id = #{oldCatalogMeta.catalogId}"
-        + " AND catalog_name = #{oldCatalogMeta.catalogName}"
-        + " AND metalake_id = #{oldCatalogMeta.metalakeId}"
-        + " AND type = #{oldCatalogMeta.type}"
-        + " AND provider = #{oldCatalogMeta.provider}"
-        + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
-        + "   OR (CAST(catalog_comment AS VARCHAR) IS NULL AND "
-        + "   CAST(#{oldCatalogMeta.catalogComment} AS VARCHAR) IS NULL))"
-        + " AND properties = #{oldCatalogMeta.properties}"
-        + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
-        + " AND last_version = #{oldCatalogMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 }

@@ -38,6 +38,18 @@ public class SchemaMetaBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that lists all active schemas in a metalake. */
+  public String listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "SELECT schema_id as schemaId, schema_name as schemaName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+  }
+
   public String listSchemaPOsByFullQualifiedName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
     return """
@@ -273,16 +285,18 @@ public class SchemaMetaBaseSQLProvider {
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
-        + " AND schema_name = #{oldSchemaMeta.schemaName}"
-        + " AND metalake_id = #{oldSchemaMeta.metalakeId}"
-        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
-        + " AND (schema_comment = #{oldSchemaMeta.schemaComment}"
-        + "   OR (schema_comment IS NULL and #{oldSchemaMeta.schemaComment} IS NULL))"
-        + " AND properties = #{oldSchemaMeta.properties}"
-        + " AND audit_info = #{oldSchemaMeta.auditInfo}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
-        + " AND last_version = #{oldSchemaMeta.lastVersion}"
         + " AND deleted_at = 0";
+  }
+
+  /** Returns SQL that advances a schema OCC version conditionally. */
+  public String fenceSchemaMeta(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET last_version = current_version + 1, current_version = current_version + 1"
+        + " WHERE schema_id = #{schemaId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
@@ -299,20 +313,28 @@ public class SchemaMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE schema_id = #{schemaId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
-  public String softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return "UPDATE "
+  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  public String softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String deleteSchemaMetasByLegacyTimeline(

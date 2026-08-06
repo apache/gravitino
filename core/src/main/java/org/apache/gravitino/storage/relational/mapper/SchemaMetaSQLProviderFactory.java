@@ -72,6 +72,11 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().listSchemaPOsByCatalogId(catalogId);
   }
 
+  /** Returns SQL that lists all active schemas in a metalake. */
+  public static String listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listSchemaPOsByMetalakeId(metalakeId);
+  }
+
   public static String selectSchemaIdByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name) {
     return getProvider().selectSchemaIdByCatalogIdAndName(catalogId, name);
@@ -116,16 +121,25 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().updateSchemaMeta(newSchemaPO, oldSchemaPO);
   }
 
+  /** Returns SQL that advances a schema OCC version conditionally. */
+  public static String fenceSchemaMeta(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().fenceSchemaMeta(schemaId, currentVersion);
+  }
+
   public static String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
     return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 
-  public static String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteSchemaMetasByMetalakeId(metalakeId);
+  public static String softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteSchemaMetaBySchemaIdAndVersion(schemaId, currentVersion);
   }
 
-  public static String softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteSchemaMetasByCatalogId(catalogId);
+  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  public static String softDeleteSchemaMetasWithVersion(
+      @Param("schemaMetas") List<SchemaPO> schemaPOs) {
+    return getProvider().softDeleteSchemaMetasWithVersion(schemaPOs);
   }
 
   public static String deleteSchemaMetasByLegacyTimeline(

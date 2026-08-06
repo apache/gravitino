@@ -47,6 +47,12 @@ public interface CatalogMetaMapper {
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByMetalakeId")
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  /** Selects and locks all active catalogs in a metalake for the current transaction. */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "listCatalogPOsByMetalakeIdForUpdate")
+  List<CatalogPO> listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByCatalogIds")
   List<CatalogPO> listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds);
 
@@ -73,6 +79,12 @@ public interface CatalogMetaMapper {
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
 
+  /** Selects and locks an active catalog by ID for the current transaction. */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogMetaByIdForUpdate")
+  CatalogPO selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId);
+
   @InsertProvider(type = CatalogMetaSQLProviderFactory.class, method = "insertCatalogMeta")
   void insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO);
 
@@ -89,12 +101,18 @@ public interface CatalogMetaMapper {
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByCatalogId")
-  Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
+  Integer softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion);
 
+  /**
+   * Soft-deletes catalogs whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
-      method = "softDeleteCatalogMetasByMetalakeId")
-  Integer softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteCatalogMetasWithVersion")
+  Integer softDeleteCatalogMetasWithVersion(@Param("catalogMetas") List<CatalogPO> catalogPOs);
 
   @DeleteProvider(
       type = CatalogMetaSQLProviderFactory.class,

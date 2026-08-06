@@ -33,8 +33,8 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
@@ -65,13 +65,14 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.NamespaceUtil;
 
 /**
  * The service class for metalake metadata. It provides the basic database operations for metalake.
@@ -183,11 +184,15 @@ public class MetalakeMetaService {
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      MetalakeMetaMapper.class,
-                      mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO))),
+          () -> {
+            updateResult.set(
+                SessionUtils.getWithoutCommit(
+                    MetalakeMetaMapper.class,
+                    mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO)));
+            if (updateResult.get() == 0) {
+              throw optimisticLockException(ident);
+            }
+          },
           () -> {
             if (isRenamed && updateResult.get() > 0) {
               SessionUtils.doWithoutCommit(
@@ -206,11 +211,7 @@ public class MetalakeMetaService {
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newMetalakeEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + ident);
-    }
+    return newMetalakeEntity;
   }
 
   @Monitored(
@@ -218,22 +219,25 @@ public class MetalakeMetaService {
       baseMetricName = "deleteMetalake")
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifierUtil.checkMetalake(ident);
-    Long metalakeId = getMetalakeIdByName(ident.name());
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+    if (metalakePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
+    }
+    Long metalakeId = metalakePO.getMetalakeId();
+    Long currentVersion = metalakePO.getCurrentVersion();
     if (metalakeId != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    CatalogMetaMapper.class,
-                    mapper -> mapper.softDeleteCatalogMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasByMetalakeId(metalakeId)),
+            () -> {
+              deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
+              deleteCatalogsWithVersions(ident, metalakeId);
+              deleteSchemasWithVersions(ident, listSchemaPOsForCascade(metalakeId));
+            },
             () ->
                 SessionUtils.doWithoutCommit(
                     TableMetaMapper.class,
@@ -345,18 +349,18 @@ public class MetalakeMetaService {
                           OperateType.DROP));
             });
       } else {
-        List<CatalogEntity> catalogEntities =
-            CatalogMetaService.getInstance()
-                .listCatalogsByNamespace(NamespaceUtil.ofCatalog(ident.name()));
-        if (!catalogEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", ident);
-        }
         SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+            () -> {
+              deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
+              List<CatalogPO> catalogPOs =
+                  SessionUtils.getWithoutCommit(
+                      CatalogMetaMapper.class,
+                      mapper -> mapper.listCatalogPOsByMetalakeId(metalakeId));
+              if (!catalogPOs.isEmpty()) {
+                throw new NonEmptyEntityException(
+                    "Entity %s has sub-entities, you should remove sub-entities first", ident);
+              }
+            },
             () ->
                 SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,
@@ -418,6 +422,60 @@ public class MetalakeMetaService {
       }
     }
     return true;
+  }
+
+  void deleteMetalakeWithVersion(NameIdentifier identifier, Long metalakeId, Long currentVersion) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion));
+    if (deleted == 0) {
+      throw optimisticLockException(identifier);
+    }
+  }
+
+  private void deleteCatalogsWithVersions(NameIdentifier metalakeIdentifier, Long metalakeId) {
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.listCatalogPOsByMetalakeIdForUpdate(metalakeId));
+    if (catalogPOs.isEmpty()) {
+      return;
+    }
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.softDeleteCatalogMetasWithVersion(catalogPOs));
+    if (deleted != catalogPOs.size()) {
+      throw new OptimisticLockException(
+          "A catalog under metalake %s was modified concurrently; retry the operation",
+          metalakeIdentifier);
+    }
+  }
+
+  List<SchemaPO> listSchemaPOsForCascade(Long metalakeId) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByMetalakeId(metalakeId));
+  }
+
+  private void deleteSchemasWithVersions(
+      NameIdentifier metalakeIdentifier, List<SchemaPO> schemaPOs) {
+    if (schemaPOs.isEmpty()) {
+      return;
+    }
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
+    if (deleted != schemaPOs.size()) {
+      throw new OptimisticLockException(
+          "A schema under metalake %s was modified concurrently; retry the operation",
+          metalakeIdentifier);
+    }
+  }
+
+  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
+    return new OptimisticLockException(
+        "The metalake %s was modified concurrently; retry the operation", identifier);
   }
 
   @Monitored(

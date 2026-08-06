@@ -53,6 +53,11 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that lists and locks all active catalogs in a metalake. */
+  public String listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return listCatalogPOsByMetalakeId(metalakeId) + " FOR UPDATE";
+  }
+
   public String listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds) {
     return "<script>"
         + "SELECT catalog_id as catalogId, catalog_name as catalogName,"
@@ -137,6 +142,11 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that selects and locks an active catalog by ID. */
+  public String selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId) {
+    return selectCatalogMetaById(catalogId) + " FOR UPDATE";
+  }
+
   public String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -206,33 +216,33 @@ public class CatalogMetaBaseSQLProvider {
         + " last_version = #{newCatalogMeta.lastVersion},"
         + " deleted_at = #{newCatalogMeta.deletedAt}"
         + " WHERE catalog_id = #{oldCatalogMeta.catalogId}"
-        + " AND catalog_name = #{oldCatalogMeta.catalogName}"
-        + " AND metalake_id = #{oldCatalogMeta.metalakeId}"
-        + " AND type = #{oldCatalogMeta.type}"
-        + " AND provider = #{oldCatalogMeta.provider}"
-        + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
-        + "   OR (catalog_comment IS NULL and #{oldCatalogMeta.catalogComment} IS NULL))"
-        + " AND properties = #{oldCatalogMeta.properties}"
-        + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
-        + " AND last_version = #{oldCatalogMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
-  public String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "UPDATE "
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String deleteCatalogMetasByLegacyTimeline(
