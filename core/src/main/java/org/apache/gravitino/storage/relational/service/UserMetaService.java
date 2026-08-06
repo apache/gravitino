@@ -478,10 +478,9 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "countUsersByMetalake")
   public long countUsersByMetalake(String metalakeName) {
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     Long count =
         SessionUtils.getWithoutCommit(
-            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeId(metalakeId));
+            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeName(metalakeName));
     return count == null ? 0L : count;
   }
 
@@ -493,7 +492,6 @@ public class UserMetaService {
     Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
     Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     long totalCount = countUsersByMetalake(metalakeName);
     if (limit == 0 || offset >= totalCount) {
       return new PagedResult<>(totalCount, Collections.emptyList());
@@ -502,7 +500,8 @@ public class UserMetaService {
     List<ExtendedUserPO> userPOs =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.listExtendedUserPOsByMetalakeIdPaginated(metalakeId, offset, limit));
+            mapper ->
+                mapper.listExtendedUserPOsByMetalakeNamePaginated(metalakeName, offset, limit));
     List<UserEntity> users =
         userPOs.stream()
             .map(

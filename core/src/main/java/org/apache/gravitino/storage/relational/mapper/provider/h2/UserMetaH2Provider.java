@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER_ROLE_RELATION_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -55,8 +56,8 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
   }
 
   @Override
-  public String listExtendedUserPOsByMetalakeIdPaginated(
-      @Param("metalakeId") Long metalakeId,
+  public String listExtendedUserPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
       @Param("offset") int offset,
       @Param("limit") int limit) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
@@ -68,10 +69,14 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
         + " '[' || GROUP_CONCAT('\"' || rot.role_name || '\"') || ']' as roleNames,"
         + " '[' || GROUP_CONCAT('\"' || rot.role_id || '\"') || ']' as roleIds"
         + " FROM ("
-        + " SELECT user_id FROM "
+        + " SELECT ut.user_id FROM "
         + USER_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
-        + " ORDER BY user_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0"
+        + " ORDER BY ut.user_id ASC LIMIT #{limit} OFFSET #{offset}"
         + " ) paginated"
         + " JOIN "
         + USER_TABLE_NAME

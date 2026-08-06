@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.GROU
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.ibatis.annotations.Param;
@@ -100,8 +101,8 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   }
 
   @Override
-  public String listExtendedGroupPOsByMetalakeIdPaginated(
-      @Param("metalakeId") Long metalakeId,
+  public String listExtendedGroupPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
       @Param("offset") int offset,
       @Param("limit") int limit) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
@@ -113,10 +114,14 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " JSON_AGG(rot.role_name) as roleNames,"
         + " JSON_AGG(rot.role_id) as roleIds"
         + " FROM ("
-        + " SELECT group_id FROM "
+        + " SELECT gt.group_id FROM "
         + GROUP_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
-        + " ORDER BY group_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " gt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON gt.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND gt.deleted_at = 0 AND mt.deleted_at = 0"
+        + " ORDER BY gt.group_id ASC LIMIT #{limit} OFFSET #{offset}"
         + " ) paginated"
         + " JOIN "
         + GROUP_TABLE_NAME

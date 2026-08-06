@@ -76,14 +76,18 @@ public class GroupMetaBaseSQLProvider {
         + " GROUP BY gt.group_id";
   }
 
-  public String countGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+  public String countGroupMetasByMetalakeName(@Param("metalakeName") String metalakeName) {
     return "SELECT COUNT(*) FROM "
         + GROUP_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " gt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON gt.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND gt.deleted_at = 0 AND mt.deleted_at = 0";
   }
 
-  public String listExtendedGroupPOsByMetalakeIdPaginated(
-      @Param("metalakeId") Long metalakeId,
+  public String listExtendedGroupPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
       @Param("offset") int offset,
       @Param("limit") int limit) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
@@ -95,10 +99,14 @@ public class GroupMetaBaseSQLProvider {
         + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
         + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM ("
-        + " SELECT group_id FROM "
+        + " SELECT gt.group_id FROM "
         + GROUP_TABLE_NAME
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0"
-        + " ORDER BY group_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " gt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON gt.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND gt.deleted_at = 0 AND mt.deleted_at = 0"
+        + " ORDER BY gt.group_id ASC LIMIT #{limit} OFFSET #{offset}"
         + " ) paginated"
         + " JOIN "
         + GROUP_TABLE_NAME

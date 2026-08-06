@@ -490,10 +490,9 @@ public class GroupMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "countGroupsByMetalake")
   public long countGroupsByMetalake(String metalakeName) {
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     Long count =
         SessionUtils.getWithoutCommit(
-            GroupMetaMapper.class, mapper -> mapper.countGroupMetasByMetalakeId(metalakeId));
+            GroupMetaMapper.class, mapper -> mapper.countGroupMetasByMetalakeName(metalakeName));
     return count == null ? 0L : count;
   }
 
@@ -505,7 +504,6 @@ public class GroupMetaService {
     Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
     Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
 
-    Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     long totalCount = countGroupsByMetalake(metalakeName);
     if (limit == 0 || offset >= totalCount) {
       return new PagedResult<>(totalCount, Collections.emptyList());
@@ -514,7 +512,8 @@ public class GroupMetaService {
     List<ExtendedGroupPO> groupPOs =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
-            mapper -> mapper.listExtendedGroupPOsByMetalakeIdPaginated(metalakeId, offset, limit));
+            mapper ->
+                mapper.listExtendedGroupPOsByMetalakeNamePaginated(metalakeName, offset, limit));
     List<GroupEntity> groups =
         groupPOs.stream()
             .map(
