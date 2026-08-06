@@ -100,6 +100,37 @@ public class SecretManager implements Closeable {
   }
 
   /**
+   * Checks secret keys and puts reference / write-through URN strings into {@code
+   * targetProperties}.
+   *
+   * <p>Callers typically validate {@code targetProperties}, then call {@link #writeSecrets} with
+   * the returned write-through URNs, and {@link #rollbackWritten} on failure. {@code properties} is
+   * used only for key uniqueness checks (e.g. the original request map); {@code targetProperties}
+   * is the mutable map that will be stored (may already contain merged catalog conf).
+   *
+   * @param properties properties used for key uniqueness checks (may be null)
+   * @param targetProperties mutable properties that receive URN values
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param secretBindings property key → write-through binding (may be null)
+   * @param secretReferences property key → secret locator (may be null)
+   * @return write-through URNs for {@link #writeSecrets} / {@link #rollbackWritten}
+   */
+  public List<SecretUrn> assembleSecretUrns(
+      @Nullable Map<String, String> properties,
+      Map<String, String> targetProperties,
+      String entityType,
+      long entityId,
+      @Nullable Map<String, SecretBinding> secretBindings,
+      @Nullable Map<String, SecretReference> secretReferences) {
+    checkSecretKeys(properties, secretBindings, secretReferences);
+    SecretPropertyUtils.putSecretUrns(targetProperties, getSecretReferenceUrns(secretReferences));
+    List<SecretUrn> secretUrns = getSecretBindingUrns(entityType, entityId, secretBindings);
+    SecretPropertyUtils.putSecretUrns(targetProperties, secretUrns);
+    return secretUrns;
+  }
+
+  /**
    * Builds external-reference URNs from {@code secretReferences} without writing secret material.
    *
    * <p>Callers must put the returned URN strings into properties themselves (e.g. via {@link
@@ -184,12 +215,14 @@ public class SecretManager implements Closeable {
    * Writes plaintext secrets from {@code secretBindings} values into the write-through providers
    * for {@code secretUrns} (e.g. Vault).
    *
-   * <p>{@code secretUrns} must come from {@link #getSecretBindingUrns}. On failure, already-written
-   * URNs are rolled back. Callers must put URN strings into properties themselves (e.g. via {@link
-   * SecretPropertyUtils#putSecretUrns}).
+   * <p>{@code secretUrns} must come from {@link #assembleSecretUrns} or {@link
+   * #getSecretBindingUrns}. On failure, already-written URNs are rolled back. When using {@link
+   * #assembleSecretUrns}, URN strings are already in properties; otherwise callers must put them
+   * themselves (e.g. via {@link SecretPropertyUtils#putSecretUrns}).
    *
    * @param secretBindings property key → write-through binding (null or empty is a no-op)
-   * @param secretUrns write-through URNs from {@link #getSecretBindingUrns}
+   * @param secretUrns write-through URNs from {@link #assembleSecretUrns} or {@link
+   *     #getSecretBindingUrns}
    */
   public void writeSecrets(
       @Nullable Map<String, SecretBinding> secretBindings, @Nullable List<SecretUrn> secretUrns) {

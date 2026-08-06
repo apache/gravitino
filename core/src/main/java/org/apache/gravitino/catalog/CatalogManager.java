@@ -108,7 +108,6 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
@@ -606,11 +605,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     final Map<String, String> mergedConfig = new HashMap<>(buildCatalogConf(provider, properties));
     long uid = idGenerator.nextId();
 
-    secretManager.checkSecretKeys(properties, secretBindings, secretReferences);
-    SecretPropertyUtils.putSecretUrns(
-        mergedConfig, secretManager.getSecretReferenceUrns(secretReferences));
-    List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns("catalog", uid, secretBindings);
-    SecretPropertyUtils.putSecretUrns(mergedConfig, secretUrns);
+    List<SecretUrn> secretUrns =
+        secretManager.assembleSecretUrns(
+            properties, mergedConfig, "catalog", uid, secretBindings, secretReferences);
     secretManager.writeSecrets(secretBindings, secretUrns);
 
     StringIdentifier stringId = StringIdentifier.fromId(uid);
