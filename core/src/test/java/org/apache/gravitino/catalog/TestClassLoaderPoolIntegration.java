@@ -34,6 +34,7 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -90,7 +91,8 @@ public class TestClassLoaderPoolIntegration {
 
   @BeforeEach
   public void beforeEach() throws IOException {
-    catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
+    catalogManager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator(), new SecretManager(config));
   }
 
   @AfterEach
@@ -243,7 +245,11 @@ public class TestClassLoaderPoolIntegration {
     noSharingConfig.set(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED, false);
 
     CatalogManager noSharingManager =
-        new CatalogManager(noSharingConfig, entityStore, new RandomIdGenerator());
+        new CatalogManager(
+            noSharingConfig,
+            entityStore,
+            new RandomIdGenerator(),
+            new SecretManager(noSharingConfig));
     try {
       Map<String, String> props =
           ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");
@@ -292,7 +298,11 @@ public class TestClassLoaderPoolIntegration {
     noSharingConfig.set(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED, false);
 
     CatalogManager noSharingManager =
-        new CatalogManager(noSharingConfig, entityStore, new RandomIdGenerator());
+        new CatalogManager(
+            noSharingConfig,
+            entityStore,
+            new RandomIdGenerator(),
+            new SecretManager(noSharingConfig));
     try {
       Map<String, String> props =
           ImmutableMap.of("key1", "value1", "key2", "value2", "key5-1", "value3");

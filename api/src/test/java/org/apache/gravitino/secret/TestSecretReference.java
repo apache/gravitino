@@ -16,22 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-plugins {
-  `maven-publish`
-  id("java")
-  id("idea")
-}
 
-dependencies {
-  implementation(libs.commons.lang3)
-  implementation(libs.commons.collections4)
-  implementation(libs.guava)
+package org.apache.gravitino.secret;
 
-  testImplementation(libs.junit.jupiter.api)
-  testImplementation(libs.junit.jupiter.params)
-  testRuntimeOnly(libs.junit.jupiter.engine)
-}
+import java.util.Map;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-tasks.build {
-  dependsOn("javadoc")
+public class TestSecretReference {
+
+  @Test
+  void testSecretReference() {
+    SecretReference reference =
+        new SecretReference("vault", Map.of("path", "secret/data/x", "key", "password"));
+    Assertions.assertEquals("vault", reference.provider());
+    Assertions.assertEquals("secret/data/x", reference.attributes().get("path"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new SecretReference("vault", null));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new SecretReference("vault", Map.of()));
+  }
 }
