@@ -38,7 +38,7 @@ public class TestSecretPropertyUtils {
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
       List<SecretUrn> secretUrns =
           secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
-      SecretPropertyUtils.applySecretUrns(properties, secretUrns);
+      SecretPropertyUtils.putSecretUrns(properties, secretUrns);
       secretManager.writeSecrets(secretBindings, secretUrns);
 
       String urn = properties.get("jdbc-password");
@@ -73,11 +73,11 @@ public class TestSecretPropertyUtils {
 
       secretManager.checkSecretKeys(properties, secretBindings, Map.of());
       Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-      SecretPropertyUtils.applySecretUrns(
+      SecretPropertyUtils.putSecretUrns(
           entityProperties, secretManager.getSecretReferenceUrns(Map.of()));
       List<SecretUrn> secretUrns =
           secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
-      SecretPropertyUtils.applySecretUrns(entityProperties, secretUrns);
+      SecretPropertyUtils.putSecretUrns(entityProperties, secretUrns);
       secretManager.writeSecrets(secretBindings, secretUrns);
 
       Assertions.assertEquals("root", entityProperties.get("jdbc-user"));
@@ -103,10 +103,10 @@ public class TestSecretPropertyUtils {
   void testEmptySecretsAreNoOp() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> entityProperties = new HashMap<>(Map.of("jdbc-user", "root"));
-      SecretPropertyUtils.applySecretUrns(
+      SecretPropertyUtils.putSecretUrns(
           entityProperties, secretManager.getSecretReferenceUrns(Map.of()));
       List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns("schema", 1L, Map.of());
-      SecretPropertyUtils.applySecretUrns(entityProperties, secretUrns);
+      SecretPropertyUtils.putSecretUrns(entityProperties, secretUrns);
       secretManager.writeSecrets(Map.of(), secretUrns);
       Assertions.assertTrue(secretUrns.isEmpty());
       Assertions.assertEquals("root", entityProperties.get("jdbc-user"));

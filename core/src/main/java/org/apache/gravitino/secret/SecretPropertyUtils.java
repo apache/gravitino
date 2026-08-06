@@ -62,21 +62,18 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Applies each URN string into {@code entityProperties} under the property key encoded in the URN
+   * Puts each URN string into {@code entityProperties} under the property key encoded in the URN
    * (last identifier segment).
    *
    * @param entityProperties mutable entity properties
    * @param secretUrns secret URNs whose last identifier segment is the property key
    */
-  public static void applySecretUrns(
+  public static void putSecretUrns(
       Map<String, String> entityProperties, List<SecretUrn> secretUrns) {
     Preconditions.checkArgument(entityProperties != null, "entityProperties must not be null");
     Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
     for (SecretUrn urn : secretUrns) {
-      List<String> segments = urn.identifierSegments();
-      Preconditions.checkArgument(
-          !segments.isEmpty(), "Secret URN must contain at least one identifier segment: %s", urn);
-      entityProperties.put(segments.get(segments.size() - 1), urn.toString());
+      entityProperties.put(urn.propertyKey(), urn.toString());
     }
   }
 

@@ -102,8 +102,8 @@ public class SecretManager implements Closeable {
    * Builds external-reference URNs from {@code secretReferences} without writing secret material.
    *
    * <p>Callers must put the returned URN strings into properties themselves (e.g. via {@link
-   * SecretPropertyUtils#applySecretUrns}). External-ref URNs are owned outside Gravitino and must
-   * not be passed to {@link #rollbackWritten}.
+   * SecretPropertyUtils#putSecretUrns}). External-ref URNs are owned outside Gravitino and must not
+   * be passed to {@link #rollbackWritten}.
    *
    * @param secretReferences property key → secret locator (null or empty returns an empty list)
    * @return external-reference URNs (insertion order)
@@ -143,7 +143,7 @@ public class SecretManager implements Closeable {
    *
    * <p>Callers should pass the returned URNs to {@link #writeSecrets} to persist plaintext from
    * each binding's value, then put URNs into properties (e.g. via {@link
-   * SecretPropertyUtils#applySecretUrns}).
+   * SecretPropertyUtils#putSecretUrns}).
    *
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
@@ -185,7 +185,7 @@ public class SecretManager implements Closeable {
    *
    * <p>{@code secretUrns} must come from {@link #getSecretBindingUrns}. On failure, already-written
    * URNs are rolled back. Callers must put URN strings into properties themselves (e.g. via {@link
-   * SecretPropertyUtils#applySecretUrns}).
+   * SecretPropertyUtils#putSecretUrns}).
    *
    * @param secretBindings property key → write-through binding (null or empty is a no-op)
    * @param secretUrns write-through URNs from {@link #getSecretBindingUrns}
@@ -214,7 +214,7 @@ public class SecretManager implements Closeable {
         }
         String entityType = segments.get(0);
         String entityId = segments.get(1);
-        String propertyKey = segments.get(2);
+        String propertyKey = urn.propertyKey();
         SecretBinding binding = secretBindings.get(propertyKey);
         if (binding == null) {
           throw new IllegalArgumentException(
@@ -279,7 +279,7 @@ public class SecretManager implements Closeable {
   }
 
   private static void ensureUrnEndsWithPropertyKey(SecretUrn urn, String propertyKey) {
-    if (!urn.toString().endsWith(propertyKey)) {
+    if (!urn.propertyKey().equals(propertyKey)) {
       throw new IllegalArgumentException(
           "Built secret URN must end with property key \"" + propertyKey + "\": " + urn);
     }

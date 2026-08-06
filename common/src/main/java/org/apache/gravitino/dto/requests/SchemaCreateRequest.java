@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.requests;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -60,7 +61,7 @@ public class SchemaCreateRequest implements RESTRequest {
 
   /** Default constructor for Jackson deserialization. */
   public SchemaCreateRequest() {
-    this(null, null, null, null, null);
+    this(null, null, null, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**
@@ -71,7 +72,7 @@ public class SchemaCreateRequest implements RESTRequest {
    * @param properties The properties of the schema.
    */
   public SchemaCreateRequest(String name, String comment, Map<String, String> properties) {
-    this(name, comment, properties, null, null);
+    this(name, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**

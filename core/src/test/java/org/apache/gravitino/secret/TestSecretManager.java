@@ -38,7 +38,7 @@ public class TestSecretManager {
       List<SecretUrn> secretUrns =
           secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
       secretManager.writeSecrets(secretBindings, secretUrns);
-      SecretPropertyUtils.applySecretUrns(properties, secretUrns);
+      SecretPropertyUtils.putSecretUrns(properties, secretUrns);
 
       String urn = properties.get("jdbc-password");
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));

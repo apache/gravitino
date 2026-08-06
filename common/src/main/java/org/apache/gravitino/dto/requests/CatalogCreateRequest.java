@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -82,7 +83,7 @@ public class CatalogCreateRequest implements RESTRequest {
       String provider,
       String comment,
       Map<String, String> properties) {
-    this(name, type, provider, comment, properties, null, null);
+    this(name, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**

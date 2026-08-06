@@ -607,10 +607,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     long uid = idGenerator.nextId();
 
     secretManager.checkSecretKeys(properties, secretBindings, secretReferences);
-    SecretPropertyUtils.applySecretUrns(
+    SecretPropertyUtils.putSecretUrns(
         mergedConfig, secretManager.getSecretReferenceUrns(secretReferences));
     List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns("catalog", uid, secretBindings);
-    SecretPropertyUtils.applySecretUrns(mergedConfig, secretUrns);
+    SecretPropertyUtils.putSecretUrns(mergedConfig, secretUrns);
     secretManager.writeSecrets(secretBindings, secretUrns);
 
     StringIdentifier stringId = StringIdentifier.fromId(uid);
