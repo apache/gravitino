@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.dto.requests;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
@@ -30,9 +29,6 @@ import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a request to associate tags with optional values. */
-@JsonAutoDetect(
-    getterVisibility = JsonAutoDetect.Visibility.NONE,
-    isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 public class TagValuesAssociateRequest implements RESTRequest {
 
   private static final int MAX_TAG_VALUE_LENGTH = 256;
@@ -65,7 +61,7 @@ public class TagValuesAssociateRequest implements RESTRequest {
    *
    * @return The tag values to add.
    */
-  public TagValue[] getTagsToAdd() {
+  public TagValue[] tagValuesToAdd() {
     return toTagValues(tagsToAdd);
   }
 
@@ -74,7 +70,7 @@ public class TagValuesAssociateRequest implements RESTRequest {
    *
    * @return The tag values to remove.
    */
-  public TagValue[] getTagsToRemove() {
+  public TagValue[] tagValuesToRemove() {
     return toTagValues(tagsToRemove);
   }
 

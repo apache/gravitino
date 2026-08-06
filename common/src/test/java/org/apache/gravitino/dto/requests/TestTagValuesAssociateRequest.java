@@ -39,8 +39,8 @@ public class TestTagValuesAssociateRequest {
         JsonUtils.objectMapper().readValue(json, TagValuesAssociateRequest.class);
 
     Assertions.assertEquals(request, deserialized);
-    Assertions.assertArrayEquals(request.getTagsToAdd(), deserialized.getTagsToAdd());
-    Assertions.assertArrayEquals(request.getTagsToRemove(), deserialized.getTagsToRemove());
+    Assertions.assertArrayEquals(request.tagValuesToAdd(), deserialized.tagValuesToAdd());
+    Assertions.assertArrayEquals(request.tagValuesToRemove(), deserialized.tagValuesToRemove());
   }
 
   @Test
