@@ -353,6 +353,7 @@ public class TagManager implements TagDispatcher {
         "Cannot associate tags for unsupported metadata object type %s",
         metadataObject.type());
     validateTagValuesToAdd(tagsToAdd);
+    validateTagValuesToRemove(tagsToRemove);
 
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
@@ -443,6 +444,16 @@ public class TagManager implements TagDispatcher {
           previous == null || previous == valued,
           "Cannot add assignments both with and without values for tag %s",
           tagValue.name());
+    }
+  }
+
+  private static void validateTagValuesToRemove(TagValue[] tagValues) {
+    if (tagValues == null) {
+      return;
+    }
+
+    for (TagValue tagValue : tagValues) {
+      Preconditions.checkNotNull(tagValue, "Tag value to remove must not be null");
     }
   }
 

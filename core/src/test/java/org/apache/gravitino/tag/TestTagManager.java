@@ -721,6 +721,21 @@ public class TestTagManager {
   }
 
   @Test
+  public void testRejectNullTagValueToRemove() {
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    NullPointerException exception =
+        Assertions.assertThrows(
+            NullPointerException.class,
+            () ->
+                tagManager.associateTagValuesForMetadataObject(
+                    METALAKE, tableObject, null, new TagValue[] {null}));
+    Assertions.assertEquals("Tag value to remove must not be null", exception.getMessage());
+  }
+
+  @Test
   public void testRejectMixedTagAdditionsWithAndWithoutValues() {
     Tag noValueFirstTag = tagManager.createTag(METALAKE, "no_value_first", null, null);
     Tag valuedFirstTag = tagManager.createTag(METALAKE, "valued_first", null, null);
