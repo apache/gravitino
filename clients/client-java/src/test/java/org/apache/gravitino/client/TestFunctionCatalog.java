@@ -26,6 +26,7 @@ import static org.apache.hc.core5.http.HttpStatus.SC_SERVER_ERROR;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
+import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -97,8 +98,8 @@ public class TestFunctionCatalog extends TestBase {
             provider,
             "comment",
             ImmutableMap.of("k1", "k2"),
-            null,
-            null);
+            Collections.emptyMap(),
+            Collections.emptyMap());
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,

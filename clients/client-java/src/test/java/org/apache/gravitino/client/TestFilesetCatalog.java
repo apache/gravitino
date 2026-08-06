@@ -29,6 +29,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.nio.file.NoSuchFileException;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -107,8 +108,8 @@ public class TestFilesetCatalog extends TestBase {
             provider,
             "comment",
             ImmutableMap.of("k1", "k2"),
-            null,
-            null);
+            Collections.emptyMap(),
+            Collections.emptyMap());
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,

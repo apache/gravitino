@@ -84,7 +84,12 @@ public class TestRelationalTable extends TestRelationalCatalog {
     SchemaDTO mockedSchema = createMockSchema(schemaName, "comment", Collections.emptyMap());
 
     SchemaCreateRequest req =
-        new SchemaCreateRequest(schemaName, "comment", Collections.emptyMap(), null, null);
+        new SchemaCreateRequest(
+            schemaName,
+            "comment",
+            Collections.emptyMap(),
+            Collections.emptyMap(),
+            Collections.emptyMap());
     SchemaResponse resp = new SchemaResponse(mockedSchema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 

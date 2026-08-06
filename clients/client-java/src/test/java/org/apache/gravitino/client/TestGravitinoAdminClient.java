@@ -281,8 +281,8 @@ public class TestGravitinoAdminClient extends TestBase {
             "hive",
             "comment",
             Collections.emptyMap(),
-            null,
-            null);
+            Collections.emptyMap(),
+            Collections.emptyMap());
     BaseResponse resp = new BaseResponse();
     buildMockResource(
         Method.POST, "/api/metalakes/mock/catalogs/testConnection", req, resp, HttpStatus.SC_OK);

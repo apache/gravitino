@@ -21,6 +21,7 @@ package org.apache.gravitino.json;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
@@ -106,36 +107,70 @@ public class TestRequestJsonSerDe {
             "hive",
             "comment",
             ImmutableMap.of("key", "value"),
-            null,
-            null);
+            Collections.emptyMap(),
+            Collections.emptyMap());
     String serJson = JsonUtils.objectMapper().writeValueAsString(req);
     CatalogCreateRequest deserReq =
         JsonUtils.objectMapper().readValue(serJson, CatalogCreateRequest.class);
-    Assertions.assertEquals(req, deserReq);
+    assertCatalogCreateRequestWithoutSecrets(req, deserReq);
 
     // Test with optional fields
     CatalogCreateRequest req1 =
         new CatalogCreateRequest(
-            "catalog", Catalog.Type.RELATIONAL, "hive", null, null, null, null);
+            "catalog",
+            Catalog.Type.RELATIONAL,
+            "hive",
+            null,
+            null,
+            Collections.emptyMap(),
+            Collections.emptyMap());
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(req1);
     CatalogCreateRequest deserReq1 =
         JsonUtils.objectMapper().readValue(serJson1, CatalogCreateRequest.class);
-    Assertions.assertEquals(req1, deserReq1);
+    assertCatalogCreateRequestWithoutSecrets(req1, deserReq1);
 
     CatalogCreateRequest req2 =
-        new CatalogCreateRequest("catalog", Catalog.Type.RELATIONAL, "hive", "", null, null, null);
+        new CatalogCreateRequest(
+            "catalog",
+            Catalog.Type.RELATIONAL,
+            "hive",
+            "",
+            null,
+            Collections.emptyMap(),
+            Collections.emptyMap());
     String serJson2 = JsonUtils.objectMapper().writeValueAsString(req2);
     CatalogCreateRequest deserReq2 =
         JsonUtils.objectMapper().readValue(serJson2, CatalogCreateRequest.class);
-    Assertions.assertEquals(req2, deserReq2);
+    assertCatalogCreateRequestWithoutSecrets(req2, deserReq2);
 
     CatalogCreateRequest req3 =
         new CatalogCreateRequest(
-            "catalog", Catalog.Type.RELATIONAL, "hive", "", ImmutableMap.of(), null, null);
+            "catalog",
+            Catalog.Type.RELATIONAL,
+            "hive",
+            "",
+            ImmutableMap.of(),
+            Collections.emptyMap(),
+            Collections.emptyMap());
     String serJson3 = JsonUtils.objectMapper().writeValueAsString(req3);
     CatalogCreateRequest deserReq3 =
         JsonUtils.objectMapper().readValue(serJson3, CatalogCreateRequest.class);
-    Assertions.assertEquals(req3, deserReq3);
+    assertCatalogCreateRequestWithoutSecrets(req3, deserReq3);
+  }
+
+  /**
+   * Empty secret maps are omitted from JSON ({@code NON_EMPTY}) and deserialize as null, so full
+   * object equality cannot be used after a round-trip.
+   */
+  private static void assertCatalogCreateRequestWithoutSecrets(
+      CatalogCreateRequest expected, CatalogCreateRequest actual) {
+    Assertions.assertEquals(expected.getName(), actual.getName());
+    Assertions.assertEquals(expected.getType(), actual.getType());
+    Assertions.assertEquals(expected.getProvider(), actual.getProvider());
+    Assertions.assertEquals(expected.getComment(), actual.getComment());
+    Assertions.assertEquals(expected.getProperties(), actual.getProperties());
+    Assertions.assertNull(actual.getSecretBindings());
+    Assertions.assertNull(actual.getSecretReferences());
   }
 
   @Test
