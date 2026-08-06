@@ -58,7 +58,16 @@ public class TestTagValuesAssociateRequest {
             .readValue(
                 "{\"tagsToAdd\":[{\"name\":\"data_domain\"}],\"tagsToRemove\":null}",
                 TagValuesAssociateRequest.class);
-    Assertions.assertThrows(IllegalArgumentException.class, nullFieldRequest::validate);
+    Assertions.assertDoesNotThrow(nullFieldRequest::validate);
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldRequest.tagValuesToRemove());
+
+    TagValuesAssociateRequest nullFieldsRequest =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"tagsToAdd\":null,\"tagsToRemove\":null}", TagValuesAssociateRequest.class);
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldsRequest.tagValuesToAdd());
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldsRequest.tagValuesToRemove());
+    Assertions.assertThrows(IllegalArgumentException.class, nullFieldsRequest::validate);
 
     TagValuesAssociateRequest blankNameRequest =
         JsonUtils.objectMapper()
