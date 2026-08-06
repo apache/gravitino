@@ -606,17 +606,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     final Map<String, String> mergedConfig = new HashMap<>(buildCatalogConf(provider, properties));
     long uid = idGenerator.nextId();
 
-    SecretPropertyUtils.checkNoOverlap(secretBindings, secretReferences);
-    if (secretReferences != null && !secretReferences.isEmpty()) {
-      SecretPropertyUtils.applySecretUrns(
-          mergedConfig, secretManager.getSecretReferenceUrns(secretReferences));
-    }
-    final List<SecretUrn> secretUrns = new ArrayList<>();
-    if (secretBindings != null && !secretBindings.isEmpty()) {
-      secretUrns.addAll(secretManager.getSecretBindingUrns("catalog", uid, secretBindings));
-      secretManager.writeSecrets(secretBindings, secretUrns);
-      SecretPropertyUtils.applySecretUrns(mergedConfig, secretUrns);
-    }
+    SecretPropertyUtils.mergeSecretsForValidation(
+        mergedConfig, secretBindings, secretReferences, secretManager);
+    List<SecretUrn> secretUrns =
+        SecretPropertyUtils.writeBindingsAndApplyUrns(
+            mergedConfig, "catalog", uid, secretBindings, secretManager);
 
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Instant now = Instant.now();

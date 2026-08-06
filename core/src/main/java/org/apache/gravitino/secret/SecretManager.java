@@ -74,9 +74,10 @@ public class SecretManager implements Closeable {
    * @return external-reference URNs (insertion order)
    */
   public List<SecretUrn> getSecretReferenceUrns(Map<String, SecretReference> secretReferences) {
-    Preconditions.checkArgument(
-        secretReferences != null && !secretReferences.isEmpty(),
-        "secretReferences must not be null or empty");
+    Preconditions.checkArgument(secretReferences != null, "secretReferences must not be null");
+    if (secretReferences.isEmpty()) {
+      return List.of();
+    }
     validateSecretReferences(secretReferences);
 
     List<SecretUrn> urns = new ArrayList<>(secretReferences.size());
@@ -117,9 +118,10 @@ public class SecretManager implements Closeable {
   public List<SecretUrn> getSecretBindingUrns(
       String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
     Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
-    Preconditions.checkArgument(
-        secretBindings != null && !secretBindings.isEmpty(),
-        "secretBindings must not be null or empty");
+    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
+    if (secretBindings.isEmpty()) {
+      return List.of();
+    }
     validateSecretBindings(secretBindings);
 
     List<SecretUrn> urns = new ArrayList<>(secretBindings.size());
@@ -152,11 +154,14 @@ public class SecretManager implements Closeable {
    * @param secretUrns write-through URNs from {@link #getSecretBindingUrns}
    */
   public void writeSecrets(Map<String, SecretBinding> secretBindings, List<SecretUrn> secretUrns) {
-    Preconditions.checkArgument(
-        secretBindings != null && !secretBindings.isEmpty(),
-        "secretBindings must not be null or empty");
-    Preconditions.checkArgument(
-        secretUrns != null && !secretUrns.isEmpty(), "secretUrns must not be null or empty");
+    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
+    Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
+    if (secretBindings.isEmpty()) {
+      Preconditions.checkArgument(
+          secretUrns.isEmpty(), "secretUrns must be empty when bindings are");
+      return;
+    }
+    Preconditions.checkArgument(!secretUrns.isEmpty(), "secretUrns must not be empty");
     validateSecretBindings(secretBindings);
 
     List<SecretUrn> written = new ArrayList<>(secretUrns.size());

@@ -64,6 +64,57 @@ public class TestSecretPropertyUtils {
     }
   }
 
+  @Test
+  void testMergeAndWriteBindingsForCreate() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> properties = new HashMap<>();
+      properties.put("jdbc-user", "root");
+      Map<String, SecretBinding> secretBindings =
+          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+
+      SecretPropertyUtils.mergeSecretsForValidation(
+          properties, secretBindings, Map.of(), secretManager);
+      Assertions.assertEquals("s3cr3t", properties.get("jdbc-password"));
+
+      Map<String, String> toValidate =
+          SecretPropertyUtils.propertiesForCreateValidation(
+              Map.of("jdbc-user", "root"), properties, secretBindings, Map.of());
+      Assertions.assertSame(properties, toValidate);
+
+      List<SecretUrn> secretUrns =
+          SecretPropertyUtils.writeBindingsAndApplyUrns(
+              properties, "catalog", 42L, secretBindings, secretManager);
+      Assertions.assertEquals(1, secretUrns.size());
+      Assertions.assertTrue(
+          SecretPropertyUtils.isSecretProperty("jdbc-password", properties.get("jdbc-password")));
+      Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
+    }
+  }
+
+  @Test
+  void testPropertiesForCreateValidationSkipOnNull() {
+    Map<String, String> propertiesForCreate = new HashMap<>();
+    Assertions.assertNull(
+        SecretPropertyUtils.propertiesForCreateValidation(
+            null, propertiesForCreate, Map.of(), Map.of()));
+    Assertions.assertSame(
+        propertiesForCreate,
+        SecretPropertyUtils.propertiesForCreateValidation(
+            null, propertiesForCreate, Map.of("k", new SecretBinding("memory", "v")), Map.of()));
+  }
+
+  @Test
+  void testWriteBindingsNoOpOnEmpty() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> properties = new HashMap<>(Map.of("jdbc-user", "root"));
+      List<SecretUrn> secretUrns =
+          SecretPropertyUtils.writeBindingsAndApplyUrns(
+              properties, "schema", 1L, Map.of(), secretManager);
+      Assertions.assertTrue(secretUrns.isEmpty());
+      Assertions.assertEquals("root", properties.get("jdbc-user"));
+    }
+  }
+
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();

@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -120,23 +119,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     long uid = idGenerator.nextId();
     Map<String, String> propertiesForCreate =
         properties == null ? new HashMap<>() : new HashMap<>(properties);
-    SecretPropertyUtils.checkNoOverlap(secretBindings, secretReferences);
-    if (secretReferences != null && !secretReferences.isEmpty()) {
-      SecretPropertyUtils.applySecretUrns(
-          propertiesForCreate, secretManager.getSecretReferenceUrns(secretReferences));
-    }
-    if (secretBindings != null) {
-      for (Map.Entry<String, SecretBinding> entry : secretBindings.entrySet()) {
-        propertiesForCreate.put(entry.getKey(), entry.getValue().plaintext());
-      }
-    }
-    // Preserve skip-on-null validation when caller passed null properties and no secrets.
+    SecretPropertyUtils.mergeSecretsForValidation(
+        propertiesForCreate, secretBindings, secretReferences, secretManager);
     Map<String, String> propertiesToValidate =
-        properties == null
-                && (secretBindings == null || secretBindings.isEmpty())
-                && (secretReferences == null || secretReferences.isEmpty())
-            ? null
-            : propertiesForCreate;
+        SecretPropertyUtils.propertiesForCreateValidation(
+            properties, propertiesForCreate, secretBindings, secretReferences);
     doWithCatalog(
         catalogIdent,
         c ->
@@ -146,12 +133,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   return null;
                 }),
         IllegalArgumentException.class);
-    final List<SecretUrn> secretUrns = new ArrayList<>();
-    if (secretBindings != null && !secretBindings.isEmpty()) {
-      secretUrns.addAll(secretManager.getSecretBindingUrns("schema", uid, secretBindings));
-      secretManager.writeSecrets(secretBindings, secretUrns);
-      SecretPropertyUtils.applySecretUrns(propertiesForCreate, secretUrns);
-    }
+    List<SecretUrn> secretUrns =
+        SecretPropertyUtils.writeBindingsAndApplyUrns(
+            propertiesForCreate, "schema", uid, secretBindings, secretManager);
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
     // SchemaEntity will be visible.

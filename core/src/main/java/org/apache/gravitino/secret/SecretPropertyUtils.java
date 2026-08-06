@@ -89,6 +89,95 @@ public final class SecretPropertyUtils {
   }
 
   /**
+   * Merges create-time secrets into {@code properties} for entity property validation.
+   *
+   * <p>Checks binding/reference key overlap, applies external-reference URNs, and puts binding
+   * plaintext under each binding key. Call {@link #writeBindingsAndApplyUrns} after {@code
+   * validatePropertyForCreate} to persist write-through secrets and replace plaintext with URNs.
+   *
+   * <p>{@code null} bindings/references are treated as empty maps.
+   *
+   * @param properties mutable entity properties
+   * @param secretBindings property key → write-through binding (may be null)
+   * @param secretReferences property key → secret locator (may be null)
+   * @param secretManager secret manager used to resolve reference URNs
+   */
+  public static void mergeSecretsForValidation(
+      Map<String, String> properties,
+      @Nullable Map<String, SecretBinding> secretBindings,
+      @Nullable Map<String, SecretReference> secretReferences,
+      SecretManager secretManager) {
+    Preconditions.checkArgument(properties != null, "properties must not be null");
+    Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
+    Map<String, SecretBinding> bindings = emptyIfNull(secretBindings);
+    Map<String, SecretReference> references = emptyIfNull(secretReferences);
+    checkNoOverlap(bindings, references);
+    applySecretUrns(properties, secretManager.getSecretReferenceUrns(references));
+    for (Map.Entry<String, SecretBinding> entry : bindings.entrySet()) {
+      properties.put(entry.getKey(), entry.getValue().plaintext());
+    }
+  }
+
+  /**
+   * Returns the map to pass to {@code validatePropertyForCreate}, preserving skip-on-null when the
+   * caller passed {@code null} properties and no secrets.
+   *
+   * @param originalProperties properties from the create request (may be null)
+   * @param propertiesForCreate mutable properties after {@link #mergeSecretsForValidation}
+   * @param secretBindings property key → write-through binding (may be null)
+   * @param secretReferences property key → secret locator (may be null)
+   * @return {@code null} when validation should be skipped; otherwise {@code propertiesForCreate}
+   */
+  @Nullable
+  public static Map<String, String> propertiesForCreateValidation(
+      @Nullable Map<String, String> originalProperties,
+      Map<String, String> propertiesForCreate,
+      @Nullable Map<String, SecretBinding> secretBindings,
+      @Nullable Map<String, SecretReference> secretReferences) {
+    Preconditions.checkArgument(
+        propertiesForCreate != null, "propertiesForCreate must not be null");
+    if (originalProperties == null
+        && emptyIfNull(secretBindings).isEmpty()
+        && emptyIfNull(secretReferences).isEmpty()) {
+      return null;
+    }
+    return propertiesForCreate;
+  }
+
+  /**
+   * Persists write-through bindings and replaces their plaintext values in {@code properties} with
+   * URNs.
+   *
+   * <p>{@code null} or empty bindings are a no-op and return an empty list. Returned URNs should be
+   * passed to {@link SecretManager#rollbackWritten} if entity create fails.
+   *
+   * @param properties mutable entity properties (binding keys currently hold plaintext)
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param secretBindings property key → write-through binding (may be null)
+   * @param secretManager secret manager used to write secrets
+   * @return write-through URNs that were persisted (may be empty)
+   */
+  public static List<SecretUrn> writeBindingsAndApplyUrns(
+      Map<String, String> properties,
+      String entityType,
+      long entityId,
+      @Nullable Map<String, SecretBinding> secretBindings,
+      SecretManager secretManager) {
+    Preconditions.checkArgument(properties != null, "properties must not be null");
+    Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
+    Map<String, SecretBinding> bindings = emptyIfNull(secretBindings);
+    List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns(entityType, entityId, bindings);
+    secretManager.writeSecrets(bindings, secretUrns);
+    applySecretUrns(properties, secretUrns);
+    return secretUrns;
+  }
+
+  private static <V> Map<String, V> emptyIfNull(@Nullable Map<String, V> map) {
+    return map == null ? Map.of() : map;
+  }
+
+  /**
    * Returns a copy of {@code properties} with secret URN values replaced by plaintext from {@code
    * secretManager}.
    *
