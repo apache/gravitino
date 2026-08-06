@@ -56,6 +56,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -106,6 +107,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretAlterHelper;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretPropertyUtils;
@@ -904,23 +906,40 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           try {
-            CatalogEntity updatedCatalog =
-                store.update(
-                    ident,
-                    CatalogEntity.class,
-                    EntityType.CATALOG,
-                    catalog -> {
-                      CatalogEntity.Builder newCatalogBuilder =
-                          newCatalogBuilder(ident.namespace(), catalog);
+            AtomicReference<List<SecretUrn>> writtenSecretUrns = new AtomicReference<>(List.of());
+            boolean secretUpdateCommitted = false;
+            CatalogEntity updatedCatalog;
+            try {
+              updatedCatalog =
+                  store.update(
+                      ident,
+                      CatalogEntity.class,
+                      EntityType.CATALOG,
+                      catalog -> {
+                        SecretAlterHelper.Result<CatalogChange> secretResult =
+                            SecretAlterHelper.applyCatalogChanges(
+                                secretManager, catalog.getProperties(), catalog.id(), changes);
+                        writtenSecretUrns.set(secretResult.writtenUrns());
+                        CatalogChange[] effectiveChanges = secretResult.changes();
 
-                      Map<String, String> newProps =
-                          catalog.getProperties() == null
-                              ? new HashMap<>()
-                              : new HashMap<>(catalog.getProperties());
-                      newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
+                        CatalogEntity.Builder newCatalogBuilder =
+                            newCatalogBuilder(ident.namespace(), catalog);
 
-                      return newCatalogBuilder.build();
-                    });
+                        Map<String, String> newProps =
+                            catalog.getProperties() == null
+                                ? new HashMap<>()
+                                : new HashMap<>(catalog.getProperties());
+                        newCatalogBuilder =
+                            updateEntity(newCatalogBuilder, newProps, effectiveChanges);
+
+                        return newCatalogBuilder.build();
+                      });
+              secretUpdateCommitted = true;
+            } finally {
+              if (!secretUpdateCommitted) {
+                secretManager.rollbackWritten(writtenSecretUrns.get());
+              }
+            }
             // Invalidate after store.update() so that any background thread that tries to reload
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
@@ -1183,6 +1202,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               if (catalogChange instanceof SetProperty) {
                 SetProperty setProperty = (SetProperty) catalogChange;
                 upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (catalogChange instanceof CatalogChange.SetSecretBinding) {
+                CatalogChange.SetSecretBinding setSecretBinding =
+                    (CatalogChange.SetSecretBinding) catalogChange;
+                upserts.put(
+                    setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
+              } else if (catalogChange instanceof CatalogChange.SetSecretReference) {
+                CatalogChange.SetSecretReference setSecretReference =
+                    (CatalogChange.SetSecretReference) catalogChange;
+                upserts.put(setSecretReference.getProperty(), setSecretReference.getProperty());
               } else if (catalogChange instanceof RemoveProperty) {
                 RemoveProperty removeProperty = (RemoveProperty) catalogChange;
                 deletes.put(removeProperty.getProperty(), removeProperty.getProperty());

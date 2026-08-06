@@ -45,6 +45,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretAlterHelper;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretPropertyUtils;
@@ -283,12 +284,45 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         ident,
         LockType.WRITE,
         () -> {
-          validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
-          Schema alteredSchema =
+          Schema currentSchema =
               doWithCatalog(
                   catalogIdent,
-                  c -> c.doWithSchemaOps(s -> s.alterSchema(ident, changes)),
+                  c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
                   NoSuchSchemaException.class);
+          Map<String, String> currentProperties = currentSchema.properties();
+
+          validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
+
+          StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
+          long entityIdForSecrets;
+          if (currentStringId != null) {
+            entityIdForSecrets = currentStringId.id();
+          } else {
+            SchemaEntity se = getEntity(ident, SCHEMA, SchemaEntity.class);
+            entityIdForSecrets = se != null ? se.id() : 0L;
+          }
+
+          List<SecretUrn> writtenSecretUrns = List.of();
+          boolean alterCommitted = false;
+          Schema alteredSchema;
+          try {
+            SecretAlterHelper.Result<SchemaChange> secretResult =
+                SecretAlterHelper.applySchemaChanges(
+                    secretManager, currentProperties, entityIdForSecrets, changes);
+            writtenSecretUrns = secretResult.writtenUrns();
+            SchemaChange[] effectiveChanges = secretResult.changes();
+
+            alteredSchema =
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithSchemaOps(s -> s.alterSchema(ident, effectiveChanges)),
+                    NoSuchSchemaException.class);
+            alterCommitted = true;
+          } finally {
+            if (!alterCommitted) {
+              secretManager.rollbackWritten(writtenSecretUrns);
+            }
+          }
 
           // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);

@@ -22,6 +22,8 @@ package org.apache.gravitino;
 
 import java.util.Objects;
 import org.apache.gravitino.annotation.Evolving;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /** NamespaceChange class to set the property and value pairs for the namespace. */
 @Evolving
@@ -46,6 +48,28 @@ public interface SchemaChange {
    */
   static SchemaChange removeProperty(String property) {
     return new RemoveProperty(property);
+  }
+
+  /**
+   * Creates a schema change to bind a write-through secret for a property.
+   *
+   * @param property The property name to bind.
+   * @param binding The write-through binding ({@code provider} + {@code plaintext}).
+   * @return The SchemaChange object.
+   */
+  static SchemaChange setSecretBinding(String property, SecretBinding binding) {
+    return new SetSecretBinding(property, binding);
+  }
+
+  /**
+   * Creates a schema change to bind an external secret reference for a property.
+   *
+   * @param property The property name to bind.
+   * @param reference The external secret locator ({@code provider} + {@code attributes}).
+   * @return The SchemaChange object.
+   */
+  static SchemaChange setSecretReference(String property, SecretReference reference) {
+    return new SetSecretReference(property, reference);
   }
 
   /** SchemaChange class to set the property and value pairs for the schema. */
@@ -166,6 +190,100 @@ public interface SchemaChange {
     @Override
     public String toString() {
       return "REMOVEPROPERTY " + property;
+    }
+  }
+
+  /** SchemaChange to bind a write-through secret for a property. */
+  final class SetSecretBinding implements SchemaChange {
+    private final String property;
+    private final SecretBinding binding;
+
+    private SetSecretBinding(String property, SecretBinding binding) {
+      this.property = property;
+      this.binding = binding;
+    }
+
+    /**
+     * Retrieves the property name being bound.
+     *
+     * @return The property name.
+     */
+    public String getProperty() {
+      return property;
+    }
+
+    /**
+     * Retrieves the write-through binding.
+     *
+     * @return The secret binding.
+     */
+    public SecretBinding getBinding() {
+      return binding;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SetSecretBinding that = (SetSecretBinding) o;
+      return Objects.equals(property, that.property) && Objects.equals(binding, that.binding);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(property, binding);
+    }
+
+    @Override
+    public String toString() {
+      return "SETSECRETBINDING " + property + " " + binding;
+    }
+  }
+
+  /** SchemaChange to bind an external secret reference for a property. */
+  final class SetSecretReference implements SchemaChange {
+    private final String property;
+    private final SecretReference reference;
+
+    private SetSecretReference(String property, SecretReference reference) {
+      this.property = property;
+      this.reference = reference;
+    }
+
+    /**
+     * Retrieves the property name being bound.
+     *
+     * @return The property name.
+     */
+    public String getProperty() {
+      return property;
+    }
+
+    /**
+     * Retrieves the external secret reference.
+     *
+     * @return The secret reference.
+     */
+    public SecretReference getReference() {
+      return reference;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      SetSecretReference that = (SetSecretReference) o;
+      return Objects.equals(property, that.property) && Objects.equals(reference, that.reference);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(property, reference);
+    }
+
+    @Override
+    public String toString() {
+      return "SETSECRETREFERENCE " + property + " " + reference;
     }
   }
 }

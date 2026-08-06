@@ -41,6 +41,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.secret.SecretAlterHelper;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretPropertyUtils;
@@ -242,7 +243,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     boolean containsRenameFileset =
@@ -254,12 +254,44 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         TreeLockUtils.doWithTreeLock(
             nameIdentifierForLock,
             LockType.WRITE,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
-                    NoSuchFilesetException.class,
-                    IllegalArgumentException.class));
+            () -> {
+              Fileset currentFileset =
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+                      NoSuchFilesetException.class);
+              Map<String, String> currentProperties = currentFileset.properties();
+
+              validateAlterProperties(
+                  ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
+
+              StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
+              long filesetId = currentStringId != null ? currentStringId.id() : 0L;
+
+              List<SecretUrn> writtenSecretUrns = List.of();
+              boolean alterCommitted = false;
+              Fileset altered;
+              try {
+                SecretAlterHelper.Result<FilesetChange> secretResult =
+                    SecretAlterHelper.applyFilesetChanges(
+                        secretManager, currentProperties, filesetId, changes);
+                writtenSecretUrns = secretResult.writtenUrns();
+                FilesetChange[] effectiveChanges = secretResult.changes();
+
+                altered =
+                    doWithCatalog(
+                        catalogIdent,
+                        c -> c.doWithFilesetOps(f -> f.alterFileset(ident, effectiveChanges)),
+                        NoSuchFilesetException.class,
+                        IllegalArgumentException.class);
+                alterCommitted = true;
+              } finally {
+                if (!alterCommitted) {
+                  secretManager.rollbackWritten(writtenSecretUrns);
+                }
+              }
+              return altered;
+            });
 
     return EntityCombinedFileset.of(alteredFileset)
         .withHiddenProperties(
