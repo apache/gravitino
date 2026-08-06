@@ -718,8 +718,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       }
 
       Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
-      Map<String, String> resolvedConfig =
-          SecretPropertyUtils.resolveSecretProperties(mergedConfig, secretManager);
+      Map<String, String> plaintextConfig = secretManager.toPlaintextProperties(mergedConfig);
       Instant now = Instant.now();
       String creator = PrincipalUtils.getCurrentPrincipal().getName();
       CatalogEntity dummyEntity =
@@ -744,7 +743,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       try {
         wrapper.doWithCatalogOps(
             c -> {
-              c.testConnection(ident, type, provider, comment, resolvedConfig);
+              c.testConnection(ident, type, provider, comment, plaintextConfig);
               return null;
             });
       } finally {
@@ -1326,8 +1325,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
     catalog
-        .withCatalogConf(
-            SecretPropertyUtils.resolveSecretProperties(entity.getProperties(), secretManager))
+        .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
         .withCatalogEntity(entity);
     catalog.initAuthorizationPluginInstance(classLoader);
     return catalog;

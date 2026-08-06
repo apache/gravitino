@@ -52,6 +52,38 @@ public class TestSecretManager {
   }
 
   @Test
+  void testToPlaintextPropertiesReplacesUrnsWithPlaintext() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, String> properties = new HashMap<>();
+      properties.put("jdbc-user", "root");
+      Map<String, SecretBinding> secretBindings =
+          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+      List<SecretUrn> secretUrns =
+          secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
+      SecretPropertyUtils.putSecretUrns(properties, secretUrns);
+      secretManager.writeSecrets(secretBindings, secretUrns);
+
+      String urn = properties.get("jdbc-password");
+      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));
+
+      Map<String, String> plaintext = secretManager.toPlaintextProperties(properties);
+
+      Assertions.assertEquals("root", plaintext.get("jdbc-user"));
+      Assertions.assertEquals("s3cr3t", plaintext.get("jdbc-password"));
+      // Stored properties keep the URN.
+      Assertions.assertEquals(urn, properties.get("jdbc-password"));
+    }
+  }
+
+  @Test
+  void testToPlaintextPropertiesNullOrEmpty() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Assertions.assertTrue(secretManager.toPlaintextProperties(null).isEmpty());
+      Assertions.assertTrue(secretManager.toPlaintextProperties(Map.of()).isEmpty());
+    }
+  }
+
+  @Test
   void testGetSecretReferenceUrnsRejectedByMemoryProvider() {
     try (SecretManager secretManager = memorySecretManager()) {
       Assertions.assertThrows(

@@ -27,6 +27,7 @@ import static org.apache.gravitino.secret.SecretPropertyUtils.validateSecretRefe
 import com.google.common.collect.ImmutableMap;
 import java.io.Closeable;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -271,6 +272,33 @@ public class SecretManager implements Closeable {
       throw new IllegalArgumentException("urn must not be null");
     }
     return registry.getProvider(urn.providerName()).readSecret(urn);
+  }
+
+  /**
+   * Returns a copy of {@code properties} with secret URN values replaced by plaintext.
+   *
+   * <p>Used so connectors receive plaintext conf while entity storage keeps URN strings. Non-secret
+   * entries are copied unchanged.
+   *
+   * @param properties entity or request properties (may be null)
+   * @return a new map with secret URNs replaced by plaintext; empty map when {@code properties} is
+   *     null
+   */
+  public Map<String, String> toPlaintextProperties(@Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return properties == null ? Map.of() : Map.copyOf(properties);
+    }
+    Map<String, String> plaintext = new HashMap<>(properties.size());
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (SecretPropertyUtils.isSecretProperty(key, value)) {
+        plaintext.put(key, readSecret(SecretUrn.parse(value)));
+      } else {
+        plaintext.put(key, value);
+      }
+    }
+    return plaintext;
   }
 
   @Override

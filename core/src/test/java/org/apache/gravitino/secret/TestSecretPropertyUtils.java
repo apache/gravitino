@@ -30,41 +30,6 @@ import org.junit.jupiter.api.Test;
 public class TestSecretPropertyUtils {
 
   @Test
-  void testResolveSecretPropertiesReplacesUrnsWithPlaintext() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Map<String, String> properties = new HashMap<>();
-      properties.put("jdbc-user", "root");
-      Map<String, SecretBinding> secretBindings =
-          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
-      List<SecretUrn> secretUrns =
-          secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
-      SecretPropertyUtils.putSecretUrns(properties, secretUrns);
-      secretManager.writeSecrets(secretBindings, secretUrns);
-
-      String urn = properties.get("jdbc-password");
-      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));
-
-      Map<String, String> resolved =
-          SecretPropertyUtils.resolveSecretProperties(properties, secretManager);
-
-      Assertions.assertEquals("root", resolved.get("jdbc-user"));
-      Assertions.assertEquals("s3cr3t", resolved.get("jdbc-password"));
-      // Stored properties keep the URN.
-      Assertions.assertEquals(urn, properties.get("jdbc-password"));
-    }
-  }
-
-  @Test
-  void testResolveSecretPropertiesNullOrEmpty() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Assertions.assertTrue(
-          SecretPropertyUtils.resolveSecretProperties(null, secretManager).isEmpty());
-      Assertions.assertTrue(
-          SecretPropertyUtils.resolveSecretProperties(Map.of(), secretManager).isEmpty());
-    }
-  }
-
-  @Test
   void testAssembleEntityPropertiesThenWrite() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> properties = Map.of("jdbc-user", "root");
