@@ -606,8 +606,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     final Map<String, String> mergedConfig = new HashMap<>(buildCatalogConf(provider, properties));
     long uid = idGenerator.nextId();
 
-    SecretPropertyUtils.mergeSecretsForValidation(
-        mergedConfig, secretBindings, secretReferences, secretManager);
+    SecretPropertyUtils.checkSecretKeys(properties, secretBindings, secretReferences);
+    SecretPropertyUtils.applySecretReferences(mergedConfig, secretReferences, secretManager);
     List<SecretUrn> secretUrns =
         SecretPropertyUtils.writeBindingsAndApplyUrns(
             mergedConfig, "catalog", uid, secretBindings, secretManager);

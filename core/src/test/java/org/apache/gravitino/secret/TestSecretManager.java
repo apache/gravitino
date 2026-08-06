@@ -70,7 +70,8 @@ public class TestSecretManager {
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () ->
-              SecretPropertyUtils.checkNoOverlap(
+              SecretPropertyUtils.checkSecretKeys(
+                  Map.of(),
                   Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
                   Map.of(
                       "jdbc-password",

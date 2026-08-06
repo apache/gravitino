@@ -116,12 +116,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     long uid = idGenerator.nextId();
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-    SecretPropertyUtils.mergeSecretsForValidation(
-        entityProperties, secretBindings, secretReferences, secretManager);
+    SecretPropertyUtils.checkSecretKeys(properties, secretBindings, secretReferences);
     Map<String, String> propertiesToValidate =
         SecretPropertyUtils.propertiesToValidate(
-            properties, entityProperties, secretBindings, secretReferences);
+            properties, secretBindings, secretReferences, secretManager);
     doWithCatalog(
         catalogIdent,
         c ->
@@ -131,6 +129,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   return null;
                 }),
         IllegalArgumentException.class);
+    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    SecretPropertyUtils.applySecretReferences(entityProperties, secretReferences, secretManager);
     List<SecretUrn> secretUrns =
         SecretPropertyUtils.writeBindingsAndApplyUrns(
             entityProperties, "schema", uid, secretBindings, secretManager);

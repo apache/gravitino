@@ -154,12 +154,10 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-    SecretPropertyUtils.mergeSecretsForValidation(
-        entityProperties, secretBindings, secretReferences, secretManager);
+    SecretPropertyUtils.checkSecretKeys(properties, secretBindings, secretReferences);
     Map<String, String> propertiesToValidate =
         SecretPropertyUtils.propertiesToValidate(
-            properties, entityProperties, secretBindings, secretReferences);
+            properties, secretBindings, secretReferences, secretManager);
     doWithCatalog(
         catalogIdent,
         c ->
@@ -169,6 +167,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
+    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    SecretPropertyUtils.applySecretReferences(entityProperties, secretReferences, secretManager);
     List<SecretUrn> secretUrns =
         SecretPropertyUtils.writeBindingsAndApplyUrns(
             entityProperties, "fileset", uid, secretBindings, secretManager);
