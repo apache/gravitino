@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -117,13 +116,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     long uid = idGenerator.nextId();
-    Map<String, String> propertiesForCreate =
-        properties == null ? new HashMap<>() : new HashMap<>(properties);
+    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
     SecretPropertyUtils.mergeSecretsForValidation(
-        propertiesForCreate, secretBindings, secretReferences, secretManager);
+        entityProperties, secretBindings, secretReferences, secretManager);
     Map<String, String> propertiesToValidate =
-        SecretPropertyUtils.propertiesForCreateValidation(
-            properties, propertiesForCreate, secretBindings, secretReferences);
+        SecretPropertyUtils.propertiesToValidate(
+            properties, entityProperties, secretBindings, secretReferences);
     doWithCatalog(
         catalogIdent,
         c ->
@@ -135,13 +133,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         IllegalArgumentException.class);
     List<SecretUrn> secretUrns =
         SecretPropertyUtils.writeBindingsAndApplyUrns(
-            propertiesForCreate, "schema", uid, secretBindings, secretManager);
+            entityProperties, "schema", uid, secretBindings, secretManager);
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
     // SchemaEntity will be visible.
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Map<String, String> updatedProperties =
-        StringIdentifier.newPropertiesWithId(stringId, propertiesForCreate);
+        StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
     try {
       return TreeLockUtils.doWithTreeLock(

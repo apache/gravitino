@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
@@ -155,13 +154,12 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
-    Map<String, String> propertiesForCreate =
-        properties == null ? new HashMap<>() : new HashMap<>(properties);
+    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
     SecretPropertyUtils.mergeSecretsForValidation(
-        propertiesForCreate, secretBindings, secretReferences, secretManager);
+        entityProperties, secretBindings, secretReferences, secretManager);
     Map<String, String> propertiesToValidate =
-        SecretPropertyUtils.propertiesForCreateValidation(
-            properties, propertiesForCreate, secretBindings, secretReferences);
+        SecretPropertyUtils.propertiesToValidate(
+            properties, entityProperties, secretBindings, secretReferences);
     doWithCatalog(
         catalogIdent,
         c ->
@@ -173,10 +171,10 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         IllegalArgumentException.class);
     List<SecretUrn> secretUrns =
         SecretPropertyUtils.writeBindingsAndApplyUrns(
-            propertiesForCreate, "fileset", uid, secretBindings, secretManager);
+            entityProperties, "fileset", uid, secretBindings, secretManager);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Map<String, String> updatedProperties =
-        StringIdentifier.newPropertiesWithId(stringId, propertiesForCreate);
+        StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
     try {
       Fileset createdFileset =

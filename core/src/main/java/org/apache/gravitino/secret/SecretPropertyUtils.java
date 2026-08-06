@@ -71,25 +71,38 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Applies each URN string into {@code properties} under the property key encoded in the URN (last
-   * identifier segment).
+   * Returns a mutable copy of entity properties for create-time assembly.
    *
-   * @param properties mutable entity properties
+   * <p>{@code null} becomes an empty {@link HashMap}; otherwise returns a new {@link HashMap} copy.
+   *
+   * @param properties entity properties from the create request (may be null)
+   * @return a mutable property map, never null
+   */
+  public static Map<String, String> copyEntityProperties(@Nullable Map<String, String> properties) {
+    return properties == null ? new HashMap<>() : new HashMap<>(properties);
+  }
+
+  /**
+   * Applies each URN string into {@code entityProperties} under the property key encoded in the URN
+   * (last identifier segment).
+   *
+   * @param entityProperties mutable entity properties
    * @param secretUrns secret URNs whose last identifier segment is the property key
    */
-  public static void applySecretUrns(Map<String, String> properties, List<SecretUrn> secretUrns) {
-    Preconditions.checkArgument(properties != null, "properties must not be null");
+  public static void applySecretUrns(
+      Map<String, String> entityProperties, List<SecretUrn> secretUrns) {
+    Preconditions.checkArgument(entityProperties != null, "entityProperties must not be null");
     Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
     for (SecretUrn urn : secretUrns) {
       List<String> segments = urn.identifierSegments();
       Preconditions.checkArgument(
           !segments.isEmpty(), "Secret URN must contain at least one identifier segment: %s", urn);
-      properties.put(segments.get(segments.size() - 1), urn.toString());
+      entityProperties.put(segments.get(segments.size() - 1), urn.toString());
     }
   }
 
   /**
-   * Merges create-time secrets into {@code properties} for entity property validation.
+   * Merges create-time secrets into {@code entityProperties} for entity property validation.
    *
    * <p>Checks binding/reference key overlap, applies external-reference URNs, and puts binding
    * plaintext under each binding key. Call {@link #writeBindingsAndApplyUrns} after {@code
@@ -97,24 +110,24 @@ public final class SecretPropertyUtils {
    *
    * <p>{@code null} bindings/references are treated as empty maps.
    *
-   * @param properties mutable entity properties
+   * @param entityProperties mutable entity properties
    * @param secretBindings property key → write-through binding (may be null)
    * @param secretReferences property key → secret locator (may be null)
    * @param secretManager secret manager used to resolve reference URNs
    */
   public static void mergeSecretsForValidation(
-      Map<String, String> properties,
+      Map<String, String> entityProperties,
       @Nullable Map<String, SecretBinding> secretBindings,
       @Nullable Map<String, SecretReference> secretReferences,
       SecretManager secretManager) {
-    Preconditions.checkArgument(properties != null, "properties must not be null");
+    Preconditions.checkArgument(entityProperties != null, "entityProperties must not be null");
     Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
     Map<String, SecretBinding> bindings = emptyIfNull(secretBindings);
     Map<String, SecretReference> references = emptyIfNull(secretReferences);
     checkNoOverlap(bindings, references);
-    applySecretUrns(properties, secretManager.getSecretReferenceUrns(references));
+    applySecretUrns(entityProperties, secretManager.getSecretReferenceUrns(references));
     for (Map.Entry<String, SecretBinding> entry : bindings.entrySet()) {
-      properties.put(entry.getKey(), entry.getValue().plaintext());
+      entityProperties.put(entry.getKey(), entry.getValue().plaintext());
     }
   }
 
@@ -123,35 +136,34 @@ public final class SecretPropertyUtils {
    * caller passed {@code null} properties and no secrets.
    *
    * @param originalProperties properties from the create request (may be null)
-   * @param propertiesForCreate mutable properties after {@link #mergeSecretsForValidation}
+   * @param entityProperties mutable properties after {@link #mergeSecretsForValidation}
    * @param secretBindings property key → write-through binding (may be null)
    * @param secretReferences property key → secret locator (may be null)
-   * @return {@code null} when validation should be skipped; otherwise {@code propertiesForCreate}
+   * @return {@code null} when validation should be skipped; otherwise {@code entityProperties}
    */
   @Nullable
-  public static Map<String, String> propertiesForCreateValidation(
+  public static Map<String, String> propertiesToValidate(
       @Nullable Map<String, String> originalProperties,
-      Map<String, String> propertiesForCreate,
+      Map<String, String> entityProperties,
       @Nullable Map<String, SecretBinding> secretBindings,
       @Nullable Map<String, SecretReference> secretReferences) {
-    Preconditions.checkArgument(
-        propertiesForCreate != null, "propertiesForCreate must not be null");
+    Preconditions.checkArgument(entityProperties != null, "entityProperties must not be null");
     if (originalProperties == null
         && emptyIfNull(secretBindings).isEmpty()
         && emptyIfNull(secretReferences).isEmpty()) {
       return null;
     }
-    return propertiesForCreate;
+    return entityProperties;
   }
 
   /**
-   * Persists write-through bindings and replaces their plaintext values in {@code properties} with
-   * URNs.
+   * Persists write-through bindings and replaces their plaintext values in {@code entityProperties}
+   * with URNs.
    *
    * <p>{@code null} or empty bindings are a no-op and return an empty list. Returned URNs should be
    * passed to {@link SecretManager#rollbackWritten} if entity create fails.
    *
-   * @param properties mutable entity properties (binding keys currently hold plaintext)
+   * @param entityProperties mutable entity properties (binding keys currently hold plaintext)
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
    * @param secretBindings property key → write-through binding (may be null)
@@ -159,17 +171,17 @@ public final class SecretPropertyUtils {
    * @return write-through URNs that were persisted (may be empty)
    */
   public static List<SecretUrn> writeBindingsAndApplyUrns(
-      Map<String, String> properties,
+      Map<String, String> entityProperties,
       String entityType,
       long entityId,
       @Nullable Map<String, SecretBinding> secretBindings,
       SecretManager secretManager) {
-    Preconditions.checkArgument(properties != null, "properties must not be null");
+    Preconditions.checkArgument(entityProperties != null, "entityProperties must not be null");
     Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
     Map<String, SecretBinding> bindings = emptyIfNull(secretBindings);
     List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns(entityType, entityId, bindings);
     secretManager.writeSecrets(bindings, secretUrns);
-    applySecretUrns(properties, secretUrns);
+    applySecretUrns(entityProperties, secretUrns);
     return secretUrns;
   }
 
