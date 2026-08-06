@@ -661,7 +661,7 @@ public class TestTagManager {
             NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
 
     String[] tags =
-        tagManager.associateTagsForMetadataObject(
+        tagManager.associateTagValuesForMetadataObject(
             METALAKE,
             tableObject,
             new TagValue[] {TagValue.of(tag.name(), "finance"), TagValue.of(tag.name(), "risk")},
@@ -677,7 +677,7 @@ public class TestTagManager {
         new String[] {"finance", "risk"}, tagInfos[0].assignment().get().values());
 
     String[] repeatedTags =
-        tagManager.associateTagsForMetadataObject(
+        tagManager.associateTagValuesForMetadataObject(
             METALAKE, tableObject, new TagValue[] {TagValue.of(tag.name(), "finance")}, null);
     Assertions.assertArrayEquals(new String[] {tag.name()}, repeatedTags);
     Tag[] repeatedTagInfos = tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject);
@@ -686,12 +686,12 @@ public class TestTagManager {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            tagManager.associateTagsForMetadataObject(
+            tagManager.associateTagValuesForMetadataObject(
                 METALAKE, tableObject, new TagValue[] {TagValue.of(tag.name(), "pii")}, null));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            tagManager.associateTagsForMetadataObject(
+            tagManager.associateTagValuesForMetadataObject(
                 METALAKE, tableObject, new TagValue[] {TagValue.noValue(tag.name())}, null));
 
     MetadataObject[] financeObjects =
@@ -701,12 +701,12 @@ public class TestTagManager {
         0, tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "pii").length);
 
     Tag ownerTag = tagManager.createTag(METALAKE, "owner", null, null);
-    tagManager.associateTagsForMetadataObject(
+    tagManager.associateTagValuesForMetadataObject(
         METALAKE, tableObject, new TagValue[] {TagValue.noValue(ownerTag.name())}, null);
     Tag ownerInfoWithoutValue =
         tagManager.getTagForMetadataObject(METALAKE, tableObject, ownerTag.name());
     assertAssignmentValues(ownerInfoWithoutValue, new String[0]);
-    tagManager.associateTagsForMetadataObject(
+    tagManager.associateTagValuesForMetadataObject(
         METALAKE, tableObject, new TagValue[] {TagValue.of(ownerTag.name(), "team-a")}, null);
     Tag ownerInfo = tagManager.getTagForMetadataObject(METALAKE, tableObject, ownerTag.name());
     Assertions.assertArrayEquals(new String[] {"team-a"}, ownerInfo.assignment().get().values());
@@ -731,7 +731,7 @@ public class TestTagManager {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            tagManager.associateTagsForMetadataObject(
+            tagManager.associateTagValuesForMetadataObject(
                 METALAKE,
                 tableObject,
                 new TagValue[] {
@@ -742,7 +742,7 @@ public class TestTagManager {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
-            tagManager.associateTagsForMetadataObject(
+            tagManager.associateTagValuesForMetadataObject(
                 METALAKE,
                 tableObject,
                 new TagValue[] {

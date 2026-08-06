@@ -313,7 +313,8 @@ public class TestTagEvent {
             Entity.EntityType.CATALOG);
     TagValue[] tagsToAdd = {TagValue.of("data_domain", "finance")};
     TagValue[] tagsToRemove = {TagValue.noValue("pii")};
-    dispatcher.associateTagsForMetadataObject("metalake", metadataObject, tagsToAdd, tagsToRemove);
+    dispatcher.associateTagValuesForMetadataObject(
+        "metalake", metadataObject, tagsToAdd, tagsToRemove);
 
     AssociateTagsForMetadataObjectPreEvent preEvent =
         (AssociateTagsForMetadataObjectPreEvent) dummyEventListener.popPreEvent();
@@ -553,7 +554,7 @@ public class TestTagEvent {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
         () ->
-            failureDispatcher.associateTagsForMetadataObject(
+            failureDispatcher.associateTagValuesForMetadataObject(
                 "metalake", metadataObject, tagsToAdd, tagsToRemove));
 
     AssociateTagsForMetadataObjectFailureEvent event =

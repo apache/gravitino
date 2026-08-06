@@ -321,7 +321,7 @@ public class TagEventDispatcher implements TagDispatcher {
   }
 
   @Override
-  public String[] associateTagsForMetadataObject(
+  public String[] associateTagValuesForMetadataObject(
       String metalake,
       MetadataObject metadataObject,
       TagValue[] tagsToAdd,
@@ -336,7 +336,7 @@ public class TagEventDispatcher implements TagDispatcher {
 
     try {
       String[] associatedTags =
-          dispatcher.associateTagsForMetadataObject(
+          dispatcher.associateTagValuesForMetadataObject(
               metalake, metadataObject, tagsToAdd, tagsToRemove);
       eventBus.dispatchEvent(
           new AssociateTagsForMetadataObjectEvent(

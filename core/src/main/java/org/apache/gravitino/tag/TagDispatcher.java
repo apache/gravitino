@@ -169,7 +169,7 @@ public interface TagDispatcher {
    * @param tagsToRemove Tag values to disassociate from the object.
    * @return An array of updated tag names.
    */
-  default String[] associateTagsForMetadataObject(
+  default String[] associateTagValuesForMetadataObject(
       String metalake,
       MetadataObject metadataObject,
       TagValue[] tagsToAdd,

@@ -340,12 +340,12 @@ public class TagManager implements TagDispatcher {
   public String[] associateTagsForMetadataObject(
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
-    return associateTagsForMetadataObject(
+    return associateTagValuesForMetadataObject(
         metalake, metadataObject, toNoValue(tagsToAdd), toNoValue(tagsToRemove));
   }
 
   @Override
-  public String[] associateTagsForMetadataObject(
+  public String[] associateTagValuesForMetadataObject(
       String metalake, MetadataObject metadataObject, TagValue[] tagsToAdd, TagValue[] tagsToRemove)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(

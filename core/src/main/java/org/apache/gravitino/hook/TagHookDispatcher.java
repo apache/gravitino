@@ -124,12 +124,12 @@ public class TagHookDispatcher implements TagDispatcher {
   }
 
   @Override
-  public String[] associateTagsForMetadataObject(
+  public String[] associateTagValuesForMetadataObject(
       String metalake,
       MetadataObject metadataObject,
       TagValue[] tagsToAdd,
       TagValue[] tagsToRemove) {
-    return dispatcher.associateTagsForMetadataObject(
+    return dispatcher.associateTagValuesForMetadataObject(
         metalake, metadataObject, tagsToAdd, tagsToRemove);
   }
 
