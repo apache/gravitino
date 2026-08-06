@@ -330,7 +330,7 @@ public class MetadataObjectTagOperations {
 
   private static TagValue[] toNoValue(String[] tags) {
     if (tags == null) {
-      return null;
+      return new TagValue[0];
     }
     return Arrays.stream(tags).map(TagValue::noValue).toArray(TagValue[]::new);
   }

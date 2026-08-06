@@ -44,7 +44,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
-import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
@@ -375,37 +374,5 @@ public class TagOperations {
         new MetadataObjectTagOperations(tagDispatcher);
     metadataObjectTagOperations.setHttpRequest(httpRequest);
     return metadataObjectTagOperations.associateTagsForObject(metalake, type, fullName, request);
-  }
-
-  /**
-   * Associates tag values with a metadata object using the v2 request representation.
-   *
-   * @param metalake The metalake name.
-   * @param type The metadata object type.
-   * @param fullName The metadata object full name.
-   * @param request The tag values association request.
-   * @return The response containing associated tag names.
-   * @deprecated This API has moved to {@code
-   *     /api/metalakes/{metalake}/objects/{type}/{fullName}/tags}.
-   */
-  @Deprecated
-  @POST
-  @Path("{type}/{fullName}")
-  @Produces("application/vnd.gravitino.v2+json")
-  @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "associate-object-tags", absolute = true)
-  @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
-  public Response associateTagValuesForObject(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("type") @AuthorizationObjectType String type,
-      @PathParam("fullName") @AuthorizationFullName String fullName,
-      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
-          TagValuesAssociateRequest request) {
-    MetadataObjectTagOperations metadataObjectTagOperations =
-        new MetadataObjectTagOperations(tagDispatcher);
-    metadataObjectTagOperations.setHttpRequest(httpRequest);
-    return metadataObjectTagOperations.associateTagValuesForObject(
-        metalake, type, fullName, request);
   }
 }

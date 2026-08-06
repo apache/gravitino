@@ -48,7 +48,6 @@ import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
-import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
@@ -1046,29 +1045,6 @@ public class TestTagOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = response3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
-  }
-
-  @Test
-  public void testAssociateTagValuesForObjectV2() {
-    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
-    TagValue[] tagsToAdd = {TagValue.noValue("pii"), TagValue.of("data_domain", "finance")};
-    TagValue[] tagsToRemove = {TagValue.of("data_domain", "old")};
-    when(tagManager.associateTagValuesForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
-        .thenReturn(new String[] {"pii", "data_domain"});
-
-    TagValuesAssociateRequest request = new TagValuesAssociateRequest(tagsToAdd, tagsToRemove);
-    Response response =
-        target(tagPath(metalake))
-            .path(catalog.type().toString())
-            .path(catalog.fullName())
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v2+json")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    Assertions.assertArrayEquals(
-        new String[] {"pii", "data_domain"},
-        response.readEntity(NameListResponse.class).getNames());
   }
 
   @Test
