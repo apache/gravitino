@@ -19,7 +19,15 @@
 
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
+import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * {@code SchemaDispatcher} interface acts as a specialization of the {@link SupportsSchemas}
@@ -27,4 +35,33 @@ import org.apache.gravitino.connector.SupportsSchemas;
  * to dispatching or handling schema-related events or actions that are not covered by the standard
  * {@code SupportsSchemas} operations.
  */
-public interface SchemaDispatcher extends SupportsSchemas {}
+public interface SchemaDispatcher extends SupportsSchemas {
+
+  /**
+   * Create a schema in the catalog with optional secret maps.
+   *
+   * @param ident The name identifier of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created schema.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws SchemaAlreadyExistsException If the schema already exists.
+   */
+  Schema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException;
+
+  @Override
+  default Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+}

@@ -65,8 +65,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
 
 /** Operations for interacting with a generic lakehouse catalog in Apache Gravitino. */
@@ -164,12 +162,7 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   @Override
-  public Schema createSchema(
-      NameIdentifier ident,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences)
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     return schemaOps.createSchema(ident, comment, properties);
   }

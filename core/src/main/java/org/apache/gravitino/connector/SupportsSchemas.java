@@ -20,7 +20,6 @@
 
 package org.apache.gravitino.connector;
 
-import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -31,8 +30,6 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 
 /**
  * The Catalog interface to support schema operations. If the implemented catalog has schema
@@ -73,28 +70,6 @@ public interface SupportsSchemas {
   }
 
   /**
-   * Create a schema in the catalog with optional secret maps.
-   *
-   * @param ident The name identifier of the schema.
-   * @param comment The comment of the schema.
-   * @param properties The properties of the schema.
-   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
-   *     for write-through
-   * @param secretReferences optional property key → secret locator ({@code provider} plus
-   *     provider-specific attributes).
-   * @return The created schema.
-   * @throws NoSuchCatalogException If the catalog does not exist.
-   * @throws SchemaAlreadyExistsException If the schema already exists.
-   */
-  Schema createSchema(
-      NameIdentifier ident,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException;
-
-  /**
    * Create a schema in the catalog.
    *
    * @param ident The name identifier of the schema.
@@ -104,10 +79,8 @@ public interface SupportsSchemas {
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */
-  default Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
-  }
+  Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException;
 
   /**
    * Load metadata properties for a schema.

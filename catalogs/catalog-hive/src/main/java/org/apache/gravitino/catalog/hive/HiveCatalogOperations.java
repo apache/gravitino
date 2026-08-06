@@ -41,7 +41,6 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -90,8 +89,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -236,29 +233,6 @@ public class HiveCatalogOperations
   @Override
   public HiveSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
-  }
-
-  /**
-   * Creates a new schema with the provided identifier, comment, metadata, and secret options.
-   *
-   * @param ident The identifier of the schema to create.
-   * @param comment The comment for the schema.
-   * @param properties The metadata properties for the schema.
-   * @param secretBindings The secret bindings for the schema.
-   * @param secretReferences The secret references for the schema.
-   * @return The created {@link HiveSchema}.
-   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
-   * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
-   */
-  @Override
-  public HiveSchema createSchema(
-      NameIdentifier ident,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     try {
       HiveSchema hiveSchema =

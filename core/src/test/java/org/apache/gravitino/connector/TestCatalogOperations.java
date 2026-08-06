@@ -101,8 +101,6 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -492,12 +490,7 @@ public class TestCatalogOperations
   }
 
   @Override
-  public Schema createSchema(
-      NameIdentifier ident,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences)
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();

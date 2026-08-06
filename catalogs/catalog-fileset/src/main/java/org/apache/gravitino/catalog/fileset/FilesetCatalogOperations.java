@@ -104,8 +104,6 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -731,15 +729,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public Schema createSchema(
-      NameIdentifier ident,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences)
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
     if (disableFSOps) {
-      return super.createSchema(ident, comment, properties, secretBindings, secretReferences);
+      return super.createSchema(ident, comment, properties);
     }
 
     try {
@@ -797,7 +790,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
           }
         });
 
-    return super.createSchema(ident, comment, properties, secretBindings, secretReferences);
+    return super.createSchema(ident, comment, properties);
   }
 
   @Override
