@@ -71,7 +71,8 @@ public interface UserMetaMapper {
   void insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO);
 
   @UpdateProvider(type = UserMetaSQLProviderFactory.class, method = "softDeleteUserMetaByUserId")
-  void softDeleteUserMetaByUserId(@Param("userId") Long userId);
+  Integer softDeleteUserMetaByUserId(
+      @Param("userId") Long userId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = UserMetaSQLProviderFactory.class,

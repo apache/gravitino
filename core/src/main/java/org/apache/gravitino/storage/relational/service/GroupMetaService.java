@@ -37,15 +37,18 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -171,9 +174,18 @@ public class GroupMetaService {
 
       NameIdentifier metalakeIdent =
           NameIdentifier.of(NameIdentifierUtil.getMetalake(groupEntity.nameIdentifier()));
-      Long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class,
+              mapper -> mapper.selectMetalakeMetaByName(metalakeIdent.name()));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeIdent.name());
+      }
 
-      GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakeId);
+      GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(groupEntity.roleIds()).orElse(Lists.newArrayList());
@@ -181,6 +193,7 @@ public class GroupMetaService {
           POConverters.initializeGroupRoleRelsPOWithVersion(groupEntity, roleIds);
 
       SessionUtils.doMultipleWithCommit(
+          () -> fenceMetalakeForGroupCreate(metalakePO),
           () ->
               SessionUtils.doWithoutCommit(
                   GroupMetaMapper.class,
@@ -214,12 +227,22 @@ public class GroupMetaService {
   public boolean deleteGroup(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    Long groupId = EntityIdService.getEntityId(identifier, Entity.EntityType.GROUP);
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long groupId = groupPO.getGroupId();
 
     SessionUtils.doMultipleWithCommit(
-        () ->
-            SessionUtils.doWithoutCommit(
-                GroupMetaMapper.class, mapper -> mapper.softDeleteGroupMetaByGroupId(groupId)),
+        () -> {
+          int deleted =
+              SessionUtils.getWithoutCommit(
+                  GroupMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteGroupMetaByGroupId(groupId, groupPO.getCurrentVersion()));
+          if (deleted == 0) {
+            throw optimisticLockException(identifier);
+          }
+        },
         () ->
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
@@ -264,18 +287,20 @@ public class GroupMetaService {
     Set<Long> insertRoleIds = Sets.difference(newRoleIds, oldRoleIds);
     Set<Long> deleteRoleIds = Sets.difference(oldRoleIds, newRoleIds);
 
-    if (insertRoleIds.isEmpty() && deleteRoleIds.isEmpty()) {
-      return newEntity;
-    }
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  GroupMetaMapper.class,
-                  mapper ->
-                      mapper.updateGroupMeta(
-                          POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                          oldGroupPO)),
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    GroupMetaMapper.class,
+                    mapper ->
+                        mapper.updateGroupMeta(
+                            POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
+                            oldGroupPO));
+            if (updated == 0) {
+              throw optimisticLockException(identifier);
+            }
+          },
           () -> {
             if (insertRoleIds.isEmpty()) {
               return;
@@ -394,21 +419,6 @@ public class GroupMetaService {
         groupPO, rolePOs, AuthorizationUtils.ofGroupNamespace(metalake));
   }
 
-  private GroupPO getGroupPOByMetalakeNameAndId(String metalakeName, Long groupId) {
-    GroupPO groupPO =
-        SessionUtils.getWithoutCommit(
-            GroupMetaMapper.class,
-            mapper -> mapper.selectGroupMetaByMetalakeNameAndId(metalakeName, groupId));
-
-    if (groupPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.GROUP.name().toLowerCase(),
-          String.valueOf(groupId));
-    }
-    return groupPO;
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getGroupById")
@@ -439,13 +449,18 @@ public class GroupMetaService {
 
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  GroupMetaMapper.class,
-                  mapper ->
-                      mapper.updateGroupMeta(
-                          POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
-                          oldGroupPO)),
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    GroupMetaMapper.class,
+                    mapper ->
+                        mapper.updateGroupMeta(
+                            POConverters.updateGroupPOWithVersion(oldGroupPO, newEntity),
+                            oldGroupPO));
+            if (updated == 0) {
+              throw optimisticLockException(newEntity.nameIdentifier());
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   GroupMetaMapper.class,
@@ -462,16 +477,25 @@ public class GroupMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteGroupById")
   public boolean deleteGroupById(String metalake, long groupId) {
+    GroupPO groupPO;
     try {
-      getGroupPOByMetalakeNameAndId(metalake, groupId);
+      groupPO = getGroupPOByMetalakeNameAndId(metalake, groupId);
     } catch (NoSuchEntityException e) {
       return false;
     }
+    NameIdentifier identifier = AuthorizationUtils.ofGroup(metalake, groupPO.getGroupName());
 
     SessionUtils.doMultipleWithCommit(
-        () ->
-            SessionUtils.doWithoutCommit(
-                GroupMetaMapper.class, mapper -> mapper.softDeleteGroupMetaByGroupId(groupId)),
+        () -> {
+          int deleted =
+              SessionUtils.getWithoutCommit(
+                  GroupMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteGroupMetaByGroupId(groupId, groupPO.getCurrentVersion()));
+          if (deleted == 0) {
+            throw optimisticLockException(identifier);
+          }
+        },
         () ->
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
@@ -483,5 +507,39 @@ public class GroupMetaService {
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
                         groupId, Entity.EntityType.GROUP.name())));
     return true;
+  }
+
+  private GroupPO getGroupPOByMetalakeNameAndId(String metalakeName, Long groupId) {
+    GroupPO groupPO =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class,
+            mapper -> mapper.selectGroupMetaByMetalakeNameAndId(metalakeName, groupId));
+
+    if (groupPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.GROUP.name().toLowerCase(),
+          String.valueOf(groupId));
+    }
+    return groupPO;
+  }
+
+  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
+    return new OptimisticLockException(
+        "The group %s was modified concurrently; retry the operation", identifier);
+  }
+
+  private void fenceMetalakeForGroupCreate(MetalakePO metalakePO) {
+    int fenced =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper ->
+                mapper.fenceMetalakeMeta(
+                    metalakePO.getMetalakeId(), metalakePO.getCurrentVersion()));
+    if (fenced == 0) {
+      throw new OptimisticLockException(
+          "The parent metalake %s was modified concurrently; retry the operation",
+          metalakePO.getMetalakeName());
+    }
   }
 }
