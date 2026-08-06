@@ -569,3 +569,40 @@ class TestViewOperationUrlEncoding(unittest.TestCase):
         url = _called_url(client.get)
         self.assertIn(_ENCODED_QUERY_INJECTION, url)
         self.assertNotIn("?admin=true", url)
+
+    def test_create_view_omits_unset_default_catalog_and_schema(self):
+        client = _make_mock_client({"view": {}})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.create_view("catalog", "schema", "v", "", [], [], {}))
+        request = client.post.call_args[1]["json"]
+        self.assertNotIn("defaultCatalog", request)
+        self.assertNotIn("defaultSchema", request)
+
+    def test_create_view_includes_defaults_when_set(self):
+        client = _make_mock_client({"view": {}})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(
+            op.create_view(
+                "catalog", "schema", "v", "", [], [], {}, "cat", "sch"
+            )
+        )
+        request = client.post.call_args[1]["json"]
+        self.assertEqual("cat", request["defaultCatalog"])
+        self.assertEqual("sch", request["defaultSchema"])
+
+    def test_alter_view_encodes_view_name(self):
+        client = _make_mock_client({"view": {}})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        asyncio.run(op.alter_view("catalog", "schema", _QUERY_INJECTION, []))
+        url = _called_url(client.put)
+        self.assertIn(_ENCODED_QUERY_INJECTION, url)
+        self.assertNotIn("?admin=true", url)
+
+    def test_drop_view_reads_dropped_response(self):
+        client = _make_mock_client({"code": 0, "dropped": True})
+        op = PlainRESTClientViewOperation(METALAKE, client)
+        result = asyncio.run(op.drop_view("catalog", "schema", _PATH_TRAVERSAL))
+        self.assertEqual("true", result)
+        url = _called_url(client.delete)
+        self.assertIn(_ENCODED_PATH_TRAVERSAL, url)
+        self.assertNotIn("../../", url)
