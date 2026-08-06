@@ -128,9 +128,7 @@ public class TestRelationalCatalog extends TestBase {
             CatalogDTO.Type.RELATIONAL,
             provider,
             "comment",
-            ImmutableMap.of("k1", "k2"),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            ImmutableMap.of("k1", "k2"));
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,
@@ -238,12 +236,7 @@ public class TestRelationalCatalog extends TestBase {
     SchemaDTO schema = createMockSchema(schemaName, "comment", Collections.emptyMap());
 
     SchemaCreateRequest req =
-        new SchemaCreateRequest(
-            schemaName,
-            "comment",
-            Collections.emptyMap(),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+        new SchemaCreateRequest(schemaName, "comment", Collections.emptyMap());
     SchemaResponse resp = new SchemaResponse(schema);
     buildMockResource(Method.POST, schemaPath, req, resp, SC_OK);
 

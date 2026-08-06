@@ -423,14 +423,7 @@ public class GravitinoMetalake extends MetalakeDTO
       Map<String, String> properties)
       throws Exception {
     CatalogCreateRequest req =
-        new CatalogCreateRequest(
-            catalogName,
-            type,
-            provider,
-            comment,
-            properties,
-            Collections.emptyMap(),
-            Collections.emptyMap());
+        new CatalogCreateRequest(catalogName, type, provider, comment, properties);
     req.validate();
 
     // The response maybe a `BaseResponse` (test successfully)  or an `ErrorResponse` (test failed),

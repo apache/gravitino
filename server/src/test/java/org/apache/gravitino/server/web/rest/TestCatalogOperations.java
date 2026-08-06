@@ -226,9 +226,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
             Catalog.Type.RELATIONAL,
             "test",
             "comment",
-            ImmutableMap.of("key", "value"),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            ImmutableMap.of("key", "value"));
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
     when(manager.createCatalog(any(), any(), any(), any(), any(), any(), any()))
@@ -312,9 +310,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
             Catalog.Type.RELATIONAL,
             "test",
             "comment",
-            ImmutableMap.of("key", "value"),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            ImmutableMap.of("key", "value"));
     doNothing().when(manager).testConnection(any(), any(), any(), any(), any());
     Response resp =
         target("/metalakes/metalake1/catalogs/testConnection")

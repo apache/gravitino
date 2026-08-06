@@ -279,13 +279,7 @@ public class TestGravitinoMetalake extends TestBase {
             .build();
     CatalogCreateRequest req =
         new CatalogCreateRequest(
-            catalogName,
-            Catalog.Type.RELATIONAL,
-            provider,
-            "comment",
-            Collections.emptyMap(),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            catalogName, Catalog.Type.RELATIONAL, provider, "comment", Collections.emptyMap());
     CatalogResponse resp = new CatalogResponse(mockCatalog);
     buildMockResource(Method.POST, path, req, resp, HttpStatus.SC_OK);
 
@@ -308,13 +302,7 @@ public class TestGravitinoMetalake extends TestBase {
             .build();
     CatalogCreateRequest req1 =
         new CatalogCreateRequest(
-            catalogName,
-            Catalog.Type.MESSAGING,
-            provider,
-            "comment",
-            Collections.emptyMap(),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            catalogName, Catalog.Type.MESSAGING, provider, "comment", Collections.emptyMap());
     CatalogResponse resp1 = new CatalogResponse(mockCatalog1);
     buildMockResource(Method.POST, path, req1, resp1, HttpStatus.SC_OK);
     NameIdentifier id = NameIdentifier.of(metalakeName, catalogName);

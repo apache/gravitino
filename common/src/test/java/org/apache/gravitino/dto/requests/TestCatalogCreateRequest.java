@@ -21,7 +21,6 @@ package org.apache.gravitino.dto.requests;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonMappingException;
 import com.google.common.collect.ImmutableMap;
-import java.util.Collections;
 import java.util.Locale;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.json.JsonUtils;
@@ -38,32 +37,22 @@ public class TestCatalogCreateRequest {
             Catalog.Type.MODEL,
             "provider_test",
             "catalog comment",
-            ImmutableMap.of("key", "value"),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            ImmutableMap.of("key", "value"));
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(request);
     CatalogCreateRequest deserRequest =
         JsonUtils.objectMapper().readValue(serJson, CatalogCreateRequest.class);
 
+    Assertions.assertEquals(request, deserRequest);
     Assertions.assertEquals("catalog_test", deserRequest.getName());
     Assertions.assertEquals(Catalog.Type.MODEL, deserRequest.getType());
     Assertions.assertEquals("provider_test", deserRequest.getProvider());
     Assertions.assertEquals("catalog comment", deserRequest.getComment());
     Assertions.assertEquals(ImmutableMap.of("key", "value"), deserRequest.getProperties());
-    Assertions.assertNull(deserRequest.getSecretBindings());
-    Assertions.assertNull(deserRequest.getSecretReferences());
 
     // Test with null provider, comment and properties
     CatalogCreateRequest request1 =
-        new CatalogCreateRequest(
-            "catalog_test",
-            Catalog.Type.MODEL,
-            null,
-            null,
-            null,
-            Collections.emptyMap(),
-            Collections.emptyMap());
+        new CatalogCreateRequest("catalog_test", Catalog.Type.MODEL, null, null, null);
 
     String serJson1 = JsonUtils.objectMapper().writeValueAsString(request1);
     CatalogCreateRequest deserRequest1 =
@@ -81,15 +70,7 @@ public class TestCatalogCreateRequest {
     // Test using null provider with catalog type doesn't support managed catalog
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () ->
-            new CatalogCreateRequest(
-                "catalog_test",
-                Catalog.Type.RELATIONAL,
-                null,
-                null,
-                null,
-                Collections.emptyMap(),
-                Collections.emptyMap()));
+        () -> new CatalogCreateRequest("catalog_test", Catalog.Type.RELATIONAL, null, null, null));
 
     String json1 = "{\"name\":\"catalog_test\",\"type\":\"relational\"}";
     Assertions.assertThrows(
@@ -104,15 +85,7 @@ public class TestCatalogCreateRequest {
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () ->
-                new CatalogCreateRequest(
-                    "catalog_test",
-                    null,
-                    "hadoop",
-                    null,
-                    null,
-                    Collections.emptyMap(),
-                    Collections.emptyMap()));
+            () -> new CatalogCreateRequest("catalog_test", null, "hadoop", null, null));
 
     // Verify the exception message
     Assertions.assertEquals(

@@ -93,13 +93,7 @@ public class TestGenericModelCatalog extends TestBase {
 
     CatalogCreateRequest request =
         new CatalogCreateRequest(
-            CATALOG_NAME,
-            Catalog.Type.MODEL,
-            null,
-            "comment",
-            Collections.emptyMap(),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            CATALOG_NAME, Catalog.Type.MODEL, null, "comment", Collections.emptyMap());
     CatalogResponse resp = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,

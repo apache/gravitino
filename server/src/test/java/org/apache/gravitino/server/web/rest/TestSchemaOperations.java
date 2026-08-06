@@ -36,7 +36,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
-import java.util.Collections;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
@@ -221,12 +220,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
   @Test
   public void testCreateSchema() {
     SchemaCreateRequest req =
-        new SchemaCreateRequest(
-            "schema1",
-            "comment",
-            ImmutableMap.of("key", "value"),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+        new SchemaCreateRequest("schema1", "comment", ImmutableMap.of("key", "value"));
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
 
     when(dispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);

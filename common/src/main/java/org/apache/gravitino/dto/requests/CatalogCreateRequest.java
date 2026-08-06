@@ -68,6 +68,24 @@ public class CatalogCreateRequest implements RESTRequest {
   private final Map<String, SecretReferenceDTO> secretReferences;
 
   /**
+   * Constructor for CatalogCreateRequest without secret maps.
+   *
+   * @param name The name of the catalog.
+   * @param type The type of the catalog.
+   * @param provider The provider of the catalog.
+   * @param comment The comment for the catalog.
+   * @param properties The properties for the catalog.
+   */
+  public CatalogCreateRequest(
+      String name,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    this(name, type, provider, comment, properties, null, null);
+  }
+
+  /**
    * Constructor for CatalogCreateRequest.
    *
    * @param name The name of the catalog.

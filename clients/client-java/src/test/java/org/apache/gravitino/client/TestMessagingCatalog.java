@@ -27,7 +27,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.time.Instant;
-import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -85,9 +84,7 @@ public class TestMessagingCatalog extends TestBase {
             CatalogDTO.Type.MESSAGING,
             provider,
             "comment",
-            ImmutableMap.of("k1", "k2"),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            ImmutableMap.of("k1", "k2"));
     CatalogResponse catalogResponse = new CatalogResponse(mockCatalog);
     buildMockResource(
         Method.POST,

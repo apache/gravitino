@@ -276,13 +276,7 @@ public class TestGravitinoAdminClient extends TestBase {
     // test TestConnection success
     CatalogCreateRequest req =
         new CatalogCreateRequest(
-            "catalog",
-            Catalog.Type.RELATIONAL,
-            "hive",
-            "comment",
-            Collections.emptyMap(),
-            Collections.emptyMap(),
-            Collections.emptyMap());
+            "catalog", Catalog.Type.RELATIONAL, "hive", "comment", Collections.emptyMap());
     BaseResponse resp = new BaseResponse();
     buildMockResource(
         Method.POST, "/api/metalakes/mock/catalogs/testConnection", req, resp, HttpStatus.SC_OK);

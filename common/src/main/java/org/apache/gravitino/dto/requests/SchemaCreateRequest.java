@@ -64,6 +64,17 @@ public class SchemaCreateRequest implements RESTRequest {
   }
 
   /**
+   * Creates a new SchemaCreateRequest without secret maps.
+   *
+   * @param name The name of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   */
+  public SchemaCreateRequest(String name, String comment, Map<String, String> properties) {
+    this(name, comment, properties, null, null);
+  }
+
+  /**
    * Creates a new SchemaCreateRequest.
    *
    * @param name The name of the schema.
