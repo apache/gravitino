@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -39,6 +40,9 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
@@ -91,6 +95,7 @@ import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -808,6 +813,89 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
     }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
+      throws IOException {
+    if (!query.relationValue().isPresent()) {
+      return listEntitiesByRelation(
+          query.relationType(),
+          query.anchorIdentifier(),
+          query.anchorEntityType(),
+          query.allFields());
+    }
+
+    switch (query.relationType()) {
+      case TAG_METADATA_OBJECT_REL:
+        Preconditions.checkArgument(
+            query.anchorEntityType() == Entity.EntityType.TAG,
+            "Relation value filter is only supported when listing metadata objects for a tag");
+        return (List<E>)
+            TagMetaService.getInstance()
+                .listAssociatedMetadataObjectsForTag(
+                    query.anchorIdentifier(), query.relationValue().get());
+      default:
+        throw new IllegalArgumentException(
+            String.format(
+                "Relation value filter is not supported for relation type %s",
+                query.relationType()));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    switch (update.relationType()) {
+      case TAG_METADATA_OBJECT_REL:
+        return (List<E>)
+            TagMetaService.getInstance()
+                .associateTagValuesWithMetadataObject(
+                    update.sourceIdentifier(),
+                    update.sourceEntityType(),
+                    toTagValues(update.targetsToAdd()),
+                    toTagValues(update.targetsToRemove()));
+      default:
+        Preconditions.checkArgument(
+            !update.hasRelationValues(),
+            "Relation values are not supported for relation type %s",
+            update.relationType());
+        return updateEntityRelations(
+            update.relationType(),
+            update.sourceIdentifier(),
+            update.sourceEntityType(),
+            toNameIdentifiers(update.targetsToAdd()),
+            toNameIdentifiers(update.targetsToRemove()));
+    }
+  }
+
+  private static NameIdentifier[] toNameIdentifiers(RelationEdgeTarget[] relationTargets) {
+    if (relationTargets == null) {
+      return null;
+    }
+
+    return Arrays.stream(relationTargets)
+        .map(RelationEdgeTarget::nameIdentifier)
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static TagValue[] toTagValues(RelationEdgeTarget[] relationTargets) {
+    if (relationTargets == null) {
+      return null;
+    }
+
+    return Arrays.stream(relationTargets).map(JDBCBackend::toTagValue).toArray(TagValue[]::new);
+  }
+
+  private static TagValue toTagValue(RelationEdgeTarget relationTarget) {
+    Preconditions.checkArgument(
+        relationTarget.entityType() == Entity.EntityType.TAG,
+        "Relation target type must be TAG for tag metadata object relations, but is %s",
+        relationTarget.entityType());
+    return relationTarget
+        .relationValue()
+        .map(value -> TagValue.of(relationTarget.nameIdentifier().name(), value))
+        .orElseGet(() -> TagValue.noValue(relationTarget.nameIdentifier().name()));
   }
 
   @Override
