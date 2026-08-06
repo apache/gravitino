@@ -1325,9 +1325,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
-    Map<String, String> confForOps =
-        SecretPropertyUtils.resolveSecretProperties(entity.getProperties(), secretManager);
-    catalog.withCatalogConf(confForOps).withCatalogEntity(entity);
+    catalog
+        .withCatalogConf(
+            SecretPropertyUtils.resolveSecretProperties(entity.getProperties(), secretManager))
+        .withCatalogEntity(entity);
     catalog.initAuthorizationPluginInstance(classLoader);
     return catalog;
   }
