@@ -389,7 +389,7 @@ public class UserMetaService {
     return newEntity;
   }
 
-private UserPO getUserPOByMetalakeNameAndId(String metalakeName, Long userId) {
+  private UserPO getUserPOByMetalakeNameAndId(String metalakeName, Long userId) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,

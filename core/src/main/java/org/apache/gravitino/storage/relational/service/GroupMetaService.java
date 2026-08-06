@@ -395,7 +395,7 @@ public class GroupMetaService {
         groupPO, rolePOs, AuthorizationUtils.ofGroupNamespace(metalake));
   }
 
-private GroupPO getGroupPOByMetalakeNameAndId(String metalakeName, Long groupId) {
+  private GroupPO getGroupPOByMetalakeNameAndId(String metalakeName, Long groupId) {
     GroupPO groupPO =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class,
