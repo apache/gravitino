@@ -155,9 +155,17 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
     secretManager.checkSecretKeys(properties, secretBindings, secretReferences);
+    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    SecretPropertyUtils.applySecretUrns(
+        entityProperties, secretManager.getSecretReferenceUrns(secretReferences));
+    List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns("fileset", uid, secretBindings);
+    SecretPropertyUtils.applySecretUrns(entityProperties, secretUrns);
     Map<String, String> propertiesToValidate =
-        SecretPropertyUtils.propertiesToValidate(
-            properties, secretBindings, secretReferences, secretManager);
+        properties == null
+                && (secretBindings == null || secretBindings.isEmpty())
+                && (secretReferences == null || secretReferences.isEmpty())
+            ? null
+            : entityProperties;
     doWithCatalog(
         catalogIdent,
         c ->
@@ -167,11 +175,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-    SecretPropertyUtils.applySecretReferences(entityProperties, secretReferences, secretManager);
-    List<SecretUrn> secretUrns =
-        SecretPropertyUtils.writeBindingsAndApplyUrns(
-            entityProperties, "fileset", uid, secretBindings, secretManager);
+    secretManager.writeSecrets(secretBindings, secretUrns);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);

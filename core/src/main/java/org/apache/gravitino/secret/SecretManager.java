@@ -65,7 +65,7 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Ensures each secret property key appears at most once across {@code properties}, {@code
+   * Ensures each property key appears at most once across {@code properties}, {@code
    * secretBindings}, and {@code secretReferences}.
    *
    * <p>{@code null} maps are treated as empty.
@@ -78,27 +78,23 @@ public class SecretManager implements Closeable {
       @Nullable Map<String, String> properties,
       @Nullable Map<String, SecretBinding> secretBindings,
       @Nullable Map<String, SecretReference> secretReferences) {
-    Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
-    Map<String, SecretReference> references =
-        secretReferences == null ? Map.of() : secretReferences;
-
-    Set<String> overlap = new HashSet<>(bindings.keySet());
-    overlap.retainAll(references.keySet());
-    if (!overlap.isEmpty()) {
-      throw new IllegalArgumentException(
-          "Property keys cannot appear in both secretBindings and secretReferences: " + overlap);
+    Set<String> keys = new HashSet<>();
+    int count = 0;
+    if (properties != null) {
+      keys.addAll(properties.keySet());
+      count += properties.size();
     }
-
-    Set<String> secretKeys = new HashSet<>(bindings.keySet());
-    secretKeys.addAll(references.keySet());
-    if (properties != null && !secretKeys.isEmpty()) {
-      Set<String> withProperties = new HashSet<>(properties.keySet());
-      withProperties.retainAll(secretKeys);
-      if (!withProperties.isEmpty()) {
-        throw new IllegalArgumentException(
-            "Property keys cannot appear in both properties and secretBindings/secretReferences: "
-                + withProperties);
-      }
+    if (secretBindings != null) {
+      keys.addAll(secretBindings.keySet());
+      count += secretBindings.size();
+    }
+    if (secretReferences != null) {
+      keys.addAll(secretReferences.keySet());
+      count += secretReferences.size();
+    }
+    if (keys.size() != count) {
+      throw new IllegalArgumentException(
+          "Duplicate property key across properties, secretBindings and secretReferences");
     }
   }
 

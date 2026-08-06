@@ -38,8 +38,8 @@ public class TestSecretPropertyUtils {
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
       List<SecretUrn> secretUrns =
           secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
-      secretManager.writeSecrets(secretBindings, secretUrns);
       SecretPropertyUtils.applySecretUrns(properties, secretUrns);
+      secretManager.writeSecrets(secretBindings, secretUrns);
 
       String urn = properties.get("jdbc-password");
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));
@@ -65,25 +65,20 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testCheckSecretKeysAndAssembleEntityProperties() {
+  void testAssembleEntityPropertiesThenWrite() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> properties = Map.of("jdbc-user", "root");
       Map<String, SecretBinding> secretBindings =
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
 
       secretManager.checkSecretKeys(properties, secretBindings, Map.of());
-
-      Map<String, String> toValidate =
-          SecretPropertyUtils.propertiesToValidate(
-              properties, secretBindings, Map.of(), secretManager);
-      Assertions.assertEquals("root", toValidate.get("jdbc-user"));
-      Assertions.assertEquals("s3cr3t", toValidate.get("jdbc-password"));
-
       Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-      SecretPropertyUtils.applySecretReferences(entityProperties, Map.of(), secretManager);
+      SecretPropertyUtils.applySecretUrns(
+          entityProperties, secretManager.getSecretReferenceUrns(Map.of()));
       List<SecretUrn> secretUrns =
-          SecretPropertyUtils.writeBindingsAndApplyUrns(
-              entityProperties, "catalog", 42L, secretBindings, secretManager);
+          secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
+      SecretPropertyUtils.applySecretUrns(entityProperties, secretUrns);
+      secretManager.writeSecrets(secretBindings, secretUrns);
 
       Assertions.assertEquals("root", entityProperties.get("jdbc-user"));
       Assertions.assertTrue(
@@ -91,18 +86,6 @@ public class TestSecretPropertyUtils {
               "jdbc-password", entityProperties.get("jdbc-password")));
       Assertions.assertEquals(1, secretUrns.size());
       Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
-    }
-  }
-
-  @Test
-  void testPropertiesToValidateSkipOnNull() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Assertions.assertNull(
-          SecretPropertyUtils.propertiesToValidate(null, Map.of(), Map.of(), secretManager));
-      Map<String, String> toValidate =
-          SecretPropertyUtils.propertiesToValidate(
-              null, Map.of("k", new SecretBinding("memory", "v")), Map.of(), secretManager);
-      Assertions.assertEquals("v", toValidate.get("k"));
     }
   }
 
@@ -117,12 +100,14 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testWriteBindingsNoOpOnEmpty() {
+  void testEmptySecretsAreNoOp() {
     try (SecretManager secretManager = memorySecretManager()) {
       Map<String, String> entityProperties = new HashMap<>(Map.of("jdbc-user", "root"));
-      List<SecretUrn> secretUrns =
-          SecretPropertyUtils.writeBindingsAndApplyUrns(
-              entityProperties, "schema", 1L, Map.of(), secretManager);
+      SecretPropertyUtils.applySecretUrns(
+          entityProperties, secretManager.getSecretReferenceUrns(Map.of()));
+      List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns("schema", 1L, Map.of());
+      SecretPropertyUtils.applySecretUrns(entityProperties, secretUrns);
+      secretManager.writeSecrets(Map.of(), secretUrns);
       Assertions.assertTrue(secretUrns.isEmpty());
       Assertions.assertEquals("root", entityProperties.get("jdbc-user"));
     }

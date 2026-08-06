@@ -117,9 +117,17 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     long uid = idGenerator.nextId();
     secretManager.checkSecretKeys(properties, secretBindings, secretReferences);
+    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    SecretPropertyUtils.applySecretUrns(
+        entityProperties, secretManager.getSecretReferenceUrns(secretReferences));
+    List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns("schema", uid, secretBindings);
+    SecretPropertyUtils.applySecretUrns(entityProperties, secretUrns);
     Map<String, String> propertiesToValidate =
-        SecretPropertyUtils.propertiesToValidate(
-            properties, secretBindings, secretReferences, secretManager);
+        properties == null
+                && (secretBindings == null || secretBindings.isEmpty())
+                && (secretReferences == null || secretReferences.isEmpty())
+            ? null
+            : entityProperties;
     doWithCatalog(
         catalogIdent,
         c ->
@@ -129,11 +137,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   return null;
                 }),
         IllegalArgumentException.class);
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-    SecretPropertyUtils.applySecretReferences(entityProperties, secretReferences, secretManager);
-    List<SecretUrn> secretUrns =
-        SecretPropertyUtils.writeBindingsAndApplyUrns(
-            entityProperties, "schema", uid, secretBindings, secretManager);
+    secretManager.writeSecrets(secretBindings, secretUrns);
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
     // SchemaEntity will be visible.
