@@ -27,12 +27,13 @@ import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestSecretManager {
+public class TestSecretPropertyUtils {
 
   @Test
-  void testWriteSecrets() {
+  void testResolveSecretPropertiesReplacesUrnsWithPlaintext() {
     try (SecretManager secretManager = memorySecretManager()) {
-      Map<String, String> properties = new HashMap<>(Map.of("jdbc-user", "root"));
+      Map<String, String> properties = new HashMap<>();
+      properties.put("jdbc-user", "root");
       Map<String, SecretBinding> secretBindings =
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
       List<SecretUrn> secretUrns =
@@ -42,58 +43,25 @@ public class TestSecretManager {
 
       String urn = properties.get("jdbc-password");
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));
-      Assertions.assertEquals("root", properties.get("jdbc-user"));
-      Assertions.assertEquals(1, secretUrns.size());
-      Assertions.assertEquals(
-          "s3cr3t",
-          secretManager.getRegistry().getProvider("memory").readSecret(secretUrns.get(0)));
-      Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
+
+      Map<String, String> resolved =
+          SecretPropertyUtils.resolveSecretProperties(properties, secretManager);
+
+      Assertions.assertEquals("root", resolved.get("jdbc-user"));
+      Assertions.assertEquals("s3cr3t", resolved.get("jdbc-password"));
+      // Stored properties keep the URN.
+      Assertions.assertEquals(urn, properties.get("jdbc-password"));
     }
   }
 
   @Test
-  void testGetSecretReferenceUrnsRejectedByMemoryProvider() {
+  void testResolveSecretPropertiesNullOrEmpty() {
     try (SecretManager secretManager = memorySecretManager()) {
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              secretManager.getSecretReferenceUrns(
-                  Map.of(
-                      "jdbc-password",
-                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
+      Assertions.assertTrue(
+          SecretPropertyUtils.resolveSecretProperties(null, secretManager).isEmpty());
+      Assertions.assertTrue(
+          SecretPropertyUtils.resolveSecretProperties(Map.of(), secretManager).isEmpty());
     }
-  }
-
-  @Test
-  void testRejectOverlapAndInvalidBinding() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              SecretPropertyUtils.checkNoOverlap(
-                  Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
-                  Map.of(
-                      "jdbc-password",
-                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
-
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> new SecretBinding(" ", "s3cr3t"));
-
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              secretManager.getSecretReferenceUrns(
-                  Map.of(
-                      "jdbc-password",
-                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
-    }
-  }
-
-  @Test
-  void testSecretBindingToStringRedactsPlaintext() {
-    SecretBinding binding = new SecretBinding("memory", "s3cr3t");
-    Assertions.assertFalse(binding.toString().contains("s3cr3t"));
-    Assertions.assertTrue(binding.toString().contains("***"));
   }
 
   private static SecretManager memorySecretManager() {

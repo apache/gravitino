@@ -21,6 +21,8 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -84,6 +86,36 @@ public final class SecretPropertyUtils {
           !segments.isEmpty(), "Secret URN must contain at least one identifier segment: %s", urn);
       properties.put(segments.get(segments.size() - 1), urn.toString());
     }
+  }
+
+  /**
+   * Returns a copy of {@code properties} with secret URN values replaced by plaintext from {@code
+   * secretManager}.
+   *
+   * <p>Used by the central catalog path so connectors receive plaintext conf while entity storage
+   * keeps URN strings. Non-secret entries are copied unchanged.
+   *
+   * @param properties entity or request properties (may be null)
+   * @param secretManager the secret manager used to read plaintext
+   * @return a new map with secret URNs resolved; empty map when {@code properties} is null
+   */
+  public static Map<String, String> resolveSecretProperties(
+      @Nullable Map<String, String> properties, SecretManager secretManager) {
+    Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
+    if (properties == null || properties.isEmpty()) {
+      return properties == null ? Collections.emptyMap() : Map.copyOf(properties);
+    }
+    Map<String, String> resolved = new HashMap<>(properties.size());
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (isSecretProperty(key, value)) {
+        resolved.put(key, secretManager.readSecret(SecretUrn.parse(value)));
+      } else {
+        resolved.put(key, value);
+      }
+    }
+    return resolved;
   }
 
   /**

@@ -215,6 +215,17 @@ public class SecretManager implements Closeable {
     }
   }
 
+  /**
+   * Reads plaintext for a secret URN via the provider named in the URN.
+   *
+   * @param urn the secret URN
+   * @return the secret plaintext
+   */
+  public String readSecret(SecretUrn urn) {
+    Preconditions.checkArgument(urn != null, "urn must not be null");
+    return registry.getProvider(urn.providerName()).readSecret(urn);
+  }
+
   @Override
   public void close() {
     registry.close();
