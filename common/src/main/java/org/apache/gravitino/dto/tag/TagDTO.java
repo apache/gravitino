@@ -115,7 +115,6 @@ public class TagDTO implements Tag {
         && Objects.equal(comment, tagDTO.comment)
         && Objects.equal(properties, tagDTO.properties)
         && Arrays.equals(allowedValues, tagDTO.allowedValues)
-        && Arrays.equals(assignmentValues, tagDTO.assignmentValues)
         && Objects.equal(audit, tagDTO.audit);
   }
 
@@ -123,7 +122,6 @@ public class TagDTO implements Tag {
   public int hashCode() {
     int result = Objects.hashCode(name, comment, properties, audit);
     result = 31 * result + Arrays.hashCode(allowedValues);
-    result = 31 * result + Arrays.hashCode(assignmentValues);
     return result;
   }
 

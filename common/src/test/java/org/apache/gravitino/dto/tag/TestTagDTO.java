@@ -118,4 +118,30 @@ public class TestTagDTO {
     TagDTO deserTagDTO4 = JsonUtils.objectMapper().readValue(serJson, TagDTO.class);
     Assertions.assertEquals(Optional.of(true), deserTagDTO4.inherited());
   }
+
+  @Test
+  public void testAssignmentValuesDoNotAffectEquality() {
+    AuditDTO audit = AuditDTO.builder().withCreator("user1").withCreateTime(Instant.now()).build();
+    TagDTO globalTag =
+        TagDTO.builder().withName("tag_test").withComment("tag comment").withAudit(audit).build();
+    TagDTO assignedTag =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withAssignmentValues(new String[0])
+            .build();
+    TagDTO valuedAssignedTag =
+        TagDTO.builder()
+            .withName("tag_test")
+            .withComment("tag comment")
+            .withAudit(audit)
+            .withAssignmentValues(new String[] {"finance"})
+            .build();
+
+    Assertions.assertEquals(globalTag, assignedTag);
+    Assertions.assertEquals(globalTag, valuedAssignedTag);
+    Assertions.assertEquals(globalTag.hashCode(), assignedTag.hashCode());
+    Assertions.assertEquals(globalTag.hashCode(), valuedAssignedTag.hashCode());
+  }
 }
