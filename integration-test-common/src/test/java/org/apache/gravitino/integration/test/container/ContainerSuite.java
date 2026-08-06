@@ -76,6 +76,8 @@ public class ContainerSuite implements Closeable {
   private static volatile HiveContainer kerberosHiveContainer;
   private static volatile HiveContainer sqlBaseHiveContainer;
   private static volatile StarRocksContainer starRocksContainer;
+  private static volatile FlussContainer flussContainer;
+  private static volatile FlussContainer authenticatedFlussContainer;
   private static volatile MySQLContainer mySQLContainer;
   private static volatile MySQLContainer mySQLVersion5Container;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
@@ -511,6 +513,53 @@ public class ContainerSuite implements Closeable {
     }
   }
 
+  /** Starts the Fluss container suite if it has not been started. */
+  public void startFlussContainer() {
+    ITUtils.cleanDisk();
+    if (flussContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (flussContainer == null) {
+          initIfNecessary();
+          FlussContainer.Builder builder = FlussContainer.builder().withNetwork(network);
+          FlussContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start Fluss container", e);
+            throw new RuntimeException("Failed to start Fluss container", e);
+          }
+          flussContainer = container;
+        }
+      }
+    }
+  }
+
+  /** Starts the authenticated Fluss container suite if it has not been started. */
+  public void startAuthenticatedFlussContainer() {
+    ITUtils.cleanDisk();
+    if (authenticatedFlussContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (authenticatedFlussContainer == null) {
+          initIfNecessary();
+          FlussContainer.Builder builder =
+              FlussContainer.builder()
+                  .withHostName(FlussContainer.AUTHENTICATED_FLUSS_HOST_NAME)
+                  .withNetwork(network)
+                  .withSaslPlainAuth(
+                      FlussContainer.FLUSS_AUTH_USERNAME, FlussContainer.FLUSS_AUTH_PASSWORD);
+          FlussContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start authenticated Fluss container", e);
+            throw new RuntimeException("Failed to start authenticated Fluss container", e);
+          }
+          authenticatedFlussContainer = container;
+        }
+      }
+    }
+  }
+
   public void startLocalStackContainer() {
     ITUtils.cleanDisk();
     if (gravitinoLocalStackContainer == null) {
@@ -683,6 +732,16 @@ public class ContainerSuite implements Closeable {
 
   public KafkaContainer getKafkaContainer() {
     return kafkaContainer;
+  }
+
+  /** Returns the Fluss container suite. */
+  public FlussContainer getFlussContainer() {
+    return flussContainer;
+  }
+
+  /** Returns the authenticated Fluss container suite. */
+  public FlussContainer getAuthenticatedFlussContainer() {
+    return authenticatedFlussContainer;
   }
 
   public TrinoContainer getTrinoContainer() {
@@ -906,6 +965,8 @@ public class ContainerSuite implements Closeable {
       trinoITContainers = null;
       rangerContainer = null;
       kafkaContainer = null;
+      flussContainer = null;
+      authenticatedFlussContainer = null;
       dorisContainer = null;
       dorisContainerMap.clear();
       kerberosHiveContainer = null;
