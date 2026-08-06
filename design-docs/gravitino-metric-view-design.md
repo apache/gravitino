@@ -75,28 +75,26 @@ semantic_model:
         source: sales.mart.orders
 ```
 
-Gravitino maps the root `version` to `MetricRepresentation.osiVersion` and one `semantic_model` item to `semanticModel`. A three-part OSI dataset source maps to a `NameIdentifier`. View identity and lifecycle remain in the surrounding View object.
+Gravitino maps one `semantic_model` item to `semanticModel`. A three-part OSI dataset source maps to a `NameIdentifier`. View identity and lifecycle remain in the surrounding View object.
 
 ```text
 MetricRepresentation
   type: "metric"
-  osiVersion: string
   semanticModel: MetricModel
 ```
 
-The representation has three fields:
+The representation has two fields:
 
 - `type`: The fixed value "metric" classifies the View as a Metric View.
-- `osiVersion`: A required string identifying the OSI profile used to interpret and validate the model. The initial supported value is `0.2.0.dev0`.
 - `semanticModel`: The stable, structured Gravitino model exposed through public APIs.
 - A Metric View contains exactly one `MetricRepresentation`.
 - Its `columns` array is empty.
 - It cannot contain a SQL representation.
-- Both `osiVersion` and `semanticModel` are required.
+- Both `type` and `semanticModel` are required.
 
 #### MetricModel Schema
 
-The canonical model follows the pinned OSI `0.2.0.dev0` profile. Fields marked with `?` are optional; all other fields are required. Names below use OSI wire-format spelling, while language bindings use idiomatic accessor names.
+The canonical model follows the [Apache Ossie schema pinned at commit `4eb588b`](https://github.com/apache/ossie/blob/4eb588bee8340ab66e985433bb7e8af01688d4bb/core-spec/osi-schema.json), whose declared specification version is `0.2.0.dev0`. Fields marked with `?` are optional; all other fields are required. Names below use OSI wire-format spelling, while language bindings use idiomatic accessor names.
 
 ```text
 MetricModel
@@ -138,10 +136,11 @@ Field
 - `Dataset` names are unique within `MetricModel`.
 - `Field` names are unique within each `Dataset`.
 - Internal field references resolve within the model.
-- Each `source` is a `NameIdentifier` with namespace `[catalog, schema]`; `source.name` identifies a `Table` or `View`, and the enclosing object supplies the metalake.
+- Each `source` is a `NameIdentifier` in the form `catalog.schema.name`. Gravitino resolves it in the metalake that contains the Metric View. Cross-catalog references are allowed, while cross-metalake references are not supported.
+- `source` does not declare whether the referenced entity is a `Table` or `View`. Validation calls `loadTable` first and, if no Table is found, calls `loadView`; it fails if neither entity exists.
 - For `Table` and logical `View` sources, Gravitino validates columns explicitly declared in `primary_key`, `unique_keys`, `from_columns`, and `to_columns` against the source schema. It does not infer source-column references from field or metric expressions.
 - Metric View sources validate direct existence only.
-- Inline query sources are not supported; register the query as a logical View and reference that View through a `NameIdentifier`.
+- Inline query sources are not supported. For example, instead of storing `SELECT * FROM sales.orders WHERE status = 'active'` directly in `Dataset.source`, create a logical View named `sales.mart.active_orders` with that SQL and set `Dataset.source` to `sales.mart.active_orders`. Raw SQL is not stored directly in the Metric View.
 - Catalog unavailability is treated as a retriable validation failure.
 
 Relationship and metric definitions:
@@ -200,15 +199,11 @@ Dialect = "ANSI_SQL" | "SNOWFLAKE" | "MDX" | "TABLEAU"
 
 The required `MetricModel.name` is independent of the enclosing View name. This preserves semantic-model identity across imports and View renames.
 
-Every supported `custom_extensions` array is retained losslessly. Unknown standardized fields are rejected until the declared OSI profile supports them.
-
-Create and alter reject an unsupported `osiVersion` before validating or persisting `semanticModel`. The REST API returns HTTP 400 with the requested and supported versions, and creates no View or View version.
-
-Once an `osiVersion` has been accepted for persistence by a released Gravitino version, later releases retain read support for it. Write support may be removed only through a major-version compatibility change with a documented migration path. Unknown stored versions fail explicitly and are never silently coerced.
+Every supported `custom_extensions` array is retained losslessly. For standardized OSI model objects, fields not defined by the [pinned OSI schema](https://github.com/apache/ossie/blob/4eb588bee8340ab66e985433bb7e8af01688d4bb/core-spec/osi-schema.json#L282-L327) are rejected because the schema sets `additionalProperties` to `false`. Gravitino Metric Views enforce the same restriction.
 
 **Implementation note:**
 
-Gravitino selects a versioned OSI validation profile by `osiVersion`. Each profile pins the upstream JSON Schema and adds only version-specific projection or semantic rules beyond the shared validator. Compatible OSI versions may reuse the same validator implementation, while incompatible changes require a new profile. Every new OSI version must still be explicitly registered in a Gravitino release; unregistered versions are rejected. Adapters required to read previously accepted versions are retained for backward compatibility.
+Gravitino pins the exact upstream OSI `0.2.0.dev0` JSON Schema used by the structured model and adds Gravitino-specific projection and semantic rules beyond schema validation. The current contract does not persist an OSI version in each Metric View. If a future OSI version introduces an incompatible interpretation, Gravitino can add explicit version metadata and define compatibility behavior then; existing definitions without that metadata retain the initial semantics.
 
 - All representation and model checks run on `create` and `alter` before a View or View version is persisted.
 - Validation checks direct references only.
@@ -253,7 +248,6 @@ MetricModel model =
 
 MetricRepresentation representation =
     MetricRepresentation.builder()
-        .withOsiVersion("0.2.0.dev0")
         .withSemanticModel(model)
         .build();
 
@@ -275,7 +269,6 @@ MetricModel updatedModel =
         .build();
 MetricRepresentation updatedRepresentation =
     MetricRepresentation.builder()
-        .withOsiVersion("0.2.0.dev0")
         .withSemanticModel(updatedModel)
         .build();
 
@@ -288,6 +281,43 @@ View updated =
             null, null, "Updated sales metric definitions"));
 
 boolean dropped = catalog.dropView(ident);
+```
+
+#### Python API
+
+The Python API exposes the same structured model and View lifecycle:
+
+```python
+ident = NameIdentifier.of("mart", "sales_metrics")
+orders = Dataset("orders", NameIdentifier.of("sales", "mart", "orders"))
+model = MetricModel("sales_semantic_model", [orders])
+representation = MetricRepresentation(model)
+
+created = catalog.create_metric_view(
+    ident,
+    [representation],
+    comment="Sales metric definitions",
+)
+
+loaded = catalog.load_view(ident)
+views = catalog.list_views(Namespace.of("mart"))
+
+updated_model = MetricModel(
+    "sales_semantic_model",
+    [orders],
+    _description="Updated sales model",
+)
+updated_representation = MetricRepresentation(updated_model)
+updated = catalog.alter_view(
+    ident,
+    ViewChange.replace_view(
+        columns=[],
+        representations=[updated_representation],
+        comment="Updated sales metric definitions",
+    ),
+)
+
+dropped = catalog.drop_view(ident)
 ```
 
 #### REST API
@@ -303,7 +333,6 @@ POST /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views
   "representations": [
     {
       "type": "metric",
-      "osiVersion": "0.2.0.dev0",
       "semanticModel": {
         "name": "sales_semantic_model",
         "datasets": [
@@ -330,7 +359,6 @@ PUT /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/sales_metric
       "representations": [
         {
           "type": "metric",
-          "osiVersion": "0.2.0.dev0",
           "semanticModel": {
             "name": "sales_semantic_model",
             "description": "Updated sales model",
@@ -354,7 +382,7 @@ DELETE /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/sales_met
 - **Listing.** The server merges authorized catalog-backed logical Views with authorized Gravitino-managed Metric Views into the existing View listing.
 - **Connector capability.** A connector that does not support Metric Views filters them from `listViews` and returns an explicit unsupported-Metric-View error for a direct `loadView`. Generic REST and Java View APIs continue to expose them.
 - **Namespace conflicts.** Create checks both storage sources. If an external client later creates a same-name logical View directly in the catalog, list and load report a conflict and select neither object. The external operation must rename or remove its object; ownership, versions, tags, and policies remain attached to the Gravitino Metric View and never transfer.
-- **Persistence and history.** Each stored View version contains `type`, `osiVersion`, and the structured `semanticModel`. Every successful alter creates an immutable View version. Existing logical View records require no migration.
+- **Persistence and history.** Each stored View version contains `type` and the structured `semanticModel`. Every successful alter creates an immutable View version. Existing logical View records require no migration.
 
 ### Authorization and Governance
 
@@ -368,6 +396,6 @@ DELETE /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/sales_met
 - **Add API types.** Implement `MetricRepresentation` and structured model DTOs in Java, REST, and Python without coupling `MetricModel.name` to the enclosing View name, with compatibility fixtures.
 - **Implement lifecycle and persistence.** Add create, load, alter, drop, immutable versioning, and EntityStore persistence while preserving the shared View namespace.
 - **Implement catalog exposure.** Merge View listings, add connector capability handling, and enforce deterministic namespace-conflict behavior.
-- **Implement OSI version profiles and validation.** Pin OSI `0.2.0.dev0` as the initial profile, register supported versions, reject unregistered versions, retain read support for previously accepted versions, and add document-local consistency and direct `NameIdentifier` source and column checks.
+- **Implement OSI validation.** Pin the upstream OSI `0.2.0.dev0` schema and add document-local consistency and direct `NameIdentifier` source and column checks.
 - **Integrate governance.** Reuse View authorization, ownership, audit, tag, and policy paths and verify that conflicts cannot redirect governance operations.
 - **Complete verification and documentation.** Add end-to-end tests for lifecycle, versioning, validation, merged listing, connector behavior, governance, and compatibility; replace the unreleased document-representation prototype before publication.
