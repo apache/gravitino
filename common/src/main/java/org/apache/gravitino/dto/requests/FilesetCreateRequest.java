@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -67,10 +68,12 @@ public class FilesetCreateRequest implements RESTRequest {
   private Map<String, String> properties;
 
   @Nullable
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretBindings")
   private Map<String, SecretBindingDTO> secretBindings;
 
   @Nullable
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretReferences")
   private Map<String, SecretReferenceDTO> secretReferences;
 

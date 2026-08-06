@@ -266,7 +266,7 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
   public JdbcSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(ident, comment, properties, null, null);
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**

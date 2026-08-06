@@ -41,6 +41,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -236,7 +237,7 @@ public class HiveCatalogOperations
   public HiveSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(ident, comment, properties, null, null);
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**

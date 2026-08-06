@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -57,10 +58,12 @@ public class CatalogCreateRequest implements RESTRequest {
   private final Map<String, String> properties;
 
   @Nullable
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretBindings")
   private final Map<String, SecretBindingDTO> secretBindings;
 
   @Nullable
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretReferences")
   private final Map<String, SecretReferenceDTO> secretReferences;
 

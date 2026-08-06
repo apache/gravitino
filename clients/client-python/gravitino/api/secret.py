@@ -37,6 +37,10 @@ class SecretReference:
     provider: str
     attributes: Dict[str, str] = field(default_factory=dict)
 
+    def __post_init__(self):
+        if not self.attributes:
+            raise ValueError("attributes must not be null or empty")
+
     def __repr__(self) -> str:
         return (
             f"SecretReference(provider={self.provider!r}, attributes={self.attributes!r})"

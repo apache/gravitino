@@ -29,6 +29,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -186,7 +187,8 @@ public class PaimonCatalogOperations
   public PaimonSchema createSchema(
       NameIdentifier identifier, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(identifier, comment, properties, null, null);
+    return createSchema(
+        identifier, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**

@@ -26,6 +26,7 @@ import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -238,7 +239,7 @@ public class IcebergCatalogOperations
   public IcebergSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(ident, comment, properties, null, null);
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**

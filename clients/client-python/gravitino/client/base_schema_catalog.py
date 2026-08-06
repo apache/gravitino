@@ -16,7 +16,6 @@
 # under the License.
 
 import logging
-from gravitino.api.secret import SecretBinding, SecretReference
 from typing import Dict, List, Optional
 
 from gravitino.api.catalog import Catalog
@@ -29,6 +28,7 @@ from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag

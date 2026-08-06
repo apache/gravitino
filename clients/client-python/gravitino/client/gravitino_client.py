@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-from gravitino.api.secret import SecretBinding, SecretReference
 from typing import Dict, List, Optional
 
 from gravitino.api.authorization.group import Group
@@ -33,6 +32,7 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase

@@ -20,6 +20,7 @@
 
 package org.apache.gravitino.connector;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -105,7 +106,7 @@ public interface SupportsSchemas {
    */
   default Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(ident, comment, properties, null, null);
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**

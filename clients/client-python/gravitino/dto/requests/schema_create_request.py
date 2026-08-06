@@ -18,10 +18,9 @@
 from dataclasses import dataclass, field
 from typing import Optional, Dict
 
-from gravitino.api.secret import SecretBinding, SecretReference
-
 from dataclasses_json import config
 
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.rest.rest_message import RESTRequest
 
 

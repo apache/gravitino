@@ -16,11 +16,11 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from gravitino.api.secret import SecretBinding, SecretReference
 from typing import Dict, List, Optional
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.exceptions.base import NoSuchSchemaException
 
 

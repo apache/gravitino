@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -129,7 +130,14 @@ public interface SupportsCatalogs {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return createCatalog(catalogName, type, provider, comment, properties, null, null);
+    return createCatalog(
+        catalogName,
+        type,
+        provider,
+        comment,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   /**

@@ -21,6 +21,7 @@ package org.apache.gravitino.file;
 import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -155,7 +156,13 @@ public interface FilesetCatalog {
       Map<String, String> properties)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     return createMultipleLocationFileset(
-        ident, comment, type, storageLocations, properties, null, null);
+        ident,
+        comment,
+        type,
+        storageLocations,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   /**

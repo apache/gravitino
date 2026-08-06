@@ -20,6 +20,7 @@
 
 package org.apache.gravitino;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -130,7 +131,8 @@ public interface SupportsSchemas {
    */
   default Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(schemaName, comment, properties, null, null);
+    return createSchema(
+        schemaName, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**
