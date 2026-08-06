@@ -122,18 +122,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         entityProperties, secretManager.getSecretReferenceUrns(secretReferences));
     List<SecretUrn> secretUrns = secretManager.getSecretBindingUrns("schema", uid, secretBindings);
     SecretPropertyUtils.applySecretUrns(entityProperties, secretUrns);
-    Map<String, String> propertiesToValidate =
-        properties == null
-                && (secretBindings == null || secretBindings.isEmpty())
-                && (secretReferences == null || secretReferences.isEmpty())
-            ? null
-            : entityProperties;
     doWithCatalog(
         catalogIdent,
         c ->
             c.doWithPropertiesMeta(
                 p -> {
-                  validatePropertyForCreate(p.schemaPropertiesMetadata(), propertiesToValidate);
+                  validatePropertyForCreate(p.schemaPropertiesMetadata(), entityProperties);
                   return null;
                 }),
         IllegalArgumentException.class);
