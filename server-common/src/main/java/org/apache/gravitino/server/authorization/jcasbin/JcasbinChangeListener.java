@@ -33,8 +33,10 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.GravitinoCache;
 import org.apache.gravitino.storage.relational.EntityChangeLogListener;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.ChangedOwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
@@ -258,7 +260,9 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
   @VisibleForTesting
   static MetadataObject metadataObjectFromChangeLog(
       String metalake, String fullName, MetadataObject.Type type) {
-    List<String> names = new ArrayList<>(Arrays.asList(fullName.split("\\.")));
+    NameIdentifier ident = EntityChangeLogNameIdentifierCodec.decode(fullName);
+    List<String> names = new ArrayList<>(Arrays.asList(ident.namespace().levels()));
+    names.add(ident.name());
     if (type != MetadataObject.Type.METALAKE
         && !names.isEmpty()
         && Objects.equals(names.get(0), metalake)) {
