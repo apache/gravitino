@@ -109,6 +109,43 @@ public interface FilesetCatalog {
   }
 
   /**
+   * Create a fileset metadata with a default location and optional create-time secrets.
+   *
+   * @param ident A fileset identifier.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocation The storage location of the fileset.
+   * @param properties The properties of the fileset.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created fileset metadata
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FilesetAlreadyExistsException If the fileset already exists.
+   */
+  default Fileset createFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      String storageLocation,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    return createMultipleLocationFileset(
+        ident,
+        comment,
+        type,
+        storageLocation == null
+            ? ImmutableMap.of()
+            : ImmutableMap.of(LOCATION_NAME_UNKNOWN, storageLocation),
+        properties,
+        secretBindings,
+        secretReferences);
+  }
+
+  /**
    * Create a fileset metadata with multiple storage locations in the catalog.
    *
    * @param ident A fileset identifier.
