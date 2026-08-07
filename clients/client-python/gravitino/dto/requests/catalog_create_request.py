@@ -21,6 +21,7 @@ from typing import Optional, Dict
 from dataclasses_json import config
 
 from gravitino.api.catalog import Catalog
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.rest.rest_message import RESTRequest
 
 
@@ -41,6 +42,12 @@ class CatalogCreateRequest(RESTRequest):
     _properties: Optional[Dict[str, str]] = field(
         metadata=config(field_name="properties")
     )
+    _secret_bindings: Optional[Dict[str, SecretBinding]] = field(
+        default=None, metadata=config(field_name="secretBindings")
+    )
+    _secret_references: Optional[Dict[str, SecretReference]] = field(
+        default=None, metadata=config(field_name="secretReferences")
+    )
 
     def __init__(
         self,
@@ -49,12 +56,16 @@ class CatalogCreateRequest(RESTRequest):
         provider: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
+        secret_bindings: Dict[str, SecretBinding] = None,
+        secret_references: Dict[str, SecretReference] = None,
     ):
         self._name = name
         self._type = catalog_type
         self._provider = provider
         self._comment = comment
         self._properties = properties
+        self._secret_bindings = secret_bindings
+        self._secret_references = secret_references
 
     def validate(self):
         """Validates the fields of the request.

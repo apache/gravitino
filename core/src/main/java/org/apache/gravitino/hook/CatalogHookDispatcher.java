@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Entity;
@@ -38,6 +40,8 @@ import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -67,6 +71,12 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
+      throws NoSuchMetalakeException {
+    return dispatcher.listCatalogsInfo(namespace, catalogNames);
+  }
+
+  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     return dispatcher.loadCatalog(ident);
   }
@@ -79,7 +89,23 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    Catalog catalog =
+        dispatcher.createCatalog(
+            ident, type, provider, comment, properties, secretBindings, secretReferences);
 
     try {
       // Set the creator as the owner of the catalog.

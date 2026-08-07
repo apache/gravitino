@@ -32,6 +32,7 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
@@ -103,9 +104,17 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         provider: str,
         comment: str,
         properties: Dict[str, str],
+        secret_bindings: Dict[str, SecretBinding] = None,
+        secret_references: Dict[str, SecretReference] = None,
     ) -> Catalog:
         return self.get_metalake().create_catalog(
-            name, catalog_type, provider, comment, properties
+            name,
+            catalog_type,
+            provider,
+            comment,
+            properties,
+            secret_bindings,
+            secret_references,
         )
 
     def alter_catalog(self, name: str, *changes: CatalogChange):

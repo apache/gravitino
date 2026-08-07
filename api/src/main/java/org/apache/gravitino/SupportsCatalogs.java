@@ -26,6 +26,8 @@ import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * Client interface for supporting catalogs. It includes methods for listing, loading, creating,
@@ -84,14 +86,14 @@ public interface SupportsCatalogs {
    * the created catalog is the managed catalog, like model, fileset catalog. For the details of the
    * provider definition, see {@link CatalogProvider}.
    *
-   * @param catalogName the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog, or null if the catalog is a managed catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
-   * @return The created catalog.
-   * @throws NoSuchMetalakeException If the metalake does not exist.
-   * @throws CatalogAlreadyExistsException If the catalog already exists.
+   * @param catalogName the name of the catalog
+   * @param type the type of the catalog
+   * @param provider the provider of the catalog, or null if the catalog is a managed catalog
+   * @param comment the comment of the catalog
+   * @param properties the properties of the catalog
+   * @return the created catalog
+   * @throws NoSuchMetalakeException if the metalake does not exist
+   * @throws CatalogAlreadyExistsException if the catalog already exists
    */
   Catalog createCatalog(
       String catalogName,
@@ -100,6 +102,38 @@ public interface SupportsCatalogs {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException;
+
+  /**
+   * Create a catalog with optional secret maps.
+   *
+   * <p>The default implementation rejects create-time secrets. Implementations that support secrets
+   * must override this method.
+   *
+   * @param catalogName the name of the catalog
+   * @param type the type of the catalog
+   * @param provider the provider of the catalog, or null if managed
+   * @param comment the comment of the catalog
+   * @param properties the properties of the catalog
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes)
+   * @return the created catalog
+   * @throws NoSuchMetalakeException if the metalake does not exist
+   * @throws CatalogAlreadyExistsException if the catalog already exists
+   * @throws UnsupportedOperationException if create-time secrets are not supported
+   */
+  default Catalog createCatalog(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 
   /**
    * Create a managed catalog with specified catalog name, type, comment, and properties.

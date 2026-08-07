@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Arrays;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.CatalogProvider;
@@ -31,6 +34,8 @@ import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * Interface for supporting catalogs. It includes methods for listing, loading, creating, altering
@@ -56,6 +61,29 @@ public interface SupportsCatalogs {
    * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
    */
   Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException;
+
+  /**
+   * List catalogs with their information, restricted to the given catalog names.
+   *
+   * <p>Implementations should resolve catalog details (including secret materialization) only for
+   * the catalogs in {@code catalogNames}, so callers can authorize first and avoid resolving
+   * unauthorized catalogs.
+   *
+   * @param namespace The namespace to list the catalogs under it.
+   * @param catalogNames The catalog names to include; must not be null.
+   * @return The list of catalog's information for the requested names that exist.
+   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
+   */
+  default Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
+      throws NoSuchMetalakeException {
+    Objects.requireNonNull(catalogNames, "catalogNames cannot be null");
+    if (catalogNames.isEmpty()) {
+      return new Catalog[0];
+    }
+    return Arrays.stream(listCatalogsInfo(namespace))
+        .filter(catalog -> catalogNames.contains(catalog.name()))
+        .toArray(Catalog[]::new);
+  }
 
   /**
    * Load a catalog by its identifier.
@@ -104,6 +132,38 @@ public interface SupportsCatalogs {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException;
+
+  /**
+   * Create a catalog with optional secret maps.
+   *
+   * <p>The default implementation rejects create-time secrets. Implementations that support secrets
+   * must override this method.
+   *
+   * @param ident the identifier of the catalog.
+   * @param type the type of the catalog.
+   * @param comment the comment of the catalog.
+   * @param provider the provider of the catalog.
+   * @param properties the properties of the catalog.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created catalog.
+   * @throws NoSuchMetalakeException If the metalake does not exist.
+   * @throws CatalogAlreadyExistsException If the catalog already exists.
+   * @throws UnsupportedOperationException if create-time secrets are not supported
+   */
+  default Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 
   /**
    * Alter a catalog with specified identifier.

@@ -58,6 +58,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
@@ -106,7 +107,11 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -379,7 +384,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param config The configuration for the manager.
    * @param store The entity store to use.
    * @param idGenerator The id generator to use.
-   * @param secretManager The secret manager used by catalog operations.
+   * @param secretManager The secret manager to use for create-time secret bindings/references.
    */
   public CatalogManager(
       Config config, EntityStore store, IdGenerator idGenerator, SecretManager secretManager) {
@@ -533,6 +538,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
+    return listCatalogsInfo(namespace, null);
+  }
+
+  @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
+      throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
     try {
       List<CatalogEntity> catalogEntities =
@@ -543,11 +554,19 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 checkMetalake(metalakeIdent, store);
                 return store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
               });
-      return catalogEntities.stream()
-          // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
-          // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
-          // after reading the catalog entity, we convert it to the new fileset catalog entity.
-          .map(this::convertFilesetCatalogEntity)
+      Stream<CatalogEntity> stream =
+          catalogEntities.stream()
+              // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
+              // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
+              // after reading the catalog entity, we convert it to the new fileset catalog entity.
+              .map(this::convertFilesetCatalogEntity);
+      if (catalogNames != null) {
+        if (catalogNames.isEmpty()) {
+          return new Catalog[0];
+        }
+        stream = stream.filter(entity -> catalogNames.contains(entity.name()));
+      }
+      return stream
           .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {
@@ -595,10 +614,30 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
-    Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+    Map<String, String> mergedConfig =
+        SecretPropertyUtils.copyEntityProperties(buildCatalogConf(provider, properties));
     long uid = idGenerator.nextId();
+
+    List<SecretUrn> secretUrns =
+        secretManager.assembleSecretUrns(
+            properties, mergedConfig, "catalog", uid, secretBindings, secretReferences);
+
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Instant now = Instant.now();
     String creator = PrincipalUtils.getCurrentPrincipal().getName();
@@ -626,12 +665,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         () -> {
           checkMetalake(metalakeIdent, store);
           boolean needClean = true;
+          // Only roll back secrets that were actually written inside this locked section.
+          boolean needSecretClean = false;
           try {
+            secretManager.writeSecrets(secretBindings, secretUrns);
+            needSecretClean = true;
+
             store.put(e, false /* overwrite */);
             CatalogWrapper wrapper =
                 catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 
             needClean = false;
+            needSecretClean = false;
             return wrapper.catalog;
 
           } catch (EntityAlreadyExistsException e1) {
@@ -651,6 +696,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw new RuntimeException(e3);
 
           } finally {
+            if (needSecretClean) {
+              secretManager.rollbackWritten(secretUrns);
+            }
             if (needClean) {
               // since we put the catalog entity into the store but failed to create the catalog
               // instance,
@@ -698,7 +746,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
       }
 
+      // Do not resolve secret URNs from caller-controlled properties (exfiltration risk).
+      secretManager.rejectRawSecretUrnsInProperties(properties);
       Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+      secretManager.rejectRawSecretUrnsInProperties(mergedConfig);
       Instant now = Instant.now();
       String creator = PrincipalUtils.getCurrentPrincipal().getName();
       CatalogEntity dummyEntity =
@@ -975,9 +1026,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
             // Invalidate after store.delete() to prevent a background thread from repopulating
             // the cache with stale data between invalidate and delete.
+            Map<String, String> catalogProperties =
+                catalogWrapper.catalog().entity().getProperties();
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
+              secretManager.deleteWrittenSecretsFromProperties(catalogProperties);
             }
             catalogCache.invalidate(ident);
             return deleted;
@@ -1304,7 +1358,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
-    // Fileset FS merge assumes catalog conf is already plaintext at this boundary.
     catalog
         .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
         .withCatalogEntity(entity);

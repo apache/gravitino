@@ -57,6 +57,8 @@ public class TestCatalogHookDispatcher {
                 Mockito.eq(Catalog.Type.RELATIONAL),
                 Mockito.eq("provider"),
                 Mockito.eq("comment"),
+                Mockito.anyMap(),
+                Mockito.anyMap(),
                 Mockito.anyMap()))
         .thenReturn(catalog);
 
@@ -107,6 +109,8 @@ public class TestCatalogHookDispatcher {
                 Mockito.eq(Catalog.Type.RELATIONAL),
                 Mockito.eq("provider"),
                 Mockito.eq("comment"),
+                Mockito.anyMap(),
+                Mockito.anyMap(),
                 Mockito.anyMap()))
         .thenReturn(catalog);
     Mockito.doThrow(rollbackException).when(dispatcher).dropCatalog(ident, true);

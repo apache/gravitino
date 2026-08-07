@@ -26,6 +26,8 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /**
  * The client interface to support schema operations. The server side should use the other one with
@@ -102,6 +104,34 @@ public interface SupportsSchemas {
    */
   Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException;
+
+  /**
+   * Creates a schema with optional secret maps.
+   *
+   * <p>The default implementation rejects create-time secrets. Implementations that support secrets
+   * must override this method.
+   *
+   * @param schemaName The name of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through
+   * @param secretReferences optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes)
+   * @return The schema as defined by the caller, without all default values.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws SchemaAlreadyExistsException If the schema already exists.
+   * @throws UnsupportedOperationException if create-time secrets are not supported
+   */
+  default Schema createSchema(
+      String schemaName,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    throw new UnsupportedOperationException("Not implemented");
+  }
 
   /**
    * Load metadata properties for a schema.

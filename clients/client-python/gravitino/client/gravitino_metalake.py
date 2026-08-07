@@ -31,6 +31,7 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
@@ -217,6 +218,8 @@ class GravitinoMetalake(
         provider: str,
         comment: str,
         properties: Dict[str, str],
+        secret_bindings: Dict[str, SecretBinding] = None,
+        secret_references: Dict[str, SecretReference] = None,
     ) -> Catalog:
         """Create a new catalog with specified name, catalog type, comment and properties.
 
@@ -228,6 +231,8 @@ class GravitinoMetalake(
             None provider. For the details, please refer to the Catalog.Type.
             comment: The comment of the catalog.
             properties: The properties of the catalog.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchMetalakeException if the metalake does not exist.
@@ -243,6 +248,8 @@ class GravitinoMetalake(
             provider=provider,
             comment=comment,
             properties=properties,
+            secret_bindings=secret_bindings,
+            secret_references=secret_references,
         )
         catalog_create_request.validate()
 

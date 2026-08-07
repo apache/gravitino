@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -46,6 +47,8 @@ import org.apache.gravitino.listener.api.event.LoadSchemaEvent;
 import org.apache.gravitino.listener.api.event.LoadSchemaFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadSchemaPreEvent;
 import org.apache.gravitino.listener.api.info.SchemaInfo;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -96,11 +99,23 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Schema createSchema(
+      NameIdentifier ident,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
     SchemaInfo createSchemaRequest = new SchemaInfo(ident.name(), comment, properties, null);
     eventBus.dispatchEvent(
         new CreateSchemaPreEvent(PrincipalUtils.getCurrentUserName(), ident, createSchemaRequest));
     try {
-      Schema schema = dispatcher.createSchema(ident, comment, properties);
+      Schema schema =
+          dispatcher.createSchema(ident, comment, properties, secretBindings, secretReferences);
       eventBus.dispatchEvent(
           new CreateSchemaEvent(
               PrincipalUtils.getCurrentUserName(), ident, new SchemaInfo(schema)));

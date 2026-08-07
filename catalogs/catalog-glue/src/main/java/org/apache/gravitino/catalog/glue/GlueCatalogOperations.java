@@ -200,6 +200,16 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     return result.toArray(new NameIdentifier[0]);
   }
 
+  /**
+   * Creates a new schema with the provided identifier, comment, and properties.
+   *
+   * @param ident The identifier of the schema to create.
+   * @param comment The comment for the schema.
+   * @param properties The properties for the schema.
+   * @return The created {@link GlueSchema}.
+   * @throws NoSuchCatalogException If the provided namespace is invalid or does not exist.
+   * @throws SchemaAlreadyExistsException If a schema with the same name already exists.
+   */
   @Override
   public GlueSchema createSchema(
       NameIdentifier ident, String comment, Map<String, String> properties)

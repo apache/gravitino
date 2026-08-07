@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener.api.event;
 
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -274,7 +275,12 @@ public class TestSchemaEvent {
 
   private SchemaDispatcher mockSchemaDispatcher() {
     SchemaDispatcher dispatcher = mock(SchemaDispatcher.class);
-    when(dispatcher.createSchema(any(NameIdentifier.class), any(String.class), any(Map.class)))
+    when(dispatcher.createSchema(
+            any(NameIdentifier.class),
+            any(String.class),
+            nullable(Map.class),
+            nullable(Map.class),
+            nullable(Map.class)))
         .thenReturn(schema);
     when(dispatcher.loadSchema(any(NameIdentifier.class))).thenReturn(schema);
     when(dispatcher.dropSchema(any(NameIdentifier.class), eq(true))).thenReturn(false);

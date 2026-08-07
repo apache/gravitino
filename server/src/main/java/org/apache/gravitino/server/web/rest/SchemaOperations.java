@@ -49,6 +49,8 @@ import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -150,7 +152,12 @@ public class SchemaOperations {
             NameIdentifier ident =
                 NameIdentifierUtil.ofSchema(metalake, catalog, request.getName());
             Schema schema =
-                dispatcher.createSchema(ident, request.getComment(), request.getProperties());
+                dispatcher.createSchema(
+                    ident,
+                    request.getComment(),
+                    request.getProperties(),
+                    SecretBindingDTO.toSecretBindings(request.getSecretBindings()),
+                    SecretReferenceDTO.toSecretReferences(request.getSecretReferences()));
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(schema)));
             LOG.info("Schema created: {}.{}.{}", metalake, catalog, schema.name());
             return response;

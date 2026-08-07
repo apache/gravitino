@@ -36,6 +36,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
@@ -48,9 +49,16 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -411,6 +419,59 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertTrue(dispatcher.dropSchema(leaf, false));
     Assertions.assertTrue(entityStore.exists(parentAb, SCHEMA));
     Assertions.assertTrue(entityStore.exists(ancestorA, SCHEMA));
+  }
+
+  @Test
+  public void testCreateSchemaWithSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_1");
+      Map<String, String> props = ImmutableMap.of("k1", "v1");
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+
+      Schema schema = d.createSchema(ident, "comment", props, bindings, Map.of());
+      Assertions.assertFalse(schema.properties().containsKey("k2"));
+
+      // Storage keeps secret URNs; runtime FS conf resolves via toPlaintextProperties (catalog
+      // pattern).
+      Schema stored =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithSchemaOps(ops -> ops.loadSchema(ident));
+      Assertions.assertTrue(
+          org.apache.gravitino.secret.SecretPropertyUtils.isSecretProperty(
+              "k2", stored.properties().get("k2")));
+
+      SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      Assertions.assertThrows(
+          SchemaAlreadyExistsException.class,
+          () -> d.createSchema(ident, "comment", props, bindings, Map.of()));
+
+      Assertions.assertTrue(d.dropSchema(ident, false));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
   }
 
   private void putSchemaEntity(NameIdentifier ident) throws IOException {
