@@ -70,6 +70,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -635,6 +636,11 @@ public class TestAccessControlManager {
     Assertions.assertEquals(beforeCount + 5, page.totalCount());
     Assertions.assertEquals(2, page.items().size());
 
+    // Repeated call with the same offset/limit must be stable.
+    PagedResult<User> pageAgain = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
     PagedResult<User> lastPage =
         accessControlManager.listUsers(METALAKE, (int) beforeCount + 4, 10);
     Assertions.assertEquals(beforeCount + 5, lastPage.totalCount());
@@ -643,6 +649,12 @@ public class TestAccessControlManager {
     for (int i = 0; i < 5; i++) {
       accessControlManager.removeUser(METALAKE, "page_user_" + i);
     }
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.countUsers("no_such_metalake"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.listUsers("no_such_metalake", 0, 10));
   }
 
   @Test
@@ -657,9 +669,19 @@ public class TestAccessControlManager {
     Assertions.assertEquals(beforeCount + 3, page.totalCount());
     Assertions.assertEquals(2, page.items().size());
 
+    PagedResult<Group> pageAgain = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
     for (int i = 0; i < 3; i++) {
       accessControlManager.removeGroup(METALAKE, "page_group_" + i);
     }
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.countGroups("no_such_metalake"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.listGroups("no_such_metalake", 0, 10));
   }
 
   private void createCatalogRole(String role) {

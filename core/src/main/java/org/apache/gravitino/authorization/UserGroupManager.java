@@ -124,14 +124,24 @@ class UserGroupManager {
   }
 
   long countUsers(String metalake) {
-    return UserMetaService.getInstance().countUsersByMetalake(metalake);
+    try {
+      return UserMetaService.getInstance().countUsersByMetalake(metalake);
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    }
   }
 
   PagedResult<User> listUsers(String metalake, int offset, int limit) {
-    PagedResult<UserEntity> result =
-        UserMetaService.getInstance().listUsersByMetalakePaginated(metalake, offset, limit);
-    return new PagedResult<>(
-        result.totalCount(), Arrays.asList(result.items().toArray(new User[0])));
+    try {
+      PagedResult<UserEntity> result =
+          UserMetaService.getInstance().listUsersByMetalakePaginated(metalake, offset, limit);
+      return new PagedResult<>(
+          result.totalCount(), Arrays.asList(result.items().toArray(new User[0])));
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    }
   }
 
   Group addGroup(String metalake, String group) throws GroupAlreadyExistsException {
@@ -192,14 +202,24 @@ class UserGroupManager {
   }
 
   long countGroups(String metalake) {
-    return GroupMetaService.getInstance().countGroupsByMetalake(metalake);
+    try {
+      return GroupMetaService.getInstance().countGroupsByMetalake(metalake);
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    }
   }
 
   PagedResult<Group> listGroups(String metalake, int offset, int limit) {
-    PagedResult<GroupEntity> result =
-        GroupMetaService.getInstance().listGroupsByMetalakePaginated(metalake, offset, limit);
-    return new PagedResult<>(
-        result.totalCount(), Arrays.asList(result.items().toArray(new Group[0])));
+    try {
+      PagedResult<GroupEntity> result =
+          GroupMetaService.getInstance().listGroupsByMetalakePaginated(metalake, offset, limit);
+      return new PagedResult<>(
+          result.totalCount(), Arrays.asList(result.items().toArray(new Group[0])));
+    } catch (NoSuchEntityException e) {
+      LOG.error("Metalake {} does not exist", metalake, e);
+      throw new NoSuchMetalakeException(METALAKE_DOES_NOT_EXIST_MSG, metalake);
+    }
   }
 
   String[] listGroupNames(String metalake) {

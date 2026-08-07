@@ -36,6 +36,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -1103,26 +1104,91 @@ class TestGroupMetaService extends TestJDBCBackend {
 
   @TestTemplate
   void testGroupPagination() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
     createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
     GroupMetaService svc = GroupMetaService.getInstance();
-    svc.insertGroup(
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "page_group_role",
+            auditInfo,
+            catalogName);
+    roleMetaService.insertRole(role1, false);
+
+    GroupEntity g1 =
         createGroupEntity(
             RandomIdGenerator.INSTANCE.nextId(),
             AuthorizationUtils.ofGroupNamespace(metalakeName),
-            "g1",
-            AUDIT_INFO),
-        false);
+            "page_g1",
+            auditInfo);
+    GroupEntity g2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g2",
+            auditInfo,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    GroupEntity g3 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g3",
+            auditInfo);
+    GroupEntity g4 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g4",
+            auditInfo);
+    svc.insertGroup(g1, false);
+    svc.insertGroup(g2, false);
+    svc.insertGroup(g3, false);
+    svc.insertGroup(g4, false);
 
-    Assertions.assertEquals(1, svc.countGroupsByMetalake(metalakeName));
+    List<GroupEntity> ordered =
+        Lists.newArrayList(g1, g2, g3, g4).stream()
+            .sorted(Comparator.comparing(GroupEntity::id))
+            .collect(Collectors.toList());
 
-    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 0, 10);
-    Assertions.assertEquals(1, page.totalCount());
-    Assertions.assertEquals(1, page.items().size());
-    Assertions.assertEquals("g1", page.items().get(0).name());
+    Assertions.assertEquals(4, svc.countGroupsByMetalake(metalakeName));
+
+    // offset=1, limit=2 exercises JDBC OFFSET and stable ORDER BY group_id ASC.
+    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(4, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+    Assertions.assertEquals(ordered.get(1).name(), page.items().get(0).name());
+    Assertions.assertEquals(ordered.get(2).name(), page.items().get(1).name());
+    Assertions.assertEquals(ordered.get(1).id(), page.items().get(0).id());
+    Assertions.assertEquals(ordered.get(2).id(), page.items().get(1).id());
+
+    GroupEntity withRole =
+        ordered.stream().filter(g -> "page_g2".equals(g.name())).findFirst().orElseThrow();
+    int roleGroupOffset = ordered.indexOf(withRole);
+    PagedResult<GroupEntity> rolePage =
+        svc.listGroupsByMetalakePaginated(metalakeName, roleGroupOffset, 1);
+    Assertions.assertEquals(1, rolePage.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet("page_group_role"), Sets.newHashSet(rolePage.items().get(0).roleNames()));
+
+    PagedResult<GroupEntity> pageAgain = svc.listGroupsByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
 
     Assertions.assertTrue(svc.listGroupsByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
     Assertions.assertTrue(
         svc.listGroupsByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> svc.countGroupsByMetalake("no_such_metalake"));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> svc.listGroupsByMetalakePaginated("no_such_metalake", 0, 10));
   }
 
   private NameIdentifier groupExtIdent(String externalId) {
