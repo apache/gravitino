@@ -20,9 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.Arrays;
-import java.util.Set;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -55,8 +52,6 @@ import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
-import org.apache.gravitino.dto.secret.SecretBindingDTO;
-import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -105,19 +100,15 @@ public class CatalogOperations {
             Namespace catalogNS = NamespaceUtil.ofCatalog(metalake);
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             if (verbose) {
-              // Authorize on identifiers first, then resolve catalog details (including secrets)
-              // only for authorized catalogs.
-              NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
-              idents =
+              Catalog[] catalogs = catalogDispatcher.listCatalogsInfo(catalogNS);
+              catalogs =
                   MetadataAuthzHelper.filterByExpression(
                       metalake,
                       AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.CATALOG,
-                      idents);
-              Set<String> authorizedCatalogNames =
-                  Arrays.stream(idents).map(NameIdentifier::name).collect(Collectors.toSet());
-              Catalog[] catalogs =
-                  catalogDispatcher.listCatalogsInfo(catalogNS, authorizedCatalogNames);
+                      catalogs,
+                      (catalogEntity) ->
+                          NameIdentifierUtil.ofCatalog(metalake, catalogEntity.name()));
               Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
               LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
               return response;
@@ -163,9 +154,7 @@ public class CatalogOperations {
                     request.getType(),
                     request.getProvider(),
                     request.getComment(),
-                    request.getProperties(),
-                    SecretBindingDTO.toSecretBindings(request.getSecretBindings()),
-                    SecretReferenceDTO.toSecretReferences(request.getSecretReferences()));
+                    request.getProperties());
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
             LOG.info("Catalog created: {}.{}", metalake, catalog.name());
             return response;

@@ -20,7 +20,6 @@ from typing import Dict, List, Optional
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
-from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.exceptions.base import NoSuchSchemaException
 
 
@@ -80,12 +79,7 @@ class SupportsSchemas(ABC):
 
     @abstractmethod
     def create_schema(
-        self,
-        schema_name: str,
-        comment: str,
-        properties: Dict[str, str],
-        secret_bindings: Dict[str, SecretBinding] = None,
-        secret_references: Dict[str, SecretReference] = None,
+        self, schema_name: str, comment: str, properties: Dict[str, str]
     ) -> Schema:
         """Create a schema in the catalog.
 
@@ -93,8 +87,6 @@ class SupportsSchemas(ABC):
             schema_name: The name of the schema.
             comment: The comment of the schema.
             properties: The properties of the schema.
-            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
-            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchCatalogException: If the catalog does not exist.

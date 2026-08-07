@@ -20,7 +20,6 @@
 package org.apache.gravitino.listener.api.event;
 
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -383,9 +382,7 @@ public class TestCatalogEvent {
             any(Catalog.Type.class),
             any(String.class),
             any(String.class),
-            nullable(Map.class),
-            nullable(Map.class),
-            nullable(Map.class)))
+            any(Map.class)))
         .thenReturn(catalog);
     when(dispatcher.loadCatalog(any(NameIdentifier.class))).thenReturn(catalog);
     when(dispatcher.dropCatalog(any(NameIdentifier.class), anyBoolean())).thenReturn(true);

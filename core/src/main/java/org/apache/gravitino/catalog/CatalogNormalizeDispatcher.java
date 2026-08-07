@@ -22,7 +22,6 @@ import static org.apache.gravitino.Entity.SYSTEM_CATALOG_RESERVED_NAME;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
@@ -35,8 +34,6 @@ import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 
 public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   private static final Set<String> RESERVED_WORDS =
@@ -70,12 +67,6 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
-  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
-      throws NoSuchMetalakeException {
-    return dispatcher.listCatalogsInfo(namespace, catalogNames);
-  }
-
-  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     return dispatcher.loadCatalog(ident);
   }
@@ -93,23 +84,8 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return createCatalog(
-        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
-  }
-
-  @Override
-  public Catalog createCatalog(
-      NameIdentifier ident,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences)
-      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     validateCatalogName(ident.name());
-    return dispatcher.createCatalog(
-        ident, type, provider, comment, properties, secretBindings, secretReferences);
+    return dispatcher.createCatalog(ident, type, provider, comment, properties);
   }
 
   @Override

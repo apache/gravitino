@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
-import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -33,8 +32,6 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
-import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretReference;
 
 /**
  * Note on list operations: names returned by list methods (e.g. {@link #listSchemas(Namespace)})
@@ -76,19 +73,7 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   @Override
   public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
-  }
-
-  @Override
-  public Schema createSchema(
-      NameIdentifier ident,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBinding> secretBindings,
-      Map<String, SecretReference> secretReferences)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return dispatcher.createSchema(
-        normalizeNameIdentifier(ident), comment, properties, secretBindings, secretReferences);
+    return dispatcher.createSchema(normalizeNameIdentifier(ident), comment, properties);
   }
 
   @Override

@@ -20,7 +20,6 @@ from typing import Optional, Dict
 
 from dataclasses_json import config
 
-from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.rest.rest_message import RESTRequest
 
 
@@ -33,26 +32,13 @@ class SchemaCreateRequest(RESTRequest):
     _properties: Optional[Dict[str, str]] = field(
         metadata=config(field_name="properties")
     )
-    _secret_bindings: Optional[Dict[str, SecretBinding]] = field(
-        default=None, metadata=config(field_name="secretBindings")
-    )
-    _secret_references: Optional[Dict[str, SecretReference]] = field(
-        default=None, metadata=config(field_name="secretReferences")
-    )
 
     def __init__(
-        self,
-        name: str,
-        comment: Optional[str],
-        properties: Optional[Dict[str, str]],
-        secret_bindings: Optional[Dict[str, SecretBinding]] = None,
-        secret_references: Optional[Dict[str, SecretReference]] = None,
+        self, name: str, comment: Optional[str], properties: Optional[Dict[str, str]]
     ):
         self._name = name
         self._comment = comment
         self._properties = properties
-        self._secret_bindings = secret_bindings
-        self._secret_references = secret_references
 
     def validate(self):
         if not self._name:
