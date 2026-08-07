@@ -35,8 +35,8 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"
-        + " '[' || GROUP_CONCAT('\"' || rot.role_name || '\"') || ']' as roleNames,"
-        + " '[' || GROUP_CONCAT('\"' || rot.role_id || '\"') || ']' as roleIds"
+        + " CAST(JSON_ARRAYAGG(rot.role_name) AS VARCHAR) as roleNames,"
+        + " CAST(JSON_ARRAYAGG(rot.role_id) AS VARCHAR) as roleIds"
         + " FROM "
         + USER_TABLE_NAME
         + " ut LEFT OUTER JOIN ("
@@ -66,8 +66,8 @@ public class UserMetaH2Provider extends UserMetaBaseSQLProvider {
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"
-        + " '[' || GROUP_CONCAT('\"' || rot.role_name || '\"') || ']' as roleNames,"
-        + " '[' || GROUP_CONCAT('\"' || rot.role_id || '\"') || ']' as roleIds"
+        + " CAST(JSON_ARRAYAGG(rot.role_name) AS VARCHAR) as roleNames,"
+        + " CAST(JSON_ARRAYAGG(rot.role_id) AS VARCHAR) as roleIds"
         + " FROM ("
         + " SELECT ut.user_id FROM "
         + USER_TABLE_NAME

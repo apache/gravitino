@@ -1350,6 +1350,55 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testUserPaginationWithSpecialRoleNames() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService svc = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    String quotedRole = "role\"quoted";
+    String backslashRole = "back\\slash";
+    RoleEntity roleQuoted =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            quotedRole,
+            auditInfo,
+            "catalog");
+    RoleEntity roleBackslash =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            backslashRole,
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(roleQuoted, false);
+    roleMetaService.insertRole(roleBackslash, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "special_role_user",
+            auditInfo,
+            Lists.newArrayList(quotedRole, backslashRole),
+            Lists.newArrayList(roleQuoted.id(), roleBackslash.id()));
+    svc.insertUser(user, false);
+
+    PagedResult<UserEntity> page = svc.listUsersByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet(quotedRole, backslashRole),
+        Sets.newHashSet(page.items().get(0).roleNames()));
+  }
+
+  @TestTemplate
   void testUserExtId() throws IOException {
     UserMetaService svc = userMetaService();
     svc.insertUser(userWithExtId("u1", "ext-1"), false);
