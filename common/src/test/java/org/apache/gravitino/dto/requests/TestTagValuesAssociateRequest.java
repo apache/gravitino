@@ -48,6 +48,26 @@ public class TestTagValuesAssociateRequest {
     TagValuesAssociateRequest validRequest =
         new TagValuesAssociateRequest(new TagValue[] {TagValue.of("data_domain", "finance")}, null);
     Assertions.assertDoesNotThrow(validRequest::validate);
+    Assertions.assertArrayEquals(new TagValue[0], validRequest.tagValuesToRemove());
+
+    TagValuesAssociateRequest emptyRequest = new TagValuesAssociateRequest(null, null);
+    Assertions.assertThrows(IllegalArgumentException.class, emptyRequest::validate);
+
+    TagValuesAssociateRequest nullFieldRequest =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"tagsToAdd\":[{\"name\":\"data_domain\"}],\"tagsToRemove\":null}",
+                TagValuesAssociateRequest.class);
+    Assertions.assertDoesNotThrow(nullFieldRequest::validate);
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldRequest.tagValuesToRemove());
+
+    TagValuesAssociateRequest nullFieldsRequest =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"tagsToAdd\":null,\"tagsToRemove\":null}", TagValuesAssociateRequest.class);
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldsRequest.tagValuesToAdd());
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldsRequest.tagValuesToRemove());
+    Assertions.assertThrows(IllegalArgumentException.class, nullFieldsRequest::validate);
 
     TagValuesAssociateRequest blankNameRequest =
         JsonUtils.objectMapper()

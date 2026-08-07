@@ -115,10 +115,10 @@ public class VersioningFilter implements Filter {
       }
     }
 
-    // If no version accept header not is set, then we need to set the latest version.
+    // If no version accept header is set, use the default version for backward compatibility.
     MutableHttpServletRequest mutableRequest = new MutableHttpServletRequest(req);
-    ApiVersion latest = ApiVersion.latestVersion();
-    mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(latest.version()));
+    ApiVersion defaultVersion = ApiVersion.defaultVersion();
+    mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(defaultVersion.version()));
 
     chain.doFilter(mutableRequest, response);
   }

@@ -19,6 +19,8 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
 import javax.annotation.Nullable;
@@ -34,9 +36,11 @@ public class TagValuesAssociateRequest implements RESTRequest {
   private static final int MAX_TAG_VALUE_LENGTH = 256;
 
   @JsonProperty("tagsToAdd")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   private final RequestTagValue[] tagsToAdd;
 
   @JsonProperty("tagsToRemove")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   private final RequestTagValue[] tagsToRemove;
 
   /**
@@ -52,8 +56,7 @@ public class TagValuesAssociateRequest implements RESTRequest {
 
   /** This is the constructor that is used by Jackson deserializer */
   public TagValuesAssociateRequest() {
-    this.tagsToAdd = null;
-    this.tagsToRemove = null;
+    this(null, null);
   }
 
   /**
@@ -82,8 +85,8 @@ public class TagValuesAssociateRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        tagsToAdd != null || tagsToRemove != null,
-        "tagsToAdd and tagsToRemove cannot both be null");
+        tagsToAdd.length > 0 || tagsToRemove.length > 0,
+        "tagsToAdd and tagsToRemove cannot both be empty");
 
     validateTagValues(tagsToAdd, "tagsToAdd");
     validateTagValues(tagsToRemove, "tagsToRemove");
@@ -91,23 +94,19 @@ public class TagValuesAssociateRequest implements RESTRequest {
 
   private static RequestTagValue[] toRequestTagValues(TagValue[] tagValues) {
     if (tagValues == null) {
-      return null;
+      return new RequestTagValue[0];
     }
     return Arrays.stream(tagValues).map(RequestTagValue::new).toArray(RequestTagValue[]::new);
   }
 
   private static TagValue[] toTagValues(RequestTagValue[] tagValues) {
     if (tagValues == null) {
-      return null;
+      return new TagValue[0];
     }
     return Arrays.stream(tagValues).map(RequestTagValue::toTagValue).toArray(TagValue[]::new);
   }
 
   private static void validateTagValues(RequestTagValue[] tagValues, String fieldName) {
-    if (tagValues == null) {
-      return;
-    }
-
     for (RequestTagValue tagValue : tagValues) {
       Preconditions.checkArgument(
           tagValue != null, "%s must not contain null tag values", fieldName);

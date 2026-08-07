@@ -73,7 +73,7 @@ public class TestVersioningFilter {
 
     when(mockRequest.getHeaders("Accept"))
         .thenReturn(
-            new Vector<>(Collections.singletonList("application/vnd.gravitino.v2+json"))
+            new Vector<>(Collections.singletonList("application/vnd.gravitino.v3+json"))
                 .elements());
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
@@ -102,7 +102,7 @@ public class TestVersioningFilter {
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
     assertEquals(
-        String.format("application/vnd.gravitino.v%d+json", ApiVersion.latestVersion().version()),
+        String.format("application/vnd.gravitino.v%d+json", ApiVersion.defaultVersion().version()),
         captor.getValue().getHeader("Accept"));
   }
 
@@ -124,7 +124,7 @@ public class TestVersioningFilter {
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
     assertEquals(
-        String.format("application/vnd.gravitino.v%d+json", ApiVersion.latestVersion().version()),
+        String.format("application/vnd.gravitino.v%d+json", ApiVersion.defaultVersion().version()),
         captor.getValue().getHeader("Accept"));
   }
 
@@ -147,8 +147,8 @@ public class TestVersioningFilter {
     reset(mockChain, mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
-    verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    verify(mockChain).doFilter(any(), any());
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
   }
 
   @Test
@@ -168,7 +168,7 @@ public class TestVersioningFilter {
         ArgumentCaptor.forClass(MutableHttpServletRequest.class);
     verify(mockChain).doFilter(captor.capture(), any());
     assertEquals(
-        String.format("application/vnd.gravitino.v%d+json", ApiVersion.latestVersion().version()),
+        String.format("application/vnd.gravitino.v%d+json", ApiVersion.defaultVersion().version()),
         captor.getValue().getHeader("Accept"));
   }
 
@@ -231,8 +231,8 @@ public class TestVersioningFilter {
     reset(mockChain, mockResponse);
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
-    verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    verify(mockChain).doFilter(any(), any());
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
 
     reset(mockChain, mockResponse);
 
@@ -286,8 +286,8 @@ public class TestVersioningFilter {
                 .elements());
 
     filter.doFilter(mockRequest, mockResponse, mockChain);
-    verify(mockChain, never()).doFilter(any(), any());
-    verify(mockResponse).sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    verify(mockChain).doFilter(any(), any());
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
 
     reset(mockChain, mockResponse);
 
