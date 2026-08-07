@@ -36,8 +36,8 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
-        + " CAST(JSON_ARRAYAGG(rot.role_name) AS VARCHAR) as roleNames,"
-        + " CAST(JSON_ARRAYAGG(rot.role_id) AS VARCHAR) as roleIds"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
         + " gt LEFT OUTER JOIN ("
@@ -67,8 +67,8 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
-        + " CAST(JSON_ARRAYAGG(rot.role_name) AS VARCHAR) as roleNames,"
-        + " CAST(JSON_ARRAYAGG(rot.role_id) AS VARCHAR) as roleIds"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM ("
         + " SELECT gt.group_id FROM "
         + GROUP_TABLE_NAME
@@ -106,8 +106,8 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
-        + " CAST(JSON_ARRAYAGG(rot.role_name) AS VARCHAR) as roleNames,"
-        + " CAST(JSON_ARRAYAGG(rot.role_id) AS VARCHAR) as roleIds"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
         + " gt LEFT OUTER JOIN ("
