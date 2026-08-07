@@ -1351,7 +1351,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testCreateCatalogWithSecrets() throws Exception {
+  void testCreateWithSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       CatalogManager manager =
           new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets);
@@ -1390,7 +1390,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testCreateCatalogSecretRollback() throws Exception {
+  void testCreateSecretRollback() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       AtomicLong nextId = new AtomicLong(4242L);
       IdGenerator ids = nextId::getAndIncrement;
@@ -1436,7 +1436,7 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testCreateCatalogSecretNotWrittenWhenMetalakeMissing() throws Exception {
+  void testCreateSecretSkippedNoMetalake() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       AtomicLong nextId = new AtomicLong(4343L);
       IdGenerator ids = nextId::getAndIncrement;

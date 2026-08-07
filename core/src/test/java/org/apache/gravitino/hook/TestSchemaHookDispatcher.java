@@ -162,7 +162,7 @@ public class TestSchemaHookDispatcher {
   }
 
   @Test
-  public void testCreateSchemaRollbackExceptionDoesNotMaskPostHookException() {
+  public void testCreateRollbackSuppressed() {
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "test_schema");
     Schema mockSchema = mock(Schema.class);
     when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);

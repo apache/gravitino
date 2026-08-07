@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
-import java.util.Collections;
+import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
@@ -36,72 +36,48 @@ import org.mockito.Mockito;
 public class TestCatalogHookDispatcher {
 
   @Test
-  public void testCreateCatalogThrowsPostHookExceptionWhenRollbackSucceeds() throws Exception {
-    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
-    Object originalFutureGrantManager =
-        FieldUtils.readField(gravitinoEnv, "futureGrantManager", true);
-
-    CatalogDispatcher dispatcher = Mockito.mock(CatalogDispatcher.class);
-    Catalog catalog = Mockito.mock(Catalog.class);
-    NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
-    RuntimeException postHookException = new RuntimeException("post-hook failed");
-
-    OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.doThrow(postHookException)
-        .when(ownerDispatcher)
-        .setOwner(Mockito.anyString(), Mockito.any(), Mockito.anyString(), Mockito.any());
-    Mockito.when(
-            dispatcher.createCatalog(
-                Mockito.eq(ident),
-                Mockito.eq(Catalog.Type.RELATIONAL),
-                Mockito.eq("provider"),
-                Mockito.eq("comment"),
-                Mockito.anyMap(),
-                Mockito.anyMap(),
-                Mockito.anyMap()))
-        .thenReturn(catalog);
-
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", ownerDispatcher, true);
-    FieldUtils.writeField(gravitinoEnv, "futureGrantManager", null, true);
-
-    try {
-      CatalogHookDispatcher hookDispatcher = new CatalogHookDispatcher(dispatcher);
-      RuntimeException thrown =
-          assertThrowsExactly(
-              RuntimeException.class,
-              () ->
-                  hookDispatcher.createCatalog(
-                      ident,
-                      Catalog.Type.RELATIONAL,
-                      "provider",
-                      "comment",
-                      Collections.emptyMap()));
-      assertSame(postHookException, thrown);
-
-      Mockito.verify(dispatcher).dropCatalog(ident, true);
-    } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
-      FieldUtils.writeField(gravitinoEnv, "futureGrantManager", originalFutureGrantManager, true);
-    }
+  public void testCreatePostHookRollback() throws Exception {
+    RuntimeException postHook = new RuntimeException("post-hook failed");
+    runCreateWithPostHookFailure(
+        postHook,
+        null,
+        (dispatcher, ident, thrown) -> {
+          assertSame(postHook, thrown);
+          Mockito.verify(dispatcher).dropCatalog(ident, true);
+        });
   }
 
   @Test
-  public void testCreateCatalogRollbackExceptionDoesNotMaskPostHookException() throws Exception {
-    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
-    Object originalFutureGrantManager =
-        FieldUtils.readField(gravitinoEnv, "futureGrantManager", true);
+  public void testCreateRollbackSuppressed() throws Exception {
+    RuntimeException postHook = new RuntimeException("post-hook failed");
+    RuntimeException rollback = new RuntimeException("rollback failed");
+    runCreateWithPostHookFailure(
+        postHook,
+        rollback,
+        (dispatcher, ident, thrown) -> {
+          assertSame(postHook, thrown);
+          assertTrue(Arrays.stream(thrown.getSuppressed()).anyMatch(t -> t == rollback));
+          Mockito.verify(dispatcher).dropCatalog(ident, true);
+        });
+  }
+
+  @FunctionalInterface
+  private interface PostHookAssert {
+    void check(CatalogDispatcher dispatcher, NameIdentifier ident, RuntimeException thrown);
+  }
+
+  private static void runCreateWithPostHookFailure(
+      RuntimeException postHook, RuntimeException dropFailure, PostHookAssert asserts)
+      throws Exception {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Object savedOwner = FieldUtils.readField(env, "ownerDispatcher", true);
+    Object savedFutureGrant = FieldUtils.readField(env, "futureGrantManager", true);
 
     CatalogDispatcher dispatcher = Mockito.mock(CatalogDispatcher.class);
-    Catalog catalog = Mockito.mock(Catalog.class);
     NameIdentifier ident = NameIdentifier.of("metalake", "catalog");
-    RuntimeException postHookException = new RuntimeException("post-hook failed");
-    RuntimeException rollbackException = new RuntimeException("rollback failed");
-
-    OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
-    Mockito.doThrow(postHookException)
-        .when(ownerDispatcher)
+    OwnerDispatcher owner = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(postHook)
+        .when(owner)
         .setOwner(Mockito.anyString(), Mockito.any(), Mockito.anyString(), Mockito.any());
     Mockito.when(
             dispatcher.createCatalog(
@@ -112,31 +88,25 @@ public class TestCatalogHookDispatcher {
                 Mockito.anyMap(),
                 Mockito.anyMap(),
                 Mockito.anyMap()))
-        .thenReturn(catalog);
-    Mockito.doThrow(rollbackException).when(dispatcher).dropCatalog(ident, true);
+        .thenReturn(Mockito.mock(Catalog.class));
+    if (dropFailure != null) {
+      Mockito.doThrow(dropFailure).when(dispatcher).dropCatalog(ident, true);
+    }
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", ownerDispatcher, true);
-    FieldUtils.writeField(gravitinoEnv, "futureGrantManager", null, true);
-
+    FieldUtils.writeField(env, "ownerDispatcher", owner, true);
+    FieldUtils.writeField(env, "futureGrantManager", null, true);
     try {
-      CatalogHookDispatcher hookDispatcher = new CatalogHookDispatcher(dispatcher);
+      CatalogHookDispatcher hook = new CatalogHookDispatcher(dispatcher);
       RuntimeException thrown =
           assertThrowsExactly(
               RuntimeException.class,
               () ->
-                  hookDispatcher.createCatalog(
-                      ident,
-                      Catalog.Type.RELATIONAL,
-                      "provider",
-                      "comment",
-                      Collections.emptyMap()));
-      assertSame(postHookException, thrown);
-      assertTrue(Arrays.stream(thrown.getSuppressed()).anyMatch(t -> t == rollbackException));
-
-      Mockito.verify(dispatcher).dropCatalog(ident, true);
+                  hook.createCatalog(
+                      ident, Catalog.Type.RELATIONAL, "provider", "comment", Map.of()));
+      asserts.check(dispatcher, ident, thrown);
     } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
-      FieldUtils.writeField(gravitinoEnv, "futureGrantManager", originalFutureGrantManager, true);
+      FieldUtils.writeField(env, "ownerDispatcher", savedOwner, true);
+      FieldUtils.writeField(env, "futureGrantManager", savedFutureGrant, true);
     }
   }
 }

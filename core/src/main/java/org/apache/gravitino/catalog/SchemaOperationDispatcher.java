@@ -207,7 +207,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                         schema.properties()));
           });
     } catch (RuntimeException e) {
-      secretManager.rollbackWritten(secretUrns);
+      secretManager.rollbackBindings(secretUrns);
       throw e;
     }
   }
@@ -364,7 +364,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         () -> {
           // Capture persisted properties (including write-through secret URNs) before drop so we
           // can clean provider material after a successful delete. External-ref URNs are skipped by
-          // deleteWrittenSecretsFromProperties.
+          // deleteBindingsFromProperties.
           Map<String, String> schemaProperties = null;
           try {
             Schema schema =
@@ -388,7 +388,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
             if (droppedFromCatalog) {
-              secretManager.deleteWrittenSecretsFromProperties(schemaProperties);
+              secretManager.deleteBindingsFromProperties(schemaProperties);
             }
             return droppedFromCatalog;
           }
@@ -419,7 +419,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
           if (droppedFromCatalog) {
-            secretManager.deleteWrittenSecretsFromProperties(schemaProperties);
+            secretManager.deleteBindingsFromProperties(schemaProperties);
           }
           return droppedFromCatalog;
         });

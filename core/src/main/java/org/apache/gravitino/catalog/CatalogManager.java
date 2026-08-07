@@ -697,7 +697,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } finally {
             if (needSecretClean) {
-              secretManager.rollbackWritten(secretUrns);
+              secretManager.rollbackBindings(secretUrns);
             }
             if (needClean) {
               // since we put the catalog entity into the store but failed to create the catalog
@@ -747,9 +747,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       }
 
       // Do not resolve secret URNs from caller-controlled properties (exfiltration risk).
-      secretManager.rejectRawSecretUrnsInProperties(properties);
+      secretManager.checkSecretKeys(properties, null, null);
       Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
-      secretManager.rejectRawSecretUrnsInProperties(mergedConfig);
+      secretManager.checkSecretKeys(mergedConfig, null, null);
       Instant now = Instant.now();
       String creator = PrincipalUtils.getCurrentPrincipal().getName();
       CatalogEntity dummyEntity =
@@ -1031,7 +1031,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
-              secretManager.deleteWrittenSecretsFromProperties(catalogProperties);
+              secretManager.deleteBindingsFromProperties(catalogProperties);
             }
             catalogCache.invalidate(ident);
             return deleted;

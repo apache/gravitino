@@ -56,6 +56,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
@@ -422,7 +423,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateSchemaWithSecrets() throws Exception {
+  public void testCreateWithSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       SchemaOperationDispatcher d =
           new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
@@ -433,15 +434,12 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Schema schema = d.createSchema(ident, "comment", props, bindings, Map.of());
       Assertions.assertFalse(schema.properties().containsKey("k2"));
 
-      // Storage keeps secret URNs; runtime FS conf resolves via toPlaintextProperties (catalog
-      // pattern).
       Schema stored =
           catalogManager
               .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
               .doWithSchemaOps(ops -> ops.loadSchema(ident));
       Assertions.assertTrue(
-          org.apache.gravitino.secret.SecretPropertyUtils.isSecretProperty(
-              "k2", stored.properties().get("k2")));
+          SecretPropertyUtils.isSecretProperty("k2", stored.properties().get("k2")));
 
       SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
       SecretUrn urn =
@@ -455,7 +453,6 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", props, bindings, Map.of()));
-
       Assertions.assertTrue(d.dropSchema(ident, false));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }
