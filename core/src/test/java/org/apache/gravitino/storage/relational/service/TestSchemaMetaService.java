@@ -37,6 +37,8 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.FunctionEntity;
@@ -49,7 +51,13 @@ import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -79,6 +87,42 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(schema, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(schemaCopy, false));
+  }
+
+  @TestTemplate
+  public void testInsertSchemaFencesCatalogAndRollsBackFenceOnFailure() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity catalog = createAndInsertCatalog(metalakeName, catalogName);
+    CatalogPO beforeInsert =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_fence",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    CatalogPO afterInsert =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    Assertions.assertEquals(beforeInsert.getCurrentVersion() + 1, afterInsert.getCurrentVersion());
+    Assertions.assertEquals(afterInsert.getCurrentVersion(), afterInsert.getLastVersion());
+
+    SchemaEntity duplicate =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            schema.name(),
+            AUDIT_INFO);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(duplicate, false));
+
+    CatalogPO afterFailure =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    Assertions.assertEquals(afterInsert.getCurrentVersion(), afterFailure.getCurrentVersion());
+    Assertions.assertEquals(afterInsert.getLastVersion(), afterFailure.getLastVersion());
   }
 
   @TestTemplate
@@ -143,6 +187,91 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     SchemaEntity updatedSchema =
         schemaMetaService.getSchemaByIdentifier(schemaEntity.nameIdentifier());
     Assertions.assertEquals("schema comment updated", updatedSchema.comment());
+  }
+
+  @TestTemplate
+  public void testAlterAndDeleteUseCurrentVersion() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_occ",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+    SchemaPO oldPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+    SchemaEntity updatedSchema =
+        SchemaEntity.builder()
+            .withId(schema.id())
+            .withName(schema.name())
+            .withNamespace(schema.namespace())
+            .withAuditInfo(schema.auditInfo())
+            .withComment("updated")
+            .withProperties(schema.properties())
+            .build();
+    SchemaPO newPO = POConverters.updateSchemaPOWithVersion(oldPO, updatedSchema);
+
+    int updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class, mapper -> mapper.updateSchemaMeta(newPO, oldPO));
+    int staleUpdate =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class, mapper -> mapper.updateSchemaMeta(newPO, oldPO));
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                    schema.id(), oldPO.getCurrentVersion()));
+    Assertions.assertEquals(1, updated);
+    Assertions.assertEquals(0, staleUpdate);
+    Assertions.assertEquals(0, staleDelete);
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    int deleted =
+        SessionUtils.doWithCommitAndFetchResult(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                    schema.id(), newPO.getCurrentVersion()));
+    Assertions.assertEquals(1, deleted);
+  }
+
+  @TestTemplate
+  public void testAlterReportsOptimisticLockConflict() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_alter_conflict",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SchemaMetaService.getInstance()
+                .updateSchema(
+                    schema.nameIdentifier(),
+                    entity -> {
+                      SchemaEntity current = (SchemaEntity) entity;
+                      SchemaPO currentPO =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper -> mapper.selectSchemaMetaById(current.id()));
+                      SchemaEntity competingUpdate =
+                          copySchemaWithComment(current, "competing update");
+                      SchemaPO competingPO =
+                          POConverters.updateSchemaPOWithVersion(currentPO, competingUpdate);
+                      SessionUtils.doWithCommitAndFetchResult(
+                          SchemaMetaMapper.class,
+                          mapper -> mapper.updateSchemaMeta(competingPO, currentPO));
+                      return copySchemaWithComment(current, "requested update");
+                    }));
   }
 
   @TestTemplate
@@ -215,11 +344,21 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             topicName,
             AUDIT_INFO);
     topicMetaService.insertTopic(topic, false);
+    SchemaPO beforeDelete =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
 
     Assertions.assertThrows(
         NonEmptyEntityException.class,
         () -> schemaMetaService.deleteSchema(schema.nameIdentifier(), false),
         "Non-cascading delete must fail when dependent topics exist.");
+
+    SchemaPO afterDelete =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+    Assertions.assertEquals(beforeDelete.getCurrentVersion(), afterDelete.getCurrentVersion());
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertTrue(backend.exists(topic.nameIdentifier(), Entity.EntityType.TOPIC));
 
     topicMetaService.deleteTopic(topic.nameIdentifier());
     schemaMetaService.deleteSchema(schema.nameIdentifier(), false);
@@ -507,14 +646,24 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             .build();
     schemaMetaService.insertSchema(first, false);
 
-    long idA =
-        schemaMetaService
-            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorA))
-            .id();
-    long idAB =
-        schemaMetaService
-            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorAB))
-            .id();
+    SchemaPO ancestorAPOBefore =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaMetaById(
+                    schemaMetaService
+                        .getSchemaByIdentifier(
+                            NameIdentifier.of(metalakeName, catalogName, ancestorA))
+                        .id()));
+    SchemaPO ancestorABPOBefore =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaMetaById(
+                    schemaMetaService
+                        .getSchemaByIdentifier(
+                            NameIdentifier.of(metalakeName, catalogName, ancestorAB))
+                        .id()));
 
     SchemaEntity second =
         SchemaEntity.builder()
@@ -527,16 +676,41 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             .build();
     schemaMetaService.insertSchema(second, false);
 
+    SchemaPO ancestorAPOAfter =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaMetaById(
+                    schemaMetaService
+                        .getSchemaByIdentifier(
+                            NameIdentifier.of(metalakeName, catalogName, ancestorA))
+                        .id()));
+    SchemaPO ancestorABPOAfter =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaMetaById(
+                    schemaMetaService
+                        .getSchemaByIdentifier(
+                            NameIdentifier.of(metalakeName, catalogName, ancestorAB))
+                        .id()));
+    Assertions.assertEquals(ancestorAPOBefore.getSchemaId(), ancestorAPOAfter.getSchemaId());
+    Assertions.assertEquals(ancestorABPOBefore.getSchemaId(), ancestorABPOAfter.getSchemaId());
     Assertions.assertEquals(
-        idA,
-        schemaMetaService
-            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorA))
-            .id());
+        ancestorAPOBefore.getCurrentVersion() + 1, ancestorAPOAfter.getCurrentVersion());
     Assertions.assertEquals(
-        idAB,
-        schemaMetaService
-            .getSchemaByIdentifier(NameIdentifier.of(metalakeName, catalogName, ancestorAB))
-            .id());
+        ancestorABPOBefore.getCurrentVersion() + 1, ancestorABPOAfter.getCurrentVersion());
+  }
+
+  private SchemaEntity copySchemaWithComment(SchemaEntity schema, String comment) {
+    return SchemaEntity.builder()
+        .withId(schema.id())
+        .withName(schema.name())
+        .withNamespace(schema.namespace())
+        .withComment(comment)
+        .withProperties(schema.properties())
+        .withAuditInfo(schema.auditInfo())
+        .build();
   }
 
   private void associateTag(TagEntity tag, NameIdentifier ident, Entity.EntityType type)

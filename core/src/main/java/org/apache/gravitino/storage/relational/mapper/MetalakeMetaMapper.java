@@ -70,10 +70,20 @@ public interface MetalakeMetaMapper {
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
 
+  /**
+   * Advances the metalake version when the expected OCC version still matches.
+   *
+   * @return the number of updated rows
+   */
+  @UpdateProvider(type = MetalakeMetaSQLProviderFactory.class, method = "fenceMetalakeMeta")
+  Integer fenceMetalakeMeta(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion);
+
   @UpdateProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "softDeleteMetalakeMetaByMetalakeId")
-  Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
+  Integer softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion);
 
   @DeleteProvider(
       type = MetalakeMetaSQLProviderFactory.class,

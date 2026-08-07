@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -116,9 +117,11 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
                     .build())
             .build();
     try {
-      store().put(schemaEntity, true /* overwrite */);
+      store().put(schemaEntity, false /* overwrite */);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to create schema " + ident, ioe);
+    } catch (EntityAlreadyExistsException e) {
+      throw new SchemaAlreadyExistsException(e, "Schema %s already exists", ident);
     } catch (NoSuchEntityException e) {
       throw new NoSuchCatalogException(e, "Catalog %s does not exist", ident.namespace());
     }
