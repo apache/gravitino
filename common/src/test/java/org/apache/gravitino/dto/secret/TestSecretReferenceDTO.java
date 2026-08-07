@@ -32,6 +32,9 @@ public class TestSecretReferenceDTO {
     SecretReferenceDTO dto = SecretReferenceDTO.builder().withProvider("vault").build();
     Assertions.assertNotNull(dto.getAttributes());
     Assertions.assertTrue(dto.getAttributes().isEmpty());
+    SecretReference reference = dto.toSecretReference();
+    Assertions.assertEquals("vault", reference.provider());
+    Assertions.assertTrue(reference.attributes().isEmpty());
   }
 
   @Test
@@ -52,5 +55,18 @@ public class TestSecretReferenceDTO {
     Map<String, SecretBindingDTO> bindingDtos = SecretBindingDTO.fromSecretBindings(bindings);
     Assertions.assertEquals(1, bindingDtos.size());
     Assertions.assertEquals(bindings, SecretBindingDTO.toSecretBindings(bindingDtos));
+  }
+
+  @Test
+  void testNullMapValuesRejected() {
+    Map<String, SecretReferenceDTO> nullRef = new java.util.HashMap<>();
+    nullRef.put("jdbc-password", null);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> SecretReferenceDTO.toSecretReferences(nullRef));
+
+    Map<String, SecretBindingDTO> nullBinding = new java.util.HashMap<>();
+    nullBinding.put("jdbc-password", null);
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> SecretBindingDTO.toSecretBindings(nullBinding));
   }
 }

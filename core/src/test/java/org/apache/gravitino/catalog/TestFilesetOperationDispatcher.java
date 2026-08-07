@@ -25,15 +25,26 @@ import com.google.common.collect.Maps;
 import java.io.File;
 import java.io.IOException;
 import java.util.Map;
+import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.IdGenerator;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -311,5 +322,77 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
         path.delete();
       }
     }
+  }
+
+  @Test
+  public void testCreateFilesetWithSecretBindingsHidesPlaintextAndRollsBackOnConflict() {
+    try (SecretManager memorySecrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(9000L);
+      IdGenerator fixedIds = nextId::getAndIncrement;
+      FilesetOperationDispatcher secretDispatcher =
+          new FilesetOperationDispatcher(catalogManager, entityStore, fixedIds, memorySecrets);
+      SchemaOperationDispatcher schemaDispatcher =
+          new SchemaOperationDispatcher(catalogManager, entityStore, fixedIds, memorySecrets);
+
+      Namespace filesetNs = Namespace.of(metalake, catalog, "schema_secret_fileset");
+      Map<String, String> props = ImmutableMap.of("k1", "v1");
+      schemaDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
+
+      NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_secret_1");
+      Map<String, SecretBinding> bindings =
+          Map.of("k2", new SecretBinding("memory", "fileset-s3cr3t"));
+      long expectedId = nextId.get();
+      Fileset fileset =
+          secretDispatcher.createMultipleLocationFileset(
+              filesetIdent,
+              "comment",
+              Fileset.Type.MANAGED,
+              Map.of(Fileset.LOCATION_NAME_UNKNOWN, "test_secret_loc"),
+              props,
+              bindings,
+              Map.of());
+      Assertions.assertEquals("v1", fileset.properties().get("k1"));
+      Assertions.assertFalse(fileset.properties().containsKey("k2"));
+      Assertions.assertFalse(
+          fileset.properties().values().stream().anyMatch(v -> v.contains("fileset-s3cr3t")));
+
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE,
+                  "fileset",
+                  SecretConstants.ATTR_ENTITY_ID,
+                  String.valueOf(expectedId),
+                  SecretConstants.ATTR_PROPERTY_KEY,
+                  "k2"));
+      Assertions.assertEquals("fileset-s3cr3t", memorySecrets.readSecret(urn));
+
+      Assertions.assertThrows(
+          FilesetAlreadyExistsException.class,
+          () ->
+              secretDispatcher.createMultipleLocationFileset(
+                  filesetIdent,
+                  "comment",
+                  Fileset.Type.MANAGED,
+                  Map.of(Fileset.LOCATION_NAME_UNKNOWN, "test_secret_loc"),
+                  props,
+                  bindings,
+                  Map.of()));
+      Assertions.assertEquals("fileset-s3cr3t", memorySecrets.readSecret(urn));
+    }
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config secretConfig = new Config(false) {};
+    Properties properties = new Properties();
+    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    properties.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    secretConfig.loadFromProperties(properties);
+    return new SecretManager(secretConfig);
   }
 }

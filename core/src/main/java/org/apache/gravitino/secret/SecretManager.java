@@ -67,9 +67,11 @@ public class SecretManager implements Closeable {
 
   /**
    * Ensures each property key appears at most once across {@code properties}, {@code
-   * secretBindings}, and {@code secretReferences}.
+   * secretBindings}, and {@code secretReferences}, and that {@code properties} do not contain raw
+   * secret URN values.
    *
-   * <p>{@code null} maps are treated as empty.
+   * <p>{@code null} maps are treated as empty. Callers must bind/reference secrets via the typed
+   * maps rather than embedding {@code urn:gravitino-secret:} values in properties.
    *
    * @param properties entity properties from the create request (may be null)
    * @param secretBindings property key → write-through binding (may be null)
@@ -79,6 +81,7 @@ public class SecretManager implements Closeable {
       @Nullable Map<String, String> properties,
       @Nullable Map<String, SecretBinding> secretBindings,
       @Nullable Map<String, SecretReference> secretReferences) {
+    rejectRawSecretUrnsInProperties(properties);
     Set<String> keys = new HashSet<>();
     int count = 0;
     if (properties != null) {
@@ -96,6 +99,31 @@ public class SecretManager implements Closeable {
     if (keys.size() != count) {
       throw new IllegalArgumentException(
           "Duplicate property key across properties, secretBindings and secretReferences");
+    }
+  }
+
+  /**
+   * Rejects caller-supplied property values that look like Gravitino secret URNs.
+   *
+   * <p>Raw URNs in request properties bypass typed secretBindings/secretReferences and can be used
+   * to resolve another entity's secret. Used by create assembly and by {@code testConnection}.
+   *
+   * @param properties request properties (may be null)
+   */
+  public void rejectRawSecretUrnsInProperties(@Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return;
+    }
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (SecretPropertyUtils.isSecretProperty(key, value)) {
+        throw new IllegalArgumentException(
+            "Property \""
+                + key
+                + "\" must not contain a raw gravitino secret URN; use secretBindings or"
+                + " secretReferences instead");
+      }
     }
   }
 
@@ -292,6 +320,37 @@ public class SecretManager implements Closeable {
         LOG.warn("Failed to roll back written secret {}", urn, e);
       }
     }
+  }
+
+  /**
+   * Best-effort delete of write-through secrets whose URN values appear in entity properties.
+   *
+   * <p>Used when dropping an entity so create-time write-through secrets are not left orphaned
+   * (including CatalogHookDispatcher post-hook rollback via {@code dropCatalog}). External
+   * reference URNs (not write-through shape) are left untouched.
+   *
+   * @param properties persisted entity properties (may be null)
+   */
+  public void deleteWrittenSecretsFromProperties(@Nullable Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return;
+    }
+    List<SecretUrn> writeThrough = new ArrayList<>();
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      if (!SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
+        continue;
+      }
+      try {
+        SecretUrn urn = SecretUrn.parse(entry.getValue());
+        // Write-through URNs are entityType:entityId:propertyKey (3 segments).
+        if (urn.identifierSegments().size() == 3) {
+          writeThrough.add(urn);
+        }
+      } catch (IllegalArgumentException e) {
+        LOG.warn("Skipping invalid secret URN in properties for key {}", entry.getKey(), e);
+      }
+    }
+    rollbackWritten(writeThrough);
   }
 
   /**

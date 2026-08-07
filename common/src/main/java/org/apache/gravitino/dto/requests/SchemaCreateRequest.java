@@ -18,10 +18,10 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
-import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -61,7 +61,7 @@ public class SchemaCreateRequest implements RESTRequest {
 
   /** Default constructor for Jackson deserialization. */
   public SchemaCreateRequest() {
-    this(null, null, null, Collections.emptyMap(), Collections.emptyMap());
+    this(null, null, null, null, null);
   }
 
   /**
@@ -72,7 +72,7 @@ public class SchemaCreateRequest implements RESTRequest {
    * @param properties The properties of the schema.
    */
   public SchemaCreateRequest(String name, String comment, Map<String, String> properties) {
-    this(name, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+    this(name, comment, properties, null, null);
   }
 
   /**
@@ -86,12 +86,13 @@ public class SchemaCreateRequest implements RESTRequest {
    * @param secretReferences Optional property key → secret locator DTO ({@code provider} plus
    *     provider-specific attributes).
    */
+  @JsonCreator
   public SchemaCreateRequest(
-      String name,
-      String comment,
-      Map<String, String> properties,
-      Map<String, SecretBindingDTO> secretBindings,
-      Map<String, SecretReferenceDTO> secretReferences) {
+      @JsonProperty("name") String name,
+      @JsonProperty("comment") String comment,
+      @JsonProperty("properties") Map<String, String> properties,
+      @JsonProperty("secretBindings") Map<String, SecretBindingDTO> secretBindings,
+      @JsonProperty("secretReferences") Map<String, SecretReferenceDTO> secretReferences) {
     this.name = name;
     this.comment = comment;
     this.properties = properties;

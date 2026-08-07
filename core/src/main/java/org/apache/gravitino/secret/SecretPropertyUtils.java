@@ -49,11 +49,12 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Returns a mutable copy of entity properties for create-time assembly.
+   * Returns a mutable copy of a property map for create-time assembly.
    *
    * <p>{@code null} becomes an empty {@link HashMap}; otherwise returns a new {@link HashMap} copy.
+   * Used for request properties and for merged catalog conf (which may be unmodifiable).
    *
-   * @param properties entity properties from the create request (may be null)
+   * @param properties property map to copy (may be null)
    * @return a mutable property map, never null
    */
   public static Map<String, String> copyEntityProperties(@Nullable Map<String, String> properties) {

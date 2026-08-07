@@ -80,7 +80,12 @@ public class SecretReferenceDTO {
     }
     ImmutableMap.Builder<String, SecretReference> references = ImmutableMap.builder();
     for (Map.Entry<String, SecretReferenceDTO> entry : dtos.entrySet()) {
-      references.put(entry.getKey(), entry.getValue().toSecretReference());
+      String key = entry.getKey();
+      SecretReferenceDTO dto = entry.getValue();
+      if (dto == null) {
+        throw new IllegalArgumentException("secretReferences[\"" + key + "\"] must not be null");
+      }
+      references.put(key, dto.toSecretReference());
     }
     return references.build();
   }

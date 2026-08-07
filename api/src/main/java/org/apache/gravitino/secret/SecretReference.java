@@ -40,12 +40,12 @@ public final class SecretReference {
    * Creates an external secret reference.
    *
    * @param provider registered provider instance name
-   * @param attributes provider-specific locator keys; must be non-null and non-empty
+   * @param attributes provider-specific locator keys; must be non-null (may be empty when the
+   *     provider needs no attributes)
    */
   public SecretReference(String provider, Map<String, String> attributes) {
     Preconditions.checkArgument(StringUtils.isNotBlank(provider), "provider must not be blank");
-    Preconditions.checkArgument(
-        attributes != null && !attributes.isEmpty(), "attributes must not be null or empty");
+    Preconditions.checkArgument(attributes != null, "attributes must not be null");
     this.provider = provider;
     this.attributes = ImmutableMap.copyOf(attributes);
   }
@@ -60,7 +60,7 @@ public final class SecretReference {
   }
 
   /**
-   * Returns provider-specific locator attributes (never {@code null} or empty).
+   * Returns provider-specific locator attributes (never {@code null}; may be empty).
    *
    * @return an unmodifiable attributes map
    */

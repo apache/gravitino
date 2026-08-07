@@ -16,7 +16,7 @@
 # under the License.
 
 from dataclasses import dataclass, field
-from typing import Dict
+from typing import Dict, Optional
 
 
 @dataclass
@@ -35,13 +35,11 @@ class SecretReference:
     """External secret locator: provider instance name plus provider-specific attributes."""
 
     provider: str
-    attributes: Dict[str, str] = field(default_factory=dict)
+    attributes: Optional[Dict[str, str]] = field(default_factory=dict)
 
     def __post_init__(self):
-        if not self.attributes:
-            raise ValueError("attributes must not be null or empty")
+        if self.attributes is None:
+            raise ValueError("attributes must not be null")
 
     def __repr__(self) -> str:
-        return (
-            f"SecretReference(provider={self.provider!r}, attributes={self.attributes!r})"
-        )
+        return f"SecretReference(provider={self.provider!r}, attributes={self.attributes!r})"

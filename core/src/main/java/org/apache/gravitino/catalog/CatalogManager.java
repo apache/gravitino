@@ -108,6 +108,7 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
@@ -602,7 +603,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
-    final Map<String, String> mergedConfig = new HashMap<>(buildCatalogConf(provider, properties));
+    Map<String, String> mergedConfig =
+        SecretPropertyUtils.copyEntityProperties(buildCatalogConf(provider, properties));
     long uid = idGenerator.nextId();
 
     List<SecretUrn> secretUrns =
@@ -714,8 +716,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
       }
 
+      // Do not resolve secret URNs from caller-controlled properties (exfiltration risk).
+      secretManager.rejectRawSecretUrnsInProperties(properties);
       Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
-      Map<String, String> plaintextConfig = secretManager.toPlaintextProperties(mergedConfig);
+      secretManager.rejectRawSecretUrnsInProperties(mergedConfig);
       Instant now = Instant.now();
       String creator = PrincipalUtils.getCurrentPrincipal().getName();
       CatalogEntity dummyEntity =
@@ -740,7 +744,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       try {
         wrapper.doWithCatalogOps(
             c -> {
-              c.testConnection(ident, type, provider, comment, plaintextConfig);
+              c.testConnection(ident, type, provider, comment, mergedConfig);
               return null;
             });
       } finally {
@@ -992,9 +996,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
             // Invalidate after store.delete() to prevent a background thread from repopulating
             // the cache with stale data between invalidate and delete.
+            Map<String, String> catalogProperties =
+                catalogWrapper.catalog().entity().getProperties();
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
+              secretManager.deleteWrittenSecretsFromProperties(catalogProperties);
             }
             catalogCache.invalidate(ident);
             return deleted;

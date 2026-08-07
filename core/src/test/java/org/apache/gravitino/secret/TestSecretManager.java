@@ -136,6 +136,70 @@ public class TestSecretManager {
     Assertions.assertTrue(binding.toString().contains("***"));
   }
 
+  @Test
+  void testRejectRawSecretUrnsInProperties() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, SecretBinding> secretBindings =
+          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+      List<SecretUrn> secretUrns =
+          secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
+      secretManager.writeSecrets(secretBindings, secretUrns);
+      String urn = secretUrns.get(0).toString();
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> secretManager.rejectRawSecretUrnsInProperties(Map.of("jdbc-password", urn)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> secretManager.checkSecretKeys(Map.of("jdbc-password", urn), Map.of(), Map.of()));
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              secretManager.assembleSecretUrns(
+                  Map.of("jdbc-password", urn),
+                  new HashMap<>(),
+                  "catalog",
+                  1L,
+                  Map.of(),
+                  Map.of()));
+    }
+  }
+
+  @Test
+  void testDeleteWrittenSecretsFromProperties() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, SecretBinding> secretBindings =
+          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+      List<SecretUrn> secretUrns =
+          secretManager.getSecretBindingUrns("catalog", 99L, secretBindings);
+      secretManager.writeSecrets(secretBindings, secretUrns);
+      Map<String, String> properties = new HashMap<>();
+      SecretPropertyUtils.putSecretUrns(properties, secretUrns);
+      properties.put("jdbc-user", "root");
+
+      Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
+      secretManager.deleteWrittenSecretsFromProperties(properties);
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(secretUrns.get(0)));
+    }
+  }
+
+  @Test
+  void testRollbackWrittenDeletesSecrets() {
+    try (SecretManager secretManager = memorySecretManager()) {
+      Map<String, SecretBinding> secretBindings =
+          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+      List<SecretUrn> secretUrns =
+          secretManager.getSecretBindingUrns("catalog", 7L, secretBindings);
+      secretManager.writeSecrets(secretBindings, secretUrns);
+      Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
+
+      secretManager.rollbackWritten(secretUrns);
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(secretUrns.get(0)));
+    }
+  }
+
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();

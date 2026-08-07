@@ -78,7 +78,12 @@ public class SecretBindingDTO {
     }
     ImmutableMap.Builder<String, SecretBinding> bindings = ImmutableMap.builder();
     for (Map.Entry<String, SecretBindingDTO> entry : dtos.entrySet()) {
-      bindings.put(entry.getKey(), entry.getValue().toSecretBinding());
+      String key = entry.getKey();
+      SecretBindingDTO dto = entry.getValue();
+      if (dto == null) {
+        throw new IllegalArgumentException("secretBindings[\"" + key + "\"] must not be null");
+      }
+      bindings.put(key, dto.toSecretBinding());
     }
     return bindings.build();
   }

@@ -37,6 +37,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -65,7 +66,12 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -1339,5 +1345,90 @@ public class TestCatalogManager {
         });
 
     Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+  }
+
+  @Test
+  void testCreateCatalogWithSecretBindingsPersistsUrnAndDropCleans() throws Exception {
+    try (SecretManager memorySecrets = memorySecretManager()) {
+      CatalogManager manager =
+          new CatalogManager(config, entityStore, new RandomIdGenerator(), memorySecrets);
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_catalog_ok");
+      Map<String, String> props =
+          ImmutableMap.of(
+              "provider",
+              "test",
+              PROPERTY_KEY1,
+              "value1",
+              PROPERTY_KEY2,
+              "value2",
+              PROPERTY_KEY5_PREFIX + "1",
+              "value3");
+      Map<String, SecretBinding> bindings =
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "catalog-s3cr3t"));
+
+      Catalog catalog =
+          manager.createCatalog(
+              ident, Catalog.Type.RELATIONAL, provider, "comment", props, bindings, Map.of());
+      Assertions.assertFalse(catalog.properties().containsKey(PROPERTY_KEY4));
+      Assertions.assertFalse(
+          catalog.properties().values().stream().anyMatch(v -> v.contains("catalog-s3cr3t")));
+
+      CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+      String urnValue = entity.getProperties().get(PROPERTY_KEY4);
+      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urnValue));
+      SecretUrn urn = SecretUrn.parse(urnValue);
+      Assertions.assertEquals("catalog-s3cr3t", memorySecrets.readSecret(urn));
+
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> memorySecrets.readSecret(urn));
+      manager.close();
+    }
+  }
+
+  @Test
+  void testCreateCatalogRollsBackSecretsWhenInitFails() throws Exception {
+    try (SecretManager memorySecrets = memorySecretManager()) {
+      CatalogManager manager =
+          Mockito.spy(
+              new CatalogManager(config, entityStore, new RandomIdGenerator(), memorySecrets));
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_catalog_fail");
+      Map<String, String> props =
+          ImmutableMap.of(
+              "provider",
+              "test",
+              PROPERTY_KEY1,
+              "value1",
+              PROPERTY_KEY2,
+              "value2",
+              PROPERTY_KEY5_PREFIX + "1",
+              "value3");
+      Map<String, SecretBinding> bindings =
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "should-rollback"));
+
+      Mockito.doThrow(new RuntimeException("simulated catalog init failure"))
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), any());
+
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              manager.createCatalog(
+                  ident, Catalog.Type.RELATIONAL, provider, "comment", props, bindings, Map.of()));
+      Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+      manager.close();
+    }
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config secretConfig = new Config(false) {};
+    Properties properties = new Properties();
+    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    properties.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    secretConfig.loadFromProperties(properties);
+    return new SecretManager(secretConfig);
   }
 }
