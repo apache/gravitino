@@ -77,6 +77,7 @@ tasks.jar {
 tasks.test {
   val shadowJar = tasks.named<ShadowJar>("shadowJar")
   dependsOn(shadowJar)
+  inputs.file(shadowJar.flatMap { it.archiveFile })
   doFirst {
     systemProperty(
       "shadowJarPath",
