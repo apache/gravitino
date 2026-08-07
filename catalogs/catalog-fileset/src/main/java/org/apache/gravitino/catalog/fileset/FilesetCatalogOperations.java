@@ -128,6 +128,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
   private final EntityStore store;
 
+  private final SecretManager secretManager;
+
   private HasPropertyMetadata propertiesMetadata;
 
   @VisibleForTesting Configuration hadoopConf;
@@ -170,7 +172,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       };
 
   FilesetCatalogOperations(EntityStore store) {
+    this(store, GravitinoEnv.getInstance().secretManager());
+  }
+
+  @VisibleForTesting
+  FilesetCatalogOperations(EntityStore store, SecretManager secretManager) {
     this.store = store;
+    this.secretManager = Preconditions.checkNotNull(secretManager, "secretManager");
   }
 
   static class FileSystemCacheKey {
@@ -216,7 +224,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   public FilesetCatalogOperations() {
-    this(GravitinoEnv.getInstance().entityStore());
+    this(GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().secretManager());
   }
 
   @Override
@@ -1516,7 +1524,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     // properties keep secret URNs in storage; resolve them here so FileSystem ops see plaintext,
     // matching the catalog "storage=URN / connector=plaintext" split.
     Map<String, String> mergedProperties = new HashMap<>(conf);
-    SecretManager secretManager = GravitinoEnv.getInstance().secretManager();
     if (ident.namespace().levels().length == 2) {
       // schema level
       mergedProperties.putAll(secretManager.toPlaintextProperties(entityProperties));

@@ -188,6 +188,8 @@ public class TestFilesetCatalogOperations {
 
   private static EntityStore store;
 
+  private static SecretManager secretManager;
+
   private static IdGenerator idGenerator;
   private static SchemaMetaService spySchemaMetaService;
 
@@ -356,11 +358,27 @@ public class TestFilesetCatalogOperations {
         .thenReturn(spySchemaMetaService);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "config", config, true);
+
+    Config secretConfig = new Config(false) {};
+    Properties secretProps = new Properties();
+    secretProps.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    secretProps.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    secretConfig.loadFromProperties(secretProps);
+    secretManager = new SecretManager(secretConfig);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", secretManager, true);
   }
 
   @AfterAll
-  public static void tearDown() throws IOException {
+  public static void tearDown() throws IOException, IllegalAccessException {
     store.close();
+    if (secretManager != null) {
+      secretManager.close();
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", null, true);
+    }
     new Path(TEST_ROOT_PATH)
         .getFileSystem(new Configuration())
         .delete(new Path(TEST_ROOT_PATH), true);
@@ -3247,8 +3265,6 @@ public class TestFilesetCatalogOperations {
     secretConfig.loadFromProperties(secretProps);
 
     try (SecretManager secrets = new SecretManager(secretConfig)) {
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", secrets, true);
-
       long entityId = idGenerator.nextId();
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
@@ -3267,7 +3283,7 @@ public class TestFilesetCatalogOperations {
       Map<String, String> catalogProps = Maps.newHashMap();
       catalogProps.put(LOCATION, TEST_ROOT_PATH);
 
-      try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
+      try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secrets)) {
         ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
 
         NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
@@ -3287,8 +3303,6 @@ public class TestFilesetCatalogOperations {
         Assertions.assertEquals("super-secret", merged.get("aws-sk"));
         // Original schema properties are unchanged.
         Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
-      } finally {
-        FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", null, true);
       }
     }
   }
