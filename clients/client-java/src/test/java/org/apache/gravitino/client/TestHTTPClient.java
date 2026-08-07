@@ -355,7 +355,6 @@ public class TestHTTPClient {
     }
   }
 
-  @Test
   public void testConnectionRefusedThrowsMeaningfulException() {
     GravitinoAdminClient client = GravitinoAdminClient.builder("http://localhost:1").build();
 

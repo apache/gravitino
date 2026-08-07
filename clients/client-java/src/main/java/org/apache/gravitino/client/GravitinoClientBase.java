@@ -29,6 +29,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Consumer;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -71,27 +73,43 @@ public abstract class GravitinoClientBase implements Closeable {
       boolean checkVersion,
       Map<String, String> headers,
       Map<String, String> properties) {
+    this(uri, authDataProvider, checkVersion, headers, properties, ignored -> {});
+  }
+
+  /**
+   * Constructs a new GravitinoClient with the given URI, authenticator, AuthDataProvider, and
+   * httpConfigurer.
+   *
+   * @param uri The base URI for the Gravitino API.
+   * @param authDataProvider The provider of the data which is used for authentication.
+   * @param checkVersion Whether to check the version of the Gravitino server.
+   * @param headers The base header of the Gravitino API.
+   * @param properties A map of properties (key-value pairs) used to configure the Gravitino client.
+   * @param httpConfigurer The configurer for the underling HTTP client builder.
+   */
+  protected GravitinoClientBase(
+      String uri,
+      AuthDataProvider authDataProvider,
+      boolean checkVersion,
+      Map<String, String> headers,
+      Map<String, String> properties,
+      Consumer<HTTPClient.Builder> httpConfigurer) {
     ObjectMapper mapper = ObjectMapperProvider.objectMapper();
 
-    if (checkVersion) {
-      this.restClient =
-          HTTPClient.builder(properties)
-              .uri(uri)
-              .withAuthDataProvider(authDataProvider)
-              .withObjectMapper(mapper)
-              .withPreConnectHandler(this::checkVersion)
-              .withHeaders(headers)
-              .build();
+    HTTPClient.Builder httpBuilder =
+        HTTPClient.builder(properties)
+            .uri(uri)
+            .withAuthDataProvider(authDataProvider)
+            .withObjectMapper(mapper)
+            .withHeaders(headers);
 
-    } else {
-      this.restClient =
-          HTTPClient.builder(properties)
-              .uri(uri)
-              .withAuthDataProvider(authDataProvider)
-              .withObjectMapper(mapper)
-              .withHeaders(headers)
-              .build();
+    httpConfigurer.accept(httpBuilder);
+
+    if (checkVersion) {
+      httpBuilder.withPreConnectHandler(this::checkVersion);
     }
+
+    this.restClient = httpBuilder.build();
   }
 
   /**
@@ -214,6 +232,8 @@ public abstract class GravitinoClientBase implements Closeable {
     protected Map<String, String> headers = ImmutableMap.of();
     /** A map of properties (key-value pairs) used to configure the Gravitino client. */
     protected Map<String, String> properties = ImmutableMap.of();
+    /** Configurer applied to underlying HTTP client builder */
+    protected Consumer<HTTPClient.Builder> httpConfigurer = ignored -> {};
 
     /**
      * The constructor for the Builder class.
@@ -367,6 +387,17 @@ public abstract class GravitinoClientBase implements Closeable {
       if (properties != null) {
         this.properties = ImmutableMap.copyOf(properties);
       }
+      return this;
+    }
+
+    /**
+     * Configures the underlying HTTP client
+     *
+     * @param configurer The HTTP client builder configuration.
+     * @return This builder instance for method chaining.
+     */
+    public Builder<T> configureHttp(Consumer<HTTPClient.Builder> configurer) {
+      this.httpConfigurer = Objects.requireNonNull(configurer, "configurer cannot be null");
       return this;
     }
 
