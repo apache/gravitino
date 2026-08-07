@@ -19,6 +19,7 @@
 package org.apache.gravitino.dto.secret;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
@@ -28,24 +29,24 @@ import org.junit.jupiter.api.Test;
 public class TestSecretReferenceDTO {
 
   @Test
-  void testAttributesRequiredNonEmpty() {
+  void testAttributesRequired() {
     SecretReferenceDTO dto = SecretReferenceDTO.builder().withProvider("vault").build();
     Assertions.assertNotNull(dto.getAttributes());
     Assertions.assertTrue(dto.getAttributes().isEmpty());
     Assertions.assertThrows(IllegalArgumentException.class, dto::toSecretReference);
 
-    SecretReferenceDTO withAttrs =
+    SecretReference reference =
         SecretReferenceDTO.builder()
             .withProvider("vault")
             .withAttributes(Map.of("path", "secret/data/x"))
-            .build();
-    SecretReference reference = withAttrs.toSecretReference();
+            .build()
+            .toSecretReference();
     Assertions.assertEquals("vault", reference.provider());
     Assertions.assertEquals("secret/data/x", reference.attributes().get("path"));
   }
 
   @Test
-  void testMapConvertersPreferEmptyOverNull() {
+  void testMapConverters() {
     Assertions.assertEquals(ImmutableMap.of(), SecretReferenceDTO.toSecretReferences(null));
     Assertions.assertEquals(ImmutableMap.of(), SecretReferenceDTO.fromSecretReferences(null));
     Assertions.assertEquals(ImmutableMap.of(), SecretBindingDTO.toSecretBindings(null));
@@ -65,13 +66,13 @@ public class TestSecretReferenceDTO {
   }
 
   @Test
-  void testNullMapValuesRejected() {
-    Map<String, SecretReferenceDTO> nullRef = new java.util.HashMap<>();
+  void testNullMapValues() {
+    Map<String, SecretReferenceDTO> nullRef = new HashMap<>();
     nullRef.put("jdbc-password", null);
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> SecretReferenceDTO.toSecretReferences(nullRef));
 
-    Map<String, SecretBindingDTO> nullBinding = new java.util.HashMap<>();
+    Map<String, SecretBindingDTO> nullBinding = new HashMap<>();
     nullBinding.put("jdbc-password", null);
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> SecretBindingDTO.toSecretBindings(nullBinding));

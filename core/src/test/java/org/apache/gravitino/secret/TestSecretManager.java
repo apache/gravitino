@@ -29,137 +29,92 @@ import org.junit.jupiter.api.Test;
 
 public class TestSecretManager {
 
+  private static final Map<String, SecretBinding> BINDINGS =
+      Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+  private static final Map<String, SecretReference> REFERENCES =
+      Map.of("jdbc-password", new SecretReference("memory", Map.of("path", "secret/data/x")));
+
   @Test
   void testWriteSecrets() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Map<String, String> properties = new HashMap<>(Map.of("jdbc-user", "root"));
-      Map<String, SecretBinding> secretBindings =
-          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
-      List<SecretUrn> secretUrns =
-          secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
-      secretManager.writeSecrets(secretBindings, secretUrns);
-      SecretPropertyUtils.putSecretUrns(properties, secretUrns);
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
+      List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
+      sm.writeSecrets(BINDINGS, urns);
+      SecretPropertyUtils.putSecretUrns(props, urns);
 
-      String urn = properties.get("jdbc-password");
+      String urn = props.get("jdbc-password");
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));
-      Assertions.assertEquals("root", properties.get("jdbc-user"));
-      Assertions.assertEquals(1, secretUrns.size());
+      Assertions.assertEquals("root", props.get("jdbc-user"));
+      Assertions.assertEquals(1, urns.size());
       Assertions.assertEquals(
-          "s3cr3t",
-          secretManager.getRegistry().getProvider("memory").readSecret(secretUrns.get(0)));
-      Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
+          "s3cr3t", sm.getRegistry().getProvider("memory").readSecret(urns.get(0)));
+      Assertions.assertEquals("s3cr3t", sm.readSecret(urns.get(0)));
     }
   }
 
   @Test
-  void testToPlaintextPropertiesReplacesUrnsWithPlaintext() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Map<String, String> properties = new HashMap<>();
-      properties.put("jdbc-user", "root");
-      Map<String, SecretBinding> secretBindings =
-          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
-      List<SecretUrn> secretUrns =
-          secretManager.getSecretBindingUrns("catalog", 42L, secretBindings);
-      SecretPropertyUtils.putSecretUrns(properties, secretUrns);
-      secretManager.writeSecrets(secretBindings, secretUrns);
+  void testToPlaintextProperties() {
+    try (SecretManager sm = memorySecretManager()) {
+      Assertions.assertTrue(sm.toPlaintextProperties(null).isEmpty());
+      Assertions.assertTrue(sm.toPlaintextProperties(Map.of()).isEmpty());
 
-      String urn = properties.get("jdbc-password");
-      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("jdbc-password", urn));
+      Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
+      List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
+      SecretPropertyUtils.putSecretUrns(props, urns);
+      sm.writeSecrets(BINDINGS, urns);
 
-      Map<String, String> plaintext = secretManager.toPlaintextProperties(properties);
-
+      String urn = props.get("jdbc-password");
+      Map<String, String> plaintext = sm.toPlaintextProperties(props);
       Assertions.assertEquals("root", plaintext.get("jdbc-user"));
       Assertions.assertEquals("s3cr3t", plaintext.get("jdbc-password"));
-      // Stored properties keep the URN.
-      Assertions.assertEquals(urn, properties.get("jdbc-password"));
+      Assertions.assertEquals(urn, props.get("jdbc-password"));
     }
   }
 
   @Test
-  void testToPlaintextPropertiesNullOrEmpty() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Assertions.assertTrue(secretManager.toPlaintextProperties(null).isEmpty());
-      Assertions.assertTrue(secretManager.toPlaintextProperties(Map.of()).isEmpty());
+  void testRejectReferenceUrns() {
+    try (SecretManager sm = memorySecretManager()) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> sm.getSecretReferenceUrns(REFERENCES));
     }
   }
 
   @Test
-  void testGetSecretReferenceUrnsRejectedByMemoryProvider() {
-    try (SecretManager secretManager = memorySecretManager()) {
+  void testCheckSecretKeys() {
+    try (SecretManager sm = memorySecretManager()) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> sm.checkSecretKeys(Map.of(), BINDINGS, REFERENCES));
       Assertions.assertThrows(
           IllegalArgumentException.class,
-          () ->
-              secretManager.getSecretReferenceUrns(
-                  Map.of(
-                      "jdbc-password",
-                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
-    }
-  }
+          () -> sm.checkSecretKeys(Map.of("jdbc-password", "plain"), BINDINGS, Map.of()));
 
-  @Test
-  void testRejectOverlapAndInvalidBinding() {
-    try (SecretManager secretManager = memorySecretManager()) {
+      List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
       Assertions.assertThrows(
           IllegalArgumentException.class,
           () ->
-              secretManager.checkSecretKeys(
-                  Map.of(),
-                  Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
-                  Map.of(
-                      "jdbc-password",
-                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              secretManager.checkSecretKeys(
-                  Map.of("jdbc-password", "plain"),
-                  Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")),
-                  Map.of()));
+              sm.checkSecretKeys(
+                  Map.of("jdbc-password", urns.get(0).toString()), Map.of(), Map.of()));
 
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> new SecretBinding(" ", "s3cr3t"));
-
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              secretManager.getSecretReferenceUrns(
-                  Map.of(
-                      "jdbc-password",
-                      new SecretReference("memory", Map.of("path", "secret/data/x")))));
     }
   }
 
   @Test
-  void testSecretBindingToStringRedactsPlaintext() {
+  void testBindingRedacts() {
     SecretBinding binding = new SecretBinding("memory", "s3cr3t");
     Assertions.assertFalse(binding.toString().contains("s3cr3t"));
     Assertions.assertTrue(binding.toString().contains("***"));
   }
 
   @Test
-  void testRejectRawUrns() {
+  void testDeleteBindingsFromProperties() {
     try (SecretManager sm = memorySecretManager()) {
-      List<SecretUrn> urns =
-          sm.getSecretBindingUrns(
-              "catalog", 42L, Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")));
-      sm.writeSecrets(Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t")), urns);
-      String urn = urns.get(0).toString();
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () -> sm.rejectRawSecretUrnsInProperties(Map.of("jdbc-password", urn)));
-    }
-  }
-
-  @Test
-  void testDeleteWrittenFromProperties() {
-    try (SecretManager sm = memorySecretManager()) {
-      Map<String, SecretBinding> bindings =
-          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
-      List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 99L, bindings);
-      sm.writeSecrets(bindings, urns);
+      List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 99L, BINDINGS);
+      sm.writeSecrets(BINDINGS, urns);
       Map<String, String> props = new HashMap<>();
       SecretPropertyUtils.putSecretUrns(props, urns);
-      sm.deleteWrittenSecretsFromProperties(props);
+      sm.deleteBindingsFromProperties(props);
       Assertions.assertThrows(IllegalArgumentException.class, () -> sm.readSecret(urns.get(0)));
     }
   }

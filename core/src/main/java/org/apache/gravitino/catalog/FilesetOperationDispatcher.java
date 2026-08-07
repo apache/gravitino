@@ -200,7 +200,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   HasPropertyMetadata::filesetPropertiesMetadata,
                   createdFileset.properties()));
     } catch (RuntimeException e) {
-      secretManager.rollbackWritten(secretUrns);
+      secretManager.rollbackBindings(secretUrns);
       throw e;
     }
   }
@@ -285,7 +285,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   c -> c.doWithFilesetOps(f -> f.dropFileset(ident)),
                   NonEmptyEntityException.class);
           if (dropped) {
-            secretManager.deleteWrittenSecretsFromProperties(filesetProperties);
+            secretManager.deleteBindingsFromProperties(filesetProperties);
           }
           return dropped;
         });

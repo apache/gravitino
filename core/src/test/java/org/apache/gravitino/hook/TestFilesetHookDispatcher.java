@@ -40,10 +40,12 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.VERSION_RETENTION_COUNT;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.Arrays;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -188,6 +190,86 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     } finally {
       FieldUtils.writeField(
           GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+    }
+  }
+
+  @Test
+  public void testCreatePostHookRollback() throws Exception {
+    RuntimeException postHook = new RuntimeException("post-hook failed");
+    runCreateWithPostHookFailure(
+        postHook,
+        null,
+        (dispatcher, ident, thrown) -> {
+          Assertions.assertSame(postHook, thrown);
+          Mockito.verify(dispatcher).dropFileset(ident);
+        });
+  }
+
+  @Test
+  public void testCreateRollbackSuppressed() throws Exception {
+    RuntimeException postHook = new RuntimeException("post-hook failed");
+    RuntimeException rollback = new RuntimeException("rollback failed");
+    runCreateWithPostHookFailure(
+        postHook,
+        rollback,
+        (dispatcher, ident, thrown) -> {
+          Assertions.assertSame(postHook, thrown);
+          Assertions.assertTrue(Arrays.stream(thrown.getSuppressed()).anyMatch(t -> t == rollback));
+          Mockito.verify(dispatcher).dropFileset(ident);
+        });
+  }
+
+  @FunctionalInterface
+  private interface PostHookAssert {
+    void check(FilesetDispatcher dispatcher, NameIdentifier ident, RuntimeException thrown);
+  }
+
+  private static void runCreateWithPostHookFailure(
+      RuntimeException postHook, RuntimeException dropFailure, PostHookAssert asserts)
+      throws Exception {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    Object savedOwner = FieldUtils.readField(env, "ownerDispatcher", true);
+    Object savedCatalog = FieldUtils.readField(env, "catalogManager", true);
+
+    FilesetDispatcher dispatcher = Mockito.mock(FilesetDispatcher.class);
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "fileset");
+    OwnerDispatcher owner = Mockito.mock(OwnerDispatcher.class);
+    Mockito.doThrow(postHook)
+        .when(owner)
+        .setOwner(Mockito.anyString(), Mockito.any(), Mockito.anyString(), Mockito.any());
+    Mockito.when(
+            dispatcher.createMultipleLocationFileset(
+                eq(ident), any(), any(), anyMap(), anyMap(), anyMap(), anyMap()))
+        .thenReturn(Mockito.mock(Fileset.class));
+    if (dropFailure != null) {
+      Mockito.doThrow(dropFailure).when(dispatcher).dropFileset(ident);
+    }
+
+    CatalogManager mockCatalog = Mockito.mock(CatalogManager.class);
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(mockCatalog.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
+    FieldUtils.writeField(env, "ownerDispatcher", owner, true);
+    FieldUtils.writeField(env, "catalogManager", mockCatalog, true);
+
+    try {
+      FilesetHookDispatcher hook = new FilesetHookDispatcher(dispatcher);
+      RuntimeException thrown =
+          Assertions.assertThrowsExactly(
+              RuntimeException.class,
+              () ->
+                  hook.createMultipleLocationFileset(
+                      ident,
+                      "comment",
+                      Fileset.Type.MANAGED,
+                      Map.of(),
+                      Map.of(),
+                      Map.of(),
+                      Map.of()));
+      asserts.check(dispatcher, ident, thrown);
+    } finally {
+      FieldUtils.writeField(env, "ownerDispatcher", savedOwner, true);
+      FieldUtils.writeField(env, "catalogManager", savedCatalog, true);
     }
   }
 

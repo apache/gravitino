@@ -41,6 +41,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
@@ -325,7 +326,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateFilesetWithSecrets() throws Exception {
+  public void testCreateWithSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       AtomicLong nextId = new AtomicLong(9000L);
       IdGenerator ids = nextId::getAndIncrement;
@@ -340,27 +341,20 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       NameIdentifier ident =
           NameIdentifier.of(metalake, catalog, "schema_secret_fileset", "fileset_secret_1");
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+      Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
+      Map<String, String> props = ImmutableMap.of("k1", "v1");
       long entityId = nextId.get();
       Fileset fileset =
           filesets.createMultipleLocationFileset(
-              ident,
-              "comment",
-              Fileset.Type.MANAGED,
-              Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc"),
-              ImmutableMap.of("k1", "v1"),
-              bindings,
-              Map.of());
+              ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
       Assertions.assertFalse(fileset.properties().containsKey("k2"));
 
-      // Storage keeps secret URNs; runtime FS conf resolves via toPlaintextProperties (catalog
-      // pattern).
       Fileset stored =
           catalogManager
               .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
               .doWithFilesetOps(ops -> ops.loadFileset(ident));
       Assertions.assertTrue(
-          org.apache.gravitino.secret.SecretPropertyUtils.isSecretProperty(
-              "k2", stored.properties().get("k2")));
+          SecretPropertyUtils.isSecretProperty("k2", stored.properties().get("k2")));
 
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
@@ -374,14 +368,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
           FilesetAlreadyExistsException.class,
           () ->
               filesets.createMultipleLocationFileset(
-                  ident,
-                  "comment",
-                  Fileset.Type.MANAGED,
-                  Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc"),
-                  ImmutableMap.of("k1", "v1"),
-                  bindings,
-                  Map.of()));
-
+                  ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of()));
       Assertions.assertTrue(filesets.dropFileset(ident));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }

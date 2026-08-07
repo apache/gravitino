@@ -171,14 +171,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         }
       };
 
-  FilesetCatalogOperations(EntityStore store) {
-    this(store, GravitinoEnv.getInstance().secretManager());
-  }
-
-  @VisibleForTesting
   FilesetCatalogOperations(EntityStore store, SecretManager secretManager) {
     this.store = store;
-    this.secretManager = Preconditions.checkNotNull(secretManager, "secretManager");
+    this.secretManager = secretManager;
   }
 
   static class FileSystemCacheKey {

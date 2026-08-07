@@ -30,24 +30,21 @@ import org.junit.jupiter.api.Test;
 public class TestSecretPropertyUtils {
 
   @Test
-  void testAssembleEntityPropertiesThenWrite() {
-    try (SecretManager secretManager = memorySecretManager()) {
+  void testAssembleAndWrite() {
+    try (SecretManager sm = memorySecretManager()) {
       Map<String, String> properties = Map.of("jdbc-user", "root");
-      Map<String, SecretBinding> secretBindings =
+      Map<String, SecretBinding> bindings =
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+      Map<String, String> entityProps = SecretPropertyUtils.copyEntityProperties(properties);
+      List<SecretUrn> urns =
+          sm.assembleSecretUrns(properties, entityProps, "catalog", 42L, bindings, Map.of());
+      sm.writeSecrets(bindings, urns);
 
-      Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-      List<SecretUrn> secretUrns =
-          secretManager.assembleSecretUrns(
-              properties, entityProperties, "catalog", 42L, secretBindings, Map.of());
-      secretManager.writeSecrets(secretBindings, secretUrns);
-
-      Assertions.assertEquals("root", entityProperties.get("jdbc-user"));
+      Assertions.assertEquals("root", entityProps.get("jdbc-user"));
       Assertions.assertTrue(
-          SecretPropertyUtils.isSecretProperty(
-              "jdbc-password", entityProperties.get("jdbc-password")));
-      Assertions.assertEquals(1, secretUrns.size());
-      Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
+          SecretPropertyUtils.isSecretProperty("jdbc-password", entityProps.get("jdbc-password")));
+      Assertions.assertEquals(1, urns.size());
+      Assertions.assertEquals("s3cr3t", sm.readSecret(urns.get(0)));
     }
   }
 
@@ -62,15 +59,14 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testEmptySecretsAreNoOp() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Map<String, String> entityProperties = new HashMap<>(Map.of("jdbc-user", "root"));
-      List<SecretUrn> secretUrns =
-          secretManager.assembleSecretUrns(
-              entityProperties, entityProperties, "schema", 1L, Map.of(), Map.of());
-      secretManager.writeSecrets(Map.of(), secretUrns);
-      Assertions.assertTrue(secretUrns.isEmpty());
-      Assertions.assertEquals("root", entityProperties.get("jdbc-user"));
+  void testEmptySecretsNoOp() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = new HashMap<>(Map.of("jdbc-user", "root"));
+      List<SecretUrn> urns =
+          sm.assembleSecretUrns(entityProps, entityProps, "schema", 1L, Map.of(), Map.of());
+      sm.writeSecrets(Map.of(), urns);
+      Assertions.assertTrue(urns.isEmpty());
+      Assertions.assertEquals("root", entityProps.get("jdbc-user"));
     }
   }
 
