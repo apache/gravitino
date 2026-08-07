@@ -1,3 +1,4 @@
+# pylint: disable=too-many-lines
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
 # distributed with this work for additional information
@@ -40,6 +41,7 @@ from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
 from gravitino.dto.requests.catalog_set_request import CatalogSetRequest
 from gravitino.dto.requests.catalog_updates_request import CatalogUpdatesRequest
+from gravitino.dto.requests.group_add_request import GroupAddRequest
 from gravitino.dto.requests.job_run_request import JobRunRequest
 from gravitino.dto.requests.job_template_register_request import (
     JobTemplateRegisterRequest,
@@ -48,25 +50,33 @@ from gravitino.dto.requests.job_template_updates_request import (
     JobTemplateUpdatesRequest,
 )
 from gravitino.dto.requests.owner_set_request import OwnerSetRequest
+from gravitino.dto.requests.privilege_grant_request import PrivilegeGrantRequest
+from gravitino.dto.requests.privilege_revoke_request import PrivilegeRevokeRequest
+from gravitino.dto.requests.role_create_request import RoleCreateRequest
+from gravitino.dto.requests.role_grant_request import RoleGrantRequest
+from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
 from gravitino.dto.requests.tag_create_request import TagCreateRequest
 from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 from gravitino.dto.requests.user_add_request import UserAddRequest
-from gravitino.dto.requests.group_add_request import GroupAddRequest
-from gravitino.dto.requests.role_create_request import RoleCreateRequest
-from gravitino.dto.requests.privilege_grant_request import PrivilegeGrantRequest
-from gravitino.dto.requests.privilege_revoke_request import PrivilegeRevokeRequest
-from gravitino.dto.requests.role_grant_request import RoleGrantRequest
-from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.group_response import (
+    GroupListResponse,
+    GroupNamesListResponse,
+    GroupResponse,
+)
 from gravitino.dto.responses.job_list_response import JobListResponse
 from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
 from gravitino.dto.responses.job_template_response import JobTemplateResponse
 from gravitino.dto.responses.owner_response import OwnerResponse
 from gravitino.dto.responses.remove_response import RemoveResponse
+from gravitino.dto.responses.role_response import (
+    RoleNamesListResponse,
+    RoleResponse,
+)
 from gravitino.dto.responses.set_response import SetResponse
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
@@ -78,23 +88,14 @@ from gravitino.dto.responses.user_response import (
     UserNamesListResponse,
     UserResponse,
 )
-from gravitino.dto.responses.group_response import (
-    GroupListResponse,
-    GroupNamesListResponse,
-    GroupResponse,
-)
-from gravitino.dto.responses.role_response import (
-    RoleNamesListResponse,
-    RoleResponse,
-)
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 from gravitino.exceptions.handlers.group_error_handler import GROUP_ERROR_HANDLER
+from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
+from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
 from gravitino.exceptions.handlers.permission_error_handler import (
     PERMISSION_ERROR_HANDLER,
 )
 from gravitino.exceptions.handlers.role_error_handler import ROLE_ERROR_HANDLER
-from gravitino.exceptions.handlers.job_error_handler import JOB_ERROR_HANDLER
-from gravitino.exceptions.handlers.owner_error_handler import OWNER_ERROR_HANDLER
 from gravitino.exceptions.handlers.tag_error_handler import TAG_ERROR_HANDLER
 from gravitino.exceptions.handlers.user_error_handler import USER_ERROR_HANDLER
 from gravitino.rest.rest_utils import encode_string
