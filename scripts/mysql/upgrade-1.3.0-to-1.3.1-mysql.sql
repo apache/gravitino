@@ -4,7 +4,7 @@
 -- distributed with this work for additional information
 -- regarding copyright ownership.  The ASF licenses this file
 -- to you under the Apache License, Version 2.0 (the
--- "License"); you may not use this file except in compliance
+-- "License"). You may not use this file except in compliance
 -- with the License.  You may obtain a copy of the License at
 --
 --  http://www.apache.org/licenses/LICENSE-2.0
@@ -17,35 +17,9 @@
 -- under the License.
 --
 
-ALTER TABLE `user_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`,
-    ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `external_id`;
-
-ALTER TABLE `group_meta`
-    ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system' AFTER `metalake_id`;
-
-CREATE UNIQUE INDEX `uk_mid_ueid_del` ON `user_meta` (`metalake_id`, `external_id`, `deleted_at`);
-CREATE UNIQUE INDEX `uk_mid_geid_del` ON `group_meta` (`metalake_id`, `external_id`, `deleted_at`);
-
-ALTER TABLE `table_column_version_info`
-    MODIFY COLUMN `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment';
-
-ALTER TABLE `tag_meta`
-    ADD COLUMN `allowed_values` MEDIUMTEXT DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;
-
-ALTER TABLE `tag_relation_meta`
-    DROP INDEX `uk_ti_mi_mo_del`;
-
-ALTER TABLE `tag_relation_meta`
-    ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
-
-CREATE UNIQUE INDEX `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
-CREATE INDEX `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
-
 -- Index names are only scoped per-table in MySQL, so the same name could be
 -- reused across tables. Prefix each reused name with its table name so that
--- every index name is unique across the whole schema. A database upgraded
--- from 1.3.0 ends up with the same index names as a fresh 2.0.0 install.
+-- every index name is unique across the whole schema.
 ALTER TABLE `schema_meta` RENAME INDEX `idx_mid` TO `schema_meta_idx_mid`;
 ALTER TABLE `table_meta` RENAME INDEX `uk_sid_tn_del` TO `table_meta_uk_sid_tn_del`;
 ALTER TABLE `table_meta` RENAME INDEX `idx_mid` TO `table_meta_idx_mid`;
