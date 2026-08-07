@@ -28,9 +28,10 @@ import org.apache.gravitino.annotation.Unstable;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
- * An interface representing a logical view in a {@link Namespace}. A view is a named query whose
- * definition may be expressed in one or more SQL dialects. A catalog implementation with {@link
- * ViewCatalog} should implement this interface.
+ * An interface representing a view in a {@link Namespace}. A logical view is a named query whose
+ * definition may be expressed in one or more SQL dialects. A Metric View carries a structured
+ * {@link MetricRepresentation}. A catalog implementation with {@link ViewCatalog} should implement
+ * this interface.
  */
 @Unstable
 public interface View extends Auditable {
@@ -111,6 +112,21 @@ public interface View extends Auditable {
         if (dialect.equalsIgnoreCase(sqlRep.dialect())) {
           return Optional.of(sqlRep);
         }
+      }
+    }
+    return Optional.empty();
+  }
+
+  /**
+   * Returns the structured metric representation when this is a Metric View.
+   *
+   * @return The metric representation, or {@link Optional#empty()} for a logical View.
+   */
+  default Optional<MetricRepresentation> metricRepresentation() {
+    Representation[] reps = representations();
+    for (Representation rep : reps) {
+      if (rep instanceof MetricRepresentation) {
+        return Optional.of((MetricRepresentation) rep);
       }
     }
     return Optional.empty();

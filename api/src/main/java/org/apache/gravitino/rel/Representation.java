@@ -22,8 +22,7 @@ import org.apache.gravitino.annotation.Unstable;
 
 /**
  * A representation of a view's underlying definition. A view can carry multiple representations
- * targeting different engines or dialects. Currently only the {@link #TYPE_SQL SQL} representation
- * type is supported.
+ * targeting different engines or semantic models.
  */
 @Unstable
 public interface Representation {
@@ -31,8 +30,11 @@ public interface Representation {
   /** The representation type for SQL-based view definitions. */
   String TYPE_SQL = "sql";
 
+  /** The representation type for structured metric view definitions. */
+  String TYPE_METRIC = "metric";
+
   /**
-   * Returns the representation type. The only supported value today is {@link #TYPE_SQL}.
+   * Returns the representation type.
    *
    * @return The representation type identifier.
    */
