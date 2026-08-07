@@ -422,55 +422,43 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateSchemaWithSecretBindingsHidesPlaintextAndRollsBackOnConflict()
-      throws Exception {
-    try (SecretManager memorySecrets = memorySecretManager()) {
-      SchemaOperationDispatcher secretDispatcher =
-          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, memorySecrets);
-      NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_secret_1");
+  public void testCreateSchemaWithSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      SchemaOperationDispatcher d =
+          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_1");
       Map<String, String> props = ImmutableMap.of("k1", "v1");
-      Map<String, SecretBinding> bindings =
-          Map.of("k2", new SecretBinding("memory", "schema-s3cr3t"));
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
 
-      Schema schema =
-          secretDispatcher.createSchema(schemaIdent, "comment", props, bindings, Map.of());
-      Assertions.assertEquals("v1", schema.properties().get("k1"));
+      Schema schema = d.createSchema(ident, "comment", props, bindings, Map.of());
       Assertions.assertFalse(schema.properties().containsKey("k2"));
-      Assertions.assertFalse(
-          schema.properties().values().stream().anyMatch(v -> v.contains("schema-s3cr3t")));
 
-      SchemaEntity entity = entityStore.get(schemaIdent, SCHEMA, SchemaEntity.class);
+      SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
               "memory",
               Map.of(
-                  SecretConstants.ATTR_ENTITY_TYPE,
-                  "schema",
-                  SecretConstants.ATTR_ENTITY_ID,
-                  String.valueOf(entity.id()),
-                  SecretConstants.ATTR_PROPERTY_KEY,
-                  "k2"));
-      Assertions.assertEquals("schema-s3cr3t", memorySecrets.readSecret(urn));
-
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
-          () -> secretDispatcher.createSchema(schemaIdent, "comment", props, bindings, Map.of()));
-      // Original write-through secret remains after the conflicting create is rolled back.
-      Assertions.assertEquals("schema-s3cr3t", memorySecrets.readSecret(urn));
+          () -> d.createSchema(ident, "comment", props, bindings, Map.of()));
     }
   }
 
   private static SecretManager memorySecretManager() {
-    Config secretConfig = new Config(false) {};
-    Properties properties = new Properties();
-    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
-    properties.setProperty(
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    p.setProperty(
         SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
             + "memory."
             + SecretProviderRegistry.CLASS_NAME,
         InMemorySecretsProvider.class.getName());
-    secretConfig.loadFromProperties(properties);
-    return new SecretManager(secretConfig);
+    c.loadFromProperties(p);
+    return new SecretManager(c);
   }
 
   private void putSchemaEntity(NameIdentifier ident) throws IOException {

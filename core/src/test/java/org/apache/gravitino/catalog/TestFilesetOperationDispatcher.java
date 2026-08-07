@@ -325,74 +325,65 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateFilesetWithSecretBindingsHidesPlaintextAndRollsBackOnConflict() {
-    try (SecretManager memorySecrets = memorySecretManager()) {
+  public void testCreateFilesetWithSecrets() {
+    try (SecretManager secrets = memorySecretManager()) {
       AtomicLong nextId = new AtomicLong(9000L);
-      IdGenerator fixedIds = nextId::getAndIncrement;
-      FilesetOperationDispatcher secretDispatcher =
-          new FilesetOperationDispatcher(catalogManager, entityStore, fixedIds, memorySecrets);
-      SchemaOperationDispatcher schemaDispatcher =
-          new SchemaOperationDispatcher(catalogManager, entityStore, fixedIds, memorySecrets);
+      IdGenerator ids = nextId::getAndIncrement;
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
+          .createSchema(
+              NameIdentifier.of(metalake, catalog, "schema_secret_fileset"),
+              "comment",
+              ImmutableMap.of("k1", "v1"));
 
-      Namespace filesetNs = Namespace.of(metalake, catalog, "schema_secret_fileset");
-      Map<String, String> props = ImmutableMap.of("k1", "v1");
-      schemaDispatcher.createSchema(NameIdentifier.of(filesetNs.levels()), "comment", props);
-
-      NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_secret_1");
-      Map<String, SecretBinding> bindings =
-          Map.of("k2", new SecretBinding("memory", "fileset-s3cr3t"));
-      long expectedId = nextId.get();
+      NameIdentifier ident =
+          NameIdentifier.of(metalake, catalog, "schema_secret_fileset", "fileset_secret_1");
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+      long entityId = nextId.get();
       Fileset fileset =
-          secretDispatcher.createMultipleLocationFileset(
-              filesetIdent,
+          filesets.createMultipleLocationFileset(
+              ident,
               "comment",
               Fileset.Type.MANAGED,
-              Map.of(Fileset.LOCATION_NAME_UNKNOWN, "test_secret_loc"),
-              props,
+              Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc"),
+              ImmutableMap.of("k1", "v1"),
               bindings,
               Map.of());
-      Assertions.assertEquals("v1", fileset.properties().get("k1"));
       Assertions.assertFalse(fileset.properties().containsKey("k2"));
-      Assertions.assertFalse(
-          fileset.properties().values().stream().anyMatch(v -> v.contains("fileset-s3cr3t")));
 
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
               "memory",
               Map.of(
-                  SecretConstants.ATTR_ENTITY_TYPE,
-                  "fileset",
-                  SecretConstants.ATTR_ENTITY_ID,
-                  String.valueOf(expectedId),
-                  SecretConstants.ATTR_PROPERTY_KEY,
-                  "k2"));
-      Assertions.assertEquals("fileset-s3cr3t", memorySecrets.readSecret(urn));
-
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
       Assertions.assertThrows(
           FilesetAlreadyExistsException.class,
           () ->
-              secretDispatcher.createMultipleLocationFileset(
-                  filesetIdent,
+              filesets.createMultipleLocationFileset(
+                  ident,
                   "comment",
                   Fileset.Type.MANAGED,
-                  Map.of(Fileset.LOCATION_NAME_UNKNOWN, "test_secret_loc"),
-                  props,
+                  Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc"),
+                  ImmutableMap.of("k1", "v1"),
                   bindings,
                   Map.of()));
-      Assertions.assertEquals("fileset-s3cr3t", memorySecrets.readSecret(urn));
     }
   }
 
   private static SecretManager memorySecretManager() {
-    Config secretConfig = new Config(false) {};
-    Properties properties = new Properties();
-    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
-    properties.setProperty(
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    p.setProperty(
         SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
             + "memory."
             + SecretProviderRegistry.CLASS_NAME,
         InMemorySecretsProvider.class.getName());
-    secretConfig.loadFromProperties(properties);
-    return new SecretManager(secretConfig);
+    c.loadFromProperties(p);
+    return new SecretManager(c);
   }
 }

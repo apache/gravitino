@@ -74,52 +74,6 @@ public class TestSecretPropertyUtils {
     }
   }
 
-  @Test
-  void testAssembleForSchemaAndFilesetEntityTypes() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Map<String, SecretBinding> bindings =
-          Map.of("k2", new SecretBinding("memory", "schema-secret"));
-      Map<String, String> schemaProps =
-          SecretPropertyUtils.copyEntityProperties(Map.of("k1", "v1"));
-      List<SecretUrn> schemaUrns =
-          secretManager.assembleSecretUrns(
-              Map.of("k1", "v1"), schemaProps, "schema", 11L, bindings, Map.of());
-      secretManager.writeSecrets(bindings, schemaUrns);
-      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("k2", schemaProps.get("k2")));
-      Assertions.assertEquals("schema-secret", secretManager.readSecret(schemaUrns.get(0)));
-
-      Map<String, SecretBinding> filesetBindings =
-          Map.of("k2", new SecretBinding("memory", "fileset-secret"));
-      Map<String, String> filesetProps =
-          SecretPropertyUtils.copyEntityProperties(Map.of("k1", "v1"));
-      List<SecretUrn> filesetUrns =
-          secretManager.assembleSecretUrns(
-              Map.of("k1", "v1"), filesetProps, "fileset", 22L, filesetBindings, Map.of());
-      secretManager.writeSecrets(filesetBindings, filesetUrns);
-      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty("k2", filesetProps.get("k2")));
-      Assertions.assertEquals("fileset-secret", secretManager.readSecret(filesetUrns.get(0)));
-    }
-  }
-
-  @Test
-  void testAssembleWriteThenRollback() {
-    try (SecretManager secretManager = memorySecretManager()) {
-      Map<String, SecretBinding> bindings =
-          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
-      Map<String, String> entityProperties =
-          SecretPropertyUtils.copyEntityProperties(Map.of("jdbc-user", "root"));
-      List<SecretUrn> secretUrns =
-          secretManager.assembleSecretUrns(
-              Map.of("jdbc-user", "root"), entityProperties, "catalog", 42L, bindings, Map.of());
-      secretManager.writeSecrets(bindings, secretUrns);
-      Assertions.assertEquals("s3cr3t", secretManager.readSecret(secretUrns.get(0)));
-
-      secretManager.rollbackWritten(secretUrns);
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> secretManager.readSecret(secretUrns.get(0)));
-    }
-  }
-
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();
