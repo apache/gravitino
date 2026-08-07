@@ -1183,12 +1183,6 @@ class TestGroupMetaService extends TestJDBCBackend {
     Assertions.assertTrue(svc.listGroupsByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
     Assertions.assertTrue(
         svc.listGroupsByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class, () -> svc.countGroupsByMetalake("no_such_metalake"));
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> svc.listGroupsByMetalakePaginated("no_such_metalake", 0, 10));
   }
 
   private NameIdentifier groupExtIdent(String externalId) {

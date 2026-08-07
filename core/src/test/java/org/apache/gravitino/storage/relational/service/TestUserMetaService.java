@@ -1347,12 +1347,6 @@ class TestUserMetaService extends TestJDBCBackend {
 
     Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
     Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
-
-    Assertions.assertThrows(
-        NoSuchEntityException.class, () -> svc.countUsersByMetalake("no_such_metalake"));
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> svc.listUsersByMetalakePaginated("no_such_metalake", 0, 10));
   }
 
   @TestTemplate

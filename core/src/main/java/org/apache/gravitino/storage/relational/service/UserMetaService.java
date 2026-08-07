@@ -478,8 +478,6 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "countUsersByMetalake")
   public long countUsersByMetalake(String metalakeName) {
-    // Ensure metalake exists; throws NoSuchEntityException when missing.
-    MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     Long count =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeName(metalakeName));

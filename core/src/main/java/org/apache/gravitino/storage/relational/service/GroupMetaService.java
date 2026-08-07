@@ -490,8 +490,6 @@ public class GroupMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "countGroupsByMetalake")
   public long countGroupsByMetalake(String metalakeName) {
-    // Ensure metalake exists; throws NoSuchEntityException when missing.
-    MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
     Long count =
         SessionUtils.getWithoutCommit(
             GroupMetaMapper.class, mapper -> mapper.countGroupMetasByMetalakeName(metalakeName));
