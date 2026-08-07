@@ -26,11 +26,16 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -50,6 +55,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
@@ -301,9 +307,20 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    TableEntity loadedEntity = loadTableEntity(ident);
+    Table loadedTable = toGenericTable(loadedEntity);
+    List<Field> fieldsToAdd = prepareFieldsToAdd(loadedTable, changes);
+    long version = handleLanceTableChange(loadedTable, changes, fieldsToAdd);
 
-    Table loadedTable = super.loadTable(ident);
-    long version = handleLanceTableChange(loadedTable, changes);
+    if (!fieldsToAdd.isEmpty()) {
+      try {
+        return persistAddedColumns(ident, loadedEntity, changes, version);
+      } catch (RuntimeException metadataFailure) {
+        rollbackAddedColumns(loadedTable, fieldsToAdd, metadataFailure);
+        throw metadataFailure;
+      }
+    }
+
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
@@ -722,7 +739,10 @@ public class LanceTableOperations extends ManagedTableOperations {
         .withName(tableEntity.name())
         .withComment(tableEntity.comment())
         .withColumns(
-            tableEntity.columns().stream().map(this::toGenericColumn).toArray(Column[]::new))
+            tableEntity.columns().stream()
+                .sorted(Comparator.comparingInt(ColumnEntity::position))
+                .map(this::toGenericColumn)
+                .toArray(Column[]::new))
         .withProperties(tableEntity.properties())
         .withAuditInfo(tableEntity.auditInfo())
         .withSortOrders(tableEntity.sortOrders())
@@ -754,9 +774,19 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @return the new version id of the Lance dataset after applying the changes
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
+    List<Field> fieldsToAdd = prepareFieldsToAdd(table, changes);
+    return handleLanceTableChange(table, changes, fieldsToAdd);
+  }
+
+  private long handleLanceTableChange(Table table, TableChange[] changes, List<Field> fieldsToAdd) {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+
+    if (!fieldsToAdd.isEmpty()) {
+      return addColumns(table, fieldsToAdd, location, storageOptions);
+    }
+
     try (Dataset dataset = openDataset(location, storageOptions)) {
       for (TableChange change : changes) {
         if (change instanceof TableChange.DeleteColumn deleteColumn) {
@@ -781,7 +811,7 @@ public class LanceTableOperations extends ManagedTableOperations {
                   .build();
           dataset.alterColumns(List.of(lanceColumnAlter));
         } else {
-          // Currently, only column drop/rename and index addition are supported.
+          // Currently, only column add/drop/rename and index addition are supported.
           // TODO: Support change column type once we have a clear knowledge about the means of
           // castTo in Lance.
           throw new UnsupportedOperationException(
@@ -797,6 +827,35 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
   }
 
+  private long addColumns(
+      Table table, List<Field> fieldsToAdd, String location, Map<String, String> storageOptions) {
+    List<Field> expectedCurrentFields = convertColumnsToArrowSchema(table.columns()).getFields();
+    List<Field> expectedUpdatedFields = new ArrayList<>(expectedCurrentFields);
+    expectedUpdatedFields.addAll(fieldsToAdd);
+
+    boolean addAttempted = false;
+    try (Dataset dataset = openDataset(location, storageOptions)) {
+      validateSchemaMatches(expectedCurrentFields, dataset.getSchema(), location, "before add");
+      addAttempted = true;
+      dataset.addColumns(fieldsToAdd);
+      dataset.checkoutLatest();
+      validateSchemaMatches(expectedUpdatedFields, dataset.getSchema(), location, "after add");
+      return dataset.getVersion().getId();
+    } catch (RuntimeException e) {
+      if (addAttempted) {
+        rollbackAddedColumns(table, fieldsToAdd, e);
+      }
+      throw e;
+    } catch (Exception e) {
+      RuntimeException failure =
+          new RuntimeException("Failed to add columns to Lance dataset at location " + location, e);
+      if (addAttempted) {
+        rollbackAddedColumns(table, fieldsToAdd, failure);
+      }
+      throw failure;
+    }
+  }
+
   Dataset openDataset(String location) {
     return openDataset(location, Map.of());
   }
@@ -809,6 +868,237 @@ public class LanceTableOperations extends ManagedTableOperations {
         .uri(location)
         .readOptions(new ReadOptions.Builder().setStorageOptions(storageOptions).build())
         .build();
+  }
+
+  private TableEntity loadTableEntity(NameIdentifier ident) {
+    try {
+      return store.get(ident, Entity.EntityType.TABLE, TableEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to load table " + ident, e);
+    }
+  }
+
+  private Table persistAddedColumns(
+      NameIdentifier ident,
+      TableEntity expectedEntity,
+      TableChange[] changes,
+      long datasetVersion) {
+    try {
+      TableEntity updatedEntity =
+          updateTableWithCasRetry(
+              ident,
+              current -> {
+                if (!current.equals(expectedEntity)) {
+                  throw new OptimisticLockException(
+                      "Table %s metadata changed while adding Lance columns", ident);
+                }
+                return appendAddedColumns(current, changes, datasetVersion);
+              });
+      return toGenericTable(updatedEntity);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTableException(e, "Table %s does not exist", ident);
+    } catch (EntityAlreadyExistsException e) {
+      throw new IllegalArgumentException("Failed to persist added columns for table " + ident, e);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to persist added columns for table " + ident, e);
+    }
+  }
+
+  private TableEntity appendAddedColumns(
+      TableEntity tableEntity, TableChange[] changes, long datasetVersion) {
+    List<ColumnEntity> updatedColumns =
+        tableEntity.columns().stream()
+            .sorted(Comparator.comparingInt(ColumnEntity::position))
+            .collect(Collectors.toCollection(ArrayList::new));
+    Instant now = Instant.now();
+    AuditInfo columnAuditInfo =
+        AuditInfo.builder()
+            .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
+            .withCreateTime(now)
+            .build();
+    for (TableChange change : changes) {
+      TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      updatedColumns.add(
+          ColumnEntity.builder()
+              .withId(idGenerator.nextId())
+              .withName(addColumn.fieldName()[0])
+              .withPosition(updatedColumns.size())
+              .withDataType(addColumn.getDataType())
+              .withComment(addColumn.getComment())
+              .withNullable(true)
+              .withAutoIncrement(false)
+              .withDefaultValue(DEFAULT_VALUE_NOT_SET)
+              .withAuditInfo(columnAuditInfo)
+              .build());
+    }
+
+    Map<String, String> updatedProperties = new HashMap<>(tableEntity.properties());
+    updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+
+    return TableEntity.builder()
+        .withId(tableEntity.id())
+        .withName(tableEntity.name())
+        .withNamespace(tableEntity.namespace())
+        .withComment(tableEntity.comment())
+        .withColumns(updatedColumns)
+        .withProperties(updatedProperties)
+        .withPartitioning(tableEntity.partitioning())
+        .withDistribution(tableEntity.distribution())
+        .withSortOrders(tableEntity.sortOrders())
+        .withIndexes(tableEntity.indexes())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(tableEntity.auditInfo().creator())
+                .withCreateTime(tableEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(now)
+                .build())
+        .build();
+  }
+
+  private void rollbackAddedColumns(
+      Table table, List<Field> fieldsToAdd, RuntimeException originalFailure) {
+    String location = table.properties().get(Table.PROPERTY_LOCATION);
+    Map<String, String> storageOptions =
+        LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
+    List<Field> expectedFields = convertColumnsToArrowSchema(table.columns()).getFields();
+    try (Dataset dataset = openDataset(location, storageOptions)) {
+      rollbackAddedColumns(
+          dataset, fieldNames(fieldsToAdd), expectedFields, location, originalFailure);
+    } catch (RuntimeException rollbackFailure) {
+      addRollbackFailure(originalFailure, rollbackFailure, location);
+    }
+  }
+
+  private void rollbackAddedColumns(
+      Dataset dataset,
+      List<String> addedColumnNames,
+      List<Field> expectedFields,
+      String location,
+      RuntimeException originalFailure) {
+    try {
+      dataset.checkoutLatest();
+      Set<String> currentColumnNames =
+          dataset.getSchema().getFields().stream().map(Field::getName).collect(Collectors.toSet());
+      List<String> columnsToDrop =
+          addedColumnNames.stream().filter(currentColumnNames::contains).toList();
+      if (!columnsToDrop.isEmpty()) {
+        dataset.dropColumns(columnsToDrop);
+        dataset.checkoutLatest();
+      }
+      validateSchemaMatches(expectedFields, dataset.getSchema(), location, "after rollback");
+      LOG.warn(
+          "Rolled back Lance columns {} at {} after alteration failure", columnsToDrop, location);
+    } catch (RuntimeException rollbackFailure) {
+      addRollbackFailure(originalFailure, rollbackFailure, location);
+    }
+  }
+
+  private void addRollbackFailure(
+      RuntimeException originalFailure, RuntimeException rollbackFailure, String location) {
+    originalFailure.addSuppressed(rollbackFailure);
+    LOG.error("Failed to roll back added Lance columns at {}", location, rollbackFailure);
+  }
+
+  private List<Field> prepareFieldsToAdd(Table table, TableChange[] changes) {
+    Preconditions.checkArgument(changes != null && changes.length > 0, "Changes cannot be empty");
+
+    int addColumnCount = 0;
+    for (TableChange change : changes) {
+      Preconditions.checkArgument(change != null, "Table change cannot be null");
+      if (change instanceof TableChange.AddColumn) {
+        addColumnCount++;
+      } else if (!(change instanceof TableChange.DeleteColumn)
+          && !(change instanceof TableChange.AddIndex)
+          && !(change instanceof TableChange.RenameColumn)) {
+        throw new UnsupportedOperationException(
+            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
+      }
+    }
+
+    if (addColumnCount == 0) {
+      return List.of();
+    }
+
+    Preconditions.checkArgument(
+        addColumnCount == changes.length,
+        "Lance AddColumn cannot be combined with other table changes");
+
+    Set<String> columnNames =
+        new HashSet<>(Arrays.stream(table.columns()).map(Column::name).toList());
+    List<Field> fieldsToAdd = new ArrayList<>(changes.length);
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.AddColumn addColumn) {
+        Preconditions.checkArgument(
+            addColumn.fieldName().length == 1,
+            "Lance only supports adding top-level columns: %s",
+            String.join(".", addColumn.fieldName()));
+        String columnName = addColumn.fieldName()[0];
+        Preconditions.checkArgument(
+            addColumn.isNullable(),
+            "Lance only supports adding nullable columns because existing rows are backfilled "
+                + "with null: %s",
+            columnName);
+        Preconditions.checkArgument(
+            TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
+            "Lance only supports appending new columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            !addColumn.isAutoIncrement(),
+            "Lance does not support adding auto-increment columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            addColumn.getDefaultValue() == null
+                || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
+            "Lance does not support default values when adding columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            columnNames.add(columnName), "Column %s already exists", columnName);
+        fieldsToAdd.add(
+            LanceDataTypeConverter.CONVERTER.toArrowField(
+                addColumn.fieldName()[0], addColumn.getDataType(), true));
+      }
+    }
+    return fieldsToAdd;
+  }
+
+  private void validateSchemaMatches(
+      List<Field> expectedFields, Schema actualSchema, String location, String stage) {
+    if (actualSchema == null || !fieldsMatch(expectedFields, actualSchema.getFields())) {
+      throw new OptimisticLockException(
+          "Lance schema at %s is inconsistent with Gravitino metadata %s; expected fields %s but "
+              + "found %s",
+          location,
+          stage,
+          expectedFields,
+          actualSchema == null ? "an unavailable schema" : actualSchema.getFields());
+    }
+  }
+
+  private boolean fieldsMatch(List<Field> expectedFields, List<Field> actualFields) {
+    if (expectedFields.size() != actualFields.size()) {
+      return false;
+    }
+    for (int i = 0; i < expectedFields.size(); i++) {
+      if (!fieldMatches(expectedFields.get(i), actualFields.get(i))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  private boolean fieldMatches(Field expected, Field actual) {
+    return expected.getName().equals(actual.getName())
+        && expected.isNullable() == actual.isNullable()
+        && expected.getType().equals(actual.getType())
+        && Objects.equals(expected.getDictionary(), actual.getDictionary())
+        && fieldsMatch(expected.getChildren(), actual.getChildren());
+  }
+
+  private List<String> fieldNames(List<Field> fields) {
+    return fields.stream().map(Field::getName).toList();
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {

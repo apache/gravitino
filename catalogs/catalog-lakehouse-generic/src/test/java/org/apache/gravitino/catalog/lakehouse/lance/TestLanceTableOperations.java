@@ -48,12 +48,14 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
@@ -471,6 +473,425 @@ public class TestLanceTableOperations {
 
     Assertions.assertEquals("9", alteredTable.properties().get(LANCE_TABLE_VERSION));
     Assertions.assertEquals("9", storedTable.get().properties().get(LANCE_TABLE_VERSION));
+  }
+
+  @Test
+  public void testAlterTableAddsNullableColumnsInSingleCommit() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("add-column").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(10L)
+                    .withName("description")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(1)
+                    .withNullable(true)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build(),
+                ColumnEntity.builder()
+                    .withId(9L)
+                    .withName("id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withNullable(true)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(idGenerator.nextId()).thenReturn(11L, 12L);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(tableEntity);
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    Schema currentSchema =
+        new Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("description", new ArrowType.Utf8())));
+    List<Field> addedFields =
+        List.of(
+            Field.nullable("name", new ArrowType.Utf8()),
+            Field.nullable("active", new ArrowType.Bool()));
+    Schema updatedSchema =
+        new Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("description", new ArrowType.Utf8()),
+                Field.nullable("name", new ArrowType.Utf8()),
+                Field.nullable("active", new ArrowType.Bool())));
+    when(dataset.getSchema()).thenReturn(currentSchema, updatedSchema);
+    Version version = mock(Version.class);
+    when(dataset.getVersion()).thenReturn(version);
+    when(version.getId()).thenReturn(9L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table alteredTable =
+        PrincipalUtils.doAs(
+            new UserPrincipal("tester"),
+            () ->
+                lanceTableOps.alterTable(
+                    ident,
+                    TableChange.addColumn(
+                        new String[] {"name"}, Types.StringType.get(), "name comment"),
+                    TableChange.addColumn(
+                        new String[] {"active"}, Types.BooleanType.get(), "active comment")));
+
+    verify(dataset).addColumns(addedFields);
+    verify(dataset).checkoutLatest();
+    Assertions.assertEquals(4, alteredTable.columns().length);
+    Assertions.assertEquals("id", alteredTable.columns()[0].name());
+    Assertions.assertEquals("description", alteredTable.columns()[1].name());
+    Assertions.assertEquals("name", alteredTable.columns()[2].name());
+    Assertions.assertEquals(Types.StringType.get(), alteredTable.columns()[2].dataType());
+    Assertions.assertEquals("name comment", alteredTable.columns()[2].comment());
+    Assertions.assertTrue(alteredTable.columns()[2].nullable());
+    Assertions.assertEquals("active", alteredTable.columns()[3].name());
+    Assertions.assertEquals(Types.BooleanType.get(), alteredTable.columns()[3].dataType());
+    Assertions.assertEquals("active comment", alteredTable.columns()[3].comment());
+    Assertions.assertTrue(alteredTable.columns()[3].nullable());
+    Assertions.assertEquals("9", alteredTable.properties().get(LANCE_TABLE_VERSION));
+  }
+
+  @Test
+  public void testAddColumnRejectsUnsupportedOptionsBeforeOpeningDataset() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    when(table.columns()).thenReturn(new Column[0]);
+
+    List<TableChange> unsupportedChanges =
+        List.of(
+            TableChange.addColumn(new String[] {"parent", "nested"}, Types.StringType.get()),
+            TableChange.addColumn(new String[] {"required"}, Types.StringType.get(), false),
+            TableChange.addColumn(
+                new String[] {"first"}, Types.StringType.get(), TableChange.ColumnPosition.first()),
+            TableChange.addColumn(
+                new String[] {"sequence"}, Types.LongType.get(), null, null, true, true),
+            TableChange.addColumn(
+                new String[] {"with_default"},
+                Types.IntegerType.get(),
+                Literals.integerLiteral(1)));
+
+    for (TableChange change : unsupportedChanges) {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () -> lanceTableOps.handleLanceTableChange(table, new TableChange[] {change}));
+    }
+    verify(lanceTableOps, never()).openDataset("location", Map.of());
+  }
+
+  @Test
+  public void testAddColumnRejectsNameConflictsBeforeOpeningDataset() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    when(table.columns()).thenReturn(new Column[] {Column.of("id", Types.IntegerType.get(), "id")});
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.addColumn(new String[] {"id"}, Types.StringType.get())
+                }));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.addColumn(new String[] {"new_col"}, Types.StringType.get()),
+                  TableChange.addColumn(new String[] {"new_col"}, Types.LongType.get())
+                }));
+
+    verify(lanceTableOps, never()).openDataset("location", Map.of());
+  }
+
+  @Test
+  public void testAddColumnRejectsMixedChangesBeforeOpeningDataset() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+
+    TableChange addColumn = TableChange.addColumn(new String[] {"added"}, Types.StringType.get());
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  addColumn, TableChange.renameColumn(new String[] {"old"}, "renamed")
+                }));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  addColumn, TableChange.deleteColumn(new String[] {"old"}, false)
+                }));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  addColumn,
+                  TableChange.addIndex(Index.IndexType.SCALAR, "idx_old", new String[][] {{"old"}})
+                }));
+
+    verify(lanceTableOps, never()).openDataset("location", Map.of());
+  }
+
+  @Test
+  public void testInvalidChangeBatchIsRejectedBeforeOpeningDataset() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> lanceTableOps.handleLanceTableChange(table, new TableChange[0]));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.renameColumn(new String[] {"old"}, "renamed"),
+                  TableChange.updateComment("unsupported")
+                }));
+
+    verify(lanceTableOps, never()).openDataset("location", Map.of());
+  }
+
+  @Test
+  public void testAddColumnRejectsSchemaDriftBeforePhysicalChange() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    when(table.columns()).thenReturn(new Column[] {Column.of("id", Types.IntegerType.get(), "id")});
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("id", new ArrowType.Int(32, true)),
+                    Field.nullable("external", new ArrowType.Utf8()))));
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset("location", Map.of());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.addColumn(new String[] {"added"}, Types.StringType.get())
+                }));
+
+    verify(dataset, never()).addColumns(anyList());
+    verify(dataset, never()).dropColumns(anyList());
+  }
+
+  @Test
+  public void testAddColumnRollsBackUnexpectedResultSchema() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    when(table.columns()).thenReturn(new Column[] {Column.of("id", Types.IntegerType.get(), "id")});
+
+    Schema currentSchema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    Schema unexpectedSchema =
+        new Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("added", new ArrowType.Int(64, true))));
+    Dataset addDataset = mock(Dataset.class);
+    when(addDataset.getSchema()).thenReturn(currentSchema, unexpectedSchema);
+    Dataset rollbackDataset = mock(Dataset.class);
+    when(rollbackDataset.getSchema()).thenReturn(unexpectedSchema, currentSchema);
+    Mockito.doReturn(addDataset, rollbackDataset)
+        .when(lanceTableOps)
+        .openDataset("location", Map.of());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.addColumn(new String[] {"added"}, Types.StringType.get())
+                }));
+
+    verify(addDataset).addColumns(List.of(Field.nullable("added", new ArrowType.Utf8())));
+    verify(rollbackDataset).dropColumns(List.of("added"));
+    verify(rollbackDataset, Mockito.times(2)).getSchema();
+  }
+
+  @Test
+  public void testAddColumnRollsBackAmbiguousPhysicalFailure() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    when(table.columns()).thenReturn(new Column[] {Column.of("id", Types.IntegerType.get(), "id")});
+
+    Schema currentSchema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    Schema updatedSchema =
+        new Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("added", new ArrowType.Utf8())));
+    Dataset addDataset = mock(Dataset.class);
+    when(addDataset.getSchema()).thenReturn(currentSchema);
+    Mockito.doThrow(new RuntimeException("commit response lost"))
+        .when(addDataset)
+        .addColumns(anyList());
+    Dataset rollbackDataset = mock(Dataset.class);
+    when(rollbackDataset.getSchema()).thenReturn(updatedSchema, currentSchema);
+    Mockito.doReturn(addDataset, rollbackDataset)
+        .when(lanceTableOps)
+        .openDataset("location", Map.of());
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                lanceTableOps.handleLanceTableChange(
+                    table,
+                    new TableChange[] {
+                      TableChange.addColumn(new String[] {"added"}, Types.StringType.get())
+                    }));
+
+    Assertions.assertEquals("commit response lost", failure.getMessage());
+    verify(rollbackDataset).dropColumns(List.of("added"));
+  }
+
+  @Test
+  public void testAddColumnPreservesRollbackFailureAsSuppressed() {
+    Table table = mock(Table.class);
+    when(table.properties()).thenReturn(Map.of(Table.PROPERTY_LOCATION, "location"));
+    when(table.columns()).thenReturn(new Column[] {Column.of("id", Types.IntegerType.get(), "id")});
+
+    Schema currentSchema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    Dataset addDataset = mock(Dataset.class);
+    when(addDataset.getSchema()).thenReturn(currentSchema);
+    Mockito.doThrow(new RuntimeException("physical add failed"))
+        .when(addDataset)
+        .addColumns(anyList());
+    Dataset rollbackDataset = mock(Dataset.class);
+    Mockito.doThrow(new RuntimeException("rollback failed")).when(rollbackDataset).checkoutLatest();
+    Mockito.doReturn(addDataset, rollbackDataset)
+        .when(lanceTableOps)
+        .openDataset("location", Map.of());
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                lanceTableOps.handleLanceTableChange(
+                    table,
+                    new TableChange[] {
+                      TableChange.addColumn(new String[] {"added"}, Types.StringType.get())
+                    }));
+
+    Assertions.assertEquals("physical add failed", failure.getMessage());
+    Assertions.assertEquals(1, failure.getSuppressed().length);
+    Assertions.assertEquals("rollback failed", failure.getSuppressed()[0].getMessage());
+  }
+
+  @Test
+  public void testAddColumnRollsBackMetadataUpdateFailure() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("metadata-failure").toString();
+    TableEntity tableEntity = nullableIntegerTable(ident, location);
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(new IOException("metadata unavailable"));
+
+    Schema currentSchema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    Schema updatedSchema =
+        new Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("added", new ArrowType.Utf8())));
+    Dataset addDataset = successfulAddDataset(currentSchema, updatedSchema, 9L);
+    Dataset rollbackDataset = mock(Dataset.class);
+    when(rollbackDataset.getSchema()).thenReturn(updatedSchema, currentSchema);
+    Mockito.doReturn(addDataset, rollbackDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"),
+                    () ->
+                        lanceTableOps.alterTable(
+                            ident,
+                            TableChange.addColumn(
+                                new String[] {"added"}, Types.StringType.get()))));
+
+    Assertions.assertTrue(failure.getMessage().contains("Failed to persist added columns"));
+    verify(rollbackDataset).dropColumns(List.of("added"));
+  }
+
+  @Test
+  public void testAddColumnRollsBackConcurrentMetadataChange() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("metadata-conflict").toString();
+    TableEntity tableEntity = nullableIntegerTable(ident, location);
+    TableEntity concurrentEntity =
+        tableEntity(
+            ident,
+            tableEntity.columns(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_VERSION,
+                "8",
+                "concurrent.property",
+                "changed"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(concurrentEntity);
+            });
+
+    Schema currentSchema = new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true))));
+    Schema updatedSchema =
+        new Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("added", new ArrowType.Utf8())));
+    Dataset addDataset = successfulAddDataset(currentSchema, updatedSchema, 9L);
+    Dataset rollbackDataset = mock(Dataset.class);
+    when(rollbackDataset.getSchema()).thenReturn(updatedSchema, currentSchema);
+    Mockito.doReturn(addDataset, rollbackDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            PrincipalUtils.doAs(
+                new UserPrincipal("tester"),
+                () ->
+                    lanceTableOps.alterTable(
+                        ident,
+                        TableChange.addColumn(new String[] {"added"}, Types.StringType.get()))));
+
+    verify(rollbackDataset).dropColumns(List.of("added"));
   }
 
   @Test
@@ -939,6 +1360,31 @@ public class TestLanceTableOperations {
         loaded.properties().containsKey(LANCE_TABLE_DECLARED),
         "lance.declared must be removed after schema is written");
     verify(dataset).getSchema();
+  }
+
+  private static TableEntity nullableIntegerTable(NameIdentifier ident, String location) {
+    return tableEntity(
+        ident,
+        List.of(
+            ColumnEntity.builder()
+                .withId(10L)
+                .withName("id")
+                .withDataType(Types.IntegerType.get())
+                .withPosition(0)
+                .withNullable(true)
+                .withAuditInfo(AuditInfo.EMPTY)
+                .build()),
+        Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+  }
+
+  private static Dataset successfulAddDataset(
+      Schema currentSchema, Schema updatedSchema, long versionId) {
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema()).thenReturn(currentSchema, updatedSchema);
+    Version version = mock(Version.class);
+    when(dataset.getVersion()).thenReturn(version);
+    when(version.getId()).thenReturn(versionId);
+    return dataset;
   }
 
   private static TableEntity tableEntity(
