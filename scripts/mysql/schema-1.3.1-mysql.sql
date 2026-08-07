@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` TEXT NOT NULL COMMENT 'column type',
-    `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
+    `column_comment` VARCHAR(256) DEFAULT '' COMMENT 'column comment',
     `column_nullable` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'column nullable, 0 is not nullable, 1 is nullable',
     `column_auto_increment` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'column auto increment, 0 is not auto increment, 1 is auto increment',
     `column_default_value` TEXT DEFAULT NULL COMMENT 'column default value',
@@ -162,8 +162,6 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'username',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system',
-    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'user audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'user last version',
@@ -171,7 +169,6 @@ CREATE TABLE IF NOT EXISTS `user_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`user_id`),
     UNIQUE KEY `uk_mid_us_del` (`metalake_id`, `user_name`, `deleted_at`),
-    UNIQUE KEY `uk_mid_ueid_del` (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_user_meta_name_del_upd` (`metalake_id`, `user_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'user metadata';
 
@@ -221,7 +218,6 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'group name',
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
-    `external_id` VARCHAR(256) DEFAULT NULL COMMENT 'external identifier from an upstream identity system',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'group audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'group last version',
@@ -229,7 +225,6 @@ CREATE TABLE IF NOT EXISTS `group_meta` (
     `updated_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'updated at',
     PRIMARY KEY (`group_id`),
     UNIQUE KEY `uk_mid_gr_del` (`metalake_id`, `group_name`, `deleted_at`),
-    UNIQUE KEY `uk_mid_geid_del` (`metalake_id`, `external_id`, `deleted_at`),
     KEY `idx_group_meta_name_del_upd` (`metalake_id`, `group_name`, `deleted_at`, `updated_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'group metadata';
 
@@ -286,7 +281,6 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `tag_comment` VARCHAR(256) DEFAULT '' COMMENT 'tag comment',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'tag properties',
-    `allowed_values` MEDIUMTEXT DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',
@@ -300,16 +294,14 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
     `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
-    `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ti_mi_mo_tv_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`),
+    UNIQUE KEY `uk_ti_mi_mo_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
-    KEY `tag_relation_meta_idx_mid` (`metadata_object_id`),
-    KEY `idx_tid_value` (`tag_id`, `tag_value`)
+    KEY `tag_relation_meta_idx_mid` (`metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (
