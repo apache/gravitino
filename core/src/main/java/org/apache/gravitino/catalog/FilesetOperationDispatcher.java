@@ -38,6 +38,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class FilesetOperationDispatcher extends OperationDispatcher implements FilesetDispatcher {
@@ -47,10 +48,14 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
    * @param catalogManager The CatalogManager instance to be used for fileset operations.
    * @param store The EntityStore instance to be used for fileset operations.
    * @param idGenerator The IdGenerator instance to be used for fileset operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public FilesetOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   /**

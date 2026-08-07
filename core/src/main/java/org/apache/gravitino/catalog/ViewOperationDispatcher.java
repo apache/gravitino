@@ -51,6 +51,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -69,10 +70,19 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @param catalogManager The CatalogManager instance to be used for view operations.
    * @param store The EntityStore instance to be used for view operations.
    * @param idGenerator The IdGenerator instance to be used for view operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public ViewOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    this(catalogManager, store, idGenerator, () -> GravitinoEnv.getInstance().schemaDispatcher());
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    this(
+        catalogManager,
+        store,
+        idGenerator,
+        () -> GravitinoEnv.getInstance().schemaDispatcher(),
+        secretManager);
   }
 
   /**
@@ -82,13 +92,15 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @param store The EntityStore instance to be used for view operations.
    * @param idGenerator The IdGenerator instance to be used for view operations.
    * @param schemaDispatcherSupplier The SchemaDispatcher supplier to ensure schemas are imported.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public ViewOperationDispatcher(
       CatalogManager catalogManager,
       EntityStore store,
       IdGenerator idGenerator,
-      Supplier<SchemaDispatcher> schemaDispatcherSupplier) {
-    super(catalogManager, store, idGenerator);
+      Supplier<SchemaDispatcher> schemaDispatcherSupplier,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
     this.schemaDispatcherSupplier =
         Preconditions.checkNotNull(
             schemaDispatcherSupplier, "schemaDispatcherSupplier must not be null");

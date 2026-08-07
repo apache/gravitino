@@ -53,6 +53,7 @@ import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
@@ -77,6 +78,8 @@ public abstract class TestOperationDispatcher {
 
   protected static CatalogManager catalogManager;
 
+  protected static SecretManager secretManager;
+
   private static Config config;
 
   @BeforeAll
@@ -97,7 +100,8 @@ public abstract class TestOperationDispatcher {
             .build();
     entityStore.put(metalakeEntity, true);
 
-    catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    secretManager = new SecretManager(config);
+    catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
 
     Config config = mock(Config.class);

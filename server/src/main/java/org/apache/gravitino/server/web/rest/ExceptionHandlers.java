@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
@@ -1103,6 +1104,11 @@ public class ExceptionHandlers {
         // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
         LOG.warn(errorMsg, e);
         return Utils.connectionFailed(errorMsg, e);
+      }
+
+      if (e instanceof OptimisticLockException) {
+        LOG.warn(errorMsg, e);
+        return Utils.optimisticLockConflict(errorMsg, e);
       }
 
       LOG.error(errorMsg, e);
