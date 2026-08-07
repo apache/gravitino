@@ -34,6 +34,7 @@ public class TestSecretReference {
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new SecretReference("vault", null));
-    Assertions.assertTrue(new SecretReference("vault", Map.of()).attributes().isEmpty());
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> new SecretReference("vault", Map.of()));
   }
 }

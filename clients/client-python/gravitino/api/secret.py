@@ -15,8 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from dataclasses import dataclass, field
-from typing import Dict, Optional
+from dataclasses import dataclass
+from typing import Dict
 
 
 @dataclass
@@ -35,11 +35,11 @@ class SecretReference:
     """External secret locator: provider instance name plus provider-specific attributes."""
 
     provider: str
-    attributes: Optional[Dict[str, str]] = field(default_factory=dict)
+    attributes: Dict[str, str]
 
     def __post_init__(self):
-        if self.attributes is None:
-            raise ValueError("attributes must not be null")
+        if self.attributes is None or len(self.attributes) == 0:
+            raise ValueError("attributes must not be null or empty")
 
     def __repr__(self) -> str:
         return f"SecretReference(provider={self.provider!r}, attributes={self.attributes!r})"

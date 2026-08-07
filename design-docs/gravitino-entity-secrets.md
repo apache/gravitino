@@ -574,7 +574,7 @@ schema, and fileset create bodies).
 | Field        | Required | Meaning                                                                                                      |
 | ------------ | -------- | ------------------------------------------------------------------------------------------------------------ |
 | `provider`   | Yes      | Registered `provider_name`                                                                                   |
-| `attributes` | No       | Provider-specific locator keys (`map<string, string>`). Empty / omitted ⇒ empty map. Never a raw URN string. |
+| `attributes` | Yes      | Provider-specific locator keys (`map<string, string>`); must be non-null and non-empty. Never a raw URN string. |
 
 **`attributes`** are provider-specific. The REST schema stays the same for every provider; each
 `GravitinoSecretProvider` documents required keys. **`InMemorySecretsProvider` does not use

@@ -28,13 +28,20 @@ import org.junit.jupiter.api.Test;
 public class TestSecretReferenceDTO {
 
   @Test
-  void testAttributesDefaultEmpty() {
+  void testAttributesRequiredNonEmpty() {
     SecretReferenceDTO dto = SecretReferenceDTO.builder().withProvider("vault").build();
     Assertions.assertNotNull(dto.getAttributes());
     Assertions.assertTrue(dto.getAttributes().isEmpty());
-    SecretReference reference = dto.toSecretReference();
+    Assertions.assertThrows(IllegalArgumentException.class, dto::toSecretReference);
+
+    SecretReferenceDTO withAttrs =
+        SecretReferenceDTO.builder()
+            .withProvider("vault")
+            .withAttributes(Map.of("path", "secret/data/x"))
+            .build();
+    SecretReference reference = withAttrs.toSecretReference();
     Assertions.assertEquals("vault", reference.provider());
-    Assertions.assertTrue(reference.attributes().isEmpty());
+    Assertions.assertEquals("secret/data/x", reference.attributes().get("path"));
   }
 
   @Test
