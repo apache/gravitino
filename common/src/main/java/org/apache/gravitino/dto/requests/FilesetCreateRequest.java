@@ -78,6 +78,26 @@ public class FilesetCreateRequest implements RESTRequest {
   private Map<String, SecretReferenceDTO> secretReferences;
 
   /**
+   * Constructor for FilesetCreateRequest without secret maps.
+   *
+   * @param name The name of the fileset.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocation The storage location of the fileset.
+   * @param storageLocations The storage locations of the fileset.
+   * @param properties The properties of the fileset.
+   */
+  public FilesetCreateRequest(
+      String name,
+      String comment,
+      Fileset.Type type,
+      String storageLocation,
+      Map<String, String> storageLocations,
+      Map<String, String> properties) {
+    this(name, comment, type, storageLocation, storageLocations, properties, null, null);
+  }
+
+  /**
    * Validates the request.
    *
    * @throws IllegalArgumentException if the request is invalid.

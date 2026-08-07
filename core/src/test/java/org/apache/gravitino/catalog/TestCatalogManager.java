@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -67,11 +68,13 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -1389,8 +1392,9 @@ public class TestCatalogManager {
   @Test
   void testCreateCatalogSecretRollback() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
-      CatalogManager manager =
-          Mockito.spy(new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets));
+      AtomicLong nextId = new AtomicLong(4242L);
+      IdGenerator ids = nextId::getAndIncrement;
+      CatalogManager manager = Mockito.spy(new CatalogManager(config, entityStore, ids, secrets));
       NameIdentifier ident = NameIdentifier.of("metalake", "secret_catalog_fail");
       Map<String, String> props =
           ImmutableMap.of(
@@ -1406,6 +1410,14 @@ public class TestCatalogManager {
           .when(manager)
           .createCatalogWrapper(any(CatalogEntity.class), any());
 
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "catalog",
+                  SecretConstants.ATTR_ENTITY_ID, "4242",
+                  SecretConstants.ATTR_PROPERTY_KEY, PROPERTY_KEY4));
+
       Assertions.assertThrows(
           RuntimeException.class,
           () ->
@@ -1418,6 +1430,46 @@ public class TestCatalogManager {
                   Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
                   Map.of()));
       Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      manager.close();
+    }
+  }
+
+  @Test
+  void testCreateCatalogSecretNotWrittenWhenMetalakeMissing() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(4343L);
+      IdGenerator ids = nextId::getAndIncrement;
+      CatalogManager manager = new CatalogManager(config, entityStore, ids, secrets);
+      NameIdentifier ident = NameIdentifier.of("missing_metalake", "secret_catalog");
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "catalog",
+                  SecretConstants.ATTR_ENTITY_ID, "4343",
+                  SecretConstants.ATTR_PROPERTY_KEY, PROPERTY_KEY4));
+
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  ImmutableMap.of(
+                      "provider",
+                      "test",
+                      PROPERTY_KEY1,
+                      "value1",
+                      PROPERTY_KEY2,
+                      "value2",
+                      PROPERTY_KEY5_PREFIX + "1",
+                      "value3"),
+                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                  Map.of()));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
       manager.close();
     }
   }

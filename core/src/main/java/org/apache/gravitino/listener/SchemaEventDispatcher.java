@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -93,6 +94,12 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   @Override
   public boolean schemaExists(NameIdentifier ident) {
     return dispatcher.schemaExists(ident);
+  }
+
+  @Override
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   @Override

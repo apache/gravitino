@@ -325,7 +325,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateFilesetWithSecrets() {
+  public void testCreateFilesetWithSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       AtomicLong nextId = new AtomicLong(9000L);
       IdGenerator ids = nextId::getAndIncrement;
@@ -352,6 +352,16 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
               Map.of());
       Assertions.assertFalse(fileset.properties().containsKey("k2"));
 
+      // Storage keeps secret URNs; runtime FS conf resolves via toPlaintextProperties (catalog
+      // pattern).
+      Fileset stored =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident));
+      Assertions.assertTrue(
+          org.apache.gravitino.secret.SecretPropertyUtils.isSecretProperty(
+              "k2", stored.properties().get("k2")));
+
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
               "memory",
@@ -371,6 +381,9 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
                   ImmutableMap.of("k1", "v1"),
                   bindings,
                   Map.of()));
+
+      Assertions.assertTrue(filesets.dropFileset(ident));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }
   }
 

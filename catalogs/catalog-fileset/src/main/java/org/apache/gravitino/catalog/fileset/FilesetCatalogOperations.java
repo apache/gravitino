@@ -104,6 +104,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -1510,10 +1511,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       NameIdentifier ident, Map<String, String> entityProperties, Path path) {
     // Merge configurations from catalog, schema, and entity (fileset) levels, and also include
     // user-defined configurations for the specified location.
+    //
+    // Catalog conf is already plaintext (CatalogManager.createBaseCatalog). Schema/fileset entity
+    // properties keep secret URNs in storage; resolve them here so FileSystem ops see plaintext,
+    // matching the catalog "storage=URN / connector=plaintext" split.
     Map<String, String> mergedProperties = new HashMap<>(conf);
     if (ident.namespace().levels().length == 2) {
       // schema level
-      mergedProperties.putAll(entityProperties);
+      mergedProperties.putAll(toPlaintextProperties(entityProperties));
       // Add user-defined configs for location if provided
       mergedProperties.putAll(
           FilesetUtil.getUserDefinedFileSystemConfigs(
@@ -1527,8 +1532,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     NameIdentifierUtil.checkFileset(ident);
     NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(ident);
     Schema schema = loadSchema(schemaIdent);
-    mergedProperties.putAll(schema.properties());
-    mergedProperties.putAll(entityProperties);
+    mergedProperties.putAll(toPlaintextProperties(schema.properties()));
+    mergedProperties.putAll(toPlaintextProperties(entityProperties));
     // Add user-defined configs for location if provided
     mergedProperties.putAll(
         FilesetUtil.getUserDefinedFileSystemConfigs(
@@ -1536,6 +1541,27 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             mergedProperties,
             FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
     return mergedProperties;
+  }
+
+  /**
+   * Resolve secret URNs in entity properties for connector/FileSystem use. Storage and API paths
+   * keep URN strings; only this runtime conf merge should see plaintext.
+   */
+  private Map<String, String> toPlaintextProperties(Map<String, String> properties) {
+    if (properties == null || properties.isEmpty()) {
+      return properties == null ? Map.of() : properties;
+    }
+    boolean hasSecretUrn = false;
+    for (Map.Entry<String, String> entry : properties.entrySet()) {
+      if (SecretPropertyUtils.isSecretProperty(entry.getKey(), entry.getValue())) {
+        hasSecretUrn = true;
+        break;
+      }
+    }
+    if (!hasSecretUrn) {
+      return properties;
+    }
+    return GravitinoEnv.getInstance().secretManager().toPlaintextProperties(properties);
   }
 
   @Override

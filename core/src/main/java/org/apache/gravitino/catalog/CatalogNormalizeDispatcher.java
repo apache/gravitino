@@ -22,6 +22,7 @@ import static org.apache.gravitino.Entity.SYSTEM_CATALOG_RESERVED_NAME;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
@@ -69,6 +70,12 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
+      throws NoSuchMetalakeException {
+    return dispatcher.listCatalogsInfo(namespace, catalogNames);
+  }
+
+  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     return dispatcher.loadCatalog(ident);
   }
@@ -76,6 +83,18 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   @Override
   public boolean catalogExists(NameIdentifier ident) {
     return dispatcher.catalogExists(ident);
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   @Override

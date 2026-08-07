@@ -20,7 +20,6 @@
 
 package org.apache.gravitino;
 
-import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -99,6 +98,22 @@ public interface SupportsSchemas {
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
+   * @return The schema as defined by the caller, without all default values.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws SchemaAlreadyExistsException If the schema already exists.
+   */
+  Schema createSchema(String schemaName, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException;
+
+  /**
+   * Creates a schema with optional secret maps.
+   *
+   * <p>The default implementation rejects create-time secrets. Implementations that support secrets
+   * must override this method.
+   *
+   * @param schemaName The name of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
    * @param secretBindings optional property key → binding ({@code provider} + {@code plaintext})
    *     for write-through
    * @param secretReferences optional property key → secret locator ({@code provider} plus
@@ -106,33 +121,16 @@ public interface SupportsSchemas {
    * @return The schema as defined by the caller, without all default values.
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
+   * @throws UnsupportedOperationException if create-time secrets are not supported
    */
-  Schema createSchema(
+  default Schema createSchema(
       String schemaName,
       String comment,
       Map<String, String> properties,
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException;
-
-  /**
-   * Creates a schema in the catalog based on the provided details.
-   *
-   * <p>This method returns the schema as defined by the user without applying all defaults. If you
-   * need the schema with default values applied, use the {@link #loadSchema(String)} method after
-   * creation.
-   *
-   * @param schemaName The name of the schema.
-   * @param comment The comment of the schema.
-   * @param properties The properties of the schema.
-   * @return The schema as defined by the caller, without all default values.
-   * @throws NoSuchCatalogException If the catalog does not exist.
-   * @throws SchemaAlreadyExistsException If the schema already exists.
-   */
-  default Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    return createSchema(
-        schemaName, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+    throw new UnsupportedOperationException("Not implemented");
   }
 
   /**

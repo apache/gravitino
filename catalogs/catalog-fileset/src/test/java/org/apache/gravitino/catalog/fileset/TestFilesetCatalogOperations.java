@@ -62,7 +62,9 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -102,6 +104,12 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.RelationalEntityStore;
@@ -3223,6 +3231,65 @@ public class TestFilesetCatalogOperations {
       Assertions.assertNull(result3.get("aws-ak"));
       Assertions.assertNull(result3.get("aws-sk"));
       Assertions.assertNull(result3.get("endpoint"));
+    }
+  }
+
+  @Test
+  public void testMergeUpLevelConfigurationsResolvesSecretUrns() throws Exception {
+    Config secretConfig = new Config(false) {};
+    Properties secretProps = new Properties();
+    secretProps.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    secretProps.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    secretConfig.loadFromProperties(secretProps);
+
+    try (SecretManager secrets = new SecretManager(secretConfig)) {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", secrets, true);
+
+      long entityId = idGenerator.nextId();
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "aws-sk"));
+      secrets.writeSecrets(
+          Map.of("aws-sk", new SecretBinding("memory", "super-secret")), List.of(urn));
+
+      final long testId = generateTestId();
+      final String schemaName = "schema_secret_" + testId;
+      final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
+
+      Map<String, String> catalogProps = Maps.newHashMap();
+      catalogProps.put(LOCATION, TEST_ROOT_PATH);
+
+      try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store)) {
+        ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
+
+        NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+        Map<String, String> schemaProps = Maps.newHashMap();
+        schemaProps.put(LOCATION, schemaPath);
+        schemaProps.put("aws-sk", urn.toString());
+        StringIdentifier stringId = StringIdentifier.fromId(entityId);
+        schemaProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProps));
+        Schema schema = ops.createSchema(schemaIdent, "comment", schemaProps);
+
+        // Storage keeps the URN.
+        Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
+
+        Map<String, String> merged =
+            ops.mergeUpLevelConfigurations(schemaIdent, schema.properties(), new Path(schemaPath));
+        // FS/connector conf sees plaintext.
+        Assertions.assertEquals("super-secret", merged.get("aws-sk"));
+        // Original schema properties are unchanged.
+        Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
+      } finally {
+        FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", null, true);
+      }
     }
   }
 }

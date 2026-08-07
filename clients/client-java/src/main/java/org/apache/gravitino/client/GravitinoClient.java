@@ -21,6 +21,7 @@ package org.apache.gravitino.client;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -131,6 +132,24 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
     return getMetalake().loadCatalog(catalogName);
+  }
+
+  @Override
+  public Catalog createCatalog(
+      String catalogName,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        catalogName,
+        type,
+        provider,
+        comment,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   @Override

@@ -169,6 +169,9 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         IllegalArgumentException.class);
     secretManager.writeSecrets(secretBindings, secretUrns);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
+    // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
+    // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
+    // FilesetCatalogOperations.mergeUpLevelConfigurations / CatalogManager.createBaseCatalog.
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
@@ -261,11 +264,31 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(ident.namespace().levels()),
         LockType.WRITE,
-        () ->
-            doWithCatalog(
-                getCatalogIdentifier(ident),
-                c -> c.doWithFilesetOps(f -> f.dropFileset(ident)),
-                NonEmptyEntityException.class));
+        () -> {
+          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          // Capture properties (including write-through secret URNs) before drop.
+          Map<String, String> filesetProperties;
+          try {
+            Fileset fileset =
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+                    NoSuchFilesetException.class);
+            filesetProperties = fileset.properties();
+          } catch (NoSuchFilesetException e) {
+            return false;
+          }
+
+          boolean dropped =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithFilesetOps(f -> f.dropFileset(ident)),
+                  NonEmptyEntityException.class);
+          if (dropped) {
+            secretManager.deleteWrittenSecretsFromProperties(filesetProperties);
+          }
+          return dropped;
+        });
   }
 
   /**

@@ -433,6 +433,16 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Schema schema = d.createSchema(ident, "comment", props, bindings, Map.of());
       Assertions.assertFalse(schema.properties().containsKey("k2"));
 
+      // Storage keeps secret URNs; runtime FS conf resolves via toPlaintextProperties (catalog
+      // pattern).
+      Schema stored =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithSchemaOps(ops -> ops.loadSchema(ident));
+      Assertions.assertTrue(
+          org.apache.gravitino.secret.SecretPropertyUtils.isSecretProperty(
+              "k2", stored.properties().get("k2")));
+
       SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
@@ -445,6 +455,9 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", props, bindings, Map.of()));
+
+      Assertions.assertTrue(d.dropSchema(ident, false));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }
   }
 

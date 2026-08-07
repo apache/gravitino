@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.hook;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Entity;
@@ -69,8 +71,26 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
+      throws NoSuchMetalakeException {
+    return dispatcher.listCatalogsInfo(namespace, catalogNames);
+  }
+
+  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     return dispatcher.loadCatalog(ident);
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   @Override

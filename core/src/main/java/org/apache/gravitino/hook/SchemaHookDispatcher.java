@@ -46,6 +46,8 @@ import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * {@code SchemaHookDispatcher} is a decorator for {@link SchemaDispatcher} that not only delegates
@@ -53,6 +55,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
  * before or after the underlying operations.
  */
 public class SchemaHookDispatcher implements SchemaDispatcher {
+  private static final Logger LOG = LoggerFactory.getLogger(SchemaHookDispatcher.class);
   private final SchemaDispatcher dispatcher;
 
   public SchemaHookDispatcher(SchemaDispatcher dispatcher) {
@@ -62,6 +65,12 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   @Override
   public NameIdentifier[] listSchemas(Namespace namespace) throws NoSuchCatalogException {
     return dispatcher.listSchemas(namespace);
+  }
+
+  @Override
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   @Override
@@ -101,25 +110,45 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
           Schema schema =
               dispatcher.createSchema(ident, comment, properties, secretBindings, secretReferences);
 
-          // Set the creator as the owner of the new schema and of any ancestors it created. This
-          // mirrors IcebergNamespaceHookDispatcher.createNamespace so ownership-based
-          // authorization -- which treats ownership of an ancestor schema as ownership of the
-          // whole subtree -- behaves the same on the Gravitino and Iceberg REST surfaces.
-          OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-          if (ownerManager != null) {
-            List<MetadataObject> ownedObjects = new ArrayList<>(newAncestors.size() + 1);
-            for (NameIdentifier ancestor : newAncestors) {
+          try {
+            // Set the creator as the owner of the new schema and of any ancestors it created. This
+            // mirrors IcebergNamespaceHookDispatcher.createNamespace so ownership-based
+            // authorization -- which treats ownership of an ancestor schema as ownership of the
+            // whole subtree -- behaves the same on the Gravitino and Iceberg REST surfaces.
+            OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+            if (ownerManager != null) {
+              List<MetadataObject> ownedObjects = new ArrayList<>(newAncestors.size() + 1);
+              for (NameIdentifier ancestor : newAncestors) {
+                ownedObjects.add(
+                    NameIdentifierUtil.toMetadataObject(ancestor, Entity.EntityType.SCHEMA));
+              }
               ownedObjects.add(
-                  NameIdentifierUtil.toMetadataObject(ancestor, Entity.EntityType.SCHEMA));
+                  NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA));
+              // All objects are SCHEMA-typed, so the batch path (single object type) is valid.
+              ownerManager.setOwners(
+                  normalizedIdent.namespace().level(0),
+                  ownedObjects,
+                  PrincipalUtils.getCurrentUserName(),
+                  Owner.Type.USER);
             }
-            ownedObjects.add(
-                NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.SCHEMA));
-            // All objects are SCHEMA-typed, so the batch path (single object type) is valid.
-            ownerManager.setOwners(
-                normalizedIdent.namespace().level(0),
-                ownedObjects,
-                PrincipalUtils.getCurrentUserName(),
-                Owner.Type.USER);
+          } catch (Exception postHookException) {
+            LOG.warn(
+                "Failed to execute post hook operations, rolling back schema " + normalizedIdent,
+                postHookException);
+            try {
+              // Drop the leaf first, then newly created ancestors innermost-to-outermost so parents
+              // are empty when removed. Pre-existing ancestors are not in newAncestors and stay.
+              dispatcher.dropSchema(normalizedIdent, false);
+              List<NameIdentifier> createdAncestors = new ArrayList<>(newAncestors);
+              Collections.reverse(createdAncestors);
+              for (NameIdentifier ancestor : createdAncestors) {
+                dispatcher.dropSchema(ancestor, false);
+              }
+            } catch (Exception rollbackException) {
+              LOG.warn("Failed to roll back the schema during the post hook", rollbackException);
+              postHookException.addSuppressed(rollbackException);
+            }
+            throw postHookException;
           }
           return schema;
         });

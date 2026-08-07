@@ -19,7 +19,9 @@
 
 package org.apache.gravitino.listener;
 
+import java.util.Collections;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
@@ -116,6 +118,25 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
+      throws NoSuchMetalakeException {
+    eventBus.dispatchEvent(new ListCatalogPreEvent(PrincipalUtils.getCurrentUserName(), namespace));
+    try {
+      Catalog[] catalogs = dispatcher.listCatalogsInfo(namespace, catalogNames);
+      eventBus.dispatchEvent(
+          new ListCatalogEvent(
+              PrincipalUtils.getCurrentUserName(),
+              namespace,
+              catalogs != null ? catalogs.length : -1));
+      return catalogs;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListCatalogFailureEvent(PrincipalUtils.getCurrentUserName(), e, namespace));
+      throw e;
+    }
+  }
+
+  @Override
   public Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     eventBus.dispatchEvent(new LoadCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident));
     try {
@@ -129,6 +150,18 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
           new LoadCatalogFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
       throw e;
     }
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   @Override

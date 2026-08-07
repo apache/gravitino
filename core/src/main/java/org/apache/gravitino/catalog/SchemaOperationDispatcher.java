@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -106,6 +107,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * @throws SchemaAlreadyExistsException If a schema with the same identifier already exists.
    */
   @Override
+  public Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
   public Schema createSchema(
       NameIdentifier ident,
       String comment,
@@ -133,6 +140,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
     // SchemaEntity will be visible.
+    //
+    // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
+    // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
+    // FilesetCatalogOperations.mergeUpLevelConfigurations / CatalogManager.createBaseCatalog.
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
@@ -351,6 +362,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         catalogIdent,
         LockType.WRITE,
         () -> {
+          // Capture persisted properties (including write-through secret URNs) before drop so we
+          // can clean provider material after a successful delete. External-ref URNs are skipped by
+          // deleteWrittenSecretsFromProperties.
+          Map<String, String> schemaProperties = null;
+          try {
+            Schema schema =
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+                    NoSuchSchemaException.class);
+            schemaProperties = schema.properties();
+          } catch (NoSuchSchemaException e) {
+            LOG.debug("Schema {} does not exist when preparing drop cleanup", ident);
+          }
+
           boolean droppedFromCatalog =
               doWithCatalog(
                   catalogIdent,
@@ -361,6 +387,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // For managed schema, we don't need to drop the schema from the store again.
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
+            if (droppedFromCatalog) {
+              secretManager.deleteWrittenSecretsFromProperties(schemaProperties);
+            }
             return droppedFromCatalog;
           }
 
@@ -389,6 +418,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       catalogIdent,
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
+          if (droppedFromCatalog) {
+            secretManager.deleteWrittenSecretsFromProperties(schemaProperties);
+          }
           return droppedFromCatalog;
         });
   }
