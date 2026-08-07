@@ -23,7 +23,7 @@
 
 Business metrics such as revenue, order count, and active users are shared semantic assets consumed by analytics, BI, and AI applications. When their definitions are kept only in individual semantic-layer tools or project files, discovery, ownership, version history, access control, and consistent reuse become fragmented. Gravitino therefore needs a governed metadata model that manages metric definitions alongside the data entities they reference.
 
-Semantic-layer definitions are commonly authored and exchanged as YAML. That is convenient for authoring and interoperability, but a raw document does not provide Gravitino consumers with a typed API for datasets, relationships, fields, metrics, and AI context. This design introduces an OSI/Ossie-compatible structured representation while retaining the existing View lifecycle and governance model.
+Semantic-layer definitions are commonly authored and exchanged as YAML. That is convenient for authoring and interoperability, but a raw document does not provide Gravitino consumers with a typed API for datasets, relationships, fields, metrics, and AI context. This design introduces a structured representation compatible with Apache Ossie, formerly Open Semantic Interchange (OSI), while retaining the existing View lifecycle and governance model.
 
 ## Goals
 
@@ -80,7 +80,7 @@ Gravitino maps one `semantic_model` item to `semanticModel`. A three-part OSI da
 ```text
 MetricRepresentation
   type: "metric"
-  semanticModel: MetricModel
+  semanticModel: SemanticModel
 ```
 
 The representation has two fields:
@@ -92,12 +92,12 @@ The representation has two fields:
 - It cannot contain a SQL representation.
 - Both `type` and `semanticModel` are required.
 
-#### MetricModel Schema
+#### SemanticModel Schema
 
 The canonical model follows the [Apache Ossie schema pinned at commit `4eb588b`](https://github.com/apache/ossie/blob/4eb588bee8340ab66e985433bb7e8af01688d4bb/core-spec/osi-schema.json), whose declared specification version is `0.2.0.dev0`. Fields marked with `?` are optional; all other fields are required. Names below use OSI wire-format spelling, while language bindings use idiomatic accessor names.
 
 ```text
-MetricModel
+SemanticModel
   name: string
   description?: string
   ai_context?: AIContext
@@ -107,7 +107,7 @@ MetricModel
   custom_extensions?: CustomExtension[]
 ```
 
-- `MetricModel` contains at least one `Dataset`.
+- `SemanticModel` contains at least one `Dataset`.
 - Names in each collection follow the uniqueness and reference rules defined with the nested types below.
 
 Dataset and field definitions:
@@ -133,15 +133,14 @@ Field
   custom_extensions?: CustomExtension[]
 ```
 
-- `Dataset` names are unique within `MetricModel`.
+- `Dataset` names are unique within `SemanticModel`.
 - `Field` names are unique within each `Dataset`.
-- Internal field references resolve within the model.
 - Each `source` is a `NameIdentifier` in the form `catalog.schema.name`. Gravitino resolves it in the metalake that contains the Metric View. Cross-catalog references are allowed, while cross-metalake references are not supported.
 - `source` does not declare whether the referenced entity is a `Table` or `View`. Validation calls `loadTable` first and, if no Table is found, calls `loadView`; it fails if neither entity exists.
-- For `Table` and logical `View` sources, Gravitino validates columns explicitly declared in `primary_key`, `unique_keys`, `from_columns`, and `to_columns` against the source schema. It does not infer source-column references from field or metric expressions.
+- For `Table` and logical `View` sources, Gravitino validates that columns explicitly declared in `primary_key`, `unique_keys`, `from_columns`, and `to_columns` are exposed by the referenced Table or logical View. It does not infer source-column references from field or metric expressions.
 - Metric View sources validate direct existence only.
 - Inline query sources are not supported. For example, instead of storing `SELECT * FROM sales.orders WHERE status = 'active'` directly in `Dataset.source`, create a logical View named `sales.mart.active_orders` with that SQL and set `Dataset.source` to `sales.mart.active_orders`. Raw SQL is not stored directly in the Metric View.
-- Catalog unavailability is treated as a retriable validation failure.
+- For REST requests, transient catalog unavailability is treated as a retriable validation failure and returns `503`, while an invalid Metric View definition returns `400`.
 
 Relationship and metric definitions:
 
@@ -163,7 +162,7 @@ Metric
   custom_extensions?: CustomExtension[]
 ```
 
-- `Relationship` and `Metric` names are unique within `MetricModel`.
+- `Relationship` and `Metric` names are unique within `SemanticModel`.
 - Each relationship endpoint references an existing `Dataset`.
 - `from_columns` and `to_columns` are non-empty and have equal length.
 - Each metric expression satisfies the `Expression` rules below.
@@ -181,8 +180,13 @@ DialectExpression
 Dimension
   is_time?: boolean
 
-AIContext = string | { instructions?: string, synonyms?: string[],
-                       examples?: string[], ... }
+AIContext = string | AIContextObject
+
+AIContextObject
+  instructions?: string
+  synonyms?: string[]
+  examples?: string[]
+  additional properties: allowed and retained losslessly
 
 CustomExtension
   vendor_name: string
@@ -197,7 +201,7 @@ Dialect = "ANSI_SQL" | "SNOWFLAKE" | "MDX" | "TABLEAU"
 - Every dialect entry has a non-empty `expression`.
 - `Dimension`, `AIContext`, and `CustomExtension` values satisfy the structures above.
 
-The required `MetricModel.name` is independent of the enclosing View name. This preserves semantic-model identity across imports and View renames.
+The required `SemanticModel.name` is independent of the enclosing View name. This preserves semantic-model identity across imports and View renames.
 
 Every supported `custom_extensions` array is retained losslessly. For standardized OSI model objects, fields not defined by the [pinned OSI schema](https://github.com/apache/ossie/blob/4eb588bee8340ab66e985433bb7e8af01688d4bb/core-spec/osi-schema.json#L282-L327) are rejected because the schema sets `additionalProperties` to `false`. Gravitino Metric Views enforce the same restriction.
 
@@ -205,7 +209,7 @@ Every supported `custom_extensions` array is retained losslessly. For standardiz
 
 Gravitino pins the exact upstream OSI `0.2.0.dev0` JSON Schema used by the structured model and adds Gravitino-specific projection and semantic rules beyond schema validation. The current contract does not persist an OSI version in each Metric View. If a future OSI version introduces an incompatible interpretation, Gravitino can add explicit version metadata and define compatibility behavior then; existing definitions without that metadata retain the initial semantics.
 
-- All representation and model checks run on `create` and `alter` before a View or View version is persisted.
+- Metric View writes are expected to be infrequent, so all representation, model, and direct-source checks run on `create` and every `alter` before a View or View version is persisted.
 - Validation checks direct references only.
 - Transitive dependency and cycle correctness are not checked; a cyclic definition may be persisted and later rejected by a downstream consumer.
 - Catalog changes do not trigger automatic revalidation.
@@ -213,18 +217,20 @@ Gravitino pins the exact upstream OSI `0.2.0.dev0` JSON Schema used by the struc
 
 ### Usage
 
-Metric Views reuse the existing View lifecycle. Their columns are always empty, and create, list, load, alter, and drop operations use the existing View APIs.
+Metric Views reuse the existing View lifecycle. Their columns are always empty, and create, list, load, alter, and drop operations use the existing View APIs. The Java `createMetricView` convenience method delegates to `createView` while supplying the Metric View invariants.
+
+Callers identify a Metric View through `Representation.TYPE_METRIC` or `View.metricRepresentation()`; an empty `columns` array alone is not a discriminator.
 
 #### Supported Alter Operations
 
 Metric Views support the existing `ViewChange` operations:
 
-- `rename`: Renames the enclosing View only; `MetricModel.name` is unchanged. The target name must be available in the shared View namespace.
+- `rename`: Renames the enclosing View only; `SemanticModel.name` is unchanged. The target name must be available in the shared View namespace.
 - `setProperty`: Adds or replaces a View-level property.
 - `removeProperty`: Removes a View-level property.
 - `replaceView`: Atomically replaces the View body. The `columns` must remain empty, exactly one `MetricRepresentation` must remain, and changing between metric and logical semantics is rejected.
 
-Member-level patch operations are not supported; changes to datasets, relationships, fields, or metrics require replacing the complete `MetricModel`.
+Member-level patch operations are not supported; changes to datasets, relationships, fields, or metrics require replacing the complete `SemanticModel`.
 
 Metric Views do not use `defaultCatalog` or `defaultSchema` because dataset sources use `NameIdentifier`; both values must be `null` in create and `replaceView` requests.
 
@@ -240,8 +246,8 @@ Dataset orders =
         .withSource(NameIdentifier.of("sales", "mart", "orders"))
         .build();
 
-MetricModel model =
-    MetricModel.builder()
+SemanticModel model =
+    SemanticModel.builder()
         .withName("sales_semantic_model")
         .withDatasets(List.of(orders))
         .build();
@@ -253,16 +259,17 @@ MetricRepresentation representation =
 
 View created =
     catalog.createMetricView(
-        ident, "Sales metric definitions", List.of(representation),
-        null, null, Map.of());
+        ident, "Sales metric definitions", representation, Map.of());
 ```
 
 ```java
 View loaded = catalog.loadView(ident);
+MetricRepresentation loadedRepresentation =
+    loaded.metricRepresentation().orElseThrow(IllegalStateException::new);
 NameIdentifier[] views = catalog.listViews(Namespace.of("mart"));
 
-MetricModel updatedModel =
-    MetricModel.builder()
+SemanticModel updatedModel =
+    SemanticModel.builder()
         .withName("sales_semantic_model")
         .withDescription("Updated sales model")
         .withDatasets(List.of(orders))
@@ -290,7 +297,7 @@ The Python API exposes the same structured model and View lifecycle:
 ```python
 ident = NameIdentifier.of("mart", "sales_metrics")
 orders = Dataset("orders", NameIdentifier.of("sales", "mart", "orders"))
-model = MetricModel("sales_semantic_model", [orders])
+model = SemanticModel("sales_semantic_model", [orders])
 representation = MetricRepresentation(model)
 
 created = catalog.create_metric_view(
@@ -302,7 +309,7 @@ created = catalog.create_metric_view(
 loaded = catalog.load_view(ident)
 views = catalog.list_views(Namespace.of("mart"))
 
-updated_model = MetricModel(
+updated_model = SemanticModel(
     "sales_semantic_model",
     [orders],
     _description="Updated sales model",
@@ -378,8 +385,9 @@ DELETE /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/sales_met
 
 ### Storage and Connector Behavior
 
-- **Source of truth.** Metric Views are stored only in the Gravitino EntityStore. Logical Views remain stored by their underlying catalogs.
+- **Source of truth.** Metric Views are always Gravitino-managed and stored in the Gravitino EntityStore, regardless of the underlying catalog's View capability. Logical Views continue to follow the existing per-catalog capability tiers.
 - **Listing.** The server merges authorized catalog-backed logical Views with authorized Gravitino-managed Metric Views into the existing View listing.
+- **Parent lifecycle.** Metric Views participate in the existing schema and catalog lifecycle: they are included in non-empty checks and are removed when the containing schema or catalog is deleted with cascade or force enabled.
 - **Connector capability.** A connector that does not support Metric Views filters them from `listViews` and returns an explicit unsupported-Metric-View error for a direct `loadView`. Generic REST and Java View APIs continue to expose them.
 - **Namespace conflicts.** Create checks both storage sources. If an external client later creates a same-name logical View directly in the catalog, list and load report a conflict and select neither object. The external operation must rename or remove its object; ownership, versions, tags, and policies remain attached to the Gravitino Metric View and never transfer.
 - **Persistence and history.** Each stored View version contains `type` and the structured `semanticModel`. Every successful alter creates an immutable View version. Existing logical View records require no migration.
@@ -393,7 +401,7 @@ DELETE /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/views/sales_met
 
 ## Development Plan
 
-- **Add API types.** Implement `MetricRepresentation` and structured model DTOs in Java, REST, and Python without coupling `MetricModel.name` to the enclosing View name, with compatibility fixtures.
+- **Add API types.** Implement `MetricRepresentation` and structured model DTOs in Java, REST, and Python without coupling `SemanticModel.name` to the enclosing View name, with compatibility fixtures.
 - **Implement lifecycle and persistence.** Add create, load, alter, drop, immutable versioning, and EntityStore persistence while preserving the shared View namespace.
 - **Implement catalog exposure.** Merge View listings, add connector capability handling, and enforce deterministic namespace-conflict behavior.
 - **Implement OSI validation.** Pin the upstream OSI `0.2.0.dev0` schema and add document-local consistency and direct `NameIdentifier` source and column checks.
