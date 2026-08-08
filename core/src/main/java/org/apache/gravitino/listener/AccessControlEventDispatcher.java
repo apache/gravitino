@@ -26,6 +26,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.GroupChange;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
@@ -52,6 +53,12 @@ import org.apache.gravitino.listener.api.event.AlterGroupPreEvent;
 import org.apache.gravitino.listener.api.event.AlterUserEvent;
 import org.apache.gravitino.listener.api.event.AlterUserFailureEvent;
 import org.apache.gravitino.listener.api.event.AlterUserPreEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsFailureEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsPreEvent;
+import org.apache.gravitino.listener.api.event.CountUsersEvent;
+import org.apache.gravitino.listener.api.event.CountUsersFailureEvent;
+import org.apache.gravitino.listener.api.event.CountUsersPreEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
@@ -93,6 +100,9 @@ import org.apache.gravitino.listener.api.event.ListGroupNamesFailureEvent;
 import org.apache.gravitino.listener.api.event.ListGroupNamesPreEvent;
 import org.apache.gravitino.listener.api.event.ListGroupsEvent;
 import org.apache.gravitino.listener.api.event.ListGroupsFailureEvent;
+import org.apache.gravitino.listener.api.event.ListGroupsPagedEvent;
+import org.apache.gravitino.listener.api.event.ListGroupsPagedFailureEvent;
+import org.apache.gravitino.listener.api.event.ListGroupsPagedPreEvent;
 import org.apache.gravitino.listener.api.event.ListGroupsPreEvent;
 import org.apache.gravitino.listener.api.event.ListRoleNamesEvent;
 import org.apache.gravitino.listener.api.event.ListRoleNamesFailureEvent;
@@ -102,6 +112,9 @@ import org.apache.gravitino.listener.api.event.ListUserNamesFailureEvent;
 import org.apache.gravitino.listener.api.event.ListUserNamesPreEvent;
 import org.apache.gravitino.listener.api.event.ListUsersEvent;
 import org.apache.gravitino.listener.api.event.ListUsersFailureEvent;
+import org.apache.gravitino.listener.api.event.ListUsersPagedEvent;
+import org.apache.gravitino.listener.api.event.ListUsersPagedFailureEvent;
+import org.apache.gravitino.listener.api.event.ListUsersPagedPreEvent;
 import org.apache.gravitino.listener.api.event.ListUsersPreEvent;
 import org.apache.gravitino.listener.api.event.OverridePrivilegesEvent;
 import org.apache.gravitino.listener.api.event.OverridePrivilegesFailureEvent;
@@ -344,6 +357,43 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public PagedResult<User> listUsers(String metalake, int offset, int limit)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListUsersPagedPreEvent(initiator, metalake, offset, limit));
+    try {
+      PagedResult<User> users = dispatcher.listUsers(metalake, offset, limit);
+      eventBus.dispatchEvent(
+          new ListUsersPagedEvent(
+              initiator, metalake, offset, limit, users.items().size(), users.totalCount()));
+
+      return users;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new ListUsersPagedFailureEvent(initiator, metalake, e, offset, limit));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public long countUsers(String metalake) throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new CountUsersPreEvent(initiator, metalake));
+    try {
+      long count = dispatcher.countUsers(metalake);
+      eventBus.dispatchEvent(new CountUsersEvent(initiator, metalake, count));
+
+      return count;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new CountUsersFailureEvent(initiator, metalake, e));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public String[] listUserNames(String metalake) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -540,6 +590,43 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return groups;
     } catch (Exception e) {
       eventBus.dispatchEvent(new ListGroupsFailureEvent(initiator, metalake, e));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public PagedResult<Group> listGroups(String metalake, int offset, int limit) {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new ListGroupsPagedPreEvent(initiator, metalake, offset, limit));
+    try {
+      PagedResult<Group> groups = dispatcher.listGroups(metalake, offset, limit);
+      eventBus.dispatchEvent(
+          new ListGroupsPagedEvent(
+              initiator, metalake, offset, limit, groups.items().size(), groups.totalCount()));
+
+      return groups;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListGroupsPagedFailureEvent(initiator, metalake, e, offset, limit));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public long countGroups(String metalake) {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new CountGroupsPreEvent(initiator, metalake));
+    try {
+      long count = dispatcher.countGroups(metalake);
+      eventBus.dispatchEvent(new CountGroupsEvent(initiator, metalake, count));
+
+      return count;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new CountGroupsFailureEvent(initiator, metalake, e));
       throw e;
     }
   }

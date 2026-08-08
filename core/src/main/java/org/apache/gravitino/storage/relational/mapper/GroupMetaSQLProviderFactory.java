@@ -97,6 +97,17 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().listExtendedGroupPOsByMetalakeId(metalakeId);
   }
 
+  public static String countGroupMetasByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return getProvider().countGroupMetasByMetalakeName(metalakeName);
+  }
+
+  public static String listExtendedGroupPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return getProvider().listExtendedGroupPOsByMetalakeNamePaginated(metalakeName, offset, limit);
+  }
+
   public static String deleteGroupMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteGroupMetasByLegacyTimeline(legacyTimeline, limit);
