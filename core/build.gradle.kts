@@ -36,6 +36,7 @@ dependencies {
   implementation(libs.bundles.metrics)
   implementation(libs.bundles.prometheus)
   implementation(libs.caffeine)
+  implementation(libs.commons.codec)
   implementation(libs.commons.dbcp2)
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
@@ -47,7 +48,7 @@ dependencies {
   implementation(libs.lance) {
     exclude(group = "com.fasterxml.jackson.core", module = "*") // provided by gravitino
     exclude(group = "com.fasterxml.jackson.datatype", module = "*") // provided by gravitino
-    exclude(group = "commons-codec", module = "commons-codec") // provided by jcasbin
+    exclude(group = "commons-codec", module = "commons-codec") // provided directly by gravitino
     exclude(group = "com.google.guava", module = "guava") // provided by gravitino
     exclude(group = "org.apache.commons", module = "commons-lang3") // provided by gravitino
     exclude(group = "org.junit.jupiter", module = "*") // provided by test scope

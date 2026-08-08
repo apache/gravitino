@@ -384,8 +384,6 @@
    reyerizo jcstress-gradle-plugin
    melix jmh-gradle-plugin
    Lance
-   JCasbin
-   Aviator
    OGNL
    Google FlatBuffers
    IPAddress

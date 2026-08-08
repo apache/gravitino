@@ -24,7 +24,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -110,6 +112,26 @@ public class TestAuthorizationRequestContext {
     assertEquals(2, counter.get(), "Flag should remain false after failure so next call runs.");
     context.loadRole(counter::incrementAndGet);
     assertEquals(2, counter.get(), "After a successful loadRole, further calls must be ignored.");
+  }
+
+  @Test
+  public void testEffectiveRoleIdsDefaultToEmptySet() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+
+    assertTrue(context.getEffectiveRoleIds().isEmpty());
+  }
+
+  @Test
+  public void testEffectiveRoleIdsAreDefensivelyCopiedAndImmutable() {
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    Set<Long> roleIds = new HashSet<>(Arrays.asList(1L, 2L));
+
+    context.setEffectiveRoleIds(roleIds);
+    roleIds.add(3L);
+
+    assertEquals(new HashSet<>(Arrays.asList(1L, 2L)), context.getEffectiveRoleIds());
+    assertThrows(UnsupportedOperationException.class, () -> context.getEffectiveRoleIds().add(4L));
+    assertThrows(NullPointerException.class, () -> context.setEffectiveRoleIds(null));
   }
 
   @Test

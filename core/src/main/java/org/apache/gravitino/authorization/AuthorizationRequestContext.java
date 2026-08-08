@@ -20,9 +20,12 @@
 package org.apache.gravitino.authorization;
 
 import java.security.Principal;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -65,6 +68,12 @@ public class AuthorizationRequestContext {
 
   /** Used to determine whether the role has already been loaded. */
   private final AtomicBoolean hasLoadRole = new AtomicBoolean();
+
+  /**
+   * Immutable IDs of the direct and group-inherited roles held by the current principal. Populated
+   * once by the role-loading path and reused by all authorization probes in this request.
+   */
+  private volatile Set<Long> effectiveRoleIds = Collections.emptySet();
 
   /** Per-request user identity cache. Key: {@code metalake::userName}. */
   private final Map<String, Optional<UserUpdatedAt>> userInfoCache = new ConcurrentHashMap<>();
@@ -161,6 +170,29 @@ public class AuthorizationRequestContext {
         throw new RuntimeException("Failed to load role: ", e);
       }
     }
+  }
+
+  /**
+   * Returns the direct and group-inherited role IDs held by the current principal.
+   *
+   * @return an immutable role ID set, or an empty set before roles are loaded
+   */
+  public Set<Long> getEffectiveRoleIds() {
+    return effectiveRoleIds;
+  }
+
+  /**
+   * Stores an immutable snapshot of the direct and group-inherited role IDs held by the current
+   * principal.
+   *
+   * @param effectiveRoleIds role IDs resolved for this request
+   */
+  public void setEffectiveRoleIds(Set<Long> effectiveRoleIds) {
+    Objects.requireNonNull(effectiveRoleIds, "effectiveRoleIds must not be null");
+    this.effectiveRoleIds =
+        effectiveRoleIds.isEmpty()
+            ? Collections.emptySet()
+            : Collections.unmodifiableSet(new LinkedHashSet<>(effectiveRoleIds));
   }
 
   /**
