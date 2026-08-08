@@ -53,7 +53,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -609,6 +613,128 @@ public class TestJcasbinAuthorizer {
     Assertions.assertFalse(
         getLoadedRolesCache(jcasbinAuthorizer).getIfPresent(ALLOW_ROLE_ID).isPresent(),
         "loadedRoles entry for the deleted role must be evicted");
+  }
+
+  @Test
+  public void testPartialPolicyLoadIsNotRecordedAsLoaded() throws Exception {
+    // Regression test for the permanently-denied-role failure mode. When a securable object cannot
+    // be resolved to a metadata id, loadPolicyByRoleEntity skips it. Recording the role as loaded
+    // anyway pins the broken state forever: role_meta.updated_at never moves, so the version check
+    // keeps skipping the reload and the role's privileges never come back on that node.
+    makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
+
+    RoleEntity allowRole =
+        mockRoleInStore(ALLOW_ROLE_ID, "allowRole", ImmutableList.of(getAllowSecurableObject()));
+    Enforcer allowEnforcer = getAllowEnforcer(jcasbinAuthorizer);
+    GravitinoCache<Long, Long> loadedRoles = getLoadedRolesCache(jcasbinAuthorizer);
+    GravitinoCache<Long, Boolean> backoff = getPartialRoleLoadBackoffCache(jcasbinAuthorizer);
+
+    // 1. The role's only securable object does not resolve, so nothing can be loaded.
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+        .thenReturn(Optional.empty());
+    try {
+      invokeVersionCheckAndLoadRoles(
+          jcasbinAuthorizer,
+          METALAKE,
+          ImmutableList.of(ALLOW_ROLE_ID),
+          new AuthorizationRequestContext());
+
+      assertFalse(
+          loadedRoles.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+          "a role whose policies could not be loaded must not be recorded as loaded");
+      assertTrue(
+          allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+          "no p-row can exist when the securable object did not resolve");
+      assertTrue(
+          backoff.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+          "the incomplete load must arm the retry backoff");
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(any(), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+
+    // 2. While the backoff is armed the role is not re-read, so a request cannot turn into a DB
+    //    round-trip per call for a role that stays unresolvable.
+    invokeVersionCheckAndLoadRoles(
+        jcasbinAuthorizer,
+        METALAKE,
+        ImmutableList.of(ALLOW_ROLE_ID),
+        new AuthorizationRequestContext());
+    assertTrue(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(ALLOW_ROLE_ID)).isEmpty(),
+        "the backoff must suppress the immediate retry");
+
+    // 3. Once the backoff lapses the role is retried and, now that the object resolves, loads
+    //    fully and is recorded — this is the self-healing the old code could never reach.
+    backoff.invalidate(ALLOW_ROLE_ID);
+    invokeVersionCheckAndLoadRoles(
+        jcasbinAuthorizer,
+        METALAKE,
+        ImmutableList.of(ALLOW_ROLE_ID),
+        new AuthorizationRequestContext());
+
+    assertFalse(
+        allowEnforcer.getFilteredPolicy(0, String.valueOf(allowRole.id())).isEmpty(),
+        "the retry must load the role's p-rows");
+    assertTrue(
+        loadedRoles.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "a fully loaded role must be recorded as loaded");
+    assertFalse(
+        backoff.getIfPresent(ALLOW_ROLE_ID).isPresent(),
+        "a successful load must disarm the retry backoff");
+  }
+
+  @Test
+  public void testClearRolePoliciesSerializesWithRolePolicyLock() throws Exception {
+    // The JcasbinLoadedRolesCache removal listener calls clearRolePolicies from whichever thread
+    // drains Caffeine's maintenance queue. If that is not ordered against the clear-then-reload
+    // sequence, an eviction landing between another thread's policy writes and its loadedRoles
+    // update erases the rows that thread just wrote while leaving the marker claiming they are
+    // loaded — exactly the state no later version check can detect. Assert the serialization
+    // directly: clearRolePolicies must block while the mutation lock is held.
+    Field lockField = JcasbinAuthorizer.class.getDeclaredField("rolePolicyLock");
+    lockField.setAccessible(true);
+    ReentrantLock rolePolicyLock = (ReentrantLock) lockField.get(jcasbinAuthorizer);
+
+    Method clearRolePolicies =
+        JcasbinAuthorizer.class.getDeclaredMethod("clearRolePolicies", long.class);
+    clearRolePolicies.setAccessible(true);
+
+    CountDownLatch started = new CountDownLatch(1);
+    CountDownLatch finished = new CountDownLatch(1);
+    AtomicReference<Throwable> failure = new AtomicReference<>();
+
+    rolePolicyLock.lock();
+    Thread clearer =
+        new Thread(
+            () -> {
+              started.countDown();
+              try {
+                clearRolePolicies.invoke(jcasbinAuthorizer, ALLOW_ROLE_ID.longValue());
+              } catch (Throwable t) {
+                failure.set(t);
+              } finally {
+                finished.countDown();
+              }
+            });
+    clearer.setDaemon(true);
+    try {
+      clearer.start();
+      assertTrue(started.await(5, TimeUnit.SECONDS), "the clearing thread must start");
+      assertFalse(
+          finished.await(300, TimeUnit.MILLISECONDS),
+          "clearRolePolicies must not proceed while the role policy lock is held");
+    } finally {
+      rolePolicyLock.unlock();
+    }
+
+    assertTrue(
+        finished.await(5, TimeUnit.SECONDS),
+        "clearRolePolicies must proceed once the lock is released");
+    clearer.join(5000);
+    Assertions.assertNull(failure.get(), "clearRolePolicies must not fail");
   }
 
   /** Reflectively invoke the private versionCheckAndLoadRoles. */
@@ -2361,6 +2487,14 @@ public class TestJcasbinAuthorizer {
     Field field = JcasbinAuthorizer.class.getDeclaredField("loadedRoles");
     field.setAccessible(true);
     return (GravitinoCache<Long, Long>) field.get(authorizer);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static GravitinoCache<Long, Boolean> getPartialRoleLoadBackoffCache(
+      JcasbinAuthorizer authorizer) throws Exception {
+    Field field = JcasbinAuthorizer.class.getDeclaredField("partialRoleLoadBackoff");
+    field.setAccessible(true);
+    return (GravitinoCache<Long, Boolean>) field.get(authorizer);
   }
 
   @SuppressWarnings("unchecked")
