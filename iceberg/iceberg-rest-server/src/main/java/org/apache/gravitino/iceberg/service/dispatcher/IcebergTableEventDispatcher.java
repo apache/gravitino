@@ -25,12 +25,18 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.BaseEvent;
+import org.apache.gravitino.listener.api.event.IcebergCancelPlanningEvent;
+import org.apache.gravitino.listener.api.event.IcebergCancelPlanningFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergCancelPlanningPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchPlanningResultEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchPlanningResultFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchPlanningResultPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
@@ -59,6 +65,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchPlanningResultResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -303,6 +310,44 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(new IcebergPlanTableScanEvent(context, gravitinoNameIdentifier));
     return planTableScanResponse;
+  }
+
+  @Override
+  public FetchPlanningResultResponse fetchPlanningResult(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(
+        new IcebergFetchPlanningResultPreEvent(context, gravitinoNameIdentifier));
+    FetchPlanningResultResponse response;
+    try {
+      response =
+          icebergTableOperationDispatcher.fetchPlanningResult(context, tableIdentifier, planId);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergFetchPlanningResultFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergFetchPlanningResultEvent(context, gravitinoNameIdentifier));
+    return response;
+  }
+
+  @Override
+  public void cancelPlanning(
+      IcebergRequestContext context, TableIdentifier tableIdentifier, String planId) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(new IcebergCancelPlanningPreEvent(context, gravitinoNameIdentifier));
+    try {
+      icebergTableOperationDispatcher.cancelPlanning(context, tableIdentifier, planId);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergCancelPlanningFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergCancelPlanningEvent(context, gravitinoNameIdentifier));
   }
 
   @Override
