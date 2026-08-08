@@ -127,6 +127,29 @@ public class TestIcebergConfig extends IcebergTestBase {
   }
 
   @Test
+  public void testConfigEndpointsContainScanPlanForNonRESTBackend() {
+    // Non-REST backends (memory, hive, jdbc) support server-side scan planning,
+    // so the scan plan endpoint must be advertised.
+    String warehouseName = IcebergRestTestUtil.PREFIX;
+    Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
+    Response resp =
+        getIcebergClientBuilder(IcebergRestTestUtil.CONFIG_PATH, Optional.of(queryParams)).get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    boolean hasScanPlanEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().contains("namespaces/{namespace}/tables/{table}/plan"));
+    Assertions.assertTrue(
+        hasScanPlanEndpoint,
+        "Config response must advertise scan plan endpoint for non-REST backend catalogs");
+  }
+
+  @Test
   public void testConfigScanPlanEndpointPathIsNamespaceScoped() {
     // Iceberg 1.11+ advertises the namespace-scoped scan plan path via
     // Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN. This test guards against regressing to the broken

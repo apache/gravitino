@@ -75,8 +75,10 @@ public class IcebergConfigOperations {
           .add(Endpoint.V1_REGISTER_TABLE)
           .add(Endpoint.V1_REPORT_METRICS)
           .add(Endpoint.V1_TABLE_CREDENTIALS)
-          .add(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN)
           .build();
+
+  private static final List<Endpoint> SCAN_PLAN_ENDPOINTS =
+      ImmutableList.of(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN);
 
   private static final List<Endpoint> DEFAULT_VIEW_ENDPOINTS =
       ImmutableList.<Endpoint>builder()
@@ -101,21 +103,29 @@ public class IcebergConfigOperations {
   @ResponseMetered(name = "config", absolute = true)
   public Response getConfig(@DefaultValue("") @QueryParam("warehouse") String warehouse) {
     String catalogName = getCatalogName(warehouse);
-    boolean supportsView = supportsViewOperations(catalogName);
+    CatalogWrapperForREST catalogWrapper = getCatalogWrapper(catalogName);
+    boolean supportsView = catalogWrapper.supportsViewOperations();
+    boolean supportsScanPlan = catalogWrapper.supportsScanPlanOperations();
     ConfigResponse.Builder builder = ConfigResponse.builder();
-    builder.withDefaults(getDefaultConfig(catalogName)).withEndpoints(getEndpoints(supportsView));
+    builder
+        .withDefaults(getDefaultConfig(catalogName))
+        .withEndpoints(getEndpoints(supportsView, supportsScanPlan));
     if (StringUtils.isNotBlank(warehouse)) {
       builder.withDefault("prefix", warehouse);
     }
     return IcebergRESTUtils.ok(builder.build());
   }
 
-  private List<Endpoint> getEndpoints(boolean supportsViewOperations) {
-    if (!supportsViewOperations) {
-      return DEFAULT_ENDPOINTS;
+  private List<Endpoint> getEndpoints(
+      boolean supportsViewOperations, boolean supportsScanPlanOperations) {
+    Stream<Endpoint> endpoints = DEFAULT_ENDPOINTS.stream();
+    if (supportsScanPlanOperations) {
+      endpoints = Stream.concat(endpoints, SCAN_PLAN_ENDPOINTS.stream());
     }
-    return Stream.concat(DEFAULT_ENDPOINTS.stream(), DEFAULT_VIEW_ENDPOINTS.stream())
-        .collect(Collectors.toList());
+    if (supportsViewOperations) {
+      endpoints = Stream.concat(endpoints, DEFAULT_VIEW_ENDPOINTS.stream());
+    }
+    return endpoints.collect(Collectors.toList());
   }
 
   private Map<String, String> getCatalogConfig(String catalogName) {
@@ -131,11 +141,6 @@ public class IcebergConfigOperations {
     } else {
       return warehouse;
     }
-  }
-
-  private boolean supportsViewOperations(String catalogName) {
-    CatalogWrapperForREST catalogWrapperForREST = getCatalogWrapper(catalogName);
-    return catalogWrapperForREST.supportsViewOperations();
   }
 
   private CatalogWrapperForREST getCatalogWrapper(String catalogName) {
