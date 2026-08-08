@@ -31,6 +31,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.withSettings;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.io.ByteStreams;
 import com.sun.net.httpserver.HttpServer;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
@@ -78,10 +79,13 @@ import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.auth.AuthProperties;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponseParser;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
@@ -551,6 +555,83 @@ public class TestCatalogWrapperForREST {
       Assertions.assertEquals(
           "v1/local/namespaces/db/tables/tbl/credentials",
           credential.config().get("client.refresh-credentials-endpoint"));
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  @SuppressWarnings("deprecation")
+  @Test
+  void testFederatedFetchScanTasksDelegatesToRemote() throws Exception {
+    TableIdentifier table = TableIdentifier.of(Namespace.of("db"), "tbl");
+    String expectedPath = "/v1/upstream/namespaces/db/tables/tbl/tasks";
+
+    // Plan tasks are minted by the remote catalog in a federated setup, so this wrapper only has to
+    // hand the plan task back and return whatever the remote catalog answers.
+    FetchScanTasksResponse upstreamResponse =
+        FetchScanTasksResponse.builder()
+            .withPlanTasks(Collections.singletonList("upstream-next-token"))
+            .withSpecsById(ImmutableMap.of(0, PartitionSpec.unpartitioned()))
+            .build();
+    String upstreamJson = FetchScanTasksResponseParser.toJson(upstreamResponse);
+
+    AtomicReference<String> requestPath = new AtomicReference<>();
+    AtomicReference<String> requestMethod = new AtomicReference<>();
+    AtomicReference<String> requestBody = new AtomicReference<>();
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requestPath.set(exchange.getRequestURI().getPath());
+          requestMethod.set(exchange.getRequestMethod());
+          requestBody.set(
+              new String(
+                  ByteStreams.toByteArray(exchange.getRequestBody()), StandardCharsets.UTF_8));
+          byte[] body = upstreamJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+      RESTCatalog restCatalog = mock(RESTCatalog.class);
+      when(restCatalog.name()).thenReturn("upstream");
+      when(restCatalog.properties())
+          .thenReturn(
+              ImmutableMap.of(
+                  CatalogProperties.URI,
+                  uri,
+                  AuthProperties.AUTH_TYPE,
+                  AuthProperties.AUTH_TYPE_NONE,
+                  "prefix",
+                  "upstream"));
+      Table mockTable = mock(Table.class);
+      when(mockTable.specs()).thenReturn(ImmutableMap.of(0, PartitionSpec.unpartitioned()));
+      when(restCatalog.loadTable(table)).thenReturn(mockTable);
+
+      IcebergConfig config =
+          new IcebergConfig(
+              ImmutableMap.of(
+                  IcebergConstants.CATALOG_BACKEND,
+                  "memory",
+                  IcebergConstants.WAREHOUSE,
+                  "/tmp/warehouse"));
+      CatalogWrapperForREST wrapper = new StaticCatalogWrapperForREST("local", config, restCatalog);
+
+      FetchScanTasksResponse response =
+          wrapper.fetchScanTasks(table, new FetchScanTasksRequest("upstream-token"));
+
+      Assertions.assertEquals(expectedPath, requestPath.get());
+      Assertions.assertEquals("POST", requestMethod.get());
+      Assertions.assertTrue(
+          requestBody.get().contains("upstream-token"),
+          "The remote catalog's plan task must be forwarded untouched, but sent: "
+              + requestBody.get());
+      Assertions.assertEquals(
+          Collections.singletonList("upstream-next-token"), response.planTasks());
     } finally {
       server.stop(0);
     }

@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
@@ -68,9 +69,11 @@ import org.apache.iceberg.rest.auth.AuthManagers;
 import org.apache.iceberg.rest.auth.AuthSession;
 import org.apache.iceberg.rest.credentials.Credential;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
@@ -188,66 +191,45 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
         catalogCredentialManager.catalogName(), tableIdentifier, response);
   }
 
+  /**
+   * Delegates the second step of scan planning to the remote REST catalog.
+   *
+   * <p>{@code plan-tasks} in a federated setup are issued by the remote catalog during {@link
+   * #planTableScan}, so they are opaque here and are handed back untouched for the remote catalog
+   * to resolve. Scan tasks carry no credentials, so nothing needs rewriting on the way back.
+   *
+   * @param tableIdentifier the table the plan task belongs to.
+   * @param request the request carrying the remote catalog's {@code plan-task}.
+   * @return the scan tasks the remote catalog returns for that plan task.
+   */
+  @Override
+  public FetchScanTasksResponse fetchScanTasks(
+      TableIdentifier tableIdentifier, FetchScanTasksRequest request) {
+    Table table = getCatalog().loadTable(tableIdentifier);
+    return getRESTFetchScanTasks(
+        (RESTCatalog) getCatalog(), tableIdentifier, request, table.specs());
+  }
+
   private static LoadCredentialsResponse getRESTTableCredentials(
       RESTCatalog restCatalog, TableIdentifier identifier) {
-    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
-    String credentialsPath =
-        ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
-
-    AuthManager authManager = null;
-    RESTClient client = null;
-    AuthSession authSession = null;
-    try {
-      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
-      client =
-          HTTPClient.builder(properties)
-              .uri(properties.get(CatalogProperties.URI))
-              .withHeaders(RESTUtil.configHeaders(properties))
-              .build();
-      authSession = authManager.catalogSession(client, properties);
-      return client
-          .withAuthSession(authSession)
-          .get(
-              credentialsPath,
-              LoadCredentialsResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
-    } finally {
-      if (authSession != null) {
-        try {
-          authSession.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth session when loading credentials for table: {}", identifier, e);
-        }
-      }
-
-      if (client != null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close REST client when loading credentials for table: {}", identifier, e);
-        }
-      }
-
-      if (authManager != null) {
-        try {
-          authManager.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth manager when loading credentials for table: {}", identifier, e);
-        }
-      }
-    }
+    return callRemoteCatalog(
+        restCatalog,
+        identifier,
+        "loading credentials",
+        (client, properties) ->
+            client.get(
+                ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials",
+                LoadCredentialsResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.tableErrorHandler()));
   }
 
   /**
    * Sends a {@code POST {table}/plan} request to the remote REST catalog.
    *
-   * <p>Follows the same HTTP client lifecycle as {@link #getRESTTableCredentials}. When credential
-   * vending is requested, the {@code X-Iceberg-Access-Delegation: vended-credentials} header is
-   * included so the remote catalog returns credentials inline in the plan response.
+   * <p>When credential vending is requested, the {@code X-Iceberg-Access-Delegation:
+   * vended-credentials} header is included so the remote catalog returns credentials inline in the
+   * plan response.
    *
    * <p>The Iceberg response deserializer requires pre-loaded partition specs to parse {@code
    * file-scan-tasks}. These are supplied via a {@link ParserContext} built from the caller-provided
@@ -266,9 +248,6 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
       PlanTableScanRequest scanRequest,
       boolean requestCredentialVending,
       Map<Integer, PartitionSpec> specsById) {
-    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
-    String planPath = ResourcePaths.forCatalogProperties(properties).planTableScan(identifier);
-
     Map<String, String> headers =
         requestCredentialVending
             ? ImmutableMap.of("X-Iceberg-Access-Delegation", "vended-credentials")
@@ -279,6 +258,75 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
             .add("specsById", specsById)
             .add("caseSensitive", scanRequest.caseSensitive())
             .build();
+
+    return callRemoteCatalog(
+        restCatalog,
+        identifier,
+        "planning table scan",
+        (client, properties) ->
+            client.post(
+                ResourcePaths.forCatalogProperties(properties).planTableScan(identifier),
+                scanRequest,
+                PlanTableScanResponse.class,
+                headers,
+                ErrorHandlers.planErrorHandler(),
+                ignored -> {},
+                parserContext));
+  }
+
+  /**
+   * Sends a {@code POST {table}/tasks} request to the remote REST catalog, redeeming a {@code
+   * plan-task} the remote catalog issued.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param identifier the table the plan task belongs to.
+   * @param request the request carrying the remote catalog's {@code plan-task}.
+   * @param specsById partition specs for the table, needed for response deserialization.
+   * @return the scan tasks the remote catalog returns for that plan task.
+   */
+  private static FetchScanTasksResponse getRESTFetchScanTasks(
+      RESTCatalog restCatalog,
+      TableIdentifier identifier,
+      FetchScanTasksRequest request,
+      Map<Integer, PartitionSpec> specsById) {
+    // A fetch scan tasks request carries only the plan task, so the case sensitivity the scan was
+    // planned with is not known here; the response deserializer needs a value and Iceberg's default
+    // is case sensitive.
+    ParserContext parserContext =
+        ParserContext.builder().add("specsById", specsById).add("caseSensitive", true).build();
+
+    return callRemoteCatalog(
+        restCatalog,
+        identifier,
+        "fetching scan tasks",
+        (client, properties) ->
+            client.post(
+                ResourcePaths.forCatalogProperties(properties).fetchScanTasks(identifier),
+                request,
+                FetchScanTasksResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.planTaskHandler(),
+                ignored -> {},
+                parserContext));
+  }
+
+  /**
+   * Runs {@code action} against the remote REST catalog with an authenticated client, then closes
+   * the auth session, client and auth manager. A failure to close is logged rather than raised, so
+   * it cannot mask the result of the call.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param identifier the table the call is for, used for log context.
+   * @param operation what the call is doing, used for log context.
+   * @param action receives the authenticated client and the remote catalog properties.
+   * @return whatever {@code action} returns.
+   */
+  private static <R> R callRemoteCatalog(
+      RESTCatalog restCatalog,
+      TableIdentifier identifier,
+      String operation,
+      BiFunction<RESTClient, Map<String, String>, R> action) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
 
     AuthManager authManager = null;
     RESTClient client = null;
@@ -291,43 +339,24 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
               .withHeaders(RESTUtil.configHeaders(properties))
               .build();
       authSession = authManager.catalogSession(client, properties);
-      return client
-          .withAuthSession(authSession)
-          .post(
-              planPath,
-              scanRequest,
-              PlanTableScanResponse.class,
-              headers,
-              ErrorHandlers.planErrorHandler(),
-              ignored -> {},
-              parserContext);
+      return action.apply(client.withAuthSession(authSession), properties);
     } finally {
-      if (authSession != null) {
-        try {
-          authSession.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth session when planning table scan for table: {}", identifier, e);
-        }
-      }
+      closeQuietly(authSession, "auth session", operation, identifier);
+      closeQuietly(client, "REST client", operation, identifier);
+      closeQuietly(authManager, "auth manager", operation, identifier);
+    }
+  }
 
-      if (client != null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close REST client when planning table scan for table: {}", identifier, e);
-        }
-      }
+  private static void closeQuietly(
+      AutoCloseable closeable, String resource, String operation, TableIdentifier identifier) {
+    if (closeable == null) {
+      return;
+    }
 
-      if (authManager != null) {
-        try {
-          authManager.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth manager when planning table scan for table: {}", identifier, e);
-        }
-      }
+    try {
+      closeable.close();
+    } catch (Exception e) {
+      LOG.warn("Failed to close {} when {} for table: {}", resource, operation, identifier, e);
     }
   }
 

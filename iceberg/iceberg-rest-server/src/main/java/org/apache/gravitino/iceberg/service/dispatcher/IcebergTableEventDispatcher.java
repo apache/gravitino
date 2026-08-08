@@ -31,6 +31,9 @@ import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
@@ -56,9 +59,11 @@ import org.apache.gravitino.listener.api.event.IcebergUpdateTablePreEvent;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -303,6 +308,36 @@ public class IcebergTableEventDispatcher implements IcebergTableOperationDispatc
     }
     eventBus.dispatchEvent(new IcebergPlanTableScanEvent(context, gravitinoNameIdentifier));
     return planTableScanResponse;
+  }
+
+  /**
+   * Fetch the scan tasks for a {@code plan-task} returned by a prior scan plan.
+   *
+   * @param context Iceberg REST request context information.
+   * @param tableIdentifier The Iceberg table identifier.
+   * @param request The request carrying the {@code plan-task}.
+   * @return A FetchScanTasksResponse containing the scan tasks for that plan task
+   */
+  @Override
+  public FetchScanTasksResponse fetchScanTasks(
+      IcebergRequestContext context,
+      TableIdentifier tableIdentifier,
+      FetchScanTasksRequest request) {
+    NameIdentifier gravitinoNameIdentifier =
+        IcebergRESTUtils.getGravitinoNameIdentifier(
+            metalakeName, context.catalogName(), tableIdentifier);
+    eventBus.dispatchEvent(new IcebergFetchScanTasksPreEvent(context, gravitinoNameIdentifier));
+    FetchScanTasksResponse fetchScanTasksResponse;
+    try {
+      fetchScanTasksResponse =
+          icebergTableOperationDispatcher.fetchScanTasks(context, tableIdentifier, request);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new IcebergFetchScanTasksFailureEvent(context, gravitinoNameIdentifier, e));
+      throw e;
+    }
+    eventBus.dispatchEvent(new IcebergFetchScanTasksEvent(context, gravitinoNameIdentifier));
+    return fetchScanTasksResponse;
   }
 
   @Override
