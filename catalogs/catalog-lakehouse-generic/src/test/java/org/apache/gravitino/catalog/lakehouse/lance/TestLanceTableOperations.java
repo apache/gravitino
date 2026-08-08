@@ -122,6 +122,36 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testVariantTypeIsRejectedBeforeOverwriteMutation() {
+    NameIdentifier ident = NameIdentifier.of("catalog", "schema", "table");
+    Column[] columns = {Column.of("payload", Types.VariantType.get(), "variant")};
+    Map<String, String> properties =
+        Map.of(
+            Table.PROPERTY_LOCATION,
+            tempDir.resolve("variant-overwrite").toString(),
+            LANCE_CREATION_MODE,
+            "OVERWRITE");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                lanceTableOps.createTable(
+                    ident,
+                    columns,
+                    null,
+                    properties,
+                    new Transform[0],
+                    null,
+                    new SortOrder[0],
+                    new Index[0]));
+
+    Assertions.assertTrue(exception.getMessage().contains("exact native representation"));
+    verify(lanceTableOps, never()).purgeTable(ident);
+    verify(lanceTableOps, never()).dropTable(ident);
+  }
+
+  @Test
   public void testLoadDeclaredTableSchemaFromLocation() throws Exception {
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("declared-table").toString();
