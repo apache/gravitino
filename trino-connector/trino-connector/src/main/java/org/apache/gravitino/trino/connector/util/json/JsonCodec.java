@@ -58,6 +58,7 @@ import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
 public class JsonCodec {
   private static volatile ObjectMapper mapper;
   private static volatile Type jsonType;
+  private static volatile TypeManager typeManagerInstance;
 
   private static ObjectMapper buildMapper(ClassLoader classLoader) {
     try {
@@ -265,6 +266,34 @@ public class JsonCodec {
       }
       jsonType = buildJsonType(classLoader);
       return jsonType;
+    }
+  }
+
+  /**
+   * Gets the singleton {@link TypeManager} instance, used to resolve a {@link
+   * io.trino.spi.type.TypeId} (an opaque, serializable type identifier) back into a full Trino
+   * {@link Type}.
+   *
+   * @param classLoader the class loader to use for loading Trino internal classes
+   * @return the {@link TypeManager} instance
+   */
+  public static TypeManager getTypeManager(ClassLoader classLoader) {
+    if (typeManagerInstance != null) {
+      return typeManagerInstance;
+    }
+
+    synchronized (JsonCodec.class) {
+      if (typeManagerInstance != null) {
+        return typeManagerInstance;
+      }
+      ClassLoader appClassLoader =
+          GravitinoConnectorPluginManager.instance(classLoader).getAppClassloader();
+      try {
+        typeManagerInstance = createTypeManager(appClassLoader);
+      } catch (Exception e) {
+        throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to build TypeManager", e);
+      }
+      return typeManagerInstance;
     }
   }
 }
