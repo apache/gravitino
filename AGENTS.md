@@ -60,7 +60,7 @@
 - **Format**: `./gradlew spotlessApply`
 - **Unit Tests**: `./gradlew test -PskipITs -PskipDockerTests=false`
 - **Integration Tests**: `./gradlew test -PskipTests -PskipDockerTests=false`
-- **OpenAPI Docs Validation**: `./gradlew :docs:build` — Run this after any changes to `docs/open-api/*.yaml` to validate OpenAPI specification correctness.
+- **OpenAPI Spec Validation**: `cd dev/openapi && npm ci && npm run lint` — Run this after any changes to `docs/open-api/*.yaml` to validate OpenAPI specification correctness (Redocly structural + Spectral governance). CI runs the same via `.github/workflows/openapi.yml`. See `dev/openapi/README.md`.
 
 ## Claude Memory Usage
 - Before starting any task, use mcp-search to check if similar work has been done before.
