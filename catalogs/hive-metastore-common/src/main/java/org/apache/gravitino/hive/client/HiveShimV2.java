@@ -216,6 +216,17 @@ class HiveShimV2 extends HiveShim {
   }
 
   @Override
+  public List<HivePartition> listPartitionsByNames(HiveTable table, List<String> partitionNames) {
+    try {
+      String databaseName = table.databaseName();
+      var partitions = client.getPartitionsByNames(databaseName, table.name(), partitionNames);
+      return partitions.stream().map(p -> HiveTableConverter.fromHivePartition(table, p)).toList();
+    } catch (Exception e) {
+      throw HiveExceptionConverter.toGravitinoException(e, ExceptionTarget.table(table.name()));
+    }
+  }
+
+  @Override
   public HivePartition getPartition(HiveTable table, String partitionName) {
     try {
       String databaseName = table.databaseName();

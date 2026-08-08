@@ -135,6 +135,11 @@ public class HiveClientImpl implements HiveClient {
   }
 
   @Override
+  public List<HivePartition> listPartitionsByNames(HiveTable table, List<String> partitionNames) {
+    return shim.listPartitionsByNames(table, partitionNames);
+  }
+
+  @Override
   public HivePartition getPartition(HiveTable table, String partitionName) {
     return shim.getPartition(table, partitionName);
   }
