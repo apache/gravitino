@@ -47,6 +47,7 @@ import org.slf4j.LoggerFactory;
 
 public class TrinoQueryIT extends TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryIT.class);
+  private static final int DEFAULT_TRINO_VERSION = 478;
 
   protected static String testsetsDir;
   protected AtomicInteger passCount = new AtomicInteger(0);
@@ -93,6 +94,9 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     queryParams.put("trino_uri", trinoUri);
     queryParams.put("postgresql_uri", postgresqlUri);
     queryParams.put("gravitino_uri", gravitinoUri);
+    queryParams.put(
+        "trino_version",
+        String.valueOf(trinoVersion == null ? DEFAULT_TRINO_VERSION : trinoVersion));
 
     LOG.info("Test query env parameters: {}", queryParams);
   }
@@ -195,7 +199,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
     return sql.replaceAll("--.*?\\n", "");
   }
 
-  private static String resolveParameters(String sql) throws Exception {
+  static String resolveParameters(String sql) throws Exception {
     // ${?param} is optional (resolves to empty string when not provided); ${param} is required.
     Matcher sqlMatcher = PARAM_PATTERN.matcher(sql);
     StringBuffer replacedString = new StringBuffer();
@@ -249,6 +253,7 @@ public class TrinoQueryIT extends TrinoQueryITBase {
           expectResult = resultMatcher.group(4).trim();
         }
       }
+      expectResult = resolveParameters(expectResult);
 
       String result = queryRunner.runQuery(sql).trim();
       result = result.replaceAll("WARNING:.*?\\n", "");

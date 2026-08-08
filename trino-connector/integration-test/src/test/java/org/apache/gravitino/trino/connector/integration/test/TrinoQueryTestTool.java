@@ -99,7 +99,7 @@ public class TrinoQueryTestTool {
               + "otherwise fall back to a single-node setup with combined coordinator-worker roles.");
 
       options.addOption(
-          "trino_version", true, "Specify the Trino version to test, the default value is 435.");
+          "trino_version", true, "Specify the Trino version to test, the default value is 478.");
 
       options.addOption(
           "trino_connector_dir",
