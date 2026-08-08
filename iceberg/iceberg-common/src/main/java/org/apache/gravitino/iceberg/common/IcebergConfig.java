@@ -319,10 +319,15 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
 
   public static final ConfigEntry<String> SCAN_PLAN_CACHE_IMPL =
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_IMPL)
-          .doc("The implementation of the scan plan cache")
+          .doc(
+              "The implementation of the scan plan cache. Set to empty string(\"\") to disable "
+                  + "scan plan caching.")
           .version(ConfigConstants.VERSION_1_2_0)
           .stringConf()
-          .create();
+          // The default implementation lives in the Iceberg REST server module, which
+          // iceberg-common does not depend on, so it is referenced by name. The name is pinned by
+          // TestCatalogWrapperForREST#testScanPlanCacheDefaultImpl.
+          .createWithDefault("org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache");
 
   public static final ConfigEntry<Integer> SCAN_PLAN_CACHE_CAPACITY =
       new ConfigBuilder(IcebergConstants.SCAN_PLAN_CACHE_CAPACITY)

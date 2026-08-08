@@ -699,13 +699,15 @@ Gravitino caches scan plan results to speed up repeated queries with identical p
 
 Plan scan responses follow the Iceberg 1.11 REST API: completed plans return structured `file-scan-tasks` only. Legacy `plan-tasks` JSON strings (used by some Iceberg 1.9.x–1.10.x clients) are not emitted.
 
-| Configuration item                                         | Description                                              | Default value | Required | Since Version |
-|------------------------------------------------------------|----------------------------------------------------------|---------------|----------|---------------|
-| `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       | 1.2.0         |
-| `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of the scan plan cache.                     | 200           | No       | 1.2.0         |
-| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes`    | The expiration time (in minutes) of the scan plan cache. | 60            | No       | 1.2.0         |
+| Configuration item                                      | Description                                                                                      | Default value                                                   | Required | Since Version |
+|---------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------------------------------------------------------|----------|---------------|
+| `gravitino.iceberg-rest.scan-plan-cache-impl`           | The implementation of the scan plan cache. Set to empty string("") to disable scan plan caching. | `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` | No       | 1.2.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-capacity`       | The capacity of the scan plan cache.                                                             | 200                                                             | No       | 1.2.0         |
+| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes` | The expiration time (in minutes) of the scan plan cache.                                         | 60                                                              | No       | 1.2.0         |
 
 The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This can provide significant speedup for repeated queries like dashboard refreshes or BI tool queries.
+
+The cache is enabled by default and is held per catalog in the server process. Each entry holds a whole plan response, so a server that plans very large scans keeps up to `scan-plan-cache-capacity` plan responses on the heap per catalog; lower the capacity, or set `scan-plan-cache-impl` to an empty string to turn caching off, when that footprint matters more than the replanning it saves. Catalogs with `catalog-backend` set to `rest` delegate scan planning to the upstream REST catalog, so the cache does not apply to them.
 
 Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.LocalScanPlanCache` to store the cached data in memory. Also implement your custom scan plan cache by implementing the `org.apache.gravitino.iceberg.service.cache.ScanPlanCache` interface.
 
