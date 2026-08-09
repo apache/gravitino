@@ -349,7 +349,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 #### `OAuth` Authentication
 
 If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
-refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/security.md).
+refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/how-to-authenticate.md).
 
 Then, you can configure the Hadoop configuration like this:
 
@@ -373,7 +373,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 #### `Kerberos` Authentication
 
 If you want to use `kerberos` authentication for the Gravitino client in the Gravitino Virtual File System,
-refer to this document to complete the configuration of the Gravitino server: [Security](security/security.md).
+refer to this document to complete the configuration of the Gravitino server: [Security](security/how-to-authenticate.md).
 
 Then, you can configure the Hadoop configuration like this:
 
@@ -413,8 +413,8 @@ to recompile the native libraries like `libhdfs` and others, and completely repl
 | `cache_size`                    | The cache capacity of the Gravitino Virtual File System.                                                                                                                                                                                                                                                                                                               | `20`                                                                 | No                                |
 | `cache_expired_time`            | The value of time that the cache expires after accessing in the Gravitino Virtual File System. The value is in `seconds`.                                                                                                                                                                                                                                              | `3600`                                                               | No                                |
 | `auth_type`                     | The auth type the Gravitino client uses with the Gravitino Virtual File System. Supports `simple`, `basic`, and `oauth2`.                                                                                                                                                                                                                                              | `simple`                                                             | No                                |
-| `basic_username`                | The username for the Gravitino client when using `basic` auth type with the built-in IDP.                                                                                                                                                                                                                                                                              | (none)                                                               | Yes if you use `basic` auth type  |
-| `basic_password`                | The password for the Gravitino client when using `basic` auth type with the built-in IDP.                                                                                                                                                                                                                                                                              | (none)                                                               | Yes if you use `basic` auth type  |
+| `basic_username`                | The username for the Gravitino client when using `basic` auth type with the local user store.                                                                                                                                                                                                                                                                              | (none)                                                               | Yes if you use `basic` auth type  |
+| `basic_password`                | The password for the Gravitino client when using `basic` auth type with the local user store.                                                                                                                                                                                                                                                                              | (none)                                                               | Yes if you use `basic` auth type  |
 | `oauth2_server_uri`             | The auth server URI for the Gravitino client when using `oauth2` auth type.                                                                                                                                                                                                                                                                                            | (none)                                                               | Yes if you use `oauth2` auth type |
 | `oauth2_credential`             | The auth credential for the Gravitino client when using `oauth2` auth type.                                                                                                                                                                                                                                                                                            | (none)                                                               | Yes if you use `oauth2` auth type |
 | `oauth2_path`                   | The auth server path for the Gravitino client when using `oauth2` auth type. Please remove the first slash `/` from the path, for example `oauth/token`.                                                                                                                                                                                                               | (none)                                                               | Yes if you use `oauth2` auth type |
@@ -734,7 +734,7 @@ print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 #### `OAuth` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `oauth2` authentication mode,
-and you have an OAuth server to fetch the token: [Security](security/security.md).
+and you have an OAuth server to fetch the token: [Security](security/how-to-authenticate.md).
 
 Then, you can configure the authentication like this:
 

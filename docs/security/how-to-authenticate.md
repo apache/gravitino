@@ -45,7 +45,7 @@ curl -v -X GET \
 
 ### Basic Mode
 
-In Basic mode, Gravitino verifies HTTP Basic credentials against built-in IDP user metadata stored
+In Basic mode, Gravitino verifies HTTP Basic credentials against local user metadata stored
 in the relational entity store.
 
 To enable Basic mode:
@@ -53,14 +53,14 @@ To enable Basic mode:
 - Set `gravitino.authenticators` to `basic`.
 - Set `gravitino.server.rest.extensionPackages` to `org.apache.gravitino.idp.web.rest.feature`.
 - Set `gravitino.authorization.serviceAdmins` to the service admin usernames that should exist in
-  the built-in IDP.
+  the local user store.
 
-Built-in IdP is **incompatible** with the `simple` authenticator (the default),
+Local user store is **incompatible** with the `simple` authenticator (the default),
 `gravitino.authenticators` must include `basic` and must not include `simple`.
 - On the first startup, if any configured service admin does not yet have a password, set the
   `GRAVITINO_INITIAL_ADMIN_PASSWORD` environment variable to the initial password (12 to 64
   characters) before starting Gravitino. The same password is applied to every configured service
-  admin that does not yet exist in the built-in IDP.
+  admin that does not yet exist in the local user store.
 
 For the client side, enable Basic mode with the following code:
 
@@ -91,8 +91,8 @@ curl -v -X GET \
 ```
 
 The Web UI uses the first entry in `gravitino.authenticators` from `/configs`. When it is `basic`,
-the login page shows a username and password form backed by built-in IdP user metadata. See
-[built-in IDP Web UI](how-to-use-built-in-idp.md#web-ui).
+the login page shows a username and password form backed by local user metadata. See
+[Local users and groups](local-users-and-groups.md).
 
 ### OAuth Mode
 
@@ -383,7 +383,7 @@ This example shows how to enable built-in Basic authentication.
 
 - Gravitino distribution package (includes the idp-basic plugin on the server classpath)
 
-Built-in IdP is **incompatible** with the `simple` authenticator (the default),
+Local user store is **incompatible** with the `simple` authenticator (the default),
 `gravitino.authenticators` must include `basic` and must not include `simple`.
 
 **Configuration:**
