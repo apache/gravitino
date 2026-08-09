@@ -86,6 +86,12 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
 
+  /** Selects and locks an active schema by ID for the current transaction. */
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdForUpdate")
+  SchemaPO selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId);
+
   @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "insertSchemaMeta")
   void insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO);
 
@@ -105,15 +111,6 @@ public interface SchemaMetaMapper {
   @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "updateSchemaMeta")
   Integer updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO);
-
-  /**
-   * Advances the schema version when the expected OCC version still matches.
-   *
-   * @return the number of updated rows
-   */
-  @UpdateProvider(type = SchemaMetaSQLProviderFactory.class, method = "fenceSchemaMeta")
-  Integer fenceSchemaMeta(
-      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,

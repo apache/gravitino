@@ -98,6 +98,11 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().selectSchemaMetaById(schemaId);
   }
 
+  /** Returns SQL that selects and locks an active schema by ID. */
+  public static String selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdForUpdate(schemaId);
+  }
+
   public static String insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO) {
     return getProvider().insertSchemaMeta(schemaPO);
   }
@@ -119,12 +124,6 @@ public class SchemaMetaSQLProviderFactory {
   public static String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return getProvider().updateSchemaMeta(newSchemaPO, oldSchemaPO);
-  }
-
-  /** Returns SQL that advances a schema OCC version conditionally. */
-  public static String fenceSchemaMeta(
-      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().fenceSchemaMeta(schemaId, currentVersion);
   }
 
   public static String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {

@@ -26,6 +26,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class MetalakeMetaPostgreSQLProvider extends MetalakeMetaBaseSQLProvider {
   @Override
+  public String selectMetalakeMetaByIdForShare(Long metalakeId) {
+    return selectMetalakeMetaById(metalakeId) + " FOR SHARE";
+  }
+
+  @Override
   public String softDeleteMetalakeMetaByMetalakeId(Long metalakeId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME

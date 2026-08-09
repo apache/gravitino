@@ -27,6 +27,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   @Override
+  public String selectCatalogMetaByIdForShare(Long catalogId) {
+    return selectCatalogMetaById(catalogId) + " FOR SHARE";
+  }
+
+  @Override
   public String softDeleteCatalogMetasByCatalogId(Long catalogId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME

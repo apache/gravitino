@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -241,24 +240,22 @@ public class CatalogMetaService {
     String oldFullName =
         NameIdentifierUtil.ofCatalog(metalakeName, oldCatalogEntity.name()).toString();
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            updateResult.set(
+            int updated =
                 SessionUtils.getWithoutCommit(
                     CatalogMetaMapper.class,
                     mapper ->
                         mapper.updateCatalogMeta(
                             POConverters.updateCatalogPOWithVersion(
                                 oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
-                            oldCatalogPO)));
-            if (updateResult.get() == 0) {
-              throw optimisticLockException(identifier);
+                            oldCatalogPO));
+            if (updated == 0) {
+              throw catalogWriteFailure(identifier, oldCatalogPO);
             }
           },
-          () -> {
-            if (updateResult.get() > 0) {
+          () ->
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -266,9 +263,7 @@ public class CatalogMetaService {
                           metalakeName,
                           Entity.EntityType.CATALOG.name(),
                           oldFullName,
-                          OperateType.ALTER));
-            }
-          });
+                          OperateType.ALTER)));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
@@ -287,13 +282,12 @@ public class CatalogMetaService {
     String catalogName = identifier.name();
     CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
     long catalogId = catalogPO.getCatalogId();
-    long currentVersion = catalogPO.getCurrentVersion();
     String metalakeName = identifier.namespace().level(0);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            deleteCatalogWithVersion(identifier, catalogId, currentVersion);
+            deleteCatalogWithVersion(identifier, catalogPO);
             deleteSchemasWithVersions(identifier, catalogId);
           },
           () ->
@@ -374,7 +368,7 @@ public class CatalogMetaService {
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            deleteCatalogWithVersion(identifier, catalogId, currentVersion);
+            deleteCatalogWithVersion(identifier, catalogPO);
             List<SchemaPO> schemaPOs =
                 SessionUtils.getWithoutCommit(
                     SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
@@ -426,14 +420,15 @@ public class CatalogMetaService {
     return true;
   }
 
-  private void deleteCatalogWithVersion(
-      NameIdentifier identifier, Long catalogId, Long currentVersion) {
+  private void deleteCatalogWithVersion(NameIdentifier identifier, CatalogPO observedCatalogPO) {
     int deleted =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
-            mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId, currentVersion));
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(
+                    observedCatalogPO.getCatalogId(), observedCatalogPO.getCurrentVersion()));
     if (deleted == 0) {
-      throw optimisticLockException(identifier);
+      throw catalogWriteFailure(identifier, observedCatalogPO);
     }
   }
 
@@ -441,14 +436,32 @@ public class CatalogMetaService {
     MetalakePO currentMetalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaByIdForUpdate(observedMetalakePO.getMetalakeId()));
+            mapper -> mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId()));
     if (currentMetalakePO == null
         || !Objects.equals(
             currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
-      throw new OptimisticLockException(
-          "The parent metalake %s was modified concurrently; retry the operation",
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
           observedMetalakePO.getMetalakeName());
     }
+  }
+
+  private RuntimeException catalogWriteFailure(
+      NameIdentifier identifier, CatalogPO observedCatalogPO) {
+    CatalogPO currentCatalogPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId()));
+    if (currentCatalogPO == null
+        || !Objects.equals(currentCatalogPO.getCatalogName(), observedCatalogPO.getCatalogName())
+        || !Objects.equals(currentCatalogPO.getMetalakeId(), observedCatalogPO.getMetalakeId())) {
+      return new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.name());
+    }
+    return optimisticLockException(identifier);
   }
 
   private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {

@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -181,20 +180,20 @@ public class MetalakeMetaService {
     String oldFullName = oldMetalakeEntity.name();
     boolean isRenamed = !Objects.equals(oldMetalakeEntity.name(), newMetalakeEntity.name());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            updateResult.set(
+            int updated =
                 SessionUtils.getWithoutCommit(
                     MetalakeMetaMapper.class,
-                    mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO)));
-            if (updateResult.get() == 0) {
-              throw optimisticLockException(ident);
+                    mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
+            if (updated == 0) {
+              throw metalakeWriteFailure(
+                  ident, oldMetalakePO.getMetalakeId(), oldMetalakePO.getMetalakeName());
             }
           },
           () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            if (isRenamed) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -430,8 +429,23 @@ public class MetalakeMetaService {
             MetalakeMetaMapper.class,
             mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion));
     if (deleted == 0) {
-      throw optimisticLockException(identifier);
+      throw metalakeWriteFailure(identifier, metalakeId, identifier.name());
     }
+  }
+
+  private RuntimeException metalakeWriteFailure(
+      NameIdentifier identifier, Long metalakeId, String observedName) {
+    MetalakePO currentMetalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId));
+    if (currentMetalakePO == null
+        || !Objects.equals(currentMetalakePO.getMetalakeName(), observedName)) {
+      return new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          identifier.name());
+    }
+    return optimisticLockException(identifier);
   }
 
   private void deleteCatalogsWithVersions(NameIdentifier metalakeIdentifier, Long metalakeId) {

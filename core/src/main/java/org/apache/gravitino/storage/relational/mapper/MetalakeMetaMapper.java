@@ -53,6 +53,12 @@ public interface MetalakeMetaMapper {
       method = "selectMetalakeMetaByIdForUpdate")
   MetalakePO selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId);
 
+  /** Selects and share-locks an active metalake by ID for the current transaction. */
+  @SelectProvider(
+      type = MetalakeMetaSQLProviderFactory.class,
+      method = "selectMetalakeMetaByIdForShare")
+  MetalakePO selectMetalakeMetaByIdForShare(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "listMetalakePOsByMetalakeIds")

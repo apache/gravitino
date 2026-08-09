@@ -42,6 +42,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -319,6 +320,37 @@ public class TestCatalogMetaService extends TestJDBCBackend {
                       SessionUtils.doWithCommitAndFetchResult(
                           CatalogMetaMapper.class,
                           mapper -> mapper.updateCatalogMeta(competingPO, currentPO));
+                      return copyCatalogWithComment(current, "requested update");
+                    }));
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenCatalogIsDeletedConcurrently() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_alter_deleted",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            CatalogMetaService.getInstance()
+                .updateCatalog(
+                    catalog.nameIdentifier(),
+                    entity -> {
+                      CatalogEntity current = (CatalogEntity) entity;
+                      CatalogPO currentPO =
+                          SessionUtils.getWithoutCommit(
+                              CatalogMetaMapper.class,
+                              mapper -> mapper.selectCatalogMetaById(current.id()));
+                      SessionUtils.doWithCommitAndFetchResult(
+                          CatalogMetaMapper.class,
+                          mapper ->
+                              mapper.softDeleteCatalogMetasByCatalogId(
+                                  current.id(), currentPO.getCurrentVersion()));
                       return copyCatalogWithComment(current, "requested update");
                     }));
   }

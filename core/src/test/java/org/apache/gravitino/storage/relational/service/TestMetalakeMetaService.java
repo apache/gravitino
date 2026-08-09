@@ -25,12 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -192,6 +194,38 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testAlterReportsNoSuchWhenMetalakeIsDeletedConcurrently() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            MetalakeMetaService.getInstance()
+                .updateMetalake(
+                    metalake.nameIdentifier(),
+                    entity -> {
+                      BaseMetalake current = (BaseMetalake) entity;
+                      MetalakePO currentPO =
+                          SessionUtils.getWithoutCommit(
+                              MetalakeMetaMapper.class,
+                              mapper -> mapper.selectMetalakeMetaById(current.id()));
+                      SessionUtils.doWithCommitAndFetchResult(
+                          MetalakeMetaMapper.class,
+                          mapper ->
+                              mapper.softDeleteMetalakeMetaByMetalakeId(
+                                  current.id(), currentPO.getCurrentVersion()));
+                      return BaseMetalake.builder()
+                          .withId(current.id())
+                          .withName(current.name())
+                          .withAuditInfo(current.auditInfo())
+                          .withComment("requested update")
+                          .withProperties(current.properties())
+                          .withVersion(current.getVersion())
+                          .build();
+                    }));
+  }
+
+  @TestTemplate
   public void testDeleteReportsOptimisticLockConflict() throws IOException {
     BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
     MetalakePO stalePO =
@@ -293,6 +327,62 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         schemaBeforeDelete.getCurrentVersion() + 1, schemaAfterDelete.getCurrentVersion());
     Assertions.assertEquals("competing update", schemaAfterDelete.getSchemaComment());
+  }
+
+  @TestTemplate
+  public void testConcurrentMetalakeCascadeAndSchemaCreateLeavesNoOrphan() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog");
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(METALAKE_NAME, catalog.name()),
+            "concurrent_schema",
+            AUDIT_INFO);
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> createResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  SchemaMetaService.getInstance().insertSchema(schema, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Future<Throwable> deleteResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(ready.await(30, TimeUnit.SECONDS));
+      start.countDown();
+      Throwable createFailure = createResult.get(30, TimeUnit.SECONDS);
+      Throwable deleteFailure = deleteResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue(
+          createFailure == null || createFailure instanceof NoSuchEntityException,
+          () -> "Schema create produced an unexpected failure: " + createFailure);
+      Assertions.assertNull(deleteFailure, () -> "Metalake cascade failed: " + deleteFailure);
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+
+    assertFalse(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
   }
 
   @TestTemplate

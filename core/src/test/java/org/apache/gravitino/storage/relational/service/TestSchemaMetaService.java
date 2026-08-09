@@ -43,6 +43,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -178,6 +179,27 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertTrue(
         results.stream().allMatch(Objects::isNull),
         () -> "Concurrent schema creates failed: " + results);
+  }
+
+  @TestTemplate
+  public void testConcurrentSameSchemaDeletesAreIdempotent() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "concurrent_delete_schema",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    List<Throwable> results =
+        deleteSchemasConcurrently(schema.nameIdentifier(), schema.nameIdentifier());
+    Assertions.assertEquals(1, results.stream().filter(Objects::isNull).count());
+    Throwable loser = results.stream().filter(Objects::nonNull).findFirst().orElseThrow();
+    Assertions.assertTrue(
+        loser instanceof NoSuchEntityException,
+        () -> "Expected an idempotent missing result, but got " + loser);
   }
 
   @TestTemplate
@@ -330,6 +352,39 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testAlterReportsNoSuchWhenSchemaIsDeletedConcurrently() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_alter_deleted",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            SchemaMetaService.getInstance()
+                .updateSchema(
+                    schema.nameIdentifier(),
+                    entity -> {
+                      SchemaEntity current = (SchemaEntity) entity;
+                      SchemaPO currentPO =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper -> mapper.selectSchemaMetaById(current.id()));
+                      SessionUtils.doWithCommitAndFetchResult(
+                          SchemaMetaMapper.class,
+                          mapper ->
+                              mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                  current.id(), currentPO.getCurrentVersion()));
+                      return copySchemaWithComment(current, "requested update");
+                    }));
+  }
+
+  @TestTemplate
   public void testMetaLifeCycleFromCreationToDeletion() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -417,6 +472,57 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     topicMetaService.deleteTopic(topic.nameIdentifier());
     schemaMetaService.deleteSchema(schema.nameIdentifier(), false);
+  }
+
+  @TestTemplate
+  public void testDeleteSchemaNonCascadingFailsWhenViewExists() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_with_view",
+            AUDIT_INFO);
+    SchemaMetaService.getInstance().insertSchema(schema, false);
+    ViewEntity view =
+        createViewEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofView(metalakeName, catalogName, schema.name()),
+            "dependent_view");
+    ViewMetaService.getInstance().insertView(view, false);
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false));
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertTrue(backend.exists(view.nameIdentifier(), Entity.EntityType.VIEW));
+  }
+
+  @TestTemplate
+  public void testDeleteSchemaNonCascadingFailsWhenFunctionExists() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_with_function",
+            AUDIT_INFO);
+    SchemaMetaService.getInstance().insertSchema(schema, false);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(metalakeName, catalogName, schema.name()),
+            "dependent_function",
+            AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> SchemaMetaService.getInstance().deleteSchema(schema.nameIdentifier(), false));
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    assertTrue(backend.exists(function.nameIdentifier(), Entity.EntityType.FUNCTION));
   }
 
   @TestTemplate
@@ -530,6 +636,42 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertTrue(
         backend.exists(
             NameIdentifier.of(metalakeName, catalogName, "anc_a"), Entity.EntityType.SCHEMA));
+  }
+
+  @TestTemplate
+  public void testOverlappingHierarchicalSchemaDeletesDoNotDeadlock() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaMetaService schemaMetaService = SchemaMetaService.getInstance();
+    String firstLeaf = "overlap_a:overlap_b:leaf_c";
+    String secondLeaf = "overlap_a:overlap_b:leaf_d";
+    schemaMetaService.insertSchema(
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            firstLeaf,
+            AUDIT_INFO),
+        false);
+    schemaMetaService.insertSchema(
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            secondLeaf,
+            AUDIT_INFO),
+        false);
+
+    NameIdentifier ancestor = NameIdentifier.of(metalakeName, catalogName, "overlap_a:overlap_b");
+    NameIdentifier descendant = NameIdentifier.of(metalakeName, catalogName, firstLeaf);
+    List<Throwable> results = deleteSchemasConcurrently(ancestor, descendant);
+    Assertions.assertTrue(
+        results.stream()
+            .allMatch(result -> result == null || result instanceof NoSuchEntityException),
+        () -> "Overlapping cascade deletes produced an unexpected failure: " + results);
+    Assertions.assertFalse(backend.exists(ancestor, Entity.EntityType.SCHEMA));
+    Assertions.assertFalse(backend.exists(descendant, Entity.EntityType.SCHEMA));
+    Assertions.assertFalse(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, secondLeaf), Entity.EntityType.SCHEMA));
   }
 
   @TestTemplate
@@ -752,9 +894,9 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     Assertions.assertEquals(ancestorAPOBefore.getSchemaId(), ancestorAPOAfter.getSchemaId());
     Assertions.assertEquals(ancestorABPOBefore.getSchemaId(), ancestorABPOAfter.getSchemaId());
     Assertions.assertEquals(
-        ancestorAPOBefore.getCurrentVersion() + 1, ancestorAPOAfter.getCurrentVersion());
+        ancestorAPOBefore.getCurrentVersion(), ancestorAPOAfter.getCurrentVersion());
     Assertions.assertEquals(
-        ancestorABPOBefore.getCurrentVersion() + 1, ancestorABPOAfter.getCurrentVersion());
+        ancestorABPOBefore.getCurrentVersion(), ancestorABPOAfter.getCurrentVersion());
   }
 
   private List<Throwable> insertSchemasConcurrently(SchemaEntity first, SchemaEntity second)
@@ -794,6 +936,38 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     } finally {
       start.countDown();
       executor.shutdownNow();
+    }
+  }
+
+  private List<Throwable> deleteSchemasConcurrently(NameIdentifier first, NameIdentifier second)
+      throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      Future<Throwable> firstResult =
+          executor.submit(() -> deleteSchemaAfterStart(first, ready, start));
+      Future<Throwable> secondResult =
+          executor.submit(() -> deleteSchemaAfterStart(second, ready, start));
+      assertTrue(ready.await(30, TimeUnit.SECONDS));
+      start.countDown();
+      return Arrays.asList(
+          firstResult.get(30, TimeUnit.SECONDS), secondResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  private Throwable deleteSchemaAfterStart(
+      NameIdentifier identifier, CountDownLatch ready, CountDownLatch start) {
+    ready.countDown();
+    try {
+      start.await();
+      SchemaMetaService.getInstance().deleteSchema(identifier, true);
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
     }
   }
 

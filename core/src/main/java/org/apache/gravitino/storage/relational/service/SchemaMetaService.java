@@ -28,7 +28,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.regex.Pattern;
@@ -171,7 +170,7 @@ public class SchemaMetaService {
       }
 
       SessionUtils.doMultipleWithCommit(
-          () -> lockCatalogForSchemaCreate(catalogPO),
+          () -> lockCatalogForSchemaCreate(catalogPO, rowsToInsert.size() > 1),
           () ->
               SessionUtils.doWithoutCommit(
                   SchemaMetaMapper.class,
@@ -192,8 +191,6 @@ public class SchemaMetaService {
                       for (SchemaEntity row : rowsToInsert.subList(0, n - 1)) {
                         SchemaPO existingAncestor = existingAncestors.get(row.name());
                         if (existingAncestor != null) {
-                          fenceSchemaAncestor(
-                              mapper, existingAncestor, schemaEntity.nameIdentifier());
                           continue;
                         }
                         SchemaPO.Builder builder = newSchemaPOBuilder(catalogPO);
@@ -237,24 +234,23 @@ public class SchemaMetaService {
         NameIdentifierUtil.ofSchema(metalakeName, catalogName, oldSchemaEntity.name()).toString();
     boolean isRenamed = !Objects.equals(oldSchemaEntity.name(), newEntity.name());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            updateResult.set(
+            int updated =
                 SessionUtils.getWithoutCommit(
                     SchemaMetaMapper.class,
                     mapper ->
                         ops.updatePO(
                             mapper,
                             POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
-                            oldSchemaPO)));
-            if (updateResult.get() == 0) {
-              throw optimisticLockException(identifier);
+                            oldSchemaPO));
+            if (updated == 0) {
+              throw schemaWriteFailure(identifier, oldSchemaPO);
             }
           },
           () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            if (isRenamed) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -292,7 +288,8 @@ public class SchemaMetaService {
       AtomicReference<List<Long>> schemaIds = new AtomicReference<>();
       SessionUtils.doMultipleWithCommit(
           () -> {
-            deleteSchemaWithVersion(identifier, schemaId, schemaPO.getCurrentVersion());
+            lockCatalogForSchemaDelete(identifier, schemaPO);
+            deleteSchemaWithVersion(identifier, schemaPO);
             List<SchemaPO> descendants = listDescendantSchemaPOs(schemaPO);
             deleteDescendantSchemasWithVersions(identifier, descendants);
             List<Long> ids = new ArrayList<>(descendants.size() + 1);
@@ -377,7 +374,8 @@ public class SchemaMetaService {
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
-            deleteSchemaWithVersion(identifier, schemaId, schemaPO.getCurrentVersion());
+            lockCatalogForSchemaDelete(identifier, schemaPO);
+            deleteSchemaWithVersion(identifier, schemaPO);
             checkSchemaIsEmpty(identifier, schemaPO);
           },
           () ->
@@ -422,14 +420,15 @@ public class SchemaMetaService {
     return true;
   }
 
-  private void deleteSchemaWithVersion(
-      NameIdentifier identifier, Long schemaId, Long currentVersion) {
+  private void deleteSchemaWithVersion(NameIdentifier identifier, SchemaPO observedSchemaPO) {
     int deleted =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
-            mapper -> mapper.softDeleteSchemaMetaBySchemaIdAndVersion(schemaId, currentVersion));
+            mapper ->
+                mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                    observedSchemaPO.getSchemaId(), observedSchemaPO.getCurrentVersion()));
     if (deleted == 0) {
-      throw optimisticLockException(identifier);
+      throw schemaWriteFailure(identifier, observedSchemaPO);
     }
   }
 
@@ -471,28 +470,63 @@ public class SchemaMetaService {
         mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.SCHEMA));
   }
 
-  private void lockCatalogForSchemaCreate(CatalogPO observedCatalogPO) {
+  private void lockCatalogForSchemaCreate(
+      CatalogPO observedCatalogPO, boolean createsImplicitAncestors) {
     CatalogPO currentCatalogPO =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId()));
+            mapper ->
+                createsImplicitAncestors
+                    ? mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId())
+                    : mapper.selectCatalogMetaByIdForShare(observedCatalogPO.getCatalogId()));
     if (currentCatalogPO == null
         || !Objects.equals(currentCatalogPO.getCatalogName(), observedCatalogPO.getCatalogName())
         || !Objects.equals(currentCatalogPO.getMetalakeId(), observedCatalogPO.getMetalakeId())) {
-      throw new OptimisticLockException(
-          "The parent catalog %s was modified concurrently; retry the operation",
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
           observedCatalogPO.getCatalogName());
     }
   }
 
-  private void fenceSchemaAncestor(
-      SchemaMetaMapper mapper, SchemaPO ancestor, NameIdentifier schemaIdentifier) {
-    int fenced = mapper.fenceSchemaMeta(ancestor.getSchemaId(), ancestor.getCurrentVersion());
-    if (fenced == 0) {
-      throw new OptimisticLockException(
-          "An ancestor of schema %s was modified concurrently; retry the operation",
-          schemaIdentifier);
+  private void lockCatalogForSchemaDelete(NameIdentifier identifier, SchemaPO observedSchemaPO) {
+    CatalogPO currentCatalogPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.selectCatalogMetaByIdForUpdate(observedSchemaPO.getCatalogId()));
+    if (currentCatalogPO == null
+        || !Objects.equals(currentCatalogPO.getCatalogName(), identifier.namespace().level(1))
+        || !Objects.equals(currentCatalogPO.getMetalakeId(), observedSchemaPO.getMetalakeId())) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.namespace().level(1));
     }
+  }
+
+  private RuntimeException schemaWriteFailure(
+      NameIdentifier identifier, SchemaPO observedSchemaPO) {
+    SchemaPO currentSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper -> mapper.selectSchemaMetaByIdForUpdate(observedSchemaPO.getSchemaId()));
+    if (currentSchemaPO == null) {
+      return noSuchSchemaException(identifier);
+    }
+    currentSchemaPO = physicalToLogicalSchemaPO(currentSchemaPO);
+    if (!Objects.equals(currentSchemaPO.getSchemaName(), observedSchemaPO.getSchemaName())
+        || !Objects.equals(currentSchemaPO.getCatalogId(), observedSchemaPO.getCatalogId())
+        || !Objects.equals(currentSchemaPO.getMetalakeId(), observedSchemaPO.getMetalakeId())) {
+      return noSuchSchemaException(identifier);
+    }
+    return optimisticLockException(identifier);
+  }
+
+  private NoSuchEntityException noSuchSchemaException(NameIdentifier identifier) {
+    return new NoSuchEntityException(
+        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+        Entity.EntityType.SCHEMA.name().toLowerCase(),
+        identifier.name());
   }
 
   private void deleteDescendantSchemasWithVersions(
@@ -532,7 +566,23 @@ public class SchemaMetaService {
                 TopicMetaMapper.class,
                 mapper -> mapper.listTopicPOsBySchemaId(schemaPO.getSchemaId()))
             .isEmpty();
-    if (hasDescendantSchemas || hasTables || hasFilesets || hasModels || hasTopics) {
+    boolean hasViews =
+        !SessionUtils.getWithoutCommit(
+                ViewMetaMapper.class,
+                mapper -> mapper.listViewPOsBySchemaId(schemaPO.getSchemaId()))
+            .isEmpty();
+    boolean hasFunctions =
+        !SessionUtils.getWithoutCommit(
+                FunctionMetaMapper.class,
+                mapper -> mapper.listFunctionPOsBySchemaId(schemaPO.getSchemaId()))
+            .isEmpty();
+    if (hasDescendantSchemas
+        || hasTables
+        || hasFilesets
+        || hasModels
+        || hasTopics
+        || hasViews
+        || hasFunctions) {
       throw new NonEmptyEntityException(
           "Entity %s has sub-entities, you should remove sub-entities first", identifier);
     }

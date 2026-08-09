@@ -182,6 +182,11 @@ public class SchemaMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that selects and locks an active schema by ID. */
+  public String selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId) {
+    return selectSchemaMetaById(schemaId) + " FOR UPDATE";
+  }
+
   public String insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -287,16 +292,6 @@ public class SchemaMetaBaseSQLProvider {
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
         + " AND deleted_at = 0";
-  }
-
-  /** Returns SQL that advances a schema OCC version conditionally. */
-  public String fenceSchemaMeta(
-      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET last_version = current_version + 1, current_version = current_version + 1"
-        + " WHERE schema_id = #{schemaId}"
-        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
