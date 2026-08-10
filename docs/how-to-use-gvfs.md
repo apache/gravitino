@@ -378,7 +378,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 #### `OAuth` Authentication
 
 If you want to use `oauth2` authentication for the Gravitino client in the Gravitino Virtual File System,
-refer to this document to complete the configuration of the Gravitino server and the OAuth server: [Security](security/security.md).
+refer to this document to complete the configuration of the Gravitino server and the OAuth server: [How to authenticate](security/how-to-authenticate.md).
 
 Then, you can configure the Hadoop configuration like this:
 
@@ -402,7 +402,7 @@ FileSystem fs = filesetPath.getFileSystem(conf);
 #### `Kerberos` Authentication
 
 If you want to use `kerberos` authentication for the Gravitino client in the Gravitino Virtual File System,
-refer to this document to complete the configuration of the Gravitino server: [Security](security/security.md).
+refer to this document to complete the configuration of the Gravitino server: [How to authenticate](security/how-to-authenticate.md).
 
 Then, you can configure the Hadoop configuration like this:
 
@@ -513,6 +513,9 @@ with underscores rather than hyphens. Bundle jar names and the full property lis
 | Azure Data Lake Storage | `azure_storage_account_name`, `azure_storage_account_key`                  |
 | Alibaba Cloud OSS       | `oss_endpoint`, `oss_access_key_id`, `oss_secret_access_key`               |
 | Tencent Cloud COS       | `cos_region`, `cos_access_key_id`, `cos_secret_access_key`, `cos_endpoint` |
+
+`s3_endpoint` is optional against Amazon S3 itself and required for S3-compatible services such as
+MinIO. The Java client requires it in all cases.
 
 Pass them in the options alongside the properties above. For S3:
 
@@ -786,7 +789,7 @@ print(fs.ls("gvfs://fileset/fileset_catalog/tmp/test_fileset"))
 #### `OAuth` Authentication
 
 First, make sure that your Gravitino server is also configured to use the `oauth2` authentication mode,
-and you have an OAuth server to fetch the token: [Security](security/security.md).
+and you have an OAuth server to fetch the token: [How to authenticate](security/how-to-authenticate.md).
 
 Then, you can configure the authentication like this:
 
