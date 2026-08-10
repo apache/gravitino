@@ -16,7 +16,7 @@
 # under the License.
 
 import logging
-from typing import List, Dict
+from typing import Dict, List, Optional
 
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 
@@ -139,8 +139,8 @@ class FilesetCatalog(
         fileset_type: Fileset.Type,
         storage_location: str,
         properties: Dict[str, str],
-        secret_bindings: Dict[str, SecretBinding] = None,
-        secret_references: Dict[str, SecretReference] = None,
+        secret_bindings: Optional[Dict[str, SecretBinding]] = None,
+        secret_references: Optional[Dict[str, SecretReference]] = None,
     ) -> Fileset:
         """Create a fileset metadata in the catalog.
 
@@ -165,6 +165,8 @@ class FilesetCatalog(
         Returns:
             The created fileset metadata
         """
+        secret_bindings = {} if secret_bindings is None else secret_bindings
+        secret_references = {} if secret_references is None else secret_references
         locations = (
             {Fileset.LOCATION_NAME_UNKNOWN: storage_location}
             if storage_location
@@ -187,8 +189,8 @@ class FilesetCatalog(
         fileset_type: Fileset.Type,
         storage_locations: Dict[str, str],
         properties: Dict[str, str],
-        secret_bindings: Dict[str, SecretBinding] = None,
-        secret_references: Dict[str, SecretReference] = None,
+        secret_bindings: Optional[Dict[str, SecretBinding]] = None,
+        secret_references: Optional[Dict[str, SecretReference]] = None,
     ):
         """Create a fileset metadata in the catalog with multiple storage locations.
 
@@ -208,6 +210,8 @@ class FilesetCatalog(
         Returns:
             The created fileset metadata
         """
+        secret_bindings = {} if secret_bindings is None else secret_bindings
+        secret_references = {} if secret_references is None else secret_references
         self.check_fileset_name_identifier(ident)
 
         full_namespace = self._get_fileset_full_namespace(ident.namespace())

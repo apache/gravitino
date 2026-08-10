@@ -73,15 +73,11 @@ public final class SecretUrn {
    * Returns the property key encoded as the last identifier segment.
    *
    * <p>Gravitino secret URNs end with the entity property key that stores the URN (see {@link
-   * #buildWriteThrough}).
+   * #buildWriteThrough}). Identifier segments are validated when the URN is parsed or built.
    *
    * @return the property key
-   * @throws IllegalArgumentException if this URN has no identifier segments
    */
   public String propertyKey() {
-    if (identifierSegments.isEmpty()) {
-      throw new IllegalArgumentException("Secret URN has no identifier segments: " + this);
-    }
     return identifierSegments.get(identifierSegments.size() - 1);
   }
 

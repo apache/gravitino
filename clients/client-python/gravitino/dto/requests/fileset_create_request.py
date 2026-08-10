@@ -38,11 +38,11 @@ class FilesetCreateRequest(RESTRequest):
     _properties: Optional[Dict[str, str]] = field(
         metadata=config(field_name="properties")
     )
-    _secret_bindings: Optional[Dict[str, SecretBinding]] = field(
-        default=None, metadata=config(field_name="secretBindings")
+    _secret_bindings: Dict[str, SecretBinding] = field(
+        default_factory=dict, metadata=config(field_name="secretBindings")
     )
-    _secret_references: Optional[Dict[str, SecretReference]] = field(
-        default=None, metadata=config(field_name="secretReferences")
+    _secret_references: Dict[str, SecretReference] = field(
+        default_factory=dict, metadata=config(field_name="secretReferences")
     )
 
     def __init__(
@@ -60,8 +60,8 @@ class FilesetCreateRequest(RESTRequest):
         self._type = fileset_type
         self._storage_locations = storage_locations
         self._properties = properties
-        self._secret_bindings = secret_bindings
-        self._secret_references = secret_references
+        self._secret_bindings = {} if secret_bindings is None else secret_bindings
+        self._secret_references = {} if secret_references is None else secret_references
 
     def validate(self):
         """Validates the request.
