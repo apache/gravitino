@@ -29,9 +29,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * A {@link GravitinoCache} of {@code roleId -> updated_at} that synchronously deletes the role's
- * JCasbin policies from both enforcers when a key is evicted (by TTL, size, or explicit
- * invalidate).
+ * A {@link GravitinoCache} of {@code roleId -> updated_at} that synchronously requests cleanup of
+ * the role's JCasbin policies when a key is evicted (by TTL, size, or explicit invalidate). The
+ * cleaner may ignore a stale removal when the role was reloaded while the callback waited for the
+ * authorizer's policy mutation lock.
  *
  * <p>This cache owns role permission policies only. Therefore, eviction must clear only {@code
  * p(roleId, ...)} policies and must not delete the role itself, because JCasbin's {@code

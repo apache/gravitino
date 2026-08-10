@@ -139,19 +139,21 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   private static final long PARTIAL_ROLE_LOAD_RETRY_MS = 10_000L;
 
   /**
-   * Serializes every mutation of role permission policies, i.e. {@link #clearRolePolicies} and the
-   * policy writes in {@link #applyRolePolicies}. Both {@code SyncedEnforcer} calls are individually
-   * atomic, but the {@code clear -> re-add} sequence is not, and neither is it ordered against the
-   * {@link JcasbinLoadedRolesCache} removal listener, which calls {@link #clearRolePolicies} from
-   * whichever thread happens to drain Caffeine's maintenance queue. Without this lock an eviction
-   * firing between another thread's policy writes and its {@link #loadedRoles} update erases the
-   * rows that thread just wrote while leaving the marker saying they are loaded — a state no
-   * subsequent version check can detect or repair.
+   * Serializes every mutation of role permission policies, including {@link
+   * #invalidateRolePolicies}, {@link #replaceRolePolicies}, and the policy writes in {@link
+   * #applyRolePolicies}. Both {@code SyncedEnforcer} calls are individually atomic, but the {@code
+   * clear -> re-add} sequence is not, and neither is it ordered against the {@link
+   * JcasbinLoadedRolesCache} removal listener, which calls {@link #clearRolePoliciesOnCacheRemoval}
+   * from whichever thread happens to drain Caffeine's maintenance queue. Without this lock an
+   * eviction firing between another thread's policy writes and its {@link #loadedRoles} update
+   * erases the rows that thread just wrote while leaving the marker saying they are loaded — a
+   * state no subsequent version check can detect or repair.
    *
    * <p>The lock guards in-memory enforcer mutations only: metadata ids are resolved before it is
    * taken (see {@link #resolveRolePolicies}), so no DB round-trip ever runs inside the critical
    * section. It is reentrant because a {@link #loadedRoles} write performed under the lock can
-   * itself trigger an eviction, and therefore a nested {@link #clearRolePolicies} call.
+   * itself trigger an eviction, and therefore a nested {@link #clearRolePoliciesOnCacheRemoval}
+   * call.
    */
   private final ReentrantLock rolePolicyLock = new ReentrantLock();
 
@@ -188,7 +190,9 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   /**
    * partialRoleLoadBackoff: roleId -> marker present while a role whose last load was incomplete
-   * must not be retried. See {@link #PARTIAL_ROLE_LOAD_RETRY_MS}.
+   * must not be retried. Policy replacement writes this marker under {@link #rolePolicyLock}, so a
+   * delayed loaded-role removal callback can also use its presence to recognize a newer partial
+   * policy state. See {@link #PARTIAL_ROLE_LOAD_RETRY_MS}.
    */
   private GravitinoCache<Long, Boolean> partialRoleLoadBackoff;
 
@@ -235,7 +239,8 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
     // loadedRoles: roleId -> updated_at.
     // When evicted, we must clean up the corresponding JCasbin policies.
-    loadedRoles = new JcasbinLoadedRolesCache(ttlMs, roleCacheSize, this::clearRolePolicies);
+    loadedRoles =
+        new JcasbinLoadedRolesCache(ttlMs, roleCacheSize, this::clearRolePoliciesOnCacheRemoval);
     partialRoleLoadBackoff =
         new CaffeineGravitinoCache<>(Math.min(PARTIAL_ROLE_LOAD_RETRY_MS, ttlMs), roleCacheSize);
 
@@ -699,11 +704,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
 
   @Override
   public void handleRolePrivilegeChange(Long roleId) {
-    loadedRoles.invalidate(roleId);
-    // An explicit privilege change is a stronger signal than the retry throttle: drop the backoff
-    // so the next request reloads immediately instead of waiting it out. The object that failed to
-    // resolve on the previous attempt may well be exactly what this change added.
-    partialRoleLoadBackoff.invalidate(roleId);
+    invalidateRolePolicies(roleId);
   }
 
   @Override
@@ -1345,14 +1346,7 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
     }
     for (Long roleId : uniqueRoleIds) {
       if (!existingRoleIds.contains(roleId)) {
-        rolePolicyLock.lock();
-        try {
-          clearRolePolicies(roleId);
-          loadedRoles.invalidate(roleId);
-        } finally {
-          rolePolicyLock.unlock();
-        }
-        partialRoleLoadBackoff.invalidate(roleId);
+        invalidateRolePolicies(roleId);
       }
     }
 
@@ -1425,29 +1419,14 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // critical section below stays free of DB round-trips.
       ResolvedRolePolicies resolved = resolveRolePolicies(roleEntity, requestContext);
 
-      rolePolicyLock.lock();
-      try {
-        // Refresh only permission policies. deleteRole would also remove the current user's freshly
-        // bound grouping links. The clear is unconditional: rows can exist without a loadedRoles
-        // entry when a previous load was incomplete, and re-adding over a stale row set would
-        // otherwise leak privileges that the role no longer grants.
-        clearRolePolicies(roleId);
-        applyRolePolicies(resolved);
-        // Only record the role as loaded when the enforcer actually received everything the role
-        // grants. Marking a partially loaded role as loaded would pin it forever: role_meta's
-        // updated_at does not change, so the version check above would skip the reload on every
-        // later request and the missing privileges would never come back.
-        if (resolved.isComplete()) {
-          loadedRoles.put(roleId, dbUpdatedAt);
-        }
-      } finally {
-        rolePolicyLock.unlock();
+      if (!replaceRolePolicies(roleId, dbUpdatedAt, resolved)) {
+        // Another request completed this version (or a newer one) while this request was resolving
+        // metadata ids. Its policies and marker are authoritative, even if this request's older
+        // resolution result was partial.
+        continue;
       }
 
-      if (resolved.isComplete()) {
-        partialRoleLoadBackoff.invalidate(roleId);
-      } else {
-        partialRoleLoadBackoff.put(roleId, Boolean.TRUE);
+      if (!resolved.isComplete()) {
         LOG.warn(
             "Loaded role {} ({}) with {} of {} securable objects; unresolved objects: {}. "
                 + "The role is not marked as loaded and will be retried in at most {} ms.",
@@ -1462,18 +1441,100 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
   }
 
   /**
-   * Removes every {@code p(roleId, ...)} row from both enforcers. Also invoked by the {@link
-   * JcasbinLoadedRolesCache} removal listener, hence the lock: see {@link #rolePolicyLock}.
+   * Replaces a role's policies if no concurrent loader has already installed the same or a newer
+   * role version.
+   *
+   * <p>Resolution happens outside {@link #rolePolicyLock}, so two requests can reach this method
+   * with different results for the same role version. The version check must therefore be repeated
+   * under the mutation lock. Otherwise, a late partial result can clear a complete result and leave
+   * the complete loader's marker behind.
+   *
+   * @return {@code true} if {@code resolved} was applied, or {@code false} if a same-or-newer
+   *     complete load was already present
    */
-  private void clearRolePolicies(long roleId) {
-    String roleIdStr = String.valueOf(roleId);
+  private boolean replaceRolePolicies(
+      long roleId, long dbUpdatedAt, ResolvedRolePolicies resolved) {
     rolePolicyLock.lock();
     try {
-      allowEnforcer.removeFilteredPolicy(0, roleIdStr);
-      denyEnforcer.removeFilteredPolicy(0, roleIdStr);
+      Optional<Long> latestLoadedAt = loadedRoles.getIfPresent(roleId);
+      if (latestLoadedAt.isPresent() && latestLoadedAt.get() >= dbUpdatedAt) {
+        partialRoleLoadBackoff.invalidate(roleId);
+        return false;
+      }
+
+      // Refresh only permission policies. deleteRole would also remove the current user's freshly
+      // bound grouping links. If a marker exists, its synchronous removal callback clears the old
+      // policies. With no marker, rows can still remain from a previous partial load and must be
+      // cleared explicitly.
+      loadedRoles.invalidate(roleId);
+      if (!latestLoadedAt.isPresent()) {
+        clearRolePoliciesWithoutLock(roleId);
+      }
+      applyRolePolicies(resolved);
+
+      // Only record the role as loaded when the enforcer actually received everything the role
+      // grants. Marking a partially loaded role as loaded would pin it forever: role_meta's
+      // updated_at does not change, so the version check above would skip the reload on every later
+      // request and the missing privileges would never come back.
+      if (resolved.isComplete()) {
+        loadedRoles.put(roleId, dbUpdatedAt);
+        partialRoleLoadBackoff.invalidate(roleId);
+      } else {
+        partialRoleLoadBackoff.put(roleId, Boolean.TRUE);
+      }
+      return true;
     } finally {
       rolePolicyLock.unlock();
     }
+  }
+
+  /** Clears a role's policies and removes its loaded marker as one serialized operation. */
+  private void invalidateRolePolicies(long roleId) {
+    rolePolicyLock.lock();
+    try {
+      // An explicit invalidation is stronger than the retry throttle. Clear it under the same lock
+      // before removing the loaded marker so the removal callback cannot mistake the old partial
+      // state for a newer load and skip policy cleanup.
+      partialRoleLoadBackoff.invalidate(roleId);
+      boolean markerPresent = loadedRoles.getIfPresent(roleId).isPresent();
+      loadedRoles.invalidate(roleId);
+      if (!markerPresent) {
+        // An incomplete load has policies but deliberately has no loadedRoles marker.
+        clearRolePoliciesWithoutLock(roleId);
+      }
+    } finally {
+      rolePolicyLock.unlock();
+    }
+  }
+
+  /**
+   * Handles a loaded-role cache removal after acquiring the policy mutation lock.
+   *
+   * <p>Caffeine removes the old marker before invoking its listener. While the listener waits for
+   * this lock, a concurrent loader may install a new policy state: either a complete load with a
+   * new loaded marker or a partial load with a retry-backoff marker. In either case this is a stale
+   * removal event and must not clear the newly installed policies.
+   */
+  private void clearRolePoliciesOnCacheRemoval(long roleId) {
+    rolePolicyLock.lock();
+    try {
+      if (loadedRoles.getIfPresent(roleId).isPresent()
+          || partialRoleLoadBackoff.getIfPresent(roleId).isPresent()) {
+        LOG.debug(
+            "Skip clearing policies for role {} because it was reloaded after cache removal",
+            roleId);
+        return;
+      }
+      clearRolePoliciesWithoutLock(roleId);
+    } finally {
+      rolePolicyLock.unlock();
+    }
+  }
+
+  private void clearRolePoliciesWithoutLock(long roleId) {
+    String roleIdStr = String.valueOf(roleId);
+    allowEnforcer.removeFilteredPolicy(0, roleIdStr);
+    denyEnforcer.removeFilteredPolicy(0, roleIdStr);
   }
 
   private void bindUserRoles(long userId, List<Long> roleIds) {
