@@ -106,32 +106,34 @@ class AuditDTO(Audit, DataClassJsonMixin):
             and self.last_modified_time() == other.last_modified_time()
         )
 
-    def creator(self) -> str:
+    def creator(self) -> Optional[str]:
         """The creator of the entity.
 
         Returns:
-             the creator of the entity.
+             The creator of the entity, or ``None`` if unavailable.
         """
         return self._creator
 
-    def create_time(self) -> datetime:
+    def create_time(self) -> Optional[datetime]:
         """The creation time of the entity.
 
         Returns:
-             The creation time of the entity.
+             The creation time of the entity, or ``None`` if unavailable.
         """
         return self._create_time
 
-    def last_modifier(self) -> str:
-        """
+    def last_modifier(self) -> Optional[str]:
+        """The last modifier of the entity.
+
         Returns:
-             The last modifier of the entity.
+             The last modifier of the entity, or ``None`` if unavailable.
         """
         return self._last_modifier
 
-    def last_modified_time(self) -> datetime:
-        """
+    def last_modified_time(self) -> Optional[datetime]:
+        """The last modified time of the entity.
+
         Returns:
-             The last modified time of the entity.
+             The last modified time of the entity, or ``None`` if unavailable.
         """
         return self._last_modified_time

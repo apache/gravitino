@@ -96,13 +96,19 @@ class TestAuditDTO(unittest.TestCase):
             audit.create_time(),
         )
 
-    def test_none_datetime(self):
-        audit = AuditDTO(_creator="alice")
+    def test_none_fields(self):
+        audit = AuditDTO()
 
+        self.assertIsNone(audit.creator())
         self.assertIsNone(audit.create_time())
+        self.assertIsNone(audit.last_modifier())
         self.assertIsNone(audit.last_modified_time())
-        self.assertIsNone(audit.to_dict()["createTime"])
-        self.assertIsNone(audit.to_dict()["lastModifiedTime"])
+
+        serialized = audit.to_dict()
+        self.assertIsNone(serialized["creator"])
+        self.assertIsNone(serialized["createTime"])
+        self.assertIsNone(serialized["lastModifier"])
+        self.assertIsNone(serialized["lastModifiedTime"])
 
     def test_invalid_datetime(self):
         with self.assertRaises(ValueError):
