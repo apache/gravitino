@@ -112,18 +112,18 @@ Do not add them to the standalone server configuration.
 
 #### HTTP Server
 
-| Configuration item                               | Description                                                                                                                                                                                                                                          | Default value                                                                | Required |
-|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|
-| `gravitino.iceberg-rest.host`                    | The host of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                              | `0.0.0.0`                                                                    | No       |
-| `gravitino.iceberg-rest.httpPort`                | The port of the Gravitino Iceberg REST catalog service.                                                                                                                                                                                              | `9001`                                                                       | No       |
-| `gravitino.iceberg-rest.minThreads`              | The minimum number of threads in the thread pool used by the Jetty web server. `minThreads` is 8 if the value is less than 8.                                                                                                                        | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       |
-| `gravitino.iceberg-rest.maxThreads`              | The maximum number of threads in the thread pool used by the Jetty web server. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be greater than or equal to `minThreads`.                                                        | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       |
-| `gravitino.iceberg-rest.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by Gravitino Iceberg REST catalog service.                                                                                                                                                             | `100`                                                                        | No       |
-| `gravitino.iceberg-rest.stopTimeout`             | The amount of time in ms for the Gravitino Iceberg REST catalog service to stop gracefully. For more information, see `org.eclipse.jetty.server.Server#setStopTimeout`.                                                                              | `30000`                                                                      | No       |
-| `gravitino.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                                                                               | `30000`                                                                      | No       |
-| `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                                                                                 | `131072`                                                                     | No       |
-| `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                                                                                | `131072`                                                                     | No       |
-| `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                                                                                     | (none)                                                                       | No       |
+| Configuration item                               | Description                                                                                                                                                                                   | Default value                                                                | Required |
+|--------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------|----------|
+| `gravitino.iceberg-rest.host`                    | The host of the Gravitino Iceberg REST catalog service.                                                                                                                                       | `0.0.0.0`                                                                    | No       |
+| `gravitino.iceberg-rest.httpPort`                | The port of the Gravitino Iceberg REST catalog service.                                                                                                                                       | `9001`                                                                       | No       |
+| `gravitino.iceberg-rest.minThreads`              | The minimum number of threads in the thread pool used by the Jetty web server. `minThreads` is 8 if the value is less than 8.                                                                 | `Math.max(Math.min(Runtime.getRuntime().availableProcessors() * 2, 100), 8)` | No       |
+| `gravitino.iceberg-rest.maxThreads`              | The maximum number of threads in the thread pool used by the Jetty web server. `maxThreads` is 8 if the value is less than 8, and `maxThreads` must be greater than or equal to `minThreads`. | `Math.max(Runtime.getRuntime().availableProcessors() * 4, 400)`              | No       |
+| `gravitino.iceberg-rest.threadPoolWorkQueueSize` | The size of the queue in the thread pool used by Gravitino Iceberg REST catalog service.                                                                                                      | `100`                                                                        | No       |
+| `gravitino.iceberg-rest.stopTimeout`             | The amount of time in ms for the Gravitino Iceberg REST catalog service to stop gracefully. For more information, see `org.eclipse.jetty.server.Server#setStopTimeout`.                       | `30000`                                                                      | No       |
+| `gravitino.iceberg-rest.idleTimeout`             | The timeout in ms of idle connections.                                                                                                                                                        | `30000`                                                                      | No       |
+| `gravitino.iceberg-rest.requestHeaderSize`       | The maximum size of an HTTP request.                                                                                                                                                          | `131072`                                                                     | No       |
+| `gravitino.iceberg-rest.responseHeaderSize`      | The maximum size of an HTTP response.                                                                                                                                                         | `131072`                                                                     | No       |
+| `gravitino.iceberg-rest.customFilters`           | Comma-separated list of filter class names to apply to the APIs.                                                                                                                              | (none)                                                                       | No       |
 
 The filter in `customFilters` should be a standard javax servlet filter.
 Specify filter parameters by setting configuration entries in the style `gravitino.iceberg-rest.<class name of filter>.param.<param name>=<value>`.
@@ -156,29 +156,29 @@ The Gravitino Iceberg REST catalog service uses the memory catalog backend by de
 
 #### Hive Backend Configuration
 
-| Configuration item                                                        | Description                                                                                                                                  | Default value                                                                  | Required |
-|---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|----------|
-| `gravitino.iceberg-rest.catalog-backend`                                  | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`hive`** for the Hive catalog backend.                    | `memory`                                                                       | Yes      |
-| `gravitino.iceberg-rest.uri`                                              | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                                                | (none)                                                                         | Yes      |
-| `gravitino.iceberg-rest.warehouse`                                        | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                         | Yes      |
-| `gravitino.iceberg-rest.catalog-backend-name`                             | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend  | No       |
+| Configuration item                            | Description                                                                                                                                  | Default value                                                                 | Required |
+|-----------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------|----------|
+| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`hive`** for the Hive catalog backend.                    | `memory`                                                                      | Yes      |
+| `gravitino.iceberg-rest.uri`                  | The Hive metadata address, such as `thrift://127.0.0.1:9083`.                                                                                | (none)                                                                        | Yes      |
+| `gravitino.iceberg-rest.warehouse`            | The warehouse directory of the Hive catalog, such as `/user/hive/warehouse-hive/`.                                                           | (none)                                                                        | Yes      |
+| `gravitino.iceberg-rest.catalog-backend-name` | The catalog backend name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables. | `hive` for Hive backend, `jdbc` for JDBC backend, `memory` for memory backend | No       |
 
 For Kerberos-secured Hive Metastore and HDFS, see [Backend Authentication](#backend-authentication).
 
 #### JDBC Backend Configuration
 
-| Configuration item                            | Description                                                                                                                                                                                                                                            | Default value           | Required |
-|-----------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
-| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for the JDBC catalog backend.                                                                                                                              | `memory`                | Yes      |
-| `gravitino.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.                                                                                                                     | (none)                  | Yes      |
-| `gravitino.iceberg-rest.warehouse`            | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`                                                                                                                   | (none)                  | Yes      |
-| `gravitino.iceberg-rest.catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                                                                   | `jdbc` for JDBC backend | No       |
-| `gravitino.iceberg-rest.jdbc-user`            | The username of the JDBC connection.                                                                                                                                                                                                                   | (none)                  | No       |
-| `gravitino.iceberg-rest.jdbc-password`        | The password of the JDBC connection.                                                                                                                                                                                                                   | (none)                  | No       |
-| `gravitino.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                                                                                                                                  | `true`                  | No       |
-| `gravitino.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                                                                                                                               | (none)                  | Yes      |
-| `gravitino.iceberg-rest.jdbc-schema-version`  | The schema version of the JDBC catalog. Defaults to `V1` to enable view support. Set to `V0` only if you need to opt out of view support. Once the underlying database is migrated to V1, this property is no longer required on subsequent restarts.  | `V1`                    | No       |
-| `gravitino.iceberg-rest.jdbc.strict-mode`     | Whether the JDBC catalog runs in strict mode. Defaults to `true` so that creating a table or view in a namespace that does not exist fails with `NoSuchNamespace` (HTTP 404), matching the Iceberg REST specification. Set to `false` to restore the legacy behavior of implicitly creating the namespace.  | `true`                  | No       |
+| Configuration item                            | Description                                                                                                                                                                                                                                                                                                | Default value           | Required |
+|-----------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
+| `gravitino.iceberg-rest.catalog-backend`      | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`jdbc`** for the JDBC catalog backend.                                                                                                                                                                                  | `memory`                | Yes      |
+| `gravitino.iceberg-rest.uri`                  | The JDBC connection address, such as `jdbc:postgresql://127.0.0.1:5432` for Postgres, or `jdbc:mysql://127.0.0.1:3306/` for mysql.                                                                                                                                                                         | (none)                  | Yes      |
+| `gravitino.iceberg-rest.warehouse`            | The warehouse directory of JDBC catalog. Set the HDFS prefix if using HDFS, such as `hdfs://127.0.0.1:9000/user/hive/warehouse-jdbc`                                                                                                                                                                       | (none)                  | Yes      |
+| `gravitino.iceberg-rest.catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                                                                                                                       | `jdbc` for JDBC backend | No       |
+| `gravitino.iceberg-rest.jdbc-user`            | The username of the JDBC connection.                                                                                                                                                                                                                                                                       | (none)                  | No       |
+| `gravitino.iceberg-rest.jdbc-password`        | The password of the JDBC connection.                                                                                                                                                                                                                                                                       | (none)                  | No       |
+| `gravitino.iceberg-rest.jdbc-initialize`      | Whether to initialize the meta tables when creating the JDBC catalog.                                                                                                                                                                                                                                      | `true`                  | No       |
+| `gravitino.iceberg-rest.jdbc-driver`          | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL.                                                                                                                                                                                                   | (none)                  | Yes      |
+| `gravitino.iceberg-rest.jdbc-schema-version`  | The schema version of the JDBC catalog. Defaults to `V1` to enable view support. Set to `V0` only if you need to opt out of view support. Once the underlying database is migrated to V1, this property is no longer required on subsequent restarts.                                                      | `V1`                    | No       |
+| `gravitino.iceberg-rest.jdbc.strict-mode`     | Whether the JDBC catalog runs in strict mode. Defaults to `true` so that creating a table or view in a namespace that does not exist fails with `NoSuchNamespace` (HTTP 404), matching the Iceberg REST specification. Set to `false` to restore the legacy behavior of implicitly creating the namespace. | `true`                  | No       |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
@@ -195,15 +195,15 @@ Use the REST backend to proxy another Iceberg REST catalog server (IRC2). The Gr
 
 By default, when the backend catalog is a REST catalog, IRC1 skips authorization and behaves as a proxy. IRC2 handles authorization. If you want IRC1 to keep authorization checks, set `gravitino.iceberg-rest.disable-rest-authz=false`.
 
-| Configuration item                                                  | Description                                                                                                                                                    | Default value | Required |
-|---------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `gravitino.iceberg-rest.catalog-backend`                            | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                      | `memory`      | Yes      |
-| `gravitino.iceberg-rest.uri`                                        | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                  | (none)        | Yes      |
-| `gravitino.iceberg-rest.warehouse`                                  | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2.                                  | (none)        | No       |
-| `gravitino.iceberg-rest.rest-client-connection-timeout-ms`          | The HTTP connection timeout in milliseconds for IRC1 requests to the REST catalog backend.                                                                     | `10000`       | No       |
-| `gravitino.iceberg-rest.rest-client-socket-timeout-ms`              | The HTTP socket timeout in milliseconds for IRC1 requests to the REST catalog backend.                                                                         | `60000`       | No       |
-| `gravitino.iceberg-rest.data-access`                                | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.                                   | (none)        | No       |
-| `gravitino.iceberg-rest.disable-rest-authz`                         | Whether IRC1 disables authorization when the target backend catalog is a REST catalog. Set to `false` if you want IRC1 to enforce authorization before proxying. | `true`        | No       |
+| Configuration item                                         | Description                                                                                                                                                      | Default value | Required |
+|------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.catalog-backend`                   | The Catalog backend of the Gravitino Iceberg REST catalog service. Use the value **`rest`** for the REST catalog backend.                                        | `memory`      | Yes      |
+| `gravitino.iceberg-rest.uri`                               | The Iceberg REST catalog URI (IRC2), such as `http://127.0.0.1:9001/iceberg`.                                                                                    | (none)        | Yes      |
+| `gravitino.iceberg-rest.warehouse`                         | The catalog name in the Iceberg REST spec. Set to a specific catalog name, or leave empty to use the default catalog on IRC2.                                    | (none)        | No       |
+| `gravitino.iceberg-rest.rest-client-connection-timeout-ms` | The HTTP connection timeout in milliseconds for IRC1 requests to the REST catalog backend.                                                                       | `10000`       | No       |
+| `gravitino.iceberg-rest.rest-client-socket-timeout-ms`     | The HTTP socket timeout in milliseconds for IRC1 requests to the REST catalog backend.                                                                           | `60000`       | No       |
+| `gravitino.iceberg-rest.data-access`                       | Data access mode exposed to Iceberg REST clients via `/v1/config`. Supported values: `vended-credentials`, `remote-signing`.                                     | (none)        | No       |
+| `gravitino.iceberg-rest.disable-rest-authz`                | Whether IRC1 disables authorization when the target backend catalog is a REST catalog. Set to `false` if you want IRC1 to enforce authorization before proxying. | `true`        | No       |
 
 IRC1 configuration example if IRC2 using HDFS storage:
 
@@ -280,12 +280,12 @@ gravitino.iceberg-rest.catalog.jdbc_backend.warehouse = hdfs://127.0.0.1:9000/us
 
 The dynamic catalog configuration provider retrieves the catalog configuration from the Gravitino server, and the catalog configuration could be updated dynamically.
 
-| Configuration item                                          | Description                                                                                                                                                                                         | Default value | Required                                                             |
-|-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------|
-| `gravitino.iceberg-rest.gravitino-uri`                      | The uri of Gravitino server address, only worked if `catalog-config-provider` is `dynamic-config-provider`. Not required when running as an auxiliary service embedded in Gravitino server.         | (none)        | Yes, when using `dynamic-config-provider` in standalone mode         |
-| `gravitino.iceberg-rest.gravitino-metalake`                 | The metalake name that `dynamic-config-provider` used to request to Gravitino, only worked if `catalog-config-provider` is `dynamic-config-provider`.                                               | (none)        | Yes, when using `dynamic-config-provider`                            |
-| `gravitino.iceberg-rest.default-catalog-name`               | The default catalog name used by Iceberg REST server if the Iceberg REST client doesn't specify the catalog name explicitly. Only worked if `catalog-config-provider` is `dynamic-config-provider`. | (none)        | No                                                                   |
-| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms` | Catalog cache eviction interval.                                                                                                                                                                    | 3600000       | No                                                                   |
+| Configuration item                                          | Description                                                                                                                                                                                         | Default value | Required                                                     |
+|-------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|--------------------------------------------------------------|
+| `gravitino.iceberg-rest.gravitino-uri`                      | The uri of Gravitino server address, only worked if `catalog-config-provider` is `dynamic-config-provider`. Not required when running as an auxiliary service embedded in Gravitino server.         | (none)        | Yes, when using `dynamic-config-provider` in standalone mode |
+| `gravitino.iceberg-rest.gravitino-metalake`                 | The metalake name that `dynamic-config-provider` used to request to Gravitino, only worked if `catalog-config-provider` is `dynamic-config-provider`.                                               | (none)        | Yes, when using `dynamic-config-provider`                    |
+| `gravitino.iceberg-rest.default-catalog-name`               | The default catalog name used by Iceberg REST server if the Iceberg REST client doesn't specify the catalog name explicitly. Only worked if `catalog-config-provider` is `dynamic-config-provider`. | (none)        | No                                                           |
+| `gravitino.iceberg-rest.catalog-cache-eviction-interval-ms` | Catalog cache eviction interval.                                                                                                                                                                    | 3600000       | No                                                           |
 
 :::tip
 When using `dynamic-config-provider`, the behavior differs based on deployment mode:
@@ -341,10 +341,10 @@ When enabling OAuth2 and leveraging a dynamic configuration provider to retrieve
 |------------------------------------------------------|--------------------------------------------------------------------------------------------------|-----------------------|-------------------|
 | `gravitino.iceberg-rest.gravitino-auth-type`         | The auth type for communicating with the Gravitino server. Supported values: `simple`, `oauth2`. | `simple`              | No                |
 | `gravitino.iceberg-rest.gravitino-simple.user-name`  | The username when using `simple` auth type.                                                      | `iceberg-rest-server` | No                |
-| `gravitino.iceberg-rest.gravitino-oauth2.server-uri` | The OAuth2 server uri address.                                                      | (none)                | Yes, for `oauth2` |
-| `gravitino.iceberg-rest.gravitino-oauth2.credential` | The credential to request the OAuth2 token.                                         | (none)                | Yes, for `oauth2` |
-| `gravitino.iceberg-rest.gravitino-oauth2.token-path` | The path for token of the default OAuth server.                                     | (none)                | Yes, for `oauth2` |
-| `gravitino.iceberg-rest.gravitino-oauth2.scope`      | The scope to request the OAuth2 token.                                              | (none)                | Yes, for `oauth2` |
+| `gravitino.iceberg-rest.gravitino-oauth2.server-uri` | The OAuth2 server uri address.                                                                   | (none)                | Yes, for `oauth2` |
+| `gravitino.iceberg-rest.gravitino-oauth2.credential` | The credential to request the OAuth2 token.                                                      | (none)                | Yes, for `oauth2` |
+| `gravitino.iceberg-rest.gravitino-oauth2.token-path` | The path for token of the default OAuth server.                                                  | (none)                | Yes, for `oauth2` |
+| `gravitino.iceberg-rest.gravitino-oauth2.scope`      | The scope to request the OAuth2 token.                                                           | (none)                | Yes, for `oauth2` |
 
 Here is an example of how to enable OAuth2 for Gravitino Iceberg REST server:
 
@@ -393,8 +393,8 @@ These are often linked to identity providers without full token exchange support
 
 The following Apache Iceberg change is relevant to this behavior:
 
-| Version         | Change                                                                                                                                                                                 |
-|-----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Version         | Change                                                                                                                                                                                                    |
+|-----------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Iceberg 1.11.0+ | Supports disabling token exchange, renewing tokens with client credentials, and ensuring that child `AuthSession` instances use their own expiration instead of inheriting the parent session expiration. |
 
 **Apache Iceberg OAuth 2.0 configuration**
@@ -438,15 +438,15 @@ For the Hive catalog backend, `gravitino.iceberg-rest.authentication.type` contr
 
 The detailed configuration items are as follows:
 
-| Configuration item                                                            | Description                                                                                                                                                                                                                                               | Default value     | Required                                                                                                                                                                 |
-| ----------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `gravitino.iceberg-rest.authentication.type`                                  | The authentication type for HDFS warehouse access. Supports `kerberos` and `simple` for Hive and JDBC catalog backends.                                                                                                                                   | `simple`          | No                                                                                                                                                                       |
-| `gravitino.iceberg-rest.authentication.impersonation-enable`                  | Whether to enable impersonation for the Iceberg catalog.                                                                                                                                                                                                  | `false`           | No                                                                                                                                                                       |
-| `gravitino.iceberg-rest.hive.metastore.sasl.enabled`                          | Whether to enable SASL when connecting to a Kerberos Hive Metastore.                                                                                                                                                                                      | `false`           | No. Set to true in most cases when `gravitino.iceberg-rest.authentication.type` is `kerberos` (some deployments use SSL instead, but that is rare).                      |
-| `gravitino.iceberg-rest.authentication.kerberos.principal`                    | The principal for Kerberos authentication.                                                                                                                                                                                                                | (none)            | Yes, if `gravitino.iceberg-rest.authentication.type` is `kerberos`.                                                                                                      |
-| `gravitino.iceberg-rest.authentication.kerberos.keytab-uri`                   | The URI of the keytab for Kerberos authentication.                                                                                                                                                                                                        | (none)            | Yes, if `gravitino.iceberg-rest.authentication.type` is `kerberos`.                                                                                                      |
-| `gravitino.iceberg-rest.authentication.kerberos.check-interval-sec`           | The check interval of Kerberos credential for the Iceberg catalog.                                                                                                                                                                                        | 60                | No                                                                                                                                                                       |
-| `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-timeout-sec`     | The fetch timeout for retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                               | 60                | No                                                                                                                                                                       |
+| Configuration item                                                        | Description                                                                                                             | Default value | Required                                                                                                                                            |
+|---------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|---------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
+| `gravitino.iceberg-rest.authentication.type`                              | The authentication type for HDFS warehouse access. Supports `kerberos` and `simple` for Hive and JDBC catalog backends. | `simple`      | No                                                                                                                                                  |
+| `gravitino.iceberg-rest.authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog.                                                                | `false`       | No                                                                                                                                                  |
+| `gravitino.iceberg-rest.hive.metastore.sasl.enabled`                      | Whether to enable SASL when connecting to a Kerberos Hive Metastore.                                                    | `false`       | No. Set to true in most cases when `gravitino.iceberg-rest.authentication.type` is `kerberos` (some deployments use SSL instead, but that is rare). |
+| `gravitino.iceberg-rest.authentication.kerberos.principal`                | The principal for Kerberos authentication.                                                                              | (none)        | Yes, if `gravitino.iceberg-rest.authentication.type` is `kerberos`.                                                                                 |
+| `gravitino.iceberg-rest.authentication.kerberos.keytab-uri`               | The URI of the keytab for Kerberos authentication.                                                                      | (none)        | Yes, if `gravitino.iceberg-rest.authentication.type` is `kerberos`.                                                                                 |
+| `gravitino.iceberg-rest.authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for the Iceberg catalog.                                                      | 60            | No                                                                                                                                                  |
+| `gravitino.iceberg-rest.authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout for retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                             | 60            | No                                                                                                                                                  |
 
 Kerberos applies to **HDFS warehouse** access.
 
@@ -635,9 +635,9 @@ Please set the `gravitino.iceberg-rest.warehouse` parameter to `{storage_prefix}
 
 View operations are supported when using the JDBC catalog backend with schema version `V1`. The default schema version is now `V1`, so view support is enabled out of the box. Iceberg will automatically migrate the database schema on the first restart and detect the migration on all subsequent restarts.
 
-| Configuration item                           | Description                                                                                                          | Default value | Required |
-|----------------------------------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Defaults to `V1` to enable view operations. Set to `V0` to opt out.  | `V1`          | No       |
+| Configuration item                           | Description                                                                                                         | Default value | Required |
+|----------------------------------------------|---------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.jdbc-schema-version` | The schema version of the JDBC catalog backend. Defaults to `V1` to enable view operations. Set to `V0` to opt out. | `V1`          | No       |
 
 #### Additional Iceberg Catalog Properties
 
@@ -699,11 +699,11 @@ Gravitino caches scan plan results to speed up repeated queries with identical p
 
 Plan scan responses follow the Iceberg 1.11 REST API: completed plans return structured `file-scan-tasks` only. Legacy `plan-tasks` JSON strings (used by some Iceberg 1.9.x–1.10.x clients) are not emitted.
 
-| Configuration item                                         | Description                                              | Default value | Required |
-|------------------------------------------------------------|----------------------------------------------------------|---------------|----------|
-| `gravitino.iceberg-rest.scan-plan-cache-impl`              | The implementation of the scan plan cache.               | (none)        | No       |
-| `gravitino.iceberg-rest.scan-plan-cache-capacity`          | The capacity of the scan plan cache.                     | 200           | No       |
-| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes`    | The expiration time (in minutes) of the scan plan cache. | 60            | No       |
+| Configuration item                                      | Description                                              | Default value | Required |
+|---------------------------------------------------------|----------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.scan-plan-cache-impl`           | The implementation of the scan plan cache.               | (none)        | No       |
+| `gravitino.iceberg-rest.scan-plan-cache-capacity`       | The capacity of the scan plan cache.                     | 200           | No       |
+| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes` | The expiration time (in minutes) of the scan plan cache. | 60            | No       |
 
 The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This can provide significant speedup for repeated queries like dashboard refreshes or BI tool queries.
 
@@ -721,11 +721,11 @@ Gravitino provides the built-in `org.apache.gravitino.iceberg.service.cache.Loca
 
 The Iceberg REST server exposes three health check endpoints following the same [MicroProfile Health](https://microprofile.io/project/eclipse/microprofile-health) semantics as the main Gravitino server. All endpoints are exempt from authentication. The readiness probe checks whether the `IcebergCatalogWrapperManager` has been initialized. It performs no I/O and has no configurable timeout.
 
-| Endpoint                     | Description                                                                                                                | HTTP status |
-|------------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
-| `GET /iceberg/health/live`   | Liveness probe. Returns 200 as long as the HTTP server thread can respond.                                                 | 200         |
-| `GET /iceberg/health/ready`  | Readiness probe. Returns 200 when the catalog wrapper manager is initialized; 503 when initialization is not yet complete. | 200 / 503   |
-| `GET /iceberg/health`        | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
+| Endpoint                    | Description                                                                                                                | HTTP status |
+|-----------------------------|----------------------------------------------------------------------------------------------------------------------------|-------------|
+| `GET /iceberg/health/live`  | Liveness probe. Returns 200 as long as the HTTP server thread can respond.                                                 | 200         |
+| `GET /iceberg/health/ready` | Readiness probe. Returns 200 when the catalog wrapper manager is initialized; 503 when initialization is not yet complete. | 200 / 503   |
+| `GET /iceberg/health`       | Aggregate check. Returns 200 when both liveness and readiness pass; 503 when any check fails.                              | 200 / 503   |
 
 Root-level aliases are also available for global traffic managers that require probes at well-known root paths:
 
@@ -817,49 +817,49 @@ docker run -d -p 9001:9001 apache/gravitino-iceberg-rest:latest
 The Docker image supports local storage by default.
 For cloud or remote storage, configure the corresponding [storage](#storage) settings through these environment variables:
 
-| Environment Variable                                           | Configuration items                                        |
-|----------------------------------------------------------------|------------------------------------------------------------|
-| `GRAVITINO_ICEBERG_REST_HOST`                                  | `gravitino.iceberg-rest.host`                              |
-| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                             | `gravitino.iceberg-rest.httpPort`                          |
-| `GRAVITINO_ICEBERG_REST_URI`                                   | `gravitino.iceberg-rest.uri`                               |
-| `GRAVITINO_ICEBERG_REST_IO_IMPL`                               | `gravitino.iceberg-rest.io-impl`                           |
-| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                       | `gravitino.iceberg-rest.catalog-backend`                   |
-| `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                           | `gravitino.iceberg-rest.jdbc-driver`                       |
-| `GRAVITINO_ICEBERG_REST_JDBC_USER`                             | `gravitino.iceberg-rest.jdbc-user`                         |
-| `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                         | `gravitino.iceberg-rest.jdbc-password`                     |
-| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                             | `gravitino.iceberg-rest.warehouse`                         |
-| `GRAVITINO_ICEBERG_REST_REST_CLIENT_CONNECTION_TIMEOUT_MS`     | `gravitino.iceberg-rest.rest-client-connection-timeout-ms` |
-| `GRAVITINO_ICEBERG_REST_REST_CLIENT_SOCKET_TIMEOUT_MS`         | `gravitino.iceberg-rest.rest-client-socket-timeout-ms`     |
-| `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`                  | `gravitino.iceberg-rest.credential-providers`              |
-| `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`              | `gravitino.iceberg-rest.gcs-service-account-file`          |
-| `GRAVITINO_ICEBERG_REST_S3_ACCESS_KEY`                         | `gravitino.iceberg-rest.s3-access-key-id`                  |
-| `GRAVITINO_ICEBERG_REST_S3_SECRET_KEY`                         | `gravitino.iceberg-rest.s3-secret-access-key`              |
-| `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                           | `gravitino.iceberg-rest.s3-endpoint`                       |
-| `GRAVITINO_ICEBERG_REST_S3_REGION`                             | `gravitino.iceberg-rest.s3-region`                         |
-| `GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS`                  | `gravitino.iceberg-rest.s3-path-style-access`              |
-| `GRAVITINO_ICEBERG_REST_S3_ROLE_ARN`                           | `gravitino.iceberg-rest.s3-role-arn`                       |
-| `GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID`                        | `gravitino.iceberg-rest.s3-external-id`                    |
-| `GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT`             | `gravitino.iceberg-rest.s3-token-service-endpoint`         |
-| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_NAME`            | `gravitino.iceberg-rest.azure-storage-account-name`        |
-| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_KEY`             | `gravitino.iceberg-rest.azure-storage-account-key`         |
-| `GRAVITINO_ICEBERG_REST_AZURE_TENANT_ID`                       | `gravitino.iceberg-rest.azure-tenant-id`                   |
-| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_ID`                       | `gravitino.iceberg-rest.azure-client-id`                   |
-| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_SECRET`                   | `gravitino.iceberg-rest.azure-client-secret`               |
-| `GRAVITINO_ICEBERG_REST_OSS_ACCESS_KEY`                        | `gravitino.iceberg-rest.oss-access-key-id`                 |
-| `GRAVITINO_ICEBERG_REST_OSS_SECRET_KEY`                        | `gravitino.iceberg-rest.oss-secret-access-key`             |
-| `GRAVITINO_ICEBERG_REST_OSS_ENDPOINT`                          | `gravitino.iceberg-rest.oss-endpoint`                      |
-| `GRAVITINO_ICEBERG_REST_OSS_REGION`                            | `gravitino.iceberg-rest.oss-region`                        |
-| `GRAVITINO_ICEBERG_REST_OSS_ROLE_ARN`                          | `gravitino.iceberg-rest.oss-role-arn`                      |
-| `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                       | `gravitino.iceberg-rest.oss-external-id`                   |
+| Environment Variable                                       | Configuration items                                        |
+|------------------------------------------------------------|------------------------------------------------------------|
+| `GRAVITINO_ICEBERG_REST_HOST`                              | `gravitino.iceberg-rest.host`                              |
+| `GRAVITINO_ICEBERG_REST_HTTP_PORT`                         | `gravitino.iceberg-rest.httpPort`                          |
+| `GRAVITINO_ICEBERG_REST_URI`                               | `gravitino.iceberg-rest.uri`                               |
+| `GRAVITINO_ICEBERG_REST_IO_IMPL`                           | `gravitino.iceberg-rest.io-impl`                           |
+| `GRAVITINO_ICEBERG_REST_CATALOG_BACKEND`                   | `gravitino.iceberg-rest.catalog-backend`                   |
+| `GRAVITINO_ICEBERG_REST_JDBC_DRIVER`                       | `gravitino.iceberg-rest.jdbc-driver`                       |
+| `GRAVITINO_ICEBERG_REST_JDBC_USER`                         | `gravitino.iceberg-rest.jdbc-user`                         |
+| `GRAVITINO_ICEBERG_REST_JDBC_PASSWORD`                     | `gravitino.iceberg-rest.jdbc-password`                     |
+| `GRAVITINO_ICEBERG_REST_WAREHOUSE`                         | `gravitino.iceberg-rest.warehouse`                         |
+| `GRAVITINO_ICEBERG_REST_REST_CLIENT_CONNECTION_TIMEOUT_MS` | `gravitino.iceberg-rest.rest-client-connection-timeout-ms` |
+| `GRAVITINO_ICEBERG_REST_REST_CLIENT_SOCKET_TIMEOUT_MS`     | `gravitino.iceberg-rest.rest-client-socket-timeout-ms`     |
+| `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`              | `gravitino.iceberg-rest.credential-providers`              |
+| `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`          | `gravitino.iceberg-rest.gcs-service-account-file`          |
+| `GRAVITINO_ICEBERG_REST_S3_ACCESS_KEY`                     | `gravitino.iceberg-rest.s3-access-key-id`                  |
+| `GRAVITINO_ICEBERG_REST_S3_SECRET_KEY`                     | `gravitino.iceberg-rest.s3-secret-access-key`              |
+| `GRAVITINO_ICEBERG_REST_S3_ENDPOINT`                       | `gravitino.iceberg-rest.s3-endpoint`                       |
+| `GRAVITINO_ICEBERG_REST_S3_REGION`                         | `gravitino.iceberg-rest.s3-region`                         |
+| `GRAVITINO_ICEBERG_REST_S3_PATH_STYLE_ACCESS`              | `gravitino.iceberg-rest.s3-path-style-access`              |
+| `GRAVITINO_ICEBERG_REST_S3_ROLE_ARN`                       | `gravitino.iceberg-rest.s3-role-arn`                       |
+| `GRAVITINO_ICEBERG_REST_S3_EXTERNAL_ID`                    | `gravitino.iceberg-rest.s3-external-id`                    |
+| `GRAVITINO_ICEBERG_REST_S3_TOKEN_SERVICE_ENDPOINT`         | `gravitino.iceberg-rest.s3-token-service-endpoint`         |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_NAME`        | `gravitino.iceberg-rest.azure-storage-account-name`        |
+| `GRAVITINO_ICEBERG_REST_AZURE_STORAGE_ACCOUNT_KEY`         | `gravitino.iceberg-rest.azure-storage-account-key`         |
+| `GRAVITINO_ICEBERG_REST_AZURE_TENANT_ID`                   | `gravitino.iceberg-rest.azure-tenant-id`                   |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_ID`                   | `gravitino.iceberg-rest.azure-client-id`                   |
+| `GRAVITINO_ICEBERG_REST_AZURE_CLIENT_SECRET`               | `gravitino.iceberg-rest.azure-client-secret`               |
+| `GRAVITINO_ICEBERG_REST_OSS_ACCESS_KEY`                    | `gravitino.iceberg-rest.oss-access-key-id`                 |
+| `GRAVITINO_ICEBERG_REST_OSS_SECRET_KEY`                    | `gravitino.iceberg-rest.oss-secret-access-key`             |
+| `GRAVITINO_ICEBERG_REST_OSS_ENDPOINT`                      | `gravitino.iceberg-rest.oss-endpoint`                      |
+| `GRAVITINO_ICEBERG_REST_OSS_REGION`                        | `gravitino.iceberg-rest.oss-region`                        |
+| `GRAVITINO_ICEBERG_REST_OSS_ROLE_ARN`                      | `gravitino.iceberg-rest.oss-role-arn`                      |
+| `GRAVITINO_ICEBERG_REST_OSS_EXTERNAL_ID`                   | `gravitino.iceberg-rest.oss-external-id`                   |
 
 ### Deprecated Environment Variables
 
 Use the replacement environment variables instead of these deprecated names.
 
-| Deprecated Environment variables                         | New environment variables                            | Deprecated version |
-|----------------------------------------------------------|------------------------------------------------------|--------------------|
-| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE`                     | `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`        | 0.8.0-incubating   |
-| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH`                     | `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE`    | 0.8.0-incubating   |
+| Deprecated Environment variables     | New environment variables                         | Deprecated version |
+|--------------------------------------|---------------------------------------------------|--------------------|
+| `GRAVITINO_CREDENTIAL_PROVIDER_TYPE` | `GRAVITINO_ICEBERG_REST_CREDENTIAL_PROVIDERS`     | 0.8.0-incubating   |
+| `GRAVITINO_GCS_CREDENTIAL_FILE_PATH` | `GRAVITINO_ICEBERG_REST_GCS_SERVICE_ACCOUNT_FILE` | 0.8.0-incubating   |
 
 ### Custom Image Build
 
