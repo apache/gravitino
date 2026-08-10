@@ -891,6 +891,7 @@ public class TestPOConverters {
     assertEquals(1L, tagMetadataObjectRelPO.getMetadataObjectId());
     assertEquals(
         MetadataObject.Type.CATALOG.toString(), tagMetadataObjectRelPO.getMetadataObjectType());
+    assertEquals("", tagMetadataObjectRelPO.getTagValue());
 
     assertEquals(1, tagMetadataObjectRelPO.getCurrentVersion());
     assertEquals(1, tagMetadataObjectRelPO.getLastVersion());

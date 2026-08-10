@@ -118,31 +118,47 @@ public interface AccessControlDispatcher {
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
-   * Enables a User without removing role bindings.
+   * Gets a User by Gravitino-assigned id.
    *
    * @param metalake The Metalake of the User.
-   * @param externalId The external identifier of the User.
-   * @return The updated User instance.
-   * @throws IllegalArgumentException If externalId is null or blank.
-   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @param userId The Gravitino-assigned id of the User.
+   * @return The getting User instance.
+   * @throws NoSuchUserException If the User with the given id does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If updating the User encounters storage issues.
+   * @throws RuntimeException If getting the User encounters storage issues.
    */
-  User enableUser(String metalake, String externalId)
+  User getUserById(String metalake, long userId)
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
-   * Disables a User without removing role bindings.
+   * Removes a User by Gravitino-assigned id.
    *
    * @param metalake The Metalake of the User.
-   * @param externalId The external identifier of the User.
+   * @param userId The Gravitino-assigned id of the User.
+   * @return True if the User was successfully removed, false only when there's no such user,
+   *     otherwise it will throw an exception.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the User encounters storage issues.
+   */
+  boolean removeUserById(String metalake, long userId) throws NoSuchMetalakeException;
+
+  /**
+   * Alters a User by Gravitino-assigned id.
+   *
+   * <p>Supports updating {@code enabled} and/or {@code externalId} in one call via {@link
+   * UserChange}. Role bindings are preserved.
+   *
+   * @param metalake The Metalake of the User.
+   * @param userId The Gravitino-assigned id of the User.
+   * @param changes The changes to apply. Must not be empty.
    * @return The updated User instance.
-   * @throws IllegalArgumentException If externalId is null or blank.
-   * @throws NoSuchUserException If the User with the given external id does not exist.
+   * @throws IllegalArgumentException If changes is null or empty, or contains an unsupported
+   *     change.
+   * @throws NoSuchUserException If the User with the given id does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If updating the User encounters storage issues.
    */
-  User disableUser(String metalake, String externalId)
+  User alterUserById(String metalake, long userId, UserChange... changes)
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
@@ -153,6 +169,27 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   User[] listUsers(String metalake) throws NoSuchMetalakeException;
+
+  /**
+   * Lists users with pagination.
+   *
+   * @param metalake The Metalake of the User.
+   * @param offset The number of users to skip.
+   * @param limit The maximum number of users to return.
+   * @return The paginated User result.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  PagedResult<User> listUsers(String metalake, int offset, int limit)
+      throws NoSuchMetalakeException;
+
+  /**
+   * Counts users in a metalake.
+   *
+   * @param metalake The Metalake of the User.
+   * @return The total number of users.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  long countUsers(String metalake) throws NoSuchMetalakeException;
 
   /**
    * Lists the usernames.
@@ -245,6 +282,49 @@ public interface AccessControlDispatcher {
       throws NoSuchGroupException, NoSuchMetalakeException;
 
   /**
+   * Gets a Group by Gravitino-assigned id.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param groupId The Gravitino-assigned id of the Group.
+   * @return The getting Group instance.
+   * @throws NoSuchGroupException If the Group with the given id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the Group encounters storage issues.
+   */
+  Group getGroupById(String metalake, long groupId)
+      throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
+   * Removes a Group by Gravitino-assigned id.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param groupId The Gravitino-assigned id of the Group.
+   * @return True if the Group was successfully removed, false only when there's no such group,
+   *     otherwise it will throw an exception.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Group encounters storage issues.
+   */
+  boolean removeGroupById(String metalake, long groupId) throws NoSuchMetalakeException;
+
+  /**
+   * Alters a Group by Gravitino-assigned id.
+   *
+   * <p>Supports updating {@code externalId} via {@link GroupChange}. Role bindings are preserved.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param groupId The Gravitino-assigned id of the Group.
+   * @param changes The changes to apply. Must not be empty.
+   * @return The updated Group instance.
+   * @throws IllegalArgumentException If changes is null or empty, or contains an unsupported
+   *     change.
+   * @throws NoSuchGroupException If the Group with the given id does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If updating the Group encounters storage issues.
+   */
+  Group alterGroupById(String metalake, long groupId, GroupChange... changes)
+      throws NoSuchGroupException, NoSuchMetalakeException;
+
+  /**
    * List groups
    *
    * @param metalake The Metalake of the Group.
@@ -252,6 +332,26 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    */
   Group[] listGroups(String metalake);
+
+  /**
+   * Lists groups with pagination.
+   *
+   * @param metalake The Metalake of the Group.
+   * @param offset The number of groups to skip.
+   * @param limit The maximum number of groups to return.
+   * @return The paginated Group result.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  PagedResult<Group> listGroups(String metalake, int offset, int limit);
+
+  /**
+   * Counts groups in a metalake.
+   *
+   * @param metalake The Metalake of the Group.
+   * @return The total number of groups.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   */
+  long countGroups(String metalake);
 
   /**
    * List group names

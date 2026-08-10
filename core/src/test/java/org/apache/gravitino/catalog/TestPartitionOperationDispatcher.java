@@ -78,11 +78,11 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
 
   protected static void prepareTable() throws IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     tableOperationDispatcher =
-        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     partitionOperationDispatcher =
-        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
