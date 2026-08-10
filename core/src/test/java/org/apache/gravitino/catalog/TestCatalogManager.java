@@ -857,7 +857,8 @@ public class TestCatalogManager {
     store.initialize(config);
     store.put(metalakeEntity, true);
 
-    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
     NameIdentifier ident = NameIdentifier.of("metalake", "concurrently_deleted");
     Map<String, String> props =
         ImmutableMap.of(
