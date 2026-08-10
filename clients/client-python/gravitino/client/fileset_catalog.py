@@ -16,7 +16,8 @@
 # under the License.
 
 import logging
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping
 
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 
@@ -43,6 +44,9 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class FilesetCatalog(
@@ -139,8 +143,8 @@ class FilesetCatalog(
         fileset_type: Fileset.Type,
         storage_location: str,
         properties: Dict[str, str],
-        secret_bindings: Optional[Dict[str, SecretBinding]] = None,
-        secret_references: Optional[Dict[str, SecretReference]] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Fileset:
         """Create a fileset metadata in the catalog.
 
@@ -165,8 +169,6 @@ class FilesetCatalog(
         Returns:
             The created fileset metadata
         """
-        secret_bindings = {} if secret_bindings is None else secret_bindings
-        secret_references = {} if secret_references is None else secret_references
         locations = (
             {Fileset.LOCATION_NAME_UNKNOWN: storage_location}
             if storage_location
@@ -189,8 +191,8 @@ class FilesetCatalog(
         fileset_type: Fileset.Type,
         storage_locations: Dict[str, str],
         properties: Dict[str, str],
-        secret_bindings: Optional[Dict[str, SecretBinding]] = None,
-        secret_references: Optional[Dict[str, SecretReference]] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ):
         """Create a fileset metadata in the catalog with multiple storage locations.
 
@@ -210,8 +212,6 @@ class FilesetCatalog(
         Returns:
             The created fileset metadata
         """
-        secret_bindings = {} if secret_bindings is None else secret_bindings
-        secret_references = {} if secret_references is None else secret_references
         self.check_fileset_name_identifier(ident)
 
         full_namespace = self._get_fileset_full_namespace(ident.namespace())
@@ -222,8 +222,8 @@ class FilesetCatalog(
             fileset_type=fileset_type,
             storage_locations=storage_locations,
             properties=properties,
-            secret_bindings=secret_bindings,
-            secret_references=secret_references,
+            secret_bindings=dict(secret_bindings),
+            secret_references=dict(secret_references),
         )
         req.validate()
 

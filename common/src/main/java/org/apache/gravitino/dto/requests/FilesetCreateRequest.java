@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.requests;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
@@ -94,7 +95,15 @@ public class FilesetCreateRequest implements RESTRequest {
       String storageLocation,
       Map<String, String> storageLocations,
       Map<String, String> properties) {
-    this(name, comment, type, storageLocation, storageLocations, properties, null, null);
+    this(
+        name,
+        comment,
+        type,
+        storageLocation,
+        storageLocations,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
   }
 
   /**
