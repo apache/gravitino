@@ -66,6 +66,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -114,7 +115,8 @@ public class TestCatalogManager {
 
     entityStore.put(metalakeEntity, true);
 
-    catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
+    catalogManager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator(), new SecretManager(config));
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     catalogManager = Mockito.spy(catalogManager);
   }
@@ -794,7 +796,8 @@ public class TestCatalogManager {
   @Test
   void testCloseUnregistersCatalogChangeLogListener() {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
-    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
 
     EntityChangeLogListener registeredListener = store.listener.get();
     Assertions.assertNotNull(registeredListener);
@@ -810,7 +813,8 @@ public class TestCatalogManager {
     store.initialize(config);
     store.put(metalakeEntity, true);
 
-    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
     NameIdentifier ident = NameIdentifier.of("metalake", "delete_returns_false");
     Map<String, String> props =
         ImmutableMap.of(
@@ -872,7 +876,8 @@ public class TestCatalogManager {
     store.initialize(config);
     store.put(metalakeEntity, true);
 
-    CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator());
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
     NameIdentifier ident = NameIdentifier.of("metalake", "failed_create_cleanup");
 
     // A creation that fails validation (key1 is required but missing) stores the entity and then

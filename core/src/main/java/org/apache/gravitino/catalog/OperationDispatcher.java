@@ -40,6 +40,8 @@ import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -58,18 +60,25 @@ public abstract class OperationDispatcher {
 
   protected final IdGenerator idGenerator;
 
+  protected final SecretManager secretManager;
+
   /**
    * Creates a new CatalogOperationDispatcher instance.
    *
    * @param catalogManager The CatalogManager instance to be used for catalog operations.
    * @param store The EntityStore instance to be used for catalog operations.
    * @param idGenerator The IdGenerator instance to be used for catalog operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   protected OperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
     this.catalogManager = catalogManager;
     this.store = store;
     this.idGenerator = idGenerator;
+    this.secretManager = secretManager;
   }
 
   protected <R, E extends Throwable> R doWithTable(
@@ -140,8 +149,12 @@ public abstract class OperationDispatcher {
             c.doWithPropertiesMeta(
                 p -> {
                   PropertiesMetadata propertiesMetadata = provider.apply(p);
-                  return properties.keySet().stream()
-                      .filter(propertiesMetadata::isHiddenProperty)
+                  return properties.entrySet().stream()
+                      .filter(
+                          e ->
+                              propertiesMetadata.isHiddenProperty(e.getKey())
+                                  || SecretPropertyUtils.isSecretProperty(e.getKey(), e.getValue()))
+                      .map(Map.Entry::getKey)
                       .collect(Collectors.toSet());
                 }),
         IllegalArgumentException.class);

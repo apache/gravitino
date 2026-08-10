@@ -36,6 +36,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -471,5 +472,43 @@ public class UserMetaService {
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
                         userId, Entity.EntityType.USER.name())));
     return true;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "countUsersByMetalake")
+  public long countUsersByMetalake(String metalakeName) {
+    Long count =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeName(metalakeName));
+    return count == null ? 0L : count;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByMetalakePaginated")
+  public PagedResult<UserEntity> listUsersByMetalakePaginated(
+      String metalakeName, int offset, int limit) {
+    Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
+    Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
+
+    long totalCount = countUsersByMetalake(metalakeName);
+    if (limit == 0 || offset >= totalCount) {
+      return new PagedResult<>(totalCount, Collections.emptyList());
+    }
+
+    List<ExtendedUserPO> userPOs =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper ->
+                mapper.listExtendedUserPOsByMetalakeNamePaginated(metalakeName, offset, limit));
+    List<UserEntity> users =
+        userPOs.stream()
+            .map(
+                po ->
+                    POConverters.fromExtendedUserPO(
+                        po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+            .collect(Collectors.toList());
+    return new PagedResult<>(totalCount, users);
   }
 }

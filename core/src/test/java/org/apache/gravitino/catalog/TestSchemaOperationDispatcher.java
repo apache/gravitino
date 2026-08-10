@@ -61,7 +61,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
 
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
-    dispatcher = new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+    dispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(Configs.TREE_LOCK_MAX_NODE_IN_MEMORY);
