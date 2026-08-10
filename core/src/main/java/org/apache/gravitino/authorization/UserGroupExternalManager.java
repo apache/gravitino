@@ -117,50 +117,6 @@ class UserGroupExternalManager extends UserGroupManager {
     }
   }
 
-  User enableUser(String metalake, String externalId) throws NoSuchUserException {
-    return updateEnabledByExternalId(metalake, externalId, true);
-  }
-
-  User disableUser(String metalake, String externalId) throws NoSuchUserException {
-    return updateEnabledByExternalId(metalake, externalId, false);
-  }
-
-  private User updateEnabledByExternalId(String metalake, String externalId, boolean enabled)
-      throws NoSuchUserException {
-    try {
-      return store
-          .externalIdOperations()
-          .updateByExternalId(
-              AuthorizationUtils.ofUserExternalId(metalake, externalId),
-              Entity.EntityType.USER,
-              UserEntity.class,
-              user ->
-                  UserEntity.builder()
-                      .withId(user.id())
-                      .withName(user.name())
-                      .withNamespace(user.namespace())
-                      .withExternalId(user.externalId())
-                      .withEnabled(enabled)
-                      .withRoleNames(user.roleNames())
-                      .withRoleIds(user.roleIds())
-                      .withAuditInfo(user.auditInfo())
-                      .build());
-    } catch (NoSuchEntityException e) {
-      LOG.warn(
-          "User with external id {} does not exist in the metalake {}", externalId, metalake, e);
-      throw new NoSuchUserException(
-          AuthorizationUtils.USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG, externalId, metalake);
-    } catch (IOException ioe) {
-      LOG.error(
-          "Updating enabled state for user with external id {} in the metalake {} failed due to"
-              + " storage issues",
-          externalId,
-          metalake,
-          ioe);
-      throw new RuntimeException(ioe);
-    }
-  }
-
   Group addGroup(String metalake, String group, String externalId)
       throws GroupAlreadyExistsException {
     try {

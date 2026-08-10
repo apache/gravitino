@@ -98,6 +98,8 @@ import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
 import org.apache.gravitino.storage.IdGenerator;
@@ -156,6 +158,8 @@ public class GravitinoEnv {
   private CredentialOperationDispatcher credentialOperationDispatcher;
 
   private KmsClientRegistry kmsClientRegistry;
+
+  private SecretManager secretManager;
 
   private TagDispatcher tagDispatcher;
 
@@ -437,6 +441,29 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the {@link SecretManager} associated with the Gravitino environment.
+   *
+   * @return The SecretManager instance.
+   * @throws IllegalStateException if the environment has not been initialized
+   */
+  public SecretManager secretManager() {
+    Preconditions.checkState(secretManager != null, "GravitinoEnv components are not initialized.");
+    return secretManager;
+  }
+
+  /**
+   * Get the secrets-provider registry associated with the Gravitino environment.
+   *
+   * <p>Owned by {@link #secretManager()}. Callers may use it for discovery but must not close it.
+   *
+   * @return The secrets-provider registry instance.
+   * @throws IllegalStateException if the environment has not been initialized
+   */
+  public SecretProviderRegistry secretProviderRegistry() {
+    return secretManager().getRegistry();
+  }
+
+  /**
    * Get the IdGenerator associated with the Gravitino environment.
    *
    * @return The IdGenerator instance.
@@ -657,11 +684,16 @@ public class GravitinoEnv {
       kmsClientRegistry.close();
     }
 
+    if (secretManager != null) {
+      secretManager.close();
+    }
+
     LOG.info("Gravitino Environment is shut down.");
   }
 
   private void initBaseComponents() {
     this.kmsClientRegistry = new KmsClientRegistry(config);
+    this.secretManager = new SecretManager(config);
 
     this.metricsSystem = new MetricsSystem();
     metricsSystem.register(new JVMMetricsSource());
@@ -701,7 +733,7 @@ public class GravitinoEnv {
     // CatalogManager
     // CatalogManager registers its own change-log listener with the entity store (when the store
     // supports it), so no poller wiring is needed here.
-    this.catalogManager = new CatalogManager(config, entityStore, idGenerator);
+    this.catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
     this.internalCatalogDispatcher = catalogManager;
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
@@ -711,10 +743,10 @@ public class GravitinoEnv {
     this.catalogDispatcher = new CatalogHookDispatcher(catalogEventDispatcher);
 
     this.credentialOperationDispatcher =
-        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalSchemaDispatcher = schemaOperationDispatcher;
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
@@ -724,13 +756,17 @@ public class GravitinoEnv {
     this.schemaDispatcher = new SchemaHookDispatcher(schemaEventDispatcher);
 
     TableOperationDispatcher tableOperationDispatcher =
-        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalTableDispatcher = tableOperationDispatcher;
     TableNormalizeDispatcher tableNormalizeDispatcher =
         new TableNormalizeDispatcher(tableOperationDispatcher, catalogManager);
     TableOperationDispatcher internalTableOperationDispatcher =
         new TableOperationDispatcher(
-            catalogManager, entityStore, idGenerator, () -> internalSchemaDispatcher);
+            catalogManager,
+            entityStore,
+            idGenerator,
+            () -> internalSchemaDispatcher,
+            secretManager);
     this.internalTableDispatcher =
         new TableNormalizeDispatcher(internalTableOperationDispatcher, catalogManager);
     TableEventDispatcher tableEventDispatcher =
@@ -741,13 +777,13 @@ public class GravitinoEnv {
     // TODO: We can install hooks when we need, we only supports ownership post hook,
     //  partition doesn't have ownership, so we don't need it now.
     PartitionOperationDispatcher partitionOperationDispatcher =
-        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
     this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
 
     FilesetOperationDispatcher filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
         new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
     this.internalFilesetDispatcher = filesetNormalizeDispatcher;
@@ -756,7 +792,7 @@ public class GravitinoEnv {
     this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
-        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new TopicOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     TopicNormalizeDispatcher topicNormalizeDispatcher =
         new TopicNormalizeDispatcher(topicOperationDispatcher, catalogManager);
     this.internalTopicDispatcher = topicNormalizeDispatcher;
@@ -765,7 +801,7 @@ public class GravitinoEnv {
     this.topicDispatcher = new TopicHookDispatcher(topicEventDispatcher);
 
     ModelOperationDispatcher modelOperationDispatcher =
-        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     ModelNormalizeDispatcher modelNormalizeDispatcher =
         new ModelNormalizeDispatcher(modelOperationDispatcher, catalogManager);
     ModelEventDispatcher modelEventDispatcher =
@@ -777,7 +813,7 @@ public class GravitinoEnv {
     // FunctionOperationDispatcher
     FunctionOperationDispatcher functionOperationDispatcher =
         new FunctionOperationDispatcher(
-            catalogManager, schemaOperationDispatcher, entityStore, idGenerator);
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
     FunctionNormalizeDispatcher functionNormalizeDispatcher =
         new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
     FunctionEventDispatcher functionEventDispatcher =
@@ -789,13 +825,17 @@ public class GravitinoEnv {
     // TODO(#11007): Add ViewHookDispatcher for view ownership and privilege hooks when view
     // privilege support is finalized.
     ViewOperationDispatcher viewOperationDispatcher =
-        new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new ViewOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalViewDispatcher = viewOperationDispatcher;
     ViewNormalizeDispatcher viewNormalizeDispatcher =
         new ViewNormalizeDispatcher(viewOperationDispatcher, catalogManager);
     ViewOperationDispatcher internalViewOperationDispatcher =
         new ViewOperationDispatcher(
-            catalogManager, entityStore, idGenerator, () -> internalSchemaDispatcher);
+            catalogManager,
+            entityStore,
+            idGenerator,
+            () -> internalSchemaDispatcher,
+            secretManager);
     this.internalViewDispatcher =
         new ViewNormalizeDispatcher(internalViewOperationDispatcher, catalogManager);
     ViewEventDispatcher viewEventDispatcher =
