@@ -66,6 +66,15 @@ public class VersioningFilter implements Filter {
     }
 
     @Override
+    public Enumeration<String> getHeaders(String name) {
+      String headerValue = customHeaders.get(name);
+      if (headerValue != null) {
+        return Collections.enumeration(Collections.singletonList(headerValue));
+      }
+      return ((HttpServletRequest) getRequest()).getHeaders(name);
+    }
+
+    @Override
     public Enumeration<String> getHeaderNames() {
       List<String> combinedHeaderNames = new ArrayList<>(customHeaders.keySet());
 

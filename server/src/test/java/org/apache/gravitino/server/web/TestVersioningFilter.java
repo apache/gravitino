@@ -261,6 +261,25 @@ public class TestVersioningFilter {
   }
 
   @Test
+  public void testGetHeaders() {
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    when(mockRequest.getHeaders("Header1"))
+        .thenReturn(new Vector<>(Collections.singletonList("Value1")).elements());
+
+    VersioningFilter.MutableHttpServletRequest mutableRequest =
+        new VersioningFilter.MutableHttpServletRequest(mockRequest);
+    mutableRequest.putHeader("Accept", "application/vnd.gravitino.v1+json");
+
+    List<String> customHeaderValues = Collections.list(mutableRequest.getHeaders("Accept"));
+    assertEquals(1, customHeaderValues.size());
+    assertEquals("application/vnd.gravitino.v1+json", customHeaderValues.get(0));
+
+    List<String> delegatedHeaderValues = Collections.list(mutableRequest.getHeaders("Header1"));
+    assertEquals(1, delegatedHeaderValues.size());
+    assertEquals("Value1", delegatedHeaderValues.get(0));
+  }
+
+  @Test
   public void testDoFilterWithHeaderContainingValidVersionAsSubstring() throws Exception {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);
