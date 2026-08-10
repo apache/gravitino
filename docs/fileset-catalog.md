@@ -21,21 +21,68 @@ What changes per storage system is small: a bundle jar on the classpath, the URI
 
 The catalog is built against Hadoop 3 but uses no Hadoop 3 features, so Hadoop 2.x should also work. Report any incompatibility as an [issue](https://github.com/apache/gravitino/issues).
 
+## Quick Start
+
+**1. Create the catalog.** No provider is needed. Give it a base `location` and, for object
+storage, the credential properties for that backend.
+
+```shell
+curl -X POST -H "Content-Type: application/json" \
+  -d '{
+        "name": "{catalog_name}",
+        "type": "FILESET",
+        "comment": "",
+        "properties": {
+          "location": "hdfs://{cluster}/{path}"
+        }
+      }' \
+  http://localhost:8090/api/metalakes/{metalake}/catalogs
+```
+
+**2. Create a schema.** The directory is created under the catalog location unless
+`disable-filesystem-ops` is set.
+
+```shell
+curl -X POST -H "Content-Type: application/json" \
+  -d '{"name": "{schema_name}", "comment": "", "properties": {}}' \
+  http://localhost:8090/api/metalakes/{metalake}/catalogs/{catalog_name}/schemas
+```
+
+**3. Create a fileset.**
+
+```shell
+curl -X POST -H "Content-Type: application/json" \
+  -d '{
+        "name": "{fileset_name}",
+        "type": "MANAGED",
+        "comment": "",
+        "properties": {}
+      }' \
+  http://localhost:8090/api/metalakes/{metalake}/catalogs/{catalog_name}/schemas/{schema_name}/filesets
+```
+
+**4. Read and write the files.** The fileset is addressable as
+`gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}` from the Java client, the Python
+client, Spark, and the Hadoop shell. See [How to Use GVFS](./how-to-use-gvfs.md).
+
+Only step 1 changes per storage backend, and only in the `location` scheme and the credential
+properties. Steps 2 through 4 are the same over HDFS, S3, GCS, ADLS, OSS, and COS.
+
 ## Catalog Properties
 
 These apply in addition to the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration).
 
-| Property Name                        | Description                                                                                                                  | Default Value |
-|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------|---------------|
-| `location`                           | Base storage location, named `unknown`. Always a directory or path prefix, never a single file                               | (none)        |
-| `location-`                          | Prefix for named locations, as `location-{name}={path}`                                                                      | (none)        |
-| `credential-providers`               | Credential provider types, separated by commas                                                                               | (none)        |
-| `config.resources`                   | Configuration files to load, separated by commas, such as `hdfs-site.xml,core-site.xml`                                      | (none)        |
-| `filesystem-conn-timeout-secs`       | Timeout when obtaining a filesystem client, in seconds                                                                       | `6`           |
-| `disable-filesystem-ops`             | Stops the server creating and removing directories when schemas and filesets are created and dropped                         | `false`       |
-| `fileset-cache-eviction-interval-ms` | Fileset cache eviction interval, where `-1` never evicts                                                                     | `3600000`     |
-| `fileset-cache-max-size`             | Maximum filesets held in the cache, where `-1` is unlimited                                                                  | `200000`      |
-| `fs.path.config.<n>`                 | A logical location entry set to a base URI such as `hdfs://cluster1/`. Keys sharing the prefix are forwarded to that filesystem client | (none) |
+| Property Name                        | Description                                                                                                                            | Default Value |
+|--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `location`                           | Base storage location, named `unknown`. Always a directory or path prefix, never a single file                                         | (none)        |
+| `location-`                          | Prefix for named locations, as `location-{name}={path}`                                                                                | (none)        |
+| `credential-providers`               | Credential provider types, separated by commas                                                                                         | (none)        |
+| `config.resources`                   | Configuration files to load, separated by commas, such as `hdfs-site.xml,core-site.xml`                                                | (none)        |
+| `filesystem-conn-timeout-secs`       | Timeout when obtaining a filesystem client, in seconds                                                                                 | `6`           |
+| `disable-filesystem-ops`             | Stops the server creating and removing directories when schemas and filesets are created and dropped                                   | `false`       |
+| `fileset-cache-eviction-interval-ms` | Fileset cache eviction interval, where `-1` never evicts                                                                               | `3600000`     |
+| `fileset-cache-max-size`             | Maximum filesets held in the cache, where `-1` is unlimited                                                                            | `200000`      |
+| `fs.path.config.<n>`                 | A logical location entry set to a base URI such as `hdfs://cluster1/`. Keys sharing the prefix are forwarded to that filesystem client | (none)        |
 
 `default-filesystem-provider` and `filesystem-providers` are deprecated and no longer needed. The catalog loads filesystem providers from the classpath, including cloud providers whenever the matching bundle jar is present.
 
@@ -124,14 +171,14 @@ One catalog can carry the properties for several storage systems at once, and Gr
 
 A secured HDFS cluster needs these on the catalog, and they can be narrowed on a schema or fileset.
 
-| Property Name                                      | Description                                                | Default Value |
-|----------------------------------------------------|-------------------------------------------------------------|---------------|
-| `authentication.type`                              | `simple` or `kerberos`                                      | `simple`      |
-| `authentication.impersonation-enable`              | Whether the catalog impersonates the calling user           | `false`       |
-| `authentication.kerberos.principal`                | Kerberos principal, required when the type is `kerberos`    | (none)        |
-| `authentication.kerberos.keytab-uri`               | URI of the keytab, required when the type is `kerberos`     | (none)        |
-| `authentication.kerberos.check-interval-sec`       | Credential check interval                                   | `60`          |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | Timeout when retrieving the keytab                          | `60`          |
+| Property Name                                      | Description                                              | Default Value |
+|----------------------------------------------------|----------------------------------------------------------|---------------|
+| `authentication.type`                              | `simple` or `kerberos`                                   | `simple`      |
+| `authentication.impersonation-enable`              | Whether the catalog impersonates the calling user        | `false`       |
+| `authentication.kerberos.principal`                | Kerberos principal, required when the type is `kerberos` | (none)        |
+| `authentication.kerberos.keytab-uri`               | URI of the keytab, required when the type is `kerberos`  | (none)        |
+| `authentication.kerberos.check-interval-sec`       | Credential check interval                                | `60`          |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | Timeout when retrieving the keytab                       | `60`          |
 
 The HDFS client itself is configured through the files named in `config.resources`, where Gravitino recognizes three additional keys: `hadoop.security.authentication.kerberos.principal`, `hadoop.security.authentication.kerberos.keytab`, and `hadoop.security.authentication.kerberos.krb5.conf`.
 
@@ -139,16 +186,16 @@ The HDFS client itself is configured through the files named in `config.resource
 
 Schemas inherit every catalog property and can override these.
 
-| Property Name                         | Description                                        | Default Value  |
-|---------------------------------------|-----------------------------------------------------|----------------|
-| `location`                            | Base storage location for the schema, named `unknown` | (none)       |
-| `location-`                           | Prefix for named locations                          | (none)         |
-| `credential-providers`                | Credential provider types, separated by commas      | (none)         |
-| `config.resources`                    | Configuration files to load                         | (none)         |
-| `authentication.type`                 | `simple` or `kerberos`                              | Catalog value  |
-| `authentication.impersonation-enable` | Whether to impersonate the calling user             | Catalog value  |
-| `authentication.kerberos.principal`   | Kerberos principal for this schema                  | Catalog value  |
-| `authentication.kerberos.keytab-uri`  | Keytab URI for this schema                          | Catalog value  |
+| Property Name                         | Description                                           | Default Value |
+|---------------------------------------|-------------------------------------------------------|---------------|
+| `location`                            | Base storage location for the schema, named `unknown` | (none)        |
+| `location-`                           | Prefix for named locations                            | (none)        |
+| `credential-providers`                | Credential provider types, separated by commas        | (none)        |
+| `config.resources`                    | Configuration files to load                           | (none)        |
+| `authentication.type`                 | `simple` or `kerberos`                                | Catalog value |
+| `authentication.impersonation-enable` | Whether to impersonate the calling user               | Catalog value |
+| `authentication.kerberos.principal`   | Kerberos principal for this schema                    | Catalog value |
+| `authentication.kerberos.keytab-uri`  | Keytab URI for this schema                            | Catalog value |
 
 Creating or dropping a schema creates or removes the matching directories, except when `disable-filesystem-ops` is `true` or the location contains [placeholders](./manage-fileset-metadata-using-gravitino.md#placeholder).
 
@@ -156,17 +203,17 @@ Creating or dropping a schema creates or removes the matching directories, excep
 
 Filesets inherit every schema property, including those the schema inherited from the catalog.
 
-| Property Name                         | Description                                                            | Default Value                        | Immutable |
-|---------------------------------------|-------------------------------------------------------------------------|--------------------------------------|-----------|
-| `location`                            | Storage location for the fileset, named `unknown`                       | (none)                               | No        |
-| `default-location-name`               | Which location GVFS uses when none is named. Required with several      | The only location, when there is one | Yes       |
-| `placeholder-`                        | Values substituted into placeholders in the location                    | (none)                               | Yes       |
-| `credential-providers`                | Credential provider types, separated by commas                          | (none)                               | No        |
-| `config.resources`                    | Configuration files to load                                             | (none)                               | No        |
-| `authentication.type`                 | `simple` or `kerberos`                                                  | Schema value                         | No        |
-| `authentication.impersonation-enable` | Whether to impersonate the calling user                                 | Schema value                         | Yes       |
-| `authentication.kerberos.principal`   | Kerberos principal for this fileset                                     | Schema value                         | No        |
-| `authentication.kerberos.keytab-uri`  | Keytab URI for this fileset                                             | Schema value                         | No        |
+| Property Name                         | Description                                                        | Default Value                        | Immutable |
+|---------------------------------------|--------------------------------------------------------------------|--------------------------------------|-----------|
+| `location`                            | Storage location for the fileset, named `unknown`                  | (none)                               | No        |
+| `default-location-name`               | Which location GVFS uses when none is named. Required with several | The only location, when there is one | Yes       |
+| `placeholder-`                        | Values substituted into placeholders in the location               | (none)                               | Yes       |
+| `credential-providers`                | Credential provider types, separated by commas                     | (none)                               | No        |
+| `config.resources`                    | Configuration files to load                                        | (none)                               | No        |
+| `authentication.type`                 | `simple` or `kerberos`                                             | Schema value                         | No        |
+| `authentication.impersonation-enable` | Whether to impersonate the calling user                            | Schema value                         | Yes       |
+| `authentication.kerberos.principal`   | Kerberos principal for this fileset                                | Schema value                         | No        |
+| `authentication.kerberos.keytab-uri`  | Keytab URI for this fileset                                        | Schema value                         | No        |
 
 Three placeholders are supplied by Gravitino and cannot be set: `placeholder-catalog`, `placeholder-schema`, and `placeholder-fileset`, which resolve to the names of the objects themselves.
 

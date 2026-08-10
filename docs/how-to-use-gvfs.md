@@ -112,16 +112,45 @@ The plain `fs.path.config.<name>` entry specifies the base path of the filesyste
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](./how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
-Apart from the above properties, to access fileset like S3, GCS, OSS and custom fileset, extra properties are needed; see
-[S3 GVFS Java client configurations](./fileset-catalog-with-s3.md#access-the-fileset-with-the-gvfs-java-client),
-[GCS GVFS Java client configurations](./fileset-catalog-with-gcs.md#access-the-fileset-with-the-gvfs-java-client),
-[OSS GVFS Java client configurations](./fileset-catalog-with-oss.md#access-the-fileset-with-the-gvfs-java-client)
-and [Azure Blob Storage GVFS Java client configurations](./fileset-catalog-with-adls.md#access-the-fileset-with-the-gvfs-java-client) for more details.
+#### Object Storage Filesets
+
+A fileset backed by object storage needs two more things on the client: the matching bundle jar on
+the classpath, and the same credential properties the catalog takes. Bundle jar names and the full
+property list are on [Fileset Catalog](./fileset-catalog.md#storage-backends).
+
+| Storage system          | Client properties                                                          |
+|-------------------------|----------------------------------------------------------------------------|
+| Amazon S3               | `s3-endpoint`, `s3-access-key-id`, `s3-secret-access-key`                  |
+| Google Cloud Storage    | `gcs-service-account-file`                                                 |
+| Azure Data Lake Storage | `azure-storage-account-name`, `azure-storage-account-key`                  |
+| Alibaba Cloud OSS       | `oss-endpoint`, `oss-access-key-id`, `oss-secret-access-key`               |
+| Tencent Cloud COS       | `cos-region`, `cos-access-key-id`, `cos-secret-access-key`, `cos-endpoint` |
+
+Set them alongside the GVFS properties above. For S3:
+
+```xml
+<property>
+  <name>s3-endpoint</name>
+  <value>{endpoint}</value>
+</property>
+<property>
+  <name>s3-access-key-id</name>
+  <value>{access_key_id}</value>
+</property>
+<property>
+  <name>s3-secret-access-key</name>
+  <value>{secret_access_key}</value>
+</property>
+```
+
+If the catalog sets `credential-providers`, none of this is needed. Gravitino issues a short-lived
+credential per request and the client holds no cloud keys. See
+[Credential Vending](./security/credential-vending.md).
 
 #### Custom Fileset
 
 Users can define their own fileset type and configure the corresponding
-properties, for more, refer to [Custom Fileset](./fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset).
+properties, for more, refer to [Custom Fileset](./fileset-catalog.md#implementing-a-custom-filesystem-provider).
 So, if you want to access the custom fileset through GVFS, you need to configure the corresponding properties.
 
 | Configuration item       | Description                                                                                             | Default value | Required |
@@ -473,13 +502,36 @@ The plain `fs_path_config_<name>` entry specifies the base path of the filesyste
 
 #### Configurations for S3, GCS, OSS and Azure Blob Storage Fileset
 
-Please see the cloud-storage-specific configurations [GCS GVFS Python client configurations](./fileset-catalog-with-gcs.md#access-the-fileset-with-the-gvfs-python-client),
-[S3 GVFS Python client configurations](./fileset-catalog-with-s3.md#access-the-fileset-with-the-gvfs-python-client),
-[OSS GVFS Python client configurations](./fileset-catalog-with-oss.md#access-the-fileset-with-the-gvfs-python-client)
-and [Azure Blob Storage GVFS Python client configurations](./fileset-catalog-with-adls.md#access-the-fileset-with-the-gvfs-python-client) for more details.
+A fileset backed by object storage needs the same credential properties the catalog takes, written
+with underscores rather than hyphens. Bundle jar names and the full property list are on
+[Fileset Catalog](./fileset-catalog.md#storage-backends).
+
+| Storage system          | Client properties                                                          |
+|-------------------------|----------------------------------------------------------------------------|
+| Amazon S3               | `s3_endpoint`, `s3_access_key_id`, `s3_secret_access_key`                  |
+| Google Cloud Storage    | `gcs_service_account_file`                                                 |
+| Azure Data Lake Storage | `azure_storage_account_name`, `azure_storage_account_key`                  |
+| Alibaba Cloud OSS       | `oss_endpoint`, `oss_access_key_id`, `oss_secret_access_key`               |
+| Tencent Cloud COS       | `cos_region`, `cos_access_key_id`, `cos_secret_access_key`, `cos_endpoint` |
+
+Pass them in the options alongside the properties above. For S3:
+
+```python
+options = {
+    "server_uri": "http://{gravitino_host}:8090",
+    "metalake_name": "{metalake}",
+    "s3_endpoint": "{endpoint}",
+    "s3_access_key_id": "{access_key_id}",
+    "s3_secret_access_key": "{secret_access_key}",
+}
+fs = gvfs.GravitinoVirtualFileSystem(**options)
+```
+
+If the catalog sets `credential-providers`, set `enable_credential_vending` to `True` instead and
+omit the cloud keys. See [Credential Vending](./security/credential-vending.md).
 
 :::note
-Gravitino python client does not support [customized file systems](fileset-catalog.md#implement-a-custom-hcfs-file-system-fileset) defined by users due to the limit of `fsspec` library.
+Gravitino python client does not support [customized file systems](fileset-catalog.md#implementing-a-custom-filesystem-provider) defined by users due to the limit of `fsspec` library.
 :::
 
 ### Examples
