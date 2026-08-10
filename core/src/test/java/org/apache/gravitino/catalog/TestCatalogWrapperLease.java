@@ -157,7 +157,10 @@ public class TestCatalogWrapperLease {
 
     CatalogManager expiringManager =
         new CatalogManager(
-            expiringConfig, entityStore, new RandomIdGenerator(), new SecretManager(config));
+            expiringConfig,
+            entityStore,
+            new RandomIdGenerator(),
+            new SecretManager(expiringConfig));
     try {
       NameIdentifier ident = NameIdentifier.of(METALAKE, "expiring_catalog");
       expiringManager.createCatalog(ident, Catalog.Type.RELATIONAL, PROVIDER, "comment", PROPS);

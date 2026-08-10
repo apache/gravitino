@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.BaseCatalog;
 
@@ -31,8 +32,8 @@ import org.apache.gravitino.connector.BaseCatalog;
  * resources are released once the wrapper is retired and its last lease is closed, so an operation
  * can never observe a half-closed catalog.
  *
- * <p>Leases are obtained from {@link CatalogManager#acquireCatalogLease(org.apache.gravitino
- * .NameIdentifier)} and must be closed exactly once, ideally with try-with-resources:
+ * <p>Leases are obtained from {@link CatalogManager#acquireCatalogLease(NameIdentifier)} and must
+ * be closed exactly once, ideally with try-with-resources:
  *
  * <pre>{@code
  * try (CatalogLease lease = catalogManager.acquireCatalogLease(ident)) {

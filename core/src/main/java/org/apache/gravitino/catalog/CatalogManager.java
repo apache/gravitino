@@ -174,9 +174,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   public static class CatalogWrapper {
 
-    private BaseCatalog catalog;
-    private IsolatedClassLoader classLoader;
-    private ClassLoaderPool pool;
+    // Volatile because cleanup() nulls it outside leaseLock (holding the lock across a catalog
+    // close would stall tryAcquire), while unleased readers such as callers of
+    // loadCatalogAndWrap() may read it from another thread. Leased readers cannot race with
+    // cleanup at all: cleanup is only claimed once the wrapper is retired and no lease is held.
+    private volatile BaseCatalog catalog;
+
+    private final IsolatedClassLoader classLoader;
+    private final ClassLoaderPool pool;
+
+    // Only written by the single thread that claims the cleanup, and read nowhere else.
     private PooledClassLoaderEntry poolEntry;
 
     /** Guards {@link #activeOps}, {@link #retired} and {@link #cleanupStarted}. */
@@ -194,6 +201,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     /** Non-pooled constructor: each catalog owns its ClassLoader exclusively. */
     CatalogWrapper(IsolatedClassLoader classLoader) {
       this.classLoader = classLoader;
+      this.pool = null;
+      this.poolEntry = null;
     }
 
     /** Pooled constructor: ClassLoader is managed by the pool with reference counting. */
