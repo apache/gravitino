@@ -282,12 +282,12 @@ SELECT * FROM orders WHERE order_ts >= DATE '2024-01-01';
 
 The Gravitino Spark connector maps the following catalog property names to Spark Hive/Iceberg connector configuration.
 
-| Property name in Gravitino catalog properties | Spark Hive connector configuration | Description                                 | Since Version |
-|-----------------------------------------------|------------------------------------|---------------------------------------------|---------------|
-| `aws-region`                                  | `aws.region`                       | AWS region for Glue Data Catalog            | 1.3.0         |
-| `aws-glue-catalog-id`                         | `aws.glue.catalog.id`              | 12-digit AWS account ID owning Glue catalog | 1.3.0         |
-| `aws-glue-endpoint`                           | `aws.glue.endpoint`                | Custom Glue endpoint URL                    | 1.3.0         |
-| `warehouse`                                   | (Iceberg) `warehouse`              | Base storage path for Iceberg tables        | 1.3.0         |
+| Property name in Gravitino catalog properties | Spark Hive connector configuration | Description                                 |
+|-----------------------------------------------|------------------------------------|---------------------------------------------|
+| `aws-region`                                  | `aws.region`                       | AWS region for Glue Data Catalog            |
+| `aws-glue-catalog-id`                         | `aws.glue.catalog.id`              | 12-digit AWS account ID owning Glue catalog |
+| `aws-glue-endpoint`                           | `aws.glue.endpoint`                | Custom Glue endpoint URL                    |
+| `warehouse`                                   | (Iceberg) `warehouse`              | Base storage path for Iceberg tables        |
 
 For Iceberg tables, Gravitino properties are mapped to Iceberg GlueCatalog configuration:
 
