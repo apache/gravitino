@@ -203,17 +203,17 @@ Creating or dropping a schema creates or removes the matching directories, excep
 
 Filesets inherit every schema property, including those the schema inherited from the catalog.
 
-| Property Name                         | Description                                                        | Default Value                        | Immutable |
-|---------------------------------------|--------------------------------------------------------------------|--------------------------------------|-----------|
-| `location`                            | Storage location for the fileset, named `unknown`                  | (none)                               | No        |
-| `default-location-name`               | Which location GVFS uses when none is named. Required with several | The only location, when there is one | Yes       |
-| `placeholder-`                        | Values substituted into placeholders in the location               | (none)                               | Yes       |
-| `credential-providers`                | Credential provider types, separated by commas                     | (none)                               | No        |
-| `config.resources`                    | Configuration files to load                                        | (none)                               | No        |
-| `authentication.type`                 | `simple` or `kerberos`                                             | Schema value                         | No        |
-| `authentication.impersonation-enable` | Whether to impersonate the calling user                            | Schema value                         | Yes       |
-| `authentication.kerberos.principal`   | Kerberos principal for this fileset                                | Schema value                         | No        |
-| `authentication.kerberos.keytab-uri`  | Keytab URI for this fileset                                        | Schema value                         | No        |
+| Property Name                         | Description                                                                                        | Default Value                        | Immutable |
+|---------------------------------------|----------------------------------------------------------------------------------------------------|--------------------------------------|-----------|
+| `location`                            | Storage location for the fileset, named `unknown`                                                  | (none)                               | No        |
+| `default-location-name`               | Which location GVFS uses when none is named. Required when the fileset has several named locations | The only location, when there is one | Yes       |
+| `placeholder-`                        | Values substituted into placeholders in the location                                               | (none)                               | Yes       |
+| `credential-providers`                | Credential provider types, separated by commas                                                     | (none)                               | No        |
+| `config.resources`                    | Configuration files to load                                                                        | (none)                               | No        |
+| `authentication.type`                 | `simple` or `kerberos`                                                                             | Schema value                         | No        |
+| `authentication.impersonation-enable` | Whether to impersonate the calling user                                                            | Schema value                         | Yes       |
+| `authentication.kerberos.principal`   | Kerberos principal for this fileset                                                                | Schema value                         | No        |
+| `authentication.kerberos.keytab-uri`  | Keytab URI for this fileset                                                                        | Schema value                         | No        |
 
 Three placeholders are supplied by Gravitino and cannot be set: `placeholder-catalog`, `placeholder-schema`, and `placeholder-fileset`, which resolve to the names of the objects themselves.
 
