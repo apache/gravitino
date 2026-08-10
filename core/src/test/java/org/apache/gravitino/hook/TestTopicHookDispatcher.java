@@ -31,8 +31,8 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CatalogLease;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TestOperationDispatcher;
 import org.apache.gravitino.catalog.TestTopicOperationDispatcher;
 import org.apache.gravitino.catalog.TopicDispatcher;
@@ -76,8 +76,7 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
     Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogLease.of(catalogWrapper));
-    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(catalogWrapper));
     authorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
     Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(authorizationPlugin);
   }
@@ -94,8 +93,7 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
     Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
     Mockito.when(mockCatalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogLease.of(mockWrapper));
-    Mockito.when(mockWrapper.tryAcquire()).thenReturn(true);
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockWrapper));
 
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     TopicDispatcher mockTopicDispatcher = Mockito.mock(TopicDispatcher.class);

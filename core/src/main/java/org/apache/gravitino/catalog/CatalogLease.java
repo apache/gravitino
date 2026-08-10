@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog;
 
-import com.google.common.base.Preconditions;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -48,21 +47,6 @@ public final class CatalogLease implements AutoCloseable {
 
   CatalogLease(CatalogWrapper wrapper) {
     this.wrapper = wrapper;
-  }
-
-  /**
-   * Takes a lease on a wrapper the caller already holds. Prefer {@link
-   * CatalogManager#acquireCatalogLease(org.apache.gravitino.NameIdentifier)}, which reloads a fresh
-   * wrapper when the cached one has been retired.
-   *
-   * @param wrapper the wrapper to lease.
-   * @return a lease on the given wrapper.
-   * @throws IllegalStateException if the wrapper has already been retired.
-   */
-  public static CatalogLease of(CatalogWrapper wrapper) {
-    Preconditions.checkState(
-        wrapper.tryAcquire(), "Catalog wrapper has already been retired, cannot lease it");
-    return new CatalogLease(wrapper);
   }
 
   /**

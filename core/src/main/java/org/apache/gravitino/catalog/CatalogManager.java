@@ -215,7 +215,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
      * @return true if the lease was taken, false if the wrapper has already been retired and the
      *     caller must load a fresh wrapper.
      */
-    public boolean tryAcquire() {
+    boolean tryAcquire() {
       synchronized (leaseLock) {
         if (retired) {
           return false;
@@ -228,8 +228,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     /**
      * Releases a lease taken by {@link #tryAcquire()}. Cleans up the catalog and the ClassLoader if
      * this was the last lease on an already retired wrapper.
+     *
+     * <p>Note that in that case the cleanup runs on the releasing thread, which is usually a
+     * request thread, so a slow catalog close is charged to that request. This only happens when
+     * the wrapper was evicted while the operation was in flight; the common case is that eviction
+     * finds no lease and cleans up on the cache's own thread.
      */
-    public void release() {
+    void release() {
       boolean shouldCleanup;
       synchronized (leaseLock) {
         Preconditions.checkState(activeOps > 0, "Releasing a lease that was never acquired");
@@ -246,7 +251,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
      * Retires this wrapper: no new lease can be taken. The catalog and the ClassLoader are cleaned
      * up immediately if no operation is in flight, otherwise by the last {@link #release()}.
      */
-    public void retire() {
+    void retire() {
       boolean shouldCleanup;
       synchronized (leaseLock) {
         retired = true;
@@ -263,7 +268,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
      *
      * @return true if the wrapper has been retired.
      */
-    public boolean isRetired() {
+    boolean isRetired() {
       synchronized (leaseLock) {
         return retired;
       }

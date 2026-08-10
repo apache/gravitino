@@ -31,8 +31,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CatalogLease;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.FunctionDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -66,8 +66,7 @@ public class TestFunctionHookDispatcher {
     Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogLease.of(catalogWrapper));
-    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(catalogWrapper));
 
     Mockito.when(
             dispatcher.registerFunction(
@@ -152,8 +151,7 @@ public class TestFunctionHookDispatcher {
     Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
     Mockito.when(mockCatalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogLease.of(mockWrapper));
-    Mockito.when(mockWrapper.tryAcquire()).thenReturn(true);
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockWrapper));
 
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     FunctionDispatcher mockFunctionDispatcher = Mockito.mock(FunctionDispatcher.class);
@@ -208,8 +206,7 @@ public class TestFunctionHookDispatcher {
     Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogLease.of(catalogWrapper));
-    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(catalogWrapper));
 
     FunctionDispatcher mockFunctionDispatcher = Mockito.mock(FunctionDispatcher.class);
     Function mockFunction = Mockito.mock(Function.class);

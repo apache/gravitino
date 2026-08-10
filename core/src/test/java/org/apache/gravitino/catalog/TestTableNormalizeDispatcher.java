@@ -229,8 +229,7 @@ public class TestTableNormalizeDispatcher extends TestOperationDispatcher {
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
         .thenReturn(mockWrapper);
     Mockito.when(mockCatalogManager.acquireCatalogLease(Mockito.any(NameIdentifier.class)))
-        .thenAnswer(invocation -> CatalogLease.of(mockWrapper));
-    Mockito.when(mockWrapper.tryAcquire()).thenReturn(true);
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockWrapper));
 
     TableNormalizeDispatcher dispatcher =
         new TableNormalizeDispatcher(mockDispatcher, mockCatalogManager);

@@ -32,8 +32,8 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
-import org.apache.gravitino.catalog.CatalogLease;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.ModelDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -64,8 +64,7 @@ public class TestModelHookDispatcher {
     mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
     when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
     when(mockCatalogManager.acquireCatalogLease(any()))
-        .thenAnswer(invocation -> CatalogLease.of(mockCatalogWrapper));
-    when(mockCatalogWrapper.tryAcquire()).thenReturn(true);
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(mockCatalogWrapper));
     when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
     savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
     // Read the catalogManager field directly via reflection because the public accessor
