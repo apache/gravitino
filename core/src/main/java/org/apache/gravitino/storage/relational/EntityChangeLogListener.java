@@ -28,6 +28,10 @@ public interface EntityChangeLogListener {
   /**
    * Handles a batch of entity changes.
    *
+   * <p>If this method throws, the poller may retry the same batch for this listener.
+   * Implementations must make the callback atomic or tolerate retrying changes that were applied
+   * before the exception.
+   *
    * @param changes the entity changes fetched in one poller cycle
    */
   void onEntityChange(List<EntityChangeRecord> changes);

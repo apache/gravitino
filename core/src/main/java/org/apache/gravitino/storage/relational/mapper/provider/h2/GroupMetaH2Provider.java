@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.GROU
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
@@ -35,20 +36,8 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
-        + " '[' || COALESCE(GROUP_CONCAT( "
-        + "        CASE "
-        + "          WHEN rot.role_name IS NOT NULL AND rot.role_name <> '' "
-        + "          THEN '\"' || rot.role_name || '\"' "
-        + "          ELSE NULL "
-        + "        END "
-        + "      ), '') || ']' as roleNames, "
-        + " '[' || COALESCE(GROUP_CONCAT( "
-        + "        CASE "
-        + "          WHEN rot.role_id IS NOT NULL "
-        + "          THEN '\"' || rot.role_id || '\"' "
-        + "          ELSE NULL "
-        + "        END "
-        + "      ), '') || ']' as roleIds "
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
         + " gt LEFT OUTER JOIN ("
@@ -68,6 +57,46 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
   }
 
   @Override
+  public String listExtendedGroupPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
+        + " gt.metalake_id as metalakeId,"
+        + " gt.external_id as externalId,"
+        + " gt.audit_info as auditInfo,"
+        + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
+        + " gt.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT gt.group_id FROM "
+        + GROUP_TABLE_NAME
+        + " gt JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON gt.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND gt.deleted_at = 0 AND mt.deleted_at = 0"
+        + " ORDER BY gt.group_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + GROUP_TABLE_NAME
+        + " gt ON gt.group_id = paginated.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + GROUP_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.group_id = gt.group_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY gt.group_id"
+        + " ORDER BY gt.group_id ASC";
+  }
+
+  @Override
   public String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return "<script>"
@@ -77,20 +106,8 @@ public class GroupMetaH2Provider extends GroupMetaBaseSQLProvider {
         + " gt.audit_info as auditInfo,"
         + " gt.current_version as currentVersion, gt.last_version as lastVersion,"
         + " gt.deleted_at as deletedAt,"
-        + " '[' || COALESCE(GROUP_CONCAT( "
-        + "        CASE "
-        + "          WHEN rot.role_name IS NOT NULL AND rot.role_name &lt;&gt; '' "
-        + "          THEN '\"' || rot.role_name || '\"' "
-        + "          ELSE NULL "
-        + "        END "
-        + "      ), '') || ']' as roleNames, "
-        + " '[' || COALESCE(GROUP_CONCAT( "
-        + "        CASE "
-        + "          WHEN rot.role_id IS NOT NULL "
-        + "          THEN '\"' || rot.role_id || '\"' "
-        + "          ELSE NULL "
-        + "        END "
-        + "      ), '') || ']' as roleIds "
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
         + " FROM "
         + GROUP_TABLE_NAME
         + " gt LEFT OUTER JOIN ("

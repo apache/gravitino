@@ -28,6 +28,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.junit.jupiter.api.Assertions;
@@ -61,7 +62,9 @@ public class TestFunctionOperationDispatcher {
     when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, HIVE_CATALOG)))
         .thenReturn(hiveWrapper);
 
-    dispatcher = new FunctionOperationDispatcher(catalogManager, schemaOps, store, idGenerator);
+    dispatcher =
+        new FunctionOperationDispatcher(
+            catalogManager, schemaOps, store, idGenerator, mock(SecretManager.class));
   }
 
   @Test

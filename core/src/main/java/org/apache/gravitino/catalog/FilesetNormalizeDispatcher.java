@@ -24,7 +24,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.io.IOException;
 import java.util.Map;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -36,6 +35,10 @@ import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listFilesets(Namespace)})
+ * are assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   private final CatalogManager catalogManager;
   private final FilesetDispatcher dispatcher;
@@ -50,8 +53,7 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    NameIdentifier[] identifiers = dispatcher.listFilesets(caseSensitiveNs);
-    return normalizeCaseSensitive(identifiers);
+    return dispatcher.listFilesets(caseSensitiveNs);
   }
 
   @Override
@@ -124,14 +126,5 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   private NameIdentifier normalizeCaseSensitive(NameIdentifier filesetIdent) {
     Capability capabilities = getCapability(filesetIdent, catalogManager);
     return applyCaseSensitive(filesetIdent, Capability.Scope.FILESET, capabilities);
-  }
-
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] filesetIdents) {
-    if (ArrayUtils.isEmpty(filesetIdents)) {
-      return filesetIdents;
-    }
-
-    Capability capabilities = getCapability(filesetIdents[0], catalogManager);
-    return applyCaseSensitive(filesetIdents, Capability.Scope.FILESET, capabilities);
   }
 }

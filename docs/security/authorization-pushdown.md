@@ -17,21 +17,21 @@ This module translates Gravitino's authorization model into the permission rules
 
 To use the Ranger Hadoop SQL Plugin, you need to configure the following properties:
 
-| Property Name                                         | Description                                                                                                                                          | Default Value                     | Required | Since Version    |
-|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|----------|------------------|
-| `authorization-provider`                              | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.admin.url`                      | The Apache Ranger web URIs.                                                                                                                          | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.service.type`                   | The Apache Ranger service type. Supports `HadoopSQL` or `HDFS`.                                                                                      | (none)                            | No       | 0.8.0-incubating |
-| `authorization.ranger.auth.type`                      | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`                          | No       | 0.6.0-incubating |
-| `authorization.ranger.username`                       | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.password`                       | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.service.name`                   | The Apache Ranger service name.                                                                                                                      | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.service.create-if-absent`       | If this property is true and the Ranger service doesn't exist, Gravitino will create a Ranger service                                                | false                             | No       | 0.9.0-incubating |
-| `authorization.ranger.jdbc.driverClassName`           | The property is used to specify driver class name when creating Ranger HadoopSQL service                                                             | `org.apache.hive.jdbc.HiveDrive`  | No       | 0.9.0-incubating |
-| `authorization.ranger.jdbc.url`                       | The property is used to specify jdbc url when creating Ranger HadoopSQL service                                                                      | `jdbc:hive2://127.0.0.1:8081`     | No       | 0.9.0-incubating |
-| `authorization.ranger.hadoop.security.authentication` | The property is used to specify Hadoop security authentication when creating Ranger HDFS service                                                     | `simple`                          | No       | 0.9.0-incubating |
-| `authorization.ranger.hadoop.rpc.protection`          | The property is used to specify Hadoop rpc protection when creating Ranger HDFS service                                                              | `authentication`                  | No       | 0.9.0-incubating |
-| `authorization.ranger.fs.default.name`                | The property is used to specify default filesystem when creating Ranger HDFS service                                                                 | `hdfs://127.0.0.1:8090`           | No       | 0.9.0-incubating |
+| Property Name                                         | Description                                                                                                                                          | Default Value                    | Required |
+|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------|----------|
+| `authorization-provider`                              | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)                           | No       |
+| `authorization.ranger.admin.url`                      | The Apache Ranger web URIs.                                                                                                                          | (none)                           | No       |
+| `authorization.ranger.service.type`                   | The Apache Ranger service type. Supports `HadoopSQL` or `HDFS`.                                                                                      | (none)                           | No       |
+| `authorization.ranger.auth.type`                      | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`                         | No       |
+| `authorization.ranger.username`                       | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)                           | No       |
+| `authorization.ranger.password`                       | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)                           | No       |
+| `authorization.ranger.service.name`                   | The Apache Ranger service name.                                                                                                                      | (none)                           | No       |
+| `authorization.ranger.service.create-if-absent`       | If this property is true and the Ranger service doesn't exist, Gravitino will create a Ranger service                                                | false                            | No       |
+| `authorization.ranger.jdbc.driverClassName`           | The property is used to specify driver class name when creating Ranger HadoopSQL service                                                             | `org.apache.hive.jdbc.HiveDrive` | No       |
+| `authorization.ranger.jdbc.url`                       | The property is used to specify jdbc url when creating Ranger HadoopSQL service                                                                      | `jdbc:hive2://127.0.0.1:8081`    | No       |
+| `authorization.ranger.hadoop.security.authentication` | The property is used to specify Hadoop security authentication when creating Ranger HDFS service                                                     | `simple`                         | No       |
+| `authorization.ranger.hadoop.rpc.protection`          | The property is used to specify Hadoop rpc protection when creating Ranger HDFS service                                                              | `authentication`                 | No       |
+| `authorization.ranger.fs.default.name`                | The property is used to specify default filesystem when creating Ranger HDFS service                                                                 | `hdfs://127.0.0.1:8090`          | No       |
 
 :::caution
 The Gravitino Ranger authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
@@ -62,7 +62,7 @@ authorization.ranger.service.name=hiveRepo
 ```
 
 :::caution
-Gravitino 0.8.0 only supports the authorization Apache Ranger Hive service , Apache Iceberg service and Apache Paimon Service. 
+Gravitino supports authorization pushdown to Apache Ranger for the Hive, Iceberg, and Paimon catalogs through the Ranger Hadoop SQL Plugin.
 Spark can use Kyuubi authorization plugin to access Gravitino's catalog. But the plugin can't support to update or delete data for Paimon catalog.
 More data source authorization is under development.
 :::
@@ -75,15 +75,15 @@ When a user performs an authorization operation on data within a catalog, the ch
 
 To use the chained authorization plugin, you need to configure the following properties:
 
-| Property Name                                             | Description                                                                            | Default Value | Required                    | Since Version    |
-|-----------------------------------------------------------|----------------------------------------------------------------------------------------|---------------|-----------------------------|------------------|
-| `authorization-provider`                                  | Providers to use to implement authorization plugin such as `chain`                     | (none)        | No                          | 0.8.0-incubating |
-| `authorization.chain.plugins`                             | The comma-separated list of plugin names, like `${plugin-name1},${plugin-name2},...`   | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.admin.url`     | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.service.type`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.service.name`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.username`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.password`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+| Property Name                                            | Description                                                                          | Default Value | Required                    |
+|----------------------------------------------------------|--------------------------------------------------------------------------------------|---------------|-----------------------------|
+| `authorization-provider`                                 | Providers to use to implement authorization plugin such as `chain`                   | (none)        | No                          |
+| `authorization.chain.plugins`                            | The comma-separated list of plugin names, like `${plugin-name1},${plugin-name2},...` | (none)        | Yes if you use chain plugin |
+| `authorization.chain.${plugin-name}.ranger.admin.url`    | The Ranger authorization plugin properties of the `${plugin-name}`                   | (none)        | Yes if you use chain plugin |
+| `authorization.chain.${plugin-name}.ranger.service.type` | The Ranger authorization plugin properties of the `${plugin-name}`                   | (none)        | Yes if you use chain plugin |
+| `authorization.chain.${plugin-name}.ranger.service.name` | The Ranger authorization plugin properties of the `${plugin-name}`                   | (none)        | Yes if you use chain plugin |
+| `authorization.chain.${plugin-name}.ranger.username`     | The Ranger authorization plugin properties of the `${plugin-name}`                   | (none)        | Yes if you use chain plugin |
+| `authorization.chain.${plugin-name}.ranger.password`     | The Ranger authorization plugin properties of the `${plugin-name}`                   | (none)        | Yes if you use chain plugin |
 
 :::caution
 The Gravitino chain authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.

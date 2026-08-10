@@ -43,6 +43,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -1260,6 +1261,141 @@ class TestUserMetaService extends TestJDBCBackend {
                 m.batchGetAuthSubjectsForUser(
                     metalakeName, "noSuchUser", Lists.newArrayList("noSuchGroup")));
     assertTrue(none.isEmpty());
+  }
+
+  @TestTemplate
+  void testUserPagination() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService svc = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "page_role",
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(role1, false);
+
+    UserEntity u1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u1",
+            auditInfo);
+    UserEntity u2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u2",
+            auditInfo,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    UserEntity u3 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u3",
+            auditInfo);
+    UserEntity u4 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "page_u4",
+            auditInfo);
+    svc.insertUser(u1, false);
+    svc.insertUser(u2, false);
+    svc.insertUser(u3, false);
+    svc.insertUser(u4, false);
+
+    List<UserEntity> ordered =
+        Lists.newArrayList(u1, u2, u3, u4).stream()
+            .sorted(Comparator.comparing(UserEntity::id))
+            .collect(Collectors.toList());
+
+    Assertions.assertEquals(4, svc.countUsersByMetalake(metalakeName));
+
+    // offset=1, limit=2 exercises JDBC OFFSET and stable ORDER BY user_id ASC.
+    PagedResult<UserEntity> page = svc.listUsersByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(4, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+    Assertions.assertEquals(ordered.get(1).name(), page.items().get(0).name());
+    Assertions.assertEquals(ordered.get(2).name(), page.items().get(1).name());
+    Assertions.assertEquals(ordered.get(1).id(), page.items().get(0).id());
+    Assertions.assertEquals(ordered.get(2).id(), page.items().get(1).id());
+
+    UserEntity withRole =
+        ordered.stream().filter(u -> "page_u2".equals(u.name())).findFirst().orElseThrow();
+    int roleUserOffset = ordered.indexOf(withRole);
+    PagedResult<UserEntity> rolePage =
+        svc.listUsersByMetalakePaginated(metalakeName, roleUserOffset, 1);
+    Assertions.assertEquals(1, rolePage.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet("page_role"), Sets.newHashSet(rolePage.items().get(0).roleNames()));
+
+    PagedResult<UserEntity> pageAgain = svc.listUsersByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(
+        page.items().stream().map(UserEntity::name).collect(Collectors.toList()),
+        pageAgain.items().stream().map(UserEntity::name).collect(Collectors.toList()));
+
+    Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
+    Assertions.assertTrue(svc.listUsersByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
+  }
+
+  @TestTemplate
+  void testUserPaginationWithSpecialRoleNames() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService svc = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    String quotedRole = "role\"quoted";
+    String backslashRole = "back\\slash";
+    RoleEntity roleQuoted =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            quotedRole,
+            auditInfo,
+            "catalog");
+    RoleEntity roleBackslash =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            backslashRole,
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(roleQuoted, false);
+    roleMetaService.insertRole(roleBackslash, false);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "special_role_user",
+            auditInfo,
+            Lists.newArrayList(quotedRole, backslashRole),
+            Lists.newArrayList(roleQuoted.id(), roleBackslash.id()));
+    svc.insertUser(user, false);
+
+    PagedResult<UserEntity> page = svc.listUsersByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet(quotedRole, backslashRole),
+        Sets.newHashSet(page.items().get(0).roleNames()));
   }
 
   @TestTemplate

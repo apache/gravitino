@@ -19,19 +19,32 @@
 package org.apache.gravitino.server;
 
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_PATH;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
@@ -135,5 +148,79 @@ public class TestGravitinoServer {
     assertTrue(
         hookBlock.contains("server.gracefulStop()"),
         "Shutdown hook should invoke server.gracefulStop() so app-level cleanup runs on SIGTERM");
+  }
+
+  @Test
+  public void testSecretProvidersDiscoveryEmpty() throws Exception {
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    List<Map<String, Object>> providers = fetchSecretProviders(spyServerConfig);
+    assertTrue(providers.isEmpty());
+  }
+
+  @Test
+  public void testSecretProvidersDiscoveryWithMemoryProvider() throws Exception {
+    ServerConfig serverConfig = spyServerConfig(serverConfigWithMemoryProvider());
+    gravitinoServer = new GravitinoServer(serverConfig, GravitinoEnv.getInstance());
+    gravitinoServer.initialize();
+    gravitinoServer.start();
+
+    List<Map<String, Object>> providers = fetchSecretProviders(serverConfig);
+    assertEquals(1, providers.size());
+    assertEquals("memory", providers.get(0).get("name"));
+    assertEquals("memory", providers.get(0).get("type"));
+    assertEquals("https://secrets.example.com", providers.get(0).get("uri"));
+    assertFalse(providers.get(0).containsKey("className"));
+  }
+
+  private static ServerConfig serverConfigWithMemoryProvider() throws IOException {
+    Map<String, String> configs = new HashMap<>();
+    configs.put(
+        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+        String.valueOf(RESTUtils.findAvailablePort(5000, 6000)));
+    configs.put(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    configs.put(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    configs.put(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.URI,
+        "https://secrets.example.com");
+
+    ServerConfig serverConfig = new ServerConfig();
+    serverConfig.loadFromMap(configs, t -> true);
+    return serverConfig;
+  }
+
+  private static ServerConfig spyServerConfig(ServerConfig serverConfig) {
+    ServerConfig spy = Mockito.spy(serverConfig);
+    Mockito.when(spy.getConfigsWithPrefix(AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX))
+        .thenReturn(ImmutableMap.of(AuxiliaryServiceManager.AUX_SERVICE_NAMES, ""));
+    return spy;
+  }
+
+  private static List<Map<String, Object>> fetchSecretProviders(ServerConfig serverConfig)
+      throws Exception {
+    int port =
+        JettyServerConfig.fromConfig(serverConfig, GravitinoServer.WEBSERVER_CONF_PREFIX)
+            .getHttpPort();
+    HttpResponse<String> response =
+        HttpClient.newHttpClient()
+            .send(
+                HttpRequest.newBuilder(
+                        URI.create("http://127.0.0.1:" + port + "/configs/secrets/providers"))
+                    .GET()
+                    .build(),
+                HttpResponse.BodyHandlers.ofString());
+    assertEquals(200, response.statusCode());
+    Map<String, Object> body =
+        ObjectMapperProvider.objectMapper()
+            .readValue(response.body(), new TypeReference<Map<String, Object>>() {});
+    return ObjectMapperProvider.objectMapper()
+        .convertValue(body.get("providers"), new TypeReference<List<Map<String, Object>>>() {});
   }
 }
