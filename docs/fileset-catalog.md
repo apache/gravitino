@@ -92,11 +92,11 @@ HDFS and local filesystems need no bundle jar and no credential properties. Obje
 
 | Storage System          | Bundle Jar                 | URI Scheme           | Credential Providers              |
 |-------------------------|----------------------------|----------------------|-----------------------------------|
-| Amazon S3               | `gravitino-aws-bundle`     | `s3a://`             | `s3-token`, `s3-secret-key`       |
-| Google Cloud Storage    | `gravitino-gcp-bundle`     | `gs://`              | `gcs-token`                       |
-| Azure Data Lake Storage | `gravitino-azure-bundle`   | `abfss://`           | `adls-token`, `azure-account-key` |
-| Alibaba Cloud OSS       | `gravitino-aliyun-bundle`  | `oss://`             | `oss-token`, `oss-secret-key`     |
-| Tencent Cloud COS       | `gravitino-tencent-bundle` | `cosn://`            | `cos-secret-key`                  |
+| [Amazon S3](./fileset-catalog-with-s3.md)               | `gravitino-aws-bundle`     | `s3a://`             | `s3-token`, `s3-secret-key`       |
+| [Google Cloud Storage](./fileset-catalog-with-gcs.md)    | `gravitino-gcp-bundle`     | `gs://`              | `gcs-token`                       |
+| [Azure Data Lake Storage](./fileset-catalog-with-adls.md) | `gravitino-azure-bundle`   | `abfss://`           | `adls-token`, `azure-account-key` |
+| [Alibaba Cloud OSS](./fileset-catalog-with-oss.md)       | `gravitino-aliyun-bundle`  | `oss://`             | `oss-token`, `oss-secret-key`     |
+| [Tencent Cloud COS](./fileset-catalog-with-cos.md)       | `gravitino-tencent-bundle` | `cosn://`            | `cos-secret-key`                  |
 | HDFS and local          | None, built in             | `hdfs://`, `file://` | None                              |
 
 Bundle jars are published on [Maven Central](https://mvnrepository.com/artifact/org.apache.gravitino) and versioned with the server.
@@ -169,41 +169,9 @@ One catalog can carry the properties for several storage systems at once, and Gr
 
 ## Accessing a Fileset
 
-A fileset is addressable as `gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}` from the Java client, the Python client, Spark, and the Hadoop shell. The address does not change with the storage backend, but the client needs the bundle jar for that backend and its credential properties, exactly as the catalog does.
+A fileset is addressable as `gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}` from the Java client, the Python client, Spark, and the Hadoop shell. The address does not change with the storage backend.
 
-Every client needs `gravitino-filesystem-hadoop3-runtime-{version}.jar` plus the backend bundle jar on its classpath, and these properties.
-
-| Property Name                     | Value                                                               |
-|-----------------------------------|---------------------------------------------------------------------|
-| `fs.AbstractFileSystem.gvfs.impl` | `org.apache.gravitino.filesystem.hadoop.Gvfs`                       |
-| `fs.gvfs.impl`                    | `org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem` |
-| `fs.gravitino.server.uri`         | Gravitino server address                                            |
-| `fs.gravitino.client.metalake`    | Metalake name                                                       |
-
-Add the credential properties for the backend on top of those, using the same names the catalog uses.
-
-| Storage System          | Client Credential Properties                                 |
-|-------------------------|--------------------------------------------------------------|
-| Amazon S3               | `s3-endpoint`, `s3-access-key-id`, `s3-secret-access-key`    |
-| Google Cloud Storage    | `gcs-service-account-file`                                   |
-| Azure Data Lake Storage | `azure-storage-account-name`, `azure-storage-account-key`    |
-| Alibaba Cloud OSS       | `oss-endpoint`, `oss-access-key-id`, `oss-secret-access-key` |
-| Tencent Cloud COS       | `cos-region`, `cos-access-key-id`, `cos-secret-access-key`   |
-| HDFS and local          | None                                                         |
-
-When the catalog sets `credential-providers`, replace the credential properties with `fs.gravitino.enableCredentialVending=true`. Gravitino then issues short-lived credentials per request and the client holds no cloud keys at all.
-
-```shell
-hadoop fs -ls gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}
-```
-
-The client APIs, including the Java and Python examples and the Spark session configuration, are covered in [How to Use GVFS](./how-to-use-gvfs.md).
-
-## Accessing a Fileset
-
-A fileset is addressable as `gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}` from the Java client, the Python client, Spark, and the Hadoop shell. The address does not change with the storage backend, but the client needs the bundle jar for that backend and its credential properties, exactly as the catalog does.
-
-Every client needs `gravitino-filesystem-hadoop3-runtime-{version}.jar` plus the backend bundle jar on its classpath, and these properties.
+Every client needs `gravitino-filesystem-hadoop3-runtime` on its classpath, plus the bundle jar for its backend, and these properties.
 
 | Property Name                     | Value                                                               |
 |-----------------------------------|---------------------------------------------------------------------|
@@ -212,24 +180,11 @@ Every client needs `gravitino-filesystem-hadoop3-runtime-{version}.jar` plus the
 | `fs.gravitino.server.uri`         | Gravitino server address                                            |
 | `fs.gravitino.client.metalake`    | Metalake name                                                       |
 
-Add the credential properties for the backend on top of those, using the same names the catalog uses.
+Filesets on HDFS or a local filesystem need nothing beyond those. Filesets on object storage also need the credential properties for that backend, which the page for each backend covers alongside its client examples. The Python client spells those properties with underscores where the catalog and the Java client use hyphens.
 
-| Storage System          | Client Credential Properties                                 |
-|-------------------------|--------------------------------------------------------------|
-| Amazon S3               | `s3-endpoint`, `s3-access-key-id`, `s3-secret-access-key`    |
-| Google Cloud Storage    | `gcs-service-account-file`                                   |
-| Azure Data Lake Storage | `azure-storage-account-name`, `azure-storage-account-key`    |
-| Alibaba Cloud OSS       | `oss-endpoint`, `oss-access-key-id`, `oss-secret-access-key` |
-| Tencent Cloud COS       | `cos-region`, `cos-access-key-id`, `cos-secret-access-key`   |
-| HDFS and local          | None                                                         |
+When the catalog sets `credential-providers`, set `fs.gravitino.enableCredentialVending` to `true` on the client and the credential properties can be omitted entirely.
 
-When the catalog sets `credential-providers`, replace the credential properties with `fs.gravitino.enableCredentialVending=true`. Gravitino then issues short-lived credentials per request and the client holds no cloud keys at all.
-
-```shell
-hadoop fs -ls gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}
-```
-
-The client APIs, including the Java and Python examples and the Spark session configuration, are covered in [How to Use GVFS](./how-to-use-gvfs.md).
+See [How to Use GVFS](./how-to-use-gvfs.md) for the client APIs.
 
 ## HDFS and Kerberos
 
