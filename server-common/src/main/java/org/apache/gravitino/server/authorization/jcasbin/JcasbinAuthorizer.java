@@ -96,9 +96,9 @@ import org.slf4j.LoggerFactory;
  *       {@link #groupRoleCache}, {@link #loadedRoles}. Each cached entry carries the {@code
  *       *_meta.updated_at} value it was loaded against; every read issues a lightweight version
  *       probe and discards the entry if the DB sentinel has advanced. No TTL is relied on for
- *       correctness — TTL eviction only bounds memory. User/group role snapshots use write-based
- *       TTLs through {@link CaffeineGravitinoCache}; loaded role policies use access-based TTLs
- *       through {@link JcasbinLoadedRolesCache}.
+ *       correctness — TTL eviction only bounds memory. User/group role snapshots and loaded role
+ *       policies both use write-based TTLs through {@link CaffeineGravitinoCache} and {@link
+ *       JcasbinLoadedRolesCache}, respectively.
  *   <li><b>Eventual-consistency caches</b> — {@link #metadataIdCache} and {@link #ownerRelCache}.
  *       The global entity change log poller dispatches {@code entity_change_log} batches to {@link
  *       #changePoller}, while {@link #changePoller} polls {@code owner_meta}. Other Gravitino nodes
@@ -934,8 +934,13 @@ public class JcasbinAuthorizer implements GravitinoAuthorizer {
       // normal check over every role the caller holds.
       ActiveRoles activeRoles = requestContext.getActiveRoles();
       if (narrowByActiveRoles && !activeRoles.isAll()) {
-        return enforceNarrowed(
-            userId, metadataType, metadataIdStr, privilege, activeRoles, requestContext);
+        boolean allowed =
+            enforceNarrowed(
+                userId, metadataType, metadataIdStr, privilege, activeRoles, requestContext);
+        if (!allowed) {
+          diagnoseDenial(userId, metadataType, metadataIdStr, privilege);
+        }
+        return allowed;
       }
 
       boolean allowed =
