@@ -32,6 +32,7 @@ import java.util.Collections;
 import java.util.Optional;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.CatalogLease;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.iceberg.service.CatalogWrapperForREST;
@@ -241,6 +242,9 @@ class TestIcebergAsyncPurge {
     envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
     when(env.catalogManager()).thenReturn(catalogManager);
     when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    when(catalogManager.acquireCatalogLease(any()))
+        .thenAnswer(invocation -> CatalogLease.of(wrapper));
+    when(wrapper.tryAcquire()).thenReturn(true);
     when(wrapper.catalog()).thenReturn(catalog);
     when(catalog.entity()).thenReturn(entity);
     when(entity.id()).thenReturn(CATALOG_ID);

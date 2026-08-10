@@ -52,9 +52,8 @@ public class CapabilityHelpers {
 
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
-    try {
-      return c.capabilities();
+    try (CatalogLease lease = catalogManager.acquireCatalogLease(catalogIdent)) {
+      return lease.wrapper().capabilities();
     } catch (Exception e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
     }

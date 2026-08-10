@@ -964,6 +964,7 @@ public class TestCatalogManager {
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
     Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1043,6 +1044,7 @@ public class TestCatalogManager {
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
     Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1094,6 +1096,7 @@ public class TestCatalogManager {
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
     Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(wrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doReturn(capability).when(wrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1141,6 +1144,7 @@ public class TestCatalogManager {
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
     Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
@@ -1175,6 +1179,7 @@ public class TestCatalogManager {
     Capability capability = Mockito.mock(Capability.class);
     CapabilityResult unsupportedResult = CapabilityResult.unsupported("Not managed");
     Mockito.doReturn(catalogWrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.when(catalogWrapper.tryAcquire()).thenReturn(true);
     Mockito.doReturn(catalog).when(catalogWrapper).catalog();
     Mockito.doReturn(capability).when(catalogWrapper).capabilities();
     Mockito.doReturn(unsupportedResult).when(capability).managedStorage(any());
@@ -1222,20 +1227,23 @@ public class TestCatalogManager {
   void testLoadCatalogAndWrapDoesNotInvalidateConcurrentlyReloadedWrapper() {
     NameIdentifier ident = NameIdentifier.of("metalake", "concurrent_cache_reload_test");
 
-    CatalogManager.CatalogWrapper closedWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    CatalogManager.CatalogWrapper retiredWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
     CatalogManager.CatalogWrapper freshWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     BaseCatalog<?> freshCatalog = Mockito.mock(BaseCatalog.class);
     Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
+    // The retired wrapper reports its state only after another thread has already reloaded a fresh
+    // wrapper into the cache, so the stale-entry eviction must not clobber that fresh wrapper.
     Mockito.doAnswer(
             invocation -> {
               catalogManager.getCatalogCache().put(ident, freshWrapper);
-              return null;
+              return true;
             })
-        .when(closedWrapper)
-        .catalog();
+        .when(retiredWrapper)
+        .isRetired();
 
     try {
-      catalogManager.getCatalogCache().put(ident, closedWrapper);
+      catalogManager.getCatalogCache().put(ident, retiredWrapper);
 
       CatalogManager.CatalogWrapper loadedWrapper = catalogManager.loadCatalogAndWrap(ident);
 

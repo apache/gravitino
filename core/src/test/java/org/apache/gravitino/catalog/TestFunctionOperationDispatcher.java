@@ -59,8 +59,14 @@ public class TestFunctionOperationDispatcher {
 
     when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, ICEBERG_CATALOG)))
         .thenReturn(icebergWrapper);
+    when(catalogManager.acquireCatalogLease(NameIdentifier.of(METALAKE, ICEBERG_CATALOG)))
+        .thenAnswer(invocation -> CatalogLease.of(icebergWrapper));
+    when(icebergWrapper.tryAcquire()).thenReturn(true);
     when(catalogManager.loadCatalogAndWrap(NameIdentifier.of(METALAKE, HIVE_CATALOG)))
         .thenReturn(hiveWrapper);
+    when(catalogManager.acquireCatalogLease(NameIdentifier.of(METALAKE, HIVE_CATALOG)))
+        .thenAnswer(invocation -> CatalogLease.of(hiveWrapper));
+    when(hiveWrapper.tryAcquire()).thenReturn(true);
 
     dispatcher =
         new FunctionOperationDispatcher(

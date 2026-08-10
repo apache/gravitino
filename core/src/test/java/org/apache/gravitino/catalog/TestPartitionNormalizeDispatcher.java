@@ -113,6 +113,9 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
         .thenReturn(TestCapabilityHelpers.QUOTE_AWARE_CAPABILITY);
     Mockito.when(mockCatalogManager.loadCatalogAndWrap(Mockito.any(NameIdentifier.class)))
         .thenReturn(mockWrapper);
+    Mockito.when(mockCatalogManager.acquireCatalogLease(Mockito.any(NameIdentifier.class)))
+        .thenAnswer(invocation -> CatalogLease.of(mockWrapper));
+    Mockito.when(mockWrapper.tryAcquire()).thenReturn(true);
 
     PartitionNormalizeDispatcher dispatcher =
         new PartitionNormalizeDispatcher(mockDispatcher, mockCatalogManager);
