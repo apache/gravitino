@@ -30,6 +30,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 
@@ -63,9 +64,20 @@ public class IcebergRESTMinIOTokenAuthorizationIT extends IcebergRESTCloudTokenA
 
     super.startIntegrationTest();
 
-    catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+    // A sibling IT may have left this schema behind in the shared Iceberg JDBC backend.
+    if (!catalogClientWithAllPrivilege.asSchemas().schemaExists(SCHEMA_NAME)) {
+      catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+    }
 
     setupCloudBundles();
+  }
+
+  @AfterAll
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    // The Iceberg JDBC backend is shared with sibling ITs; Iceberg has no cascading drop.
+    clearTable();
+    catalogClientWithAllPrivilege.asSchemas().dropSchema(SCHEMA_NAME, false);
+    super.stopIntegrationTest();
   }
 
   @Override
