@@ -59,13 +59,16 @@ import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.exceptions.NoSuchPlanTaskException;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
 import org.apache.iceberg.io.CloseableIterable;
 import org.apache.iceberg.rest.CatalogHandlers;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.responses.FetchScanTasksResponse;
 import org.apache.iceberg.rest.responses.ImmutableLoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
@@ -482,6 +485,34 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
       throw new RuntimeException(
           "Scan planning failed for table " + tableIdentifier + ": " + e.getMessage(), e);
     }
+  }
+
+  /**
+   * Fetch the scan tasks covered by a {@code plan-task} previously handed out by {@link
+   * #planTableScan}, completing the second step of the Iceberg REST two-step scan planning
+   * protocol.
+   *
+   * <p>{@link #planTableScan} currently returns every file scan task inline and hands out no {@code
+   * plan-tasks}, so no plan task presented here was issued by this server and every request is
+   * rejected as unknown. The endpoint is deliberately not advertised in {@code /v1/config} while
+   * that is the case, so a spec-compliant client never reaches it. Batching a plan into plan tasks,
+   * and redeeming them here, follows in a later change.
+   *
+   * @param tableIdentifier the table the plan task belongs to.
+   * @param request the request carrying the {@code plan-task}.
+   * @return the file scan tasks the plan task covers.
+   * @throws org.apache.iceberg.exceptions.NoSuchTableException if the table doesn't exist.
+   * @throws NoSuchPlanTaskException if the plan task was not issued for this table.
+   */
+  public FetchScanTasksResponse fetchScanTasks(
+      TableIdentifier tableIdentifier, FetchScanTasksRequest request) {
+    // Validate the table exists first, so a bad table reports 404 for the table rather than
+    // masking it as an unknown plan task. Consistent with planTableScan behavior.
+    getCatalog().loadTable(tableIdentifier);
+
+    LOG.info("Rejecting unknown plan task '{}' for table {}", request.planTask(), tableIdentifier);
+    throw new NoSuchPlanTaskException(
+        "Plan task %s was not issued for table %s", request.planTask(), tableIdentifier);
   }
 
   /**

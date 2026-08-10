@@ -46,6 +46,8 @@ import org.apache.gravitino.listener.api.event.IcebergCreateTablePreEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergDropTablePreEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksFailureEvent;
+import org.apache.gravitino.listener.api.event.IcebergFetchScanTasksPreEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTableFailureEvent;
 import org.apache.gravitino.listener.api.event.IcebergListTablePreEvent;
@@ -81,10 +83,12 @@ import org.apache.iceberg.metrics.ImmutableCommitReport;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTUtil;
 import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.FetchScanTasksRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RenameTableRequest;
 import org.apache.iceberg.rest.requests.ReportMetricsRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ErrorResponse;
 import org.apache.iceberg.rest.responses.ListTablesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.types.Types.NestedField;
@@ -241,6 +245,76 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergPlanTableScanPreEvent);
     Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergPlanTableScanEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchScanTasksUnknownPlanTask(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "fetch_tasks_table", true);
+
+    dummyEventListener.clearEvent();
+
+    // Scan planning hands out no plan tasks yet, so every plan task presented here is one this
+    // server never issued, reported as 404 per the Iceberg REST spec.
+    Response response =
+        doFetchScanTasks(
+            namespace, "fetch_tasks_table", new FetchScanTasksRequest("not-a-plan-task"));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+    // Assert on the error payload, not just the status: an unregistered route would also yield
+    // 404, which would let this test pass without the endpoint existing.
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("NoSuchPlanTaskException", error.type());
+    Assertions.assertTrue(
+        error.message().contains("not-a-plan-task"),
+        "Error message should name the rejected plan task, but was: " + error.message());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchScanTasksPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchScanTasksFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testFetchScanTasksTableNotFound(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    dummyEventListener.clearEvent();
+
+    // A missing table is reported as a missing table, not masked as an unknown plan task.
+    Response response =
+        doFetchScanTasks(namespace, "missing_table", new FetchScanTasksRequest("any-plan-task"));
+    Assertions.assertEquals(Status.NOT_FOUND.getStatusCode(), response.getStatus());
+
+    ErrorResponse error = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals("NoSuchTableException", error.type());
+
+    Assertions.assertTrue(
+        dummyEventListener.popPreEvent() instanceof IcebergFetchScanTasksPreEvent);
+    Assertions.assertTrue(
+        dummyEventListener.popPostEvent() instanceof IcebergFetchScanTasksFailureEvent);
+  }
+
+  @ParameterizedTest
+  @MethodSource("org.apache.gravitino.iceberg.service.rest.IcebergRestTestUtil#testNamespaces")
+  void testScanPlanningEndpointsRejectMissingRequestBody(Namespace namespace) {
+    verifyCreateNamespaceSucc(namespace);
+    verifyCreateTableSucc(namespace, "empty_body_table", true);
+
+    // Jersey hands the resource method a null entity when the body is absent. Both scan planning
+    // endpoints must report that as a 400 rather than letting a downstream NPE become a 500.
+    for (String endpoint : new String[] {"plan", "tasks"}) {
+      Response response =
+          getTableClientBuilder(namespace, Optional.of("empty_body_table/" + endpoint))
+              .post(Entity.entity("", MediaType.APPLICATION_JSON_TYPE));
+      Assertions.assertEquals(
+          Status.BAD_REQUEST.getStatusCode(),
+          response.getStatus(),
+          "Empty body on /" + endpoint + " should be a 400, not a 500");
+    }
+    // No events are asserted here: the request is rejected at the REST boundary before it reaches
+    // the dispatcher chain, so no operation event is dispatched.
   }
 
   @ParameterizedTest
@@ -554,6 +628,11 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
   private Response doPlanTableScan(Namespace ns, String tableName, PlanTableScanRequest request) {
     Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/plan"));
+    return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doFetchScanTasks(Namespace ns, String tableName, FetchScanTasksRequest request) {
+    Invocation.Builder builder = getTableClientBuilder(ns, Optional.of(tableName + "/tasks"));
     return builder.post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
   }
 
