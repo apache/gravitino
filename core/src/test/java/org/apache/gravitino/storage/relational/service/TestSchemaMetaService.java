@@ -38,6 +38,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -131,6 +132,87 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
     Assertions.assertEquals(afterInsert.getCurrentVersion(), afterFailure.getCurrentVersion());
     Assertions.assertEquals(afterInsert.getLastVersion(), afterFailure.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testEntityCreateWaitsForConcurrentSchemaDelete() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_for_entity_lock",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+    SchemaPO observedSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+
+    CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch entityCreateStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int deleted =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                      observedSchemaPO.getSchemaId(),
+                                      observedSchemaPO.getCurrentVersion()));
+                      Assertions.assertEquals(1, deleted);
+                      schemaDeleteLocked.countDown();
+                      try {
+                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+    try {
+      assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
+      NameIdentifier tableIdentifier =
+          NameIdentifier.of(metalakeName, catalogName, schema.name(), "new_table");
+      Future<Throwable> createResult =
+          executor.submit(
+              () -> {
+                entityCreateStarted.countDown();
+                try {
+                  SessionUtils.doMultipleWithCommit(
+                      () ->
+                          SchemaMetaService.getInstance()
+                              .lockSchemaForEntityWrite(
+                                  tableIdentifier,
+                                  observedSchemaPO.getSchemaId(),
+                                  observedSchemaPO.getCatalogId(),
+                                  observedSchemaPO.getMetalakeId()));
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(entityCreateStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> createResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(
+          NoSuchEntityException.class, createResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
   }
 
   @TestTemplate

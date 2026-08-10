@@ -358,7 +358,9 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             }
 
             return store.delete(ident, EntityType.METALAKE, true);
-          } catch (NoSuchMetalakeException e) {
+          } catch (NoSuchMetalakeException | NoSuchEntityException e) {
+            // Another server may have completed the drop after the initial existence check.
+            // Dropping an already-removed metalake remains an idempotent false result.
             return false;
 
           } catch (IOException e) {

@@ -30,6 +30,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -339,15 +340,37 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
             NamespaceUtil.ofSchema(METALAKE_NAME, catalog.name()),
             "concurrent_schema",
             AUDIT_INFO);
-    CountDownLatch ready = new CountDownLatch(2);
-    CountDownLatch start = new CountDownLatch(1);
+    CountDownLatch catalogsLocked = new CountDownLatch(1);
+    CountDownLatch allowSchemaSnapshot = new CountDownLatch(1);
+    CountDownLatch createStarted = new CountDownLatch(1);
     ExecutorService executor = Executors.newFixedThreadPool(2);
+    MetalakeMetaService service = Mockito.spy(MetalakeMetaService.getInstance());
     try {
+      Mockito.doAnswer(
+              invocation -> {
+                catalogsLocked.countDown();
+                assertTrue(allowSchemaSnapshot.await(30, TimeUnit.SECONDS));
+                return invocation.callRealMethod();
+              })
+          .when(service)
+          .listSchemaPOsForCascade(metalake.id());
+
+      Future<Throwable> deleteResult =
+          executor.submit(
+              () -> {
+                try {
+                  service.deleteMetalake(metalake.nameIdentifier(), true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(catalogsLocked.await(30, TimeUnit.SECONDS));
+
       Future<Throwable> createResult =
           executor.submit(
               () -> {
-                ready.countDown();
-                start.await();
+                createStarted.countDown();
                 try {
                   SchemaMetaService.getInstance().insertSchema(schema, false);
                   return null;
@@ -355,28 +378,16 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
                   return throwable;
                 }
               });
-      Future<Throwable> deleteResult =
-          executor.submit(
-              () -> {
-                ready.countDown();
-                start.await();
-                try {
-                  MetalakeMetaService.getInstance().deleteMetalake(metalake.nameIdentifier(), true);
-                  return null;
-                } catch (Throwable throwable) {
-                  return throwable;
-                }
-              });
-      assertTrue(ready.await(30, TimeUnit.SECONDS));
-      start.countDown();
+      assertTrue(createStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> createResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowSchemaSnapshot.countDown();
       Throwable createFailure = createResult.get(30, TimeUnit.SECONDS);
       Throwable deleteFailure = deleteResult.get(30, TimeUnit.SECONDS);
-      Assertions.assertTrue(
-          createFailure == null || createFailure instanceof NoSuchEntityException,
-          () -> "Schema create produced an unexpected failure: " + createFailure);
+      Assertions.assertInstanceOf(NoSuchEntityException.class, createFailure);
       Assertions.assertNull(deleteFailure, () -> "Metalake cascade failed: " + deleteFailure);
     } finally {
-      start.countDown();
+      allowSchemaSnapshot.countDown();
       executor.shutdownNow();
     }
 

@@ -109,6 +109,13 @@ public class ViewMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      viewEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
+          () ->
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
           () ->

@@ -129,6 +129,13 @@ public class TableMetaService {
       TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
       SessionUtils.doMultipleWithCommit(
           () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      tableEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
+          () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> {
@@ -205,6 +212,16 @@ public class TableMetaService {
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
+          () -> {
+            if (isSchemaChanged) {
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      newTableEntity.nameIdentifier(),
+                      newSchemaId,
+                      oldTablePO.getCatalogId(),
+                      oldTablePO.getMetalakeId());
+            }
+          },
           () ->
               updateResult.set(
                   SessionUtils.getWithoutCommit(

@@ -504,6 +504,27 @@ public class SchemaMetaService {
     }
   }
 
+  void lockSchemaForEntityWrite(
+      NameIdentifier entityIdentifier,
+      Long observedSchemaId,
+      Long observedCatalogId,
+      Long observedMetalakeId) {
+    NameIdentifier schemaIdentifier = NameIdentifierUtil.getSchemaIdentifier(entityIdentifier);
+    SchemaPO currentSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper -> mapper.selectSchemaMetaByIdForShare(observedSchemaId));
+    if (currentSchemaPO != null) {
+      currentSchemaPO = physicalToLogicalSchemaPO(currentSchemaPO);
+    }
+    if (currentSchemaPO == null
+        || !Objects.equals(currentSchemaPO.getSchemaName(), schemaIdentifier.name())
+        || !Objects.equals(currentSchemaPO.getCatalogId(), observedCatalogId)
+        || !Objects.equals(currentSchemaPO.getMetalakeId(), observedMetalakeId)) {
+      throw noSuchSchemaException(schemaIdentifier);
+    }
+  }
+
   private RuntimeException schemaWriteFailure(
       NameIdentifier identifier, SchemaPO observedSchemaPO) {
     SchemaPO currentSchemaPO =

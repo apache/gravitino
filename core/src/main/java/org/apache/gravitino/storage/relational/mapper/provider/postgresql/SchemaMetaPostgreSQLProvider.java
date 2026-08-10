@@ -27,6 +27,11 @@ import org.apache.ibatis.annotations.Param;
 
 public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
   @Override
+  public String selectSchemaMetaByIdForShare(Long schemaId) {
+    return selectSchemaMetaById(schemaId) + " FOR SHARE";
+  }
+
+  @Override
   public String insertSchemaMetaOnDuplicateKeyUpdate(SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME

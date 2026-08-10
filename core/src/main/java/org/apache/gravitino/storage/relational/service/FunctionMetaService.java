@@ -116,6 +116,13 @@ public class FunctionMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      functionEntity.nameIdentifier(),
+                      po.schemaId(),
+                      po.catalogId(),
+                      po.metalakeId()),
+          () ->
               SessionUtils.doWithoutCommit(
                   FunctionMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
           () ->

@@ -187,6 +187,11 @@ public class SchemaMetaBaseSQLProvider {
     return selectSchemaMetaById(schemaId) + " FOR UPDATE";
   }
 
+  /** Returns SQL that selects and share-locks an active schema by ID. */
+  public String selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId) {
+    return selectSchemaMetaById(schemaId) + " LOCK IN SHARE MODE";
+  }
+
   public String insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME

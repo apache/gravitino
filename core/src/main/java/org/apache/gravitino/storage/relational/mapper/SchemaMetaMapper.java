@@ -92,6 +92,12 @@ public interface SchemaMetaMapper {
       method = "selectSchemaMetaByIdForUpdate")
   SchemaPO selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId);
 
+  /** Selects and share-locks an active schema by ID for the current transaction. */
+  @SelectProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "selectSchemaMetaByIdForShare")
+  SchemaPO selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId);
+
   @InsertProvider(type = SchemaMetaSQLProviderFactory.class, method = "insertSchemaMeta")
   void insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO);
 

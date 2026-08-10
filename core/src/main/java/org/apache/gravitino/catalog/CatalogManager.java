@@ -975,6 +975,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
+          } catch (NoSuchEntityException ignored) {
+            // Another server may have deleted the catalog after it was loaded but before this
+            // transaction reached the compare-and-set delete. Preserve the idempotent drop
+            // contract and discard the now-stale local cache entry.
+            catalogCache.invalidate(ident);
+            return false;
           } catch (GravitinoRuntimeException e) {
             throw e;
           } catch (Exception e) {
