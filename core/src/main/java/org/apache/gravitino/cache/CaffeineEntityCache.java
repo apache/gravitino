@@ -25,6 +25,7 @@ import com.github.benmanes.caffeine.cache.RemovalCause;
 import com.github.benmanes.caffeine.cache.stats.CacheStats;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
@@ -44,6 +45,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,6 +84,13 @@ public class CaffeineEntityCache extends BaseEntityCache {
           new ThreadPoolExecutor.CallerRunsPolicy());
 
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
+
+  /**
+   * Characters that can separate a cached entity's identifier from a descendant's. See {@link
+   * #invalidateHierarchy(EntityCacheKey)} for why both are needed.
+   */
+  private static final List<String> CHILD_KEY_BOUNDARIES =
+      ImmutableList.of(".", HierarchicalSchemaUtil.physicalSeparator());
 
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
@@ -267,9 +276,21 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /**
    * Removes the entry for the given key and all cached descendant entries. Descendants are found
-   * through the prefix index: every child identifier starts with {@code parent identifier + "."},
-   * so the scan is exact for children and never matches siblings sharing a name prefix (e.g. {@code
-   * catalog1} vs {@code catalog10}).
+   * through the prefix index, scanning once per child boundary:
+   *
+   * <ul>
+   *   <li>{@code "."} separates {@link org.apache.gravitino.NameIdentifier} levels, so it matches
+   *       ordinary children such as the tables of a schema.
+   *   <li>The {@link HierarchicalSchemaUtil#physicalSeparator() physical separator} joins nested
+   *       {@code HierarchicalSchema} levels <em>inside</em> a single name level, so it matches
+   *       nested schemas such as {@code raw:events:2024} under {@code raw:events}. Without this
+   *       pass those descendants would survive until their TTL expires.
+   * </ul>
+   *
+   * <p>Matching on a boundary rather than the bare identifier is what keeps the scan exact: it
+   * never matches siblings sharing a name prefix, neither {@code catalog1} vs {@code catalog10} nor
+   * {@code raw:events} vs {@code raw:events2}. Because the index matches on the whole key string,
+   * the separator pass already collects descendants at any depth, so no recursion is needed.
    *
    * @param key The key of the entity whose subtree should be invalidated
    */
@@ -277,12 +298,14 @@ public class CaffeineEntityCache extends BaseEntityCache {
     cacheData.invalidate(key);
     cacheIndex.remove(key.toString());
 
-    String childPrefix = key.identifier().toString() + ".";
-    List<EntityCacheKey> childKeys =
-        Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(childPrefix));
-    for (EntityCacheKey childKey : childKeys) {
-      cacheData.invalidate(childKey);
-      cacheIndex.remove(childKey.toString());
+    String identifier = key.identifier().toString();
+    for (String boundary : CHILD_KEY_BOUNDARIES) {
+      List<EntityCacheKey> childKeys =
+          Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(identifier + boundary));
+      for (EntityCacheKey childKey : childKeys) {
+        cacheData.invalidate(childKey);
+        cacheIndex.remove(childKey.toString());
+      }
     }
   }
 
