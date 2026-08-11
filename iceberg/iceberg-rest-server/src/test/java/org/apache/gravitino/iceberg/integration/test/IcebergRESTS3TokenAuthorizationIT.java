@@ -26,9 +26,9 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.platform.commons.util.StringUtils;
@@ -55,11 +55,26 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
     this.roleArn = System.getenv().getOrDefault("GRAVITINO_S3_ROLE_ARN", "{ROLE_ARN}");
     this.externalId = System.getenv().getOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
 
+    // The server resolves S3FileIO from its classpath at startup, so the bundle must land first.
+    setupCloudBundles();
+
     super.startIntegrationTest();
 
-    catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+    if (!catalogClientWithAllPrivilege.asSchemas().schemaExists(SCHEMA_NAME)) {
+      catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+    }
+  }
 
-    setupCloudBundles();
+  @AfterAll
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    // super drops the metalake, so it has to run even when setup failed part way through.
+    try {
+      // The Iceberg JDBC backend is shared with sibling ITs; Iceberg has no cascading drop.
+      clearTable();
+      catalogClientWithAllPrivilege.asSchemas().dropSchema(SCHEMA_NAME, false);
+    } finally {
+      super.stopIntegrationTest();
+    }
   }
 
   @Override
@@ -75,22 +90,19 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
   }
 
   @Override
-  protected void downloadCloudBundleJar() throws IOException {
-    String icebergBundleJarUri =
-        String.format(
-            "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-aws-bundle/%s/iceberg-aws-bundle-%s.jar",
-            ITUtils.icebergVersion(), ITUtils.icebergVersion());
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
+  protected void downloadCloudBundleJar() {
+    // gravitino-iceberg-aws-bundle is built locally, so nothing has to be fetched.
   }
 
   @Override
   protected void copyCloudBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("aws", targetDir);
+    // The REST server and the catalog use separate classloaders, so each needs its own copy.
+    BaseIT.copyBundleJarsToDirectory(
+        "iceberg-aws-bundle", ITUtils.joinPath(gravitinoHome, "iceberg-rest-server", "libs"));
+    BaseIT.copyBundleJarsToDirectory(
+        "iceberg-aws-bundle",
+        ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs"));
   }
 
   private Map<String, String> getS3Config() {
