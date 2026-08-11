@@ -19,6 +19,7 @@ package org.apache.gravitino.server.authorization.jcasbin;
 
 import static org.apache.gravitino.authorization.Privilege.Name.USE_CATALOG;
 import static org.apache.gravitino.authorization.Privilege.Name.USE_SCHEMA;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -49,12 +50,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-<<<<<<< HEAD
-=======
-import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
->>>>>>> e85e654d9 ([#12230] fix(auth): stop a lost JCasbin role policy load from denying forever (#12231))
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
@@ -70,11 +67,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UserGroup;
 import org.apache.gravitino.UserPrincipal;
-<<<<<<< HEAD
-=======
-import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
->>>>>>> e85e654d9 ([#12230] fix(auth): stop a lost JCasbin role policy load from denying forever (#12231))
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.SecurableObject;
