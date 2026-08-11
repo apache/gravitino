@@ -20,6 +20,25 @@ To use Iceberg, you need:
   - ORC
   - Parquet (default)
 
+## Iceberg V3 type compatibility
+
+The Gravitino connector currently supports Trino versions 435 through 478. The runtime Trino
+version is passed to the Iceberg type converter so that it can reject a conversion before any
+catalog mutation when the runtime cannot preserve the type.
+
+| Iceberg / Gravitino type                       | Minimum upstream Trino version | Gravitino conversion policy                                                                           |
+|------------------------------------------------|--------------------------------|--------------------------------------------------------------------------------------------------------|
+| `Timestamp(p)` / `Timestamp_tz(p)`, `p <= 6`  | 435                            | Supported and normalized to Iceberg microsecond precision 6.                                          |
+| `Timestamp(9)` / `Timestamp_tz(9)`            | 481                            | Supported by the converter on Trino 481 or newer; rejected on the currently packaged versions.        |
+| `Variant`                                      | 481                            | Rejected even on Trino 481 or newer because Gravitino cannot preserve the complete type semantics.    |
+| `Unknown`                                      | Not supported                  | Rejected because Trino cannot use Iceberg's null-only type as a persisted table column.                |
+| `Geometry`                                     | 482                            | Rejected even on Trino 482 or newer because Gravitino cannot preserve the complete CRS metadata.      |
+| `Geography`                                    | 482                            | Rejected even on Trino 482 or newer because Gravitino cannot preserve the complete edge/CRS metadata. |
+
+Timestamp precisions 7, 8, and 10 through 12 have no lossless Iceberg representation and are
+rejected for every Trino version. The 481 and 482 rows encode the converter policy for future
+connector module ranges; they do not expand the currently packaged Trino range beyond 478.
+
 ## Schema Operations
 
 ### Create a Schema

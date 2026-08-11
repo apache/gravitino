@@ -36,6 +36,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final int MIN_SUPPORTED_TRINO_VERSION = 435;
   private static final String CONNECTOR_ICEBERG = "iceberg";
   private final IcebergPropertyMeta propertyMetadata;
   private final PropertyConverter catalogConverter;
@@ -65,8 +66,14 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
   @Override
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
+    return getMetadataAdapter(MIN_SUPPORTED_TRINO_VERSION);
+  }
+
+  @Override
+  public CatalogConnectorMetadataAdapter getMetadataAdapter(int trinoVersion) {
     // TODO yuhui Need to improve schema table and column properties
-    return new IcebergMetadataAdapter(getSchemaProperties(), getTableProperties(), emptyList());
+    return new IcebergMetadataAdapter(
+        getSchemaProperties(), getTableProperties(), emptyList(), trinoVersion);
   }
 
   @Override

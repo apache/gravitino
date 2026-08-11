@@ -63,12 +63,18 @@ public class IcebergMetadataAdapter extends CatalogConnectorMetadataAdapter {
    * @param schemaProperties the list of schema property metadata
    * @param tableProperties the list of table property metadata
    * @param columnProperties the list of column property metadata
+   * @param trinoVersion the runtime Trino SPI version
    */
   public IcebergMetadataAdapter(
       List<PropertyMetadata<?>> schemaProperties,
       List<PropertyMetadata<?>> tableProperties,
-      List<PropertyMetadata<?>> columnProperties) {
-    super(schemaProperties, tableProperties, columnProperties, new IcebergDataTypeTransformer());
+      List<PropertyMetadata<?>> columnProperties,
+      int trinoVersion) {
+    super(
+        schemaProperties,
+        tableProperties,
+        columnProperties,
+        new IcebergDataTypeTransformer(trinoVersion));
     this.tableConverter = new IcebergTablePropertyConverter();
     this.schemaConverter = new IcebergSchemaPropertyConverter();
   }
