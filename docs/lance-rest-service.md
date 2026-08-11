@@ -60,12 +60,11 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 - Full compliance with Lance REST API specification
 - Can run standalone or integrated with Gravitino server
 - Support for namespace and table management
-- Index creation and management capabilities (Index operations are not supported yet)
 - Metadata stored in Gravitino for unified governance
 
 ## Supported Operations
 
-The Lance REST service provides comprehensive support for namespace management, table management, and index operations. The table below lists all supported operations:
+The Lance REST service provides comprehensive support for namespace management and table management. Index operations are not supported yet. The table below lists all supported operations:
 
 | Operation         | Description                                                               | HTTP Method | Endpoint Pattern                      |
 |-------------------|---------------------------------------------------------------------------|-------------|---------------------------------------|
