@@ -99,7 +99,8 @@ public class HTTPClient implements RESTClient {
   private volatile HandlerStatus handlerStatus = HandlerStatus.Start;
 
   /**
-   * Constructs an instance of HTTPClient with the provided information.
+   * Constructs an instance of HTTPClient with the provided information, with a default null TLS
+   * configurer.
    *
    * @param uri The base URI of the REST API.
    * @param baseHeaders A map of base headers to be included in all HTTP requests.
@@ -115,13 +116,36 @@ public class HTTPClient implements RESTClient {
       AuthDataProvider authDataProvider,
       Runnable beforeConnectHandler,
       Map<String, String> properties) {
+    this(uri, baseHeaders, objectMapper, authDataProvider, beforeConnectHandler, properties, null);
+  }
+
+  /**
+   * Constructs an instance of HTTPClient with the provided information.
+   *
+   * @param uri The base URI of the REST API.
+   * @param baseHeaders A map of base headers to be included in all HTTP requests.
+   * @param objectMapper The ObjectMapper used for JSON serialization and deserialization.
+   * @param authDataProvider The provider of authentication data.
+   * @param beforeConnectHandler The function to be executed before connecting to the server.
+   * @param properties A map of properties (key-value pairs) used to configure the HTTP client.
+   * @param tlsConfigurer The TLSConfigurer used to configure TLS settings for the HTTP client.
+   */
+  private HTTPClient(
+      String uri,
+      Map<String, String> baseHeaders,
+      ObjectMapper objectMapper,
+      AuthDataProvider authDataProvider,
+      Runnable beforeConnectHandler,
+      Map<String, String> properties,
+      TLSConfigurer tlsConfigurer) {
     this.uri = uri;
     this.mapper = objectMapper;
     GravitinoClientConfiguration clientConfiguration =
         GravitinoClientConfiguration.buildFromProperties(properties);
 
     HttpClientBuilder clientBuilder = HttpClients.custom();
-    clientBuilder.setConnectionManager(configureConnectionManager(clientConfiguration));
+    clientBuilder.setConnectionManager(
+        configureConnectionManager(clientConfiguration, tlsConfigurer));
 
     if (baseHeaders != null) {
       clientBuilder.setDefaultHeaders(
@@ -746,7 +770,7 @@ public class HTTPClient implements RESTClient {
   }
 
   private static HttpClientConnectionManager configureConnectionManager(
-      GravitinoClientConfiguration clientConfiguration) {
+      GravitinoClientConfiguration clientConfiguration, TLSConfigurer tlsConfigurer) {
     PoolingHttpClientConnectionManagerBuilder connectionManagerBuilder =
         PoolingHttpClientConnectionManagerBuilder.create();
 
@@ -757,6 +781,34 @@ public class HTTPClient implements RESTClient {
 
     ConnectionConfig connectionConfig = configureConnectionConfig(clientConfiguration);
     connectionManagerBuilder.setDefaultConnectionConfig(connectionConfig);
+
+    // Configure custom TLS settings, if provided
+    if (tlsConfigurer != null) {
+      SSLContext sslContext = requireTlsValue(tlsConfigurer.sslContext(), "SSLContext");
+      HostnameVerifier hostnameVerifier =
+          requireTlsValue(tlsConfigurer.hostnameVerifier(), "HostnameVerifier");
+      String[] protocols =
+          requireTlsValue(tlsConfigurer.supportedProtocols(), "supported protocols");
+      String[] cipherSuites =
+          requireTlsValue(tlsConfigurer.supportedCipherSuites(), "supported cipher suites");
+
+      ClientTlsStrategyBuilder tlsStrategyBuilder =
+          ClientTlsStrategyBuilder.create()
+              .setSslContext(sslContext)
+              .setHostnameVerifier(hostnameVerifier);
+
+      // Set the supported TLS protocols and cipher suites, only if provided
+      if (protocols.length > 0) {
+        tlsStrategyBuilder.setTlsVersions(protocols);
+      }
+
+      if (cipherSuites.length > 0) {
+        tlsStrategyBuilder.setCiphers(cipherSuites);
+      }
+
+      connectionManagerBuilder.setTlsSocketStrategy(tlsStrategyBuilder.buildClassic());
+    }
+
     return connectionManagerBuilder.build();
   }
 
@@ -882,5 +934,12 @@ public class HTTPClient implements RESTClient {
 
   private StringEntity toFormEncoding(Map<?, ?> formData) {
     return new StringEntity(RESTUtils.encodeFormData(formData));
+  }
+
+  private static <T> T requireTlsValue(T value, String name) {
+    if (value == null) {
+      throw new IllegalArgumentException("TLSConfigurer must provide a non-null " + name + ".");
+    }
+    return value;
   }
 }
