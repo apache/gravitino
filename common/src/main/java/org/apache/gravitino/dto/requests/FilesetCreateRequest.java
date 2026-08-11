@@ -68,15 +68,15 @@ public class FilesetCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private Map<String, String> properties;
 
-  @Nullable
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretBindings")
-  private Map<String, SecretBindingDTO> secretBindings;
+  @Builder.Default
+  private Map<String, SecretBindingDTO> secretBindings = Collections.emptyMap();
 
-  @Nullable
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretReferences")
-  private Map<String, SecretReferenceDTO> secretReferences;
+  @Builder.Default
+  private Map<String, SecretReferenceDTO> secretReferences = Collections.emptyMap();
 
   /**
    * Constructor for FilesetCreateRequest without secret maps.

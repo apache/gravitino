@@ -207,9 +207,7 @@ public class SecretManager implements Closeable {
    */
   public List<SecretUrn> getSecretBindingUrns(
       String entityType, long entityId, @Nullable Map<String, SecretBinding> secretBindings) {
-    if (StringUtils.isBlank(entityType)) {
-      throw new IllegalArgumentException("entityType must not be blank");
-    }
+    Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
     if (secretBindings == null || secretBindings.isEmpty()) {
       return List.of();
     }
