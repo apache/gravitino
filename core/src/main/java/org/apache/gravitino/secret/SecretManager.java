@@ -122,7 +122,7 @@ public class SecretManager implements Closeable {
    * targetProperties}.
    *
    * <p>Callers typically validate {@code targetProperties}, then call {@link #writeSecrets} with
-   * the returned secret materials, and {@link #rollbackBindings} on failure. {@code properties} is
+   * the returned secret materials, and {@link #rollbackSecrets} on failure. {@code properties} is
    * used only for key uniqueness checks (e.g. the original request map); {@code targetProperties}
    * is the mutable map that will be stored (may already contain merged catalog conf).
    *
@@ -132,7 +132,7 @@ public class SecretManager implements Closeable {
    * @param entityId stable numeric entity id
    * @param secretBindings property key → write-through binding (may be null)
    * @param secretReferences property key → secret locator (may be null)
-   * @return write-through secret materials for {@link #writeSecrets} / {@link #rollbackBindings}
+   * @return write-through secret materials for {@link #writeSecrets} / {@link #rollbackSecrets}
    *     (empty when there are no bindings)
    */
   public List<SecretMaterial> assembleSecretUrns(
@@ -165,7 +165,7 @@ public class SecretManager implements Closeable {
    *
    * <p>Callers must put the returned URN strings into properties themselves (e.g. via {@link
    * SecretPropertyUtils#putSecretUrns}). External-ref URNs are owned outside Gravitino and must not
-   * be passed to {@link #rollbackBindings}.
+   * be passed to {@link #rollbackSecrets}.
    *
    * @param secretReferences property key → secret locator (empty returns an empty list; must not be
    *     null)
@@ -284,7 +284,7 @@ public class SecretManager implements Closeable {
         written.add(writtenUrn);
       }
     } catch (RuntimeException e) {
-      rollbackUrns(written);
+      deleteSecrets(written);
       throw e;
     }
   }
@@ -297,7 +297,7 @@ public class SecretManager implements Closeable {
    *
    * @param secretMaterials write-through secret materials (must not be null)
    */
-  public void rollbackBindings(List<SecretMaterial> secretMaterials) {
+  public void rollbackSecrets(List<SecretMaterial> secretMaterials) {
     Preconditions.checkArgument(secretMaterials != null, "secretMaterials must not be null");
     if (secretMaterials.isEmpty()) {
       return;
@@ -306,10 +306,10 @@ public class SecretManager implements Closeable {
     for (SecretMaterial material : secretMaterials) {
       urns.add(material.urn());
     }
-    rollbackUrns(urns);
+    deleteSecrets(urns);
   }
 
-  private void rollbackUrns(List<SecretUrn> secretUrns) {
+  private void deleteSecrets(List<SecretUrn> secretUrns) {
     if (secretUrns.isEmpty()) {
       return;
     }
@@ -317,22 +317,21 @@ public class SecretManager implements Closeable {
       try {
         registry.getProvider(urn.providerName()).deleteSecret(urn);
       } catch (Exception e) {
-        LOG.warn("Failed to roll back binding secret {}", urn, e);
+        LOG.warn("Failed to delete secret {}", urn, e);
       }
     }
   }
 
   /**
-   * Best-effort delete of {@code secretBindings} write-through secrets whose URN values appear in
-   * entity properties.
+   * Best-effort delete of write-through secrets whose URN values appear in entity properties.
    *
-   * <p>Used when dropping an entity so create-time binding secrets are not left orphaned (including
-   * CatalogHookDispatcher post-hook rollback via {@code dropCatalog}). External reference URNs from
-   * {@code secretReferences} are left untouched.
+   * <p>Used when dropping an entity so create-time write-through secrets are not left orphaned
+   * (including CatalogHookDispatcher post-hook rollback via {@code dropCatalog}). External
+   * reference URNs from {@code secretReferences} are left untouched.
    *
    * @param properties persisted entity properties (may be null)
    */
-  public void deleteBindingsFromProperties(@Nullable Map<String, String> properties) {
+  public void deleteSecretsFromProperties(@Nullable Map<String, String> properties) {
     if (properties == null || properties.isEmpty()) {
       return;
     }
@@ -351,7 +350,7 @@ public class SecretManager implements Closeable {
         LOG.warn("Skipping invalid secret URN in properties for key {}", entry.getKey(), e);
       }
     }
-    rollbackUrns(writeThrough);
+    deleteSecrets(writeThrough);
   }
 
   /**

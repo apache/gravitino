@@ -126,7 +126,7 @@ public class TestSecretManager {
       sm.writeSecrets(List.of(new SecretMaterial(urns.get(0), "s3cr3t")));
       Map<String, String> props = new HashMap<>();
       SecretPropertyUtils.putSecretUrns(props, urns);
-      sm.deleteBindingsFromProperties(props);
+      sm.deleteSecretsFromProperties(props);
       Assertions.assertThrows(IllegalArgumentException.class, () -> sm.readSecret(urns.get(0)));
     }
   }
