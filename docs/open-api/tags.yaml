@@ -254,10 +254,25 @@ paths:
               examples:
                 NameListResponse:
                   $ref: "#/components/examples/NameListResponse"
+        "400":
+          description: Bad Request - The request body is malformed or violates tag association validation rules
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: Not Found - The specified metalake does not exist
           content:
             application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+            application/vnd.gravitino.v2+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -272,8 +287,21 @@ paths:
               examples:
                 TagAlreadyAssociatedException:
                   $ref: "#/components/examples/TagAlreadyAssociatedException"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TagAlreadyAssociatedException:
+                  $ref: "#/components/examples/TagAlreadyAssociatedException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          description: A server-side problem that might not be addressable from the client side
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
 
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:

@@ -129,6 +129,49 @@ public class TestVersioningFilter {
   }
 
   @Test
+  public void testContentTypeVersionWithoutAccept() throws ServletException, IOException {
+    VersioningFilter filter = new VersioningFilter();
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+
+    when(mockRequest.getHeaders("Accept")).thenReturn(Collections.emptyEnumeration());
+    when(mockRequest.getHeader("Content-Type")).thenReturn("application/vnd.gravitino.v2+json");
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+
+    verify(mockChain).doFilter(any(), any());
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
+
+    ArgumentCaptor<MutableHttpServletRequest> captor =
+        ArgumentCaptor.forClass(MutableHttpServletRequest.class);
+    verify(mockChain).doFilter(captor.capture(), any());
+    assertEquals("application/vnd.gravitino.v2+json", captor.getValue().getHeader("Accept"));
+  }
+
+  @Test
+  public void testContentTypeVersionWithWildcardAccept() throws ServletException, IOException {
+    VersioningFilter filter = new VersioningFilter();
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+
+    when(mockRequest.getHeaders("Accept"))
+        .thenReturn(new Vector<>(Collections.singletonList("*/*")).elements());
+    when(mockRequest.getHeader("Content-Type")).thenReturn("application/vnd.gravitino.v2+json");
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+
+    verify(mockChain).doFilter(any(), any());
+    verify(mockResponse, never()).sendError(anyInt(), anyString());
+
+    ArgumentCaptor<MutableHttpServletRequest> captor =
+        ArgumentCaptor.forClass(MutableHttpServletRequest.class);
+    verify(mockChain).doFilter(captor.capture(), any());
+    assertEquals("application/vnd.gravitino.v2+json", captor.getValue().getHeader("Accept"));
+  }
+
+  @Test
   public void testDoFilterWithMultipleAcceptHeaders() throws ServletException, IOException {
     VersioningFilter filter = new VersioningFilter();
     FilterChain mockChain = mock(FilterChain.class);

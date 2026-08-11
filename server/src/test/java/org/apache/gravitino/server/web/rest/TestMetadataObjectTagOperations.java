@@ -970,14 +970,8 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
   public void testAssociateTagsForObject() {
     String[] tagsToAdd = new String[] {"tag1", "tag2"};
     String[] tagsToRemove = new String[] {"tag3", "tag4"};
-    TagValue[] tagValuesToAdd =
-        Arrays.stream(tagsToAdd).map(TagValue::noValue).toArray(TagValue[]::new);
-    TagValue[] tagValuesToRemove =
-        Arrays.stream(tagsToRemove).map(TagValue::noValue).toArray(TagValue[]::new);
-
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
-    when(tagManager.associateTagValuesForMetadataObject(
-            metalake, catalog, tagValuesToAdd, tagValuesToRemove))
+    when(tagManager.associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
         .thenReturn(tagsToAdd);
 
     TagsAssociateRequest request = new TagsAssociateRequest(tagsToAdd, tagsToRemove);
@@ -999,8 +993,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertArrayEquals(tagsToAdd, nameListResponse.getNames());
 
     // Test throw null tags
-    when(tagManager.associateTagValuesForMetadataObject(
-            metalake, catalog, tagValuesToAdd, tagValuesToRemove))
+    when(tagManager.associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
         .thenReturn(null);
     Response response1 =
         target(basePath(metalake))
@@ -1021,7 +1014,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     // Test throw TagAlreadyAssociatedException
     doThrow(new TagAlreadyAssociatedException("mock error"))
         .when(tagManager)
-        .associateTagValuesForMetadataObject(metalake, catalog, tagValuesToAdd, tagValuesToRemove);
+        .associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove);
     Response response2 =
         target(basePath(metalake))
             .path(catalog.type().toString())
@@ -1040,8 +1033,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
 
     // Test associate tags for view
     MetadataObject view = MetadataObjects.parse("object1.object2.view1", MetadataObject.Type.VIEW);
-    when(tagManager.associateTagValuesForMetadataObject(
-            metalake, view, tagValuesToAdd, tagValuesToRemove))
+    when(tagManager.associateTagsForMetadataObject(metalake, view, tagsToAdd, tagsToRemove))
         .thenReturn(tagsToAdd);
 
     Response response3 =
@@ -1060,8 +1052,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     // Test associate tags for function
     MetadataObject function =
         MetadataObjects.parse("object1.object2.function1", MetadataObject.Type.FUNCTION);
-    when(tagManager.associateTagValuesForMetadataObject(
-            metalake, function, tagValuesToAdd, tagValuesToRemove))
+    when(tagManager.associateTagsForMetadataObject(metalake, function, tagsToAdd, tagsToRemove))
         .thenReturn(tagsToAdd);
 
     Response response4 =
@@ -1080,11 +1071,8 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(tagManager)
-        .associateTagValuesForMetadataObject(
-            any(String.class),
-            any(MetadataObject.class),
-            any(TagValue[].class),
-            any(TagValue[].class));
+        .associateTagsForMetadataObject(
+            any(String.class), any(MetadataObject.class), any(String[].class), any(String[].class));
 
     Response response5 =
         target(basePath(metalake))
@@ -1127,6 +1115,25 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertArrayEquals(
         new String[] {"pii", "data_domain"},
         response.readEntity(NameListResponse.class).getNames());
+  }
+
+  @Test
+  public void testV2ErrorMediaType() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    TagValuesAssociateRequest request = new TagValuesAssociateRequest(null, null);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity(request, "application/vnd.gravitino.v2+json"));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
   }
 
   @Test

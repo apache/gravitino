@@ -53,7 +53,6 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
@@ -64,7 +63,6 @@ import org.apache.gravitino.server.authorization.expression.AuthorizationExpress
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagDispatcher;
-import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
@@ -286,11 +284,11 @@ public class MetadataObjectTagOperations {
       @PathParam("fullName") @AuthorizationFullName String fullName,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
           TagValuesAssociateRequest request) {
-    return associateTagsForObjectInternal(metalake, type, fullName, request);
+    return associateTagValuesForObjectInternal(metalake, type, fullName, request);
   }
 
   private Response associateTagsForObjectInternal(
-      String metalake, String type, String fullName, RESTRequest request) {
+      String metalake, String type, String fullName, TagsAssociateRequest request) {
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,
@@ -301,35 +299,12 @@ public class MetadataObjectTagOperations {
           httpRequest,
           () -> {
             request.validate();
-            TagValue[] tagsToAdd;
-            TagValue[] tagsToRemove;
-            if (request instanceof TagsAssociateRequest) {
-              TagsAssociateRequest tagsAssociateRequest = (TagsAssociateRequest) request;
-              tagsToAdd = toNoValue(tagsAssociateRequest.getTagsToAdd());
-              tagsToRemove = toNoValue(tagsAssociateRequest.getTagsToRemove());
-            } else {
-              TagValuesAssociateRequest tagValuesAssociateRequest =
-                  (TagValuesAssociateRequest) request;
-              tagsToAdd = tagValuesAssociateRequest.tagValuesToAdd();
-              tagsToRemove = tagValuesAssociateRequest.tagValuesToRemove();
-            }
-            MetadataObject object =
-                MetadataObjects.parse(
-                    fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+            MetadataObject object = parseMetadataObject(type, fullName);
             String[] tagNames =
-                tagDispatcher.associateTagValuesForMetadataObject(
-                    metalake, object, tagsToAdd, tagsToRemove);
+                tagDispatcher.associateTagsForMetadataObject(
+                    metalake, object, request.getTagsToAdd(), request.getTagsToRemove());
             tagNames = tagNames == null ? new String[0] : tagNames;
-            LOG.info(
-                "Associated tags: {} for object type: {}, full name: {} under metalake: {}",
-                Arrays.toString(tagNames),
-                type,
-                fullName,
-                metalake);
-            if (request instanceof TagValuesAssociateRequest) {
-              return Response.ok(new NameListResponse(tagNames), TAG_VALUES_MEDIA_TYPE).build();
-            }
-
+            logAssociatedTags(type, fullName, metalake, tagNames);
             return Utils.ok(new NameListResponse(tagNames));
           });
     } catch (Exception e) {
@@ -337,11 +312,50 @@ public class MetadataObjectTagOperations {
     }
   }
 
-  private static TagValue[] toNoValue(String[] tags) {
-    if (tags == null) {
-      return new TagValue[0];
+  private Response associateTagValuesForObjectInternal(
+      String metalake, String type, String fullName, TagValuesAssociateRequest request) {
+    LOG.info(
+        "Received associate tag values request for object type: {}, full name: {} under metalake: {}",
+        type,
+        fullName,
+        metalake);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            MetadataObject object = parseMetadataObject(type, fullName);
+            String[] tagNames =
+                tagDispatcher.associateTagValuesForMetadataObject(
+                    metalake, object, request.tagValuesToAdd(), request.tagValuesToRemove());
+            tagNames = tagNames == null ? new String[0] : tagNames;
+            logAssociatedTags(type, fullName, metalake, tagNames);
+            return Response.ok(new NameListResponse(tagNames), TAG_VALUES_MEDIA_TYPE).build();
+          });
+    } catch (Exception e) {
+      return withMediaType(
+          ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, "", fullName, e),
+          TAG_VALUES_MEDIA_TYPE);
     }
-    return Arrays.stream(tags).map(TagValue::noValue).toArray(TagValue[]::new);
+  }
+
+  private static MetadataObject parseMetadataObject(String type, String fullName) {
+    return MetadataObjects.parse(
+        fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+  }
+
+  private static void logAssociatedTags(
+      String type, String fullName, String metalake, String[] tagNames) {
+    LOG.info(
+        "Associated tags: {} for object type: {}, full name: {} under metalake: {}",
+        Arrays.toString(tagNames),
+        type,
+        fullName,
+        metalake);
+  }
+
+  private static Response withMediaType(Response response, String mediaType) {
+    return Response.fromResponse(response).type(mediaType).build();
   }
 
   private Optional<Tag> getTagForObject(String metalake, MetadataObject object, String tagName) {

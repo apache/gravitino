@@ -745,6 +745,30 @@ public class TestTagManager {
   }
 
   @Test
+  public void testV1RemoveValuedTagByName() {
+    Tag tag =
+        tagManager.createTag(
+            METALAKE, "v1_remove_valued", null, null, TagValueConstraint.ofAllowedValues("dev"));
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE, tableObject, new TagValue[] {TagValue.of(tag.name(), "dev")}, null);
+    Assertions.assertArrayEquals(
+        new MetadataObject[] {tableObject},
+        tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "dev"));
+
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, tableObject, null, new String[] {tag.name()});
+
+    Assertions.assertEquals(
+        0, tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject).length);
+    Assertions.assertEquals(
+        0, tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "dev").length);
+  }
+
+  @Test
   public void testRejectNullTagValueToRemove() {
     MetadataObject tableObject =
         NameIdentifierUtil.toMetadataObject(
