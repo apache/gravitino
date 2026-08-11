@@ -40,8 +40,8 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.secret.SecretBinding;
-import org.apache.gravitino.secret.SecretManaged;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
@@ -155,7 +155,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
     Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-    List<SecretManaged> managedSecrets =
+    List<SecretMaterial> secretMaterials =
         secretManager.assembleSecretUrns(
             properties, entityProperties, "fileset", uid, secretBindings, secretReferences);
     doWithCatalog(
@@ -167,7 +167,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
-    secretManager.writeSecrets(managedSecrets);
+    secretManager.writeSecrets(secretMaterials);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
     // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
@@ -200,7 +200,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   HasPropertyMetadata::filesetPropertiesMetadata,
                   createdFileset.properties()));
     } catch (RuntimeException e) {
-      secretManager.rollbackBindings(managedSecrets);
+      secretManager.rollbackBindings(secretMaterials);
       throw e;
     }
   }

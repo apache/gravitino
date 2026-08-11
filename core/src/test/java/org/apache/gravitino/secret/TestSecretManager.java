@@ -39,7 +39,7 @@ public class TestSecretManager {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
       List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
-      sm.writeSecrets(SecretManaged.from(urns, BINDINGS));
+      sm.writeSecrets(List.of(new SecretMaterial(urns.get(0), "s3cr3t")));
       SecretPropertyUtils.putSecretUrns(props, urns);
 
       String urn = props.get("jdbc-password");
@@ -61,7 +61,7 @@ public class TestSecretManager {
       Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
       List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
       SecretPropertyUtils.putSecretUrns(props, urns);
-      sm.writeSecrets(SecretManaged.from(urns, BINDINGS));
+      sm.writeSecrets(List.of(new SecretMaterial(urns.get(0), "s3cr3t")));
 
       String urn = props.get("jdbc-password");
       Map<String, String> plaintext = sm.toPlaintextProperties(props);
@@ -108,15 +108,14 @@ public class TestSecretManager {
   }
 
   @Test
-  void testSecretManagedFromAndRedacts() {
+  void testSecretMaterialRedacts() {
     try (SecretManager sm = memorySecretManager()) {
       List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
-      List<SecretManaged> writes = SecretManaged.from(urns, BINDINGS);
-      Assertions.assertEquals(1, writes.size());
-      Assertions.assertEquals(urns.get(0), writes.get(0).urn());
-      Assertions.assertEquals("s3cr3t", writes.get(0).plaintext());
-      Assertions.assertFalse(writes.get(0).toString().contains("s3cr3t"));
-      Assertions.assertEquals(urns, SecretManaged.urns(writes));
+      SecretMaterial material = new SecretMaterial(urns.get(0), "s3cr3t");
+      Assertions.assertEquals(urns.get(0), material.urn());
+      Assertions.assertEquals("s3cr3t", material.plaintext());
+      Assertions.assertFalse(material.toString().contains("s3cr3t"));
+      Assertions.assertTrue(material.toString().contains("***"));
     }
   }
 
@@ -124,7 +123,7 @@ public class TestSecretManager {
   void testDeleteBindingsFromProperties() {
     try (SecretManager sm = memorySecretManager()) {
       List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 99L, BINDINGS);
-      sm.writeSecrets(SecretManaged.from(urns, BINDINGS));
+      sm.writeSecrets(List.of(new SecretMaterial(urns.get(0), "s3cr3t")));
       Map<String, String> props = new HashMap<>();
       SecretPropertyUtils.putSecretUrns(props, urns);
       sm.deleteBindingsFromProperties(props);
