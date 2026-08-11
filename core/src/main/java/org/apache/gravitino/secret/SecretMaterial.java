@@ -26,8 +26,9 @@ import org.apache.gravitino.annotation.Evolving;
 /**
  * Write-through secret material: the target {@link SecretUrn} paired with the plaintext to store.
  *
- * <p>Produced by {@code SecretManager#assembleSecretUrns} and consumed by {@code
- * SecretManager#writeSecrets} / {@code SecretManager#rollbackSecrets}.
+ * <p>Internal to the secrets write path in {@code core}. Produced by {@link
+ * SecretManager#assembleSecretUrns} and consumed by {@link SecretManager#writeSecrets} / {@link
+ * SecretManager#rollbackSecrets}.
  */
 @Evolving
 public final class SecretMaterial {
