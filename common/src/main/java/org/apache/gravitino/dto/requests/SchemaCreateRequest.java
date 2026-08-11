@@ -18,17 +18,15 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.dto.secret.SecretBindingDTO;
@@ -39,31 +37,31 @@ import org.apache.gravitino.rest.RESTRequest;
 @Getter
 @EqualsAndHashCode
 @ToString
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 public class SchemaCreateRequest implements RESTRequest {
 
   @JsonProperty("name")
-  private String name;
+  private final String name;
 
   @Nullable
   @JsonProperty("comment")
-  private String comment;
+  private final String comment;
 
   @Nullable
   @JsonProperty("properties")
-  private Map<String, String> properties;
+  private final Map<String, String> properties;
 
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretBindings")
-  @Builder.Default
-  private Map<String, SecretBindingDTO> secretBindings = Collections.emptyMap();
+  private final Map<String, SecretBindingDTO> secretBindings;
 
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretReferences")
-  @Builder.Default
-  private Map<String, SecretReferenceDTO> secretReferences = Collections.emptyMap();
+  private final Map<String, SecretReferenceDTO> secretReferences;
+
+  /** Default constructor for Jackson deserialization. */
+  public SchemaCreateRequest() {
+    this(null, null, null, Collections.emptyMap(), Collections.emptyMap());
+  }
 
   /**
    * Creates a new SchemaCreateRequest without secret maps.
@@ -74,6 +72,31 @@ public class SchemaCreateRequest implements RESTRequest {
    */
   public SchemaCreateRequest(String name, String comment, Map<String, String> properties) {
     this(name, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  /**
+   * Creates a new SchemaCreateRequest.
+   *
+   * @param name The name of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code
+   *     plaintext}) for write-through secrets.
+   * @param secretReferences Optional property key → secret locator DTO ({@code provider} plus
+   *     provider-specific attributes).
+   */
+  @JsonCreator
+  public SchemaCreateRequest(
+      @JsonProperty("name") String name,
+      @JsonProperty("comment") String comment,
+      @JsonProperty("properties") Map<String, String> properties,
+      @JsonProperty("secretBindings") Map<String, SecretBindingDTO> secretBindings,
+      @JsonProperty("secretReferences") Map<String, SecretReferenceDTO> secretReferences) {
+    this.name = name;
+    this.comment = comment;
+    this.properties = properties;
+    this.secretBindings = secretBindings == null ? Collections.emptyMap() : secretBindings;
+    this.secretReferences = secretReferences == null ? Collections.emptyMap() : secretReferences;
   }
 
   /**

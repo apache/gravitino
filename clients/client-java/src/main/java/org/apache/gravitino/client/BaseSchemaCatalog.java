@@ -194,13 +194,12 @@ abstract class BaseSchemaCatalog extends CatalogDTO
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
 
     SchemaCreateRequest req =
-        SchemaCreateRequest.builder()
-            .name(schemaName)
-            .comment(comment)
-            .properties(properties)
-            .secretBindings(SecretBindingDTO.fromSecretBindings(secretBindings))
-            .secretReferences(SecretReferenceDTO.fromSecretReferences(secretReferences))
-            .build();
+        new SchemaCreateRequest(
+            schemaName,
+            comment,
+            properties,
+            SecretBindingDTO.fromSecretBindings(secretBindings),
+            SecretReferenceDTO.fromSecretReferences(secretReferences));
     req.validate();
 
     SchemaResponse resp =
