@@ -239,22 +239,20 @@ public class SecretManager implements Closeable {
    * #assembleSecretUrns}, URN strings are already in properties; otherwise callers must put them
    * themselves (e.g. via {@link SecretPropertyUtils#putSecretUrns}).
    *
-   * <p>Callers must pass non-null maps/lists (use empty collections when there are no secrets).
-   * Null checking belongs at the system entrance before invoking this method.
-   *
-   * @param secretBindings property key → write-through binding (empty is a no-op)
+   * @param secretBindings property key → write-through binding (null or empty is a no-op)
    * @param secretUrns write-through URNs from {@link #assembleSecretUrns} or {@link
    *     #getSecretBindingUrns}
    */
-  public void writeSecrets(Map<String, SecretBinding> secretBindings, List<SecretUrn> secretUrns) {
-    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
-    Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
-    if (secretBindings.isEmpty()) {
+  public void writeSecrets(
+      @Nullable Map<String, SecretBinding> secretBindings, @Nullable List<SecretUrn> secretUrns) {
+    if (secretBindings == null || secretBindings.isEmpty()) {
       Preconditions.checkArgument(
-          secretUrns.isEmpty(), "secretUrns must be empty when bindings are empty");
+          secretUrns == null || secretUrns.isEmpty(),
+          "secretUrns must be empty when bindings are empty");
       return;
     }
-    Preconditions.checkArgument(!secretUrns.isEmpty(), "secretUrns must not be empty");
+    Preconditions.checkArgument(
+        secretUrns != null && !secretUrns.isEmpty(), "secretUrns must not be null or empty");
     validateSecretBindings(secretBindings);
 
     List<SecretUrn> written = new ArrayList<>(secretUrns.size());

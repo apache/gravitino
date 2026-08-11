@@ -152,18 +152,12 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    // System entrance: normalize null secret maps to empty so SecretManager.writeSecrets can
-    // require non-null arguments.
-    Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
-    Map<String, SecretReference> references =
-        secretReferences == null ? Map.of() : secretReferences;
-
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
     Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
     List<SecretUrn> secretUrns =
         secretManager.assembleSecretUrns(
-            properties, entityProperties, "fileset", uid, bindings, references);
+            properties, entityProperties, "fileset", uid, secretBindings, secretReferences);
     doWithCatalog(
         catalogIdent,
         c ->
@@ -173,7 +167,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
-    secretManager.writeSecrets(bindings, secretUrns);
+    secretManager.writeSecrets(secretBindings, secretUrns);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
     // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
