@@ -22,14 +22,14 @@ In simple mode, the username originates from Flink. The resolution order is:
 ## Basic Mode
 
 In Basic mode, the Flink connector authenticates to the Gravitino server using HTTP Basic credentials
-against the built-in IDP. The Gravitino server must have Basic authentication enabled. See
+against the local user store. The Gravitino server must have Basic authentication enabled. See
 [How to authenticate](../security/how-to-authenticate.md#basic-mode) for server-side setup.
 
 | Property                                                      | Type   | Default Value | Description                                    | Required            |
 |---------------------------------------------------------------|--------|---------------|------------------------------------------------|---------------------|
 | table.catalog-store.gravitino.gravitino.client.auth.type      | string | (none)        | Set to `basic` to enable Basic authentication. | Yes, for Basic mode |
-| table.catalog-store.gravitino.gravitino.client.basic.username | string | (none)        | The built-in IDP username.                     | Yes, for Basic mode |
-| table.catalog-store.gravitino.gravitino.client.basic.password | string | (none)        | The built-in IDP password.                     | Yes, for Basic mode |
+| table.catalog-store.gravitino.gravitino.client.basic.username | string | (none)        | Username in the local user store.                     | Yes, for Basic mode |
+| table.catalog-store.gravitino.gravitino.client.basic.password | string | (none)        | Password for that user.                     | Yes, for Basic mode |
 
 ### Basic Configuration Example
 

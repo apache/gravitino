@@ -587,5 +587,4 @@ client.setOwner(schema, "analyst", Owner.Type.USER);
 - [Authorization Pushdown](authorization-pushdown.md), for pushing enforcement down to the underlying
   data source or to an external system such as Apache Ranger
 - [How to Authenticate](how-to-authenticate.md), for establishing who the caller is
-- [How to Use the Built-in IdP](how-to-use-built-in-idp.md)
-- [Security](security.md)
+- [Local users and groups](local-users-and-groups.md)

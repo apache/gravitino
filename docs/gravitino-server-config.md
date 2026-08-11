@@ -16,7 +16,7 @@ authorization on.
 This page covers the server itself. Catalog properties, which configure an individual catalog
 rather than the server, are covered further down. Properties for the auxiliary services live with
 those services: see [Iceberg REST Catalog Service](iceberg-rest-service.md) and
-[Security](security/security.md).
+[Security](security/how-to-authenticate.md).
 
 ## Quick Start
 
@@ -104,7 +104,7 @@ plain HTTP, so clients and the Web UI must move to `httpsPort`, which defaults t
 JWKS endpoint, which is the common case for an external identity provider. Static sign keys,
 Kerberos, and the OIDC login flow for the Web UI each take a different set of properties. See
 [How to Authenticate](security/how-to-authenticate.md), or
-[How to Use the Built-in IdP](security/how-to-use-built-in-idp.md) to keep users and groups in
+[Local users and groups](security/local-users-and-groups.md) to keep users and groups in
 Gravitino's own metadata store instead of an external provider.
 
 **`gravitino.authorization.serviceAdmins` has no default.** It is the one property here that
@@ -354,7 +354,7 @@ Naming an authenticator is one line; configuring it is not. Each value reads its
 `gravitino.authenticator.*` properties, covered in
 [How to Authenticate](security/how-to-authenticate.md). To hold users, password hashes, and group
 membership in Gravitino's own relational store rather than an external provider, see
-[How to Use the Built-in IdP](security/how-to-use-built-in-idp.md).
+[Local users and groups](security/local-users-and-groups.md).
 
 `gravitino.authenticator`, in the singular, is a deprecated spelling that still works.
 
@@ -651,7 +651,7 @@ in `conf/gravitino-env.sh`.
   properties of the auxiliary service named by `gravitino.auxService.names`
 - [How to Authenticate](security/how-to-authenticate.md), for the `gravitino.authenticator.*`
   properties behind each value of `gravitino.authenticators`
-- [How to Use the Built-in IdP](security/how-to-use-built-in-idp.md), for holding users, password
+- [Local users and groups](security/local-users-and-groups.md), for holding users, password
   hashes, and group membership in Gravitino's own relational store
 - [Access Control](security/access-control.md), for the privilege model the authorizer enforces once
   `gravitino.authorization.enable` is set: roles, grants, ownership, and metalake administration
@@ -663,4 +663,4 @@ in `conf/gravitino-env.sh`.
   store, and client certificate properties
 - [CORS](security/how-to-use-cors.md), for letting browser clients served from another origin call
   the API
-- [Security](security/security.md)
+- [Security](security/how-to-authenticate.md)
