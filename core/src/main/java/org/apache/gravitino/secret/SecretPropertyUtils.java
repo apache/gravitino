@@ -21,10 +21,9 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import com.google.common.base.Preconditions;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
@@ -32,7 +31,7 @@ import org.apache.commons.lang3.StringUtils;
  * Helpers for secret-related entity property handling and request validation.
  *
  * <p>This is intentionally separate from {@link SecretManager}, which owns secret lifecycle
- * (build/write/rollback) rather than property assembly and request-shape checks.
+ * (build/write/rollback) and secret-key uniqueness checks rather than property assembly.
  */
 public final class SecretPropertyUtils {
 
@@ -50,39 +49,31 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Rejects property keys that appear in both {@code secretBindings} and {@code secretReferences}.
+   * Returns a mutable copy of a property map for create-time assembly.
    *
-   * @param secretBindings property key → write-through binding (may be null)
-   * @param secretReferences property key → secret locator (may be null)
+   * <p>{@code null} becomes an empty {@link HashMap}; otherwise returns a new {@link HashMap} copy.
+   * Used for request properties and for merged catalog conf (which may be unmodifiable).
+   *
+   * @param properties property map to copy (may be null)
+   * @return a mutable property map, never null
    */
-  public static void checkNoOverlap(
-      @Nullable Map<String, SecretBinding> secretBindings,
-      @Nullable Map<String, SecretReference> secretReferences) {
-    Set<String> bindingKeys = secretBindings == null ? Set.of() : secretBindings.keySet();
-    Set<String> referenceKeys = secretReferences == null ? Set.of() : secretReferences.keySet();
-    Set<String> overlap = new HashSet<>(bindingKeys);
-    overlap.retainAll(referenceKeys);
-    Preconditions.checkArgument(
-        overlap.isEmpty(),
-        "Property keys cannot appear in both secretBindings and secretReferences: %s",
-        overlap);
+  public static Map<String, String> copyEntityProperties(@Nullable Map<String, String> properties) {
+    return properties == null ? new HashMap<>() : new HashMap<>(properties);
   }
 
   /**
-   * Applies each URN string into {@code properties} under the property key encoded in the URN (last
-   * identifier segment).
+   * Puts each URN string into {@code entityProperties} under the property key encoded in the URN
+   * (last identifier segment).
    *
-   * @param properties mutable entity properties
+   * @param entityProperties mutable entity properties
    * @param secretUrns secret URNs whose last identifier segment is the property key
    */
-  public static void applySecretUrns(Map<String, String> properties, List<SecretUrn> secretUrns) {
-    Preconditions.checkArgument(properties != null, "properties must not be null");
+  public static void putSecretUrns(
+      Map<String, String> entityProperties, List<SecretUrn> secretUrns) {
+    Preconditions.checkArgument(entityProperties != null, "entityProperties must not be null");
     Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
     for (SecretUrn urn : secretUrns) {
-      List<String> segments = urn.identifierSegments();
-      Preconditions.checkArgument(
-          !segments.isEmpty(), "Secret URN must contain at least one identifier segment: %s", urn);
-      properties.put(segments.get(segments.size() - 1), urn.toString());
+      entityProperties.put(urn.propertyKey(), urn.toString());
     }
   }
 

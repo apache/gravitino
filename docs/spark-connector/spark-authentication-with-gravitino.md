@@ -23,14 +23,14 @@ In the simple mode, the username originates from Spark, and is obtained using th
 ## Basic Mode
 
 In Basic mode, the Spark connector authenticates to the Gravitino server using HTTP Basic credentials
-against the built-in IDP. The Gravitino server must have Basic authentication enabled. See
+against the local user store. The Gravitino server must have Basic authentication enabled. See
 [How to authenticate](../security/how-to-authenticate.md#basic-mode) for server-side setup.
 
 | Property                           | Type   | Default Value | Description                                    | Required            |
 |------------------------------------|--------|---------------|------------------------------------------------|---------------------|
 | spark.sql.gravitino.authType       | string | `simple`      | Set to `basic` to enable Basic authentication. | Yes, for Basic mode |
-| spark.sql.gravitino.basic.username | string | (none)        | The built-in IDP username.                     | Yes, for Basic mode |
-| spark.sql.gravitino.basic.password | string | (none)        | The built-in IDP password.                     | Yes, for Basic mode |
+| spark.sql.gravitino.basic.username | string | (none)        | Username in the local user store.                     | Yes, for Basic mode |
+| spark.sql.gravitino.basic.password | string | (none)        | Password for that user.                     | Yes, for Basic mode |
 
 ### Basic Configuration Example
 

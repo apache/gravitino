@@ -104,6 +104,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -126,6 +127,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private static final Logger LOG = LoggerFactory.getLogger(FilesetCatalogOperations.class);
 
   private final EntityStore store;
+
+  private final SecretManager secretManager;
 
   private HasPropertyMetadata propertiesMetadata;
 
@@ -168,8 +171,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         }
       };
 
-  FilesetCatalogOperations(EntityStore store) {
+  FilesetCatalogOperations(EntityStore store, SecretManager secretManager) {
     this.store = store;
+    this.secretManager = secretManager;
   }
 
   static class FileSystemCacheKey {
@@ -215,7 +219,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   public FilesetCatalogOperations() {
-    this(GravitinoEnv.getInstance().entityStore());
+    this(GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().secretManager());
   }
 
   @Override
@@ -1510,10 +1514,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       NameIdentifier ident, Map<String, String> entityProperties, Path path) {
     // Merge configurations from catalog, schema, and entity (fileset) levels, and also include
     // user-defined configurations for the specified location.
+    //
+    // Catalog conf is already plaintext (CatalogManager.createBaseCatalog). Schema/fileset entity
+    // properties keep secret URNs in storage; resolve them here so FileSystem ops see plaintext,
+    // matching the catalog "storage=URN / connector=plaintext" split.
     Map<String, String> mergedProperties = new HashMap<>(conf);
     if (ident.namespace().levels().length == 2) {
       // schema level
-      mergedProperties.putAll(entityProperties);
+      mergedProperties.putAll(secretManager.toPlaintextProperties(entityProperties));
       // Add user-defined configs for location if provided
       mergedProperties.putAll(
           FilesetUtil.getUserDefinedFileSystemConfigs(
@@ -1527,8 +1535,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     NameIdentifierUtil.checkFileset(ident);
     NameIdentifier schemaIdent = NameIdentifierUtil.getSchemaIdentifier(ident);
     Schema schema = loadSchema(schemaIdent);
-    mergedProperties.putAll(schema.properties());
-    mergedProperties.putAll(entityProperties);
+    mergedProperties.putAll(secretManager.toPlaintextProperties(schema.properties()));
+    mergedProperties.putAll(secretManager.toPlaintextProperties(entityProperties));
     // Add user-defined configs for location if provided
     mergedProperties.putAll(
         FilesetUtil.getUserDefinedFileSystemConfigs(
