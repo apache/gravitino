@@ -55,13 +55,11 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
     this.roleArn = System.getenv().getOrDefault("GRAVITINO_S3_ROLE_ARN", "{ROLE_ARN}");
     this.externalId = System.getenv().getOrDefault("GRAVITINO_S3_EXTERNAL_ID", "");
 
-    // In deploy mode the server resolves S3FileIO from its own classpath, so the bundle has to be
-    // in place before it starts.
-    setupCloudBundles();
-
     super.startIntegrationTest();
 
     catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+
+    setupCloudBundles();
   }
 
   @Override
