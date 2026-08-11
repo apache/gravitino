@@ -42,8 +42,6 @@ import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * {@code FilesetHookDispatcher} is a decorator for {@link FilesetDispatcher} that not only
@@ -51,7 +49,6 @@ import org.slf4j.LoggerFactory;
  * operations before or after the underlying operations.
  */
 public class FilesetHookDispatcher implements FilesetDispatcher {
-  private static final Logger LOG = LoggerFactory.getLogger(FilesetHookDispatcher.class);
   private final FilesetDispatcher dispatcher;
 
   public FilesetHookDispatcher(FilesetDispatcher dispatcher) {
@@ -88,34 +85,21 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
         dispatcher.createMultipleLocationFileset(
             ident, comment, type, storageLocations, properties, secretBindings, secretReferences);
 
-    try {
-      // Set the creator as the owner of the fileset.
-      OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
-      if (ownerManager != null) {
-        // The inner NormalizeDispatcher case-folds the fileset name (and its schema namespace)
-        // based on catalog capabilities, so the entity is stored under the normalized identifier.
-        // Apply the same normalization here so the owner is attached to the same identifier the
-        // manager sees.
-        NameIdentifier normalizedIdent =
-            CapabilityHelpers.applyCapabilities(
-                ident, Capability.Scope.FILESET, GravitinoEnv.getInstance().catalogManager());
-        ownerManager.setOwner(
-            normalizedIdent.namespace().level(0),
-            NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.FILESET),
-            PrincipalUtils.getCurrentUserName(),
-            Owner.Type.USER);
-      }
-    } catch (Exception postHookException) {
-      LOG.warn(
-          "Failed to execute post hook operations, rolling back fileset " + ident,
-          postHookException);
-      try {
-        dispatcher.dropFileset(ident);
-      } catch (Exception rollbackException) {
-        LOG.warn("Failed to roll back the fileset during the post hook", rollbackException);
-        postHookException.addSuppressed(rollbackException);
-      }
-      throw postHookException;
+    // Set the creator as the owner of the fileset.
+    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    if (ownerManager != null) {
+      // The inner NormalizeDispatcher case-folds the fileset name (and its schema namespace)
+      // based on catalog capabilities, so the entity is stored under the normalized identifier.
+      // Apply the same normalization here so the owner is attached to the same identifier the
+      // manager sees.
+      NameIdentifier normalizedIdent =
+          CapabilityHelpers.applyCapabilities(
+              ident, Capability.Scope.FILESET, GravitinoEnv.getInstance().catalogManager());
+      ownerManager.setOwner(
+          normalizedIdent.namespace().level(0),
+          NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.FILESET),
+          PrincipalUtils.getCurrentUserName(),
+          Owner.Type.USER);
     }
     return fileset;
   }
