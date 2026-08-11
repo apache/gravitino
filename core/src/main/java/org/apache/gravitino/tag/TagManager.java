@@ -345,7 +345,7 @@ public class TagManager implements TagDispatcher {
         metadataObject,
         toNoValue(tagsToAdd),
         toNoValue(tagsToRemove),
-        false /* valueSemantics */);
+        TagAssociationMode.TAG_NAMES);
   }
 
   @Override
@@ -353,7 +353,12 @@ public class TagManager implements TagDispatcher {
       String metalake, MetadataObject metadataObject, TagValue[] tagsToAdd, TagValue[] tagsToRemove)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     return associateTagValuesForMetadataObject(
-        metalake, metadataObject, tagsToAdd, tagsToRemove, true /* valueSemantics */);
+        metalake, metadataObject, tagsToAdd, tagsToRemove, TagAssociationMode.TAG_VALUES);
+  }
+
+  private enum TagAssociationMode {
+    TAG_NAMES,
+    TAG_VALUES
   }
 
   private String[] associateTagValuesForMetadataObject(
@@ -361,7 +366,7 @@ public class TagManager implements TagDispatcher {
       MetadataObject metadataObject,
       TagValue[] tagsToAdd,
       TagValue[] tagsToRemove,
-      boolean valueSemantics)
+      TagAssociationMode mode)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
         SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type()),
@@ -398,7 +403,7 @@ public class TagManager implements TagDispatcher {
                 () -> {
                   try {
                     List<TagEntity> tags;
-                    if (valueSemantics) {
+                    if (mode == TagAssociationMode.TAG_VALUES) {
                       tags =
                           entityStore
                               .relationOperations()
