@@ -59,5 +59,10 @@ class SchemaCreateRequest(RESTRequest):
         self._secret_references = dict(secret_references)
 
     def validate(self):
+        """Validates the request.
+
+        Raises:
+            IllegalArgumentException if the request is invalid.
+        """
         if not self._name:
             raise ValueError('"name" field is required and cannot be empty')

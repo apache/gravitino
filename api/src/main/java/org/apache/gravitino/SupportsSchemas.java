@@ -20,6 +20,7 @@
 
 package org.apache.gravitino;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -95,6 +96,8 @@ public interface SupportsSchemas {
    * need the schema with default values applied, use the {@link #loadSchema(String)} method after
    * creation.
    *
+   * <p>Delegates to {@link #createSchema(String, String, Map, Map, Map)} with empty secret maps.
+   *
    * @param schemaName The name of the schema.
    * @param comment The comment of the schema.
    * @param properties The properties of the schema.
@@ -102,8 +105,11 @@ public interface SupportsSchemas {
    * @throws NoSuchCatalogException If the catalog does not exist.
    * @throws SchemaAlreadyExistsException If the schema already exists.
    */
-  Schema createSchema(String schemaName, String comment, Map<String, String> properties)
-      throws NoSuchCatalogException, SchemaAlreadyExistsException;
+  default Schema createSchema(String schemaName, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(
+        schemaName, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
 
   /**
    * Creates a schema with optional secret maps.

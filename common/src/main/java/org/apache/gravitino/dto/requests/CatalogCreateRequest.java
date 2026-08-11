@@ -110,6 +110,8 @@ public class CatalogCreateRequest implements RESTRequest {
     this.type = type;
     this.comment = comment;
     this.properties = properties;
+    // Match FilesetCreateRequest field defaults when JSON omits secret maps (@JsonCreator passes
+    // null for absent properties).
     this.secretBindings = secretBindings == null ? Collections.emptyMap() : secretBindings;
     this.secretReferences = secretReferences == null ? Collections.emptyMap() : secretReferences;
 

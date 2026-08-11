@@ -16,12 +16,16 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.exceptions.base import NoSuchSchemaException
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class SupportsSchemas(ABC):
@@ -84,8 +88,8 @@ class SupportsSchemas(ABC):
         schema_name: str,
         comment: str,
         properties: Dict[str, str],
-        secret_bindings: Dict[str, SecretBinding] = None,
-        secret_references: Dict[str, SecretReference] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Schema:
         """Create a schema in the catalog.
 

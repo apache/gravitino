@@ -262,6 +262,7 @@ class GravitinoMetalake(
             url, json=catalog_create_request, error_handler=CATALOG_ERROR_HANDLER
         )
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
+        catalog_resp.validate()
 
         return DTOConverters.to_catalog(
             self.name(), catalog_resp.catalog(), self.rest_client

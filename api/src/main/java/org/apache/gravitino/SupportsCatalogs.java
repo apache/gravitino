@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
@@ -86,6 +87,9 @@ public interface SupportsCatalogs {
    * the created catalog is the managed catalog, like model, fileset catalog. For the details of the
    * provider definition, see {@link CatalogProvider}.
    *
+   * <p>Delegates to {@link #createCatalog(String, Catalog.Type, String, String, Map, Map, Map)}
+   * with empty secret maps.
+   *
    * @param catalogName the name of the catalog
    * @param type the type of the catalog
    * @param provider the provider of the catalog, or null if the catalog is a managed catalog
@@ -95,13 +99,22 @@ public interface SupportsCatalogs {
    * @throws NoSuchMetalakeException if the metalake does not exist
    * @throws CatalogAlreadyExistsException if the catalog already exists
    */
-  Catalog createCatalog(
+  default Catalog createCatalog(
       String catalogName,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
-      throws NoSuchMetalakeException, CatalogAlreadyExistsException;
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        catalogName,
+        type,
+        provider,
+        comment,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
 
   /**
    * Create a catalog with optional secret maps.

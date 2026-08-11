@@ -240,36 +240,6 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Create a new catalog with specified identifier, type, comment and properties.
-   *
-   * @param catalogName The identifier of the catalog.
-   * @param type The type of the catalog.
-   * @param provider The provider of the catalog.
-   * @param comment The comment of the catalog.
-   * @param properties The properties of the catalog.
-   * @return The created {@link Catalog}.
-   * @throws NoSuchMetalakeException if the metalake with specified namespace does not exist.
-   * @throws CatalogAlreadyExistsException if the catalog with specified identifier already exists.
-   */
-  @Override
-  public Catalog createCatalog(
-      String catalogName,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties)
-      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    return createCatalog(
-        catalogName,
-        type,
-        provider,
-        comment,
-        properties,
-        Collections.emptyMap(),
-        Collections.emptyMap());
-  }
-
-  /**
    * Create a new catalog with specified identifier, type, comment, properties, and optional secret
    * maps.
    *

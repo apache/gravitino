@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
@@ -35,6 +36,25 @@ import org.apache.gravitino.secret.SecretReference;
  * {@code SupportsSchemas} operations.
  */
 public interface SchemaDispatcher extends SupportsSchemas {
+
+  /**
+   * Create a schema in the catalog.
+   *
+   * <p>Delegates to {@link #createSchema(NameIdentifier, String, Map, Map, Map)} with empty secret
+   * maps.
+   *
+   * @param ident The name identifier of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @return The created schema.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws SchemaAlreadyExistsException If the schema already exists.
+   */
+  @Override
+  default Schema createSchema(NameIdentifier ident, String comment, Map<String, String> properties)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(ident, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
 
   /**
    * Create a schema in the catalog with optional secret maps.

@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -90,6 +91,9 @@ public interface SupportsCatalogs {
    * catalog should be created. The short name should be the same as the {@link CatalogProvider}
    * interface provided.
    *
+   * <p>Delegates to {@link #createCatalog(NameIdentifier, Catalog.Type, String, String, Map, Map,
+   * Map)} with empty secret maps.
+   *
    * @param ident the identifier of the catalog.
    * @param type the type of the catalog.
    * @param comment the comment of the catalog.
@@ -99,13 +103,16 @@ public interface SupportsCatalogs {
    * @throws NoSuchMetalakeException If the metalake does not exist.
    * @throws CatalogAlreadyExistsException If the catalog already exists.
    */
-  Catalog createCatalog(
+  default Catalog createCatalog(
       NameIdentifier ident,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
-      throws NoSuchMetalakeException, CatalogAlreadyExistsException;
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
 
   /**
    * Create a catalog with optional secret maps.
