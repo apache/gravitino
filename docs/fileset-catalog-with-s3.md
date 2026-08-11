@@ -31,7 +31,7 @@ curl -X POST -H "Content-Type: application/json" \
           "location": "s3a://{bucket}/{prefix}",
           "s3-endpoint": "{s3_endpoint}",
           "s3-access-key-id": "{s3_access_key_id}",
-          "s3-secret-access-key": "{s3_secret_access_key}",
+          "s3-secret-access-key": "{s3_secret_access_key}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs
@@ -174,7 +174,7 @@ curl -X POST -H "Content-Type: application/json" \
           "s3-secret-access-key": "{s3_secret_access_key}",
           "credential-providers": "s3-token",
           "s3-region": "{s3_region}",
-          "s3-role-arn": "{s3_role_arn}",
+          "s3-role-arn": "{s3_role_arn}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs

@@ -70,7 +70,7 @@ properties. Steps 2 through 4 are the same over HDFS, S3, GCS, ADLS, OSS, and CO
 
 ## Catalog Properties
 
-These apply in addition to the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration).
+These apply in addition to the [common catalog properties](./gravitino-server-config.md#catalog-properties).
 
 | Property Name                        | Description                                                                                                                            | Default Value |
 |--------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------|---------------|
@@ -82,7 +82,7 @@ These apply in addition to the [common catalog properties](./gravitino-server-co
 | `disable-filesystem-ops`             | Stops the server creating and removing directories when schemas and filesets are created and dropped                                   | `false`       |
 | `fileset-cache-eviction-interval-ms` | Fileset cache eviction interval, where `-1` never evicts                                                                               | `3600000`     |
 | `fileset-cache-max-size`             | Maximum filesets held in the cache, where `-1` is unlimited                                                                            | `200000`      |
-| `fs.path.config.<n>`                 | A logical location entry set to a base URI such as `hdfs://cluster1/`. Keys sharing the prefix are forwarded to that filesystem client | (none)        |
+| `fs.path.config.<name>`              | A logical location entry set to a base URI such as `hdfs://cluster1/`. Keys sharing the prefix are forwarded to that filesystem client | (none)        |
 
 `default-filesystem-provider` and `filesystem-providers` are deprecated and no longer needed. The catalog loads filesystem providers from the classpath, including cloud providers whenever the matching bundle jar is present.
 
@@ -90,14 +90,14 @@ These apply in addition to the [common catalog properties](./gravitino-server-co
 
 HDFS and local filesystems need no bundle jar and no credential properties. Object storage needs a jar in `${GRAVITINO_HOME}/catalogs/fileset/libs/` and a server restart, plus the properties below.
 
-| Storage System          | Bundle Jar                 | URI Scheme           | Credential Providers              |
-|-------------------------|----------------------------|----------------------|-----------------------------------|
-| [Amazon S3](./fileset-catalog-with-s3.md)               | `gravitino-aws-bundle`     | `s3a://`             | `s3-token`, `s3-secret-key`       |
-| [Google Cloud Storage](./fileset-catalog-with-gcs.md)    | `gravitino-gcp-bundle`     | `gs://`              | `gcs-token`                       |
+| Storage System                                            | Bundle Jar                 | URI Scheme           | Credential Providers              |
+|-----------------------------------------------------------|----------------------------|----------------------|-----------------------------------|
+| [Amazon S3](./fileset-catalog-with-s3.md)                 | `gravitino-aws-bundle`     | `s3a://`             | `s3-token`, `s3-secret-key`       |
+| [Google Cloud Storage](./fileset-catalog-with-gcs.md)     | `gravitino-gcp-bundle`     | `gs://`              | `gcs-token`                       |
 | [Azure Data Lake Storage](./fileset-catalog-with-adls.md) | `gravitino-azure-bundle`   | `abfss://`           | `adls-token`, `azure-account-key` |
-| [Alibaba Cloud OSS](./fileset-catalog-with-oss.md)       | `gravitino-aliyun-bundle`  | `oss://`             | `oss-token`, `oss-secret-key`     |
-| [Tencent Cloud COS](./fileset-catalog-with-cos.md)       | `gravitino-tencent-bundle` | `cosn://`            | `cos-secret-key`                  |
-| HDFS and local          | None, built in             | `hdfs://`, `file://` | None                              |
+| [Alibaba Cloud OSS](./fileset-catalog-with-oss.md)        | `gravitino-aliyun-bundle`  | `oss://`             | `oss-token`, `oss-secret-key`     |
+| [Tencent Cloud COS](./fileset-catalog-with-cos.md)        | `gravitino-tencent-bundle` | `cosn://`            | `cos-secret-key`                  |
+| HDFS and local                                            | None, built in             | `hdfs://`, `file://` | None                              |
 
 Bundle jars are published on [Maven Central](https://mvnrepository.com/artifact/org.apache.gravitino) and versioned with the server.
 
@@ -216,7 +216,7 @@ Schemas inherit every catalog property and can override these.
 | `authentication.kerberos.principal`   | Kerberos principal for this schema                    | Catalog value |
 | `authentication.kerberos.keytab-uri`  | Keytab URI for this schema                            | Catalog value |
 
-Creating or dropping a schema creates or removes the matching directories, except when `disable-filesystem-ops` is `true` or the location contains [placeholders](./manage-fileset-metadata-using-gravitino.md#placeholder).
+Creating or dropping a schema creates or removes the matching directories, except when `disable-filesystem-ops` is `true` or the location contains [placeholders](./manage-fileset-metadata-using-gravitino.md#create-a-fileset-from-a-location-template).
 
 ## Fileset Properties
 

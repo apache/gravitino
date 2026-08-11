@@ -32,7 +32,7 @@ curl -X POST -H "Content-Type: application/json" \
           "cos-region": "{cos_region}",
           "cos-access-key-id": "{cos_access_key_id}",
           "cos-secret-access-key": "{cos_secret_access_key}",
-          "cos-endpoint": "{cos_endpoint}",
+          "cos-endpoint": "{cos_endpoint}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs
@@ -177,8 +177,7 @@ curl -X POST -H "Content-Type: application/json" \
           "cos-access-key-id": "{cos_access_key_id}",
           "cos-secret-access-key": "{cos_secret_access_key}",
           "cos-endpoint": "{cos_endpoint}",
-          "credential-providers": "cos-secret-key",
-
+          "credential-providers": "cos-secret-key"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs

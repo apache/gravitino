@@ -30,7 +30,7 @@ curl -X POST -H "Content-Type: application/json" \
         "properties": {
           "location": "abfss://{container}@{account}.dfs.core.windows.net/{prefix}",
           "azure-storage-account-name": "{azure_storage_account_name}",
-          "azure-storage-account-key": "{azure_storage_account_key}",
+          "azure-storage-account-key": "{azure_storage_account_key}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs
@@ -168,7 +168,7 @@ curl -X POST -H "Content-Type: application/json" \
           "credential-providers": "adls-token",
           "azure-tenant-id": "{azure_tenant_id}",
           "azure-client-id": "{azure_client_id}",
-          "azure-client-secret": "{azure_client_secret}",
+          "azure-client-secret": "{azure_client_secret}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs

@@ -31,7 +31,7 @@ curl -X POST -H "Content-Type: application/json" \
           "location": "oss://{bucket}/{prefix}",
           "oss-endpoint": "{oss_endpoint}",
           "oss-access-key-id": "{oss_access_key_id}",
-          "oss-secret-access-key": "{oss_secret_access_key}",
+          "oss-secret-access-key": "{oss_secret_access_key}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs
@@ -172,7 +172,7 @@ curl -X POST -H "Content-Type: application/json" \
           "oss-secret-access-key": "{oss_secret_access_key}",
           "credential-providers": "oss-token",
           "oss-region": "{oss_region}",
-          "oss-role-arn": "{oss_role_arn}",
+          "oss-role-arn": "{oss_role_arn}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs

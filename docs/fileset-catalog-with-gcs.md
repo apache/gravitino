@@ -29,7 +29,7 @@ curl -X POST -H "Content-Type: application/json" \
         "comment": "",
         "properties": {
           "location": "gs://{bucket}/{prefix}",
-          "gcs-service-account-file": "{gcs_service_account_file}",
+          "gcs-service-account-file": "{gcs_service_account_file}"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs
@@ -158,8 +158,7 @@ curl -X POST -H "Content-Type: application/json" \
         "properties": {
           "location": "gs://{bucket}/{prefix}",
           "gcs-service-account-file": "{gcs_service_account_file}",
-          "credential-providers": "gcs-token",
-
+          "credential-providers": "gcs-token"
         }
       }' \
   http://localhost:8090/api/metalakes/{metalake}/catalogs
