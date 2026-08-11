@@ -64,13 +64,13 @@ instead of plaintext for marked keys, expose a clear **REST create/alter contrac
 
 3. **REST + persistence split**: HTTP **`properties`** stays **`map<string, string>`**; optional
    **`secretReferences`** (key → locator object; server **builds** the URN) and/or
-   **`secretBindings`** (key → provider name for write-through) mark secrets on **create**; **alter**
-   adds `@type`s **`setSecretBinding`** / **`setSecretReference`** (§5.9.4) for **catalog, schema, and
-   fileset** (see §5.9). **Persistence** stays an all-string JSON map on each entity's properties
-   column. Secret property values are stored as **URN strings**. A property is treated as a secret
-   when its value matches the **URN recognition rule** (§5.1): starts with `urn:gravitino-secret`
-   and ends with that property's key. Whether to `deleteSecret` on entity drop or alter
-   `removeProperty` is decided from the **URN shape** (write-through embeds
+   **`secretBindings`** (key → `{ provider, plaintext }` for write-through) mark secrets on
+   **create**; **alter** adds `@type`s **`setSecretBinding`** / **`setSecretReference`** (§5.9.4)
+   for **catalog, schema, and fileset** (see §5.9). **Persistence** stays an all-string JSON map on
+   each entity's properties column. Secret property values are stored as **URN strings**. A property
+   is treated as a secret when its value matches the **URN recognition rule** (§5.1): starts with
+   `urn:gravitino-secret` and ends with that property's key. Whether to `deleteSecret` on entity drop
+   or alter `removeProperty` is decided from the **URN shape** (write-through embeds
    `entityType`/`entityId`/`propertyKey` — §5.5.2 C).
 
 4. **Backward compatible reads**: existing all-string entity properties continue to
@@ -152,11 +152,11 @@ Both peers share one idea we keep: **secret material lives outside catalog metad
 
 | Layer                               | Shape                 | Role                                                                                                                   |
 | ----------------------------------- | --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **REST** `properties`               | `map<string, string>` | Unchanged from today — create HTTP values are strings                                                                  |
-| **REST** `secretReferences`         | `map<string, object>` | Optional on **create** — **property key → locator** (external ref; server builds URN — §5.9.2)                         |
-| **REST** alter secret `@type`s      | in `updates`          | **`setSecretBinding`** / **`setSecretReference`** (§5.9.4) — same `{ "updates": [...] }` body; `setProperty` unchanged |
-| **REST** `secretBindings`           | `map<string, string>` | Optional on **create** — **property key → provider name** (write-through; plaintext in `properties`)                   |
-| **Persistence** entity `properties` | JSON **string map**   | `catalog_meta` / `schema_meta` / `fileset_version_info` — secret keys store URN strings (§5.1 recognition rule)        |
+| **REST** `properties`               | `map<string, string>` | Unchanged from today — non-secret create HTTP values are strings                                                           |
+| **REST** `secretReferences`         | `map<string, object>` | Optional on **create** — **property key → locator** (external ref; server builds URN — §5.9.2)                            |
+| **REST** alter secret `@type`s      | in `updates`          | **`setSecretBinding`** / **`setSecretReference`** (§5.9.4) — same `{ "updates": [...] }` body; `setProperty` unchanged    |
+| **REST** `secretBindings`           | `map<string, object>` | Optional on **create** — **property key → `{ provider, plaintext }`** (write-through; plaintext **not** in `properties`) |
+| **Persistence** entity `properties` | JSON **string map**   | `catalog_meta` / `schema_meta` / `fileset_version_info` — secret keys store URN strings (§5.1 recognition rule)           |
 
 **Secret recognition rule** (server-side; no reserved metadata key):
 
@@ -410,8 +410,8 @@ Create request shapes: §5.9.2 / §5.9.5. Below is the provider / URN outcome on
 
 **A. Write-through (in-memory)**
 
-Client create uses `secretBindings` (`jdbc-password` → `memory`) plus plaintext in
-`properties`. Core calls `writeSecret(plaintext, SecretWriteContext("catalog", entityId,
+Client create uses typed `secretBindings` (`jdbc-password` → `{ "provider": "memory",
+"plaintext": "…" }`). Core calls `writeSecret(plaintext, SecretWriteContext("catalog", entityId,
 "jdbc-password"))`, persists e.g.:
 
 ```text
@@ -511,9 +511,9 @@ do not diverge.
 
 | Layer                      | Today                         | v1                                                                                               |
 | -------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------ |
-| REST `properties`          | `map<string, string>`         | **Unchanged** (create)                                                                           |
-| REST `secretReferences`    | —                             | **New optional** on **create** (property key → **locator object**; server builds URN)            |
-| REST `secretBindings`      | —                             | **New optional** on **create** (property key → provider name)                                    |
+| REST `properties`          | `map<string, string>`         | **Unchanged** (create; non-secret keys only when using secret maps)                      |
+| REST `secretReferences`    | —                             | **New optional** on **create** (property key → **locator object**; server builds URN)    |
+| REST `secretBindings`      | —                             | **New optional** on **create** (property key → **`{ provider, plaintext }`**)            |
 | REST alter `updates`       | existing `@type`s             | **Add** `setSecretBinding` / `setSecretReference` (§5.9.4); `setProperty` stays plaintext string |
 | REST list providers        | —                             | **New** `GET /configs/secrets/providers` — static config discovery (§5.9.6)                      |
 | Persistence                | string map per entity         | Same; secret values = **URN strings** (recognized by URN shape; drop delete via URN shape)       |
@@ -557,8 +557,16 @@ rules as catalog list.
 
 #### 5.9.2 Create (request)
 
-**`properties`** and **`secretBindings`** are `map<string, string>`.
-**`secretReferences`** is `map<string, object>` (same for catalog, schema, and fileset create bodies).
+**`properties`** is `map<string, string>`.
+**`secretBindings`** and **`secretReferences`** are `map<string, object>` (same for catalog,
+schema, and fileset create bodies).
+
+**Binding object** (each `secretBindings` value — shared shape with alter `setSecretBinding`):
+
+| Field       | Required | Meaning                                                    |
+| ----------- | -------- | ---------------------------------------------------------- |
+| `provider`  | Yes      | Registered `provider_name`                                 |
+| `plaintext` | Yes      | Plaintext secret to write through (must not be `******`)   |
 
 **Locator object** (each `secretReferences` value — shared by create and by alter
 `setSecretReference`):
@@ -566,7 +574,7 @@ rules as catalog list.
 | Field        | Required | Meaning                                                                                                      |
 | ------------ | -------- | ------------------------------------------------------------------------------------------------------------ |
 | `provider`   | Yes      | Registered `provider_name`                                                                                   |
-| `attributes` | No       | Provider-specific locator keys (`map<string, string>`). Empty / omitted ⇒ empty map. Never a raw URN string. |
+| `attributes` | Yes      | Provider-specific locator keys (`map<string, string>`); must be non-null and non-empty. Never a raw URN string. |
 
 **`attributes`** are provider-specific. The REST schema stays the same for every provider; each
 `GravitinoSecretProvider` documents required keys. **`InMemorySecretsProvider` does not use
@@ -585,16 +593,15 @@ urn:gravitino-secret:<provider>:<type-specific-identifier>
 | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Key **not** in either secret map                                                 | Persist `properties` value as plain **string** (legacy / non-secret).                                                                                            |
 | Key in **`secretReferences`**                                                    | Validate locator; **build URN** (must end with the property key); persist **URN string**; key **must not** be in `properties`; **do not** `readSecret` on write. |
-| Key in **`secretBindings`**                                                      | `properties[key]` required; plaintext (not `******`) → `writeSecret` via named provider; persist **returned URN string**.                                        |
+| Key in **`secretBindings`**                                                      | Validate binding; `plaintext` (not `******`) → `writeSecret` via named provider; persist **returned URN string**; key **must not** be in `properties`.          |
 | Key in **both** `secretReferences` and `secretBindings`                          | **Reject**.                                                                                                                                                      |
-| Key in `secretReferences` **and** also present in `properties`                   | **Reject**.                                                                                                                                                      |
-| Key in `secretBindings`, value in `properties` is `******`                       | **Reject** (no existing value to preserve).                                                                                                                      |
-| Key in `secretBindings` but missing from `properties`                            | **Reject**.                                                                                                                                                      |
+| Key in `secretReferences` **or** `secretBindings` **and** also present in `properties` | **Reject** (no overlap with `properties`).                                                                                                                 |
+| `secretBindings` missing `provider` / `plaintext`, or `plaintext` is `******`    | **Reject**.                                                                                                                                                      |
 | `secretBindings` / locator `provider` not in `gravitino.secret.providers`        | **Reject**.                                                                                                                                                      |
 | Locator `attributes` value is a raw `urn:gravitino-secret:...` string            | **Reject** — use locator attributes, not a client-built URN.                                                                                                     |
 | Client sends a raw `urn:gravitino-secret:...` string as `secretReferences` value | **Reject** in v1 — use the locator object (server builds the URN).                                                                                               |
 
-**Write-through example** (`secretBindings` + plaintext in `properties`):
+**Write-through example** (typed `secretBindings`; plaintext **not** in `properties`):
 
 ```json
 {
@@ -602,13 +609,15 @@ urn:gravitino-secret:<provider>:<type-specific-identifier>
   "type": "relational",
   "provider": "jdbc-mysql",
   "secretBindings": {
-    "jdbc-password": "memory"
+    "jdbc-password": {
+      "provider": "memory",
+      "plaintext": "S3cret!Passw0rd"
+    }
   },
   "properties": {
     "jdbc-url": "jdbc:mysql://staging.example.com:3306/app",
     "jdbc-driver": "com.mysql.cj.jdbc.Driver",
-    "jdbc-user": "app",
-    "jdbc-password": "S3cret!Passw0rd"
+    "jdbc-user": "app"
   }
 }
 ```
@@ -650,12 +659,12 @@ sibling maps). Existing **`setProperty`** stays a **string** `value` (plaintext 
 | `@type`              | Fields (flat; not nested under `value`)                                                  | Behavior                                                                                                                                                  |
 | -------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `setProperty`        | `value` (**string** plaintext)                                                           | Today’s plaintext set. If the **current** value matches the URN recognition rule, in-place `writeSecret` via provider in the current URN; persist new URN |
-| `setSecretBinding`   | `provider` (instance name) + `value` (plaintext string)                                  | Write-through bind/re-bind (`writeSecret`); persist returned URN                                                                                          |
+| `setSecretBinding`   | `provider` (instance name) + `plaintext` (plaintext string)                              | Write-through bind/re-bind (`writeSecret`); persist returned URN                                                                                          |
 | `setSecretReference` | `provider` (instance name) + `attributes` (`map<string,string>`; same locator as §5.9.2) | External ref; server builds URN from locator (must end with the property key). Required `attributes` keys are provider-defined.                           |
 
 | Rule                                                                               | Behavior                                                                                                                                                                                                                                           |
 | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `setSecretBinding` missing `provider` / string `value`, or `value` is `******`     | **Reject**                                                                                                                                                                                                                                         |
+| `setSecretBinding` missing `provider` / string `plaintext`, or `plaintext` is `******` | **Reject**                                                                                                                                                                                                                                         |
 | `setSecretReference` missing `provider`                                            | **Reject**                                                                                                                                                                                                                                         |
 | `setSecretReference` `attributes` value is a raw `urn:gravitino-secret:...` string | **Reject** — use locator attributes, not a client-built URN                                                                                                                                                                                        |
 | `setSecretReference` missing attributes required by the selected provider          | **Reject**                                                                                                                                                                                                                                         |
@@ -691,13 +700,15 @@ Request:
   "provider": "jdbc-mysql",
   "comment": "Staging MySQL catalog",
   "secretBindings": {
-    "jdbc-password": "memory"
+    "jdbc-password": {
+      "provider": "memory",
+      "plaintext": "S3cret!Passw0rd"
+    }
   },
   "properties": {
     "jdbc-url": "jdbc:mysql://staging.example.com:3306/app",
     "jdbc-driver": "com.mysql.cj.jdbc.Driver",
-    "jdbc-user": "app",
-    "jdbc-password": "S3cret!Passw0rd"
+    "jdbc-user": "app"
   }
 }
 ```
@@ -749,7 +760,7 @@ DB `properties` (plaintext):
 
 **TC-3 — Alter: write-through via `setSecretBinding` (200)**
 
-Request (flat `provider` + plaintext `value`):
+Request (flat `provider` + `plaintext`):
 
 ```json
 {
@@ -758,7 +769,7 @@ Request (flat `provider` + plaintext `value`):
       "@type": "setSecretBinding",
       "property": "jdbc-password",
       "provider": "memory",
-      "value": "S3cret!Passw0rd"
+      "plaintext": "S3cret!Passw0rd"
     }
   ]
 }
