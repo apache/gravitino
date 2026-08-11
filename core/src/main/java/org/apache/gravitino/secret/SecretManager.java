@@ -240,10 +240,11 @@ public class SecretManager implements Closeable {
    * using {@link #assembleSecretUrns}, URN strings are already in properties; otherwise callers
    * must put them themselves (e.g. via {@link SecretPropertyUtils#putSecretUrns}).
    *
-   * @param writes pending write-through secrets (null or empty is a no-op)
+   * @param writes pending write-through secrets (empty is a no-op; must not be null)
    */
-  public void writeSecrets(@Nullable List<SecretWrite> writes) {
-    if (writes == null || writes.isEmpty()) {
+  public void writeSecrets(List<SecretWrite> writes) {
+    Preconditions.checkArgument(writes != null, "writes must not be null");
+    if (writes.isEmpty()) {
       return;
     }
 
