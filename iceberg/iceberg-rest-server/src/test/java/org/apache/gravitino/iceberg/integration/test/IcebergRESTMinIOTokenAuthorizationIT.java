@@ -27,7 +27,6 @@ import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.MinIOContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
-import org.apache.gravitino.integration.test.util.DownloaderUtils;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.AfterAll;
@@ -43,6 +42,8 @@ import org.junit.jupiter.api.Tag;
 public class IcebergRESTMinIOTokenAuthorizationIT extends IcebergRESTCloudTokenAuthorizationBaseIT {
 
   private static final String BUCKET_NAME = "gravitino-minio-it";
+
+  private static final String BUNDLE_NAME = "iceberg-aws-bundle";
 
   // MinIO does not resolve the account or resource part, but the SDK requires a well-formed ARN.
   private static final String ROLE_ARN = "arn:minio:iam:::role/test";
@@ -110,21 +111,19 @@ public class IcebergRESTMinIOTokenAuthorizationIT extends IcebergRESTCloudTokenA
   }
 
   @Override
-  protected void downloadCloudBundleJar() throws IOException {
-    String icebergBundleJarUri =
-        String.format(
-            "https://repo1.maven.org/maven2/org/apache/iceberg/"
-                + "iceberg-aws-bundle/%s/iceberg-aws-bundle-%s.jar",
-            ITUtils.icebergVersion(), ITUtils.icebergVersion());
-    String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    DownloaderUtils.downloadFile(icebergBundleJarUri, targetDir);
+  protected void downloadCloudBundleJar() {
+    // gravitino-iceberg-aws-bundle already shades the Iceberg AWS bundle and the Gravitino
+    // credential providers, so it is built locally and nothing has to be fetched.
   }
 
   @Override
   protected void copyCloudBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    String targetDir = String.format("%s/iceberg-rest-server/libs/", gravitinoHome);
-    BaseIT.copyBundleJarsToDirectory("aws", targetDir);
+    // The REST server and the lakehouse-iceberg catalog resolve S3FileIO through separate
+    // classloaders, so each needs its own copy.
+    BaseIT.copyBundleJarsToDirectory(
+        BUNDLE_NAME, ITUtils.joinPath(gravitinoHome, "iceberg-rest-server", "libs"));
+    BaseIT.copyBundleJarsToDirectory(
+        BUNDLE_NAME, ITUtils.joinPath(gravitinoHome, "catalogs", "lakehouse-iceberg", "libs"));
   }
 }
