@@ -47,7 +47,7 @@ public class TestAssociateTagAuthorizationExecutor {
   @Test
   public void testAuthorizesV1TagNames() throws Exception {
     TagsAssociateRequest request =
-        new TagsAssociateRequest(new String[] {"pii", "data_domain"}, null);
+        new TagsAssociateRequest(new String[] {"pii"}, new String[] {"data_domain"});
     assertAuthorizesAllTags("associateV1", TagsAssociateRequest.class, request);
   }
 
@@ -55,7 +55,8 @@ public class TestAssociateTagAuthorizationExecutor {
   public void testAuthorizesV2TagValues() throws Exception {
     TagValuesAssociateRequest request =
         new TagValuesAssociateRequest(
-            new TagValue[] {TagValue.noValue("pii"), TagValue.of("data_domain", "finance")}, null);
+            new TagValue[] {TagValue.noValue("pii")},
+            new TagValue[] {TagValue.of("data_domain", "finance")});
     assertAuthorizesAllTags("associateV2", TagValuesAssociateRequest.class, request);
   }
 

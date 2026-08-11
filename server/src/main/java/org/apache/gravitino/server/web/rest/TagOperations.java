@@ -39,6 +39,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.requests.TagCreateRequest;
@@ -73,6 +74,8 @@ import org.slf4j.LoggerFactory;
 public class TagOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(TagOperations.class);
+
+  private static final int MAX_TAG_VALUE_LENGTH = 256;
 
   private final TagDispatcher tagDispatcher;
 
@@ -281,6 +284,7 @@ public class TagOperations {
         metalake);
 
     try {
+      validateTagAssignmentValueFilter(value);
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -302,6 +306,21 @@ public class TagOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleTagException(OperationType.LIST, "", tagName, e);
+    }
+  }
+
+  private static void validateTagAssignmentValueFilter(String value) {
+    if (value == null) {
+      return;
+    }
+
+    if (StringUtils.isBlank(value)) {
+      throw new IllegalArgumentException("Tag assignment value must not be null or empty");
+    }
+
+    if (value.length() > MAX_TAG_VALUE_LENGTH) {
+      throw new IllegalArgumentException(
+          "Tag assignment value must not exceed " + MAX_TAG_VALUE_LENGTH + " characters");
     }
   }
 

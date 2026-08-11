@@ -1082,6 +1082,39 @@ public class TestTagOperations extends BaseOperationsTest {
       Assertions.assertEquals(objects[i].fullName(), respObjects[i].fullName());
     }
 
+    when(tagManager.listMetadataObjectsForTag(metalake, "tag1", "finance")).thenReturn(objects);
+    Response filteredResponse =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .queryParam("value", "finance")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), filteredResponse.getStatus());
+
+    Response emptyValueResponse =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .queryParam("value", "")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), emptyValueResponse.getStatus());
+
+    Response tooLongValueResponse =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .queryParam("value", "v".repeat(257))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), tooLongValueResponse.getStatus());
+
     // Test throw NoSuchTagException
     doThrow(new NoSuchTagException("mock error"))
         .when(tagManager)
