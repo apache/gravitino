@@ -29,24 +29,25 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 
 /**
- * A pending write-through secret: the target {@link SecretUrn} paired with the plaintext to store.
+ * A Gravitino-managed (write-through) secret: the target {@link SecretUrn} paired with the
+ * plaintext to store.
  *
  * <p>Produced by {@code SecretManager#assembleSecretUrns} and consumed by {@code
- * SecretManager#writeSecrets}.
+ * SecretManager#writeSecrets} / {@code SecretManager#rollbackBindings}.
  */
 @Evolving
-public final class SecretWrite {
+public final class SecretManaged {
 
   private final SecretUrn urn;
   private final String plaintext;
 
   /**
-   * Creates a pending write-through secret.
+   * Creates a managed write-through secret.
    *
    * @param urn write-through URN (provider + entity locator)
    * @param plaintext plaintext secret to write
    */
-  public SecretWrite(SecretUrn urn, String plaintext) {
+  public SecretManaged(SecretUrn urn, String plaintext) {
     Preconditions.checkArgument(urn != null, "urn must not be null");
     Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
     this.urn = urn;
@@ -76,9 +77,9 @@ public final class SecretWrite {
    *
    * @param urns write-through URNs (e.g. from {@code SecretManager#getSecretBindingUrns})
    * @param secretBindings property key → write-through binding
-   * @return pending writes in {@code urns} order
+   * @return managed secrets in {@code urns} order
    */
-  public static List<SecretWrite> from(
+  public static List<SecretManaged> from(
       @Nullable List<SecretUrn> urns, @Nullable Map<String, SecretBinding> secretBindings) {
     if (urns == null || urns.isEmpty()) {
       Preconditions.checkArgument(
@@ -87,30 +88,30 @@ public final class SecretWrite {
       return ImmutableList.of();
     }
     Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
-    List<SecretWrite> writes = new ArrayList<>(urns.size());
+    List<SecretManaged> managed = new ArrayList<>(urns.size());
     for (SecretUrn urn : urns) {
       String propertyKey = urn.propertyKey();
       SecretBinding binding = secretBindings.get(propertyKey);
       Preconditions.checkArgument(
           binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
-      writes.add(new SecretWrite(urn, binding.plaintext()));
+      managed.add(new SecretManaged(urn, binding.plaintext()));
     }
-    return ImmutableList.copyOf(writes);
+    return ImmutableList.copyOf(managed);
   }
 
   /**
-   * Extracts URNs from pending writes (e.g. for rollback).
+   * Extracts URNs from managed secrets (e.g. for rollback).
    *
-   * @param writes pending writes (null or empty returns an empty list)
+   * @param managedSecrets managed secrets (null or empty returns an empty list)
    * @return URNs in the same order
    */
-  public static List<SecretUrn> urns(@Nullable List<SecretWrite> writes) {
-    if (writes == null || writes.isEmpty()) {
+  public static List<SecretUrn> urns(@Nullable List<SecretManaged> managedSecrets) {
+    if (managedSecrets == null || managedSecrets.isEmpty()) {
       return ImmutableList.of();
     }
-    List<SecretUrn> urns = new ArrayList<>(writes.size());
-    for (SecretWrite write : writes) {
-      urns.add(write.urn());
+    List<SecretUrn> urns = new ArrayList<>(managedSecrets.size());
+    for (SecretManaged managed : managedSecrets) {
+      urns.add(managed.urn());
     }
     return ImmutableList.copyOf(urns);
   }
@@ -120,10 +121,10 @@ public final class SecretWrite {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof SecretWrite)) {
+    if (!(o instanceof SecretManaged)) {
       return false;
     }
-    SecretWrite that = (SecretWrite) o;
+    SecretManaged that = (SecretManaged) o;
     return Objects.equals(urn, that.urn) && Objects.equals(plaintext, that.plaintext);
   }
 
@@ -134,6 +135,6 @@ public final class SecretWrite {
 
   @Override
   public String toString() {
-    return "SecretWrite{urn=" + urn + ", plaintext=***}";
+    return "SecretManaged{urn=" + urn + ", plaintext=***}";
   }
 }

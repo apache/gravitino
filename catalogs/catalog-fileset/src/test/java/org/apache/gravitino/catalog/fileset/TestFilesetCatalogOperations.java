@@ -105,10 +105,10 @@ import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.secret.SecretConstants;
+import org.apache.gravitino.secret.SecretManaged;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
-import org.apache.gravitino.secret.SecretWrite;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
@@ -3262,7 +3262,7 @@ public class TestFilesetCatalogOperations {
                 SecretConstants.ATTR_ENTITY_TYPE, "schema",
                 SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
                 SecretConstants.ATTR_PROPERTY_KEY, "aws-sk"));
-    secretManager.writeSecrets(List.of(new SecretWrite(urn, "super-secret")));
+    secretManager.writeSecrets(List.of(new SecretManaged(urn, "super-secret")));
 
     String schemaName = "schema_secret_" + generateTestId();
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;

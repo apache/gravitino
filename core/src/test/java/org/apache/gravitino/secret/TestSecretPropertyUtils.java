@@ -36,7 +36,7 @@ public class TestSecretPropertyUtils {
       Map<String, SecretBinding> bindings =
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
       Map<String, String> entityProps = SecretPropertyUtils.copyEntityProperties(properties);
-      List<SecretWrite> writes =
+      List<SecretManaged> writes =
           sm.assembleSecretUrns(properties, entityProps, "catalog", 42L, bindings, Map.of());
       sm.writeSecrets(writes);
 
@@ -62,7 +62,7 @@ public class TestSecretPropertyUtils {
   void testEmptySecretsNoOp() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>(Map.of("jdbc-user", "root"));
-      List<SecretWrite> writes =
+      List<SecretManaged> writes =
           sm.assembleSecretUrns(entityProps, entityProps, "schema", 1L, Map.of(), Map.of());
       sm.writeSecrets(writes);
       Assertions.assertTrue(writes.isEmpty());
