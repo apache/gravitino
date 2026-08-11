@@ -99,11 +99,13 @@ public class ClickHouseTablePropertiesMetadata extends JdbcTablePropertiesMetada
           "",
           false);
 
+  /** Parameters accepted by the supported parameterized MergeTree engines. */
   public static final PropertyEntry<String> ENGINE_PARAMETERS_PROPERTY_ENTRY =
       stringOptionalPropertyEntry(
           TableConstants.ENGINE_PARAMETERS,
-          "Engine parameters extracted from engine_full (e.g. \"ts\" for ReplacingMergeTree(ts)). "
-              + "Only used for non-Distributed MergeTree-family engines.",
+          "Parameters supplied when creating, and restored when loading, ReplacingMergeTree, "
+              + "SummingMergeTree, CollapsingMergeTree, and VersionedCollapsingMergeTree tables. "
+              + "Use graphite.config for GraphiteMergeTree.",
           false,
           "",
           false);

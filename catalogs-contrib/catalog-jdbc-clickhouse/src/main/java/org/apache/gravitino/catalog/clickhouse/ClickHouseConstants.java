@@ -48,8 +48,8 @@ public class ClickHouseConstants {
     public static final String ENGINE_UPPER = "ENGINE";
     public static final String SETTINGS_PREFIX = "settings.";
     public static final String GRAPHITE_CONFIG = "graphite.config";
-    // Engine parameters extracted from engine_full (e.g. "ts" for ReplacingMergeTree(ts)).
-    // Does not apply to Distributed engines (those use DistributedTableConstants instead).
+
+    /** Parameters for supported parameterized MergeTree engines, without outer parentheses. */
     public static final String ENGINE_PARAMETERS = "engine_parameters";
   }
 

@@ -3020,6 +3020,21 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testEngineParamsAbsentForParameterizedNonMergeTreeEngine() {
+    String name = GravitinoITUtils.genRandomName("engine_params_join");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32, payload String) " + "ENGINE = Join(ANY, LEFT, id)",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(ENGINE.JOIN.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertFalse(
+        loaded.properties().containsKey(TableConstants.ENGINE_PARAMETERS),
+        "Parameterized non-MergeTree engines must not expose engine_parameters");
+  }
+
+  @Test
   void testEngineParamsAbsentForMergeTree() {
     // MergeTree has no engine parameters — verify the property is not present.
     String name = GravitinoITUtils.genRandomName("engine_params_none");
