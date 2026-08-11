@@ -73,10 +73,11 @@ the plugin as a provider; V1 ships Iceberg.
 
 ### Catalog-listing endpoint
 
-#### GET `{iceberg-rest-base}/gravitino/v1/catalogs`
+#### GET `{iceberg-rest-base}/gravitino/v1/management/catalogs`
 
-Placed outside the Iceberg REST specification's `/v1/` namespace (default deployment:
-`http://<host>:9001/iceberg/gravitino/v1/catalogs`) to mark it as a Gravitino-private extension.
+A Gravitino-private extension outside the Iceberg REST specification's `/v1/` namespace (default
+deployment: `http://<host>:9001/iceberg/gravitino/v1/management/catalogs`). `management` is the
+scope for further Gravitino management APIs on this server.
 
 **Request:** No parameters.
 
@@ -151,7 +152,7 @@ public interface CatalogRegistrationPolicy {
    * @param catalogName the accepted catalog name
    * @return the Spark catalog name
    */
-  default String sparkCatalogName(String format, String catalogName) {
+  default String registeredCatalogName(String format, String catalogName) {
     return catalogName;
   }
 }
@@ -193,7 +194,7 @@ target is the Iceberg REST server, the Iceberg runtime is already on its classpa
 | `spark.sql.gravitino.icebergREST.uri` | Yes | None | Base URI of the Iceberg REST server, e.g. `http://127.0.0.1:9001/iceberg/`; setting it activates the Iceberg provider |
 | `spark.sql.gravitino.icebergREST.catalogProperties.<key>` | No | None | Client properties copied into every generated catalog as `spark.sql.catalog.<name>.<key>`, applied as defaults below the generated keys (see precedence above), and passed to the listing client (static auth only, see Authentication) |
 
-For each accepted catalog, with `<sparkName>` from `sparkCatalogName`, it generates:
+For each accepted catalog, with `<sparkName>` from `registeredCatalogName`, it generates:
 
 ```text
 spark.sql.catalog.<sparkName>=org.apache.iceberg.spark.SparkCatalog
@@ -275,7 +276,7 @@ Spark Driver startup (spark.plugins: GravitinoLakehouseRESTDiscoveryPlugin, Grav
   │    └─ for each provider whose <format>REST.uri is set (Iceberg, Lance, …):
   │         ├─ fail fast if the provider is not on the classpath
   │         ├─ list catalogs ──► its Gravitino REST server → backend
-  │         ├─ drop names claimed by user conf → policy.shouldRegister/sparkCatalogName(format,name)
+  │         ├─ drop names claimed by user conf → policy.shouldRegister/registeredCatalogName(format,name)
   │         └─ apply the precedence rules above, then write
   │            spark.sql.catalog.<sparkName>.* and inject the provider's extensions
   │
@@ -332,15 +333,15 @@ spark.sql.catalog.<sparkName>.parent=<advertisedName>
 
 `parent` is set to the catalog name (`<advertisedName>`) and selects the target catalog — the same
 role `warehouse` plays in the Iceberg provider. The four core keys are the implementation key,
-`impl`, `uri`, and `parent`. Two differences from the Iceberg provider:
+`impl`, `uri`, and `parent`. Like the Iceberg provider, it injects the format's session extension
+(`org.lance.spark.extensions.LanceSparkSessionExtensions`) into `spark.sql.extensions` with the same
+deduplication; the extension class ships in the lance-spark bundle the active provider already
+requires, so a lance-spark version that provides it is a prerequisite.
 
-- **No session extension is injected.** Gravitino's documented Lance Spark usage never sets
-  `spark.sql.extensions`, and the extension class is absent from older lance-spark bundles, so
-  injecting it would risk breaking startup.
-- **Storage configuration is static pass-through.** Lance delivers it per table in
-  `DescribeTableResponse.storageOptions`, resolved from the catalog's and table's `lance.storage.*`
-  properties. The plugin generates nothing either way; unlike Iceberg vending, secrets in catalog
-  properties reach the client, with no vending equivalent today.
+One difference from the Iceberg provider: storage configuration is static pass-through. Lance
+delivers it per table in `DescribeTableResponse.storageOptions`, resolved from the catalog's and
+table's `lance.storage.*` properties. The plugin generates nothing either way; unlike Iceberg
+vending, secrets in catalog properties reach the client, with no vending equivalent today.
 
 One gap must close before Lance ships: the root list is authenticated but not
 authorization-filtered, so every authenticated caller sees all catalog names. Filtering it with
