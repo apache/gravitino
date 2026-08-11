@@ -238,8 +238,8 @@ public class SecretManager implements Closeable {
    * Vault).
    *
    * <p>{@code secretMaterials} must come from {@link #assembleSecretMaterials}. On failure,
-   * already-written URNs are rolled back. When using {@link #assembleSecretMaterials}, URN strings are
-   * already in properties; otherwise callers must put them themselves (e.g. via {@link
+   * already-written URNs are rolled back. When using {@link #assembleSecretMaterials}, URN strings
+   * are already in properties; otherwise callers must put them themselves (e.g. via {@link
    * SecretPropertyUtils#putSecretUrns}).
    *
    * @param secretMaterials write-through secret materials (empty is a no-op; must not be null)
