@@ -28,7 +28,7 @@ For Lance tables in a Generic Lakehouse Catalog, the following table summarizes 
 |-----------|-----------------|
 | List      | ✅ Full          |
 | Load      | ✅ Full          |
-| Alter     | Not support now |
+| Alter     | ✅ Partial       |
 | Create    | ✅ Full          |
 | Register  | ✅ Full          |
 | Drop      | ✅ Full          |
@@ -144,6 +144,43 @@ as long as the stored version is unchanged. Once columns are written to the data
 Table operations follow standard relational catalog patterns. See [Table Operations](./manage-relational-metadata-using-gravitino.md#table-operations) for comprehensive documentation.
 
 The following sections provide examples and important details for working with Lance tables. 
+
+#### Add a Column
+
+Lance tables support adding nullable, top-level columns through the Gravitino table API. New
+columns are appended to the schema, and Lance backfills existing rows with `NULL`. Multiple
+`AddColumn` changes in one request are committed as a single Lance schema change.
+
+```shell
+curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" -d '{
+  "updates": [
+    {
+      "@type": "addColumn",
+      "fieldName": ["new_column"],
+      "type": "string",
+      "comment": "New nullable column",
+      "position": "default",
+      "nullable": true,
+      "autoIncrement": false
+    }
+  ]
+}' http://localhost:8090/api/metalakes/test/catalogs/generic_lakehouse_lance_catalog/schemas/schema/tables/lance_table
+```
+
+The following add-column options are not supported:
+
+- Nested columns
+- Non-nullable columns
+- `FIRST` or `AFTER` column positions
+- Default values
+- Auto-increment columns
+- Combining `AddColumn` with another table-change type in the same request
+
+:::note
+This operation is available through the Gravitino table API and Java client. The Lance REST
+`/add_columns` endpoint is not supported yet.
+:::
 
 #### Create a Lance Table
 
