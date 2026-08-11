@@ -101,6 +101,14 @@ public class S3FileSystemProvider implements FileSystemProvider, SupportsCredent
     return result;
   }
 
+  @Override
+  public boolean containsClientCredentials(Map<String, String> config) {
+    return SupportsCredentialVending.allNonBlank(
+        config,
+        S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+        S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY);
+  }
+
   private void checkAndSetCredentialProvider(Map<String, String> configs) {
     String provides = configs.get(S3_CREDENTIAL_KEY);
     if (provides == null) {

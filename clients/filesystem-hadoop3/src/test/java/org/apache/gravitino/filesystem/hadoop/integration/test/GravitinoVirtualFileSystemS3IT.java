@@ -24,21 +24,27 @@ import static org.apache.gravitino.catalog.fileset.FilesetCatalogPropertiesMetad
 import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.s3.fs.S3FileSystemProvider;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.FileSystem;
+import org.apache.hadoop.fs.Path;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
@@ -198,6 +204,86 @@ public class GravitinoVirtualFileSystemS3IT extends GravitinoVirtualFileSystemIT
 
   protected String genStorageLocation(String fileset) {
     return String.format("s3a://%s/%s", bucketName, fileset);
+  }
+
+  /**
+   * Verifies that when the catalog is configured with only static S3 credentials (no explicit
+   * {@code credential-providers}), which the server hides from {@code catalog.properties()}, a GVFS
+   * client that provides no credentials but enables credential vending can still access the
+   * fileset. The server infers an {@code s3-secret-key} provider from the static credentials at the
+   * fileset level and vends them to the client.
+   */
+  @Test
+  public void testS3CredentialVendingWithServerStaticCredentials() throws IOException {
+    String vendingCatalogName = GravitinoITUtils.genRandomName("vending_catalog");
+    String vendingSchemaName = GravitinoITUtils.genRandomName("vending_schema");
+    Map<String, String> catalogProps = Maps.newHashMap();
+    catalogProps.put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, accessKey);
+    catalogProps.put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, secretKey);
+    catalogProps.put(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    catalogProps.put(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, "true");
+    catalogProps.put(FILESYSTEM_PROVIDERS, "s3");
+    // Deliberately NOT setting credential-providers: the fileset-level vending must infer the
+    // s3-secret-key provider from the static credentials above.
+
+    Catalog vendingCatalog =
+        metalake.createCatalog(
+            vendingCatalogName, Catalog.Type.FILESET, "hadoop", "catalog comment", catalogProps);
+    vendingCatalog.asSchemas().createSchema(vendingSchemaName, "schema comment", catalogProps);
+
+    // The static credentials must be hidden from the outward-facing catalog properties.
+    Map<String, String> exposed = metalake.loadCatalog(vendingCatalogName).properties();
+    Assertions.assertFalse(exposed.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertFalse(exposed.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+
+    // Use a dedicated bucket so the underlying S3AFileSystem (cached by scheme://authority) is not
+    // shared with the other tests, which would otherwise mix credential sources.
+    String vendingBucket = "vending-bucket-" + UUID.randomUUID().toString().replace("-", "");
+    gravitinoLocalStackContainer.executeInContainer(
+        "awslocal", "s3", "mb", "s3://" + vendingBucket);
+
+    String filesetName = GravitinoITUtils.genRandomName("vending_fileset");
+    NameIdentifier filesetIdent = NameIdentifier.of(vendingSchemaName, filesetName);
+    String storageLocation = String.format("s3a://%s/%s", vendingBucket, filesetName);
+    vendingCatalog
+        .asFilesetCatalog()
+        .createFileset(
+            filesetIdent,
+            "fileset comment",
+            Fileset.Type.MANAGED,
+            storageLocation,
+            new HashMap<>());
+
+    // Client GVFS conf: enables credential vending but provides NO static credentials. Only
+    // non-sensitive connection info (endpoint, path-style) is set; the credentials come from the
+    // server via vending.
+    Configuration clientConf = new Configuration();
+    clientConf.set(
+        "fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
+    clientConf.set(
+        "fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
+    clientConf.set("fs.gvfs.impl.disable.cache", "true");
+    clientConf.set("fs.gravitino.server.uri", serverUri);
+    clientConf.set("fs.gravitino.client.metalake", metalakeName);
+    clientConf.setBoolean("fs.gravitino.enableCredentialVending", true);
+    clientConf.set(S3Properties.GRAVITINO_S3_ENDPOINT, s3Endpoint);
+    clientConf.set(S3Properties.GRAVITINO_S3_PATH_STYLE_ACCESS, "true");
+
+    Path gvfsPath =
+        new Path(
+            String.format(
+                "gvfs://fileset/%s/%s/%s", vendingCatalogName, vendingSchemaName, filesetName));
+    try (FileSystem gvfs = gvfsPath.getFileSystem(clientConf)) {
+      gvfs.mkdirs(gvfsPath);
+      Path createPath = new Path(gvfsPath + "/test_vending.txt");
+      gvfs.create(createPath).close();
+      Assertions.assertTrue(gvfs.exists(createPath));
+      Assertions.assertTrue(gvfs.getFileStatus(createPath).isFile());
+    } finally {
+      vendingCatalog.asFilesetCatalog().dropFileset(filesetIdent);
+      vendingCatalog.asSchemas().dropSchema(vendingSchemaName, true);
+      metalake.dropCatalog(vendingCatalogName, true);
+    }
   }
 
   @Disabled(

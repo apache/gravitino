@@ -31,6 +31,8 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.container.GravitinoLocalStackContainer;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
@@ -187,6 +189,39 @@ public class FilesetS3CatalogIT extends FilesetCatalogIT {
     metalake.createCatalog(catalogName, Catalog.Type.FILESET, provider, "comment", map);
 
     catalog = metalake.loadCatalog(catalogName);
+  }
+
+  @Test
+  public void testS3StaticCredentialsHiddenFromCatalogProperties() {
+    Catalog loadedCatalog = metalake.loadCatalog(catalogName);
+    Map<String, String> properties = loadedCatalog.properties();
+
+    // Sensitive S3 credentials must not be exposed through the catalog properties API.
+    Assertions.assertFalse(
+        properties.containsKey(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID),
+        "s3-access-key-id must be hidden in catalog properties");
+    Assertions.assertFalse(
+        properties.containsKey(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY),
+        "s3-secret-access-key must be hidden in catalog properties");
+    // Non-sensitive connection info stays visible.
+    Assertions.assertEquals(s3Endpoint, properties.get(S3Properties.GRAVITINO_S3_ENDPOINT));
+  }
+
+  @Test
+  public void testS3CredentialVendingFromCatalog() {
+    // Hiding the static credentials does not break access: the catalog auto-enables credential
+    // vending so clients obtain the credentials through the credential API instead of properties().
+    Catalog loadedCatalog = metalake.loadCatalog(catalogName);
+    Credential[] credentials = loadedCatalog.supportsCredentials().getCredentials();
+
+    Assertions.assertEquals(1, credentials.length);
+    Assertions.assertInstanceOf(S3SecretKeyCredential.class, credentials[0]);
+
+    S3SecretKeyCredential credential = (S3SecretKeyCredential) credentials[0];
+    Assertions.assertEquals(accessKey, credential.accessKeyId());
+    Assertions.assertEquals(secretKey, credential.secretAccessKey());
+    Assertions.assertEquals(
+        S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE, credential.credentialType());
   }
 
   protected String generateLocation(String filesetName) {
