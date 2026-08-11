@@ -418,6 +418,59 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testModelChangeLogEncodesNameLevelsContainingDots() throws IOException {
+    String dottedSchema = "schema.with.dot";
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, dottedSchema, AUDIT_INFO);
+
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofModel(METALAKE_NAME, CATALOG_NAME, dottedSchema),
+            "model1",
+            "model comment",
+            0,
+            Map.of("k1", "v1"),
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+
+    // Readers decode() every full_name, so the writer must encode() it. Asserting on the encoded
+    // form (not toString()) is what pins the round trip: a raw "ml.cat.schema.with.dot.model1"
+    // decodes to a six-level identifier under a schema named "schema", not this model.
+    long maxIdBeforeModelRename = maxEntityChangeId();
+    ModelEntity renamedModel =
+        ModelMetaService.getInstance()
+            .updateModel(
+                model.nameIdentifier(),
+                entity ->
+                    createModelEntity(
+                        model.id(),
+                        model.namespace(),
+                        "model2",
+                        model.comment(),
+                        model.latestVersion(),
+                        model.properties(),
+                        AUDIT_INFO));
+    assertEntityChange(
+        maxIdBeforeModelRename,
+        METALAKE_NAME,
+        Entity.EntityType.MODEL,
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, dottedSchema, "model1")),
+        OperateType.ALTER);
+
+    long maxIdBeforeModelDrop = maxEntityChangeId();
+    Assertions.assertTrue(
+        ModelMetaService.getInstance().deleteModel(renamedModel.nameIdentifier()));
+    assertEntityChange(
+        maxIdBeforeModelDrop,
+        METALAKE_NAME,
+        Entity.EntityType.MODEL,
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, dottedSchema, "model2")),
+        OperateType.DROP);
+  }
+
+  @TestTemplate
   void testTagChangeLogOnAlterAndDrop() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
     long maxIdBeforeCreate = maxEntityChangeId();
