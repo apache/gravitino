@@ -144,10 +144,12 @@ public class SecretManager implements Closeable {
       @Nullable Map<String, SecretBinding> secretBindings,
       @Nullable Map<String, SecretReference> secretReferences) {
     checkSecretKeys(properties, secretBindings, secretReferences);
-    SecretPropertyUtils.putSecretUrns(targetProperties, getSecretReferenceUrns(secretReferences));
+    Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
+    Map<String, SecretReference> references =
+        secretReferences == null ? Map.of() : secretReferences;
+    SecretPropertyUtils.putSecretUrns(targetProperties, getSecretReferenceUrns(references));
     List<SecretWrite> writes =
-        SecretWrite.from(
-            getSecretBindingUrns(entityType, entityId, secretBindings), secretBindings);
+        SecretWrite.from(getSecretBindingUrns(entityType, entityId, bindings), bindings);
     SecretPropertyUtils.putSecretUrns(targetProperties, SecretWrite.urns(writes));
     return writes;
   }
@@ -159,12 +161,13 @@ public class SecretManager implements Closeable {
    * SecretPropertyUtils#putSecretUrns}). External-ref URNs are owned outside Gravitino and must not
    * be passed to {@link #rollbackBindings}.
    *
-   * @param secretReferences property key → secret locator (null or empty returns an empty list)
+   * @param secretReferences property key → secret locator (empty returns an empty list; must not be
+   *     null)
    * @return external-reference URNs (insertion order)
    */
-  public List<SecretUrn> getSecretReferenceUrns(
-      @Nullable Map<String, SecretReference> secretReferences) {
-    if (secretReferences == null || secretReferences.isEmpty()) {
+  public List<SecretUrn> getSecretReferenceUrns(Map<String, SecretReference> secretReferences) {
+    Preconditions.checkArgument(secretReferences != null, "secretReferences must not be null");
+    if (secretReferences.isEmpty()) {
       return List.of();
     }
     validateSecretReferences(secretReferences);
@@ -201,14 +204,15 @@ public class SecretManager implements Closeable {
    *
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
-   * @param secretBindings property key → write-through binding (null or empty returns an empty
-   *     list)
+   * @param secretBindings property key → write-through binding (empty returns an empty list; must
+   *     not be null)
    * @return write-through URNs (insertion order)
    */
   public List<SecretUrn> getSecretBindingUrns(
-      String entityType, long entityId, @Nullable Map<String, SecretBinding> secretBindings) {
+      String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
     Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
-    if (secretBindings == null || secretBindings.isEmpty()) {
+    Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
+    if (secretBindings.isEmpty()) {
       return List.of();
     }
     validateSecretBindings(secretBindings);
@@ -285,10 +289,11 @@ public class SecretManager implements Closeable {
    * <p>Only write-through URNs that were persisted by {@link #writeSecrets} may be passed. Do not
    * roll back external reference URNs from {@link #getSecretReferenceUrns}.
    *
-   * @param secretUrns write-through URNs (e.g. from {@link SecretWrite#urns})
+   * @param secretUrns write-through URNs (e.g. from {@link SecretWrite#urns}; must not be null)
    */
-  public void rollbackBindings(@Nullable List<SecretUrn> secretUrns) {
-    if (secretUrns == null || secretUrns.isEmpty()) {
+  public void rollbackBindings(List<SecretUrn> secretUrns) {
+    Preconditions.checkArgument(secretUrns != null, "secretUrns must not be null");
+    if (secretUrns.isEmpty()) {
       return;
     }
     for (SecretUrn urn : secretUrns) {
