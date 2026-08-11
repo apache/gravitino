@@ -122,10 +122,10 @@ public class SecretManager implements Closeable {
    * targetProperties}.
    *
    * <p>Callers typically validate {@code targetProperties}, then call {@link #writeSecrets} with
-   * the returned write-through URNs, and {@link #rollbackBindings} on failure. {@code properties}
-   * is used only for key uniqueness checks (e.g. the original request map); {@code
-   * targetProperties} is the mutable map that will be stored (may already contain merged catalog
-   * conf).
+   * the returned pending writes, and {@link #rollbackBindings} with {@link SecretWrite#urns} on
+   * failure. {@code properties} is used only for key uniqueness checks (e.g. the original request
+   * map); {@code targetProperties} is the mutable map that will be stored (may already contain
+   * merged catalog conf).
    *
    * @param properties properties used for key uniqueness checks (may be null)
    * @param targetProperties mutable properties that receive URN values
@@ -133,9 +133,10 @@ public class SecretManager implements Closeable {
    * @param entityId stable numeric entity id
    * @param secretBindings property key → write-through binding (may be null)
    * @param secretReferences property key → secret locator (may be null)
-   * @return write-through URNs for {@link #writeSecrets} / {@link #rollbackBindings}
+   * @return pending write-through secrets for {@link #writeSecrets} (empty when there are no
+   *     bindings)
    */
-  public List<SecretUrn> assembleSecretUrns(
+  public List<SecretWrite> assembleSecretUrns(
       @Nullable Map<String, String> properties,
       Map<String, String> targetProperties,
       String entityType,
@@ -144,9 +145,11 @@ public class SecretManager implements Closeable {
       @Nullable Map<String, SecretReference> secretReferences) {
     checkSecretKeys(properties, secretBindings, secretReferences);
     SecretPropertyUtils.putSecretUrns(targetProperties, getSecretReferenceUrns(secretReferences));
-    List<SecretUrn> secretUrns = getSecretBindingUrns(entityType, entityId, secretBindings);
-    SecretPropertyUtils.putSecretUrns(targetProperties, secretUrns);
-    return secretUrns;
+    List<SecretWrite> writes =
+        SecretWrite.from(
+            getSecretBindingUrns(entityType, entityId, secretBindings), secretBindings);
+    SecretPropertyUtils.putSecretUrns(targetProperties, SecretWrite.urns(writes));
+    return writes;
   }
 
   /**
@@ -192,9 +195,9 @@ public class SecretManager implements Closeable {
   /**
    * Builds write-through URNs from {@code secretBindings} without writing secret material.
    *
-   * <p>Callers should pass the returned URNs to {@link #writeSecrets} to persist plaintext from
-   * each binding's value, then put URNs into properties (e.g. via {@link
-   * SecretPropertyUtils#putSecretUrns}).
+   * <p>Callers typically pair these with bindings via {@link SecretWrite#from} and pass the result
+   * to {@link #writeSecrets}, or use {@link #assembleSecretUrns} which does both. URN strings must
+   * be put into properties (e.g. via {@link SecretPropertyUtils#putSecretUrns}).
    *
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
@@ -231,54 +234,40 @@ public class SecretManager implements Closeable {
   }
 
   /**
-   * Writes plaintext secrets from {@code secretBindings} values into the write-through providers
-   * for {@code secretUrns} (e.g. Vault).
+   * Writes plaintext secrets into the write-through providers for each pending {@link SecretWrite}
+   * (e.g. Vault).
    *
-   * <p>{@code secretUrns} must come from {@link #assembleSecretUrns} or {@link
-   * #getSecretBindingUrns}. On failure, already-written URNs are rolled back. When using {@link
-   * #assembleSecretUrns}, URN strings are already in properties; otherwise callers must put them
-   * themselves (e.g. via {@link SecretPropertyUtils#putSecretUrns}).
+   * <p>{@code writes} must come from {@link #assembleSecretUrns} or {@link SecretWrite#from} with
+   * URNs from {@link #getSecretBindingUrns}. On failure, already-written URNs are rolled back. When
+   * using {@link #assembleSecretUrns}, URN strings are already in properties; otherwise callers
+   * must put them themselves (e.g. via {@link SecretPropertyUtils#putSecretUrns}).
    *
-   * @param secretBindings property key → write-through binding (null or empty is a no-op)
-   * @param secretUrns write-through URNs from {@link #assembleSecretUrns} or {@link
-   *     #getSecretBindingUrns}
+   * @param writes pending write-through secrets (null or empty is a no-op)
    */
-  public void writeSecrets(
-      @Nullable Map<String, SecretBinding> secretBindings, @Nullable List<SecretUrn> secretUrns) {
-    if (secretBindings == null || secretBindings.isEmpty()) {
-      Preconditions.checkArgument(
-          secretUrns == null || secretUrns.isEmpty(),
-          "secretUrns must be empty when bindings are empty");
+  public void writeSecrets(@Nullable List<SecretWrite> writes) {
+    if (writes == null || writes.isEmpty()) {
       return;
     }
-    Preconditions.checkArgument(
-        secretUrns != null && !secretUrns.isEmpty(), "secretUrns must not be null or empty");
-    validateSecretBindings(secretBindings);
 
-    List<SecretUrn> written = new ArrayList<>(secretUrns.size());
+    List<SecretUrn> written = new ArrayList<>(writes.size());
     try {
-      for (SecretUrn urn : secretUrns) {
+      for (SecretWrite write : writes) {
+        SecretUrn urn = write.urn();
         List<String> segments = urn.identifierSegments();
-        if (segments.size() != 3) {
-          throw new IllegalArgumentException(
-              "Write-through secret URN must have entityType, entityId, propertyKey segments: "
-                  + urn);
-        }
+        Preconditions.checkArgument(
+            segments.size() == 3,
+            "Write-through secret URN must have entityType, entityId, propertyKey segments: %s",
+            urn);
         String entityType = segments.get(0);
         String entityId = segments.get(1);
         String propertyKey = urn.propertyKey();
-        SecretBinding binding = secretBindings.get(propertyKey);
-        if (binding == null) {
-          throw new IllegalArgumentException(
-              "No secretBindings entry for property key \"" + propertyKey + "\"");
-        }
         Map<String, String> attributes =
             ImmutableMap.of(
                 ATTR_ENTITY_TYPE, entityType,
                 ATTR_ENTITY_ID, entityId,
                 ATTR_PROPERTY_KEY, propertyKey);
         SecretUrn writtenUrn =
-            registry.getProvider(urn.providerName()).writeSecret(binding.plaintext(), attributes);
+            registry.getProvider(urn.providerName()).writeSecret(write.plaintext(), attributes);
         if (!urn.equals(writtenUrn)) {
           throw new IllegalArgumentException(
               "Provider returned unexpected URN: expected " + urn + ", got " + writtenUrn);
@@ -297,7 +286,7 @@ public class SecretManager implements Closeable {
    * <p>Only write-through URNs that were persisted by {@link #writeSecrets} may be passed. Do not
    * roll back external reference URNs from {@link #getSecretReferenceUrns}.
    *
-   * @param secretUrns write-through URNs from {@link #getSecretBindingUrns}
+   * @param secretUrns write-through URNs (e.g. from {@link SecretWrite#urns})
    */
   public void rollbackBindings(@Nullable List<SecretUrn> secretUrns) {
     if (secretUrns == null || secretUrns.isEmpty()) {

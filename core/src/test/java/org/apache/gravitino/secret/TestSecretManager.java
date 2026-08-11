@@ -39,7 +39,7 @@ public class TestSecretManager {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
       List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
-      sm.writeSecrets(BINDINGS, urns);
+      sm.writeSecrets(SecretWrite.from(urns, BINDINGS));
       SecretPropertyUtils.putSecretUrns(props, urns);
 
       String urn = props.get("jdbc-password");
@@ -61,7 +61,7 @@ public class TestSecretManager {
       Map<String, String> props = new HashMap<>(Map.of("jdbc-user", "root"));
       List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
       SecretPropertyUtils.putSecretUrns(props, urns);
-      sm.writeSecrets(BINDINGS, urns);
+      sm.writeSecrets(SecretWrite.from(urns, BINDINGS));
 
       String urn = props.get("jdbc-password");
       Map<String, String> plaintext = sm.toPlaintextProperties(props);
@@ -108,10 +108,23 @@ public class TestSecretManager {
   }
 
   @Test
+  void testSecretWriteFromAndRedacts() {
+    try (SecretManager sm = memorySecretManager()) {
+      List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 42L, BINDINGS);
+      List<SecretWrite> writes = SecretWrite.from(urns, BINDINGS);
+      Assertions.assertEquals(1, writes.size());
+      Assertions.assertEquals(urns.get(0), writes.get(0).urn());
+      Assertions.assertEquals("s3cr3t", writes.get(0).plaintext());
+      Assertions.assertFalse(writes.get(0).toString().contains("s3cr3t"));
+      Assertions.assertEquals(urns, SecretWrite.urns(writes));
+    }
+  }
+
+  @Test
   void testDeleteBindingsFromProperties() {
     try (SecretManager sm = memorySecretManager()) {
       List<SecretUrn> urns = sm.getSecretBindingUrns("catalog", 99L, BINDINGS);
-      sm.writeSecrets(BINDINGS, urns);
+      sm.writeSecrets(SecretWrite.from(urns, BINDINGS));
       Map<String, String> props = new HashMap<>();
       SecretPropertyUtils.putSecretUrns(props, urns);
       sm.deleteBindingsFromProperties(props);
