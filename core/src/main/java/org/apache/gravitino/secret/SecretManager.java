@@ -148,9 +148,16 @@ public class SecretManager implements Closeable {
         secretReferences == null ? Map.of() : secretReferences;
     SecretPropertyUtils.putSecretUrns(targetProperties, getSecretReferenceUrns(references));
     List<SecretUrn> bindingUrns = getSecretBindingUrns(entityType, entityId, bindings);
-    List<SecretMaterial> secretMaterials = toSecretMaterials(bindingUrns, bindings);
-    SecretPropertyUtils.putSecretUrns(targetProperties, toUrns(secretMaterials));
-    return secretMaterials;
+    List<SecretMaterial> secretMaterials = new ArrayList<>(bindingUrns.size());
+    for (SecretUrn urn : bindingUrns) {
+      String propertyKey = urn.propertyKey();
+      SecretBinding binding = bindings.get(propertyKey);
+      Preconditions.checkArgument(
+          binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
+      secretMaterials.add(new SecretMaterial(urn, binding.plaintext()));
+    }
+    SecretPropertyUtils.putSecretUrns(targetProperties, bindingUrns);
+    return List.copyOf(secretMaterials);
   }
 
   /**
@@ -292,36 +299,14 @@ public class SecretManager implements Closeable {
    */
   public void rollbackBindings(List<SecretMaterial> secretMaterials) {
     Preconditions.checkArgument(secretMaterials != null, "secretMaterials must not be null");
-    rollbackUrns(toUrns(secretMaterials));
-  }
-
-  private static List<SecretMaterial> toSecretMaterials(
-      List<SecretUrn> urns, Map<String, SecretBinding> secretBindings) {
-    if (urns.isEmpty()) {
-      Preconditions.checkArgument(
-          secretBindings.isEmpty(), "secretBindings must be empty when urns are empty");
-      return List.of();
-    }
-    List<SecretMaterial> secretMaterials = new ArrayList<>(urns.size());
-    for (SecretUrn urn : urns) {
-      String propertyKey = urn.propertyKey();
-      SecretBinding binding = secretBindings.get(propertyKey);
-      Preconditions.checkArgument(
-          binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
-      secretMaterials.add(new SecretMaterial(urn, binding.plaintext()));
-    }
-    return List.copyOf(secretMaterials);
-  }
-
-  private static List<SecretUrn> toUrns(List<SecretMaterial> secretMaterials) {
     if (secretMaterials.isEmpty()) {
-      return List.of();
+      return;
     }
     List<SecretUrn> urns = new ArrayList<>(secretMaterials.size());
     for (SecretMaterial material : secretMaterials) {
       urns.add(material.urn());
     }
-    return List.copyOf(urns);
+    rollbackUrns(urns);
   }
 
   private void rollbackUrns(List<SecretUrn> secretUrns) {
