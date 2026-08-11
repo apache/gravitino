@@ -109,9 +109,9 @@ import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
-import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -634,8 +634,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         SecretPropertyUtils.copyEntityProperties(buildCatalogConf(provider, properties));
     long uid = idGenerator.nextId();
 
-    List<SecretUrn> secretUrns =
-        secretManager.assembleSecretUrns(
+    List<SecretMaterial> secretMaterials =
+        secretManager.assembleSecretMaterials(
             properties, mergedConfig, "catalog", uid, secretBindings, secretReferences);
 
     StringIdentifier stringId = StringIdentifier.fromId(uid);
@@ -668,7 +668,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           // Only roll back secrets that were actually written inside this locked section.
           boolean needSecretClean = false;
           try {
-            secretManager.writeSecrets(secretBindings, secretUrns);
+            secretManager.writeSecrets(secretMaterials);
             needSecretClean = true;
 
             store.put(e, false /* overwrite */);
@@ -697,7 +697,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } finally {
             if (needSecretClean) {
-              secretManager.rollbackBindings(secretUrns);
+              secretManager.rollbackSecrets(secretMaterials);
             }
             if (needClean) {
               // since we put the catalog entity into the store but failed to create the catalog
@@ -1031,7 +1031,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
-              secretManager.deleteBindingsFromProperties(catalogProperties);
+              secretManager.deleteSecretsFromProperties(catalogProperties);
             }
             catalogCache.invalidate(ident);
             return deleted;

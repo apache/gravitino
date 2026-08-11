@@ -46,9 +46,9 @@ import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
-import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -124,8 +124,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     long uid = idGenerator.nextId();
     Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
-    List<SecretUrn> secretUrns =
-        secretManager.assembleSecretUrns(
+    List<SecretMaterial> secretMaterials =
+        secretManager.assembleSecretMaterials(
             properties, entityProperties, "schema", uid, secretBindings, secretReferences);
     doWithCatalog(
         catalogIdent,
@@ -136,7 +136,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   return null;
                 }),
         IllegalArgumentException.class);
-    secretManager.writeSecrets(secretBindings, secretUrns);
+    secretManager.writeSecrets(secretMaterials);
     // Add StringIdentifier to the properties, the specific catalog will handle this
     // StringIdentifier to make sure only when the operation is successful, the related
     // SchemaEntity will be visible.
@@ -207,7 +207,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                         schema.properties()));
           });
     } catch (RuntimeException e) {
-      secretManager.rollbackBindings(secretUrns);
+      secretManager.rollbackSecrets(secretMaterials);
       throw e;
     }
   }
@@ -364,7 +364,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         () -> {
           // Capture persisted properties (including write-through secret URNs) before drop so we
           // can clean provider material after a successful delete. External-ref URNs are skipped by
-          // deleteBindingsFromProperties.
+          // deleteSecretsFromProperties.
           Map<String, String> schemaProperties = null;
           try {
             Schema schema =
@@ -388,7 +388,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
             if (droppedFromCatalog) {
-              secretManager.deleteBindingsFromProperties(schemaProperties);
+              secretManager.deleteSecretsFromProperties(schemaProperties);
             }
             return droppedFromCatalog;
           }
@@ -419,7 +419,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
           if (droppedFromCatalog) {
-            secretManager.deleteBindingsFromProperties(schemaProperties);
+            secretManager.deleteSecretsFromProperties(schemaProperties);
           }
           return droppedFromCatalog;
         });
