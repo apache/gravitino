@@ -173,7 +173,8 @@ public class TestCatalogOperations extends BaseOperationsTest {
     NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog2");
 
     when(manager.listCatalogs(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
-    when(manager.listCatalogsInfo(any(), any())).thenReturn(new Catalog[] {catalog1, catalog2});
+    when(manager.loadCatalog(ident1)).thenReturn(catalog1);
+    when(manager.loadCatalog(ident2)).thenReturn(catalog2);
 
     Response resp =
         target("/metalakes/metalake1/catalogs")

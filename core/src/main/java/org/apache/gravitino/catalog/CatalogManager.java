@@ -58,7 +58,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import javax.annotation.Nullable;
 import lombok.Getter;
 import org.apache.commons.io.FileUtils;
@@ -538,12 +537,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
-    return listCatalogsInfo(namespace, null);
-  }
-
-  @Override
-  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
-      throws NoSuchMetalakeException {
     NameIdentifier metalakeIdent = NameIdentifier.of(namespace.levels());
     try {
       List<CatalogEntity> catalogEntities =
@@ -554,19 +547,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                 checkMetalake(metalakeIdent, store);
                 return store.list(namespace, CatalogEntity.class, EntityType.CATALOG);
               });
-      Stream<CatalogEntity> stream =
-          catalogEntities.stream()
-              // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
-              // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
-              // after reading the catalog entity, we convert it to the new fileset catalog entity.
-              .map(this::convertFilesetCatalogEntity);
-      if (catalogNames != null) {
-        if (catalogNames.isEmpty()) {
-          return new Catalog[0];
-        }
-        stream = stream.filter(entity -> catalogNames.contains(entity.name()));
-      }
-      return stream
+      return catalogEntities.stream()
+          // The old fileset catalog's provider is "hadoop", whereas the new fileset catalog's
+          // provider is "fileset", still using "hadoop" will lead to catalog loading issue. So
+          // after reading the catalog entity, we convert it to the new fileset catalog entity.
+          .map(this::convertFilesetCatalogEntity)
           .map(e -> e.toCatalogInfoWithResolvedProps(getResolvedProperties(e)))
           .toArray(Catalog[]::new);
     } catch (IOException ioe) {

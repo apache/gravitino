@@ -18,10 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
-import java.util.Arrays;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.CatalogProvider;
@@ -61,29 +58,6 @@ public interface SupportsCatalogs {
    * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
    */
   Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException;
-
-  /**
-   * List catalogs with their information, restricted to the given catalog names.
-   *
-   * <p>Implementations should resolve catalog details (including secret materialization) only for
-   * the catalogs in {@code catalogNames}, so callers can authorize first and avoid resolving
-   * unauthorized catalogs.
-   *
-   * @param namespace The namespace to list the catalogs under it.
-   * @param catalogNames The catalog names to include; must not be null.
-   * @return The list of catalog's information for the requested names that exist.
-   * @throws NoSuchMetalakeException If the metalake with namespace does not exist.
-   */
-  default Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
-      throws NoSuchMetalakeException {
-    Objects.requireNonNull(catalogNames, "catalogNames cannot be null");
-    if (catalogNames.isEmpty()) {
-      return new Catalog[0];
-    }
-    return Arrays.stream(listCatalogsInfo(namespace))
-        .filter(catalog -> catalogNames.contains(catalog.name()))
-        .toArray(Catalog[]::new);
-  }
 
   /**
    * Load a catalog by its identifier.

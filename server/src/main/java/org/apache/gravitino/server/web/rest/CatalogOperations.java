@@ -21,8 +21,6 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import java.util.Arrays;
-import java.util.Set;
-import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -106,7 +104,7 @@ public class CatalogOperations {
             // Lock the root and the metalake with WRITE lock to ensure the consistency of the list.
             if (verbose) {
               // Authorize on identifiers first, then resolve catalog details (including secrets)
-              // only for authorized catalogs.
+              // only for authorized catalogs via loadCatalog.
               NameIdentifier[] idents = catalogDispatcher.listCatalogs(catalogNS);
               idents =
                   MetadataAuthzHelper.filterByExpression(
@@ -114,10 +112,8 @@ public class CatalogOperations {
                       AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
                       Entity.EntityType.CATALOG,
                       idents);
-              Set<String> authorizedCatalogNames =
-                  Arrays.stream(idents).map(NameIdentifier::name).collect(Collectors.toSet());
               Catalog[] catalogs =
-                  catalogDispatcher.listCatalogsInfo(catalogNS, authorizedCatalogNames);
+                  Arrays.stream(idents).map(catalogDispatcher::loadCatalog).toArray(Catalog[]::new);
               Response response = Utils.ok(new CatalogListResponse(DTOConverters.toDTOs(catalogs)));
               LOG.info("List {} catalogs info under metalake: {}", catalogs.length, metalake);
               return response;

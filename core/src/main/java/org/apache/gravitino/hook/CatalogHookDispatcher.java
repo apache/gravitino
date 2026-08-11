@@ -21,7 +21,6 @@ package org.apache.gravitino.hook;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Entity;
@@ -68,12 +67,6 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   @Override
   public Catalog[] listCatalogsInfo(Namespace namespace) throws NoSuchMetalakeException {
     return dispatcher.listCatalogsInfo(namespace);
-  }
-
-  @Override
-  public Catalog[] listCatalogsInfo(Namespace namespace, Set<String> catalogNames)
-      throws NoSuchMetalakeException {
-    return dispatcher.listCatalogsInfo(namespace, catalogNames);
   }
 
   @Override
