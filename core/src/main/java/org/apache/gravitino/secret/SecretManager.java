@@ -135,7 +135,7 @@ public class SecretManager implements Closeable {
    * @return write-through secret materials for {@link #writeSecrets} / {@link #rollbackSecrets}
    *     (empty when there are no bindings)
    */
-  public List<SecretMaterial> assembleSecretUrns(
+  public List<SecretMaterial> assembleSecretMaterials(
       @Nullable Map<String, String> properties,
       Map<String, String> targetProperties,
       String entityType,
@@ -146,18 +146,10 @@ public class SecretManager implements Closeable {
     Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
     Map<String, SecretReference> references =
         secretReferences == null ? Map.of() : secretReferences;
-    SecretPropertyUtils.putSecretUrns(targetProperties, getSecretReferenceUrns(references));
-    List<SecretUrn> bindingUrns = getSecretBindingUrns(entityType, entityId, bindings);
-    List<SecretMaterial> secretMaterials = new ArrayList<>(bindingUrns.size());
-    for (SecretUrn urn : bindingUrns) {
-      String propertyKey = urn.propertyKey();
-      SecretBinding binding = bindings.get(propertyKey);
-      Preconditions.checkArgument(
-          binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
-      secretMaterials.add(new SecretMaterial(urn, binding.plaintext()));
-    }
+    SecretPropertyUtils.putSecretUrns(targetProperties, buildSecretReferenceUrns(references));
+    List<SecretUrn> bindingUrns = buildSecretBindingUrns(entityType, entityId, bindings);
     SecretPropertyUtils.putSecretUrns(targetProperties, bindingUrns);
-    return List.copyOf(secretMaterials);
+    return toSecretMaterials(bindingUrns, bindings);
   }
 
   /**
@@ -171,7 +163,7 @@ public class SecretManager implements Closeable {
    *     null)
    * @return external-reference URNs (insertion order)
    */
-  public List<SecretUrn> getSecretReferenceUrns(Map<String, SecretReference> secretReferences) {
+  public List<SecretUrn> buildSecretReferenceUrns(Map<String, SecretReference> secretReferences) {
     Preconditions.checkArgument(secretReferences != null, "secretReferences must not be null");
     if (secretReferences.isEmpty()) {
       return List.of();
@@ -205,7 +197,7 @@ public class SecretManager implements Closeable {
    * Builds write-through URNs from {@code secretBindings} without writing secret material.
    *
    * <p>Callers typically pass the returned URNs to {@link #writeSecrets} via {@link
-   * #assembleSecretUrns}, or put URN strings into properties themselves (e.g. via {@link
+   * #assembleSecretMaterials}, or put URN strings into properties themselves (e.g. via {@link
    * SecretPropertyUtils#putSecretUrns}).
    *
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
@@ -214,7 +206,7 @@ public class SecretManager implements Closeable {
    *     not be null)
    * @return write-through URNs (insertion order)
    */
-  public List<SecretUrn> getSecretBindingUrns(
+  public List<SecretUrn> buildSecretBindingUrns(
       String entityType, long entityId, Map<String, SecretBinding> secretBindings) {
     Preconditions.checkArgument(StringUtils.isNotBlank(entityType), "entityType must not be blank");
     Preconditions.checkArgument(secretBindings != null, "secretBindings must not be null");
@@ -245,8 +237,8 @@ public class SecretManager implements Closeable {
    * Writes plaintext secrets into the write-through providers for each {@link SecretMaterial} (e.g.
    * Vault).
    *
-   * <p>{@code secretMaterials} must come from {@link #assembleSecretUrns}. On failure,
-   * already-written URNs are rolled back. When using {@link #assembleSecretUrns}, URN strings are
+   * <p>{@code secretMaterials} must come from {@link #assembleSecretMaterials}. On failure,
+   * already-written URNs are rolled back. When using {@link #assembleSecretMaterials}, URN strings are
    * already in properties; otherwise callers must put them themselves (e.g. via {@link
    * SecretPropertyUtils#putSecretUrns}).
    *
@@ -293,7 +285,7 @@ public class SecretManager implements Closeable {
    * Best-effort delete of write-through secret materials after a failed create.
    *
    * <p>Only secrets that were persisted by {@link #writeSecrets} may be passed. Do not roll back
-   * external reference URNs from {@link #getSecretReferenceUrns}.
+   * external reference URNs from {@link #buildSecretReferenceUrns}.
    *
    * @param secretMaterials write-through secret materials (must not be null)
    */
@@ -394,6 +386,19 @@ public class SecretManager implements Closeable {
   @Override
   public void close() {
     registry.close();
+  }
+
+  private static List<SecretMaterial> toSecretMaterials(
+      List<SecretUrn> bindingUrns, Map<String, SecretBinding> bindings) {
+    List<SecretMaterial> secretMaterials = new ArrayList<>(bindingUrns.size());
+    for (SecretUrn urn : bindingUrns) {
+      String propertyKey = urn.propertyKey();
+      SecretBinding binding = bindings.get(propertyKey);
+      Preconditions.checkArgument(
+          binding != null, "No secretBindings entry for property key \"%s\"", propertyKey);
+      secretMaterials.add(new SecretMaterial(urn, binding.plaintext()));
+    }
+    return List.copyOf(secretMaterials);
   }
 
   private static void validateUrnEndsWithPropertyKey(SecretUrn urn, String propertyKey) {

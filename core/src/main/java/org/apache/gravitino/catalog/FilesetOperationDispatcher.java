@@ -156,7 +156,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     long uid = idGenerator.nextId();
     Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
     List<SecretMaterial> secretMaterials =
-        secretManager.assembleSecretUrns(
+        secretManager.assembleSecretMaterials(
             properties, entityProperties, "fileset", uid, secretBindings, secretReferences);
     doWithCatalog(
         catalogIdent,
