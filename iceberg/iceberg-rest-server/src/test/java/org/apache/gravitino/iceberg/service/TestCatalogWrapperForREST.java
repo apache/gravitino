@@ -469,6 +469,72 @@ public class TestCatalogWrapperForREST {
         "Vended request on cache hit should return fresh credentials");
   }
 
+  @Test
+  void testScanPlanCacheDefaultImpl() {
+    Assertions.assertEquals(
+        LocalScanPlanCache.class.getName(),
+        IcebergConfig.SCAN_PLAN_CACHE_IMPL.getDefaultValue(),
+        "The default scan plan cache impl is configured by class name, keep it in sync");
+    Assertions.assertEquals(
+        LocalScanPlanCache.class.getName(),
+        new IcebergConfig(ImmutableMap.of()).get(IcebergConfig.SCAN_PLAN_CACHE_IMPL));
+  }
+
+  @Test
+  void testPlanTableScanCachedByDefault() {
+    CatalogWrapperForREST wrapper =
+        newWrapperForScanPlanCache("scan-plan-cache-default", ImmutableMap.of());
+    TableIdentifier tableId = createScanPlanCacheTable(wrapper, "default_tbl");
+    PlanTableScanRequest request = PlanTableScanRequest.builder().build();
+
+    PlanTableScanResponse first =
+        wrapper.planTableScan(tableId, request, false, CredentialPrivilege.READ);
+    PlanTableScanResponse second =
+        wrapper.planTableScan(tableId, request, false, CredentialPrivilege.READ);
+
+    Assertions.assertSame(
+        first, second, "An identical scan of the same snapshot should be served from the cache");
+  }
+
+  @Test
+  void testPlanTableScanCacheDisabledByEmptyImpl() {
+    CatalogWrapperForREST wrapper =
+        newWrapperForScanPlanCache(
+            "scan-plan-cache-disabled", ImmutableMap.of(IcebergConstants.SCAN_PLAN_CACHE_IMPL, ""));
+    TableIdentifier tableId = createScanPlanCacheTable(wrapper, "disabled_tbl");
+    PlanTableScanRequest request = PlanTableScanRequest.builder().build();
+
+    PlanTableScanResponse first =
+        wrapper.planTableScan(tableId, request, false, CredentialPrivilege.READ);
+    PlanTableScanResponse second =
+        wrapper.planTableScan(tableId, request, false, CredentialPrivilege.READ);
+
+    Assertions.assertNotSame(
+        first, second, "An empty scan plan cache impl should disable caching, replanning instead");
+  }
+
+  private static CatalogWrapperForREST newWrapperForScanPlanCache(
+      String catalogName, Map<String, String> extraProperties) {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(IcebergConstants.CATALOG_BACKEND, "memory")
+            .put(IcebergConstants.WAREHOUSE, "/tmp/warehouse")
+            .putAll(extraProperties)
+            .build();
+    return new CatalogWrapperForREST(catalogName, new IcebergConfig(properties));
+  }
+
+  private static TableIdentifier createScanPlanCacheTable(
+      CatalogWrapperForREST wrapper, String tableName) {
+    Namespace namespace = Namespace.of("db");
+    Catalog catalog = wrapper.getCatalog();
+    ((SupportsNamespaces) catalog).createNamespace(namespace);
+    TableIdentifier tableId = TableIdentifier.of(namespace, tableName);
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.IntegerType.get()));
+    catalog.createTable(tableId, schema, PartitionSpec.unpartitioned());
+    return tableId;
+  }
+
   @SuppressWarnings("deprecation")
   @Test
   void testFederatedPlanTableScanDelegatesToRemote() throws Exception {
