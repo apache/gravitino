@@ -228,12 +228,14 @@ paths:
         content:
           application/json:
             schema:
-              oneOf:
-                - $ref: "#/components/requests/TagsAssociateRequest"
-                - $ref: "#/components/requests/TagValuesAssociateRequest"
+              $ref: "#/components/requests/TagsAssociateRequest"
             examples:
               TagAssociate:
                 $ref: "#/components/examples/TagAssociate"
+          application/vnd.gravitino.v2+json:
+            schema:
+              $ref: "#/components/requests/TagValuesAssociateRequest"
+            examples:
               TagValuesAssociate:
                 $ref: "#/components/examples/TagValuesAssociate"
       responses:

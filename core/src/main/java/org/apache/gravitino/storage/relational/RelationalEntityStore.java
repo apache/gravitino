@@ -468,7 +468,7 @@ public class RelationalEntityStore
     RelationEdgeTarget[] targetsToAdd = update.targetsToAdd();
     RelationEdgeTarget[] targetsToRemove = update.targetsToRemove();
     List<E> result;
-    if (update.hasRelationValues()) {
+    if (update.relationValueAware() || update.hasRelationValues()) {
       result = backend.updateEntityRelations(update);
     } else {
       result =

@@ -85,6 +85,26 @@ public class TestTagValuesAssociateRequest {
   }
 
   @Test
+  public void testTagValuesAssociateRequestRejectsOverlappingPairs() {
+    TagValuesAssociateRequest exactPairOverlap =
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.of("data_domain", "finance"), TagValue.noValue("owner")},
+            new TagValue[] {TagValue.of("data_domain", "finance")});
+    Assertions.assertThrows(IllegalArgumentException.class, exactPairOverlap::validate);
+
+    TagValuesAssociateRequest noValueOverlap =
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.noValue("owner")}, new TagValue[] {TagValue.noValue("owner")});
+    Assertions.assertThrows(IllegalArgumentException.class, noValueOverlap::validate);
+
+    TagValuesAssociateRequest differentValue =
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.of("data_domain", "finance")},
+            new TagValue[] {TagValue.of("data_domain", "risk")});
+    Assertions.assertDoesNotThrow(differentValue::validate);
+  }
+
+  @Test
   public void testTagValuesAssociateRequestRejectsV1Shape() {
     Assertions.assertThrows(
         JsonProcessingException.class,

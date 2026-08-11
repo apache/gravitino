@@ -341,12 +341,27 @@ public class TagManager implements TagDispatcher {
       String metalake, MetadataObject metadataObject, String[] tagsToAdd, String[] tagsToRemove)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     return associateTagValuesForMetadataObject(
-        metalake, metadataObject, toNoValue(tagsToAdd), toNoValue(tagsToRemove));
+        metalake,
+        metadataObject,
+        toNoValue(tagsToAdd),
+        toNoValue(tagsToRemove),
+        false /* relationValueAware */);
   }
 
   @Override
   public String[] associateTagValuesForMetadataObject(
       String metalake, MetadataObject metadataObject, TagValue[] tagsToAdd, TagValue[] tagsToRemove)
+      throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
+    return associateTagValuesForMetadataObject(
+        metalake, metadataObject, tagsToAdd, tagsToRemove, true /* relationValueAware */);
+  }
+
+  private String[] associateTagValuesForMetadataObject(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValue[] tagsToAdd,
+      TagValue[] tagsToRemove,
+      boolean relationValueAware)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
         SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type()),
@@ -382,16 +397,22 @@ public class TagManager implements TagDispatcher {
                 LockType.WRITE,
                 () -> {
                   try {
+                    RelationUpdate relationUpdate =
+                        relationValueAware
+                            ? RelationUpdate.valueAware(
+                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                                entityIdent,
+                                entityType,
+                                toRelationEdgeTargets(metalake, tagValuesToAdd),
+                                toRelationEdgeTargets(metalake, tagValuesToRemove))
+                            : RelationUpdate.of(
+                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                                entityIdent,
+                                entityType,
+                                toRelationEdgeTargets(metalake, tagValuesToAdd),
+                                toRelationEdgeTargets(metalake, tagValuesToRemove));
                     List<TagEntity> tags =
-                        entityStore
-                            .relationOperations()
-                            .updateEntityRelations(
-                                RelationUpdate.of(
-                                    SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                                    entityIdent,
-                                    entityType,
-                                    toRelationEdgeTargets(metalake, tagValuesToAdd),
-                                    toRelationEdgeTargets(metalake, tagValuesToRemove)));
+                        entityStore.relationOperations().updateEntityRelations(relationUpdate);
 
                     return tags.stream().map(Tag::name).distinct().toArray(String[]::new);
                   } catch (NoSuchEntityException e) {

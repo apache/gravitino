@@ -700,6 +700,16 @@ public class TestTagManager {
     Assertions.assertEquals(
         0, tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "pii").length);
 
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE, tableObject, null, new TagValue[] {TagValue.noValue(tag.name())});
+    Tag dataDomainInfo = tagManager.getTagForMetadataObject(METALAKE, tableObject, tag.name());
+    Assertions.assertArrayEquals(
+        new String[] {"finance", "risk"}, dataDomainInfo.assignment().get().values());
+
+    Assertions.assertArrayEquals(
+        new MetadataObject[] {tableObject},
+        tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "finance"));
+
     Tag ownerTag = tagManager.createTag(METALAKE, "owner", null, null);
     tagManager.associateTagValuesForMetadataObject(
         METALAKE, tableObject, new TagValue[] {TagValue.noValue(ownerTag.name())}, null);
@@ -713,6 +723,20 @@ public class TestTagManager {
     Assertions.assertArrayEquals(
         new MetadataObject[] {tableObject},
         tagManager.listMetadataObjectsForTag(METALAKE, ownerTag.name(), "team-a"));
+
+    Tag noValueIdempotentTag = tagManager.createTag(METALAKE, "no_value_idempotent", null, null);
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE,
+        tableObject,
+        new TagValue[] {TagValue.noValue(noValueIdempotentTag.name())},
+        null);
+    Assertions.assertDoesNotThrow(
+        () ->
+            tagManager.associateTagValuesForMetadataObject(
+                METALAKE,
+                tableObject,
+                new TagValue[] {TagValue.noValue(noValueIdempotentTag.name())},
+                null));
 
     Assertions.assertTrue(
         tagInfos[0].valueConstraint().type() == TagValueConstraint.Type.ALLOWED_VALUES);

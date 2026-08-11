@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.Optional;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.Consumes;
 import javax.ws.rs.DefaultValue;
 import javax.ws.rs.GET;
 import javax.ws.rs.POST;
@@ -72,6 +73,8 @@ import org.slf4j.LoggerFactory;
 @Path("/metalakes/{metalake}/objects/{type}/{fullName}/tags")
 public class MetadataObjectTagOperations {
   private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectTagOperations.class);
+
+  private static final String TAG_VALUES_MEDIA_TYPE = "application/vnd.gravitino.v2+json";
 
   private final TagDispatcher tagDispatcher;
 
@@ -246,6 +249,7 @@ public class MetadataObjectTagOperations {
   }
 
   @POST
+  @Consumes("application/json")
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "associate-object-tags", absolute = true)
@@ -270,7 +274,8 @@ public class MetadataObjectTagOperations {
    * @return The response containing associated tag names.
    */
   @POST
-  @Produces("application/vnd.gravitino.v2+json")
+  @Consumes(TAG_VALUES_MEDIA_TYPE)
+  @Produces(TAG_VALUES_MEDIA_TYPE)
   @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "associate-object-tags", absolute = true)
   @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
@@ -321,6 +326,10 @@ public class MetadataObjectTagOperations {
                 type,
                 fullName,
                 metalake);
+            if (request instanceof TagValuesAssociateRequest) {
+              return Response.ok(new NameListResponse(tagNames), TAG_VALUES_MEDIA_TYPE).build();
+            }
+
             return Utils.ok(new NameListResponse(tagNames));
           });
     } catch (Exception e) {

@@ -1119,9 +1119,11 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
             .path("tags")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v2+json")
-            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+            .post(Entity.entity(request, "application/vnd.gravitino.v2+json"));
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
     Assertions.assertArrayEquals(
         new String[] {"pii", "data_domain"},
         response.readEntity(NameListResponse.class).getNames());
@@ -1150,7 +1152,7 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
             .path("tags")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v2+json")
-            .post(Entity.entity(v1Json, MediaType.APPLICATION_JSON_TYPE));
+            .post(Entity.entity(v1Json, "application/vnd.gravitino.v2+json"));
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), v2WithV1Shape.getStatus());
   }
 

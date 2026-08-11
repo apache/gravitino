@@ -134,7 +134,11 @@ class MetadataObjectTagOperations implements SupportsTags {
             tagRequestPath,
             request,
             NameListResponse.class,
-            Collections.singletonMap(HttpHeaders.ACCEPT, TAG_VALUES_MEDIA_TYPE),
+            ImmutableMap.of(
+                HttpHeaders.ACCEPT,
+                TAG_VALUES_MEDIA_TYPE,
+                HttpHeaders.CONTENT_TYPE,
+                TAG_VALUES_MEDIA_TYPE),
             ErrorHandlers.tagErrorHandler());
 
     resp.validate();

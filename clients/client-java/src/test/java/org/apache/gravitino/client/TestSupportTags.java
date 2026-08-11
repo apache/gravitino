@@ -658,6 +658,7 @@ public class TestSupportTags extends TestBase {
         HttpRequest.request(path)
             .withMethod(Method.POST.name())
             .withHeader(HttpHeaders.ACCEPT, "application/vnd.gravitino.v2+json")
+            .withHeader(HttpHeaders.CONTENT_TYPE, "application/vnd.gravitino.v2+json")
             .withBody(MAPPER.writeValueAsString(valueRequest)),
         VerificationTimes.once());
 

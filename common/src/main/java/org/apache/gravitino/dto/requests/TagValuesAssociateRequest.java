@@ -23,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonSetter;
 import com.fasterxml.jackson.annotation.Nulls;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -78,6 +80,24 @@ public class TagValuesAssociateRequest implements RESTRequest {
   }
 
   /**
+   * Returns the tag names to add without validating assignment values.
+   *
+   * @return The tag names to add.
+   */
+  public String[] tagNamesToAdd() {
+    return tagNames(tagsToAdd);
+  }
+
+  /**
+   * Returns the tag names to remove without validating assignment values.
+   *
+   * @return The tag names to remove.
+   */
+  public String[] tagNamesToRemove() {
+    return tagNames(tagsToRemove);
+  }
+
+  /**
    * Validates the request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
@@ -90,6 +110,7 @@ public class TagValuesAssociateRequest implements RESTRequest {
 
     validateTagValues(tagsToAdd, "tagsToAdd");
     validateTagValues(tagsToRemove, "tagsToRemove");
+    validateNoIntersection(tagsToAdd, tagsToRemove);
   }
 
   private static RequestTagValue[] toRequestTagValues(TagValue[] tagValues) {
@@ -104,6 +125,16 @@ public class TagValuesAssociateRequest implements RESTRequest {
       return new TagValue[0];
     }
     return Arrays.stream(tagValues).map(RequestTagValue::toTagValue).toArray(TagValue[]::new);
+  }
+
+  private static String[] tagNames(RequestTagValue[] tagValues) {
+    if (tagValues == null) {
+      return new String[0];
+    }
+    return Arrays.stream(tagValues)
+        .filter(tagValue -> tagValue != null)
+        .map(tagValue -> tagValue.name)
+        .toArray(String[]::new);
   }
 
   private static void validateTagValues(RequestTagValue[] tagValues, String fieldName) {
@@ -127,6 +158,16 @@ public class TagValuesAssociateRequest implements RESTRequest {
       }
     }
   }
+
+  private static void validateNoIntersection(
+      RequestTagValue[] tagsToAdd, RequestTagValue[] tagsToRemove) {
+    Set<RequestTagValue> tagsToAddSet = new LinkedHashSet<>(Arrays.asList(tagsToAdd));
+    for (RequestTagValue tagToRemove : tagsToRemove) {
+      Preconditions.checkArgument(
+          !tagsToAddSet.contains(tagToRemove), "tagsToAdd and tagsToRemove must not overlap");
+    }
+  }
+
   /**
    * Compares this request with another object.
    *

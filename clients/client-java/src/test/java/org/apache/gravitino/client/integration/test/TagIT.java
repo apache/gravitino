@@ -330,6 +330,17 @@ public class TagIT extends BaseIT {
     Assertions.assertEquals(expectedTable.type(), financeObjects[0].type());
     Assertions.assertEquals(0, tag.associatedObjects().objects("unknown").length);
 
+    String noValueTagName = GravitinoITUtils.genRandomName("tag_it_no_value_assignment");
+    metalake.createTag(noValueTagName, "comment", Collections.emptyMap());
+    TagValue[] noValueValues = new TagValue[] {TagValue.noValue(noValueTagName)};
+    Assertions.assertDoesNotThrow(() -> table.supportsTags().associateTags(noValueValues, null));
+    Assertions.assertDoesNotThrow(() -> table.supportsTags().associateTags(noValueValues, null));
+
+    Tag noValueAssignedTag = table.supportsTags().getTag(noValueTagName);
+    Assertions.assertTrue(noValueAssignedTag.assignment().isPresent());
+    Assertions.assertEquals(0, noValueAssignedTag.assignment().get().values().length);
+    table.supportsTags().associateTags(null, noValueValues);
+
     Assertions.assertEquals(0, table.supportsTags().associateTags(null, values).length);
   }
 

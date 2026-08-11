@@ -26,6 +26,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
@@ -75,14 +76,12 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
     TagValue[] tagsToRemove;
     if (request instanceof TagsAssociateRequest) {
       TagsAssociateRequest tagsAssociateRequest = (TagsAssociateRequest) request;
-      tagsAssociateRequest.validate();
       tagsToAdd = toNoValue(tagsAssociateRequest.getTagsToAdd());
       tagsToRemove = toNoValue(tagsAssociateRequest.getTagsToRemove());
     } else {
       TagValuesAssociateRequest tagValuesAssociateRequest = (TagValuesAssociateRequest) request;
-      tagValuesAssociateRequest.validate();
-      tagsToAdd = tagValuesAssociateRequest.tagValuesToAdd();
-      tagsToRemove = tagValuesAssociateRequest.tagValuesToRemove();
+      tagsToAdd = toNoValue(tagValuesAssociateRequest.tagNamesToAdd());
+      tagsToRemove = toNoValue(tagValuesAssociateRequest.tagNamesToRemove());
     }
 
     // Authorize both 'tagsToAdd' and 'tagsToRemove' fields.
@@ -127,6 +126,9 @@ public class AssociateTagAuthorizationExecutor extends CommonAuthorizerExecutor
     if (tags == null) {
       return new TagValue[0];
     }
-    return Arrays.stream(tags).map(TagValue::noValue).toArray(TagValue[]::new);
+    return Arrays.stream(tags)
+        .filter(StringUtils::isNotBlank)
+        .map(TagValue::noValue)
+        .toArray(TagValue[]::new);
   }
 }

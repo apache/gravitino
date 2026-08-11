@@ -37,6 +37,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.tag.TagValue;
@@ -58,6 +59,34 @@ public class TestAssociateTagAuthorizationExecutor {
             new TagValue[] {TagValue.noValue("pii")},
             new TagValue[] {TagValue.of("data_domain", "finance")});
     assertAuthorizesAllTags("associateV2", TagValuesAssociateRequest.class, request);
+  }
+
+  @Test
+  public void testAuthorizesV2TagNamesWithoutValidatingValues() throws Exception {
+    TagValuesAssociateRequest request =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"tagsToAdd\":[{\"name\":\"data_domain\",\"value\":\" \"}]}",
+                TagValuesAssociateRequest.class);
+    Method method = TestOperations.class.getDeclaredMethod("associateV2", request.getClass());
+    Map<Entity.EntityType, NameIdentifier> metadataContext = new HashMap<>();
+    metadataContext.put(Entity.EntityType.METALAKE, NameIdentifier.of("metalake"));
+    AssociateTagAuthorizationExecutor executor =
+        new AssociateTagAuthorizationExecutor(
+            "TAG::OWNER",
+            method.getParameters(),
+            new Object[] {request},
+            metadataContext,
+            Collections.emptyMap(),
+            Optional.empty());
+
+    AuthorizationExpressionEvaluator evaluator = mock(AuthorizationExpressionEvaluator.class);
+    AuthorizationRequestContext context = new AuthorizationRequestContext();
+    when(evaluator.evaluate(anyMap(), anyMap(), any(), any())).thenReturn(true);
+    executor.authorizationExpressionEvaluator = evaluator;
+
+    assertTrue(executor.execute(context));
+    verify(evaluator, times(1)).evaluate(anyMap(), anyMap(), any(), any());
   }
 
   private static void assertAuthorizesAllTags(

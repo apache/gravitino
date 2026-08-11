@@ -39,18 +39,21 @@ public final class RelationUpdate {
   private final Entity.EntityType sourceEntityType;
   private final RelationEdgeTarget[] targetsToAdd;
   private final RelationEdgeTarget[] targetsToRemove;
+  private final boolean relationValueAware;
 
   private RelationUpdate(
       SupportsRelationOperations.Type relationType,
       NameIdentifier sourceIdentifier,
       Entity.EntityType sourceEntityType,
       RelationEdgeTarget[] targetsToAdd,
-      RelationEdgeTarget[] targetsToRemove) {
+      RelationEdgeTarget[] targetsToRemove,
+      boolean relationValueAware) {
     this.relationType = relationType;
     this.sourceIdentifier = sourceIdentifier;
     this.sourceEntityType = sourceEntityType;
     this.targetsToAdd = copyTargets(targetsToAdd, "targetsToAdd");
     this.targetsToRemove = copyTargets(targetsToRemove, "targetsToRemove");
+    this.relationValueAware = relationValueAware;
   }
 
   /**
@@ -73,7 +76,31 @@ public final class RelationUpdate {
     Preconditions.checkArgument(sourceIdentifier != null, "sourceIdentifier must not be null");
     Preconditions.checkArgument(sourceEntityType != null, "sourceEntityType must not be null");
     return new RelationUpdate(
-        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove);
+        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove, false);
+  }
+
+  /**
+   * Creates a relation update that preserves relation-edge value semantics even when all target
+   * values are absent.
+   *
+   * @param relationType The type of relation.
+   * @param sourceIdentifier The identifier of the source entity whose relations are being updated.
+   * @param sourceEntityType The source entity type.
+   * @param targetsToAdd Target endpoints to associate with the source entity.
+   * @param targetsToRemove Target endpoints to disassociate from the source entity.
+   * @return A relation-value-aware update.
+   */
+  public static RelationUpdate valueAware(
+      SupportsRelationOperations.Type relationType,
+      NameIdentifier sourceIdentifier,
+      Entity.EntityType sourceEntityType,
+      RelationEdgeTarget[] targetsToAdd,
+      RelationEdgeTarget[] targetsToRemove) {
+    Preconditions.checkArgument(relationType != null, "relationType must not be null");
+    Preconditions.checkArgument(sourceIdentifier != null, "sourceIdentifier must not be null");
+    Preconditions.checkArgument(sourceEntityType != null, "sourceEntityType must not be null");
+    return new RelationUpdate(
+        relationType, sourceIdentifier, sourceEntityType, targetsToAdd, targetsToRemove, true);
   }
 
   /**
@@ -109,6 +136,14 @@ public final class RelationUpdate {
    */
   public RelationEdgeTarget[] targetsToRemove() {
     return targetsToRemove.clone();
+  }
+
+  /**
+   * @return Whether the update should preserve relation-edge value semantics even when no target
+   *     carries a concrete value.
+   */
+  public boolean relationValueAware() {
+    return relationValueAware;
   }
 
   /**
