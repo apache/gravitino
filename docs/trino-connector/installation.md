@@ -182,7 +182,7 @@ system
 
 See the `gravitino` catalog in the result set. This signifies the successful installation of the Gravitino Trino connector.
 
-Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or refer to [Create a Catalog](../manage-relational-metadata-using-gravitino.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
+Assuming you have created a catalog named `test.jdbc-mysql` in the Gravitino server, or refer to [Create a Catalog](../manage-catalogs-and-schemas.md#create-a-catalog). Then you can use the Trino CLI to connect to the Trino container and run a query like this.
 
 ```text
 docker exec -it trino-gravitino trino

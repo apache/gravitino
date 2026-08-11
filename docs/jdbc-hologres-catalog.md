@@ -29,10 +29,10 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of Hologres.
 - Supports DDL operation for Hologres schemas and tables.
 - Supports table index (PRIMARY KEY in CREATE TABLE).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 - Supports LIST partitioning (physical and logical partition tables).
 - Supports Hologres-specific table properties via `WITH` clause (orientation, clustering_key, distribution_key, etc.).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Does not support [auto-increment](./tables-and-views.md#table-column-auto-increment).
 
 ### Catalog Properties
 
@@ -59,7 +59,7 @@ Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). 
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
 Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
@@ -80,7 +80,7 @@ Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden 
 
 ### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
@@ -89,10 +89,10 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Gravitino's table concept corresponds to the Hologres table.
 - Supports DDL operation for Hologres tables.
 - Supports PRIMARY KEY index in CREATE TABLE.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 - Supports expression columns via DEFAULT expressions (note: Gravitino maps these as column default values, not as true generated/computed columns in the Hologres sense).
 - Supports LIST partitioning (physical and logical).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
+- Does not support [auto-increment](./tables-and-views.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
 
 ### Table Properties
 
@@ -145,7 +145,7 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 :::info
 - Hologres does not support precision syntax for `TIMESTAMP`/`TIMESTAMPTZ` (e.g., `timestamptz(6)` is invalid), so the type converter always emits the base type without precision.
 - Array element types must be non-nullable (Hologres limitation). Multidimensional arrays are not supported.
-- Types like `json`, `jsonb`, `uuid`, `inet`, `money`, `roaringbitmap` are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** with the original type name preserved.
+- Types like `json`, `jsonb`, `uuid`, `inet`, `money`, `roaringbitmap` are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** with the original type name preserved.
 :::
 
 ### Table Distribution
