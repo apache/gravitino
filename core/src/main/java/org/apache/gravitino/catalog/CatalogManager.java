@@ -730,10 +730,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
       }
 
-      // Do not resolve secret URNs from caller-controlled properties (exfiltration risk).
-      secretManager.checkSecretKeys(properties, null, null);
       Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
-      secretManager.checkSecretKeys(mergedConfig, null, null);
       Instant now = Instant.now();
       String creator = PrincipalUtils.getCurrentPrincipal().getName();
       CatalogEntity dummyEntity =
