@@ -16,12 +16,16 @@
 # under the License.
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict
+from types import MappingProxyType
+from typing import Dict, Mapping, Optional
 
 from dataclasses_json import config
 
 from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.rest.rest_message import RESTRequest
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 @dataclass
@@ -33,11 +37,11 @@ class SchemaCreateRequest(RESTRequest):
     _properties: Optional[Dict[str, str]] = field(
         metadata=config(field_name="properties")
     )
-    _secret_bindings: Optional[Dict[str, SecretBinding]] = field(
-        default=None, metadata=config(field_name="secretBindings")
+    _secret_bindings: Dict[str, SecretBinding] = field(
+        default_factory=dict, metadata=config(field_name="secretBindings")
     )
-    _secret_references: Optional[Dict[str, SecretReference]] = field(
-        default=None, metadata=config(field_name="secretReferences")
+    _secret_references: Dict[str, SecretReference] = field(
+        default_factory=dict, metadata=config(field_name="secretReferences")
     )
 
     def __init__(
@@ -45,14 +49,14 @@ class SchemaCreateRequest(RESTRequest):
         name: str,
         comment: Optional[str],
         properties: Optional[Dict[str, str]],
-        secret_bindings: Optional[Dict[str, SecretBinding]] = None,
-        secret_references: Optional[Dict[str, SecretReference]] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ):
         self._name = name
         self._comment = comment
         self._properties = properties
-        self._secret_bindings = secret_bindings
-        self._secret_references = secret_references
+        self._secret_bindings = dict(secret_bindings)
+        self._secret_references = dict(secret_references)
 
     def validate(self):
         if not self._name:

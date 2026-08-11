@@ -16,7 +16,8 @@
 # under the License.
 # pylint: disable=too-many-lines
 import logging
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
@@ -104,6 +105,9 @@ from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
 
 logger = logging.getLogger(__name__)
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class GravitinoMetalake(
@@ -218,8 +222,8 @@ class GravitinoMetalake(
         provider: str,
         comment: str,
         properties: Dict[str, str],
-        secret_bindings: Dict[str, SecretBinding] = None,
-        secret_references: Dict[str, SecretReference] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Catalog:
         """Create a new catalog with specified name, catalog type, comment and properties.
 

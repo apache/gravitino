@@ -22,6 +22,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -57,12 +58,10 @@ public class CatalogCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
-  @Nullable
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretBindings")
   private final Map<String, SecretBindingDTO> secretBindings;
 
-  @Nullable
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
   @JsonProperty("secretReferences")
   private final Map<String, SecretReferenceDTO> secretReferences;
@@ -82,7 +81,7 @@ public class CatalogCreateRequest implements RESTRequest {
       String provider,
       String comment,
       Map<String, String> properties) {
-    this(name, type, provider, comment, properties, null, null);
+    this(name, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
   }
 
   /**
@@ -111,8 +110,8 @@ public class CatalogCreateRequest implements RESTRequest {
     this.type = type;
     this.comment = comment;
     this.properties = properties;
-    this.secretBindings = secretBindings;
-    this.secretReferences = secretReferences;
+    this.secretBindings = secretBindings == null ? Collections.emptyMap() : secretBindings;
+    this.secretReferences = secretReferences == null ? Collections.emptyMap() : secretReferences;
 
     if (StringUtils.isNotBlank(provider)) {
       this.provider = provider;

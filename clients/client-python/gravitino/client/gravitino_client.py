@@ -17,7 +17,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
@@ -39,6 +40,9 @@ from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 
 from ..api.tag.tag import Tag
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
@@ -104,8 +108,8 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         provider: str,
         comment: str,
         properties: Dict[str, str],
-        secret_bindings: Dict[str, SecretBinding] = None,
-        secret_references: Dict[str, SecretReference] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Catalog:
         return self.get_metalake().create_catalog(
             name,

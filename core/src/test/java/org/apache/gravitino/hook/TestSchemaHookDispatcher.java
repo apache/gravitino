@@ -22,11 +22,13 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -128,56 +130,8 @@ public class TestSchemaHookDispatcher {
             () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
     verify(mockDispatcher).createSchema(any(), any(), any(), any(), any());
-    verify(mockDispatcher).dropSchema(eq(ident), eq(false));
-  }
-
-  @Test
-  public void testCreateHierarchicalSchemaRollsBackNewAncestorsWhenSetOwnerFails()
-      throws Exception {
-    when(mockCatalogWrapper.capabilities()).thenReturn(new HierarchicalCapability());
-
-    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
-    NameIdentifier leaf = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
-    NameIdentifier ancestorAB = NameIdentifier.of("test_metalake", "test_catalog", "A:B");
-    NameIdentifier ancestorA = NameIdentifier.of("test_metalake", "test_catalog", "A");
-    Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
-    when(mockDispatcher.schemaExists(any())).thenReturn(false);
-
-    doThrow(new RuntimeException("Set owner failed"))
-        .when(mockOwnerDispatcher)
-        .setOwners(any(), anyList(), any(), any());
-
-    RuntimeException thrown =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
-    Assertions.assertEquals("Set owner failed", thrown.getMessage());
-
-    // Leaf first, then ancestors innermost-to-outermost.
-    org.mockito.InOrder inOrder = Mockito.inOrder(mockDispatcher);
-    inOrder.verify(mockDispatcher).dropSchema(eq(leaf), eq(false));
-    inOrder.verify(mockDispatcher).dropSchema(eq(ancestorAB), eq(false));
-    inOrder.verify(mockDispatcher).dropSchema(eq(ancestorA), eq(false));
-  }
-
-  @Test
-  public void testCreateRollbackSuppressed() {
-    NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "test_schema");
-    Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
-    RuntimeException postHookException = new RuntimeException("Set owner failed");
-    RuntimeException rollbackException = new RuntimeException("rollback failed");
-    doThrow(postHookException).when(mockOwnerDispatcher).setOwners(any(), anyList(), any(), any());
-    doThrow(rollbackException).when(mockDispatcher).dropSchema(eq(ident), eq(false));
-
-    RuntimeException thrown =
-        Assertions.assertThrows(
-            RuntimeException.class,
-            () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
-    Assertions.assertSame(postHookException, thrown);
-    Assertions.assertTrue(
-        Arrays.stream(thrown.getSuppressed()).anyMatch(t -> t == rollbackException));
+    // Align with FilesetHookDispatcher / #12366: do not drop the schema when setOwner fails.
+    verify(mockDispatcher, never()).dropSchema(any(), anyBoolean());
   }
 
   @Test

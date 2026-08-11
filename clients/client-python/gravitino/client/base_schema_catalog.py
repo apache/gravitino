@@ -16,7 +16,8 @@
 # under the License.
 
 import logging
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.catalog import Catalog
 from gravitino.api.function.function import Function
@@ -54,6 +55,9 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class BaseSchemaCatalog(
@@ -160,8 +164,8 @@ class BaseSchemaCatalog(
         schema_name: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
-        secret_bindings: Dict[str, SecretBinding] = None,
-        secret_references: Dict[str, SecretReference] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Schema:
         """Create a new schema with specified identifier, comment and metadata.
 
