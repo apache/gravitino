@@ -16,7 +16,8 @@
 # under the License.
 
 import logging
-from typing import List, Dict
+from types import MappingProxyType
+from typing import Dict, List, Mapping
 
 from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 
@@ -25,6 +26,7 @@ from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.file.fileset_change import FilesetChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.audit.caller_context import CallerContextHolder, CallerContext
 from gravitino.client.base_schema_catalog import BaseSchemaCatalog
 from gravitino.client.generic_fileset import GenericFileset
@@ -42,6 +44,9 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class FilesetCatalog(
@@ -138,6 +143,8 @@ class FilesetCatalog(
         fileset_type: Fileset.Type,
         storage_location: str,
         properties: Dict[str, str],
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Fileset:
         """Create a fileset metadata in the catalog.
 
@@ -152,6 +159,8 @@ class FilesetCatalog(
             fileset_type: The type of the fileset.
             storage_location: The storage location of the fileset.
             properties: The properties of the fileset.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchSchemaException If the schema does not exist.
@@ -166,7 +175,13 @@ class FilesetCatalog(
             else {}
         )
         return self.create_multiple_location_fileset(
-            ident, comment, fileset_type, locations, properties
+            ident,
+            comment,
+            fileset_type,
+            locations,
+            properties,
+            secret_bindings,
+            secret_references,
         )
 
     def create_multiple_location_fileset(
@@ -176,6 +191,8 @@ class FilesetCatalog(
         fileset_type: Fileset.Type,
         storage_locations: Dict[str, str],
         properties: Dict[str, str],
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ):
         """Create a fileset metadata in the catalog with multiple storage locations.
 
@@ -185,6 +202,8 @@ class FilesetCatalog(
             fileset_type: The type of the fileset.
             storage_locations: The location names and storage locations of the fileset.
             properties: The properties of the fileset.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchSchemaException If the schema does not exist.
@@ -203,6 +222,8 @@ class FilesetCatalog(
             fileset_type=fileset_type,
             storage_locations=storage_locations,
             properties=properties,
+            secret_bindings=dict(secret_bindings),
+            secret_references=dict(secret_references),
         )
         req.validate()
 

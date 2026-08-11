@@ -1303,7 +1303,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
-    catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
+    // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
+    // Fileset FS merge assumes catalog conf is already plaintext at this boundary.
+    catalog
+        .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
+        .withCatalogEntity(entity);
     catalog.initAuthorizationPluginInstance(classLoader);
     return catalog;
   }
