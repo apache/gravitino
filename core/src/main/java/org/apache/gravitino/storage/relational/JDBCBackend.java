@@ -907,7 +907,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                     toTagValues(update.targetsToRemove()));
       default:
         Preconditions.checkArgument(
-            !update.relationValueAware() && !update.hasRelationValues(),
+            !update.hasRelationValues(),
             "Relation values are not supported for relation type %s",
             update.relationType());
         return updateEntityRelations(

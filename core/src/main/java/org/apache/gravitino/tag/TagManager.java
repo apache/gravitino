@@ -345,7 +345,7 @@ public class TagManager implements TagDispatcher {
         metadataObject,
         toNoValue(tagsToAdd),
         toNoValue(tagsToRemove),
-        false /* relationValueAware */);
+        false /* valueSemantics */);
   }
 
   @Override
@@ -353,7 +353,7 @@ public class TagManager implements TagDispatcher {
       String metalake, MetadataObject metadataObject, TagValue[] tagsToAdd, TagValue[] tagsToRemove)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     return associateTagValuesForMetadataObject(
-        metalake, metadataObject, tagsToAdd, tagsToRemove, true /* relationValueAware */);
+        metalake, metadataObject, tagsToAdd, tagsToRemove, true /* valueSemantics */);
   }
 
   private String[] associateTagValuesForMetadataObject(
@@ -361,7 +361,7 @@ public class TagManager implements TagDispatcher {
       MetadataObject metadataObject,
       TagValue[] tagsToAdd,
       TagValue[] tagsToRemove,
-      boolean relationValueAware)
+      boolean valueSemantics)
       throws NoSuchMetadataObjectException, TagAlreadyAssociatedException {
     Preconditions.checkArgument(
         SUPPORTED_METADATA_OBJECT_TYPES_FOR_TAGS.contains(metadataObject.type()),
@@ -397,23 +397,29 @@ public class TagManager implements TagDispatcher {
                 LockType.WRITE,
                 () -> {
                   try {
-                    RelationUpdate relationUpdate =
-                        relationValueAware
-                            ? RelationUpdate.valueAware(
-                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                                entityIdent,
-                                entityType,
-                                toRelationEdgeTargets(metalake, tagValuesToAdd),
-                                toRelationEdgeTargets(metalake, tagValuesToRemove))
-                            : RelationUpdate.of(
-                                SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-                                entityIdent,
-                                entityType,
-                                toRelationEdgeTargets(metalake, tagValuesToAdd),
-                                toRelationEdgeTargets(metalake, tagValuesToRemove));
-                    List<TagEntity> tags =
-                        entityStore.relationOperations().updateEntityRelations(relationUpdate);
-
+                    List<TagEntity> tags;
+                    if (valueSemantics) {
+                      tags =
+                          entityStore
+                              .relationOperations()
+                              .updateEntityRelations(
+                                  RelationUpdate.of(
+                                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                                      entityIdent,
+                                      entityType,
+                                      toRelationEdgeTargets(metalake, tagValuesToAdd),
+                                      toRelationEdgeTargets(metalake, tagValuesToRemove)));
+                    } else {
+                      tags =
+                          entityStore
+                              .relationOperations()
+                              .updateEntityRelations(
+                                  SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
+                                  entityIdent,
+                                  entityType,
+                                  toNameIdentifiers(metalake, tagValuesToAdd),
+                                  toNameIdentifiers(metalake, tagValuesToRemove));
+                    }
                     return tags.stream().map(Tag::name).distinct().toArray(String[]::new);
                   } catch (NoSuchEntityException e) {
                     throw new NoSuchMetadataObjectException(
@@ -484,6 +490,12 @@ public class TagManager implements TagDispatcher {
     }
 
     return Arrays.stream(tags).map(TagValue::noValue).toArray(TagValue[]::new);
+  }
+
+  private static NameIdentifier[] toNameIdentifiers(String metalake, TagValue[] tagValues) {
+    return Arrays.stream(tagValues)
+        .map(tagValue -> NameIdentifierUtil.ofTag(metalake, tagValue.name()))
+        .toArray(NameIdentifier[]::new);
   }
 
   private static RelationEdgeTarget[] toRelationEdgeTargets(String metalake, TagValue[] tagValues) {

@@ -437,13 +437,26 @@ public class RelationalEntityStore
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return updateEntityRelations(
+    RelationUpdate update =
         RelationUpdate.of(
             relType,
             srcEntityIdent,
             srcEntityType,
             toRelationEdgeTargets(relType, destEntitiesToAdd),
-            toRelationEdgeTargets(relType, destEntitiesToRemove)));
+            toRelationEdgeTargets(relType, destEntitiesToRemove));
+    if (relType != SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL) {
+      return updateEntityRelations(update);
+    }
+
+    List<E> result =
+        backend.updateEntityRelations(
+            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    Entity.EntityType targetEntityType = relationUpdateTargetType(relType);
+    cache.invalidate(srcEntityIdent, srcEntityType);
+    invalidateRelationTargetCache(targetEntityType, update.targetsToAdd());
+    invalidateRelationTargetCache(targetEntityType, update.targetsToRemove());
+
+    return result;
   }
 
   @Override
@@ -468,7 +481,8 @@ public class RelationalEntityStore
     RelationEdgeTarget[] targetsToAdd = update.targetsToAdd();
     RelationEdgeTarget[] targetsToRemove = update.targetsToRemove();
     List<E> result;
-    if (update.relationValueAware() || update.hasRelationValues()) {
+    if (update.hasRelationValues()
+        || update.relationType() == SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL) {
       result = backend.updateEntityRelations(update);
     } else {
       result =
