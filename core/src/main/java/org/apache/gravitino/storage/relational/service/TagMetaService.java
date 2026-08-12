@@ -392,9 +392,15 @@ public class TagMetaService {
               .remove(tagValueToRemove.value());
           tagRelsToRemove.add(
               tagRelForValue(tagPO, metadataObjectId, metadataObject, tagValueToRemove));
-        } else {
+        } else if (failOnDuplicateValuelessAssignment) {
           activeValuesByTagId.remove(tagPO.getTagId());
           tagIdsToRemove.add(tagPO.getTagId());
+        } else {
+          activeValuesByTagId
+              .computeIfAbsent(tagPO.getTagId(), ignored -> new LinkedHashSet<>())
+              .remove(Optional.empty());
+          tagRelsToRemove.add(
+              tagRelForValue(tagPO, metadataObjectId, metadataObject, tagValueToRemove));
         }
       }
 

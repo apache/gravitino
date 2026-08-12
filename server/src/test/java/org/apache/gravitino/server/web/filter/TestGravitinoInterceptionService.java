@@ -17,7 +17,9 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA_AND_TAG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -30,9 +32,11 @@ import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -44,16 +48,23 @@ import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.AfterEach;
@@ -317,6 +328,75 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  @Test
+  public void testInvalidV2TagAssociationBodyReturnsBadRequestAfterAuthorization()
+      throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class)) {
+
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked
+          .when(() -> PrincipalUtils.doAs(ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenCallRealMethod();
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+      when(authorizer.deny(any(), any(), any(), any(), any())).thenReturn(false);
+      when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      TagValuesAssociateRequest request =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"tagsToAdd\":[{\"name\":\"data_domain\",\"value\":\" \"}]}",
+                  TagValuesAssociateRequest.class);
+      Method method =
+          TestMetadataObjectTagAssociationOperations.class.getMethod(
+              "associateTagValuesForObject",
+              String.class,
+              String.class,
+              String.class,
+              TagValuesAssociateRequest.class);
+      Object[] args = new Object[] {"testMetalake", "catalog", "object1", request};
+      TagDispatcher tagDispatcher = mock(TagDispatcher.class);
+      MetadataObjectTagOperations operations = new MetadataObjectTagOperations(tagDispatcher);
+      HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+      FieldUtils.writeField(operations, "httpRequest", httpRequest, true);
+      Response invalidBodyResponse =
+          operations.associateTagValuesForObject(
+              (String) args[0],
+              (String) args[1],
+              (String) args[2],
+              (TagValuesAssociateRequest) args[3]);
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      when(methodInvocation.getMethod()).thenReturn(method);
+      when(methodInvocation.getArguments()).thenReturn(args);
+      when(methodInvocation.proceed()).thenReturn(invalidBodyResponse);
+
+      MethodInterceptor methodInterceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+
+      assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      verify(tagDispatcher, never())
+          .associateTagValuesForMetadataObject(any(), any(), any(), any());
+    }
+  }
+
   /**
    * When the authorization executor returns {@code false}, {@code buildNoAuthResponse} is called
    * with {@code emitEvent=true}. Verify that:
@@ -486,6 +566,19 @@ public class TestGravitinoInterceptionService {
       Assertions.assertFalse(
           RequestContext.isOperationFailureFired(),
           "operationFailureFired must stay false so HttpAuditFilter emits the HTTP-level event");
+    }
+  }
+
+  public static class TestMetadataObjectTagAssociationOperations {
+
+    @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+    public Response associateTagValuesForObject(
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationObjectType String type,
+        @AuthorizationFullName String fullName,
+        @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+            TagValuesAssociateRequest request) {
+      return Utils.ok("unused");
     }
   }
 
