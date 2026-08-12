@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -41,10 +42,10 @@ import org.slf4j.LoggerFactory;
  * rest of the batch. A malformed row is skipped instead, because it names no catalog and so leaves
  * nothing stale.
  *
- * <p>If the clear itself fails the exception reaches the poller, which logs it at {@code ERROR} and
- * advances its cursor. That is safe now that the poller never replays a batch: a replay would
- * re-run the single-shot {@link CatalogManager#consumeLocalMutation} probe, classify a local
- * mutation as remote and tear down a catalog this node just mutated itself.
+ * <p>The listener consumes local-mutation markers for the whole batch before evicting anything. A
+ * failed eviction or clear therefore cannot strand a marker that would make a later remote change
+ * look local. If the clear itself fails, the exception reaches the poller, which logs it at {@code
+ * ERROR} and advances its cursor; the affected catalog can then remain stale until it expires.
  *
  * <p><b>Cost of the clear:</b> evicting a cached catalog closes its {@code CatalogWrapper}, which
  * tears down the connection pool and the {@code IsolatedClassLoader}. A whole-cache clear therefore
@@ -71,6 +72,7 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
 
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
+    List<CatalogInvalidation> remoteInvalidations = new ArrayList<>();
     for (EntityChangeRecord change : changes) {
       if (!isCatalogChange(change)) {
         continue;
@@ -88,15 +90,16 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       try {
         localMutation = catalogManager.consumeLocalMutation(ident);
       } catch (RuntimeException e) {
-        // The dedup probe decides whether this node caused the change. Without an answer there is
-        // no eviction to attempt, and clearing here would tear down catalogs over a bookkeeping
-        // failure, so the record is skipped.
+        // The identifier is valid, so this record may name a remote mutation. Treating an unknown
+        // origin as remote can cause an unnecessary eviction, but skipping it can leave a stale
+        // catalog cached after the poller advances its cursor.
         LOG.error(
-            "Failed to check local mutation state for catalog {}, skipping change log record id {}",
+            "Failed to check local mutation state for catalog {}, treating change log record id {} "
+                + "as remote to avoid serving stale metadata",
             ident,
             change.getId(),
             e);
-        continue;
+        localMutation = false;
       }
 
       if (localMutation) {
@@ -107,6 +110,12 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
         continue;
       }
 
+      remoteInvalidations.add(new CatalogInvalidation(change, ident));
+    }
+
+    for (CatalogInvalidation invalidation : remoteInvalidations) {
+      EntityChangeRecord change = invalidation.change;
+      NameIdentifier ident = invalidation.ident;
       // Logged at INFO on purpose: this tears down the cached catalog, including its connection
       // pool and isolated classloader, and it is the main cross-node effect of the change log.
       // CatalogManager logs the matching "Closing catalog" line when the eviction runs.
@@ -131,6 +140,16 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
         catalogManager.getCatalogCache().invalidateAll();
         return;
       }
+    }
+  }
+
+  private static class CatalogInvalidation {
+    private final EntityChangeRecord change;
+    private final NameIdentifier ident;
+
+    private CatalogInvalidation(EntityChangeRecord change, NameIdentifier ident) {
+      this.change = change;
+      this.ident = ident;
     }
   }
 

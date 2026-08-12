@@ -42,11 +42,13 @@ public class TestCatalogChangeLogListener {
   void testFailedClearPropagatesToThePoller() {
     CatalogManager catalogManager = mock(CatalogManager.class);
     Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
-    NameIdentifier ident = NameIdentifier.of("metalake", "cat");
+    NameIdentifier failing = NameIdentifier.of("metalake", "failing");
+    NameIdentifier laterLocal = NameIdentifier.of("metalake", "later_local");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(ident)).thenReturn(false);
-    doThrow(new RuntimeException("eviction failed")).when(catalogCache).invalidate(ident);
+    when(catalogManager.consumeLocalMutation(failing)).thenReturn(false);
+    when(catalogManager.consumeLocalMutation(laterLocal)).thenReturn(true);
+    doThrow(new RuntimeException("eviction failed")).when(catalogCache).invalidate(failing);
     doThrow(new RuntimeException("clear failed")).when(catalogCache).invalidateAll();
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
@@ -55,8 +57,13 @@ public class TestCatalogChangeLogListener {
     // failure: it never replays the batch, which is what used to be dangerous here, because
     // consumeLocalMutation() is single-shot and a replay would classify a local mutation as remote.
     Assertions.assertThrows(
-        RuntimeException.class, () -> listener.onEntityChange(List.of(change(1L, "metalake.cat"))));
+        RuntimeException.class,
+        () ->
+            listener.onEntityChange(
+                List.of(change(1L, "metalake.failing"), change(2L, "metalake.later_local"))));
 
+    // All markers are consumed before eviction starts, even when both eviction and recovery fail.
+    verify(catalogManager).consumeLocalMutation(laterLocal);
     verify(catalogCache).invalidateAll();
   }
 
@@ -66,10 +73,13 @@ public class TestCatalogChangeLogListener {
     CatalogManager catalogManager = mock(CatalogManager.class);
     Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
     NameIdentifier failing = NameIdentifier.of("metalake", "failing");
-    NameIdentifier later = NameIdentifier.of("metalake", "later");
+    NameIdentifier laterRemote = NameIdentifier.of("metalake", "later_remote");
+    NameIdentifier laterLocal = NameIdentifier.of("metalake", "later_local");
 
     when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
-    when(catalogManager.consumeLocalMutation(any())).thenReturn(false);
+    when(catalogManager.consumeLocalMutation(failing)).thenReturn(false);
+    when(catalogManager.consumeLocalMutation(laterRemote)).thenReturn(false);
+    when(catalogManager.consumeLocalMutation(laterLocal)).thenReturn(true);
     doThrow(new RuntimeException("eviction failed")).when(catalogCache).invalidate(failing);
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
@@ -77,12 +87,17 @@ public class TestCatalogChangeLogListener {
     Assertions.assertDoesNotThrow(
         () ->
             listener.onEntityChange(
-                List.of(change(1L, "metalake.failing"), change(2L, "metalake.later"))));
+                List.of(
+                    change(1L, "metalake.failing"),
+                    change(2L, "metalake.later_remote"),
+                    change(3L, "metalake.later_local"))));
 
-    // The clear is a superset of the failed eviction and of the rest of the batch, so the remaining
-    // records need no separate eviction.
+    // The later local marker is consumed before eviction starts. The clear is then a superset of
+    // the failed eviction and all remote records, so no additional eviction is needed.
+    verify(catalogManager).consumeLocalMutation(laterLocal);
     verify(catalogCache).invalidateAll();
-    verify(catalogCache, never()).invalidate(later);
+    verify(catalogCache, never()).invalidate(laterRemote);
+    verify(catalogCache, never()).invalidate(laterLocal);
   }
 
   @Test
@@ -133,7 +148,7 @@ public class TestCatalogChangeLogListener {
 
   @Test
   @SuppressWarnings("unchecked")
-  void testFailedLocalMutationProbeSkipsTheRecordWithoutClearing() {
+  void testFailedLocalMutationProbeTreatsTheRecordAsRemote() {
     CatalogManager catalogManager = mock(CatalogManager.class);
     Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
     NameIdentifier failing = NameIdentifier.of("metalake", "failing");
@@ -146,14 +161,14 @@ public class TestCatalogChangeLogListener {
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
-    // Without a dedup answer there is no eviction to recover, so the record is skipped rather than
-    // tearing down every cached catalog over a bookkeeping failure.
+    // An unknown origin is treated as remote: an unnecessary targeted eviction is safer than
+    // permanently skipping a real remote change after the poller advances its cursor.
     Assertions.assertDoesNotThrow(
         () ->
             listener.onEntityChange(
                 List.of(change(1L, "metalake.failing"), change(2L, "metalake.healthy"))));
 
-    verify(catalogCache, never()).invalidate(failing);
+    verify(catalogCache).invalidate(failing);
     verify(catalogCache).invalidate(healthy);
     verify(catalogCache, never()).invalidateAll();
   }

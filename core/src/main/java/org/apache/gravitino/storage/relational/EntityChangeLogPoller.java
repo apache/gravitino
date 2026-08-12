@@ -309,7 +309,7 @@ public class EntityChangeLogPoller implements AutoCloseable {
       } catch (Exception e) {
         LOG.error(
             "Entity change log listener {} failed to consume batch id range [{}, {}]; the batch is "
-                + "not retried, so the listener must have recovered locally",
+                + "not retried, and the listener did not contain the failure locally",
             listener.getClass().getName(),
             delivery.firstChangeId(),
             delivery.lastChangeId,
