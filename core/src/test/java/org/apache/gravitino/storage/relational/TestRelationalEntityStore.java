@@ -36,6 +36,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
 
@@ -157,13 +159,15 @@ public class TestRelationalEntityStore {
             dst, Entity.EntityType.TAG, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
   }
 
-  @Test
-  void testUpdateEntityRelationsInvalidatesCacheAfterBackendUpdate()
+  @ParameterizedTest
+  @CsvSource({"TAG_METADATA_OBJECT_REL, TAG", "POLICY_METADATA_OBJECT_REL, POLICY"})
+  void testUpdateEntityRelationsInvalidatesCacheAfterBackendUpdate(
+      SupportsRelationOperations.Type relationType, Entity.EntityType destinationType)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException,
           IllegalAccessException {
     NameIdentifier src = NameIdentifier.of("metalake", "catalog", "schema", "table1");
-    NameIdentifier destToAdd = NameIdentifier.of("metalake", "tag1");
-    NameIdentifier destToRemove = NameIdentifier.of("metalake", "tag2");
+    NameIdentifier destToAdd = NameIdentifier.of("metalake", "destination1");
+    NameIdentifier destToRemove = NameIdentifier.of("metalake", "destination2");
     NameIdentifier[] destEntitiesToAdd = new NameIdentifier[] {destToAdd};
     NameIdentifier[] destEntitiesToRemove = new NameIdentifier[] {destToRemove};
     NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
@@ -171,61 +175,27 @@ public class TestRelationalEntityStore {
     Mockito.doAnswer(
             invocation -> {
               Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      src,
-                      Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+                  .invalidate(src, Entity.EntityType.TABLE, relationType);
               Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      destToAdd,
-                      Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+                  .invalidate(destToAdd, destinationType, relationType);
               Mockito.verify(cache, Mockito.never())
-                  .invalidate(
-                      destToRemove,
-                      Entity.EntityType.TABLE,
-                      SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+                  .invalidate(destToRemove, destinationType, relationType);
               return List.of();
             })
         .when(backend)
         .updateEntityRelations(
-            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-            src,
-            Entity.EntityType.TABLE,
-            destEntitiesToAdd,
-            destEntitiesToRemove);
+            relationType, src, Entity.EntityType.TABLE, destEntitiesToAdd, destEntitiesToRemove);
 
     store.updateEntityRelations(
-        SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-        src,
-        Entity.EntityType.TABLE,
-        destEntitiesToAdd,
-        destEntitiesToRemove);
+        relationType, src, Entity.EntityType.TABLE, destEntitiesToAdd, destEntitiesToRemove);
 
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder
         .verify(backend)
         .updateEntityRelations(
-            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL,
-            src,
-            Entity.EntityType.TABLE,
-            destEntitiesToAdd,
-            destEntitiesToRemove);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            src, Entity.EntityType.TABLE, SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            destToAdd,
-            Entity.EntityType.TABLE,
-            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
-    inOrder
-        .verify(cache)
-        .invalidate(
-            destToRemove,
-            Entity.EntityType.TABLE,
-            SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL);
+            relationType, src, Entity.EntityType.TABLE, destEntitiesToAdd, destEntitiesToRemove);
+    inOrder.verify(cache).invalidate(src, Entity.EntityType.TABLE, relationType);
+    inOrder.verify(cache).invalidate(destToAdd, destinationType, relationType);
+    inOrder.verify(cache).invalidate(destToRemove, destinationType, relationType);
   }
 }
