@@ -216,7 +216,7 @@ public class TestMetadataIdConverter {
     MetadataObject fileset =
         MetadataObjects.of(
             ImmutableList.of("missing_catalog", "schema", "fileset"), MetadataObject.Type.FILESET);
-    when(mockCatalogManager.loadCatalogAndWrap(NameIdentifier.of("metalake", "missing_catalog")))
+    when(mockCatalogManager.acquireCatalogLease(NameIdentifier.of("metalake", "missing_catalog")))
         .thenThrow(
             new NoSuchCatalogException("Catalog %s does not exist", "metalake.missing_catalog"));
 
