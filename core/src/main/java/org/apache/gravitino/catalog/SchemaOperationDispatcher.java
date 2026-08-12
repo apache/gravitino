@@ -42,6 +42,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -58,10 +59,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * @param catalogManager The CatalogManager instance to be used for schema operations.
    * @param store The EntityStore instance to be used for schema operations.
    * @param idGenerator The IdGenerator instance to be used for schema operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public SchemaOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   /**

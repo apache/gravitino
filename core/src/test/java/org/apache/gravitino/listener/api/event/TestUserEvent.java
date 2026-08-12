@@ -25,11 +25,13 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.authorization.UserChange;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
@@ -265,6 +267,91 @@ public class TestUserEvent {
     ListUsersFailureEvent listUsersFailureEvent = (ListUsersFailureEvent) event;
     Assertions.assertEquals(
         NameIdentifier.of(INEXIST_METALAKE), listUsersFailureEvent.identifier());
+  }
+
+  @Test
+  void testListUsersPagedPreEvent() {
+    dispatcher.listUsers(METALAKE, 0, 10);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(ListUsersPagedPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USERS_PAGED, preEvent.operationType());
+
+    ListUsersPagedPreEvent pagedPreEvent = (ListUsersPagedPreEvent) preEvent;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), pagedPreEvent.identifier());
+    Assertions.assertEquals(0, pagedPreEvent.offset());
+    Assertions.assertEquals(10, pagedPreEvent.limit());
+  }
+
+  @Test
+  void testListUsersPagedEvent() {
+    dispatcher.listUsers(METALAKE, 0, 10);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListUsersPagedEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USERS_PAGED, event.operationType());
+
+    ListUsersPagedEvent pagedEvent = (ListUsersPagedEvent) event;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), pagedEvent.identifier());
+    Assertions.assertEquals(0, pagedEvent.offset());
+    Assertions.assertEquals(10, pagedEvent.limit());
+    Assertions.assertEquals(2, pagedEvent.resultCount());
+    Assertions.assertEquals(2L, pagedEvent.totalCount());
+  }
+
+  @Test
+  void testListUsersPagedFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.listUsers(METALAKE, 1, 5));
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(ListUsersPagedFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.LIST_USERS_PAGED, event.operationType());
+
+    ListUsersPagedFailureEvent failureEvent = (ListUsersPagedFailureEvent) event;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), failureEvent.identifier());
+    Assertions.assertEquals(1, failureEvent.offset());
+    Assertions.assertEquals(5, failureEvent.limit());
+  }
+
+  @Test
+  void testCountUsersPreEvent() {
+    dispatcher.countUsers(METALAKE);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(CountUsersPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.COUNT_USERS, preEvent.operationType());
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), preEvent.identifier());
+  }
+
+  @Test
+  void testCountUsersEvent() {
+    dispatcher.countUsers(METALAKE);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CountUsersEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.COUNT_USERS, event.operationType());
+
+    CountUsersEvent countEvent = (CountUsersEvent) event;
+    Assertions.assertEquals(NameIdentifier.of(METALAKE), countEvent.identifier());
+    Assertions.assertEquals(2L, countEvent.count());
+  }
+
+  @Test
+  void testCountUsersFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class, () -> failureDispatcher.countUsers(INEXIST_METALAKE));
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(CountUsersFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.COUNT_USERS, event.operationType());
+    Assertions.assertEquals(NameIdentifier.of(INEXIST_METALAKE), event.identifier());
   }
 
   @Test
@@ -628,6 +715,9 @@ public class TestUserEvent {
     when(dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(true);
 
     when(dispatcher.listUsers(METALAKE)).thenReturn(new User[] {user, otherUser});
+    when(dispatcher.listUsers(eq(METALAKE), eq(0), eq(10)))
+        .thenReturn(new PagedResult<>(2, Arrays.asList(user, otherUser)));
+    when(dispatcher.countUsers(METALAKE)).thenReturn(2L);
     when(dispatcher.listUserNames(METALAKE)).thenReturn(new String[] {userName, otherUserName});
 
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
