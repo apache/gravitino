@@ -230,13 +230,13 @@ The fileset is now addressable as
 
 ### Client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Tencent Cloud COS filesystem
-implementation. Which jar provides it depends on the environment:
+Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
+plus the Tencent Cloud COS filesystem implementation. Only the latter differs by environment:
 
-| Environment            | Jars to add                                                                                                                                                                                    |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-tencent-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-tencent-bundle) — a fat jar bundling `hadoop-cos` and the Tencent Cloud COS Java SDK            |
-| Hadoop already present | `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar` — unlike `hadoop-aws` or `hadoop-aliyun` these are not part of the Apache Hadoop distribution, download them from Maven Central |
+| Environment            | Jar providing the Tencent Cloud COS filesystem                                                                                                                                     |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-tencent-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-tencent-bundle), a fat jar bundling `hadoop-cos` and the Tencent Cloud COS Java SDK |
+| Hadoop already present | `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`, published by Tencent Cloud on Maven Central and not part of the Apache Hadoop distribution                         |
 
 ```xml
 <!-- No Hadoop environment -->
@@ -396,8 +396,10 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 </property>
 ```
 
-2. Add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar` — unlike `hadoop-aws` or `hadoop-aliyun` these are not part of the Apache Hadoop distribution, download them from Maven Central
-   to the Hadoop classpath.
+2. Add these jars to the Hadoop classpath:
+
+   - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
+   - `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`, published by Tencent Cloud on Maven Central and not part of the Apache Hadoop distribution.
 
 3. Access the fileset:
 

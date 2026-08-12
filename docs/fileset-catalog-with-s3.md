@@ -39,11 +39,11 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client | Python client          | Description                                                                                                                                          | Required |
-|-------------------------|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| `s3-endpoint`           | `s3_endpoint`          | Endpoint of the S3 service. Optional against AWS S3 for the Python client, required for the Java client and for S3-compatible storage such as MinIO. | Yes      |
-| `s3-access-key-id`      | `s3_access_key_id`     | Access key of the S3 service.                                                                                                                        | Yes      |
-| `s3-secret-access-key`  | `s3_secret_access_key` | Secret key of the S3 service.                                                                                                                        | Yes      |
+| Catalog and Java client | Python client          | Description                                                                      | Required                                         |
+|-------------------------|------------------------|----------------------------------------------------------------------------------|--------------------------------------------------|
+| `s3-endpoint`           | `s3_endpoint`          | Endpoint of the S3 service. S3-compatible storage such as MinIO always needs it. | Yes, except for the Python client against AWS S3 |
+| `s3-access-key-id`      | `s3_access_key_id`     | Access key of the S3 service.                                                    | Yes                                              |
+| `s3-secret-access-key`  | `s3_secret_access_key` | Secret key of the S3 service.                                                    | Yes                                              |
 
 :::note
 - The location must start with `s3a://`, not `s3://`. The `hadoop-aws` library does not support the
@@ -229,13 +229,13 @@ The fileset is now addressable as
 
 ### Client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Amazon S3 filesystem
-implementation. Which jar provides it depends on the environment:
+Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
+plus the Amazon S3 filesystem implementation. Only the latter differs by environment:
 
-| Environment            | Jars to add                                                                                                                                                      |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) — a fat jar bundling `hadoop-aws` (3.3.1) and the AWS SDK |
-| Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib`                          |
+| Environment            | Jar providing the Amazon S3 filesystem                                                                                                                          |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), a fat jar bundling `hadoop-aws` (3.3.1) and the AWS SDK |
+| Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                    |
 
 ```xml
 <!-- No Hadoop environment -->
@@ -388,8 +388,10 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 </property>
 ```
 
-2. Add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib`
-   to the Hadoop classpath.
+2. Add these jars to the Hadoop classpath:
+
+   - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
+   - `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
 
 3. Access the fileset:
 

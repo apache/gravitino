@@ -221,13 +221,13 @@ The fileset is now addressable as
 
 ### Client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Alibaba Cloud OSS filesystem
-implementation. Which jar provides it depends on the environment:
+Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
+plus the Alibaba Cloud OSS filesystem implementation. Only the latter differs by environment:
 
-| Environment            | Jars to add                                                                                                                                                                    |
-|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-aliyun-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) — a fat jar bundling `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss` |
-| Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib`                         |
+| Environment            | Jar providing the Alibaba Cloud OSS filesystem                                                                                                                                |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-aliyun-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), a fat jar bundling `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss` |
+| Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                   |
 
 ```xml
 <!-- No Hadoop environment -->
@@ -381,8 +381,10 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 </property>
 ```
 
-2. Add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib`
-   to the Hadoop classpath.
+2. Add these jars to the Hadoop classpath:
+
+   - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
+   - `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
 
 3. Access the fileset:
 

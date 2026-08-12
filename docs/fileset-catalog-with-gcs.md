@@ -218,13 +218,13 @@ The fileset is now addressable as
 
 ### Client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Google Cloud Storage filesystem
-implementation. Which jar provides it depends on the environment:
+Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
+plus the Google Cloud Storage filesystem implementation. Only the latter differs by environment:
 
-| Environment            | Jars to add                                                                                                                                                             |
-|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-gcp-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle) — a fat jar bundling `gcs-connector` (hadoop3-2.2.22)            |
-| Hadoop already present | [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar) |
+| Environment            | Jar providing the Google Cloud Storage filesystem                                                                                                                                                                                           |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-gcp-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle), a fat jar bundling `gcs-connector` (hadoop3-2.2.22)                                                                                 |
+| Hadoop already present | [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar), published by Google and not part of the Apache Hadoop distribution |
 
 ```xml
 <!-- No Hadoop environment -->
@@ -364,8 +364,10 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 </property>
 ```
 
-2. Add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar)
-   to the Hadoop classpath.
+2. Add these jars to the Hadoop classpath:
+
+   - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
+   - [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar), published by Google and not part of the Apache Hadoop distribution.
 
 3. Access the fileset:
 
