@@ -234,7 +234,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @throws NoSuchTableException If the table to alter does not exist.
    * @throws IllegalArgumentException If an unsupported or invalid change is specified.
    * @throws GravitinoRuntimeException If a rename succeeds in the external catalog but Gravitino
-   *     fails to update the stored table registration.
+   *     cannot update the stored table registration consistently.
    */
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
@@ -350,12 +350,14 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   "UPDATE",
                   tableId);
 
+          // operateOnEntity returns null if the store update fails or if the returned entity ID
+          // does not match the ID from the external catalog.
           if (isRenameTable && updatedTableEntity == null) {
             NameIdentifier newIdent =
                 NameIdentifier.of(getNewNamespace(ident, changes), alteredTable.name());
             throw new GravitinoRuntimeException(
                 "Table %s was renamed to %s in the external catalog, but its registration in "
-                    + "Gravitino could not be updated",
+                    + "Gravitino could not be updated consistently",
                 ident, newIdent);
           }
 
@@ -395,9 +397,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return droppedFromCatalog;
           }
 
-          // A false result can mean that a concurrent rename already moved the external table.
-          // Only remove the stored registration after the catalog confirms that this drop deleted
-          // the table.
+          // A false result is ambiguous: the external table may have been renamed or dropped out of
+          // band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+          // registration that requires separate cleanup.
           if (droppedFromCatalog) {
             try {
               store.delete(ident, TABLE);
@@ -448,9 +451,10 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return droppedFromCatalog;
           }
 
-          // A false result can mean that a concurrent rename already moved the external table.
-          // Only remove the stored registration after the catalog confirms that this purge deleted
-          // the table.
+          // A false result is ambiguous: the external table may have been renamed or dropped out of
+          // band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band purge can therefore leave a stale
+          // registration that requires separate cleanup.
           if (droppedFromCatalog) {
             try {
               store.delete(ident, TABLE);

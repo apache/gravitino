@@ -200,7 +200,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @throws NoSuchViewException If the view to alter does not exist.
    * @throws IllegalArgumentException If an unsupported or invalid change is specified.
    * @throws GravitinoRuntimeException If a rename succeeds in the external catalog but Gravitino
-   *     fails to update the stored view registration.
+   *     cannot update the stored view registration consistently.
    */
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
@@ -273,11 +273,13 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                   "UPDATE",
                   viewId);
 
+          // operateOnEntity returns null if the store update fails or if the returned entity ID
+          // does not match the ID from the external catalog.
           if (isRenameView && updatedViewEntity == null) {
             NameIdentifier newIdent = NameIdentifier.of(ident.namespace(), alteredView.name());
             throw new GravitinoRuntimeException(
                 "View %s was renamed to %s in the external catalog, but its registration in "
-                    + "Gravitino could not be updated",
+                    + "Gravitino could not be updated consistently",
                 ident, newIdent);
           }
 
@@ -317,9 +319,10 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             return droppedFromCatalog;
           }
 
-          // A false result can mean that a concurrent rename already moved the external view. Only
-          // remove the stored registration after the catalog confirms that this drop deleted the
-          // view.
+          // A false result is ambiguous: the external view may have been renamed or dropped out of
+          // band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+          // registration that requires separate cleanup.
           if (droppedFromCatalog) {
             try {
               store.delete(ident, VIEW);

@@ -339,9 +339,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // A false result can mean that the schema was renamed directly in the external catalog.
-          // Only remove the stored registration after the catalog confirms that this drop deleted
-          // the schema and its descendants.
+          // A false result is ambiguous: the external schema may have been renamed or dropped out
+          // of band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+          // registration that requires separate cleanup.
           if (droppedFromCatalog) {
             try {
               store.delete(ident, SCHEMA, true);
