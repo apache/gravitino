@@ -64,7 +64,7 @@ The Lance REST service acts as a bridge between Lance datasets and applications:
 
 ## Supported Operations
 
-The Lance REST service provides comprehensive support for namespace management and table management. Index operations are not supported yet. The table below lists all supported operations:
+The Lance REST service provides comprehensive support for namespace management, table management, and index operations. The table below lists all supported operations:
 
 | Operation         | Description                                                               | HTTP Method | Endpoint Pattern                      |
 |-------------------|---------------------------------------------------------------------------|-------------|---------------------------------------|
@@ -123,27 +123,15 @@ The `version` field of `CreateTable` response is always null, which stands for t
 
 To enable the Lance REST service within Gravitino server, configure the following properties in your Gravitino configuration file `${GRAVITINO_HOME}/conf/gravitino.conf`:
 
-<<<<<<< HEAD
-| Configuration Property                    | Description                                                                  | Default Value           | Required | Since Version |
-|-------------------------------------------|------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      | 0.2.0         |
-| `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      | 1.1.0         |
-| `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       | 1.1.0         |
-| `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       | 1.1.0         |
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (only `gravitino` is supported)                   | gravitino               | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      | 1.1.0         |
-=======
 | Configuration Property                    | Description                                                                  | Default Value           | Required |
 |-------------------------------------------|------------------------------------------------------------------------------|-------------------------|----------|
 | `gravitino.auxService.names`              | Auxiliary services to run. Include `lance-rest` to enable Lance REST service | iceberg-rest,lance-rest | Yes      |
 | `gravitino.lance-rest.classpath`          | Classpath for Lance REST service, relative to Gravitino home directory       | lance-rest-server/libs  | Yes      |
 | `gravitino.lance-rest.httpPort`           | Port number for Lance REST service                                           | 9101                    | No       |
 | `gravitino.lance-rest.host`               | Hostname for Lance REST service                                              | 0.0.0.0                 | No       |
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (currently only `gravitino` is supported)         | gravitino               | Yes      |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI. Not required in auxiliary mode.                        | http://localhost:8090   | No       |
+| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend (only `gravitino` is supported)                   | gravitino               | Yes      |
+| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI (required when namespace-backend is `gravitino`)        | http://localhost:8090   | Yes      |
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name (required when namespace-backend is `gravitino`)     | (none)                  | Yes      |
->>>>>>> bf20d6010 ([#12359] docs: Remove remaining Since Version references (#12409))
 
 **Authentication to the Gravitino Server**
 
@@ -152,16 +140,6 @@ credentials, otherwise a Gravitino server configured with an authenticator other
 rejects them and every Lance operation fails. Configure the auth type to match the Gravitino
 server:
 
-<<<<<<< HEAD
-| Configuration Property                             | Description                                                                        | Default Value       | Required          | Since Version |
-|----------------------------------------------------|------------------------------------------------------------------------------------|---------------------|-------------------|---------------|
-| `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `simple`, `oauth2` | `simple`            | No                | 1.3.0         |
-| `gravitino.lance-rest.gravitino-simple.user-name`  | User name presented when the auth type is `simple`                                 | `lance-rest-server` | No                | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.server-uri` | OAuth2 server URI                                                                  | (none)              | Yes, for `oauth2` | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                        | (none)              | Yes, for `oauth2` | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                | (none)              | Yes, for `oauth2` | 1.3.0         |
-| `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                | (none)              | Yes, for `oauth2` | 1.3.0         |
-=======
 | Configuration Property                             | Description                                                                        | Default Value       | Required          |
 |----------------------------------------------------|------------------------------------------------------------------------------------|---------------------|-------------------|
 | `gravitino.lance-rest.gravitino-auth-type`         | Auth type used to reach the Gravitino server. Supported values: `simple`, `oauth2` | `simple`            | No                |
@@ -170,7 +148,6 @@ server:
 | `gravitino.lance-rest.gravitino-oauth2.credential` | Credential used to request the OAuth2 token                                        | (none)              | Yes, for `oauth2` |
 | `gravitino.lance-rest.gravitino-oauth2.token-path` | Path on the OAuth2 server used to request the token                                | (none)              | Yes, for `oauth2` |
 | `gravitino.lance-rest.gravitino-oauth2.scope`      | Scope of the requested OAuth2 token                                                | (none)              | Yes, for `oauth2` |
->>>>>>> bf20d6010 ([#12359] docs: Remove remaining Since Version references (#12409))
 
 This setting controls how the service authenticates to the Gravitino server. It does not change how
 callers authenticate to the Lance REST service itself.
@@ -196,15 +173,6 @@ To run Lance REST service independently without Gravitino server (You need to st
 
 Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-server.conf` or passing command-line arguments:
 
-<<<<<<< HEAD
-| Configuration Property                    | Description                 | Default Value         | Required | Since Version |
-|-------------------------------------------|-----------------------------|-----------------------|----------|---------------|
-| `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend  | gravitino             | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-uri`      | Gravitino server URI        | http://localhost:8090 | Yes      | 1.1.0         |
-| `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name     | (none)                | Yes      | 1.1.0         |
-| `gravitino.lance-rest.httpPort`           | Service port number         | 9101                  | No       | 1.1.0         |
-| `gravitino.lance-rest.host`               | Service hostname            | 0.0.0.0               | No       | 1.1.0         |
-=======
 | Configuration Property                    | Description                | Default Value         | Required |
 |-------------------------------------------|----------------------------|-----------------------|----------|
 | `gravitino.lance-rest.namespace-backend`  | Namespace metadata backend | gravitino             | Yes      |
@@ -212,7 +180,6 @@ Configure the service by editing `{GRAVITINO_HOME}/conf/gravitino-lance-rest-ser
 | `gravitino.lance-rest.gravitino-metalake` | Gravitino metalake name    | (none)                | Yes      |
 | `gravitino.lance-rest.httpPort`           | Service port number        | 9101                  | No       |
 | `gravitino.lance-rest.host`               | Service hostname           | 0.0.0.0               | No       |
->>>>>>> bf20d6010 ([#12359] docs: Remove remaining Since Version references (#12409))
 
 :::tip
 In most cases, you only need to configure `gravitino.lance-rest.gravitino-metalake` and other properties can use their default values.
