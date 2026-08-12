@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -168,7 +169,25 @@ public class TestEntityCacheChangeLogListener {
   }
 
   @Test
-  void testOneFailingRowDoesNotStopTheRest() {
+  void testUndecodableFullNameIsSkippedWithoutClearingTheCache() {
+    EntityCache cache = mock(EntityCache.class);
+    EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache);
+
+    listener.onEntityChange(
+        List.of(
+            // Claims two levels but only carries one, so the codec rejects it.
+            record(EntityType.TABLE, "gravitino:v1:2:3:abc", OperateType.ALTER),
+            record(EntityType.CATALOG, "m1.cat_ok", OperateType.ALTER)));
+
+    // A row that names no entity leaves nothing stale behind, so the batch keeps going and the
+    // cache is not cleared.
+    verify(cache, times(1)).invalidate(any(NameIdentifier.class), any(EntityType.class));
+    verify(cache).invalidate(NameIdentifier.of("m1", "cat_ok"), EntityType.CATALOG);
+    verify(cache, never()).clear();
+  }
+
+  @Test
+  void testFailedInvalidationClearsTheWholeCache() {
     EntityCache cache = mock(EntityCache.class);
     NameIdentifier failing = NameIdentifier.of("m1", "boom");
     doThrow(new RuntimeException("boom")).when(cache).invalidate(failing, EntityType.CATALOG);
@@ -179,7 +198,28 @@ public class TestEntityCacheChangeLogListener {
             record(EntityType.CATALOG, "m1.boom", OperateType.DROP),
             record(EntityType.CATALOG, "m1.ok", OperateType.DROP)));
 
-    verify(cache).invalidate(NameIdentifier.of("m1", "ok"), EntityType.CATALOG);
+    // The clear is a superset of every invalidation in this batch, so the remaining row is not
+    // replayed and no entry can survive stale.
+    verify(cache).clear();
+    verify(cache, never()).invalidate(NameIdentifier.of("m1", "ok"), EntityType.CATALOG);
+  }
+
+  @Test
+  void testFailedClearPropagatesToThePoller() {
+    EntityCache cache = mock(EntityCache.class);
+    NameIdentifier failing = NameIdentifier.of("m1", "boom");
+    doThrow(new RuntimeException("boom")).when(cache).invalidate(failing, EntityType.CATALOG);
+    doThrow(new IllegalStateException("cache is broken")).when(cache).clear();
+
+    EntityCacheChangeLogListener listener = new EntityCacheChangeLogListener(cache);
+
+    // The listener cannot heal itself, so the poller must see the failure and apply its own
+    // retry / failure-action policy instead of the batch being silently dropped.
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () ->
+            listener.onEntityChange(
+                List.of(record(EntityType.CATALOG, "m1.boom", OperateType.DROP))));
   }
 
   @Test

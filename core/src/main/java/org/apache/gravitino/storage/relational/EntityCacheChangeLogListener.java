@@ -41,6 +41,20 @@ import org.slf4j.LoggerFactory;
  * org.apache.gravitino.cache.Coherence#LOCAL_PER_NODE} cache: a shared cache has a single
  * cluster-wide copy and nothing per-node to invalidate. It is called <em>synchronously</em> on the
  * poller thread, so it performs only fast, in-memory, idempotent invalidations.
+ *
+ * <p>The two failure modes of a replayed row are handled separately, because they mean different
+ * things:
+ *
+ * <ul>
+ *   <li>A <b>malformed row</b> (unknown entity type, undecodable full name) names no entity, so
+ *       there is nothing to invalidate. It is logged and skipped, and the rest of the batch still
+ *       applies.
+ *   <li>A <b>failed invalidation</b> means this node may now serve stale metadata indefinitely. The
+ *       whole cache is cleared instead, which is strictly stronger than the invalidation that
+ *       failed and only costs a cold-cache penalty, since the cache is derived state. If even the
+ *       clear fails the exception propagates, and {@link EntityChangeLogPoller} retries the batch
+ *       and ultimately applies its configured listener failure action.
+ * </ul>
  */
 public class EntityCacheChangeLogListener implements EntityChangeLogListener {
 
@@ -61,21 +75,29 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
     for (EntityChangeRecord change : changes) {
-      try {
-        EntityType type = entityType(change);
-        NameIdentifier ident = identifier(change);
-        if (type == null || ident == null) {
-          continue;
-        }
+      EntityType type = entityType(change);
+      NameIdentifier ident = identifier(change);
+      if (type == null || ident == null) {
+        // Already logged by the parsing helpers. A row that names no entity cannot invalidate
+        // anything, so skipping it leaves no stale entry behind.
+        continue;
+      }
 
+      try {
         LOG.debug("Invalidating entity cache due to entity change log: {} ({})", ident, type);
         cache.invalidate(ident, type);
       } catch (RuntimeException e) {
-        LOG.warn(
-            "Failed to process entity change log record: fullName={}, entityType={}",
-            change.getFullName(),
-            change.getEntityType(),
+        // Dropping a single invalidation would leave this node serving that entity stale until it
+        // expires. Clearing the whole cache is the safe superset, and it also covers the rest of
+        // this batch, so there is nothing left to replay.
+        LOG.error(
+            "Failed to invalidate {} ({}) from the entity change log, clearing the local entity "
+                + "cache to stay coherent",
+            ident,
+            type,
             e);
+        cache.clear();
+        return;
       }
     }
   }
@@ -99,6 +121,11 @@ public class EntityCacheChangeLogListener implements EntityChangeLogListener {
       LOG.warn("Invalid full name in entity change log: {}", fullName);
       return null;
     }
-    return EntityChangeLogNameIdentifierCodec.decode(fullName);
+    try {
+      return EntityChangeLogNameIdentifierCodec.decode(fullName);
+    } catch (IllegalArgumentException e) {
+      LOG.warn("Undecodable full name in entity change log: {}", fullName, e);
+      return null;
+    }
   }
 }
