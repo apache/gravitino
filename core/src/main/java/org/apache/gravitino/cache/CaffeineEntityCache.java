@@ -83,7 +83,7 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
   /**
    * Separates {@link NameIdentifier} levels in a cache key. See {@link
-   * #invalidateHierarchy(EntityCacheKey)} for why it is not the only child boundary.
+   * #invalidationPrefixes(EntityCacheKey)} for why it is not the only child boundary.
    */
   private static final String NAME_LEVEL_BOUNDARY = ".";
 
@@ -396,31 +396,8 @@ public class CaffeineEntityCache extends BaseEntityCache {
   }
 
   /**
-<<<<<<< HEAD
    * Syncs the entities to the cache, if entities are too big and cannot put to the cache, then it
    * will be removed from the cache, and cacheIndex will not be updated.
-=======
-   * Removes the entry for the given key and all cached descendant entries. Descendants are found
-   * through the prefix index, scanning once per child boundary:
-   *
-   * <ul>
-   *   <li>{@code "."} separates {@link NameIdentifier} levels, so it matches ordinary children such
-   *       as the tables of a schema.
-   *   <li>The {@link HierarchicalSchemaUtil#schemaSeparator() schema separator} joins nested {@code
-   *       HierarchicalSchema} levels <em>inside</em> a single name level, so it matches nested
-   *       schemas such as {@code raw:events:2024} under {@code raw:events}. Without this pass those
-   *       descendants would survive until their TTL expires. The cache sits above the storage
-   *       layer, where schema names are still logical, so the boundary is the configured external
-   *       separator and not the physical one the entity store writes to the backend. Only a schema
-   *       can carry nested levels, so this pass is skipped for every other entity type; a catalog
-   *       still reaches its nested schemas through the {@code "."} pass above.
-   * </ul>
-   *
-   * <p>Matching on a boundary rather than the bare identifier is what keeps the scan exact: it
-   * never matches siblings sharing a name prefix, neither {@code catalog1} vs {@code catalog10} nor
-   * {@code raw:events} vs {@code raw:events2}. Because the index matches on the whole key string,
-   * the separator pass already collects descendants at any depth, so no recursion is needed.
->>>>>>> bb93bf923 ([#12416] fix(core): Cascade cache invalidation to hierarchical schema descendants (#12417))
    *
    * @param key The key of the entities.
    * @param newEntities The new entities to sync to the cache.
@@ -428,7 +405,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
   private void syncEntitiesToCache(EntityCacheRelationKey key, List<Entity> newEntities) {
     List<Entity> existingEntities = cacheData.getIfPresent(key);
 
-<<<<<<< HEAD
     if (existingEntities != null && key.relationType() != null) {
       Set<Entity> merged = Sets.newLinkedHashSet(existingEntities);
       merged.addAll(newEntities);
@@ -443,26 +419,6 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     if (cacheData.policy().getIfPresentQuietly(key) != null) {
       cacheIndex.put(key.toString(), key);
-=======
-    String identifier = key.identifier().toString();
-    invalidateDescendants(identifier + NAME_LEVEL_BOUNDARY);
-    if (key.entityType() == Entity.EntityType.SCHEMA) {
-      invalidateDescendants(identifier + HierarchicalSchemaUtil.schemaSeparator());
-    }
-  }
-
-  /**
-   * Removes every cached entry whose key starts with the given prefix.
-   *
-   * @param keyPrefix The prefix that identifies the descendants to remove
-   */
-  private void invalidateDescendants(String keyPrefix) {
-    List<EntityCacheKey> childKeys =
-        Lists.newArrayList(cacheIndex.getValuesForKeysStartingWith(keyPrefix));
-    for (EntityCacheKey childKey : childKeys) {
-      cacheData.invalidate(childKey);
-      cacheIndex.remove(childKey.toString());
->>>>>>> bb93bf923 ([#12416] fix(core): Cascade cache invalidation to hierarchical schema descendants (#12417))
     }
   }
 
@@ -537,17 +493,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
 
-      // Remove related entity keys
-      List<EntityCacheKey> relatedEntityKeysToRemove =
-          Lists.newArrayList(
-              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.identifier().toString()));
+      // Remove the current entity's relation entries and its descendants.
+      Set<EntityCacheKey> relatedEntityKeysToRemove = Sets.newHashSet();
+      for (String prefix : invalidationPrefixes(currentKeyToRemove)) {
+        cacheIndex.getValuesForKeysStartingWith(prefix).forEach(relatedEntityKeysToRemove::add);
+      }
       queue.addAll(relatedEntityKeysToRemove);
 
       // Look up from reverse index to go to next depth
-      List<List<EntityCacheKey>> reverseKeysToRemove =
-          Lists.newArrayList(
-              reverseIndex.getValuesForKeysStartingWith(
-                  currentKeyToRemove.identifier().toString()));
+      List<List<EntityCacheKey>> reverseKeysToRemove = Lists.newArrayList();
+      for (String prefix : invalidationPrefixes(currentKeyToRemove)) {
+        reverseIndex.getValuesForKeysStartingWith(prefix).forEach(reverseKeysToRemove::add);
+      }
 
       reverseKeysToRemove.forEach(
           key -> {
@@ -569,6 +526,27 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     return true;
+  }
+
+  /**
+   * Returns exact prefixes for the entity, its ordinary descendants, and nested schemas.
+   *
+   * <p>The entity-type prefix includes all relation entries for the same entity without matching an
+   * entity of another type. The name-level and schema-level prefixes use explicit child boundaries,
+   * so identifiers that merely share a prefix remain cached.
+   *
+   * @param key the entity cache key
+   * @return prefixes identifying the entity and its descendants
+   */
+  private Set<String> invalidationPrefixes(EntityCacheKey key) {
+    String identifier = key.identifier().toString();
+    Set<String> prefixes = Sets.newLinkedHashSet();
+    prefixes.add(EntityCacheKey.of(key.identifier(), key.entityType()).toString());
+    prefixes.add(identifier + NAME_LEVEL_BOUNDARY);
+    if (key.entityType() == Entity.EntityType.SCHEMA) {
+      prefixes.add(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    }
+    return prefixes;
   }
 
   /** Starts the cache stats monitor. */

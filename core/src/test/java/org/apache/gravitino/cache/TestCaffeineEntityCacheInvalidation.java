@@ -18,45 +18,32 @@
  */
 package org.apache.gravitino.cache;
 
-<<<<<<< HEAD
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
-=======
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
 import org.apache.commons.lang3.reflect.FieldUtils;
->>>>>>> bb93bf923 ([#12416] fix(core): Cascade cache invalidation to hierarchical schema descendants (#12417))
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
-<<<<<<< HEAD
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.RoleEntity;
-import org.apache.gravitino.storage.RandomIdGenerator;
-import org.apache.gravitino.utils.NameIdentifierUtil;
-=======
-import org.apache.gravitino.GravitinoEnv;
-import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.GroupEntity;
-import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.TestUtil;
->>>>>>> bb93bf923 ([#12416] fix(core): Cascade cache invalidation to hierarchical schema descendants (#12417))
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -84,7 +71,6 @@ public class TestCaffeineEntityCacheInvalidation {
   }
 
   /**
-<<<<<<< HEAD
    * Builds a RoleEntity that has the given schema as its securable object.
    *
    * @param metalake the metalake name
@@ -107,7 +93,9 @@ public class TestCaffeineEntityCacheInvalidation {
         .withAuditInfo(auditInfo)
         .withSecurableObjects(Lists.newArrayList(schemaObject))
         .build();
-=======
+  }
+
+  /**
    * Joins nested schema levels the way they reach the cache. The cache sits above the storage
    * layer, so nested schema names still carry the configured external separator.
    */
@@ -117,29 +105,6 @@ public class TestCaffeineEntityCacheInvalidation {
 
   private static Namespace schemaNamespace(String schemaName) {
     return Namespace.of(CATALOG_NS.level(0), CATALOG_NS.level(1), schemaName);
-  }
-
-  @Test
-  void testInvalidateCatalogCascadesToChildren() {
-    CatalogEntity catalog =
-        TestUtil.getTestCatalogEntity(1L, "catalog1", Namespace.of("metalake"), "hive", "cmt");
-    SchemaEntity schema =
-        TestUtil.getTestSchemaEntity(2L, "schema1", Namespace.of("metalake", "catalog1"), "cmt");
-    TableEntity table =
-        TestUtil.getTestTableEntity(3L, "table1", Namespace.of("metalake", "catalog1", "schema1"));
-
-    cache.put(catalog);
-    cache.put(schema);
-    cache.put(table);
-    Assertions.assertEquals(3, cache.size());
-
-    cache.invalidate(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
-
-    Assertions.assertFalse(cache.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
-    Assertions.assertFalse(cache.contains(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
-    Assertions.assertFalse(cache.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
-    Assertions.assertEquals(0, cache.size());
->>>>>>> bb93bf923 ([#12416] fix(core): Cascade cache invalidation to hierarchical schema descendants (#12417))
   }
 
   /**
@@ -426,43 +391,11 @@ public class TestCaffeineEntityCacheInvalidation {
         sizeAfterInvalidation < sizeBeforeInvalidation,
         "Cache size must decrease after invalidating role and its related relation entries");
 
-<<<<<<< HEAD
     // Reverse index for role should be empty
     ReverseIndexCache reverseIndex = cache.getReverseIndex();
     List<EntityCacheKey> roleReverseKeys = reverseIndex.get(roleIdent, Entity.EntityType.ROLE);
     Assertions.assertNull(
         roleReverseKeys, "Reverse index for role should be empty after invalidation");
-=======
-  @Test
-  void testPutModelVersionInvalidatesModel() {
-    ModelEntity model = TestUtil.getTestModelEntity(1L, "model1", Namespace.of("m1", "c1", "s1"));
-    cache.put(model);
-    Assertions.assertTrue(cache.contains(model.nameIdentifier(), Entity.EntityType.MODEL));
-
-    ModelVersionEntity version =
-        TestUtil.getTestModelVersionEntity(
-            model.nameIdentifier(),
-            1,
-            ImmutableMap.of("unknown", "uri"),
-            ImmutableMap.of(),
-            "cmt",
-            ImmutableList.of());
-    cache.put(version);
-
-    Assertions.assertFalse(cache.contains(model.nameIdentifier(), Entity.EntityType.MODEL));
-  }
-
-  @Test
-  void testGetIfPresentReturnsCachedEntity() {
-    CatalogEntity catalog =
-        TestUtil.getTestCatalogEntity(1L, "catalog1", Namespace.of("metalake"), "hive", "cmt");
-    cache.put(catalog);
-
-    Assertions.assertEquals(
-        catalog,
-        cache.getIfPresent(catalog.nameIdentifier(), Entity.EntityType.CATALOG).orElse(null));
-    Assertions.assertTrue(
-        cache.getIfPresent(catalog.nameIdentifier(), Entity.EntityType.SCHEMA).isEmpty());
   }
 
   @Test
@@ -621,19 +554,5 @@ public class TestCaffeineEntityCacheInvalidation {
 
     Assertions.assertFalse(cache.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
     Assertions.assertTrue(cache.contains(topic.nameIdentifier(), Entity.EntityType.TOPIC));
-  }
-
-  @Test
-  void testClearResetsSizeAndIndex() {
-    CatalogEntity catalog =
-        TestUtil.getTestCatalogEntity(1L, "catalog1", Namespace.of("metalake"), "hive", "cmt");
-    cache.put(catalog);
-    Assertions.assertEquals(1, cache.size());
-
-    cache.clear();
-
-    Assertions.assertEquals(0, cache.size());
-    Assertions.assertFalse(cache.contains(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
->>>>>>> bb93bf923 ([#12416] fix(core): Cascade cache invalidation to hierarchical schema descendants (#12417))
   }
 }
