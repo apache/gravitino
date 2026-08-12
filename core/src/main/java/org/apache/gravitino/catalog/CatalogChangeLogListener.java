@@ -35,23 +35,28 @@ import org.slf4j.LoggerFactory;
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
  *
- * <p>The poller requires each listener to be self-healing. This one heals within a single record:
- * it retries that record's own eviction (see {@link #invalidateWithRetry}) and then swallows the
- * failure, so one bad record never costs the rest of the batch. It must NOT recover by clearing the
- * catalog cache the way {@code EntityCacheChangeLogListener} and {@code JcasbinChangeListener} do,
- * because evicting a catalog this process still uses closes its in-use {@code IsolatedClassLoader}
- * (#11739). Giving up on one eviction is the cheaper failure: the catalog cache expires on access,
- * so staleness is bounded by {@code gravitino.catalog.cache.evictionIntervalMs}.
+ * <p>The poller requires each listener to be self-healing, and this one recovers the same way
+ * {@code EntityCacheChangeLogListener} and {@code JcasbinChangeListener} do: a failed eviction
+ * clears the whole catalog cache, which is a strict superset of the eviction that failed and of the
+ * rest of the batch. A malformed row is skipped instead, because it names no catalog and so leaves
+ * nothing stale.
+ *
+ * <p>If the clear itself fails the exception reaches the poller, which logs it at {@code ERROR} and
+ * advances its cursor. That is safe now that the poller never replays a batch: a replay would
+ * re-run the single-shot {@link CatalogManager#consumeLocalMutation} probe, classify a local
+ * mutation as remote and tear down a catalog this node just mutated itself.
+ *
+ * <p><b>Cost of the clear:</b> evicting a cached catalog closes its {@code CatalogWrapper}, which
+ * tears down the connection pool and the {@code IsolatedClassLoader}. A whole-cache clear therefore
+ * also closes catalogs this process is actively serving; requests holding classes from a closed
+ * loader can fail with {@code NoClassDefFoundError}, the failure mode of #11739. This is accepted
+ * deliberately so that a stale catalog is never served: the alternative left this node serving the
+ * changed catalog from cache for up to {@code gravitino.catalog.cache.evictionIntervalMs}. The
+ * clear runs only on a failed eviction, which is off the normal path.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
   private static final Logger LOG = LoggerFactory.getLogger(CatalogChangeLogListener.class);
-
-  /**
-   * How many times one catalog eviction is attempted. This is the listener's whole self-healing
-   * budget: see {@link #invalidateWithRetry} for why recovery cannot be broadened here.
-   */
-  private static final int MAX_INVALIDATION_ATTEMPTS = 2;
 
   private final CatalogManager catalogManager;
 
@@ -67,98 +72,66 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
     for (EntityChangeRecord change : changes) {
-      try {
-        if (!isCatalogChange(change)) {
-          continue;
-        }
-
-        Optional<NameIdentifier> identOpt = catalogIdentifier(change);
-        if (identOpt.isEmpty()) {
-          continue;
-        }
-        NameIdentifier ident = identOpt.get();
-
-        if (catalogManager.consumeLocalMutation(ident)) {
-          LOG.debug(
-              "Skipping catalog cache invalidation for local mutation: {}, change log id {}",
-              ident,
-              change.getId());
-          continue;
-        }
-
-        // Logged at INFO on purpose: this tears down the cached catalog, including its connection
-        // pool and isolated classloader, and it is the main cross-node effect of the change log.
-        // CatalogManager logs the matching "Closing catalog" line when the eviction runs.
-        LOG.info(
-            "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
-            ident,
-            change.getOperateType(),
-            change.getId());
-        invalidateWithRetry(ident, change);
-      } catch (RuntimeException e) {
-        // Deliberately not rethrown: see the class javadoc. The poller dispatches a batch once, so
-        // rethrowing would only lose the remaining records of this batch as well.
-        LOG.error(
-            "Failed to process catalog change log record: id={}, fullName={}, entityType={}, "
-                + "operateType={}",
-            change.getId(),
-            change.getFullName(),
-            change.getEntityType(),
-            change.getOperateType(),
-            e);
+      if (!isCatalogChange(change)) {
+        continue;
       }
-    }
-  }
 
-  /**
-   * Evicts one catalog, retrying the eviction itself up to {@link #MAX_INVALIDATION_ATTEMPTS}
-   * times.
-   *
-   * <p>Recovery here is deliberately narrow, and both limits are correctness requirements rather
-   * than tuning choices:
-   *
-   * <ul>
-   *   <li>It is scoped to the single identifier this change log record named. Clearing the whole
-   *       catalog cache - the fallback the entity and JCasbin caches use - would evict catalogs
-   *       this process is actively serving and close their in-use {@code IsolatedClassLoader}s,
-   *       which is the permanent {@code NoClassDefFoundError} of #11739. Only the catalog that
-   *       actually changed on another node may be torn down.
-   *   <li>It retries the eviction only, never the {@link CatalogManager#consumeLocalMutation} probe
-   *       that ran before it. That marker is single-shot, so re-consulting it would classify a
-   *       local mutation as remote and tear down a catalog this node just mutated itself.
-   * </ul>
-   *
-   * <p>If every attempt fails, the record is given up on: this node keeps serving that catalog from
-   * cache until {@code gravitino.catalog.cache.evictionIntervalMs} expires it, so the failure is
-   * logged at {@code ERROR}.
-   */
-  private void invalidateWithRetry(NameIdentifier ident, EntityChangeRecord change) {
-    RuntimeException lastFailure = null;
-    for (int attempt = 1; attempt <= MAX_INVALIDATION_ATTEMPTS; attempt++) {
+      Optional<NameIdentifier> identOpt = catalogIdentifier(change);
+      if (identOpt.isEmpty()) {
+        // Already logged. A row that names no catalog cannot leave a stale entry behind, so it is
+        // skipped rather than escalated to a cache clear.
+        continue;
+      }
+      NameIdentifier ident = identOpt.get();
+
+      boolean localMutation;
+      try {
+        localMutation = catalogManager.consumeLocalMutation(ident);
+      } catch (RuntimeException e) {
+        // The dedup probe decides whether this node caused the change. Without an answer there is
+        // no eviction to attempt, and clearing here would tear down catalogs over a bookkeeping
+        // failure, so the record is skipped.
+        LOG.error(
+            "Failed to check local mutation state for catalog {}, skipping change log record id {}",
+            ident,
+            change.getId(),
+            e);
+        continue;
+      }
+
+      if (localMutation) {
+        LOG.debug(
+            "Skipping catalog cache invalidation for local mutation: {}, change log id {}",
+            ident,
+            change.getId());
+        continue;
+      }
+
+      // Logged at INFO on purpose: this tears down the cached catalog, including its connection
+      // pool and isolated classloader, and it is the main cross-node effect of the change log.
+      // CatalogManager logs the matching "Closing catalog" line when the eviction runs.
+      LOG.info(
+          "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
+          ident,
+          change.getOperateType(),
+          change.getId());
+
       try {
         catalogManager.getCatalogCache().invalidate(ident);
-        if (attempt > 1) {
-          LOG.info("Evicted catalog {} on attempt {}", ident, attempt);
-        }
-        return;
       } catch (RuntimeException e) {
-        lastFailure = e;
-        LOG.warn(
-            "Failed to evict catalog {} from the catalog cache on attempt {} of {}",
+        // The poller dispatches a batch once and never replays it, so dropping this eviction would
+        // serve the catalog stale until the eviction interval expires. The whole cache is cleared
+        // instead; see the class javadoc for the classloader cost this accepts.
+        LOG.error(
+            "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "
+                + "avoid serving it stale; catalogs in use by this node are closed as a result",
             ident,
-            attempt,
-            MAX_INVALIDATION_ATTEMPTS,
+            change.getId(),
             e);
+        catalogManager.getCatalogCache().invalidateAll();
+        return;
       }
     }
-
-    LOG.error(
-        "Giving up on evicting catalog {} after {} attempt(s) for change log id {}; this node may "
-            + "serve it stale until the catalog cache eviction interval expires it",
-        ident,
-        MAX_INVALIDATION_ATTEMPTS,
-        change.getId(),
-        lastFailure);
   }
 
   private boolean isCatalogChange(EntityChangeRecord change) {
