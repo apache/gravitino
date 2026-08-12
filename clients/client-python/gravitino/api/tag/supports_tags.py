@@ -62,6 +62,23 @@ class SupportsTags(ABC):
         pass
 
     @abstractmethod
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        """Assign tag-value pairs to the specific object.
+
+        Args:
+            tags_to_add: The tag-value pairs to be added to the object.
+            tags_to_remove: The tag-value pairs to be removed from the object.
+
+        Returns:
+            list[str]: The tag names directly associated with the object after assignment.
+        """
+        pass
+
+    @abstractmethod
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:

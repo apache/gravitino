@@ -39,11 +39,14 @@ class AssociatedObjects(ABC):
         return 0 if objects is None else len(objects)
 
     @abstractmethod
-    def objects(self) -> Optional[list[MetadataObject]]:
+    def objects(self, value: Optional[str] = None) -> Optional[list[MetadataObject]]:
         """Get the associated objects.
 
+        Args:
+            value: The optional exact assignment value filter.
+
         Returns:
-            Optional[list[MetadataObject]]: The list of objects that are associated with this tag..
+            Optional[list[MetadataObject]]: The list of objects that are associated with this tag.
         """
         pass
 
@@ -90,6 +93,24 @@ class Tag(Auditable):
         raise NotImplementedError()
 
     @abstractmethod
+    def allowed_values(self) -> Optional[list[str]]:
+        """Get the allowed values for this tag.
+
+        Returns:
+            Optional[list[str]]: The allowed values, or None if values are unrestricted.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
+    def assignment_values(self) -> Optional[list[str]]:
+        """Get assignment values when this tag is loaded from a metadata object.
+
+        Returns:
+            Optional[list[str]]: The assignment values, or None if not assignment-scoped.
+        """
+        raise NotImplementedError()
+
+    @abstractmethod
     def inherited(self) -> Optional[bool]:
         """Check if the tag is inherited from a parent object or not.
 
@@ -131,9 +152,12 @@ class Tag(Auditable):
             return 0 if (s := self.objects()) is None else len(s)
 
         @abstractmethod
-        def objects(self) -> list[MetadataObject]:
+        def objects(self, value: Optional[str] = None) -> list[MetadataObject]:
             """
             Retrieve the list of objects that are associated with this tag.
+
+            Args:
+                value: The optional exact assignment value filter.
 
             Raises:
                 NotImplementedError: if the method is not implemented.

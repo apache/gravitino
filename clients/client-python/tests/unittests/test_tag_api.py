@@ -110,6 +110,25 @@ class TestTagAPI(unittest.TestCase):
             self.assertTrue("tagA" not in retrieved_tags)
             self.assertTrue("tagB" in retrieved_tags)
 
+    def test_client_create_tag_with_allowed_values(self, *mock_method) -> None:
+        with mock_base.mock_tag_methods():
+            client = GravitinoClient(
+                uri="http://localhost:8090",
+                metalake_name=self._metalake_name,
+                check_version=False,
+            )
+
+            tag = client.create_tag(
+                "data_domain",
+                "Business data domain",
+                None,
+                ["finance", "risk"],
+            )
+
+            self.assertEqual("data_domain", tag.name())
+            self.assertEqual(["finance", "risk"], tag.allowed_values())
+            self.assertIsNone(tag.assignment_values())
+
     def test_client_create_tag(self, *mock_method) -> None:
         with mock_base.mock_tag_methods():
             client = GravitinoClient(
