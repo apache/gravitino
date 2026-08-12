@@ -35,12 +35,12 @@ import org.slf4j.LoggerFactory;
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
  *
- * <p>This listener never propagates a failure to the poller, so the poller never retries a batch
- * for it. That is deliberate: local-mutation de-duplication ({@link
- * CatalogManager#consumeLocalMutation}) is single-shot, so re-delivering an already-applied batch
- * would invalidate a catalog this process mutated itself and close its still-in-use {@code
- * IsolatedClassLoader}. Dropping an invalidation is the cheaper failure: the catalog cache expires
- * on access, so staleness is bounded by {@code gravitino.catalog.cache.evictionIntervalMs}.
+ * <p>The poller requires each listener to be self-healing, and this one heals by swallowing its own
+ * failures per record. It must not recover by clearing the catalog cache the way {@code
+ * EntityCacheChangeLogListener} does: invalidating a catalog this process still uses closes its
+ * in-use {@code IsolatedClassLoader}. Dropping an invalidation is the cheaper failure: the catalog
+ * cache expires on access, so staleness is bounded by {@code
+ * gravitino.catalog.cache.evictionIntervalMs}.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 

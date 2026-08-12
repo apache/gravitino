@@ -52,8 +52,9 @@ import org.slf4j.LoggerFactory;
  *   <li>A <b>failed invalidation</b> means this node may now serve stale metadata indefinitely. The
  *       whole cache is cleared instead, which is strictly stronger than the invalidation that
  *       failed and only costs a cold-cache penalty, since the cache is derived state. If even the
- *       clear fails the exception propagates, and {@link EntityChangeLogPoller} retries the batch
- *       and ultimately applies its configured listener failure action.
+ *       clear fails the exception propagates to {@link EntityChangeLogPoller}, which logs it and
+ *       moves on: the batch is not retried, so this node may keep serving stale entries until they
+ *       expire.
  * </ul>
  */
 public class EntityCacheChangeLogListener implements EntityChangeLogListener {
