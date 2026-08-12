@@ -348,7 +348,7 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
                   + "Tasks beyond this limit are handed out as plan-tasks that clients "
                   + "exchange for the remaining tasks. Set to 0 to disable batching and always "
                   + "return every task inline.")
-          .version(ConfigConstants.VERSION_1_3_0)
+          .version(ConfigConstants.VERSION_2_0_0)
           .intConf()
           .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
           .createWithDefault(100);
