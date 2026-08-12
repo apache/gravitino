@@ -527,6 +527,78 @@ public class TestLanceTableOperations {
   }
 
   @Test
+  public void testVersionCheckRecoversAfterAddColumnMetadataUpdateFailure() throws Exception {
+    lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("add-column-metadata-failure").toString();
+    AtomicReference<TableEntity> storedTable =
+        new AtomicReference<>(
+            tableEntity(
+                ident,
+                List.of(
+                    ColumnEntity.builder()
+                        .withId(10L)
+                        .withName("id")
+                        .withDataType(Types.IntegerType.get())
+                        .withPosition(0)
+                        .withNullable(true)
+                        .withAuditInfo(AuditInfo.EMPTY)
+                        .build()),
+                Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8")));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> storedTable.get());
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(new IOException("metadata unavailable"))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              TableEntity updated = updater.apply(storedTable.get());
+              storedTable.set(updated);
+              return updated;
+            });
+    when(idGenerator.nextId()).thenReturn(11L, 12L);
+
+    Dataset versionCheckDataset = mock(Dataset.class);
+    when(versionCheckDataset.version()).thenReturn(8L);
+    Dataset addDataset = successfulAddDataset(9L);
+    Dataset recoveryDataset = mock(Dataset.class);
+    when(recoveryDataset.version()).thenReturn(9L);
+    when(recoveryDataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("id", new ArrowType.Int(32, true)),
+                    Field.nullable("added", new ArrowType.Utf8()))));
+    Mockito.doReturn(versionCheckDataset, addDataset, recoveryDataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of());
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"),
+                    () ->
+                        lanceTableOps.alterTable(
+                            ident,
+                            TableChange.addColumn(
+                                new String[] {"added"}, Types.StringType.get()))));
+
+    Assertions.assertTrue(failure.getMessage().contains("Failed to alter table"));
+    Assertions.assertEquals(List.of("id"), columnNames(storedTable.get()));
+    verify(addDataset).addColumns(List.of(Field.nullable("added", new ArrowType.Utf8())));
+
+    Table recoveredTable =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(List.of("id", "added"), columnNames(recoveredTable));
+    Assertions.assertEquals("9", recoveredTable.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals(List.of("id", "added"), columnNames(storedTable.get()));
+  }
+
+  @Test
   public void testDirectAddColumnHydratesDeclaredSchema() throws Exception {
     assertDirectAddColumnHydratesEmptyStoredSchema(true);
   }
@@ -629,6 +701,33 @@ public class TestLanceTableOperations {
                 new TableChange[] {
                   TableChange.addColumn(new String[] {"added"}, Types.StringType.get()),
                   TableChange.renameColumn(new String[] {"id"}, "renamed")
+                }));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.addColumn(new String[] {"added"}, Types.StringType.get()),
+                  TableChange.deleteColumn(new String[] {"id"}, false)
+                }));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.deleteColumn(new String[] {"id"}, false),
+                  TableChange.addColumn(new String[] {"added"}, Types.StringType.get())
+                }));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            lanceTableOps.handleLanceTableChange(
+                table,
+                new TableChange[] {
+                  TableChange.addColumn(new String[] {"added"}, Types.StringType.get()),
+                  TableChange.addIndex(Index.IndexType.SCALAR, "idx_id", new String[][] {{"id"}})
                 }));
     Assertions.assertThrows(
         IllegalArgumentException.class,

@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -314,13 +315,14 @@ public class LanceTableOperations extends ManagedTableOperations {
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
-    int internalChangeCount = fieldsToAdd.isEmpty() ? 1 : 2;
-    TableChange[] metadataChanges = Arrays.copyOf(changes, changes.length + internalChangeCount);
-    metadataChanges[changes.length] =
-        TableChange.setProperty(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
+    TableChange[] metadataChanges =
+        ArrayUtils.add(
+            changes,
+            TableChange.setProperty(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version)));
     if (!fieldsToAdd.isEmpty()) {
-      metadataChanges[changes.length + 1] =
-          TableChange.removeProperty(LanceConstants.LANCE_TABLE_DECLARED);
+      metadataChanges =
+          ArrayUtils.add(
+              metadataChanges, TableChange.removeProperty(LanceConstants.LANCE_TABLE_DECLARED));
     }
     return super.alterTable(ident, metadataChanges);
   }
@@ -841,58 +843,53 @@ public class LanceTableOperations extends ManagedTableOperations {
     Preconditions.checkArgument(changes != null && changes.length > 0, "Changes cannot be empty");
 
     int addColumnCount = 0;
+    Set<String> columnNames = new HashSet<>();
+    List<Field> fieldsToAdd = new ArrayList<>(changes.length);
     for (TableChange change : changes) {
       Preconditions.checkArgument(change != null, "Table change cannot be null");
-      if (change instanceof TableChange.AddColumn) {
+      if (change instanceof TableChange.AddColumn addColumn) {
         addColumnCount++;
-      } else if (!(change instanceof TableChange.DeleteColumn)
-          && !(change instanceof TableChange.AddIndex)
-          && !(change instanceof TableChange.RenameColumn)) {
+
+        Preconditions.checkArgument(
+            addColumn.fieldName().length == 1,
+            "Lance only supports adding top-level columns: %s",
+            String.join(".", addColumn.fieldName()));
+        String columnName = addColumn.fieldName()[0];
+        Preconditions.checkArgument(
+            addColumn.isNullable(),
+            "Lance only supports adding nullable columns because existing rows are backfilled "
+                + "with null: %s",
+            columnName);
+        Preconditions.checkArgument(
+            TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
+            "Lance only supports appending new columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            !addColumn.isAutoIncrement(),
+            "Lance does not support adding auto-increment columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            addColumn.getDefaultValue() == null
+                || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
+            "Lance does not support default values when adding columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            columnNames.add(columnName), "Column %s already exists", columnName);
+        fieldsToAdd.add(
+            LanceDataTypeConverter.CONVERTER.toArrowField(
+                columnName, addColumn.getDataType(), true));
+      } else if (change instanceof TableChange.DeleteColumn
+          || change instanceof TableChange.AddIndex
+          || change instanceof TableChange.RenameColumn) {
+        // Handled by the existing Lance alter-table flow.
+      } else {
         throw new UnsupportedOperationException(
             "Unsupported changes to lance table: " + change.getClass().getSimpleName());
       }
     }
-
-    if (addColumnCount == 0) {
-      return List.of();
-    }
-
     Preconditions.checkArgument(
-        addColumnCount == changes.length,
+        addColumnCount == 0 || addColumnCount == changes.length,
         "Lance AddColumn cannot be combined with other table changes");
-
-    Set<String> columnNames = new HashSet<>();
-    List<Field> fieldsToAdd = new ArrayList<>(changes.length);
-    for (TableChange change : changes) {
-      TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
-      Preconditions.checkArgument(
-          addColumn.fieldName().length == 1,
-          "Lance only supports adding top-level columns: %s",
-          String.join(".", addColumn.fieldName()));
-      String columnName = addColumn.fieldName()[0];
-      Preconditions.checkArgument(
-          addColumn.isNullable(),
-          "Lance only supports adding nullable columns because existing rows are backfilled "
-              + "with null: %s",
-          columnName);
-      Preconditions.checkArgument(
-          TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
-          "Lance only supports appending new columns: %s",
-          columnName);
-      Preconditions.checkArgument(
-          !addColumn.isAutoIncrement(),
-          "Lance does not support adding auto-increment columns: %s",
-          columnName);
-      Preconditions.checkArgument(
-          addColumn.getDefaultValue() == null
-              || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
-          "Lance does not support default values when adding columns: %s",
-          columnName);
-      Preconditions.checkArgument(
-          columnNames.add(columnName), "Column %s already exists", columnName);
-      fieldsToAdd.add(
-          LanceDataTypeConverter.CONVERTER.toArrowField(columnName, addColumn.getDataType(), true));
-    }
     return fieldsToAdd;
   }
 
