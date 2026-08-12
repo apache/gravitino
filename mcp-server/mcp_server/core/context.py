@@ -31,6 +31,10 @@ _LOG = logging.getLogger(__name__)
 # (e.g. rotating tokens) come and go.
 _MAX_CACHED_CLIENTS = 128
 
+# Authorization schemes recognised on a static --token. A token that starts with
+# one of these is passed through unchanged rather than being wrapped in Bearer.
+_AUTH_SCHEMES = frozenset({"basic", "bearer", "negotiate", "digest"})
+
 
 def _get_request_authorization() -> str:
     """Return the raw ``Authorization`` header of the current HTTP request.
@@ -55,11 +59,20 @@ def _get_request_authorization() -> str:
 def startup_authorization(setting: Setting) -> str:
     """The static --token rendered as an ``Authorization`` header value.
 
-    The CLI token is treated as an OAuth2 Bearer token. Empty string when no
+    A token that already carries a scheme is used verbatim, so a caller can
+    supply ``Basic <credentials>`` or ``Negotiate <token>`` as well as an OAuth2
+    Bearer token, matching how a forwarded request header is treated. A bare
+    token is treated as OAuth2 and prefixed with ``Bearer``. Empty string when no
     token is configured (anonymous). This is the identity used in stdio mode and
     the fallback for HTTP requests that carry no ``Authorization`` header.
     """
-    return f"Bearer {setting.token}" if setting.token else ""
+    if not setting.token:
+        return ""
+    token = setting.token.strip()
+    scheme, _, rest = token.partition(" ")
+    if rest and scheme.lower() in _AUTH_SCHEMES:
+        return token
+    return f"Bearer {token}"
 
 
 class GravitinoContext:

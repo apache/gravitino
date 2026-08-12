@@ -33,7 +33,9 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
     mcp_url: str = DefaultSetting.default_mcp_url
-    # Static OAuth2 Bearer token. Sent on every request in stdio mode; in HTTP
+    # Static authorization credential. A bare value is treated as an OAuth2 Bearer
+    # token; a value that carries a scheme (``Basic ...``) is used as-is. Sent on
+    # every request in stdio mode; in HTTP
     # mode it is only the fallback used when an incoming request carries no
     # Authorization header (per-request identity takes priority).
     # Empty string means anonymous (no Authorization header sent).
