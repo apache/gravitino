@@ -39,15 +39,28 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client      | Python client                | Description                             | Required |
-|------------------------------|------------------------------|-----------------------------------------|----------|
-| `azure-storage-account-name` | `azure_storage_account_name` | Account name of the Azure Blob Storage. | Yes      |
-| `azure-storage-account-key`  | `azure_storage_account_key`  | Account key of the Azure Blob Storage.  | Yes      |
+| Catalog and Java client       | Python client                | Description                                                                                                                                                                                                                                                                                                     | Required        |
+|-------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
+| `azure-storage-account-name`  | `azure_storage_account_name` | Account name of the Azure Blob Storage.                                                                                                                                                                                                                                                                         | Yes             |
+| `azure-storage-account-key`   | `azure_storage_account_key`  | Account key of the Azure Blob Storage.                                                                                                                                                                                                                                                                          | Yes             |
+| `filesystem-providers`        | (n/a)                        | (deprecated) The filesystem providers to add. Set it to `abs` when the fileset is backed by ADLS, or to a comma separated string containing `abs`, such as `oss,abs,s3`, to support several kinds of fileset at once.                                                                                           | No (deprecated) |
+| `default-filesystem-provider` | (n/a)                        | (deprecated) The filesystem provider used when the location URI carries no scheme. Defaults to `builtin-local`; setting it to `abs` allows the `abfss://` prefix to be omitted from the location.                                                                                                               | No (deprecated) |
+| `credential-providers`        | (n/a)                        | The credential provider types, separated by comma. Possible values are `adls-token`, `azure-account-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#adls) for the extra properties each provider takes. | No              |
+
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
+automatically loads the filesystem providers found on the classpath, including the built-in
+providers and the cloud providers carried by a bundle jar such as `gravitino-azure-bundle`.
+:::
 
 :::note
 Azure Data Lake Storage is also known as Azure Blob Storage (ABS). The location uses the `abfss://`
 scheme.
 :::
+
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
 A fileset catalog stores its data under `location`, which for Azure Data Lake Storage looks like
 `abfss://container@account-name.dfs.core.windows.net/root`.
@@ -229,6 +242,23 @@ plus the Azure Data Lake Storage filesystem implementation. Only the latter diff
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle), a fat jar bundling `hadoop-azure` (3.3.1) and the packages it needs to reach ADLS |
 | Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                      |
+
+The artifacts in full:
+
+- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle):
+  a "fat" jar that includes the `gravitino-azure` functionality together with every dependency it needs,
+  such as `hadoop-azure` (3.3.1) and the packages it needs to reach ADLS. Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-azure` functionality. It is required for accessing Gravitino filesets in every environment.
+- `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and
+  `wildfly-openssl-1.0.7.Final.jar`: the standard Hadoop dependencies for Azure Data Lake Storage
+  access, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself
+  when running inside an existing Hadoop environment.
+- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure):
+  a "thin" jar carrying only the Azure integration code. It is already contained in both jars above,
+  so it is not needed as a direct dependency unless you prefer to manage all Hadoop and Azure
+  dependencies yourself.
 
 ```xml
 <!-- No Hadoop environment -->
@@ -435,11 +465,15 @@ ds = pd.read_csv("gvfs://fileset/adls_catalog/adls_schema/example_fileset/people
 ds.head()
 ```
 
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
+
 ## Credential Vending
 
 With credential vending the catalog holds the Azure Data Lake Storage credentials and the Gravitino server hands
 out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the full provider reference.
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[ADLS credentials](./security/credential-vending.md#adls) for the properties
+each provider takes.
 
 The supported providers are `adls-token`, which vends a short-lived token, and
 `azure-account-key`, which vends the static account key configured on the catalog. The example below

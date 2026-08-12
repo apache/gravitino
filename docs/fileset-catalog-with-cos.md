@@ -41,15 +41,26 @@ underscores while the catalog and the Java client use hyphens.
 
 | Catalog and Java client | Python client           | Description                                                                                                                                                                                                                                                                                                              | Required |
 |-------------------------|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| `cos-region`            | `cos_region`            | Region of the COS bucket, for example `ap-guangzhou`.                                                                                                                                                                                                                                                                    | Yes      |
+| `cos-region`            | `cos_region`            | Region of the COS bucket, for example `ap-guangzhou` or `ap-shanghai`.                                                                                                                                                                                                                                                   | Yes      |
 | `cos-endpoint`          | `cos_endpoint`          | Endpoint *suffix* of the COS service, mapped to `fs.cosn.bucket.endpoint_suffix`. It is a host suffix, not a URL — `cos.ap-guangzhou.myqcloud.com`, not `https://cos.ap-guangzhou.myqcloud.com`. When unset, hadoop-cos derives it from `cos-region`. Set it only to reach a non-public endpoint such as a VPC endpoint. | No       |
 | `cos-access-key-id`     | `cos_access_key_id`     | Static access key id, the Tencent Cloud `SecretId`.                                                                                                                                                                                                                                                                      | Yes      |
 | `cos-secret-access-key` | `cos_secret_access_key` | Static secret access key, the Tencent Cloud `SecretKey`.                                                                                                                                                                                                                                                                 | Yes      |
+| `credential-providers`  | (n/a)                   | The credential provider types, separated by comma. Possible values are `cos-secret-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md) for the extra properties each provider takes.                                | No       |
+
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
+automatically loads the filesystem providers found on the classpath, including the built-in
+providers and the cloud providers carried by a bundle jar such as `gravitino-tencent-bundle`.
+:::
 
 :::note
 `cos-region` is mandatory for hadoop-cos: signing requests, building the default endpoint and
 selecting the right CAM scope all need the region. Keep it set even when `cos-endpoint` is also set.
 :::
+
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
 A fileset catalog stores its data under `location`, which for Tencent Cloud COS looks like
 `cosn://my-bucket-1250000000/root`.
@@ -233,10 +244,23 @@ The fileset is now addressable as
 Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
 plus the Tencent Cloud COS filesystem implementation. Only the latter differs by environment:
 
-| Environment            | Jar providing the Tencent Cloud COS filesystem                                                                                                                                     |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-tencent-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-tencent-bundle), a fat jar bundling `hadoop-cos` and the Tencent Cloud COS Java SDK |
-| Hadoop already present | `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`, published by Tencent Cloud on Maven Central and not part of the Apache Hadoop distribution                         |
+| Environment            | Jar providing the Tencent Cloud COS filesystem                                                                                                                                                      |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-tencent-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-tencent-bundle), a fat jar bundling `hadoop-cos` and the Tencent Cloud COS Java SDK                  |
+| Hadoop already present | `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`, published by Tencent Cloud on Maven Central and, unlike `hadoop-aws` or `hadoop-aliyun`, not part of the Apache Hadoop distribution |
+
+The artifacts in full:
+
+- [`gravitino-tencent-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-tencent-bundle):
+  a "fat" jar that includes the `gravitino-tencent` functionality together with every dependency it needs,
+  such as `hadoop-cos` and the Tencent Cloud COS Java SDK. Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-tencent` functionality. It is required for accessing Gravitino filesets in every environment.
+- `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`: the standard Hadoop dependencies
+  for Tencent Cloud COS access, published by Tencent Cloud on Maven Central and, unlike `hadoop-aws`
+  or `hadoop-aliyun`, not part of the Apache Hadoop distribution. Supply them yourself when running
+  inside an existing Hadoop environment.
 
 ```xml
 <!-- No Hadoop environment -->
@@ -399,7 +423,7 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
 2. Add these jars to the Hadoop classpath:
 
    - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
-   - `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`, published by Tencent Cloud on Maven Central and not part of the Apache Hadoop distribution.
+   - `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`, published by Tencent Cloud on Maven Central and, unlike `hadoop-aws` or `hadoop-aliyun`, not part of the Apache Hadoop distribution.
 
 3. Access the fileset:
 
@@ -459,11 +483,15 @@ ds = pd.read_csv("gvfs://fileset/cos_catalog/cos_schema/example_fileset/people/p
 ds.head()
 ```
 
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
+
 ## Credential Vending
 
 With credential vending the catalog holds the Tencent Cloud COS credentials and the Gravitino server hands
 out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the full provider reference.
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[COS credentials](./security/credential-vending.md#) for the properties
+each provider takes.
 
 The supported provider is `cos-secret-key`, which vends the static
 `cos-access-key-id` / `cos-secret-access-key` configured on the catalog.

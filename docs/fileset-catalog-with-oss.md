@@ -39,11 +39,24 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client | Python client           | Description                           | Required |
-|-------------------------|-------------------------|---------------------------------------|----------|
-| `oss-endpoint`          | `oss_endpoint`          | Endpoint of the Aliyun OSS service.   | Yes      |
-| `oss-access-key-id`     | `oss_access_key_id`     | Access key of the Aliyun OSS service. | Yes      |
-| `oss-secret-access-key` | `oss_secret_access_key` | Secret key of the Aliyun OSS service. | Yes      |
+| Catalog and Java client       | Python client           | Description                                                                                                                                                                                                                                                                                                | Required        |
+|-------------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
+| `oss-endpoint`                | `oss_endpoint`          | Endpoint of the Aliyun OSS service.                                                                                                                                                                                                                                                                        | Yes             |
+| `oss-access-key-id`           | `oss_access_key_id`     | Access key of the Aliyun OSS service.                                                                                                                                                                                                                                                                      | Yes             |
+| `oss-secret-access-key`       | `oss_secret_access_key` | Secret key of the Aliyun OSS service.                                                                                                                                                                                                                                                                      | Yes             |
+| `filesystem-providers`        | (n/a)                   | (deprecated) The filesystem providers to add. Set it to `oss` when the fileset is backed by OSS, or to a comma separated string containing `oss`, such as `oss,gs,s3`, to support several kinds of fileset at once.                                                                                        | No (deprecated) |
+| `default-filesystem-provider` | (n/a)                   | (deprecated) The filesystem provider used when the location URI carries no scheme. Defaults to `builtin-local`; setting it to `oss` allows the `oss://` prefix to be omitted from the location.                                                                                                            | No (deprecated) |
+| `credential-providers`        | (n/a)                   | The credential provider types, separated by comma. Possible values are `oss-token`, `oss-secret-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#oss) for the extra properties each provider takes. | No              |
+
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
+automatically loads the filesystem providers found on the classpath, including the built-in
+providers and the cloud providers carried by a bundle jar such as `gravitino-aliyun-bundle`.
+:::
+
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
 A fileset catalog stores its data under `location`, which for Alibaba Cloud OSS looks like
 `oss://bucket/root`.
@@ -228,6 +241,23 @@ plus the Alibaba Cloud OSS filesystem implementation. Only the latter differs by
 |------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-aliyun-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), a fat jar bundling `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss` |
 | Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                   |
+
+The artifacts in full:
+
+- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle):
+  a "fat" jar that includes the `gravitino-aliyun` functionality together with every dependency it needs,
+  such as `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss`. Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-aliyun` functionality. It is required for accessing Gravitino filesets in every environment.
+- `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`: the
+  standard Hadoop dependencies for Alibaba Cloud OSS access, shipped with Hadoop under
+  `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself when running inside an existing
+  Hadoop environment.
+- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun):
+  a "thin" jar carrying only the Aliyun integration code. It is already contained in both jars
+  above, so it is not needed as a direct dependency unless you prefer to manage all Hadoop and
+  Aliyun dependencies yourself.
 
 ```xml
 <!-- No Hadoop environment -->
@@ -442,11 +472,15 @@ ds = pd.read_csv("gvfs://fileset/oss_catalog/oss_schema/example_fileset/people/p
 ds.head()
 ```
 
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
+
 ## Credential Vending
 
 With credential vending the catalog holds the Alibaba Cloud OSS credentials and the Gravitino server hands
 out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the full provider reference.
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[OSS credentials](./security/credential-vending.md#oss) for the properties
+each provider takes.
 
 The supported providers are `oss-token`, which vends a short-lived STS token, and
 `oss-secret-key`, which vends the static access key configured on the catalog. The example below uses

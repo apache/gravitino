@@ -39,14 +39,27 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client    | Python client              | Description                                | Required |
-|----------------------------|----------------------------|--------------------------------------------|----------|
-| `gcs-service-account-file` | `gcs_service_account_file` | Path of the GCS service account JSON file. | Yes      |
+| Catalog and Java client       | Python client              | Description                                                                                                                                                                                                                                                                              | Required        |
+|-------------------------------|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
+| `gcs-service-account-file`    | `gcs_service_account_file` | Path of the GCS service account JSON file.                                                                                                                                                                                                                                               | Yes             |
+| `filesystem-providers`        | (n/a)                      | (deprecated) The filesystem providers to add. Set it to `gcs` when the fileset is backed by GCS, or to a comma separated string containing `gcs`, such as `gcs,s3`, to support several kinds of fileset at once.                                                                         | No (deprecated) |
+| `default-filesystem-provider` | (n/a)                      | (deprecated) The filesystem provider used when the location URI carries no scheme. Defaults to `builtin-local`; setting it to `gcs` allows the `gs://` prefix to be omitted from the location.                                                                                           | No (deprecated) |
+| `credential-providers`        | (n/a)                      | The credential provider types, separated by comma. Possible values are `gcs-token`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#gcs) for the extra properties each provider takes. | No              |
+
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
+automatically loads the filesystem providers found on the classpath, including the built-in
+providers and the cloud providers carried by a bundle jar such as `gravitino-gcp-bundle`.
+:::
 
 :::note
 The service account file must be readable by the Gravitino server process for the catalog, and by
 each client process for GVFS.
 :::
+
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
 A fileset catalog stores its data under `location`, which for Google Cloud Storage looks like
 `gs://bucket/root`.
@@ -225,6 +238,23 @@ plus the Google Cloud Storage filesystem implementation. Only the latter differs
 |------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-gcp-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle), a fat jar bundling `gcs-connector` (hadoop3-2.2.22)                                                                                 |
 | Hadoop already present | [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar), published by Google and not part of the Apache Hadoop distribution |
+
+The artifacts in full:
+
+- [`gravitino-gcp-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle):
+  a "fat" jar that includes the `gravitino-gcp` functionality together with every dependency it needs,
+  such as `gcs-connector` (hadoop3-2.2.22). Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-gcp` functionality. It is required for accessing Gravitino filesets in every environment.
+- [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar):
+  the standard Hadoop dependencies for Google Cloud Storage access, published by Google and not part
+  of the Apache Hadoop distribution. Supply them yourself when running inside an existing Hadoop
+  environment.
+- [`gravitino-gcp-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp):
+  a "thin" jar carrying only the GCP integration code. It is already contained in both jars above,
+  so it is not needed as a direct dependency unless you prefer to manage all Hadoop and GCP
+  dependencies yourself.
 
 ```xml
 <!-- No Hadoop environment -->
@@ -421,11 +451,15 @@ ds = pd.read_csv("gvfs://fileset/gcs_catalog/gcs_schema/example_fileset/people/p
 ds.head()
 ```
 
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
+
 ## Credential Vending
 
 With credential vending the catalog holds the Google Cloud Storage credentials and the Gravitino server hands
 out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the full provider reference.
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[GCS credentials](./security/credential-vending.md#gcs) for the properties
+each provider takes.
 
 The supported provider is `gcs-token`, which vends a short-lived token.
 

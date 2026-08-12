@@ -39,19 +39,33 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client | Python client          | Description                                                                      | Required                                         |
-|-------------------------|------------------------|----------------------------------------------------------------------------------|--------------------------------------------------|
-| `s3-endpoint`           | `s3_endpoint`          | Endpoint of the S3 service. S3-compatible storage such as MinIO always needs it. | Yes, except for the Python client against AWS S3 |
-| `s3-access-key-id`      | `s3_access_key_id`     | Access key of the S3 service.                                                    | Yes                                              |
-| `s3-secret-access-key`  | `s3_secret_access_key` | Secret key of the S3 service.                                                    | Yes                                              |
+| Catalog and Java client       | Python client          | Description                                                                                                                                                                                                                                                                                                         | Required                                         |
+|-------------------------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
+| `s3-endpoint`                 | `s3_endpoint`          | Endpoint of the S3 service. S3-compatible storage such as MinIO always needs it.                                                                                                                                                                                                                                    | Yes, except for the Python client against AWS S3 |
+| `s3-access-key-id`            | `s3_access_key_id`     | Access key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
+| `s3-secret-access-key`        | `s3_secret_access_key` | Secret key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
+| `filesystem-providers`        | (n/a)                  | (deprecated) The filesystem providers to add. Set it to `s3` when the fileset is backed by S3, or to a comma separated string containing `s3`, such as `gs,s3`, to support several kinds of fileset at once.                                                                                                        | No (deprecated)                                  |
+| `default-filesystem-provider` | (n/a)                  | (deprecated) The filesystem provider used when the location URI carries no scheme. Defaults to `builtin-local`; setting it to `s3` allows the `s3a://` prefix to be omitted from the location.                                                                                                                      | No (deprecated)                                  |
+| `credential-providers`        | (n/a)                  | The credential provider types, separated by comma. Possible values are `s3-token`, `s3-secret-key`, `aws-irsa`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#s3) for the extra properties each provider takes. | No                                               |
+
+:::note
+`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
+automatically loads the filesystem providers found on the classpath, including the built-in
+providers and the cloud providers carried by a bundle jar such as `gravitino-aws-bundle`.
+:::
 
 :::note
 - The location must start with `s3a://`, not `s3://`. The `hadoop-aws` library does not support the
   `s3://` scheme.
 - For MinIO and other S3-compatible services, set `s3-endpoint` to that service and, if the service
-  requires path-style access, add `gravitino.bypass.fs.s3a.path.style.access=true` to
+  requires path-style access (`s3-path-style-access`), add
+  `gravitino.bypass.fs.s3a.path.style.access=true` to
   `${GRAVITINO_HOME}/catalogs/fileset/conf/fileset.conf`.
 :::
+
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
 A fileset catalog stores its data under `location`, which for Amazon S3 looks like
 `s3a://bucket/root`.
@@ -236,6 +250,23 @@ plus the Amazon S3 filesystem implementation. Only the latter differs by environ
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), a fat jar bundling `hadoop-aws` (3.3.1) and the AWS SDK |
 | Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                    |
+
+The artifacts in full:
+
+- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle):
+  a "fat" jar that includes the `gravitino-aws` functionality together with every dependency it needs,
+  such as `hadoop-aws` (3.3.1) and the AWS SDK. Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-aws` functionality. It is required for accessing Gravitino filesets in every environment.
+- `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`: the standard Hadoop
+  dependencies for Amazon S3 access, shipped with Hadoop under
+  `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself when running inside an existing
+  Hadoop environment.
+- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws):
+  a "thin" jar carrying only the AWS integration code. It is already contained in both jars above,
+  so it is not needed as a direct dependency unless you prefer to manage all Hadoop and AWS
+  dependencies yourself.
 
 ```xml
 <!-- No Hadoop environment -->
@@ -449,11 +480,15 @@ ds = pd.read_csv("gvfs://fileset/s3_catalog/s3_schema/example_fileset/people/par
 ds.head()
 ```
 
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
+
 ## Credential Vending
 
 With credential vending the catalog holds the Amazon S3 credentials and the Gravitino server hands
 out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the full provider reference.
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[S3 credentials](./security/credential-vending.md#s3) for the properties
+each provider takes.
 
 The supported providers are `s3-token`, which vends a short-lived STS token, and
 `s3-secret-key`, which vends the static access key configured on the catalog. The example below uses
