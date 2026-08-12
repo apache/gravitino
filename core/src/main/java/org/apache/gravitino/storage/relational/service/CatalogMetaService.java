@@ -33,7 +33,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
@@ -461,7 +460,7 @@ public class CatalogMetaService {
           Entity.EntityType.CATALOG.name().toLowerCase(),
           identifier.name());
     }
-    return optimisticLockException(identifier);
+    return ExceptionUtils.concurrentModification(Entity.EntityType.CATALOG, identifier);
   }
 
   private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {
@@ -475,15 +474,9 @@ public class CatalogMetaService {
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
     if (deleted != schemaPOs.size()) {
-      throw new OptimisticLockException(
-          "A schema under catalog %s was modified concurrently; retry the operation",
-          catalogIdentifier);
+      throw ExceptionUtils.concurrentChildModification(
+          Entity.EntityType.SCHEMA, Entity.EntityType.CATALOG, catalogIdentifier);
     }
-  }
-
-  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
-    return new OptimisticLockException(
-        "The catalog %s was modified concurrently; retry the operation", identifier);
   }
 
   @Monitored(

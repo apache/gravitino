@@ -32,7 +32,6 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -445,7 +444,7 @@ public class MetalakeMetaService {
           Entity.EntityType.METALAKE.name().toLowerCase(),
           identifier.name());
     }
-    return optimisticLockException(identifier);
+    return ExceptionUtils.concurrentModification(Entity.EntityType.METALAKE, identifier);
   }
 
   private void deleteCatalogsWithVersions(NameIdentifier metalakeIdentifier, Long metalakeId) {
@@ -461,9 +460,8 @@ public class MetalakeMetaService {
             CatalogMetaMapper.class,
             mapper -> mapper.softDeleteCatalogMetasWithVersion(catalogPOs));
     if (deleted != catalogPOs.size()) {
-      throw new OptimisticLockException(
-          "A catalog under metalake %s was modified concurrently; retry the operation",
-          metalakeIdentifier);
+      throw ExceptionUtils.concurrentChildModification(
+          Entity.EntityType.CATALOG, Entity.EntityType.METALAKE, metalakeIdentifier);
     }
   }
 
@@ -481,15 +479,9 @@ public class MetalakeMetaService {
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
     if (deleted != schemaPOs.size()) {
-      throw new OptimisticLockException(
-          "A schema under metalake %s was modified concurrently; retry the operation",
-          metalakeIdentifier);
+      throw ExceptionUtils.concurrentChildModification(
+          Entity.EntityType.SCHEMA, Entity.EntityType.METALAKE, metalakeIdentifier);
     }
-  }
-
-  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
-    return new OptimisticLockException(
-        "The metalake %s was modified concurrently; retry the operation", identifier);
   }
 
   @Monitored(

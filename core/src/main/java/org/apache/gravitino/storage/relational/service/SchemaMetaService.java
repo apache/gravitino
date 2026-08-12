@@ -40,7 +40,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.IdGenerator;
@@ -432,11 +431,6 @@ public class SchemaMetaService {
     }
   }
 
-  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
-    return new OptimisticLockException(
-        "The schema %s was modified concurrently; retry the operation", identifier);
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteSchemaMetasByLegacyTimeline")
@@ -540,7 +534,7 @@ public class SchemaMetaService {
         || !Objects.equals(currentSchemaPO.getMetalakeId(), observedSchemaPO.getMetalakeId())) {
       return noSuchSchemaException(identifier);
     }
-    return optimisticLockException(identifier);
+    return ExceptionUtils.concurrentModification(Entity.EntityType.SCHEMA, identifier);
   }
 
   private NoSuchEntityException noSuchSchemaException(NameIdentifier identifier) {
@@ -559,9 +553,8 @@ public class SchemaMetaService {
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(descendants));
     if (deleted != descendants.size()) {
-      throw new OptimisticLockException(
-          "A descendant of schema %s was modified concurrently; retry the operation",
-          schemaIdentifier);
+      throw ExceptionUtils.concurrentChildModification(
+          Entity.EntityType.SCHEMA, Entity.EntityType.SCHEMA, schemaIdentifier);
     }
   }
 
