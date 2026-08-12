@@ -55,6 +55,8 @@ final class TrinoNativeViewCodec {
   private static final String VIEW_SUFFIX = " */";
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final Pattern SIMPLE_IDENTIFIER = Pattern.compile("[a-z_][a-z0-9_]*");
+  // Trino's default time/timestamp precision (milliseconds) when none is specified.
+  private static final int DEFAULT_PRECISION = 3;
 
   private TrinoNativeViewCodec() {}
 
@@ -188,7 +190,7 @@ final class TrinoNativeViewCodec {
 
     List<String> path = new ArrayList<>();
     for (JsonNode pathNode : root.path("path")) {
-      path.add(pathNode.toString());
+      path.add(pathNode.asText());
     }
 
     return new ViewDefinition(
@@ -239,14 +241,19 @@ final class TrinoNativeViewCodec {
         return "char(" + ((Types.FixedCharType) type).length() + ")";
       case DATE:
         return "date";
+      case TIME:
+        Types.TimeType timeType = (Types.TimeType) type;
+        int timePrecision = timeType.hasPrecisionSet() ? timeType.precision() : DEFAULT_PRECISION;
+        return "time(" + timePrecision + ")";
       case TIMESTAMP:
         Types.TimestampType timestampType = (Types.TimestampType) type;
-        if (timestampType.hasTimeZone()) {
-          throw new UnsupportedOperationException(
-              "Unsupported conversion to Trino type: TIMESTAMP WITH TIME ZONE is not supported by "
-                  + "Hive-backed views");
-        }
-        return "timestamp(6)";
+        int timestampPrecision =
+            timestampType.hasPrecisionSet() ? timestampType.precision() : DEFAULT_PRECISION;
+        return timestampType.hasTimeZone()
+            ? "timestamp(" + timestampPrecision + ") with time zone"
+            : "timestamp(" + timestampPrecision + ")";
+      case UUID:
+        return "uuid";
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) type;
         return "decimal(" + decimalType.precision() + "," + decimalType.scale() + ")";
@@ -320,6 +327,8 @@ final class TrinoNativeViewCodec {
         return Types.DateType.get();
       case "varbinary":
         return Types.BinaryType.get();
+      case "uuid":
+        return Types.UUIDType.get();
       default:
         break;
     }
@@ -329,14 +338,13 @@ final class TrinoNativeViewCodec {
     if (lower.startsWith("char(")) {
       return Types.FixedCharType.of(Integer.parseInt(innerContent(s)));
     }
+    if (lower.startsWith("time(")) {
+      return Types.TimeType.of(parsePrecision(s));
+    }
     if (lower.startsWith("timestamp(")) {
-      if (lower.endsWith("with time zone")) {
-        throw new UnsupportedOperationException(
-            "Unsupported Trino type: TIMESTAMP WITH TIME ZONE is not supported by Hive-backed "
-                + "views: "
-                + typeString);
-      }
-      return Types.TimestampType.withoutTimeZone();
+      return lower.endsWith("with time zone")
+          ? Types.TimestampType.withTimeZone(parsePrecision(s))
+          : Types.TimestampType.withoutTimeZone(parsePrecision(s));
     }
     if (lower.startsWith("decimal(")) {
       String[] parts = splitTopLevel(innerContent(s));
@@ -364,6 +372,17 @@ final class TrinoNativeViewCodec {
 
   private static String innerContent(String s) {
     return s.substring(s.indexOf('(') + 1, s.length() - 1);
+  }
+
+  /**
+   * Extracts the integer precision from a type string of the form {@code name(N)[ trailing text]},
+   * e.g. {@code timestamp(3) with time zone}; unlike {@link #innerContent}, this does not assume
+   * the string ends with the closing parenthesis.
+   */
+  private static int parsePrecision(String s) {
+    int openIdx = s.indexOf('(');
+    int closeIdx = s.indexOf(')', openIdx);
+    return Integer.parseInt(s.substring(openIdx + 1, closeIdx).trim());
   }
 
   /**

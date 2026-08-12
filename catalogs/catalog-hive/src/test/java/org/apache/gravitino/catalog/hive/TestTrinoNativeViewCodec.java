@@ -108,8 +108,14 @@ class TestTrinoNativeViewCodec {
         "char(5)", TrinoNativeViewCodec.toTrinoTypeString(Types.FixedCharType.of(5)));
     Assertions.assertEquals("date", TrinoNativeViewCodec.toTrinoTypeString(Types.DateType.get()));
     Assertions.assertEquals(
-        "timestamp(6)",
+        "timestamp(3)",
         TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withoutTimeZone()));
+    Assertions.assertEquals(
+        "timestamp(3) with time zone",
+        TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withTimeZone()));
+    Assertions.assertEquals(
+        "time(3)", TrinoNativeViewCodec.toTrinoTypeString(Types.TimeType.get()));
+    Assertions.assertEquals("uuid", TrinoNativeViewCodec.toTrinoTypeString(Types.UUIDType.get()));
     Assertions.assertEquals(
         "decimal(10,2)", TrinoNativeViewCodec.toTrinoTypeString(Types.DecimalType.of(10, 2)));
     Assertions.assertEquals(
@@ -134,10 +140,15 @@ class TestTrinoNativeViewCodec {
   }
 
   @Test
-  void testToTrinoTypeStringRejectsTimestampWithTimeZone() {
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withTimeZone()));
+  void testToTrinoTypeStringPreservesExplicitPrecision() {
+    Assertions.assertEquals(
+        "timestamp(6)",
+        TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withoutTimeZone(6)));
+    Assertions.assertEquals(
+        "timestamp(6) with time zone",
+        TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withTimeZone(6)));
+    Assertions.assertEquals(
+        "time(6)", TrinoNativeViewCodec.toTrinoTypeString(Types.TimeType.of(6)));
   }
 
   @Test
@@ -164,8 +175,14 @@ class TestTrinoNativeViewCodec {
         Types.FixedCharType.of(5), TrinoNativeViewCodec.fromTrinoTypeString("char(5)"));
     Assertions.assertEquals(Types.DateType.get(), TrinoNativeViewCodec.fromTrinoTypeString("date"));
     Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(),
+        Types.TimestampType.withoutTimeZone(6),
         TrinoNativeViewCodec.fromTrinoTypeString("timestamp(6)"));
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(6),
+        TrinoNativeViewCodec.fromTrinoTypeString("timestamp(6) with time zone"));
+    Assertions.assertEquals(
+        Types.TimeType.of(6), TrinoNativeViewCodec.fromTrinoTypeString("time(6)"));
+    Assertions.assertEquals(Types.UUIDType.get(), TrinoNativeViewCodec.fromTrinoTypeString("uuid"));
     Assertions.assertEquals(
         Types.DecimalType.of(10, 2), TrinoNativeViewCodec.fromTrinoTypeString("decimal(10,2)"));
     Assertions.assertEquals(
@@ -222,17 +239,35 @@ class TestTrinoNativeViewCodec {
   }
 
   @Test
-  void testFromTrinoTypeStringRejectsTimestampWithTimeZone() {
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> TrinoNativeViewCodec.fromTrinoTypeString("timestamp(3) with time zone"));
+  void testTimestampTimeAndUuidRoundTripWithToTrinoTypeString() {
+    Types.TimestampType timestamp = Types.TimestampType.withoutTimeZone(3);
+    Assertions.assertEquals(
+        timestamp,
+        TrinoNativeViewCodec.fromTrinoTypeString(
+            TrinoNativeViewCodec.toTrinoTypeString(timestamp)));
+
+    Types.TimestampType timestampWithTimeZone = Types.TimestampType.withTimeZone(3);
+    Assertions.assertEquals(
+        timestampWithTimeZone,
+        TrinoNativeViewCodec.fromTrinoTypeString(
+            TrinoNativeViewCodec.toTrinoTypeString(timestampWithTimeZone)));
+
+    Types.TimeType time = Types.TimeType.of(3);
+    Assertions.assertEquals(
+        time,
+        TrinoNativeViewCodec.fromTrinoTypeString(TrinoNativeViewCodec.toTrinoTypeString(time)));
+
+    Types.UUIDType uuid = Types.UUIDType.get();
+    Assertions.assertEquals(
+        uuid,
+        TrinoNativeViewCodec.fromTrinoTypeString(TrinoNativeViewCodec.toTrinoTypeString(uuid)));
   }
 
   @Test
   void testFromTrinoTypeStringRejectsUnknownType() {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> TrinoNativeViewCodec.fromTrinoTypeString("uuid"));
+        () -> TrinoNativeViewCodec.fromTrinoTypeString("json"));
   }
 
   @Test
