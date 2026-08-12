@@ -158,6 +158,26 @@ class TestCatalog(IntegrationTestEnv):
         )
         self.catalog_name = self.catalog_name + "_new"
 
+    def test_alter_catalog_remove_property(self):
+        self.create_catalog(self.catalog_name)
+
+        property_key = "catalog_remove_property_key"
+        property_value = "catalog_remove_property_value"
+
+        # Set a custom property first so that there is something to remove.
+        catalog = self.gravitino_client.alter_catalog(
+            self.catalog_name,
+            CatalogChange.set_property(property_key, property_value),
+        )
+        self.assertEqual(property_value, catalog.properties().get(property_key))
+
+        # Remove the property and assert it is gone from the catalog.
+        catalog = self.gravitino_client.alter_catalog(
+            self.catalog_name,
+            CatalogChange.remove_property(property_key),
+        )
+        self.assertNotIn(property_key, catalog.properties())
+
     def test_drop_catalog(self):
         self.create_catalog(self.catalog_name)
         self.gravitino_client.disable_catalog(self.catalog_name)
