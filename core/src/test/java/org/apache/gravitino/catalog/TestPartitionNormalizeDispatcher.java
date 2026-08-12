@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.rel.Column;
@@ -48,7 +49,7 @@ public class TestPartitionNormalizeDispatcher extends TestOperationDispatcher {
             TestPartitionOperationDispatcher.partitionOperationDispatcher, catalogManager);
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
     TestPartitionOperationDispatcher.schemaOperationDispatcher.createSchema(
-        schemaIdent, "comment", null);
+        schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
     NameIdentifier tableIdent =
         NameIdentifierUtil.ofTable(metalake, catalog, SCHEMA, "test_partition_normalize_table");
     TestPartitionOperationDispatcher.tableOperationDispatcher.createTable(
