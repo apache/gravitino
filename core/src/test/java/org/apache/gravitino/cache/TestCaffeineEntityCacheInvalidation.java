@@ -21,8 +21,11 @@ package org.apache.gravitino.cache;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.GroupEntity;
@@ -50,9 +53,12 @@ public class TestCaffeineEntityCacheInvalidation {
     cache = new CaffeineEntityCache(new Config() {});
   }
 
-  /** Joins nested schema levels the way the entity store physically stores them. */
+  /**
+   * Joins nested schema levels the way they reach the cache. The cache sits above the storage
+   * layer, so nested schema names still carry the configured external separator.
+   */
   private static String hierarchicalName(String... levels) {
-    return String.join(HierarchicalSchemaUtil.physicalSeparator(), levels);
+    return String.join(HierarchicalSchemaUtil.schemaSeparator(), levels);
   }
 
   private static Namespace schemaNamespace(String schemaName) {
@@ -267,6 +273,44 @@ public class TestCaffeineEntityCacheInvalidation {
     Assertions.assertFalse(cache.contains(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
     Assertions.assertFalse(cache.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
     Assertions.assertEquals(0, cache.size());
+  }
+
+  @Test
+  void testInvalidateHierarchicalSchemaCascadesWithNonDefaultSeparator() throws Exception {
+    Config separatorConfig = new Config(false) {};
+    separatorConfig.set(Configs.SCHEMA_SEPARATOR, "|");
+    Object previousConfig = FieldUtils.readField(GravitinoEnv.getInstance(), "config", true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "config", separatorConfig, true);
+
+    try {
+      Assertions.assertEquals("|", HierarchicalSchemaUtil.schemaSeparator());
+
+      String parentName = hierarchicalName("raw", "events");
+      String childName = hierarchicalName("raw", "events", "2024");
+      String siblingName = hierarchicalName("raw", "events2");
+
+      SchemaEntity parent = TestUtil.getTestSchemaEntity(2L, parentName, CATALOG_NS, "cmt");
+      SchemaEntity child = TestUtil.getTestSchemaEntity(3L, childName, CATALOG_NS, "cmt");
+      SchemaEntity sibling = TestUtil.getTestSchemaEntity(4L, siblingName, CATALOG_NS, "cmt");
+      TableEntity tableInChild =
+          TestUtil.getTestTableEntity(5L, "t_child", schemaNamespace(childName));
+
+      cache.put(parent);
+      cache.put(child);
+      cache.put(sibling);
+      cache.put(tableInChild);
+
+      cache.invalidate(parent.nameIdentifier(), Entity.EntityType.SCHEMA);
+
+      Assertions.assertFalse(cache.contains(parent.nameIdentifier(), Entity.EntityType.SCHEMA));
+      Assertions.assertFalse(cache.contains(child.nameIdentifier(), Entity.EntityType.SCHEMA));
+      Assertions.assertFalse(
+          cache.contains(tableInChild.nameIdentifier(), Entity.EntityType.TABLE));
+      Assertions.assertTrue(cache.contains(sibling.nameIdentifier(), Entity.EntityType.SCHEMA));
+      Assertions.assertEquals(1, cache.size());
+    } finally {
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
+    }
   }
 
   @Test
