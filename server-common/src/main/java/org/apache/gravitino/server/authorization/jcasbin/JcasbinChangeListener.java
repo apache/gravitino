@@ -226,9 +226,14 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * entries will only clear via LRU eviction.
    *
    * <p><b>Poison-row tolerance:</b> a record this listener cannot map is logged and skipped rather
-   * than propagated. The poller treats a listener throw as a batch failure and, after exhausting
-   * retries, its default action is to stop the server — so one unmappable row must never be able to
-   * take the node down.
+   * than propagated. Such a row names no cache key, so skipping it leaves no stale entry behind.
+   *
+   * <p><b>Self-healing:</b> the poller dispatches each batch once and never replays it, so a failed
+   * invalidation must be recovered here or {@code metadataIdCache} would serve a stale name→id
+   * mapping to authorization decisions until the entry's TTL expires. The whole {@code
+   * metadataIdCache} is therefore cleared instead: it is pure derived state, a strict superset of
+   * the invalidation that failed and of the rest of the batch, and repopulating it only costs the
+   * name→id lookups it caches.
    *
    * <p>The {@code synchronized} modifier is defensive — see the note on {@link #pollOwnerChanges()}
    * for the rationale. The single-threaded scheduler already prevents overlapping runs in
@@ -275,7 +280,17 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
         leafKeys.add(cacheKey);
       }
     }
-    invalidateCoalescedKeys(containerPrefixes, leafKeys);
+    try {
+      invalidateCoalescedKeys(containerPrefixes, leafKeys);
+    } catch (RuntimeException e) {
+      LOG.error(
+          "Failed to invalidate {} prefix(es) and {} leaf key(s) from the entity change log, "
+              + "clearing the whole metadata id cache to stay coherent",
+          containerPrefixes.size(),
+          leafKeys.size(),
+          e);
+      metadataIdCache.invalidateAll();
+    }
   }
 
   @Override

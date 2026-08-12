@@ -41,11 +41,21 @@ import org.slf4j.LoggerFactory;
  * cache coherence process-wide because of one listener.
  *
  * <p>Listeners must therefore be self-healing: a listener that cannot apply a batch has to recover
- * locally, because it will not see that batch again. {@code EntityCacheChangeLogListener} clears
- * its whole cache, which is a strict superset of the invalidations it missed. {@code
- * CatalogChangeLogListener} swallows its own failures instead - it must NOT clear its cache,
- * because that closes {@code IsolatedClassLoader}s still in use. A listener that can satisfy
- * neither must not be registered here.
+ * locally, because it will not see that batch again. The three registered listeners recover as
+ * follows:
+ *
+ * <ul>
+ *   <li>{@code EntityCacheChangeLogListener} clears its whole entity cache, a strict superset of
+ *       the invalidations it missed.
+ *   <li>{@code JcasbinChangeListener} clears its whole {@code metadataIdCache} for the same reason;
+ *       a stale name&#8594;id mapping there would feed authorization decisions.
+ *   <li>{@code CatalogChangeLogListener} swallows its failures per record and must NOT clear its
+ *       cache, because evicting a catalog this process still uses closes its in-use {@code
+ *       IsolatedClassLoader}. It accepts staleness bounded by the catalog cache eviction interval
+ *       instead.
+ * </ul>
+ *
+ * <p>A listener that can do neither must not be registered here.
  *
  * <p>Every listener failure is logged at {@code ERROR}, so a listener whose local recovery is
  * failing stays visible in the logs even though the poller keeps making progress.

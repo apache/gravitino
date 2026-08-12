@@ -28,9 +28,11 @@ public interface EntityChangeLogListener {
   /**
    * Handles a batch of entity changes.
    *
-   * <p>If this method throws, the poller may retry the same batch for this listener.
-   * Implementations must make the callback atomic or tolerate retrying changes that were applied
-   * before the exception.
+   * <p>The batch is dispatched exactly once and is never replayed, so implementations must be
+   * self-healing: recover locally from a failure (for example by clearing the whole cache this
+   * listener maintains, which is a superset of any invalidation it missed) rather than relying on
+   * the poller to retry. If this method throws, the poller logs the failure at {@code ERROR} and
+   * advances its cursor, which leaves the listener's state permanently stale.
    *
    * @param changes the entity changes fetched in one poller cycle
    */
