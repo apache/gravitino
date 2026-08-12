@@ -106,8 +106,9 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
 
   /**
    * Sets up cloud-specific bundle JARs by downloading and copying them. This method should be
-   * called from subclass {@code startIntegrationTest()} methods after calling {@code
-   * super.startIntegrationTest()}.
+   * called from subclass {@code startIntegrationTest()} methods before calling {@code
+   * super.startIntegrationTest()}, because the server resolves the cloud {@code FileIO} from its
+   * classpath while starting.
    *
    * <p>Skips setup if running in embedded mode.
    */
