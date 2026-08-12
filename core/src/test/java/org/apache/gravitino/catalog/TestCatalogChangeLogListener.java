@@ -19,8 +19,11 @@
 package org.apache.gravitino.catalog;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -60,6 +63,61 @@ public class TestCatalogChangeLogListener {
 
     verify(catalogCache).invalidate(successfulIdentifier);
     verify(catalogCache, never()).invalidate(failedIdentifier);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testTransientEvictionFailureIsRetriedForTheSameCatalog() {
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
+    NameIdentifier ident = NameIdentifier.of("metalake", "cat");
+
+    when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
+    when(catalogManager.consumeLocalMutation(ident)).thenReturn(false);
+    doThrow(new RuntimeException("eviction failed"))
+        .doNothing()
+        .when(catalogCache)
+        .invalidate(ident);
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+
+    Assertions.assertDoesNotThrow(
+        () -> listener.onEntityChange(List.of(change(1L, "metalake.cat"))));
+
+    // The eviction is retried, so a transient failure no longer leaves this catalog stale.
+    verify(catalogCache, times(2)).invalidate(ident);
+    // The retry must not re-run the single-shot local-mutation probe: doing so would classify a
+    // local mutation as remote and close an IsolatedClassLoader this process is still using.
+    verify(catalogManager, times(1)).consumeLocalMutation(ident);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testPersistentEvictionFailureIsGivenUpWithoutClearingTheCache() {
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
+    NameIdentifier failing = NameIdentifier.of("metalake", "failing");
+    NameIdentifier healthy = NameIdentifier.of("metalake", "healthy");
+
+    when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
+    when(catalogManager.consumeLocalMutation(any())).thenReturn(false);
+    doThrow(new RuntimeException("eviction failed")).when(catalogCache).invalidate(failing);
+    doNothing().when(catalogCache).invalidate(healthy);
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            listener.onEntityChange(
+                List.of(change(1L, "metalake.failing"), change(2L, "metalake.healthy"))));
+
+    // Retries are bounded, the rest of the batch still applies, and the whole cache is NEVER
+    // cleared: that would evict catalogs this process is serving and close their in-use
+    // IsolatedClassLoaders (#11739).
+    verify(catalogCache, times(2)).invalidate(failing);
+    verify(catalogCache).invalidate(healthy);
+    verify(catalogCache, never()).invalidateAll();
+    verify(catalogCache, never()).invalidateAll(any());
   }
 
   @Test

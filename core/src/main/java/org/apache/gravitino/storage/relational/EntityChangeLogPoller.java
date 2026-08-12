@@ -49,10 +49,10 @@ import org.slf4j.LoggerFactory;
  *       the invalidations it missed.
  *   <li>{@code JcasbinChangeListener} clears its whole {@code metadataIdCache} for the same reason;
  *       a stale name&#8594;id mapping there would feed authorization decisions.
- *   <li>{@code CatalogChangeLogListener} swallows its failures per record and must NOT clear its
- *       cache, because evicting a catalog this process still uses closes its in-use {@code
- *       IsolatedClassLoader}. It accepts staleness bounded by the catalog cache eviction interval
- *       instead.
+ *   <li>{@code CatalogChangeLogListener} retries the single eviction that failed and then swallows
+ *       the failure. It must NOT clear its cache, because evicting a catalog this process still
+ *       uses closes its in-use {@code IsolatedClassLoader}; it accepts staleness bounded by the
+ *       catalog cache eviction interval instead.
  * </ul>
  *
  * <p>A listener that can do neither must not be registered here.
