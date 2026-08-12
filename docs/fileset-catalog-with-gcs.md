@@ -1,5 +1,5 @@
 ---
-title: "Fileset Catalog with Google Cloud Storage"
+title: "Fileset Catalog with GCS"
 slug: "/fileset-catalog-with-gcs"
 keyword: "Fileset catalog GCS"
 license: "This software is licensed under the Apache License version 2."

@@ -1,5 +1,5 @@
 ---
-title: "Fileset Catalog with Azure Data Lake Storage"
+title: "Fileset Catalog with ADLS"
 slug: "/fileset-catalog-with-adls"
 keyword: "Fileset catalog ADLS Azure Blob Storage"
 license: "This software is licensed under the Apache License version 2."

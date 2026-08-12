@@ -1,5 +1,5 @@
 ---
-title: "Fileset Catalog with Amazon S3"
+title: "Fileset Catalog with S3"
 slug: "/fileset-catalog-with-s3"
 keyword: "Fileset catalog S3"
 license: "This software is licensed under the Apache License version 2."

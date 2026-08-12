@@ -1,5 +1,5 @@
 ---
-title: "Fileset Catalog with Tencent Cloud COS"
+title: "Fileset Catalog with COS"
 slug: "/fileset-catalog-with-cos"
 keyword: "Fileset catalog COS"
 license: "This software is licensed under the Apache License version 2."

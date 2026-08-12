@@ -1,5 +1,5 @@
 ---
-title: "Fileset Catalog with Alibaba Cloud OSS"
+title: "Fileset Catalog with OSS"
 slug: "/fileset-catalog-with-oss"
 keyword: "Fileset catalog OSS"
 license: "This software is licensed under the Apache License version 2."
