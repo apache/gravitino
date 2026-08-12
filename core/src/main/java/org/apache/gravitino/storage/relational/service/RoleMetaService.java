@@ -41,14 +41,17 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.GroupRoleRelMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -154,8 +157,17 @@ public class RoleMetaService {
       AuthorizationUtils.checkRole(roleEntity.nameIdentifier());
 
       String metalake = NameIdentifierUtil.getMetalake(roleEntity.nameIdentifier());
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalake);
-      RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakeId);
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalake);
+      }
+
+      RolePO.Builder builder = RolePO.builder().withMetalakeId(metalakePO.getMetalakeId());
       RolePO rolePO = POConverters.initializeRolePOWithVersion(roleEntity, builder);
       List<SecurableObjectPO> securableObjectPOs = Lists.newArrayList();
       for (SecurableObject object : roleEntity.securableObjects()) {
@@ -169,6 +181,17 @@ public class RoleMetaService {
       }
 
       SessionUtils.doMultipleWithCommit(
+          () -> fenceMetalakeForRoleCreate(metalakePO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  RoleMetaMapper.class,
+                  mapper -> {
+                    if (overwritten) {
+                      mapper.insertRoleMetaOnDuplicateKeyUpdate(rolePO);
+                    } else {
+                      mapper.insertRoleMeta(rolePO);
+                    }
+                  }),
           () ->
               SessionUtils.doWithoutCommit(
                   SecurableObjectMapper.class,
@@ -178,16 +201,6 @@ public class RoleMetaService {
                     }
                     if (!securableObjectPOs.isEmpty()) {
                       mapper.batchInsertSecurableObjects(securableObjectPOs);
-                    }
-                  }),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  RoleMetaMapper.class,
-                  mapper -> {
-                    if (overwritten) {
-                      mapper.insertRoleMetaOnDuplicateKeyUpdate(rolePO);
-                    } else {
-                      mapper.insertRoleMeta(rolePO);
                     }
                   }));
 
@@ -225,10 +238,6 @@ public class RoleMetaService {
       Set<SecurableObject> insertObjects = Sets.difference(newObjects, oldObjects);
       Set<SecurableObject> deleteObjects = Sets.difference(oldObjects, newObjects);
 
-      if (insertObjects.isEmpty() && deleteObjects.isEmpty()) {
-        return newRoleEntity;
-      }
-
       List<SecurableObjectPO> deleteSecurableObjectPOs =
           toSecurableObjectPOs(deleteObjects, oldRoleEntity, metalake);
 
@@ -236,12 +245,17 @@ public class RoleMetaService {
           toSecurableObjectPOs(insertObjects, oldRoleEntity, metalake);
 
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  RoleMetaMapper.class,
-                  mapper ->
-                      mapper.updateRoleMeta(
-                          POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO)),
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    RoleMetaMapper.class,
+                    mapper ->
+                        mapper.updateRoleMeta(
+                            POConverters.updateRolePOWithVersion(rolePO, newRoleEntity), rolePO));
+            if (updated == 0) {
+              throw optimisticLockException(identifier);
+            }
+          },
           () -> {
             if (deleteSecurableObjectPOs.isEmpty()) {
               return;
@@ -308,12 +322,19 @@ public class RoleMetaService {
 
     Long metalakeId =
         MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    Long roleId = getRoleIdByMetalakeIdAndName(metalakeId, identifier.name());
+    RolePO rolePO = getRolePOByMetalakeIdAndName(metalakeId, identifier.name());
+    Long roleId = rolePO.getRoleId();
 
     SessionUtils.doMultipleWithCommit(
-        () ->
-            SessionUtils.doWithoutCommit(
-                RoleMetaMapper.class, mapper -> mapper.softDeleteRoleMetaByRoleId(roleId)),
+        () -> {
+          int deleted =
+              SessionUtils.getWithoutCommit(
+                  RoleMetaMapper.class,
+                  mapper -> mapper.softDeleteRoleMetaByRoleId(roleId, rolePO.getCurrentVersion()));
+          if (deleted == 0) {
+            throw optimisticLockException(identifier);
+          }
+        },
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
@@ -453,6 +474,25 @@ public class RoleMetaService {
           roleName);
     }
     return rolePO;
+  }
+
+  private OptimisticLockException optimisticLockException(NameIdentifier identifier) {
+    return new OptimisticLockException(
+        "The role %s was modified concurrently; retry the operation", identifier);
+  }
+
+  private void fenceMetalakeForRoleCreate(MetalakePO metalakePO) {
+    int fenced =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper ->
+                mapper.fenceMetalakeMeta(
+                    metalakePO.getMetalakeId(), metalakePO.getCurrentVersion()));
+    if (fenced == 0) {
+      throw new OptimisticLockException(
+          "The parent metalake %s was modified concurrently; retry the operation",
+          metalakePO.getMetalakeName());
+    }
   }
 
   private static MetadataObject.Type getType(String type) {
