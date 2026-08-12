@@ -16,11 +16,13 @@ Gravitino Fileset catalog index includes the following chapters:
 
 ## Fileset Catalog with Cloud Storage
 
-Apart from the above, you can also refer to the following topics to manage and access cloud storage like S3, GCS, ADLS, and OSS:
+Each cloud backend has its own page with a runnable end-to-end example, from installing the bundle
+jar to reading the fileset with Spark, the Hadoop shell, Python and pandas:
 
-- [Using Fileset catalog to manage S3](./fileset-catalog-with-s3.md).
-- [Using Fileset catalog to manage GCS](./fileset-catalog-with-gcs.md).
-- [Using Fileset catalog to manage ADLS](./fileset-catalog-with-adls.md).
-- [Using Fileset catalog to manage OSS](./fileset-catalog-with-oss.md).
+- [Using Fileset catalog to manage Amazon S3](./fileset-catalog-with-s3.md).
+- [Using Fileset catalog to manage Google Cloud Storage](./fileset-catalog-with-gcs.md).
+- [Using Fileset catalog to manage Azure Data Lake Storage](./fileset-catalog-with-adls.md).
+- [Using Fileset catalog to manage Alibaba Cloud OSS](./fileset-catalog-with-oss.md).
+- [Using Fileset catalog to manage Tencent Cloud COS](./fileset-catalog-with-cos.md).
 
 More storage options will be added soon. Stay tuned!
