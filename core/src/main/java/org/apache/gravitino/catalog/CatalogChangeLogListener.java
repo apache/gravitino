@@ -24,6 +24,7 @@ import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.storage.relational.EntityChangeLogListener;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -116,11 +117,17 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       return Optional.empty();
     }
 
-    String[] names = change.getFullName().split("\\.");
-    if (names.length != 2) {
+    NameIdentifier ident;
+    try {
+      ident = EntityChangeLogNameIdentifierCodec.decode(change.getFullName());
+    } catch (IllegalArgumentException e) {
       LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());
       return Optional.empty();
     }
-    return Optional.of(NameIdentifier.of(names[0], names[1]));
+    if (ident.namespace().length() != 1) {
+      LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());
+      return Optional.empty();
+    }
+    return Optional.of(ident);
   }
 }
