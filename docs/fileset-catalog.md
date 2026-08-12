@@ -79,13 +79,13 @@ A fileset always reaches its location through the HDFS protocol, so a cloud back
 putting the right bundle jar on the classpath and setting the credential properties for that
 backend. Each backend has its own page with a runnable end-to-end example.
 
-| Storage backend                                            | Bundle jar                  | Location scheme | Backend properties                                                          |
-|------------------------------------------------------------|-----------------------------|-----------------|-----------------------------------------------------------------------------|
-| [Amazon S3](./fileset-catalog-with-s3.md)                  | `gravitino-aws-bundle`      | `s3a://`        | `s3-endpoint`, `s3-access-key-id`, `s3-secret-access-key`                   |
-| [Google Cloud Storage](./fileset-catalog-with-gcs.md)      | `gravitino-gcp-bundle`      | `gs://`         | `gcs-service-account-file`                                                  |
-| [Azure Data Lake Storage](./fileset-catalog-with-adls.md)  | `gravitino-azure-bundle`    | `abfss://`      | `azure-storage-account-name`, `azure-storage-account-key`                   |
-| [Alibaba Cloud OSS](./fileset-catalog-with-oss.md)         | `gravitino-aliyun-bundle`   | `oss://`        | `oss-endpoint`, `oss-access-key-id`, `oss-secret-access-key`                |
-| [Tencent Cloud COS](./fileset-catalog-with-cos.md)         | `gravitino-tencent-bundle`  | `cosn://`       | `cos-region`, `cos-access-key-id`, `cos-secret-access-key`, `cos-endpoint`  |
+| Storage backend                                           | Bundle jar                 | Location scheme | Backend properties                                                         |
+|-----------------------------------------------------------|----------------------------|-----------------|----------------------------------------------------------------------------|
+| [Amazon S3](./fileset-catalog-with-s3.md)                 | `gravitino-aws-bundle`     | `s3a://`        | `s3-endpoint`, `s3-access-key-id`, `s3-secret-access-key`                  |
+| [Google Cloud Storage](./fileset-catalog-with-gcs.md)     | `gravitino-gcp-bundle`     | `gs://`         | `gcs-service-account-file`                                                 |
+| [Azure Data Lake Storage](./fileset-catalog-with-adls.md) | `gravitino-azure-bundle`   | `abfss://`      | `azure-storage-account-name`, `azure-storage-account-key`                  |
+| [Alibaba Cloud OSS](./fileset-catalog-with-oss.md)        | `gravitino-aliyun-bundle`  | `oss://`        | `oss-endpoint`, `oss-access-key-id`, `oss-secret-access-key`               |
+| [Tencent Cloud COS](./fileset-catalog-with-cos.md)        | `gravitino-tencent-bundle` | `cosn://`       | `cos-region`, `cos-access-key-id`, `cos-secret-access-key`, `cos-endpoint` |
 
 A catalog may hold locations in more than one backend at the same time, as long as every bundle jar
 involved is on the classpath. Cloud backends also accept `config.resources` to pass custom

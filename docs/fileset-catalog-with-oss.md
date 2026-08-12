@@ -39,11 +39,11 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client | Python client | Description | Required |
-|-------------------------|---------------|-------------|----------|
-| `oss-endpoint` | `oss_endpoint` | Endpoint of the Aliyun OSS service. | Yes |
-| `oss-access-key-id` | `oss_access_key_id` | Access key of the Aliyun OSS service. | Yes |
-| `oss-secret-access-key` | `oss_secret_access_key` | Secret key of the Aliyun OSS service. | Yes |
+| Catalog and Java client | Python client           | Description                           | Required |
+|-------------------------|-------------------------|---------------------------------------|----------|
+| `oss-endpoint`          | `oss_endpoint`          | Endpoint of the Aliyun OSS service.   | Yes      |
+| `oss-access-key-id`     | `oss_access_key_id`     | Access key of the Aliyun OSS service. | Yes      |
+| `oss-secret-access-key` | `oss_secret_access_key` | Secret key of the Aliyun OSS service. | Yes      |
 
 A fileset catalog stores its data under `location`, which for Alibaba Cloud OSS looks like
 `oss://bucket/root`.
@@ -224,10 +224,10 @@ The fileset is now addressable as
 Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Alibaba Cloud OSS filesystem
 implementation. Which jar provides it depends on the environment:
 
-| Environment | Jars to add |
-|-------------|-------------|
-| No Hadoop installed | [`gravitino-aliyun-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) — a fat jar bundling `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss` |
-| Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib` |
+| Environment            | Jars to add                                                                                                                                                                    |
+|------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-aliyun-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) — a fat jar bundling `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss` |
+| Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib`                         |
 
 ```xml
 <!-- No Hadoop environment -->
@@ -472,10 +472,10 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 The `oss-token` provider needs two more catalog properties.
 
-| Property Name  | Description                                       |
-|----------------|---------------------------------------------------|
+| Property Name  | Description                                         |
+|----------------|-----------------------------------------------------|
 | `oss-region`   | Region of the bucket, for example `oss-cn-hangzhou` |
-| `oss-role-arn` | ARN of the role that grants access to the data    |
+| `oss-role-arn` | ARN of the role that grants access to the data      |
 
 ### Access without local credentials
 

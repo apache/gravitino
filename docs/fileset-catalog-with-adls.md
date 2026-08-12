@@ -39,10 +39,10 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client | Python client | Description | Required |
-|-------------------------|---------------|-------------|----------|
-| `azure-storage-account-name` | `azure_storage_account_name` | Account name of the Azure Blob Storage. | Yes |
-| `azure-storage-account-key` | `azure_storage_account_key` | Account key of the Azure Blob Storage. | Yes |
+| Catalog and Java client      | Python client                | Description                             | Required |
+|------------------------------|------------------------------|-----------------------------------------|----------|
+| `azure-storage-account-name` | `azure_storage_account_name` | Account name of the Azure Blob Storage. | Yes      |
+| `azure-storage-account-key`  | `azure_storage_account_key`  | Account key of the Azure Blob Storage.  | Yes      |
 
 :::note
 Azure Data Lake Storage is also known as Azure Blob Storage (ABS). The location uses the `abfss://`
@@ -225,10 +225,10 @@ The fileset is now addressable as
 Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Azure Data Lake Storage filesystem
 implementation. Which jar provides it depends on the environment:
 
-| Environment | Jars to add |
-|-------------|-------------|
-| No Hadoop installed | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) — a fat jar bundling `hadoop-azure` (3.3.1) and the packages it needs to reach ADLS |
-| Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib` |
+| Environment            | Jars to add                                                                                                                                                                                    |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) — a fat jar bundling `hadoop-azure` (3.3.1) and the packages it needs to reach ADLS |
+| Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib`                            |
 
 ```xml
 <!-- No Hadoop environment -->
@@ -465,11 +465,11 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 The `adls-token` provider needs three more catalog properties.
 
-| Property Name         | Description                    |
-|-----------------------|--------------------------------|
-| `azure-tenant-id`     | Azure tenant id                |
-| `azure-client-id`     | Azure client id                |
-| `azure-client-secret` | Azure client secret key        |
+| Property Name         | Description             |
+|-----------------------|-------------------------|
+| `azure-tenant-id`     | Azure tenant id         |
+| `azure-client-id`     | Azure client id         |
+| `azure-client-secret` | Azure client secret key |
 
 ### Access without local credentials
 

@@ -39,11 +39,11 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client | Python client | Description | Required |
-|-------------------------|---------------|-------------|----------|
-| `s3-endpoint` | `s3_endpoint` | Endpoint of the S3 service. Optional against AWS S3 for the Python client, required for the Java client and for S3-compatible storage such as MinIO. | Yes |
-| `s3-access-key-id` | `s3_access_key_id` | Access key of the S3 service. | Yes |
-| `s3-secret-access-key` | `s3_secret_access_key` | Secret key of the S3 service. | Yes |
+| Catalog and Java client | Python client          | Description                                                                                                                                          | Required |
+|-------------------------|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `s3-endpoint`           | `s3_endpoint`          | Endpoint of the S3 service. Optional against AWS S3 for the Python client, required for the Java client and for S3-compatible storage such as MinIO. | Yes      |
+| `s3-access-key-id`      | `s3_access_key_id`     | Access key of the S3 service.                                                                                                                        | Yes      |
+| `s3-secret-access-key`  | `s3_secret_access_key` | Secret key of the S3 service.                                                                                                                        | Yes      |
 
 :::note
 - The location must start with `s3a://`, not `s3://`. The `hadoop-aws` library does not support the
@@ -232,10 +232,10 @@ The fileset is now addressable as
 Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Amazon S3 filesystem
 implementation. Which jar provides it depends on the environment:
 
-| Environment | Jars to add |
-|-------------|-------------|
-| No Hadoop installed | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) — a fat jar bundling `hadoop-aws` (3.3.1) and the AWS SDK |
-| Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib` |
+| Environment            | Jars to add                                                                                                                                                      |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) — a fat jar bundling `hadoop-aws` (3.3.1) and the AWS SDK |
+| Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, normally found under `${HADOOP_HOME}/share/hadoop/tools/lib`                          |
 
 ```xml
 <!-- No Hadoop environment -->

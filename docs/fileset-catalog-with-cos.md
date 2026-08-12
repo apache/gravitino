@@ -39,12 +39,12 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client | Python client | Description | Required |
-|-------------------------|---------------|-------------|----------|
-| `cos-region` | `cos_region` | Region of the COS bucket, for example `ap-guangzhou`. | Yes |
-| `cos-endpoint` | `cos_endpoint` | Endpoint *suffix* of the COS service, mapped to `fs.cosn.bucket.endpoint_suffix`. It is a host suffix, not a URL — `cos.ap-guangzhou.myqcloud.com`, not `https://cos.ap-guangzhou.myqcloud.com`. When unset, hadoop-cos derives it from `cos-region`. Set it only to reach a non-public endpoint such as a VPC endpoint. | No |
-| `cos-access-key-id` | `cos_access_key_id` | Static access key id, the Tencent Cloud `SecretId`. | Yes |
-| `cos-secret-access-key` | `cos_secret_access_key` | Static secret access key, the Tencent Cloud `SecretKey`. | Yes |
+| Catalog and Java client | Python client           | Description                                                                                                                                                                                                                                                                                                              | Required |
+|-------------------------|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `cos-region`            | `cos_region`            | Region of the COS bucket, for example `ap-guangzhou`.                                                                                                                                                                                                                                                                    | Yes      |
+| `cos-endpoint`          | `cos_endpoint`          | Endpoint *suffix* of the COS service, mapped to `fs.cosn.bucket.endpoint_suffix`. It is a host suffix, not a URL — `cos.ap-guangzhou.myqcloud.com`, not `https://cos.ap-guangzhou.myqcloud.com`. When unset, hadoop-cos derives it from `cos-region`. Set it only to reach a non-public endpoint such as a VPC endpoint. | No       |
+| `cos-access-key-id`     | `cos_access_key_id`     | Static access key id, the Tencent Cloud `SecretId`.                                                                                                                                                                                                                                                                      | Yes      |
+| `cos-secret-access-key` | `cos_secret_access_key` | Static secret access key, the Tencent Cloud `SecretKey`.                                                                                                                                                                                                                                                                 | Yes      |
 
 :::note
 `cos-region` is mandatory for hadoop-cos: signing requests, building the default endpoint and
@@ -233,9 +233,9 @@ The fileset is now addressable as
 Every client needs `gravitino-filesystem-hadoop3-runtime`, plus the Tencent Cloud COS filesystem
 implementation. Which jar provides it depends on the environment:
 
-| Environment | Jars to add |
-|-------------|-------------|
-| No Hadoop installed | [`gravitino-tencent-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-tencent-bundle) — a fat jar bundling `hadoop-cos` and the Tencent Cloud COS Java SDK |
+| Environment            | Jars to add                                                                                                                                                                                    |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-tencent-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-tencent-bundle) — a fat jar bundling `hadoop-cos` and the Tencent Cloud COS Java SDK            |
 | Hadoop already present | `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar` — unlike `hadoop-aws` or `hadoop-aliyun` these are not part of the Apache Hadoop distribution, download them from Maven Central |
 
 ```xml
