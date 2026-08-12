@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -28,7 +27,6 @@ import org.apache.gravitino.credential.S3TokenCredential;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.junit.platform.commons.util.StringUtils;
@@ -60,21 +58,7 @@ public class IcebergRESTS3TokenAuthorizationIT extends IcebergRESTCloudTokenAuth
 
     super.startIntegrationTest();
 
-    if (!catalogClientWithAllPrivilege.asSchemas().schemaExists(SCHEMA_NAME)) {
-      catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
-    }
-  }
-
-  @AfterAll
-  public void stopIntegrationTest() throws IOException, InterruptedException {
-    // super drops the metalake, so it has to run even when setup failed part way through.
-    try {
-      // The Iceberg JDBC backend is shared with sibling ITs; Iceberg has no cascading drop.
-      clearTable();
-      catalogClientWithAllPrivilege.asSchemas().dropSchema(SCHEMA_NAME, false);
-    } finally {
-      super.stopIntegrationTest();
-    }
+    createSchemaIfAbsent();
   }
 
   @Override
