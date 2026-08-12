@@ -1,134 +1,283 @@
 ---
-title: "Table Maintenance Service (Optimizer)"
+title: "Table Maintenance Service"
 slug: "/table-maintenance-service/optimizer"
-keyword: "table maintenance, optimizer, statistics, metrics, monitor"
+keywords:
+  - table maintenance
+  - compaction
+  - statistics
+  - quick start
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Overview
 
-The Table Maintenance Service (Optimizer) automates table maintenance by connecting:
+The table maintenance service keeps tables healthy without anyone watching them. You attach a policy to a catalog, schema, or table; the service collects statistics, evaluates them against that policy, and submits a job when the policy says work is needed.
 
-- Statistics and metrics collection
-- Rule evaluation and strategy recommendation
-- Job template based execution
+The framework is generic. Metrics collection, policy evaluation, and job submission are not tied to any particular table format, and each is a Java ServiceLoader extension point. What ships built in is deliberately narrower, and in alpha that means Iceberg data file compaction on identity-partitioned tables.
 
-The CLI commands and configuration keys use the `optimizer` name.
+The CLI binary, its configuration file, and its configuration keys carry the older name `optimizer`, so you will see `gravitino-optimizer.sh`, `gravitino-optimizer.conf`, and `gravitino.optimizer.*` throughout. Those are literal strings rather than a second product.
 
-## Alpha Status and Limitations
+## Alpha Scope
 
-The Table Maintenance Service is in **alpha** stage.
+Confirm your environment matches this list before starting an evaluation against the built-ins. Anything outside it needs a custom extension, which is covered in the [Extension Guide](./optimizer-extension-guide.md).
 
-Limitations:
+- Compaction is the only built-in strategy. There is no built-in snapshot expiration, orphan file cleanup, or sort and cluster maintenance.
+- Compaction applies to Iceberg tables only, and only where every partition uses an identity transform.
+- The service is driven through the CLI workflow rather than running on a schedule of its own.
 
-- It is operated through the optimizer CLI workflow.
-- The built-in maintenance strategy focuses on Iceberg table compaction.
-- Compaction support is limited to Iceberg tables with identity partition transforms.
 
-## Extensibility and Roadmap
+## How It Works
 
-Although the built-in capability is intentionally narrow in alpha, the framework is designed for
-extension:
+Maintenance runs as four steps. Each is a separate command, so you can stop after any of them, and the dry run on step two shows what would be submitted before anything runs.
 
-- Integrate external systems by implementing custom providers and adapters.
-- Add new strategies and handlers beyond built-in compaction.
-- Plug in custom metrics, evaluators, and job submitters for different environments.
-
-See [Optimizer Extension Guide](./optimizer-extension-guide.md) for extension points.
-
-Future versions will continue improving the out-of-the-box experience and evolve toward a more
-ready-to-use maintenance service.
-
-## Architecture Overview
-
-The optimizer workflow is based on six parts:
-
-1. Metadata objects: catalog/schema/table in a metalake.
-2. Statistics and metrics: table/partition signals used for decision making.
-3. Policies: strategy intent, for example `system_iceberg_compaction`.
-4. Job templates: executable contracts, for example built-in Spark templates.
-5. Job executor: local or custom backend that runs submitted jobs.
-6. Status and logs: REST job state plus local staging logs.
-
-![Optimizer architecture and workflow](../assets/table-maintenance-service/optimizer-architecture-workflow.png)
-
-The following diagram shows the end-to-end interactions between CLI, Gravitino server, Spark jobs,
-JDBC metrics repository, and the Recommender/Updater/Monitor modules.
-
-Typical data flow:
-
-1. Collect statistics and metrics for target tables.
-2. Evaluate rules and produce candidate actions.
-3. Submit jobs using a concrete template and `jobConf`.
-4. Track status and verify results on table metadata and logs.
+| Step     | What you run                                      | What it produces                                        |
+|----------|---------------------------------------------------|---------------------------------------------------------|
+| Collect  | `update-statistics`, `append-metrics`             | Statistics on the table, metrics in the JDBC repository |
+| Evaluate | `submit-strategy-jobs --dry-run`                  | Candidate actions, with nothing submitted               |
+| Submit   | `submit-strategy-jobs`, `submit-update-stats-job` | A Spark job, tracked by job status and staging logs     |
+| Observe  | `monitor-metrics`, `list-table-metrics`           | Before and after metrics, and rewritten data files      |
 
 ## Execution Modes
 
-| Mode | Main entry | Best for | Output |
-| --- | --- | --- | --- |
-| Built-in maintenance workflow | Gravitino REST + built-in templates | Server-side operational runs | Submitted Spark jobs and updated metadata |
-| Optimizer CLI local calculator | `gravitino-optimizer.sh` | Local file-driven testing and batch scripts | Statistics/metrics updates and optional submissions |
+There are two ways in, and they differ in where the numbers come from rather than in what they do.
 
-Use built-in maintenance workflow when you want policy-driven server execution.
-Use CLI local calculator when you want to feed JSONL input directly.
+The built-in workflow drives everything through the Gravitino server and its job templates, using the policy attached to a table to decide what runs. Use it for server-side operational runs.
 
-## Start Here
+The local calculator reads a JSONL file you supply and updates statistics and metrics directly from it. Use it for testing and batch scripts, where you already have the numbers and want to feed them in without the server computing them.
 
-- Configuration first: read [Optimizer Configuration](./optimizer-configuration.md).
-- Need custom integrations: read [Optimizer Extension Guide](./optimizer-extension-guide.md).
-- First-time enablement: run [Optimizer Quick Start and Verification](./optimizer-quick-start.md).
-- CLI-only usage: read [Optimizer CLI Reference](./optimizer-cli-reference.md).
-- Runtime failures or mismatched results: check [Optimizer Troubleshooting](./optimizer-troubleshooting.md).
+## Naming
 
-## Lifecycle
+Three identifiers look interchangeable and are not.
 
-### Step 1: Collect
+| Term          | Example                      | Where it appears                                           |
+|---------------|------------------------------|------------------------------------------------------------|
+| Policy name   | `iceberg_compaction_default` | The policy's own name, and the CLI `--strategy-name`       |
+| Policy type   | `system_iceberg_compaction`  | The `policyType` field when creating a policy over REST    |
+| Strategy type | `iceberg-data-compaction`    | The `strategy.type` field, and the strategy handler config |
 
-Generate or ingest table and partition statistics/metrics.
+`--strategy-name` takes the **policy name**, despite what it is called. Passing either of the other two reports no matching identifiers rather than naming the mistake.
 
-### Step 2: Evaluate
+## Walkthrough
 
-Apply policies and rules to decide whether maintenance should run.
+This takes one Iceberg table through the whole workflow: create it, fill it with small files, attach a compaction policy, collect statistics, and let the service decide to compact it. It runs against a local Spark and takes about fifteen minutes.
 
-### Step 3: Submit
+Each step ends with a check. If a check fails, stop there, since every step depends on the one before it.
 
-Pick a job template and submit job with concrete `jobConf`.
+### Prerequisites
 
-### Step 4: Observe
+- A running Gravitino server with a metalake. The examples use `test`.
+- Spark available to the job executor, through either `SPARK_HOME` or `gravitino.jobExecutor.local.sparkHome`.
+- `gravitino.job.statusPullIntervalInMs` lowered to `10000` and the server restarted. The default is five minutes, which makes every status check in this walkthrough feel broken.
 
-Check REST job status and validate resulting statistics, metrics, or rewritten data files.
+If your Iceberg REST backend runs in memory, do not restart it partway through. Restarting resets both metadata and data files, and you start over.
 
-## Configuration Model
+### Step 1: Confirm the Job Templates Exist
 
-| Layer | Scope | Typical keys |
-| --- | --- | --- |
-| Gravitino server config | Runtime for job manager and executor | `gravitino.job.executor`, `gravitino.job.statusPullIntervalInMs`, `gravitino.jobExecutor.local.sparkHome` |
-| Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
-| Optimizer CLI config | CLI commands | `gravitino.optimizer.*` in `conf/gravitino-optimizer.conf` |
+```bash
+curl -sS "http://localhost:8090/api/metalakes/test" | jq
+curl -sS "http://localhost:8090/api/metalakes/test/jobs/templates?details=true" \
+  | jq '.jobTemplates[].name'
+```
 
-## Terminology Mapping
+The template list must include `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files`. If it does not, the `gravitino-jobs` JAR is missing from `auxlib`. Add it and restart the server before going on.
 
-| Term | Example value | Used in |
-| --- | --- | --- |
-| Policy name | `iceberg_compaction_default` | Policy identity and CLI `--strategy-name` |
-| Policy type | `system_iceberg_compaction` | REST policy creation field `policyType` |
-| Strategy type | `iceberg-data-compaction` | Policy content field `strategy.type` and strategy handler config key |
+### Step 2: Create the Demo Catalog, Schema, and Table
 
-For strategy submission, `--strategy-name` must use policy name, not policy type or strategy type.
+```bash
+# Catalog. An "already exists" error here is fine.
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "rest_catalog",
+    "type": "RELATIONAL",
+    "comment": "Iceberg REST catalog",
+    "provider": "lakehouse-iceberg",
+    "properties": {
+      "catalog-backend": "rest",
+      "uri": "http://localhost:9001/iceberg"
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs
 
-## Prerequisites and Verification
+# Schema
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "db", "comment": "maintenance demo schema", "properties": {}}' \
+  http://localhost:8090/api/metalakes/test/catalogs/rest_catalog/schemas
 
-Quick start prerequisites and success checks are documented in
-[Optimizer Quick Start and Verification](./optimizer-quick-start.md).
+# Table
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "t1",
+    "comment": "maintenance demo table",
+    "columns": [
+      {"name": "id", "type": "integer", "nullable": true},
+      {"name": "name", "type": "string", "nullable": true}
+    ],
+    "properties": {}
+  }' \
+  http://localhost:8090/api/metalakes/test/catalogs/rest_catalog/schemas/db/tables
+```
+
+### Step 3: Create Something Worth Compacting
+
+An empty table gives the policy nothing to react to, so write 100,000 rows capped at 1,000 rows per file. That produces the many small files compaction exists to merge.
+
+```bash
+${SPARK_HOME}/bin/spark-sql \
+  --conf spark.hadoop.fs.defaultFS=file:/// \
+  --conf spark.sql.catalog.rest_catalog=org.apache.iceberg.spark.SparkCatalog \
+  --conf spark.sql.catalog.rest_catalog.type=rest \
+  --conf spark.sql.catalog.rest_catalog.uri=http://localhost:9001/iceberg \
+  -e "CREATE NAMESPACE IF NOT EXISTS rest_catalog.db; \
+      SET spark.sql.files.maxRecordsPerFile=1000; \
+      INSERT INTO rest_catalog.db.t1 \
+      SELECT id, concat('name_', CAST(id AS STRING)) FROM range(0, 100000);"
+```
+
+Without `spark.hadoop.fs.defaultFS=file:///`, Spark reaches for `hdfs://localhost:9000` and fails.
+
+### Step 4: Attach a Compaction Policy
+
+Creating the policy is not enough. It has to be attached to the table, and the attachment is what the service reads.
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "iceberg_compaction_default",
+    "comment": "Built-in Iceberg compaction policy",
+    "policyType": "system_iceberg_compaction",
+    "enabled": true,
+    "content": {}
+  }' \
+  http://localhost:8090/api/metalakes/test/policies
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{"policiesToAdd": ["iceberg_compaction_default"]}' \
+  http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies
+```
+
+Confirm the attachment before moving on:
+
+```bash
+curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/policies?details=true" | jq
+```
+
+### Step 5: Collect Statistics
+
+```bash
+update_stats_job_id=$(curl -sS -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobTemplateName": "builtin-iceberg-update-stats",
+    "jobConf": {
+      "catalog_name": "rest_catalog",
+      "table_identifier": "db.t1",
+      "update_mode": "all",
+      "updater_options": "{\"gravitino_uri\":\"http://localhost:8090\",\"metalake\":\"test\",\"statistics_updater\":\"gravitino-statistics-updater\",\"metrics_updater\":\"gravitino-metrics-updater\"}",
+      "spark_conf": "{\"spark.master\":\"local[2]\",\"spark.hadoop.fs.defaultFS\":\"file:///\"}",
+      "spark_master": "local[2]",
+      "spark_executor_instances": "1",
+      "spark_executor_cores": "1",
+      "spark_executor_memory": "1g",
+      "spark_driver_memory": "1g",
+      "catalog_type": "rest",
+      "catalog_uri": "http://localhost:9001/iceberg",
+      "warehouse_location": ""
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/jobs/runs | jq -r '.job.jobId')
+
+echo "update-stats job id: ${update_stats_job_id}"
+```
+
+Wait for it to finish, then confirm the statistics landed:
+
+```bash
+curl -sS "http://localhost:8090/api/metalakes/test/objects/table/rest_catalog.db.t1/statistics" | jq
+```
+
+The response must include `custom-data-file-mse` and `custom-delete-file-number`. Those two are what the compaction policy evaluates, so if they are absent the next step has nothing to decide on.
+
+### Step 6: Evaluate and Submit
+
+Write the CLI configuration first. `--strategy-name` takes the **policy name**, not the policy type or the strategy type.
+
+```bash
+cat > /tmp/gravitino-optimizer-submit.conf <<'EOF_CONF'
+gravitino.optimizer.gravitinoUri = http://localhost:8090
+gravitino.optimizer.gravitinoMetalake = test
+gravitino.optimizer.gravitinoDefaultCatalog = rest_catalog
+gravitino.optimizer.recommender.statisticsProvider = gravitino-statistics-provider
+gravitino.optimizer.recommender.strategyProvider = gravitino-strategy-provider
+gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-provider
+gravitino.optimizer.recommender.jobSubmitter = gravitino-job-submitter
+gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
+gravitino.optimizer.jobSubmitterConfig.catalog_name = rest_catalog
+gravitino.optimizer.jobSubmitterConfig.spark_master = local[2]
+gravitino.optimizer.jobSubmitterConfig.spark_executor_instances = 1
+gravitino.optimizer.jobSubmitterConfig.spark_executor_cores = 1
+gravitino.optimizer.jobSubmitterConfig.spark_executor_memory = 1g
+gravitino.optimizer.jobSubmitterConfig.spark_driver_memory = 1g
+gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
+gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
+# Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
+gravitino.optimizer.jobSubmitterConfig.warehouse_location =
+gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
+EOF_CONF
+```
+
+Preview first. A dry run evaluates the policy and prints what it would do without submitting anything.
+
+```bash
+./bin/gravitino-optimizer.sh \
+  --type submit-strategy-jobs \
+  --identifiers rest_catalog.db.t1 \
+  --strategy-name iceberg_compaction_default \
+  --dry-run \
+  --limit 10 \
+  --conf-path /tmp/gravitino-optimizer-submit.conf
+```
+
+`DRY-RUN` lines mean the policy fired. No output at all means it did not, which usually means the statistics from step 5 are below the policy thresholds rather than that anything is broken.
+
+Then submit for real:
+
+```bash
+submit_output=$(./bin/gravitino-optimizer.sh \
+  --type submit-strategy-jobs \
+  --identifiers rest_catalog.db.t1 \
+  --strategy-name iceberg_compaction_default \
+  --limit 10 \
+  --conf-path /tmp/gravitino-optimizer-submit.conf)
+echo "${submit_output}"
+
+strategy_job_id=$(echo "${submit_output}" | sed -n 's/.*jobId=\([^[:space:]]*\).*/\1/p')
+[[ -z "${strategy_job_id}" ]] && echo 'ERROR: failed to extract strategy job ID' && exit 1
+echo "strategy rewrite job id: ${strategy_job_id}"
+```
+
+### Step 7: Verify the Rewrite
+
+```bash
+curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${update_stats_job_id}" | jq
+curl -sS "http://localhost:8090/api/metalakes/test/jobs/runs/${strategy_job_id}" | jq
+
+log_dir="/tmp/gravitino/jobs/staging/test/builtin-iceberg-rewrite-data-files/${strategy_job_id}"
+grep -E "Rewritten data files|Added data files|completed successfully" "${log_dir}/output.log"
+```
+
+`Rewritten data files: N` with `N` greater than zero means the workflow worked end to end. The staging path comes from `gravitino.job.stagingDir`, which defaults to `/tmp/gravitino/jobs/staging`.
+
+REST job status is polled rather than pushed, so it lags the real Spark process by up to one poll interval. That is why the prerequisites lower it to ten seconds.
 
 ## Related
 
-- [Optimizer Configuration](./optimizer-configuration.md)
-- [Optimizer Extension Guide](./optimizer-extension-guide.md)
-- [Optimizer Quick Start and Verification](./optimizer-quick-start.md)
-- [Optimizer CLI Reference](./optimizer-cli-reference.md)
-- [Optimizer Troubleshooting](./optimizer-troubleshooting.md)
-- [Manage policies in Gravitino](../manage-policies-in-gravitino.md)
-- [Iceberg compaction policy](../iceberg-compaction-policy.md)
-- [Manage jobs in Gravitino](../manage-jobs-in-gravitino.md)
-- [Manage statistics in Gravitino](../manage-statistics-in-gravitino.md)
+- [Configuration](./optimizer-configuration.md) for the three configuration layers
+- [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
+- [Troubleshooting](./optimizer-troubleshooting.md) when something above does not behave
+- [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers
+- [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in strategy
