@@ -111,16 +111,9 @@ public class IcebergRESTMinIOTokenAuthorizationIT extends IcebergRESTCloudTokenA
   }
 
   @Override
-  protected void downloadCloudBundleJar() {
-    // gravitino-iceberg-aws-bundle already shades the Iceberg AWS bundle and the Gravitino
-    // credential providers, so it is built locally and nothing has to be fetched.
-  }
-
-  @Override
   protected void copyCloudBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    // The REST server and the lakehouse-iceberg catalog resolve S3FileIO through separate
-    // classloaders, so each needs its own copy.
+    // The REST server and the catalog use separate classloaders, so each needs its own copy.
     BaseIT.copyBundleJarsToDirectory(
         BUNDLE_NAME, ITUtils.joinPath(gravitinoHome, "iceberg-rest-server", "libs"));
     BaseIT.copyBundleJarsToDirectory(

@@ -83,14 +83,6 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
   public abstract Map<String, String> getCustomProperties();
 
   /**
-   * Downloads cloud-specific bundle JARs (e.g., iceberg-aws-bundle, iceberg-gcp-bundle). Subclasses
-   * implement this to download the appropriate bundle for their cloud provider.
-   *
-   * @throws Exception if download fails
-   */
-  protected abstract void downloadCloudBundleJar() throws Exception;
-
-  /**
    * Copies cloud-specific bundle JARs to the Iceberg REST server libs directory. Subclasses
    * implement this to copy the appropriate bundle (e.g., "aws", "gcp", "azure").
    */
@@ -105,21 +97,15 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
   protected abstract String getCloudProviderName();
 
   /**
-   * Sets up cloud-specific bundle JARs by downloading and copying them. This method should be
-   * called from subclass {@code startIntegrationTest()} methods before calling {@code
-   * super.startIntegrationTest()}, because the server resolves the cloud {@code FileIO} from its
-   * classpath while starting.
+   * Copies the cloud-specific bundle JARs into place. This method should be called from subclass
+   * {@code startIntegrationTest()} methods before calling {@code super.startIntegrationTest()},
+   * because the server resolves the cloud {@code FileIO} from its classpath while starting.
    *
    * <p>Skips setup if running in embedded mode.
    */
   protected void setupCloudBundles() {
     if (ITUtils.isEmbedded()) {
       return;
-    }
-    try {
-      downloadCloudBundleJar();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to download cloud bundle JAR", e);
     }
     copyCloudBundleJar();
   }

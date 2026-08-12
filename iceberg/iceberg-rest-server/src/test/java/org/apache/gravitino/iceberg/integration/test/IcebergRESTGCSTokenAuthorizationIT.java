@@ -98,11 +98,6 @@ public class IcebergRESTGCSTokenAuthorizationIT extends IcebergRESTCloudTokenAut
   }
 
   @Override
-  protected void downloadCloudBundleJar() {
-    // Both bundles are built locally, so nothing has to be fetched.
-  }
-
-  @Override
   protected void copyCloudBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
     // The REST server and the catalog use separate classloaders, so each needs its own copy.
