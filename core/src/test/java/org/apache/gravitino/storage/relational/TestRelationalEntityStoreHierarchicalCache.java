@@ -22,7 +22,9 @@ package org.apache.gravitino.storage.relational;
 import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -31,6 +33,7 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.cache.CaffeineEntityCache;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -104,6 +107,21 @@ public class TestRelationalEntityStoreHierarchicalCache {
         store.getCache().contains(child.nameIdentifier(), Entity.EntityType.SCHEMA));
     Assertions.assertTrue(
         store.getCache().contains(tableInChild.nameIdentifier(), Entity.EntityType.TABLE));
+
+    // The cache is keyed by the identifier that reaches the store, which still carries the
+    // configured external separator; the physical separator only exists in the backend rows.
+    Set<String> cacheKeys =
+        ((CaffeineEntityCache) store.getCache())
+            .getCacheData().asMap().keySet().stream()
+                .map(Object::toString)
+                .collect(Collectors.toSet());
+    Assertions.assertTrue(
+        cacheKeys.stream().anyMatch(key -> key.contains(childName)),
+        "nested schema must be cached under its logical name, keys: " + cacheKeys);
+    Assertions.assertTrue(
+        cacheKeys.stream()
+            .noneMatch(key -> key.contains(HierarchicalSchemaUtil.physicalSeparator())),
+        "no cache key may carry the physical separator, keys: " + cacheKeys);
 
     store.delete(parent.nameIdentifier(), Entity.EntityType.SCHEMA, true);
 
