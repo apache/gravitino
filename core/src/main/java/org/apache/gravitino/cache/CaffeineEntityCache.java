@@ -54,6 +54,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -79,6 +80,12 @@ public class CaffeineEntityCache extends BaseEntityCache {
           new ThreadPoolExecutor.CallerRunsPolicy());
 
   private static final Logger LOG = LoggerFactory.getLogger(CaffeineEntityCache.class.getName());
+
+  /**
+   * Separates {@link NameIdentifier} levels in a cache key. See {@link
+   * #invalidationPrefixes(EntityCacheKey)} for why it is not the only child boundary.
+   */
+  private static final String NAME_LEVEL_BOUNDARY = ".";
 
   /** Segmented locking for better concurrency */
   private final SegmentedLock segmentedLock;
@@ -486,17 +493,18 @@ public class CaffeineEntityCache extends BaseEntityCache {
       cacheData.invalidate(currentKeyToRemove);
       cacheIndex.remove(currentKeyToRemove.toString());
 
-      // Remove related entity keys
-      List<EntityCacheKey> relatedEntityKeysToRemove =
-          Lists.newArrayList(
-              cacheIndex.getValuesForKeysStartingWith(currentKeyToRemove.identifier().toString()));
+      // Remove the current entity's relation entries and its descendants.
+      Set<EntityCacheKey> relatedEntityKeysToRemove = Sets.newHashSet();
+      for (String prefix : invalidationPrefixes(currentKeyToRemove)) {
+        cacheIndex.getValuesForKeysStartingWith(prefix).forEach(relatedEntityKeysToRemove::add);
+      }
       queue.addAll(relatedEntityKeysToRemove);
 
       // Look up from reverse index to go to next depth
-      List<List<EntityCacheKey>> reverseKeysToRemove =
-          Lists.newArrayList(
-              reverseIndex.getValuesForKeysStartingWith(
-                  currentKeyToRemove.identifier().toString()));
+      List<List<EntityCacheKey>> reverseKeysToRemove = Lists.newArrayList();
+      for (String prefix : invalidationPrefixes(currentKeyToRemove)) {
+        reverseIndex.getValuesForKeysStartingWith(prefix).forEach(reverseKeysToRemove::add);
+      }
 
       reverseKeysToRemove.forEach(
           key -> {
@@ -518,6 +526,27 @@ public class CaffeineEntityCache extends BaseEntityCache {
     }
 
     return true;
+  }
+
+  /**
+   * Returns exact prefixes for the entity, its ordinary descendants, and nested schemas.
+   *
+   * <p>The entity-type prefix includes all relation entries for the same entity without matching an
+   * entity of another type. The name-level and schema-level prefixes use explicit child boundaries,
+   * so identifiers that merely share a prefix remain cached.
+   *
+   * @param key the entity cache key
+   * @return prefixes identifying the entity and its descendants
+   */
+  private Set<String> invalidationPrefixes(EntityCacheKey key) {
+    String identifier = key.identifier().toString();
+    Set<String> prefixes = Sets.newLinkedHashSet();
+    prefixes.add(EntityCacheKey.of(key.identifier(), key.entityType()).toString());
+    prefixes.add(identifier + NAME_LEVEL_BOUNDARY);
+    if (key.entityType() == Entity.EntityType.SCHEMA) {
+      prefixes.add(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    }
+    return prefixes;
   }
 
   /** Starts the cache stats monitor. */

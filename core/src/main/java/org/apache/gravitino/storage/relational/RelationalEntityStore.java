@@ -395,13 +395,14 @@ public class RelationalEntityStore
         backend.updateEntityRelations(
             relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
 
+    Entity.EntityType destEntityType = relationDestinationEntityType(relType);
     cache.invalidate(srcEntityIdent, srcEntityType, relType);
     for (NameIdentifier destToAdd : destEntitiesToAdd) {
-      cache.invalidate(destToAdd, srcEntityType, relType);
+      cache.invalidate(destToAdd, destEntityType, relType);
     }
 
     for (NameIdentifier destToRemove : destEntitiesToRemove) {
-      cache.invalidate(destToRemove, srcEntityType, relType);
+      cache.invalidate(destToRemove, destEntityType, relType);
     }
 
     return result;
@@ -418,6 +419,19 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  private static Entity.EntityType relationDestinationEntityType(
+      SupportsRelationOperations.Type relType) {
+    switch (relType) {
+      case POLICY_METADATA_OBJECT_REL:
+        return Entity.EntityType.POLICY;
+      case TAG_METADATA_OBJECT_REL:
+        return Entity.EntityType.TAG;
+      default:
+        throw new IllegalArgumentException(
+            String.format("Doesn't support the relation type %s", relType));
+    }
   }
 
   private <E extends Entity & HasIdentifier> Optional<List<RelationalEntity<?>>> getCachedRelations(
