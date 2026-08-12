@@ -616,7 +616,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
     Map<String, String> mergedConfig =
-        SecretPropertyUtils.copyEntityProperties(buildCatalogConf(provider, properties));
+        SecretPropertyUtils.copyEntityProperties(
+            buildCatalogConf(provider, properties), secretBindings, secretReferences);
     long uid = idGenerator.nextId();
 
     List<SecretMaterial> secretMaterials =

@@ -123,7 +123,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     long uid = idGenerator.nextId();
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    Map<String, String> entityProperties =
+        SecretPropertyUtils.copyEntityProperties(properties, secretBindings, secretReferences);
     List<SecretMaterial> secretMaterials =
         secretManager.assembleSecretMaterials(
             properties, entityProperties, "schema", uid, secretBindings, secretReferences);
