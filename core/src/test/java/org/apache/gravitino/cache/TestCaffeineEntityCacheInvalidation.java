@@ -34,6 +34,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.TestUtil;
@@ -175,8 +176,8 @@ public class TestCaffeineEntityCacheInvalidation {
 
   @Test
   void testInvalidateHierarchicalSchemaCascadesToNestedSchemas() {
-    // A HierarchicalSchema nests inside a single name level, joined by the physical separator,
-    // so "raw:events:2024" is a child of "raw:events" without adding a NameIdentifier level.
+    // A HierarchicalSchema nests inside a single name level, joined by the schema separator, so
+    // "raw:events:2024" is a child of "raw:events" without adding a NameIdentifier level.
     String parentName = hierarchicalName("raw", "events");
     String childName = hierarchicalName("raw", "events", "2024");
 
@@ -311,6 +312,24 @@ public class TestCaffeineEntityCacheInvalidation {
     } finally {
       FieldUtils.writeField(GravitinoEnv.getInstance(), "config", previousConfig, true);
     }
+  }
+
+  @Test
+  void testInvalidateLeafDoesNotEvictSameNameEntityOfAnotherType() {
+    // A cache key is "<identifier>:<type>", and ":" is also the default schema separator. Only a
+    // schema can nest, so the schema-separator scan must not run for other types, otherwise
+    // invalidating a table would also drop the topic of the same name.
+    Namespace schemaNs = schemaNamespace("schema1");
+    TableEntity table = TestUtil.getTestTableEntity(2L, "shared_name", schemaNs);
+    TopicEntity topic = TestUtil.getTestTopicEntity(3L, "shared_name", schemaNs, "cmt");
+
+    cache.put(table);
+    cache.put(topic);
+
+    cache.invalidate(table.nameIdentifier(), Entity.EntityType.TABLE);
+
+    Assertions.assertFalse(cache.contains(table.nameIdentifier(), Entity.EntityType.TABLE));
+    Assertions.assertTrue(cache.contains(topic.nameIdentifier(), Entity.EntityType.TOPIC));
   }
 
   @Test

@@ -284,7 +284,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
    *       schemas such as {@code raw:events:2024} under {@code raw:events}. Without this pass those
    *       descendants would survive until their TTL expires. The cache sits above the storage
    *       layer, where schema names are still logical, so the boundary is the configured external
-   *       separator and not the physical one the entity store writes to the backend.
+   *       separator and not the physical one the entity store writes to the backend. Only a schema
+   *       can carry nested levels, so this pass is skipped for every other entity type; a catalog
+   *       still reaches its nested schemas through the {@code "."} pass above.
    * </ul>
    *
    * <p>Matching on a boundary rather than the bare identifier is what keeps the scan exact: it
@@ -300,7 +302,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
 
     String identifier = key.identifier().toString();
     invalidateDescendants(identifier + NAME_LEVEL_BOUNDARY);
-    invalidateDescendants(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    if (key.entityType() == Entity.EntityType.SCHEMA) {
+      invalidateDescendants(identifier + HierarchicalSchemaUtil.schemaSeparator());
+    }
   }
 
   /**
