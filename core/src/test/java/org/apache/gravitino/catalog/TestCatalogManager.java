@@ -566,6 +566,9 @@ public class TestCatalogManager {
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
     Catalog catalog = catalogManager.loadCatalog(ident);
+    Assertions.assertFalse(
+        catalog instanceof BaseCatalog,
+        "loadCatalog must not expose a live catalog after its lease is released");
     Assertions.assertEquals("test21", catalog.name());
     Assertions.assertEquals("comment", catalog.comment());
     testProperties(props, catalog.properties());
@@ -652,10 +655,8 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
-    CatalogEntity originalEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", originalEntity, true);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     CatalogManager.CatalogWrapper staleWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
@@ -664,8 +665,11 @@ public class TestCatalogManager {
     CatalogManager.CatalogWrapper freshWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
     BaseCatalog<?> freshCatalog = Mockito.mock(BaseCatalog.class);
-    Mockito.doReturn("cache_race_test_renamed").when(freshCatalog).name();
+    Catalog freshCatalogInfo = Mockito.mock(Catalog.class);
+    Mockito.doReturn("cache_race_test_renamed").when(freshCatalogInfo).name();
     Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
+    Mockito.doReturn(true).when(freshWrapper).tryAcquire();
+    Mockito.doReturn(freshCatalogInfo).when(freshWrapper).doWithCredentialOps(any());
 
     AtomicBoolean staleInserted = new AtomicBoolean(false);
     Answer<CatalogManager.CatalogWrapper> insertStaleWrapper =
@@ -935,12 +939,10 @@ public class TestCatalogManager {
             "value3");
     String comment = "comment";
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     SchemaEntity importedSchemaEntity =
         SchemaEntity.builder()
@@ -1020,12 +1022,10 @@ public class TestCatalogManager {
             "value3");
     String comment = "comment";
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
@@ -1072,12 +1072,10 @@ public class TestCatalogManager {
             "value3");
     String comment = "comment";
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
     Mockito.doCallRealMethod().when(catalogManager).loadCatalogAndWrap(ident);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity catalogEntity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", catalogEntity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
@@ -1125,8 +1123,8 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
     String comment = "comment";
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, comment, props);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
     SchemaEntity schemaEntity =
         SchemaEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -1168,11 +1166,9 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", entity, true);
+    BaseCatalog<?> catalog = catalogManager.loadCatalogAndWrap(ident).catalog();
 
     CatalogManager.CatalogWrapper catalogWrapper =
         Mockito.mock(CatalogManager.CatalogWrapper.class, Mockito.RETURNS_DEEP_STUBS);
@@ -1206,11 +1202,8 @@ public class TestCatalogManager {
             PROPERTY_KEY5_PREFIX + "1",
             "value3");
 
-    Catalog catalog =
-        catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
     Assertions.assertDoesNotThrow(() -> catalogManager.disableCatalog(ident));
-    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    FieldUtils.writeField(catalog, "entity", entity, true);
 
     CatalogManager.CatalogWrapper closedWrapper = catalogManager.loadCatalogAndWrap(ident);
     closedWrapper.close();

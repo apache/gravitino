@@ -39,6 +39,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -56,6 +57,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 /**
  * Tests that a catalog wrapper evicted from the catalog cache is not torn down while an operation
@@ -313,12 +315,120 @@ public class TestCatalogWrapperLease {
   }
 
   @Test
+  public void testDoWithCatalogKeepsLeaseForEntireCallback() throws Exception {
+    NameIdentifier ident = createCatalog("callback_with_lease");
+    CountDownLatch callbackStarted = new CountDownLatch(1);
+    CountDownLatch continueCallback = new CountDownLatch(1);
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    try {
+      Future<Boolean> operation =
+          executor.submit(
+              () ->
+                  catalogManager.doWithCatalog(
+                      ident,
+                      catalog -> {
+                        callbackStarted.countDown();
+                        Assertions.assertTrue(continueCallback.await(10, TimeUnit.SECONDS));
+                        catalog.ops();
+                        return true;
+                      }));
+
+      Assertions.assertTrue(callbackStarted.await(10, TimeUnit.SECONDS));
+      CatalogWrapper wrapper = catalogManager.getCatalogCache().getIfPresent(ident);
+      Assertions.assertNotNull(wrapper);
+
+      catalogManager.getCatalogCache().invalidate(ident);
+      await().atMost(Duration.ofSeconds(10)).until(wrapper::isRetired);
+
+      Assertions.assertNotNull(
+          wrapper.catalog(), "the callback lease must survive a concurrent invalidation");
+      continueCallback.countDown();
+      Assertions.assertTrue(operation.get(10, TimeUnit.SECONDS));
+      Assertions.assertNull(wrapper.catalog());
+    } finally {
+      continueCallback.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testManagerCloseDefersCleanupUntilLeaseIsReleased() throws Exception {
+    NameIdentifier ident = createCatalog("manager_close_with_lease");
+
+    CatalogLease lease = catalogManager.acquireCatalogLease(ident);
+    CatalogWrapper wrapper = lease.wrapper();
+    ClassLoaderPool pool =
+        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
+
+    catalogManager.close();
+
+    Assertions.assertTrue(wrapper.isRetired());
+    Assertions.assertNotNull(
+        wrapper.catalog(), "manager shutdown must not close a catalog with an active lease");
+    Assertions.assertEquals(
+        1, pool.size(), "manager shutdown must retain an actively leased ClassLoader");
+    Assertions.assertDoesNotThrow(
+        () ->
+            wrapper.doWithSchemaOps(ops -> ops.listSchemas(Namespace.of(METALAKE, ident.name()))));
+    Assertions.assertThrows(
+        IllegalStateException.class, () -> catalogManager.acquireCatalogLease(ident));
+
+    lease.close();
+
+    Assertions.assertNull(wrapper.catalog());
+    Assertions.assertEquals(0, pool.size());
+  }
+
+  @Test
+  public void testRemovalListenerFailureDoesNotSkipWrapperRetirement() {
+    NameIdentifier ident = createCatalog("failing_removal_listener");
+    CatalogWrapper wrapper = catalogManager.getCatalogCache().getIfPresent(ident);
+    Assertions.assertNotNull(wrapper);
+    catalogManager.addCatalogCacheRemoveListener(
+        ignored -> {
+          throw new RuntimeException("listener failed");
+        });
+
+    catalogManager.getCatalogCache().invalidate(ident);
+
+    await().atMost(Duration.ofSeconds(10)).until(wrapper::isRetired);
+    Assertions.assertNull(
+        wrapper.catalog(), "listener failures must not prevent wrapper resource cleanup");
+  }
+
+  @Test
   public void testReleaseWithoutAcquireIsRejected() throws Exception {
     NameIdentifier ident = createCatalog("release_without_acquire");
     CatalogWrapper wrapper = catalogManager.getCatalogCache().getIfPresent(ident);
     Assertions.assertNotNull(wrapper);
 
     Assertions.assertThrows(IllegalStateException.class, wrapper::release);
+  }
+
+  @Test
+  public void testCleanupClearsCatalogEvenWhenCloseFails() throws Exception {
+    NameIdentifier ident = createCatalog("failing_close");
+
+    ClassLoaderPool pool =
+        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
+    Assertions.assertEquals(1, pool.size());
+
+    CatalogWrapper wrapper = catalogManager.getCatalogCache().getIfPresent(ident);
+    Assertions.assertNotNull(wrapper);
+
+    BaseCatalog<?> failingCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.doThrow(new IOException("close failed")).when(failingCatalog).close();
+    FieldUtils.writeField(wrapper, "catalog", failingCatalog, true);
+
+    // Cleanup runs exactly once, so a close() failure must not leave the reference behind: there
+    // is no second chance to clear it.
+    wrapper.retire();
+
+    Mockito.verify(failingCatalog).close();
+    Assertions.assertNull(
+        wrapper.catalog(), "a failing close must still drop the catalog reference");
+    Assertions.assertEquals(
+        0, pool.size(), "a failing close must still release the pooled ClassLoader");
   }
 
   private NameIdentifier createCatalog(String name) {

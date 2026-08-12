@@ -19,6 +19,9 @@
 package org.apache.gravitino.catalog;
 
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.utils.ThrowableFunction;
+import org.mockito.Mockito;
 
 /** Test-only helpers for catalog internals that are package-private in production code. */
 public final class CatalogTestUtils {
@@ -36,5 +39,23 @@ public final class CatalogTestUtils {
    */
   public static CatalogLease unmanagedLease(CatalogWrapper wrapper) {
     return new CatalogLease(wrapper);
+  }
+
+  /**
+   * Stubs a mocked manager so {@link CatalogManager#doWithCatalog} invokes its callback with the
+   * supplied catalog.
+   *
+   * @param catalogManager the mocked catalog manager.
+   * @param catalog the live catalog to pass to callbacks.
+   */
+  @SuppressWarnings("unchecked")
+  public static void mockDoWithCatalog(CatalogManager catalogManager, BaseCatalog<?> catalog) {
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+              return operation.apply(catalog);
+            })
+        .when(catalogManager)
+        .doWithCatalog(Mockito.any(), Mockito.any());
   }
 }

@@ -33,13 +33,15 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.ThrowableFunction;
 import org.apache.iceberg.hive.HiveCatalog;
 import org.apache.iceberg.jdbc.JdbcCatalog;
 import org.junit.jupiter.api.AfterEach;
@@ -63,6 +65,7 @@ public class TestDynamicIcebergConfigProvider {
   public void tearDown() throws IllegalAccessException {
     // Clean up GravitinoEnv and IcebergRESTServerContext state after each test
     FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
     resetServerContext();
   }
 
@@ -282,15 +285,13 @@ public class TestDynamicIcebergConfigProvider {
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Mock CatalogDispatchers
-    CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
-    CatalogDispatcher mockInternalCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
-    Catalog mockCatalog = Mockito.mock(Catalog.class);
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    mockDoWithCatalog(mockCatalogManager, mockCatalog);
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
-    Mockito.when(mockCatalog.properties())
+    Mockito.when(mockCatalog.propertiesWithCredentialProviders())
         .thenReturn(
             new HashMap<String, String>() {
               {
@@ -299,14 +300,7 @@ public class TestDynamicIcebergConfigProvider {
               }
             });
 
-    // Set the mock CatalogDispatchers to GravitinoEnv
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(),
-        "internalCatalogDispatcher",
-        mockInternalCatalogDispatcher,
-        true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -315,12 +309,11 @@ public class TestDynamicIcebergConfigProvider {
     DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
     provider.initialize(properties);
 
-    // Test that internal interface is used (internal CatalogDispatcher should be called)
+    // Test that the internal lease-aware interface is used.
     Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
 
     Assertions.assertTrue(icebergConfig.isPresent());
-    Mockito.verify(mockInternalCatalogDispatcher).loadCatalog(catalogIdent);
-    Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
+    Mockito.verify(mockCatalogManager).doWithCatalog(Mockito.eq(catalogIdent), Mockito.any());
   }
 
   @Test
@@ -362,15 +355,15 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testInternalCatalogFetcherWithNullCatalogDispatcher() throws IllegalAccessException {
+  public void testInternalCatalogFetcherWithNullCatalogManager() throws IllegalAccessException {
     String metalakeName = "test_metalake";
     String catalogName = "internal_catalog";
 
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Ensure internal CatalogDispatcher is null (simulating GravitinoEnv not initialized)
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
+    // Ensure CatalogManager is null (simulating GravitinoEnv not initialized)
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -383,7 +376,7 @@ public class TestDynamicIcebergConfigProvider {
         Assertions.assertThrows(
             IllegalStateException.class, () -> provider.getIcebergCatalogConfig(catalogName));
     Assertions.assertEquals(
-        "Internal CatalogDispatcher is not available. "
+        "Internal CatalogManager is not available. "
             + "Internal catalog fetcher requires running within Gravitino server.",
         exception.getMessage());
   }
@@ -396,22 +389,15 @@ public class TestDynamicIcebergConfigProvider {
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Mock internal CatalogDispatcher to throw NoSuchCatalogException
-    CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
-    CatalogDispatcher mockInternalCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
+    // Mock the lease-aware CatalogManager to throw NoSuchCatalogException.
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
     NameIdentifier catalogIdent =
         NameIdentifierUtil.ofCatalog(metalakeName, nonExistentCatalogName);
-    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent))
-        .thenThrow(new NoSuchCatalogException("Catalog not found: %s", nonExistentCatalogName));
+    Mockito.doThrow(new NoSuchCatalogException("Catalog not found: %s", nonExistentCatalogName))
+        .when(mockCatalogManager)
+        .doWithCatalog(Mockito.eq(catalogIdent), Mockito.any());
 
-    // Set the mock CatalogDispatchers to GravitinoEnv
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(),
-        "internalCatalogDispatcher",
-        mockInternalCatalogDispatcher,
-        true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -424,8 +410,7 @@ public class TestDynamicIcebergConfigProvider {
     Optional<IcebergConfig> result = provider.getIcebergCatalogConfig(nonExistentCatalogName);
 
     Assertions.assertFalse(result.isPresent());
-    Mockito.verify(mockInternalCatalogDispatcher).loadCatalog(catalogIdent);
-    Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
+    Mockito.verify(mockCatalogManager).doWithCatalog(Mockito.eq(catalogIdent), Mockito.any());
   }
 
   @Test
@@ -509,15 +494,13 @@ public class TestDynamicIcebergConfigProvider {
     // Enable authorization to use internal fetcher
     createMockServerContext(true);
 
-    // Mock CatalogDispatchers
-    CatalogDispatcher mockCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
-    CatalogDispatcher mockInternalCatalogDispatcher = Mockito.mock(CatalogDispatcher.class);
-    Catalog mockCatalog = Mockito.mock(Catalog.class);
+    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> mockCatalog = Mockito.mock(BaseCatalog.class);
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-    Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    mockDoWithCatalog(mockCatalogManager, mockCatalog);
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
-    Mockito.when(mockCatalog.properties())
+    Mockito.when(mockCatalog.propertiesWithCredentialProviders())
         .thenReturn(
             new HashMap<String, String>() {
               {
@@ -526,14 +509,7 @@ public class TestDynamicIcebergConfigProvider {
               }
             });
 
-    // Set the mock CatalogDispatchers to GravitinoEnv
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "catalogDispatcher", mockCatalogDispatcher, true);
-    FieldUtils.writeField(
-        GravitinoEnv.getInstance(),
-        "internalCatalogDispatcher",
-        mockInternalCatalogDispatcher,
-        true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
 
     // Initialize provider with required properties
     Map<String, String> properties = new HashMap<>();
@@ -576,12 +552,22 @@ public class TestDynamicIcebergConfigProvider {
       Assertions.assertTrue(result.isPresent(), "Each thread should get a valid config");
     }
 
-    // Verify internal CatalogDispatcher was called (at least once, possibly more due to
-    // concurrency)
-    Mockito.verify(mockInternalCatalogDispatcher, Mockito.atLeastOnce()).loadCatalog(catalogIdent);
-    Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
+    // Verify the internal lease-aware path was called (possibly more than once due to concurrency).
+    Mockito.verify(mockCatalogManager, Mockito.atLeastOnce())
+        .doWithCatalog(Mockito.eq(catalogIdent), Mockito.any());
 
     executor.shutdown();
     executor.awaitTermination(5, TimeUnit.SECONDS);
+  }
+
+  @SuppressWarnings("unchecked")
+  private static void mockDoWithCatalog(CatalogManager catalogManager, BaseCatalog<?> baseCatalog) {
+    Mockito.doAnswer(
+            invocation -> {
+              ThrowableFunction<BaseCatalog, Object> operation = invocation.getArgument(1);
+              return operation.apply(baseCatalog);
+            })
+        .when(catalogManager)
+        .doWithCatalog(Mockito.any(), Mockito.any());
   }
 }

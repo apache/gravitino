@@ -73,7 +73,7 @@ public class TestTopicHookDispatcher extends TestOperationDispatcher {
         Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(catalogWrapper.catalog()).thenReturn(catalog);
     Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, catalog);
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
     Mockito.when(catalogManager.acquireCatalogLease(any()))
         .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(catalogWrapper));
