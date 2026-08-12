@@ -121,15 +121,26 @@ public class RelationalEntityStore
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)));
 
-    // The coherence gate: a LOCAL_PER_NODE cache keeps its own copy per node, so changes made on
-    // other nodes must be replayed here through the change log. SHARED and NONE caches have
-    // nothing per-node to invalidate, so no listener is registered.
-    if (cache.coherence() == Coherence.LOCAL_PER_NODE) {
-      this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache);
-      this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
-    }
+    registerCacheChangeLogListener();
+
     this.entityChangeLogPoller.start();
     this.entityChangeLogCleaner.start();
+  }
+
+  /**
+   * The coherence gate: a {@link Coherence#LOCAL_PER_NODE} cache keeps its own copy per node, so
+   * changes made on other nodes must be replayed here through the change log. {@link
+   * Coherence#SHARED} and {@link Coherence#NONE} caches have nothing per-node to invalidate, so no
+   * listener is registered.
+   */
+  @VisibleForTesting
+  void registerCacheChangeLogListener() {
+    if (cache.coherence() != Coherence.LOCAL_PER_NODE) {
+      return;
+    }
+
+    this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache);
+    this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {

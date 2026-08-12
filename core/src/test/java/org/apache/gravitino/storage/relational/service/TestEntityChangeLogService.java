@@ -21,6 +21,9 @@ package org.apache.gravitino.storage.relational.service;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
@@ -49,9 +52,11 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -233,6 +238,49 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     Assertions.assertEquals(CATALOG_NAME, persistedCatalog.name());
     Assertions.assertEquals(maxIdBeforeUpdate, maxEntityChangeId());
+  }
+
+  @TestTemplate
+  void testEntityUpdateRollsBackWhenChangeLogInsertFails() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    long maxIdBeforeUpdate = maxEntityChangeId();
+
+    // Take the change-log table away so that the entity row is updated first and the change-log
+    // insert then fails inside the same transaction. This is the only ordering the rollback in
+    // JDBCBackend#update protects against, and the caller owns no outer transaction here.
+    renameTable("entity_change_log", "entity_change_log_bak");
+    try {
+      Assertions.assertThrows(
+          Exception.class,
+          () ->
+              backend.update(
+                  catalog.nameIdentifier(),
+                  Entity.EntityType.CATALOG,
+                  entity ->
+                      createCatalog(
+                          catalog.id(),
+                          catalog.namespace(),
+                          CATALOG_NAME + "_rolled_back",
+                          AUDIT_INFO)));
+    } finally {
+      renameTable("entity_change_log_bak", "entity_change_log");
+    }
+
+    // The entity mutation must not survive a failed change-log write.
+    CatalogEntity persistedCatalog =
+        backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertEquals(CATALOG_NAME, persistedCatalog.name());
+    Assertions.assertEquals(maxIdBeforeUpdate, maxEntityChangeId());
+  }
+
+  private void renameTable(String from, String to) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.execute(String.format("ALTER TABLE %s RENAME TO %s", from, to));
+    }
   }
 
   @TestTemplate
