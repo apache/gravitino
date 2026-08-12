@@ -125,6 +125,10 @@ public class AuthorizationTable implements Table, SupportsRead, SupportsWrite {
   }
 
   @Override
+  // Table.schema() is deprecated from Spark 3.4 in favor of columns(); this table carries no
+  // columns, so the deprecated form is the simplest way to report an empty schema on every
+  // supported version.
+  @SuppressWarnings("deprecation")
   public StructType schema() {
     return EMPTY_SCHEMA;
   }

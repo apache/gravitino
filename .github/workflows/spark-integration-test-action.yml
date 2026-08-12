@@ -56,10 +56,6 @@ jobs:
       - name: Spark Integration Test
         id: integrationTest
         run: |
-          if [ "${{ inputs.scala-version }}" == "2.12" ];then 
-            ./gradlew -PskipTests -PtestMode=${{ inputs.test-mode }} -PscalaVersion=${{ inputs.scala-version }} -PskipDockerTests=false -PskipWeb=true :spark-connector:spark-3.3:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
-          fi
-          ./gradlew -PskipTests -PtestMode=${{ inputs.test-mode }} -PscalaVersion=${{ inputs.scala-version }} -PskipDockerTests=false -PskipWeb=true :spark-connector:spark-3.4:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
           ./gradlew -PskipTests -PtestMode=${{ inputs.test-mode }} -PscalaVersion=${{ inputs.scala-version }} -PskipDockerTests=false -PskipWeb=true :spark-connector:spark-3.5:test --tests "org.apache.gravitino.spark.connector.integration.test.**"
 
       - name: Upload integrate tests reports
@@ -69,8 +65,6 @@ jobs:
           name: spark-connector-integrate-test-reports-${{ inputs.java-version }}-${{ inputs.test-mode }}
           path: |
             build/reports
-            spark-connector/v3.3/spark/build/spark-3.3-integration-test.log
-            spark-connector/v3.4/spark/build/spark-3.4-integration-test.log
             spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
             distribution/package/logs/*.out
             distribution/package/logs/*.log

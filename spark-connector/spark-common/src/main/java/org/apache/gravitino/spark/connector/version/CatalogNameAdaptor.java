@@ -32,33 +32,13 @@ public class CatalogNameAdaptor {
     catalogNames =
         builder
             .put(
-                "hive-3.3", "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark33")
-            .put(
-                "hive-3.4", "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark34")
-            .put(
                 "hive-3.5", "org.apache.gravitino.spark.connector.hive.GravitinoHiveCatalogSpark35")
-            .put(
-                "lakehouse-iceberg-3.3",
-                "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark33")
-            .put(
-                "lakehouse-iceberg-3.4",
-                "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark34")
             .put(
                 "lakehouse-iceberg-3.5",
                 "org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark35")
             .put(
-                "lakehouse-paimon-3.3",
-                "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark33")
-            .put(
-                "lakehouse-paimon-3.4",
-                "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark34")
-            .put(
                 "lakehouse-paimon-3.5",
                 "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35")
-            .put(
-                "glue-3.3", "org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark33")
-            .put(
-                "glue-3.4", "org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark34")
             .put(
                 "glue-3.5", "org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark35")
             .build();
@@ -66,19 +46,10 @@ public class CatalogNameAdaptor {
 
   private static final Map<String, String> jdbcCatalogNames =
       ImmutableMap.of(
-          "3.3",
-          "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark33",
-          "3.4",
-          "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark34",
-          "3.5",
-          "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35");
+          "3.5", "org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35");
 
   private static final Map<String, String> pgCatalogNames =
       ImmutableMap.of(
-          "3.3",
-          "org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark33",
-          "3.4",
-          "org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark34",
           "3.5",
           "org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark35");
 

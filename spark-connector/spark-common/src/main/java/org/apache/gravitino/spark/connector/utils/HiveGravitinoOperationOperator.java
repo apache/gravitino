@@ -30,7 +30,7 @@ import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.apache.spark.sql.catalyst.InternalRow;
-import org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException;
+import org.apache.spark.sql.catalyst.analysis.PartitionsAlreadyExistException;
 import org.apache.spark.sql.catalyst.expressions.GenericInternalRow;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
@@ -49,7 +49,7 @@ public class HiveGravitinoOperationOperator {
 
   public void createPartition(
       InternalRow ident, Map<String, String> properties, StructType partitionSchema)
-      throws PartitionAlreadyExistsException {
+      throws PartitionsAlreadyExistException {
     List<String[]> fields = new ArrayList<>();
     List<Literal<?>> values = new ArrayList<>();
 
@@ -68,8 +68,11 @@ public class HiveGravitinoOperationOperator {
     try {
       gravitinoTable.supportPartitions().addPartition(partition);
     } catch (org.apache.gravitino.exceptions.PartitionAlreadyExistsException e) {
-      throw new org.apache.spark.sql.catalyst.analysis.PartitionAlreadyExistsException(
-          e.getMessage());
+      // Forward Gravitino's message unchanged, as this class has always done. The plural exception
+      // replaces the singular one only because the throws clause of
+      // SupportsPartitionManagement.createPartition changed in Spark 3.4; the single-String
+      // constructor exists on both and sets the same PARTITIONS_ALREADY_EXIST error class.
+      throw new PartitionsAlreadyExistException(e.getMessage());
     }
   }
 

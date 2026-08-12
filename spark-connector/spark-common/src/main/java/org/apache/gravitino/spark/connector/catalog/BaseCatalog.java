@@ -25,6 +25,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -63,6 +64,7 @@ import org.apache.spark.sql.connector.catalog.SupportsNamespaces;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.connector.expressions.Transform;
 import org.apache.spark.sql.types.StructField;
@@ -195,6 +197,10 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
   }
 
   @Override
+  // TableCatalog.createTable(Identifier, StructType, Transform[], Map) is deprecated from Spark 3.4
+  // in favor of the Column[] overload. Overriding the deprecated form keeps one implementation that
+  // every supported Spark version dispatches to.
+  @SuppressWarnings("deprecation")
   public Table createTable(
       Identifier ident, StructType schema, Transform[] transforms, Map<String, String> properties)
       throws TableAlreadyExistsException, NoSuchNamespaceException {
@@ -280,6 +286,12 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         propertiesConverter,
         sparkTransformConverter,
         sparkTypeConverter);
+  }
+
+  @Override
+  public Table loadTable(Identifier ident, Set<TableWritePrivilege> writePrivileges)
+      throws NoSuchTableException {
+    return loadTableForWriting(ident);
   }
 
   @Override

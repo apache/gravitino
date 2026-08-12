@@ -49,7 +49,6 @@ if (hasProperty("excludePackagesForSparkConnector")) {
 }
 
 dependencies {
-  implementation(project(":spark-connector:spark-3.4"))
   implementation(project(":spark-connector:spark-common"))
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
