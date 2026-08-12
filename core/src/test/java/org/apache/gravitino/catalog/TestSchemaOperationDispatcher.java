@@ -442,6 +442,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
           SecretPropertyUtils.isSecretProperty("k2", stored.properties().get("k2")));
 
       SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
+      Assertions.assertTrue(
+          SecretPropertyUtils.isSecretProperty("k2", entity.properties().get("k2")));
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
               "memory",
@@ -453,6 +455,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", props, bindings, Map.of()));
+      // Failed recreate must not delete the existing schema's write-through secret.
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
       Assertions.assertTrue(d.dropSchema(ident, false));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }

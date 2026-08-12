@@ -24,8 +24,10 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import java.time.Instant;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -149,6 +151,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
+    // Only roll back write-through secrets from THIS create attempt when catalog create did not
+    // succeed. Rolling back after a successful create would delete secrets still referenced by the
+    // newly created schema (or leave orphans if create raced with an existing schema name).
+    AtomicBoolean schemaCreated = new AtomicBoolean(false);
     try {
       return TreeLockUtils.doWithTreeLock(
           catalogIdent,
@@ -163,6 +169,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                     c -> c.doWithSchemaOps(s -> s.createSchema(ident, comment, updatedProperties)),
                     NoSuchCatalogException.class,
                     SchemaAlreadyExistsException.class);
+            schemaCreated.set(true);
 
             // If the Schema is maintained by the Gravitino's store, we don't have to store again.
             boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
@@ -175,11 +182,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                           schema.properties()));
             }
 
+            // Persist properties (including secret URNs) in the entity store so cleanup still works
+            // when the underlying catalog does not retain schema properties.
             SchemaEntity schemaEntity =
                 SchemaEntity.builder()
                     .withId(uid)
                     .withName(ident.name())
                     .withNamespace(ident.namespace())
+                    .withProperties(updatedProperties)
                     .withAuditInfo(
                         AuditInfo.builder()
                             .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -208,7 +218,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                         schema.properties()));
           });
     } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(secretMaterials);
+      if (!schemaCreated.get()) {
+        secretManager.rollbackSecrets(secretMaterials);
+      }
       throw e;
     }
   }
@@ -363,19 +375,28 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         catalogIdent,
         LockType.WRITE,
         () -> {
-          // Capture persisted properties (including write-through secret URNs) before drop so we
-          // can clean provider material after a successful delete. External-ref URNs are skipped by
-          // deleteSecretsFromProperties.
-          Map<String, String> schemaProperties = null;
-          try {
-            Schema schema =
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
-                    NoSuchSchemaException.class);
-            schemaProperties = schema.properties();
-          } catch (NoSuchSchemaException e) {
-            LOG.debug("Schema {} does not exist when preparing drop cleanup", ident);
+          // Capture properties (including write-through secret URNs) before drop. Prefer the entity
+          // store copy (always retained for unmanaged schemas); fall back to the catalog. Load
+          // failures other than "not found" must not block drop — secret cleanup is best-effort.
+          Map<String, String> schemaProperties = loadSchemaPropertiesForSecretCleanup(ident);
+          if (schemaProperties.isEmpty()) {
+            try {
+              Schema schema =
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+                      NoSuchSchemaException.class);
+              if (schema.properties() != null) {
+                schemaProperties = schema.properties();
+              }
+            } catch (NoSuchSchemaException e) {
+              LOG.debug("Schema {} does not exist in catalog when preparing drop cleanup", ident);
+            } catch (Exception e) {
+              LOG.warn(
+                  "Failed to load schema {} from catalog before drop; secret cleanup may be skipped",
+                  ident,
+                  e);
+            }
           }
 
           boolean droppedFromCatalog =
@@ -459,6 +480,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             .withId(uid)
             .withName(identifier.name())
             .withNamespace(identifier.namespace())
+            .withProperties(
+                schema.properties() == null ? Collections.emptyMap() : schema.properties())
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(schema.auditInfo().creator())
@@ -539,5 +562,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                 HasPropertyMetadata::schemaPropertiesMetadata,
                 schema.properties()))
         .withImported(schemaEntity != null);
+  }
+
+  /**
+   * Loads schema properties from the entity store for secret cleanup. Returns an empty map when the
+   * entity is missing or has no properties.
+   */
+  private Map<String, String> loadSchemaPropertiesForSecretCleanup(NameIdentifier ident) {
+    try {
+      SchemaEntity entity = getEntity(ident, SCHEMA, SchemaEntity.class);
+      if (entity != null && entity.properties() != null && !entity.properties().isEmpty()) {
+        return new HashMap<>(entity.properties());
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to load schema entity {} for secret cleanup", ident, e);
+    }
+    return new HashMap<>();
   }
 }
