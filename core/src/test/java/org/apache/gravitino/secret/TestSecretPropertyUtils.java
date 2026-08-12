@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -67,6 +69,74 @@ public class TestSecretPropertyUtils {
       sm.writeSecrets(writes);
       Assertions.assertTrue(writes.isEmpty());
       Assertions.assertEquals("root", entityProps.get("jdbc-user"));
+    }
+  }
+
+  @Test
+  void testIsCredentialVendingProperty() {
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("s3-access-key-id"));
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("s3-secret-access-key"));
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("aws-access-key-id"));
+    Assertions.assertTrue(
+        SecretPropertyUtils.isCredentialVendingProperty("azure-storage-account-key"));
+    Assertions.assertFalse(SecretPropertyUtils.isCredentialVendingProperty("jdbc-password"));
+    Assertions.assertFalse(SecretPropertyUtils.isCredentialVendingProperty("jdbc-user"));
+    Assertions.assertFalse(SecretPropertyUtils.isCredentialVendingProperty(null));
+  }
+
+  @Test
+  void testBuildResolvedProperties() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = new HashMap<>();
+      entityProps.put("jdbc-url", "jdbc:mysql://localhost/db");
+      entityProps.put("jdbc-user", "root");
+      Map<String, SecretBinding> bindings =
+          Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+      List<SecretMaterial> writes =
+          sm.assembleSecretMaterials(
+              Map.of("jdbc-url", "jdbc:mysql://localhost/db", "jdbc-user", "root"),
+              entityProps,
+              "catalog",
+              42L,
+              bindings,
+              Map.of());
+      sm.writeSecrets(writes);
+
+      entityProps.put("s3-access-key-id", "AKIA");
+      entityProps.put("s3-secret-access-key", "SECRET");
+      entityProps.put("legacy-hidden", "plaintext-secret");
+      entityProps.put("visible", "ok");
+
+      PropertiesMetadata metadata =
+          new PropertiesMetadata() {
+            @Override
+            public Map<String, PropertyEntry<?>> propertyEntries() {
+              return Map.of(
+                  "legacy-hidden",
+                  PropertyEntry.stringOptionalPropertyEntry(
+                      "legacy-hidden", "legacy", true /* immutable */, null, true /* hidden */));
+            }
+          };
+
+      Map<String, String> resolved =
+          SecretPropertyUtils.buildResolvedProperties(sm, entityProps, metadata);
+
+      Assertions.assertEquals("jdbc:mysql://localhost/db", resolved.get("jdbc-url"));
+      Assertions.assertEquals("root", resolved.get("jdbc-user"));
+      Assertions.assertEquals("s3cr3t", resolved.get("jdbc-password"));
+      Assertions.assertEquals("ok", resolved.get("visible"));
+      Assertions.assertFalse(resolved.containsKey("s3-access-key-id"));
+      Assertions.assertFalse(resolved.containsKey("s3-secret-access-key"));
+      Assertions.assertFalse(resolved.containsKey("legacy-hidden"));
+    }
+  }
+
+  @Test
+  void testBuildResolvedPropertiesNullAndEmpty() {
+    try (SecretManager sm = memorySecretManager()) {
+      Assertions.assertTrue(SecretPropertyUtils.buildResolvedProperties(sm, null, null).isEmpty());
+      Assertions.assertTrue(
+          SecretPropertyUtils.buildResolvedProperties(sm, Map.of(), null).isEmpty());
     }
   }
 

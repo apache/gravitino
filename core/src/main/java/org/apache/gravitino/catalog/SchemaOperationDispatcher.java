@@ -43,6 +43,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -219,6 +220,38 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     }
 
     return schema;
+  }
+
+  /**
+   * Loads schema properties with secret URNs resolved to plaintext.
+   *
+   * @param ident The identifier of the schema.
+   * @return Resolved plaintext properties.
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  @Override
+  public Map<String, String> loadSchemaResolvedProperties(NameIdentifier ident)
+      throws NoSuchSchemaException {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          Schema schema =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+                  NoSuchSchemaException.class);
+          Map<String, String> rawProperties = schema.properties();
+          return doWithCatalog(
+              catalogIdent,
+              c ->
+                  c.doWithPropertiesMeta(
+                      p ->
+                          SecretPropertyUtils.buildResolvedProperties(
+                              secretManager, rawProperties, p.schemaPropertiesMetadata())),
+              IllegalArgumentException.class);
+        });
   }
 
   /**

@@ -179,6 +179,16 @@ public class GravitinoCatalogManager {
   }
 
   /**
+   * Load catalog properties with secret URNs resolved to plaintext.
+   *
+   * @param name Catalog name
+   * @return Resolved plaintext properties
+   */
+  public Map<String, String> loadCatalogResolvedProperties(String name) {
+    return metalake.loadCatalogResolvedProperties(name);
+  }
+
+  /**
    * Create catalog in Gravitino.
    *
    * @param catalogName Catalog name

@@ -67,6 +67,19 @@ public interface SupportsCatalogs {
   Catalog loadCatalog(NameIdentifier ident) throws NoSuchCatalogException;
 
   /**
+   * Load catalog properties with secret URNs resolved to plaintext for connector / runtime use.
+   *
+   * <p>Credential-vending keys are omitted (use credentials API). Legacy hidden plaintext secrets
+   * are omitted. Default {@link #loadCatalog(NameIdentifier)} omit behavior is unchanged.
+   *
+   * @param ident the identifier of the catalog
+   * @return resolved plaintext properties
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   */
+  Map<String, String> loadCatalogResolvedProperties(NameIdentifier ident)
+      throws NoSuchCatalogException;
+
+  /**
    * Check if a catalog exists.
    *
    * @param ident The identifier of the catalog.

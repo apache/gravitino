@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -62,6 +63,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
+import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -406,6 +408,34 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testLoadCatalogResolvedProperties() {
+    Map<String, String> resolved =
+        ImmutableMap.of("jdbc-url", "jdbc:mysql://localhost/db", "jdbc-password", "secret");
+    when(manager.loadCatalogResolvedProperties(any())).thenReturn(resolved);
+
+    Response resp =
+        target("/metalakes/metalake1/catalogs/catalog1/properties")
+            .queryParam("view", "resolved")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    PropertyMapResponse propertyMapResponse = resp.readEntity(PropertyMapResponse.class);
+    Assertions.assertEquals(0, propertyMapResponse.getCode());
+    Assertions.assertEquals(resolved, propertyMapResponse.getProperties());
+
+    Response missingView =
+        target("/metalakes/metalake1/catalogs/catalog1/properties")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), missingView.getStatus());
+    ErrorResponse errorResponse = missingView.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
   }
 
   @Test

@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Map;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -48,6 +49,7 @@ import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
@@ -187,6 +189,44 @@ public class SchemaOperations {
             return response;
           });
 
+    } catch (Exception e) {
+      return ExceptionHandlers.handleSchemaException(OperationType.LOAD, schema, catalog, e);
+    }
+  }
+
+  @GET
+  @Path("/{schema}/properties")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "load-schema-properties." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-schema-properties", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
+  public Response loadSchemaResolvedProperties(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @QueryParam("view") String view) {
+    LOG.info(
+        "Received load schema resolved properties request for schema: {}.{}.{}",
+        metalake,
+        catalog,
+        schema);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (!"resolved".equals(view)) {
+              return Utils.illegalArguments(
+                  "Query parameter 'view' must be 'resolved' for schema properties");
+            }
+            NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
+            Map<String, String> properties = dispatcher.loadSchemaResolvedProperties(ident);
+            Response response = Utils.ok(new PropertyMapResponse(properties));
+            LOG.info("Schema resolved properties loaded: {}.{}.{}", metalake, catalog, schema);
+            return response;
+          });
     } catch (Exception e) {
       return ExceptionHandlers.handleSchemaException(OperationType.LOAD, schema, catalog, e);
     }

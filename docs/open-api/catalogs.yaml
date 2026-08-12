@@ -258,6 +258,39 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /metalakes/{metalake}/catalogs/{catalog}/properties:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+    get:
+      tags:
+        - catalog
+      summary: Get resolved catalog properties
+      operationId: loadCatalogResolvedProperties
+      description: >
+        Returns catalog properties with secret URNs resolved to plaintext for connector / runtime
+        use. Credential-vending keys are omitted. Query parameter view=resolved is required.
+      parameters:
+        - $ref: "#/components/parameters/resolvedView"
+      responses:
+        "200":
+          $ref: "#/components/responses/PropertyMapResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified catalog does not exist in the specified metalake
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+                NoSuchCatalogException:
+                  $ref: "#/components/examples/NoSuchCatalogException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 
 
 components:
@@ -270,6 +303,16 @@ components:
       schema:
         type: boolean
         default: false
+
+    resolvedView:
+      name: view
+      in: query
+      description: Property view type. Must be "resolved" to return plaintext secret values.
+      required: true
+      schema:
+        type: string
+        enum:
+          - resolved
 
   schemas:
 
@@ -507,6 +550,28 @@ components:
 
   responses:
 
+    PropertyMapResponse:
+      description: Returns a map of resolved plaintext properties
+      content:
+        application/vnd.gravitino.v1+json:
+          schema:
+            type: object
+            properties:
+              code:
+                type: integer
+                format: int32
+                description: Status code of the response
+                enum:
+                  - 0
+              properties:
+                type: object
+                description: Resolved plaintext property map
+                additionalProperties:
+                  type: string
+          examples:
+            PropertyMapResponse:
+              $ref: "#/components/examples/PropertyMapResponse"
+
     CatalogResponse:
       description: Returns included catalog object
       content:
@@ -528,6 +593,16 @@ components:
 
 
   examples:
+    PropertyMapResponse:
+      value: {
+        "code": 0,
+        "properties": {
+          "jdbc-url": "jdbc:mysql://127.0.0.1:3306/db",
+          "jdbc-user": "app",
+          "jdbc-password": "plaintext-password"
+        }
+      }
+
     CatalogListResponse:
       value: {
         "code": 0,

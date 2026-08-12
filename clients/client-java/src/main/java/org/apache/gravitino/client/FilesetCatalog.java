@@ -42,6 +42,7 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.dto.secret.SecretBindingDTO;
 import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
@@ -127,6 +128,32 @@ class FilesetCatalog extends BaseSchemaCatalog
     resp.validate();
 
     return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
+  }
+
+  /**
+   * Load fileset properties with secret URNs resolved to plaintext.
+   *
+   * @param ident A fileset identifier in {@code schema.fileset} format.
+   * @return Resolved plaintext properties for connector / runtime use.
+   * @throws NoSuchFilesetException If the fileset does not exist.
+   */
+  public Map<String, String> loadFilesetResolvedProperties(NameIdentifier ident)
+      throws NoSuchFilesetException {
+    checkFilesetNameIdentifier(ident);
+
+    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
+    PropertyMapResponse resp =
+        restClient.get(
+            formatFilesetRequestPath(fullNamespace)
+                + "/"
+                + RESTUtils.encodeString(ident.name())
+                + "/properties",
+            Collections.singletonMap("view", "resolved"),
+            PropertyMapResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.filesetErrorHandler());
+    resp.validate();
+    return resp.getProperties();
   }
 
   /**

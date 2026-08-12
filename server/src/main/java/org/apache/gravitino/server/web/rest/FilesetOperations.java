@@ -55,6 +55,7 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.FileInfoListResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.dto.secret.SecretBindingDTO;
 import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -213,6 +214,51 @@ public class FilesetOperations {
             Fileset t = dispatcher.loadFileset(ident);
             Response response = Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
             LOG.info("Fileset loaded: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+            return response;
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleFilesetException(OperationType.LOAD, fileset, schema, e);
+    }
+  }
+
+  @GET
+  @Path("{fileset}/properties")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "load-fileset-properties." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "load-fileset-properties", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_FILESET_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.FILESET)
+  public Response loadFilesetResolvedProperties(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
+      @QueryParam("view") String view) {
+    LOG.info(
+        "Received load fileset resolved properties request: {}.{}.{}.{}",
+        metalake,
+        catalog,
+        schema,
+        fileset);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            if (!"resolved".equals(view)) {
+              return Utils.illegalArguments(
+                  "Query parameter 'view' must be 'resolved' for fileset properties");
+            }
+            NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
+            Map<String, String> properties = dispatcher.loadFilesetResolvedProperties(ident);
+            Response response = Utils.ok(new PropertyMapResponse(properties));
+            LOG.info(
+                "Fileset resolved properties loaded: {}.{}.{}.{}",
+                metalake,
+                catalog,
+                schema,
+                fileset);
             return response;
           });
     } catch (Exception e) {

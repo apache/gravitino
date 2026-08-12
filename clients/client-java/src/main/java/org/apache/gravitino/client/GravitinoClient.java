@@ -133,6 +133,12 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
+  public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+      throws NoSuchCatalogException {
+    return getMetalake().loadCatalogResolvedProperties(catalogName);
+  }
+
+  @Override
   public Catalog createCatalog(
       String catalogName,
       Catalog.Type type,

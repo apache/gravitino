@@ -19,7 +19,10 @@
 
 package org.apache.gravitino.catalog;
 
+import java.util.Map;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.SupportsSchemas;
+import org.apache.gravitino.exceptions.NoSuchSchemaException;
 
 /**
  * {@code SchemaDispatcher} interface acts as a specialization of the {@link SupportsSchemas}
@@ -27,4 +30,18 @@ import org.apache.gravitino.connector.SupportsSchemas;
  * to dispatching or handling schema-related events or actions that are not covered by the standard
  * {@code SupportsSchemas} operations.
  */
-public interface SchemaDispatcher extends SupportsSchemas {}
+public interface SchemaDispatcher extends SupportsSchemas {
+
+  /**
+   * Load schema properties with secret URNs resolved to plaintext for connector / runtime use.
+   *
+   * <p>Credential-vending keys are omitted (use credentials API). Legacy hidden plaintext secrets
+   * are omitted. Default {@link #loadSchema(NameIdentifier)} omit behavior is unchanged.
+   *
+   * @param ident the identifier of the schema
+   * @return resolved plaintext properties
+   * @throws NoSuchSchemaException If the schema does not exist.
+   */
+  Map<String, String> loadSchemaResolvedProperties(NameIdentifier ident)
+      throws NoSuchSchemaException;
+}

@@ -41,6 +41,7 @@ import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
@@ -215,6 +216,30 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     resp.validate();
 
     return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
+  }
+
+  /**
+   * Load schema properties with secret URNs resolved to plaintext.
+   *
+   * @param schemaName The name of the schema.
+   * @return Resolved plaintext properties for connector / runtime use.
+   * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
+   */
+  @Override
+  public Map<String, String> loadSchemaResolvedProperties(String schemaName)
+      throws NoSuchSchemaException {
+    PropertyMapResponse resp =
+        restClient.get(
+            formatSchemaRequestPath(schemaNamespace())
+                + "/"
+                + RESTUtils.encodeString(schemaName)
+                + "/properties",
+            Collections.singletonMap("view", "resolved"),
+            PropertyMapResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.schemaErrorHandler());
+    resp.validate();
+    return resp.getProperties();
   }
 
   /**

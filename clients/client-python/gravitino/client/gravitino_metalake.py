@@ -59,6 +59,7 @@ from gravitino.dto.requests.role_grant_request import RoleGrantRequest
 from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
+from gravitino.dto.responses.property_map_response import PropertyMapResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.job_list_response import JobListResponse
@@ -209,6 +210,30 @@ class GravitinoMetalake(
         return DTOConverters.to_catalog(
             self.name(), catalog_resp.catalog(), self.rest_client
         )
+
+    def load_catalog_resolved_properties(self, name: str) -> Dict[str, str]:
+        """Load catalog properties with secret URNs resolved to plaintext.
+
+        Args:
+            name: The name of the catalog.
+
+        Raises:
+            NoSuchCatalogException if the catalog with specified name does not exist.
+
+        Returns:
+            Resolved plaintext properties for connector / runtime use.
+        """
+        url = self.API_METALAKES_CATALOGS_PATH.format(
+            encode_string(self.name()), encode_string(name)
+        )
+        response = self.rest_client.get(
+            f"{url}/properties",
+            params={"view": "resolved"},
+            error_handler=CATALOG_ERROR_HANDLER,
+        )
+        props_resp = PropertyMapResponse.from_json(response.body, infer_missing=True)
+        props_resp.validate()
+        return props_resp.properties()
 
     def create_catalog(
         self,

@@ -62,6 +62,7 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
+import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -241,6 +242,33 @@ public class TestFilesetOperations extends BaseOperationsTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+  }
+
+  @Test
+  public void testLoadFilesetResolvedProperties() {
+    Map<String, String> resolved = ImmutableMap.of("k1", "plaintext-v1");
+    when(dispatcher.loadFilesetResolvedProperties(any())).thenReturn(resolved);
+
+    Response resp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/properties")
+            .queryParam("view", "resolved")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    PropertyMapResponse propertyMapResponse = resp.readEntity(PropertyMapResponse.class);
+    Assertions.assertEquals(0, propertyMapResponse.getCode());
+    Assertions.assertEquals(resolved, propertyMapResponse.getProperties());
+
+    Response missingView =
+        target(filesetPath(metalake, catalog, schema) + "fileset1/properties")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), missingView.getStatus());
+    ErrorResponse errorResponse = missingView.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
   }
 
   @Test

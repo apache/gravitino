@@ -107,6 +107,7 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -572,6 +573,37 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
           baseCatalog.checkMetalakeInUse();
           return baseCatalog;
+        });
+  }
+
+  /**
+   * Loads catalog properties with secret URNs resolved to plaintext.
+   *
+   * @param ident The identifier of the catalog.
+   * @return Resolved plaintext properties.
+   * @throws NoSuchCatalogException If the specified catalog does not exist.
+   */
+  @Override
+  public Map<String, String> loadCatalogResolvedProperties(NameIdentifier ident)
+      throws NoSuchCatalogException {
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          CatalogWrapper wrapper = loadCatalogAndWrap(ident);
+          BaseCatalog baseCatalog = wrapper.catalog();
+          baseCatalog.checkMetalakeInUse();
+          Map<String, String> rawProperties = baseCatalog.entity().getProperties();
+          try {
+            return wrapper.doWithPropertiesMeta(
+                meta ->
+                    SecretPropertyUtils.buildResolvedProperties(
+                        secretManager, rawProperties, meta.catalogPropertiesMetadata()));
+          } catch (RuntimeException e) {
+            throw e;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
         });
   }
 

@@ -75,6 +75,16 @@ public class GravitinoCatalogManager {
     }
   }
 
+  /**
+   * Load catalog properties with secret URNs resolved to plaintext.
+   *
+   * @param name catalog name
+   * @return resolved plaintext properties
+   */
+  public Map<String, String> loadCatalogResolvedProperties(String name) {
+    return gravitinoClient.loadCatalogResolvedProperties(name);
+  }
+
   public void loadRelationalCatalogs() {
     Catalog[] catalogs = gravitinoClient.listCatalogsInfo();
     Arrays.stream(catalogs)

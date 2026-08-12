@@ -132,6 +132,12 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   }
 
   @Override
+  public Map<String, String> loadFilesetResolvedProperties(NameIdentifier ident)
+      throws NoSuchFilesetException {
+    return dispatcher.loadFilesetResolvedProperties(ident);
+  }
+
+  @Override
   public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,

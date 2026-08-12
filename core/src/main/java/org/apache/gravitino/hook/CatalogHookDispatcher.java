@@ -72,6 +72,12 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Map<String, String> loadCatalogResolvedProperties(NameIdentifier ident)
+      throws NoSuchCatalogException {
+    return dispatcher.loadCatalogResolvedProperties(ident);
+  }
+
+  @Override
   public Catalog createCatalog(
       NameIdentifier ident,
       Catalog.Type type,

@@ -129,6 +129,12 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   }
 
   @Override
+  public Map<String, String> loadSchemaResolvedProperties(NameIdentifier ident)
+      throws NoSuchSchemaException {
+    return dispatcher.loadSchemaResolvedProperties(ident);
+  }
+
+  @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
     eventBus.dispatchEvent(

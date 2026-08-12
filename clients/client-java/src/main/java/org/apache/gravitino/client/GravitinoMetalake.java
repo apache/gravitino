@@ -88,6 +88,7 @@ import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
@@ -234,6 +235,30 @@ public class GravitinoMetalake extends MetalakeDTO
     resp.validate();
 
     return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
+  }
+
+  /**
+   * Load catalog properties with secret URNs resolved to plaintext.
+   *
+   * @param catalogName The name of the catalog.
+   * @return Resolved plaintext properties for connector / runtime use.
+   * @throws NoSuchCatalogException if the catalog with specified name does not exist.
+   */
+  @Override
+  public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+      throws NoSuchCatalogException {
+    PropertyMapResponse resp =
+        restClient.get(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/properties",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            ImmutableMap.of("view", "resolved"),
+            PropertyMapResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+    resp.validate();
+    return resp.getProperties();
   }
 
   /**

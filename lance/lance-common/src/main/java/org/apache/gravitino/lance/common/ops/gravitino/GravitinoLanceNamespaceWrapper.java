@@ -129,6 +129,11 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return catalogOperator.loadCatalog(catalogName);
   }
 
+  Map<String, String> loadCatalogResolvedProperties(String catalogName)
+      throws NoSuchCatalogException {
+    return catalogOperator.loadCatalogResolvedProperties(catalogName);
+  }
+
   Catalog createCatalog(
       String catalogName,
       Catalog.Type type,
@@ -197,6 +202,15 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
 
     return catalog.asSchemas().loadSchema(schemaName);
+  }
+
+  Map<String, String> loadSchemaResolvedProperties(Catalog catalog, String schemaName) {
+    SchemaDispatcher schemaDispatcher = currentSchemaDispatcher();
+    if (schemaDispatcher != null) {
+      return schemaDispatcher.loadSchemaResolvedProperties(schemaIdent(catalog.name(), schemaName));
+    }
+
+    return catalog.asSchemas().loadSchemaResolvedProperties(schemaName);
   }
 
   Schema createSchema(
@@ -298,6 +312,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     Catalog[] listCatalogsInfo() throws NoSuchMetalakeException;
 
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
+
+    Map<String, String> loadCatalogResolvedProperties(String catalogName)
+        throws NoSuchCatalogException;
 
     Catalog createCatalog(
         String catalogName,
@@ -404,6 +421,13 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
 
     @Override
+    public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+        throws NoSuchCatalogException {
+      return catalogDispatcher.loadCatalogResolvedProperties(
+          NameIdentifierUtil.ofCatalog(metalakeName, catalogName));
+    }
+
+    @Override
     public Catalog createCatalog(
         String catalogName,
         Catalog.Type type,
@@ -457,6 +481,12 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
       return getClient().loadCatalog(catalogName);
+    }
+
+    @Override
+    public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+        throws NoSuchCatalogException {
+      return getClient().loadCatalogResolvedProperties(catalogName);
     }
 
     @Override

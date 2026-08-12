@@ -117,11 +117,17 @@ paths:
   /metalakes/{metalake}/catalogs/{catalog}:
     $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D"
 
+  /metalakes/{metalake}/catalogs/{catalog}/properties:
+    $ref: "./catalogs.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1properties"
+
   /metalakes/{metalake}/catalogs/{catalog}/schemas:
     $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}:
     $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/properties:
+    $ref: "./schemas.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1properties"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/tables:
     $ref: "./tables.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1tables"
@@ -140,6 +146,9 @@ paths:
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}:
     $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets~1%7Bfileset%7D"
+
+  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/properties:
+    $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets~1%7Bfileset%7D~1properties"
 
   /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/files:
     $ref: "./filesets.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1catalogs~1%7Bcatalog%7D~1schemas~1%7Bschema%7D~1filesets~1%7Bfileset%7D~1files"

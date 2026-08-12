@@ -21,11 +21,14 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.connector.PropertiesMetadata;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -35,7 +38,50 @@ import org.apache.commons.lang3.StringUtils;
  */
 public final class SecretPropertyUtils {
 
+  /**
+   * Property keys owned by credential vending ({@code SupportsCredentials} / credential providers).
+   * These must be omitted from the resolved-properties HTTP delivery API; callers should use {@code
+   * getCredentials} instead.
+   *
+   * <p>Does <b>not</b> include {@code jdbc-user} / {@code jdbc-password}: those are secret-manager
+   * connection secrets and must appear as plaintext when URN-backed.
+   */
+  public static final Set<String> CREDENTIAL_VENDING_PROPERTY_KEYS =
+      ImmutableSet.of(
+          // S3
+          "s3-access-key-id",
+          "s3-secret-access-key",
+          "s3-session-token",
+          // OSS
+          "oss-access-key-id",
+          "oss-secret-access-key",
+          "oss-security-token",
+          // COS
+          "cos-access-key-id",
+          "cos-secret-access-key",
+          // AWS / Glue static keys
+          "aws-access-key-id",
+          "aws-secret-access-key",
+          // Azure
+          "azure-storage-account-key",
+          "azure-client-secret",
+          // GCS static credential material
+          "gcs-service-account-file",
+          "gcs-credential-path",
+          "gcs-credential-file-path");
+
   private SecretPropertyUtils() {}
+
+  /**
+   * Returns whether a property key is owned by credential vending and must be omitted from resolved
+   * plaintext property delivery.
+   *
+   * @param key the property key
+   * @return true when the key is a credential-vending property
+   */
+  public static boolean isCredentialVendingProperty(@Nullable String key) {
+    return key != null && CREDENTIAL_VENDING_PROPERTY_KEYS.contains(key);
+  }
 
   /**
    * Returns whether a property value is a Gravitino secret URN for the given key.
@@ -46,6 +92,53 @@ public final class SecretPropertyUtils {
    */
   public static boolean isSecretProperty(@Nullable String key, @Nullable String value) {
     return key != null && value != null && value.startsWith(URN_PREFIX) && value.endsWith(key);
+  }
+
+  /**
+   * Builds a resolved plaintext property map for connectors / Lance / IRC.
+   *
+   * <p>Starting from raw entity properties:
+   *
+   * <ol>
+   *   <li>Omit credential-vending keys (use {@code getCredentials}).
+   *   <li>Resolve secret URN values to plaintext via {@link SecretManager#readSecret}.
+   *   <li>Omit legacy hidden plaintext secrets ({@link PropertiesMetadata#isHiddenProperty}).
+   *   <li>Include all other entries unchanged.
+   * </ol>
+   *
+   * @param secretManager secret manager used to resolve URNs
+   * @param rawProperties raw entity properties (may be null)
+   * @param propertiesMetadata catalog/schema/fileset property metadata (may be null)
+   * @return a new resolved property map; never null
+   */
+  public static Map<String, String> buildResolvedProperties(
+      SecretManager secretManager,
+      @Nullable Map<String, String> rawProperties,
+      @Nullable PropertiesMetadata propertiesMetadata) {
+    Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
+    if (rawProperties == null || rawProperties.isEmpty()) {
+      return Map.of();
+    }
+    Map<String, String> resolved = new HashMap<>();
+    for (Map.Entry<String, String> entry : rawProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key == null || value == null) {
+        continue;
+      }
+      if (isCredentialVendingProperty(key)) {
+        continue;
+      }
+      if (isSecretProperty(key, value)) {
+        resolved.put(key, secretManager.readSecret(SecretUrn.parse(value)));
+        continue;
+      }
+      if (propertiesMetadata != null && propertiesMetadata.isHiddenProperty(key)) {
+        continue;
+      }
+      resolved.put(key, value);
+    }
+    return resolved;
   }
 
   /**

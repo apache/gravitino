@@ -72,6 +72,12 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public Map<String, String> loadCatalogResolvedProperties(NameIdentifier ident)
+      throws NoSuchCatalogException {
+    return dispatcher.loadCatalogResolvedProperties(ident);
+  }
+
+  @Override
   public boolean catalogExists(NameIdentifier ident) {
     return dispatcher.catalogExists(ident);
   }

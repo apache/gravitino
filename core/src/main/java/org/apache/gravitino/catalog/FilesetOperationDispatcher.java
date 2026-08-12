@@ -110,6 +110,38 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 fileset.properties()));
   }
 
+  /**
+   * Loads fileset properties with secret URNs resolved to plaintext.
+   *
+   * @param ident The identifier of the fileset.
+   * @return Resolved plaintext properties.
+   * @throws NoSuchFilesetException If the fileset does not exist.
+   */
+  @Override
+  public Map<String, String> loadFilesetResolvedProperties(NameIdentifier ident)
+      throws NoSuchFilesetException {
+    NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+    return TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          Fileset fileset =
+              doWithCatalog(
+                  catalogIdent,
+                  c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+                  NoSuchFilesetException.class);
+          Map<String, String> rawProperties = fileset.properties();
+          return doWithCatalog(
+              catalogIdent,
+              c ->
+                  c.doWithPropertiesMeta(
+                      p ->
+                          SecretPropertyUtils.buildResolvedProperties(
+                              secretManager, rawProperties, p.filesetPropertiesMetadata())),
+              IllegalArgumentException.class);
+        });
+  }
+
   @Override
   public FileInfo[] listFiles(NameIdentifier ident, String locationName, String subPath)
       throws NoSuchFilesetException {

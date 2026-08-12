@@ -44,6 +44,7 @@ from gravitino.dto.requests.schema_update_request import SchemaUpdateRequest
 from gravitino.dto.requests.schema_updates_request import SchemaUpdatesRequest
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.property_map_response import PropertyMapResponse
 from gravitino.dto.responses.schema_response import SchemaResponse
 from gravitino.exceptions.base import IllegalArgumentException
 from gravitino.exceptions.handlers.schema_error_handler import SCHEMA_ERROR_HANDLER
@@ -219,6 +220,30 @@ class BaseSchemaCatalog(
             self._catalog_namespace.level(0),
             self._name,
         )
+
+    def load_schema_resolved_properties(self, schema_name: str) -> Dict[str, str]:
+        """Load schema properties with secret URNs resolved to plaintext.
+
+        Args:
+            schema_name: The name of the schema.
+
+        Raises:
+            NoSuchSchemaException if the schema with specified identifier does not exist.
+
+        Returns:
+            Resolved plaintext properties for connector / runtime use.
+        """
+        resp = self.rest_client.get(
+            BaseSchemaCatalog.format_schema_request_path(self._schema_namespace())
+            + "/"
+            + encode_string(schema_name)
+            + "/properties",
+            params={"view": "resolved"},
+            error_handler=SCHEMA_ERROR_HANDLER,
+        )
+        props_resp = PropertyMapResponse.from_json(resp.body, infer_missing=True)
+        props_resp.validate()
+        return props_resp.properties()
 
     def alter_schema(self, schema_name: str, *changes: SchemaChange) -> Schema:
         """Alter the schema with specified identifier by applying the changes.
