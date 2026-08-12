@@ -44,11 +44,11 @@ For detailed information on available operations, see [Manage Relational Metadat
 
 ### Catalog Properties
 
-| Property                    | Description                                                                                                                                                                                                    | Example                 | Required | Since Version |
-|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      | 1.1.0         |
-| `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       | 1.1.0         |
-| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       | 1.3.0         |
+| Property                    | Description                                                                                                                                                                                                    | Example                 | Required |
+|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
+| `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      |
+| `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       |
+| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       |
 
 #### Key Property: `location`
 
@@ -148,9 +148,9 @@ See [Schema Operations](./manage-relational-metadata-using-gravitino.md#schema-o
 
 Schemas inherit catalog properties and can override specific settings:
 
-| Property   | Description                                              | Example                      | Required | Since version | 
-|------------|----------------------------------------------------------|------------------------------|----------|---------------|
-| `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       | 1.1.0         |
+| Property   | Description                                              | Example                      | Required |
+|------------|----------------------------------------------------------|------------------------------|----------|
+| `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       |
 
 For location resolution hierarchy, see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
 

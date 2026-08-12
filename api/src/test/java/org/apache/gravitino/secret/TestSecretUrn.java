@@ -44,6 +44,7 @@ public class TestSecretUrn {
     Assertions.assertEquals("urn:gravitino-secret:memory:catalog:42:jdbc-password", urn.toString());
     Assertions.assertEquals("memory", urn.providerName());
     Assertions.assertEquals(List.of("catalog", "42", "jdbc-password"), urn.identifierSegments());
+    Assertions.assertEquals("jdbc-password", urn.propertyKey());
 
     SecretUrn parsed = SecretUrn.parse(urn.toString());
     Assertions.assertEquals(urn, parsed);
@@ -58,6 +59,7 @@ public class TestSecretUrn {
     Assertions.assertEquals("local", urn.providerName());
     Assertions.assertEquals(
         List.of("catalog", "1", "authentication.password"), urn.identifierSegments());
+    Assertions.assertEquals("authentication.password", urn.propertyKey());
   }
 
   @Test

@@ -437,13 +437,26 @@ public class RelationalEntityStore
       NameIdentifier[] destEntitiesToAdd,
       NameIdentifier[] destEntitiesToRemove)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    return updateEntityRelations(
+    RelationUpdate update =
         RelationUpdate.of(
             relType,
             srcEntityIdent,
             srcEntityType,
             toRelationEdgeTargets(relType, destEntitiesToAdd),
-            toRelationEdgeTargets(relType, destEntitiesToRemove)));
+            toRelationEdgeTargets(relType, destEntitiesToRemove));
+    if (relType != SupportsRelationOperations.Type.TAG_METADATA_OBJECT_REL) {
+      return updateEntityRelations(update);
+    }
+
+    List<E> result =
+        backend.updateEntityRelations(
+            relType, srcEntityIdent, srcEntityType, destEntitiesToAdd, destEntitiesToRemove);
+    Entity.EntityType targetEntityType = relationUpdateTargetType(relType);
+    cache.invalidate(srcEntityIdent, srcEntityType);
+    invalidateRelationTargetCache(targetEntityType, update.targetsToAdd());
+    invalidateRelationTargetCache(targetEntityType, update.targetsToRemove());
+
+    return result;
   }
 
   @Override
@@ -467,18 +480,7 @@ public class RelationalEntityStore
 
     RelationEdgeTarget[] targetsToAdd = update.targetsToAdd();
     RelationEdgeTarget[] targetsToRemove = update.targetsToRemove();
-    List<E> result;
-    if (update.hasRelationValues()) {
-      result = backend.updateEntityRelations(update);
-    } else {
-      result =
-          backend.updateEntityRelations(
-              update.relationType(),
-              update.sourceIdentifier(),
-              update.sourceEntityType(),
-              toNameIdentifiers(targetsToAdd),
-              toNameIdentifiers(targetsToRemove));
-    }
+    List<E> result = backend.updateEntityRelations(update);
 
     // Invalidate after the backend write, not before: invalidating first opens a window where a
     // concurrent read could repopulate the cache with stale pre-commit data.
@@ -538,12 +540,6 @@ public class RelationalEntityStore
     return Arrays.stream(nameIdentifiers)
         .map(nameIdentifier -> RelationEdgeTarget.of(nameIdentifier, targetEntityType, null))
         .toArray(RelationEdgeTarget[]::new);
-  }
-
-  private static NameIdentifier[] toNameIdentifiers(RelationEdgeTarget[] relationTargets) {
-    return Arrays.stream(relationTargets)
-        .map(RelationEdgeTarget::nameIdentifier)
-        .toArray(NameIdentifier[]::new);
   }
 
   private static Entity.EntityType relationUpdateTargetType(Type relType) {
