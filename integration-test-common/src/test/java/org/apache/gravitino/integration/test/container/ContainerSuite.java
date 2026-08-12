@@ -89,6 +89,8 @@ public class ContainerSuite implements Closeable {
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
 
+  private static volatile MinIOContainer minIOContainer;
+
   /**
    * We can share the same Hive container as Hive container with S3 contains the following
    * differences: 1. Configuration of S3 and corresponding environment variables 2. The Hive
@@ -675,6 +677,29 @@ public class ContainerSuite implements Closeable {
 
   public GravitinoLocalStackContainer getLocalStackContainer() {
     return gravitinoLocalStackContainer;
+  }
+
+  public void startMinIOContainer() {
+    ITUtils.cleanDisk();
+    if (minIOContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (minIOContainer == null) {
+          MinIOContainer.Builder builder = MinIOContainer.builder().withNetwork(network);
+          MinIOContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start MinIO container", e);
+            throw new RuntimeException("Failed to start MinIO container", e);
+          }
+          minIOContainer = container;
+        }
+      }
+    }
+  }
+
+  public MinIOContainer getMinIOContainer() {
+    return minIOContainer;
   }
 
   public HiveContainer getHiveContainerWithS3() {
