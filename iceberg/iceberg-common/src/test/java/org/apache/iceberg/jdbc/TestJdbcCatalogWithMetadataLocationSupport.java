@@ -23,6 +23,7 @@ import com.google.common.collect.ImmutableMap;
 import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.iceberg.BaseTable;
 import org.apache.iceberg.CatalogProperties;
 import org.apache.iceberg.Schema;
@@ -53,6 +54,40 @@ public class TestJdbcCatalogWithMetadataLocationSupport {
                     "jdbc:h2:mem:test",
                     CatalogProperties.WAREHOUSE_LOCATION,
                     "warehouse")));
+  }
+
+  @Test
+  void testNamespaceIndexCreationSkippedForNonPostgresBackend() {
+    // maybeCreateNamespaceIndex() detects the backend via DatabaseMetaData#getDatabaseProductName
+    // and only runs its (PostgreSQL-only) CREATE INDEX statement for "PostgreSQL". Initializing
+    // against SQLite must not throw even though this new code path runs unconditionally on every
+    // initialize() call - it's a no-op here, not skipped entirely.
+    JdbcCatalogWithMetadataLocationSupport catalog =
+        new JdbcCatalogWithMetadataLocationSupport(true);
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "warehouse");
+
+    Assertions.assertDoesNotThrow(
+        () -> catalog.initialize("test_namespace_index_sqlite", properties));
+  }
+
+  @Test
+  void testNamespaceIndexCreationCanBeDisabledWithoutError() {
+    // With the feature disabled, initialize() must still succeed on a backend where the feature
+    // would otherwise be a no-op anyway (SQLite) - this only tests that the disable flag itself
+    // doesn't break anything. Coverage that the index is actually skipped on a real PostgreSQL
+    // backend when disabled lives in
+    // TestJdbcCatalogWithMetadataLocationSupportNamespaceIndex#testIndexCreationCanBeDisabled.
+    JdbcCatalogWithMetadataLocationSupport catalog =
+        new JdbcCatalogWithMetadataLocationSupport(true);
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "warehouse");
+    properties.put(IcebergConstants.ICEBERG_JDBC_CREATE_NAMESPACE_INDEX, "false");
+
+    Assertions.assertDoesNotThrow(
+        () -> catalog.initialize("test_namespace_index_disabled_sqlite", properties));
   }
 
   @ParameterizedTest

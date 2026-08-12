@@ -149,6 +149,18 @@ public enum TestDatabaseName {
       return this.name().toLowerCase();
     }
   },
+
+  /**
+   * Represents the PostgreSQL database for
+   * org.apache.iceberg.jdbc.TestJdbcCatalogWithMetadataLocationSupportNamespaceIndex.
+   */
+  PG_ICEBERG_NAMESPACE_INDEX_IT {
+    /** PostgreSQL only accept lowercase database name */
+    @Override
+    public String toString() {
+      return this.name().toLowerCase();
+    }
+  },
   FLINK_HIVE_CATALOG_IT,
 
   /** Represents the MySQL database for the Flink Iceberg JDBC-backend catalog integration test. */

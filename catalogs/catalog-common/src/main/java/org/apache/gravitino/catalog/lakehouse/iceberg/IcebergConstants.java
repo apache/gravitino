@@ -40,6 +40,8 @@ public class IcebergConstants {
 
   public static final String ICEBERG_JDBC_STRICT_MODE = "jdbc.strict-mode";
 
+  public static final String ICEBERG_JDBC_CREATE_NAMESPACE_INDEX = "jdbc.create-namespace-index";
+
   public static final String GRAVITINO_JDBC_DRIVER = "jdbc-driver";
   public static final String WAREHOUSE = "warehouse";
   public static final String URI = "uri";
