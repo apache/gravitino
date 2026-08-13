@@ -332,9 +332,9 @@ public class POConverters {
    * @return SchemaPO object with updated version
    */
   public static SchemaPO updateSchemaPOWithVersion(SchemaPO oldSchemaPO, SchemaEntity newSchema) {
-    Long lastVersion = oldSchemaPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Every metadata update advances the OCC token. Both version columns stay aligned because
+    // schemas do not retain independently addressable historical versions.
+    Long nextVersion = oldSchemaPO.getCurrentVersion() + 1;
     try {
       return SchemaPO.builder()
           .withSchemaId(oldSchemaPO.getSchemaId())

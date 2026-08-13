@@ -700,6 +700,8 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
     assertEquals("this is test2", updatePO.getSchemaComment());
   }
 

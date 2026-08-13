@@ -167,6 +167,13 @@ public class FilesetMetaService {
       // insert both fileset meta table and version table
       SessionUtils.doMultipleWithCommit(
           () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      filesetEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
+          () ->
               SessionUtils.doWithoutCommit(
                   FilesetMetaMapper.class,
                   mapper -> {

@@ -70,17 +70,26 @@ public class TopicMetaService {
 
       TopicPO.Builder builder = TopicPO.builder();
       fillTopicPOBuilderParentEntityId(builder, topicEntity.namespace());
+      TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
 
-      SessionUtils.doWithCommit(
-          TopicMetaMapper.class,
-          mapper -> {
-            TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
-            if (overwrite) {
-              mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertTopicMeta(po);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      topicEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TopicMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertTopicMeta(po);
+                    }
+                  }));
       // TODO: insert topic dataLayout version after supporting it
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
