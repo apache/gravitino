@@ -384,6 +384,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             schemaProperties = schema.properties();
           } catch (NoSuchSchemaException e) {
             LOG.debug("Schema {} does not exist when preparing drop cleanup", ident);
+          } catch (Exception e) {
+            // Secret cleanup is best-effort; unexpected load failures must not block drop.
+            LOG.warn(
+                "Failed to load schema {} before drop; secret cleanup may be skipped", ident, e);
           }
           List<Map<String, String>> filesetPropertySnapshots = snapshotFilesetProperties(ident);
 
