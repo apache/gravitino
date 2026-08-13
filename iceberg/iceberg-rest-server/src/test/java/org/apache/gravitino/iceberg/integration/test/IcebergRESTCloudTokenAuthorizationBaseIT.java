@@ -54,6 +54,12 @@ import org.junit.jupiter.api.Test;
 public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAuthorizationIT {
 
   protected static final String SCHEMA_NAME = "schema";
+  private static final String NARROWED_ROLE_NAME = "narrowed_select_role";
+
+  @Override
+  protected String narrowedCatalogActiveRoles() {
+    return NARROWED_ROLE_NAME;
+  }
 
   @BeforeEach
   void revokePrivilege() {
@@ -212,6 +218,50 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
 
     rows = sql("SELECT *,_file FROM %s", tableName);
     Assertions.assertEquals(2, rows.size());
+  }
+
+  @Test
+  void testActiveRolesNarrowCloudToken() {
+    String tableName = "test_narrowed_" + getCloudProviderName();
+    createTable(SCHEMA_NAME, tableName);
+
+    grantNarrowedSelectRole();
+    grantModifyTableRole(tableName);
+
+    // Every held role is active, so the vended credential can write.
+    sql("INSERT INTO %s VALUES (1,1),(2,2)", tableName);
+
+    // Narrowed to the select-only role the caller gets a read-only credential, so the write fails
+    // inside Spark instead of being rejected by Gravitino.
+    Assertions.assertThrows(
+        SparkException.class,
+        () ->
+            sql(
+                "INSERT INTO %s.%s.%s VALUES (3,3)",
+                NARROWED_SPARK_CATALOG_NAME, SCHEMA_NAME, tableName));
+
+    List<Object[]> rows =
+        sql("SELECT * FROM %s.%s.%s", NARROWED_SPARK_CATALOG_NAME, SCHEMA_NAME, tableName);
+    Assertions.assertEquals(2, rows.size());
+  }
+
+  /**
+   * The narrowed catalog names this role in a static header, so it has to carry every privilege the
+   * read path needs; narrowing deactivates the per-test USE_SCHEMA role.
+   */
+  private void grantNarrowedSelectRole() {
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            GRAVITINO_CATALOG_NAME, ImmutableList.of(Privileges.UseCatalog.allow()));
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject,
+            SCHEMA_NAME,
+            ImmutableList.of(Privileges.UseSchema.allow(), Privileges.SelectTable.allow()));
+    metalakeClientWithAllPrivilege.createRole(
+        NARROWED_ROLE_NAME, new HashMap<>(), ImmutableList.of(catalogObject, schemaObject));
+    metalakeClientWithAllPrivilege.grantRolesToUser(
+        ImmutableList.of(NARROWED_ROLE_NAME), NORMAL_USER);
   }
 
   protected void grantUseSchemaRole(String schema) {
