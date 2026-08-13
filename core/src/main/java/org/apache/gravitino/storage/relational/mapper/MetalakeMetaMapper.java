@@ -47,6 +47,12 @@ public interface MetalakeMetaMapper {
   @SelectProvider(type = MetalakeMetaSQLProviderFactory.class, method = "selectMetalakeMetaById")
   MetalakePO selectMetalakeMetaById(@Param("metalakeId") Long metalakeId);
 
+  /** Selects and locks an active metalake by ID for the current transaction. */
+  @SelectProvider(
+      type = MetalakeMetaSQLProviderFactory.class,
+      method = "selectMetalakeMetaByIdForUpdate")
+  MetalakePO selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "listMetalakePOsByMetalakeIds")
@@ -73,7 +79,8 @@ public interface MetalakeMetaMapper {
   @UpdateProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "softDeleteMetalakeMetaByMetalakeId")
-  Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
+  Integer softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion);
 
   @DeleteProvider(
       type = MetalakeMetaSQLProviderFactory.class,
