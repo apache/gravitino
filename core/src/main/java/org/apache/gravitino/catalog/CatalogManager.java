@@ -100,7 +100,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -996,9 +995,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               schemaEntities.forEach(
                   schema -> {
                     try {
-                      // Bypass SchemaOperationDispatcher — clean secrets explicitly before ops
-                      // drop.
-                      deleteSecretsForSchemaSubtree(schema);
                       catalogWrapper.doWithSchemaOps(
                           ops -> ops.dropSchema(schema.nameIdentifier(), true));
                     } catch (Exception e) {
@@ -1007,10 +1003,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                           "Failed to drop schema " + schema.nameIdentifier(), e);
                     }
                   });
-            } else {
-              // Unmanaged / mixed: store.delete cascades entity rows but does not call secret
-              // providers — clean child write-through secrets first.
-              schemaEntities.forEach(this::deleteSecretsForSchemaSubtree);
             }
 
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
@@ -1034,30 +1026,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw new RuntimeException(e);
           }
         });
-  }
-
-  /**
-   * Deletes write-through secrets for a schema entity and its fileset children. Used when dropping
-   * a catalog with cascade — {@link EntityStore#delete} removes rows but does not call secret
-   * providers.
-   */
-  private void deleteSecretsForSchemaSubtree(SchemaEntity schemaEntity) {
-    secretManager.deleteSecretsFromProperties(schemaEntity.properties());
-    NameIdentifier schemaIdent = schemaEntity.nameIdentifier();
-    Namespace filesetNs =
-        Namespace.of(
-            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
-    try {
-      List<FilesetEntity> filesets = store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
-      for (FilesetEntity fileset : filesets) {
-        secretManager.deleteSecretsFromProperties(fileset.properties());
-      }
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to list/clean fileset secrets under schema {} during catalog drop",
-          schemaIdent,
-          e);
-    }
   }
 
   /**
