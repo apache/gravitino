@@ -79,6 +79,12 @@ public interface CatalogMetaMapper {
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "selectCatalogMetaById")
   CatalogPO selectCatalogMetaById(@Param("catalogId") Long catalogId);
 
+  /** Returns an active catalog by ID and locks it. */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogMetaByIdForUpdate")
+  CatalogPO selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId);
+
   @InsertProvider(type = CatalogMetaSQLProviderFactory.class, method = "insertCatalogMeta")
   void insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO);
 
@@ -95,7 +101,8 @@ public interface CatalogMetaMapper {
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByCatalogId")
-  Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
+  Integer softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion);
 
   /**
    * Soft-deletes catalogs whose identifiers and OCC versions still match.

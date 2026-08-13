@@ -57,6 +57,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockManager;
@@ -851,6 +852,26 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testDropCatalogReturnsFalseWhenConcurrentDeleteWins() throws Exception {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    NameIdentifier ident = NameIdentifier.of("metalake", "concurrently_deleted");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    store.throwMissingForCatalogDelete = true;
+
+    Assertions.assertFalse(manager.dropCatalog(ident, true));
+    Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
+    manager.close();
+  }
+
+  @Test
   void testFailedCreateCatalogCleanupMarksLocalMutation() throws Exception {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
     store.initialize(config);
@@ -983,12 +1004,19 @@ public class TestCatalogManager {
     private final AtomicReference<EntityChangeLogListener> unregisteredListener =
         new AtomicReference<>();
     private boolean returnFalseForCatalogDelete;
+    private boolean throwMissingForCatalogDelete;
 
     @Override
     public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
         throws IOException {
       if (returnFalseForCatalogDelete && entityType == EntityType.CATALOG) {
         return false;
+      }
+      if (throwMissingForCatalogDelete && entityType == EntityType.CATALOG) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.CATALOG.name().toLowerCase(),
+            ident.toString());
       }
       return super.delete(ident, entityType, cascade);
     }

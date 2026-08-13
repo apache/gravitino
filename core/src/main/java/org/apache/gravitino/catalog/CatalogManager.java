@@ -984,6 +984,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
+          } catch (NoSuchEntityException ignored) {
+            // Another server deleted the catalog during this request. Clear the stale cache entry.
+            catalogCache.invalidate(ident);
+            return false;
           } catch (GravitinoRuntimeException e) {
             throw e;
           } catch (Exception e) {

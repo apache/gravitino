@@ -234,9 +234,8 @@ public class POConverters {
    */
   public static CatalogPO updateCatalogPOWithVersion(
       CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
-    Long lastVersion = oldCatalogPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Catalogs have no version history, so both version fields use the next OCC version.
+    Long nextVersion = oldCatalogPO.getCurrentVersion() + 1;
     try {
       return CatalogPO.builder()
           .withCatalogId(newCatalog.id())

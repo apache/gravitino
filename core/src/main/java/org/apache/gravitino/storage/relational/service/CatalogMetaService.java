@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -35,7 +34,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
@@ -43,6 +41,7 @@ import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
@@ -57,6 +56,8 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -179,20 +180,32 @@ public class CatalogMetaService {
     try {
       NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 
-      String metalake = NameIdentifierUtil.getMetalake(catalogEntity.nameIdentifier());
-      Long metalakeId =
-          EntityIdService.getEntityId(NameIdentifier.of(metalake), Entity.EntityType.METALAKE);
+      String metalakeName = NameIdentifierUtil.getMetalake(catalogEntity.nameIdentifier());
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
+      }
 
-      SessionUtils.doWithCommit(
-          CatalogMetaMapper.class,
-          mapper -> {
-            CatalogPO po = POConverters.initializeCatalogPOWithVersion(catalogEntity, metalakeId);
-            if (overwrite) {
-              mapper.insertCatalogMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertCatalogMeta(po);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          () -> lockMetalakeForCatalogCreate(metalakePO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  CatalogMetaMapper.class,
+                  mapper -> {
+                    CatalogPO po =
+                        POConverters.initializeCatalogPOWithVersion(
+                            catalogEntity, metalakePO.getMetalakeId());
+                    if (overwrite) {
+                      mapper.insertCatalogMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertCatalogMeta(po);
+                    }
+                  }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, catalogEntity.nameIdentifier().toString());
@@ -220,29 +233,28 @@ public class CatalogMetaService {
         newEntity.id(),
         oldCatalogEntity.id());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      CatalogMetaMapper.class,
-                      mapper ->
-                          mapper.updateCatalogMeta(
-                              POConverters.updateCatalogPOWithVersion(
-                                  oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
-                              oldCatalogPO))));
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    CatalogMetaMapper.class,
+                    mapper ->
+                        mapper.updateCatalogMeta(
+                            POConverters.updateCatalogPOWithVersion(
+                                oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
+                            oldCatalogPO));
+            if (updated == 0) {
+              throw catalogWriteFailure(identifier, oldCatalogPO);
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + identifier);
-    }
+    return newEntity;
   }
 
   @Monitored(
@@ -252,18 +264,15 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
-    long catalogId = EntityIdService.getEntityId(identifier, Entity.EntityType.CATALOG);
+    CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
+    long catalogId = catalogPO.getCatalogId();
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  CatalogMetaMapper.class,
-                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  SchemaMetaMapper.class,
-                  mapper -> mapper.softDeleteSchemaMetasByCatalogId(catalogId)),
+          () -> {
+            deleteCatalogWithVersion(identifier, catalogPO);
+            deleteSchemasWithVersions(identifier, catalogId);
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
@@ -328,19 +337,17 @@ public class CatalogMetaService {
                   ViewMetaMapper.class,
                   mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)));
     } else {
-      List<SchemaEntity> schemaEntities =
-          SchemaMetaService.getInstance()
-              .listSchemasByNamespace(
-                  NamespaceUtil.ofSchema(identifier.namespace().level(0), catalogName));
-      if (!schemaEntities.isEmpty()) {
-        throw new NonEmptyEntityException(
-            "Entity %s has sub-entities, you should remove sub-entities first", identifier);
-      }
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  CatalogMetaMapper.class,
-                  mapper -> mapper.softDeleteCatalogMetasByCatalogId(catalogId)),
+          () -> {
+            deleteCatalogWithVersion(identifier, catalogPO);
+            List<SchemaPO> schemaPOs =
+                SessionUtils.getWithoutCommit(
+                    SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
+            if (!schemaPOs.isEmpty()) {
+              throw new NonEmptyEntityException(
+                  "Entity %s has sub-entities, you should remove sub-entities first", identifier);
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   OwnerMetaMapper.class,
@@ -372,6 +379,68 @@ public class CatalogMetaService {
     }
 
     return true;
+  }
+
+  private void deleteCatalogWithVersion(NameIdentifier identifier, CatalogPO observedCatalogPO) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(
+                    observedCatalogPO.getCatalogId(), observedCatalogPO.getCurrentVersion()));
+    if (deleted == 0) {
+      throw catalogWriteFailure(identifier, observedCatalogPO);
+    }
+  }
+
+  private void lockMetalakeForCatalogCreate(MetalakePO observedMetalakePO) {
+    MetalakePO currentMetalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper -> mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId()));
+    if (currentMetalakePO == null
+        || !Objects.equals(
+            currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          observedMetalakePO.getMetalakeName());
+    }
+  }
+
+  private RuntimeException catalogWriteFailure(
+      NameIdentifier identifier, CatalogPO observedCatalogPO) {
+    // Use a locking read to see the latest row. A plain MySQL read may use an old snapshot and
+    // report a conflict after the catalog is gone.
+    CatalogPO currentCatalogPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId()));
+    if (currentCatalogPO == null
+        || !Objects.equals(currentCatalogPO.getCatalogName(), observedCatalogPO.getCatalogName())
+        || !Objects.equals(currentCatalogPO.getMetalakeId(), observedCatalogPO.getMetalakeId())) {
+      return new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(),
+          identifier.name());
+    }
+    return ExceptionUtils.concurrentModification(Entity.EntityType.CATALOG, identifier);
+  }
+
+  private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {
+    List<SchemaPO> schemaPOs =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
+    if (schemaPOs.isEmpty()) {
+      return;
+    }
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
+    if (deleted != schemaPOs.size()) {
+      throw ExceptionUtils.concurrentChildModification(
+          Entity.EntityType.SCHEMA, Entity.EntityType.CATALOG, catalogIdentifier);
+    }
   }
 
   @Monitored(

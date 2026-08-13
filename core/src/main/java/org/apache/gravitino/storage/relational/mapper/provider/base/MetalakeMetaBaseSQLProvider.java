@@ -64,6 +64,11 @@ public class MetalakeMetaBaseSQLProvider {
     return selectMetalakeMetaById(metalakeId) + " FOR UPDATE";
   }
 
+  /** Builds SQL that returns an active metalake by ID and locks it for shared access. */
+  public String selectMetalakeMetaByIdForShare(@Param("metalakeId") Long metalakeId) {
+    return selectMetalakeMetaById(metalakeId) + " LOCK IN SHARE MODE";
+  }
+
   public String selectMetalakeIdMetaByName(@Param("metalakeName") String metalakeName) {
     return "SELECT metalake_id as metalakeId"
         + " FROM "
