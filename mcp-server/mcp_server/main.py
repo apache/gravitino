@@ -115,9 +115,10 @@ def _parse_args():
         default=os.environ.get("GRAVITINO_TOKEN", ""),
         help="Static credential used as the Authorization header when "
         "authenticating to Gravitino. A bare token is treated as an OAuth2 Bearer "
-        "token; a value that carries a scheme such as 'Basic <base64>' is sent "
-        "unchanged. In stdio mode it is sent on every request; in HTTP mode it is "
-        "only the fallback when an incoming request carries no Authorization header "
+        "token; a value containing a valid scheme and credential, such as "
+        "'Basic <base64>', is sent as an Authorization credential. In stdio mode "
+        "it is sent on every request; in HTTP mode it is only the fallback when an "
+        "incoming request carries no Authorization header "
         "(per-request identity takes priority). "
         "Can also be set via the GRAVITINO_TOKEN environment variable. "
         "When omitted, requests are sent without authentication.",

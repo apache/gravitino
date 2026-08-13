@@ -17,6 +17,7 @@
 
 import asyncio
 import logging
+import re
 from collections import OrderedDict
 
 from mcp_server.client.factory import RESTClientFactory
@@ -31,9 +32,22 @@ _LOG = logging.getLogger(__name__)
 # (e.g. rotating tokens) come and go.
 _MAX_CACHED_CLIENTS = 128
 
-# Authorization schemes recognised on a static --token. A token that starts with
-# one of these is passed through unchanged rather than being wrapped in Bearer.
-_AUTH_SCHEMES = frozenset({"basic", "bearer", "negotiate", "digest"})
+# An RFC 9110 auth-scheme uses the HTTP token syntax. Here it must be followed by
+# one or more spaces plus credentials. Requiring credentials preserves the legacy
+# behavior for a bare token whose value happens to be a scheme name (for example,
+# Bearer).
+_AUTHORIZATION_CREDENTIAL = re.compile(
+    r"^(?P<scheme>[!#$%&'*+\-.^_`|~0-9A-Za-z]+) +(?P<credential>\S.*)$"
+)
+
+# Gravitino currently matches its built-in schemes case-sensitively. HTTP scheme
+# names are case-insensitive, so normalize them before forwarding. Custom scheme
+# names remain unchanged for custom Gravitino authenticators.
+_CANONICAL_AUTH_SCHEMES = {
+    "basic": "Basic",
+    "bearer": "Bearer",
+    "negotiate": "Negotiate",
+}
 
 
 def _get_request_authorization() -> str:
@@ -59,19 +73,23 @@ def _get_request_authorization() -> str:
 def startup_authorization(setting: Setting) -> str:
     """The static --token rendered as an ``Authorization`` header value.
 
-    A token that already carries a scheme is used verbatim, so a caller can
-    supply ``Basic <credentials>`` or ``Negotiate <token>`` as well as an OAuth2
-    Bearer token, matching how a forwarded request header is treated. A bare
-    token is treated as OAuth2 and prefixed with ``Bearer``. Empty string when no
-    token is configured (anonymous). This is the identity used in stdio mode and
-    the fallback for HTTP requests that carry no ``Authorization`` header.
+    A value containing a valid HTTP authentication scheme and credentials is
+    forwarded as an Authorization credential. Built-in Gravitino scheme names
+    are normalized to the capitalization its authenticators expect, while a
+    custom scheme name is preserved. A bare token is treated as OAuth2 and
+    prefixed with ``Bearer``. Empty string when no token is configured
+    (anonymous). This is the identity used in stdio mode and the fallback for
+    HTTP requests that carry no ``Authorization`` header.
     """
-    if not setting.token:
-        return ""
     token = setting.token.strip()
-    scheme, _, rest = token.partition(" ")
-    if rest and scheme.lower() in _AUTH_SCHEMES:
-        return token
+    if not token:
+        return ""
+    match = _AUTHORIZATION_CREDENTIAL.fullmatch(token)
+    if match:
+        scheme = match.group("scheme")
+        credential = match.group("credential")
+        canonical_scheme = _CANONICAL_AUTH_SCHEMES.get(scheme.lower(), scheme)
+        return f"{canonical_scheme} {credential}"
     return f"Bearer {token}"
 
 

@@ -34,10 +34,10 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     transport: str = DefaultSetting.default_transport
     mcp_url: str = DefaultSetting.default_mcp_url
     # Static authorization credential. A bare value is treated as an OAuth2 Bearer
-    # token; a value that carries a scheme (``Basic ...``) is used as-is. Sent on
-    # every request in stdio mode; in HTTP
-    # mode it is only the fallback used when an incoming request carries no
-    # Authorization header (per-request identity takes priority).
+    # token; a value containing a valid scheme and credential (``Basic ...``) is
+    # forwarded as an Authorization credential. Sent on every request in stdio
+    # mode; in HTTP mode it is only the fallback used when an incoming request
+    # carries no Authorization header (per-request identity takes priority).
     # Empty string means anonymous (no Authorization header sent).
     # repr=False keeps the raw value out of the dataclass-generated __repr__.
     token: str = field(default="", repr=False)
