@@ -35,6 +35,8 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.SSLContext;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Version;
 import org.apache.gravitino.auth.AuthConstants;
@@ -52,6 +54,7 @@ import org.apache.hc.client5.http.impl.classic.HttpClientBuilder;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.client5.http.io.HttpClientConnectionManager;
+import org.apache.hc.client5.http.ssl.DefaultClientTlsStrategy;
 import org.apache.hc.core5.http.ContentType;
 import org.apache.hc.core5.http.Header;
 import org.apache.hc.core5.http.HttpHeaders;
@@ -64,6 +67,7 @@ import org.apache.hc.core5.http.io.entity.StringEntity;
 import org.apache.hc.core5.http.message.BasicHeader;
 import org.apache.hc.core5.io.CloseMode;
 import org.apache.hc.core5.net.URIBuilder;
+import org.apache.hc.core5.reactor.ssl.SSLBufferMode;
 
 /**
  * An HttpClient for usage with the REST catalog.
@@ -792,21 +796,13 @@ public class HTTPClient implements RESTClient {
       String[] cipherSuites =
           requireTlsValue(tlsConfigurer.supportedCipherSuites(), "supported cipher suites");
 
-      ClientTlsStrategyBuilder tlsStrategyBuilder =
-          ClientTlsStrategyBuilder.create()
-              .setSslContext(sslContext)
-              .setHostnameVerifier(hostnameVerifier);
-
-      // Set the supported TLS protocols and cipher suites, only if provided
-      if (protocols.length > 0) {
-        tlsStrategyBuilder.setTlsVersions(protocols);
-      }
-
-      if (cipherSuites.length > 0) {
-        tlsStrategyBuilder.setCiphers(cipherSuites);
-      }
-
-      connectionManagerBuilder.setTlsSocketStrategy(tlsStrategyBuilder.buildClassic());
+      connectionManagerBuilder.setTlsSocketStrategy(
+          new DefaultClientTlsStrategy(
+              sslContext,
+              protocols.length == 0 ? null : protocols,
+              cipherSuites.length == 0 ? null : cipherSuites,
+              SSLBufferMode.STATIC,
+              hostnameVerifier));
     }
 
     return connectionManagerBuilder.build();
@@ -834,6 +830,7 @@ public class HTTPClient implements RESTClient {
     private final Map<String, String> properties;
 
     private final Map<String, String> baseHeaders = Maps.newHashMap();
+    private TLSConfigurer tlsConfigurer;
     private String uri;
     private ObjectMapper mapper = ObjectMapperProvider.objectMapper();
     private AuthDataProvider authDataProvider;
@@ -913,6 +910,17 @@ public class HTTPClient implements RESTClient {
     }
 
     /**
+     * Adds TLS configuration to the HTTP client.
+     *
+     * @param tlsConfigurer The TLS configurer for custom TLS settings.
+     * @return This Builder instance for method chaining.
+     */
+    public Builder withTlsConfigurer(TLSConfigurer tlsConfigurer) {
+      this.tlsConfigurer = tlsConfigurer;
+      return this;
+    }
+
+    /**
      * Builds and returns an instance of the HTTPClient with the configured options.
      *
      * @return An instance of HTTPClient with the configured options.
@@ -920,7 +928,13 @@ public class HTTPClient implements RESTClient {
     public HTTPClient build() {
 
       return new HTTPClient(
-          uri, baseHeaders, mapper, authDataProvider, beforeConnectHandler, properties);
+          uri,
+          baseHeaders,
+          mapper,
+          authDataProvider,
+          beforeConnectHandler,
+          properties,
+          tlsConfigurer);
     }
   }
 

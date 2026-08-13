@@ -128,7 +128,7 @@ public final class TLSConfigurers {
      */
     private SSLContext buildSslContext() {
       try {
-        KeyStore trustStore = loadStore(trustStorePath, trustStorePassword);
+        KeyStore trustStore = loadStore(trustStorePath, trustStorePassword, "truststore");
 
         TrustManagerFactory trustManagerFactory =
             TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -141,7 +141,7 @@ public final class TLSConfigurers {
           return sslContext;
         }
 
-        KeyStore keyStore = loadStore(keyStorePath, keyStorePassword);
+        KeyStore keyStore = loadStore(keyStorePath, keyStorePassword, "keystore");
 
         KeyManagerFactory keyManagerFactory =
             KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -151,7 +151,7 @@ public final class TLSConfigurers {
             keyManagerFactory.getKeyManagers(), trustManagerFactory.getTrustManagers(), null);
 
         return sslContext;
-      } catch (IOException | GeneralSecurityException e) {
+      } catch (GeneralSecurityException e) {
         throw new IllegalArgumentException(
             "Failed to configure TLS from the configured truststore or keystore", e);
       }
@@ -162,11 +162,10 @@ public final class TLSConfigurers {
      *
      * @param path path to the keystore
      * @param password password for the keystore
+     * @param storeName name of the store for error messages
      * @return the loaded keystore
-     * @throws IOException if the keystore file cannot be read
-     * @throws GeneralSecurityException if the keystore cannot be loaded
      */
-    private KeyStore loadStore(Path path, String password) {
+    private KeyStore loadStore(Path path, String password, String storeName) {
       try {
         KeyStore keyStore = KeyStore.getInstance(storeType);
 

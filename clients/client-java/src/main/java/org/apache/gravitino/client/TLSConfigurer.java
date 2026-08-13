@@ -18,10 +18,10 @@
  */
 package org.apache.gravitino.client;
 
+import java.security.NoSuchAlgorithmException;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.SSLContext;
 import org.apache.hc.client5.http.ssl.HttpsSupport;
-import org.apache.hc.core5.ssl.SSLContexts;
 
 /** Configures TLS settings for the HTTP client. */
 public interface TLSConfigurer {
@@ -32,7 +32,11 @@ public interface TLSConfigurer {
    * @return SSL context
    */
   default SSLContext sslContext() {
-    return SSLContexts.createDefault();
+    try {
+      return SSLContext.getDefault();
+    } catch (NoSuchAlgorithmException e) {
+      throw new IllegalStateException("Default SSLContext is unavailable", e);
+    }
   }
 
   /**
