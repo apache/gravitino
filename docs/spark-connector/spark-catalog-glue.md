@@ -38,6 +38,11 @@ Table routing is based on the `table-format` property in Glue table parameters. 
 - Patched Hive and AWS Glue client JARs (see [Setup](#setup); pre-installed on Amazon EMR)
 - `iceberg-spark-runtime` and `iceberg-aws-bundle` JARs on the Spark classpath for Iceberg table support (not required on Amazon EMR)
 
+:::note
+The connector resolves a Glue catalog class on Spark 4 as well, but the patched Hive JARs this
+catalog needs are only published for Spark 3, so Glue is verified on Spark 3.5 only.
+:::
+
 ## Setup
 
 Spark's bundled Hive 2.3.9 does not include the `HiveMetaStoreClientFactory` interface

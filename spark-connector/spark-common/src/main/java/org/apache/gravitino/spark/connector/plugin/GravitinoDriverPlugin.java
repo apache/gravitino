@@ -67,6 +67,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
 
+  @VisibleForTesting static final String PAIMON_PROVIDER = "lakehouse-paimon";
+
   @VisibleForTesting
   static final String PAIMON_SPARK_EXTENSIONS =
       "org.apache.paimon.spark.extensions.PaimonSparkSessionExtensions";
@@ -107,7 +109,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
     if (enablePaimonSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
+      registerPaimonExtensionsIfSupported();
     }
     if (enableIcebergSupport) {
       gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
@@ -144,7 +146,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                   && !enableIcebergSupport) {
                 return;
               }
-              if ("lakehouse-paimon".equals(provider.toLowerCase(Locale.ROOT))
+              if (PAIMON_PROVIDER.equals(provider.toLowerCase(Locale.ROOT))
                   && !enablePaimonSupport) {
                 return;
               }
@@ -174,6 +176,24 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         catalogName + " is already registered to SparkCatalogManager");
     sparkConf.set(sparkCatalogConfigName, catalogClassName);
     LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+  }
+
+  /**
+   * Queues the Paimon session extensions, unless Paimon is unavailable on the running Spark
+   * version. Paimon publishes no paimon-spark artifact for every version this connector supports,
+   * so those builds omit the Paimon classes; registering the extension there would fail
+   * SparkSession construction with a ClassNotFoundException. Skip it the way an unmapped catalog
+   * provider is skipped, so a config carried over from another Spark version degrades to a warning.
+   */
+  @VisibleForTesting
+  void registerPaimonExtensionsIfSupported() {
+    if (CatalogNameAdaptor.getCatalogName(PAIMON_PROVIDER) == null) {
+      LOG.warn(
+          "Skip registering Paimon session extensions because {} is not supported yet.",
+          PAIMON_PROVIDER);
+      return;
+    }
+    gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
   }
 
   @VisibleForTesting

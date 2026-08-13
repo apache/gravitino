@@ -36,8 +36,12 @@ import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HiveGravitinoOperationOperator {
+
+  private static final Logger LOG = LoggerFactory.getLogger(HiveGravitinoOperationOperator.class);
 
   private org.apache.gravitino.rel.Table gravitinoTable;
   private static final String PARTITION_NAME_DELIMITER = "/";
@@ -68,11 +72,12 @@ public class HiveGravitinoOperationOperator {
     try {
       gravitinoTable.supportPartitions().addPartition(partition);
     } catch (org.apache.gravitino.exceptions.PartitionAlreadyExistsException e) {
-      // Forward Gravitino's message unchanged, as this class has always done. The plural exception
-      // replaces the singular one only because the throws clause of
-      // SupportsPartitionManagement.createPartition changed in Spark 3.4; the single-String
-      // constructor exists on both and sets the same PARTITIONS_ALREADY_EXIST error class.
-      throw new PartitionsAlreadyExistException(e.getMessage());
+      // Build the exception from (table, ident, schema): that is the only constructor present on
+      // every supported Spark version, since Spark 4 dropped the single-String form this class used
+      // to call. It produces Spark's documented PARTITIONS_ALREADY_EXIST message rather than
+      // Gravitino's, so log the Gravitino-side detail, which the constructor takes no cause for.
+      LOG.debug("Gravitino rejected addPartition for table {}", gravitinoTable.name(), e);
+      throw new PartitionsAlreadyExistException(gravitinoTable.name(), ident, partitionSchema);
     }
   }
 

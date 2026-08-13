@@ -67,14 +67,17 @@ public class SparkTypeConverter {
     } else if (sparkType instanceof DecimalType) {
       DecimalType decimalType = (DecimalType) sparkType;
       return Types.DecimalType.of(decimalType.precision(), decimalType.scale());
-    } else if (sparkType instanceof StringType) {
-      return Types.StringType.get();
     } else if (sparkType instanceof VarcharType) {
+      // Varchar and Char are checked before StringType because Spark 4 made both extend it; on 3.5
+      // they extend AtomicType, so this order is correct for every supported version. Checking
+      // StringType first would swallow both and silently drop the length.
       VarcharType varcharType = (VarcharType) sparkType;
       return Types.VarCharType.of(varcharType.length());
     } else if (sparkType instanceof CharType) {
       CharType charType = (CharType) sparkType;
       return Types.FixedCharType.of(charType.length());
+    } else if (sparkType instanceof StringType) {
+      return Types.StringType.get();
     } else if (sparkType instanceof BinaryType) {
       return Types.BinaryType.get();
     } else if (sparkType instanceof BooleanType) {

@@ -105,5 +105,6 @@ jobs:
             catalogs/**/*.tar
             distribution/**/*.log
             spark-connector/v3.5/spark/build/spark-3.5-integration-test.log
+            spark-connector/v4.0/spark/build/spark-4.0-integration-test.log
             flink-connector/build/flink-connector-integration-test.log
             flink-connector/build/*.tar

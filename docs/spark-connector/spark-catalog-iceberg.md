@@ -19,6 +19,7 @@ Spark clients use a different Iceberg version than the Gravitino server (1.11.0)
 | Spark version | Scala          | Iceberg version | Iceberg client runtime artifact                         | Gravitino connector runtime artifact                                              |
 |---------------|----------------|-----------------|---------------------------------------------------------|-----------------------------------------------------------------------------------|
 | 3.5           | 2.12 or 2.13   | 1.11.0          | `iceberg-spark-runtime-3.5_${scala-version}-1.11.0.jar` | `gravitino-spark-connector-runtime-3.5_${scala-version}-${gravitino-version}.jar` |
+| 4.0           | 2.13           | 1.11.0          | `iceberg-spark-runtime-4.0_2.13-1.11.0.jar`             | `gravitino-spark-connector-runtime-4.0_2.13-${gravitino-version}.jar`             |
 
 Replace `${scala-version}` with `2.12` or `2.13`, and `${gravitino-version}` with your Gravitino release version.
 

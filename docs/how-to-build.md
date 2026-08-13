@@ -79,6 +79,8 @@ Gravitino builds from source on Linux and macOS natively, and on Windows through
 
   This creates `gravitino-spark-connector-runtime-{sparkVersion}_{scalaVersion}-{version}.jar` under the `spark-connector/v3.5/spark-runtime/build/libs` directory. Replace `2.12` with `2.13` to build against a different Scala version. The default Scala version is `2.12` if `-PscalaVersion` is not specified.
 
+  Replace `spark-runtime-3.5` with `spark-runtime-4.0` for Spark 4. Spark 4 is Scala 2.13 only, so that module ignores `-PscalaVersion` and always builds against 2.13.
+
   :::note
   The first time you build the project, downloading the dependencies may take a while.
  

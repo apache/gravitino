@@ -42,9 +42,10 @@ val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
 // The connector's shared sources are compiled here rather than consumed as a jar, so that every
-// supported Spark version builds them against its own API. `spark35` holds the classes that a Spark
-// 4 build cannot compile: those whose shape differs across versions, plus the Paimon package, which
-// has no paimon-spark-4.x artifact at the Paimon version this repository pins.
+// supported Spark version builds them against its own API. `spark35` holds the two things a Spark 4
+// build cannot compile: the authorization parser, since Spark 4 added an abstract method to
+// ParserInterface, and the Paimon package, which has no paimon-spark-4.x artifact at the Paimon
+// version this repository pins.
 val sparkCommonDir = project(":spark-connector").projectDir.resolve("spark-common")
 
 sourceSets {
