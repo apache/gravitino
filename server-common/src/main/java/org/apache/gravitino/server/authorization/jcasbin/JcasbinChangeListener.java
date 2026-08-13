@@ -280,17 +280,7 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
         leafKeys.add(cacheKey);
       }
     }
-    try {
-      invalidateCoalescedKeys(containerPrefixes, leafKeys);
-    } catch (RuntimeException e) {
-      LOG.error(
-          "Failed to invalidate {} prefix(es) and {} leaf key(s) from the entity change log, "
-              + "clearing the whole metadata id cache to stay coherent",
-          containerPrefixes.size(),
-          leafKeys.size(),
-          e);
-      metadataIdCache.invalidateAll();
-    }
+    invalidateCoalescedKeys(containerPrefixes, leafKeys);
   }
 
   @Override
@@ -341,17 +331,43 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
       return;
     }
     // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
-    // a half-applied state where some prefix/leaf keys have been evicted and others have not.
-    metadataIdCache.runInvalidationBatch(
-        () -> {
-          for (String prefix : prefixes) {
-            metadataIdCache.invalidateByPrefix(prefix);
-          }
-          for (String leafKey : leafKeys) {
-            if (prefixes.stream().noneMatch(leafKey::startsWith)) {
-              metadataIdCache.invalidate(leafKey);
+    // a half-applied state. If an individual invalidation fails, clear the whole cache before
+    // releasing that lock. Fall back to an unlocked clear only if the batch callback never starts.
+    boolean[] batchStarted = {false};
+    try {
+      metadataIdCache.runInvalidationBatch(
+          () -> {
+            batchStarted[0] = true;
+            try {
+              for (String prefix : prefixes) {
+                metadataIdCache.invalidateByPrefix(prefix);
+              }
+              for (String leafKey : leafKeys) {
+                if (prefixes.stream().noneMatch(leafKey::startsWith)) {
+                  metadataIdCache.invalidate(leafKey);
+                }
+              }
+            } catch (RuntimeException e) {
+              LOG.error(
+                  "Failed to invalidate {} prefix(es) and {} leaf key(s) from the entity change "
+                      + "log, clearing the whole metadata id cache to stay coherent",
+                  prefixes.size(),
+                  leafKeys.size(),
+                  e);
+              metadataIdCache.invalidateAll();
             }
-          }
-        });
+          });
+    } catch (RuntimeException e) {
+      if (batchStarted[0]) {
+        throw e;
+      }
+      LOG.error(
+          "Failed to start an invalidation batch for {} prefix(es) and {} leaf key(s), clearing "
+              + "the whole metadata id cache without the batch lock",
+          prefixes.size(),
+          leafKeys.size(),
+          e);
+      metadataIdCache.invalidateAll();
+    }
   }
 }

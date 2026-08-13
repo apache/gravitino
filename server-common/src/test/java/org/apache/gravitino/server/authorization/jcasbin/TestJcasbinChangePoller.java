@@ -210,6 +210,7 @@ public class TestJcasbinChangePoller {
         () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
 
     Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllInsideBatchCalls);
     // The owner cache is driven by its own poller, so a change-log failure must not clear it.
     Assertions.assertEquals(0, ownerRelCache.invalidateAllCalls);
   }
@@ -228,6 +229,7 @@ public class TestJcasbinChangePoller {
                 List.of(change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1"))));
 
     Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllInsideBatchCalls);
   }
 
   @Test
@@ -243,6 +245,7 @@ public class TestJcasbinChangePoller {
         () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
 
     Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(0, metadataIdCache.invalidateAllInsideBatchCalls);
   }
 
   @Test
@@ -285,6 +288,8 @@ public class TestJcasbinChangePoller {
     private final List<String> invalidatedPrefixes = new ArrayList<>();
 
     private int invalidateAllCalls;
+    private int invalidateAllInsideBatchCalls;
+    private boolean invalidationBatchActive;
     private boolean failKeyInvalidation;
     private boolean failPrefixInvalidation;
     private boolean failInvalidationBatch;
@@ -309,6 +314,9 @@ public class TestJcasbinChangePoller {
     @Override
     public void invalidateAll() {
       invalidateAllCalls++;
+      if (invalidationBatchActive) {
+        invalidateAllInsideBatchCalls++;
+      }
       if (failInvalidateAll) {
         throw new RuntimeException("invalidateAll failed");
       }
@@ -327,7 +335,12 @@ public class TestJcasbinChangePoller {
       if (failInvalidationBatch) {
         throw new RuntimeException("invalidation batch failed");
       }
-      batch.run();
+      invalidationBatchActive = true;
+      try {
+        batch.run();
+      } finally {
+        invalidationBatchActive = false;
+      }
     }
 
     @Override
