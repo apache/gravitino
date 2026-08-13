@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.integration.test;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.spark.SparkException;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,14 +85,6 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
   public abstract Map<String, String> getCustomProperties();
 
   /**
-   * Downloads cloud-specific bundle JARs (e.g., iceberg-aws-bundle, iceberg-gcp-bundle). Subclasses
-   * implement this to download the appropriate bundle for their cloud provider.
-   *
-   * @throws Exception if download fails
-   */
-  protected abstract void downloadCloudBundleJar() throws Exception;
-
-  /**
    * Copies cloud-specific bundle JARs to the Iceberg REST server libs directory. Subclasses
    * implement this to copy the appropriate bundle (e.g., "aws", "gcp", "azure").
    */
@@ -105,10 +99,9 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
   protected abstract String getCloudProviderName();
 
   /**
-   * Sets up cloud-specific bundle JARs by downloading and copying them. This method should be
-   * called from subclass {@code startIntegrationTest()} methods before calling {@code
-   * super.startIntegrationTest()}, because the server resolves the cloud {@code FileIO} from its
-   * classpath while starting.
+   * Copies the cloud-specific bundle JARs into place. This method should be called from subclass
+   * {@code startIntegrationTest()} methods before calling {@code super.startIntegrationTest()},
+   * because the server resolves the cloud {@code FileIO} from its classpath while starting.
    *
    * <p>Skips setup if running in embedded mode.
    */
@@ -116,12 +109,26 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
     if (ITUtils.isEmbedded()) {
       return;
     }
-    try {
-      downloadCloudBundleJar();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to download cloud bundle JAR", e);
-    }
     copyCloudBundleJar();
+  }
+
+  /** Subclasses call this after {@code super.startIntegrationTest()}. */
+  protected void createSchemaIfAbsent() {
+    if (!catalogClientWithAllPrivilege.asSchemas().schemaExists(SCHEMA_NAME)) {
+      catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+    }
+  }
+
+  @AfterAll
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    // super drops the metalake, so it has to run even when setup failed part way through.
+    try {
+      // The Iceberg JDBC backend is shared with sibling ITs; Iceberg has no cascading drop.
+      clearTable();
+      catalogClientWithAllPrivilege.asSchemas().dropSchema(SCHEMA_NAME, false);
+    } finally {
+      super.stopIntegrationTest();
+    }
   }
 
   @Test
