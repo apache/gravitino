@@ -1,12 +1,11 @@
 name: Multi-Instance Consistency Test
 
-# Verifies that authorization state (owners, roles, role privileges, user-role
-# grants) propagates correctly between two Gravitino instances backed by the
-# same MySQL entity store. Both instances run with the entity cache disabled
-# and authorization enabled, so the only consistency contracts under test are
-# the JcasbinAuthorizer caches and the JcasbinChangePoller invalidation paths.
+# Verifies that entity and authorization caches propagate changes correctly
+# between two Gravitino instances backed by the same MySQL entity store. The
+# entity test warms one instance, mutates the other, and verifies the target
+# after one entity-change-log poll interval plus a small scheduling buffer.
 #
-# The test plan and assertions live in dev/ci/test_multi_instance_consistency.sh.
+# The test plans and assertions live in the two test scripts under dev/ci/.
 
 on:
   workflow_dispatch:
@@ -34,6 +33,15 @@ jobs:
           --health-interval=5s
           --health-timeout=3s
           --health-retries=20
+      kafka:
+        image: apache/kafka:3.9.1
+        ports:
+          - 9092:9092
+        options: >-
+          --health-cmd="/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list"
+          --health-interval=5s
+          --health-timeout=10s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v4
 
@@ -50,7 +58,7 @@ jobs:
         run: |
           # Keep in sync with the latest schema file under scripts/mysql/ when the version bumps.
           mysql -h 127.0.0.1 -P 3306 -ugravitino -pgravitino gravitino \
-            < scripts/mysql/schema-1.3.0-mysql.sql
+            < scripts/mysql/schema-2.0.0-mysql.sql
 
       - name: Build Gravitino distribution
         run: ./gradlew compileDistribution -PskipWeb=true -x test
@@ -58,8 +66,20 @@ jobs:
       - name: Stage and start two instances (A=8090, B=8190)
         run: bash dev/ci/setup_multi_instance.sh
 
-      - name: Run multi-instance consistency tests
-        id: consistency
+      - name: Run multi-instance entity cache consistency tests
+        id: entity-cache-consistency
+        env:
+          INSTANCE_A: http://localhost:8090
+          INSTANCE_B: http://localhost:8190
+          INSTANCE_B_HOME: distribution/package-b
+          ADMIN_USER: admin
+          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          POLL_WAIT_SECS: 1.5
+          RUN_RESTART_TEST: true
+        run: bash dev/ci/test_multi_instance_entity_cache_consistency.sh
+
+      - name: Run multi-instance authorization consistency tests
+        id: authorization-consistency
         env:
           INSTANCE_A: http://localhost:8090
           INSTANCE_B: http://localhost:8190
