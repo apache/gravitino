@@ -236,4 +236,40 @@ public class TestCredentialFactory {
     Assertions.assertEquals(jdbcPassword, jdbcCredential.jdbcPassword());
     Assertions.assertEquals(expireTime, jdbcCredential.expireTimeInMs());
   }
+
+  @Test
+  void testUnknownCredentialType() {
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> CredentialFactory.create("no-such-credential", ImmutableMap.of(), 0));
+    Assertions.assertEquals("No credential found for: no-such-credential", e.getMessage());
+  }
+
+  @Test
+  void testUnknownCredentialTypeMessagePreservesOriginalCasing() {
+    // Lookup is case-insensitive, but the "not found" message must echo the type as the caller
+    // supplied it, not the lower-cased lookup key.
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> CredentialFactory.create("No-Such-Credential", ImmutableMap.of(), 0));
+    Assertions.assertEquals("No credential found for: No-Such-Credential", e.getMessage());
+  }
+
+  @Test
+  void testCredentialTypeLookupIsCaseInsensitive() {
+    // The factory looks up the credential class by type case-insensitively; a differently-cased
+    // type must resolve to the same implementation.
+    Credential credential =
+        CredentialFactory.create(
+            JdbcCredential.JDBC_CREDENTIAL_TYPE.toUpperCase(java.util.Locale.ROOT),
+            ImmutableMap.of(
+                JdbcCredential.GRAVITINO_JDBC_USER,
+                "test-user",
+                JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+                "test-password"),
+            0);
+    Assertions.assertInstanceOf(JdbcCredential.class, credential);
+  }
 }

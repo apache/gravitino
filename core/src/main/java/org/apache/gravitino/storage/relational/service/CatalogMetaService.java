@@ -39,7 +39,6 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.helper.CatalogIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -58,7 +57,6 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -222,10 +220,6 @@ public class CatalogMetaService {
         newEntity.id(),
         oldCatalogEntity.id());
 
-    String metalakeName = identifier.namespace().level(0);
-    String oldFullName =
-        NameIdentifierUtil.ofCatalog(metalakeName, oldCatalogEntity.name()).toString();
-
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
@@ -237,19 +231,7 @@ public class CatalogMetaService {
                           mapper.updateCatalogMeta(
                               POConverters.updateCatalogPOWithVersion(
                                   oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
-                              oldCatalogPO))),
-          () -> {
-            if (updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.CATALOG.name(),
-                          oldFullName,
-                          OperateType.ALTER));
-            }
-          });
+                              oldCatalogPO))));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.CATALOG, newEntity.nameIdentifier().toString());
@@ -271,7 +253,6 @@ public class CatalogMetaService {
 
     String catalogName = identifier.name();
     long catalogId = EntityIdService.getEntityId(identifier, Entity.EntityType.CATALOG);
-    String metalakeName = identifier.namespace().level(0);
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
@@ -344,20 +325,8 @@ public class CatalogMetaService {
                   mapper -> mapper.softDeleteStatisticsByCatalogId(catalogId)),
           () ->
               SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)),
-          // Only one CATALOG DROP record is written here; the cache layer performs prefix
-          // eviction on '<metalake>.<catalog>.*', covering all descendants automatically.
-          // Writing per-child DROP rows would multiply changelog volume without benefit.
-          () -> {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.CATALOG.name(),
-                        NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),
-                        OperateType.DROP));
-          });
+                  ViewMetaMapper.class,
+                  mapper -> mapper.softDeleteViewMetasByCatalogId(catalogId)));
     } else {
       List<SchemaEntity> schemaEntities =
           SchemaMetaService.getInstance()
@@ -399,17 +368,7 @@ public class CatalogMetaService {
                   PolicyMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          catalogId, MetadataObject.Type.CATALOG.name())),
-          () -> {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.CATALOG.name(),
-                        NameIdentifierUtil.ofCatalog(metalakeName, catalogName).toString(),
-                        OperateType.DROP));
-          });
+                          catalogId, MetadataObject.Type.CATALOG.name())));
     }
 
     return true;

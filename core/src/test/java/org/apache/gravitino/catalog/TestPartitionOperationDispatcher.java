@@ -24,6 +24,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -93,7 +94,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
     Column[] columns =
         new Column[] {
           Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())

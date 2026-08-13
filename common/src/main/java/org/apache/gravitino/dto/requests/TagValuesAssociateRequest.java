@@ -19,8 +19,12 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonSetter;
+import com.fasterxml.jackson.annotation.Nulls;
 import com.google.common.base.Preconditions;
 import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.Set;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -34,9 +38,11 @@ public class TagValuesAssociateRequest implements RESTRequest {
   private static final int MAX_TAG_VALUE_LENGTH = 256;
 
   @JsonProperty("tagsToAdd")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   private final RequestTagValue[] tagsToAdd;
 
   @JsonProperty("tagsToRemove")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   private final RequestTagValue[] tagsToRemove;
 
   /**
@@ -52,8 +58,7 @@ public class TagValuesAssociateRequest implements RESTRequest {
 
   /** This is the constructor that is used by Jackson deserializer */
   public TagValuesAssociateRequest() {
-    this.tagsToAdd = null;
-    this.tagsToRemove = null;
+    this(null, null);
   }
 
   /**
@@ -75,6 +80,24 @@ public class TagValuesAssociateRequest implements RESTRequest {
   }
 
   /**
+   * Returns the tag names to add without validating assignment values.
+   *
+   * @return The tag names to add.
+   */
+  public String[] tagNamesToAdd() {
+    return tagNames(tagsToAdd);
+  }
+
+  /**
+   * Returns the tag names to remove without validating assignment values.
+   *
+   * @return The tag names to remove.
+   */
+  public String[] tagNamesToRemove() {
+    return tagNames(tagsToRemove);
+  }
+
+  /**
    * Validates the request.
    *
    * @throws IllegalArgumentException If the request is invalid, this exception is thrown.
@@ -82,32 +105,39 @@ public class TagValuesAssociateRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
-        tagsToAdd != null || tagsToRemove != null,
-        "tagsToAdd and tagsToRemove cannot both be null");
+        tagsToAdd.length > 0 || tagsToRemove.length > 0,
+        "tagsToAdd and tagsToRemove cannot both be empty");
 
     validateTagValues(tagsToAdd, "tagsToAdd");
     validateTagValues(tagsToRemove, "tagsToRemove");
+    validateNoIntersection(tagsToAdd, tagsToRemove);
   }
 
   private static RequestTagValue[] toRequestTagValues(TagValue[] tagValues) {
     if (tagValues == null) {
-      return null;
+      return new RequestTagValue[0];
     }
     return Arrays.stream(tagValues).map(RequestTagValue::new).toArray(RequestTagValue[]::new);
   }
 
   private static TagValue[] toTagValues(RequestTagValue[] tagValues) {
     if (tagValues == null) {
-      return null;
+      return new TagValue[0];
     }
     return Arrays.stream(tagValues).map(RequestTagValue::toTagValue).toArray(TagValue[]::new);
   }
 
-  private static void validateTagValues(RequestTagValue[] tagValues, String fieldName) {
+  private static String[] tagNames(RequestTagValue[] tagValues) {
     if (tagValues == null) {
-      return;
+      return new String[0];
     }
+    return Arrays.stream(tagValues)
+        .filter(tagValue -> tagValue != null)
+        .map(tagValue -> tagValue.name)
+        .toArray(String[]::new);
+  }
 
+  private static void validateTagValues(RequestTagValue[] tagValues, String fieldName) {
     for (RequestTagValue tagValue : tagValues) {
       Preconditions.checkArgument(
           tagValue != null, "%s must not contain null tag values", fieldName);
@@ -128,6 +158,16 @@ public class TagValuesAssociateRequest implements RESTRequest {
       }
     }
   }
+
+  private static void validateNoIntersection(
+      RequestTagValue[] tagsToAdd, RequestTagValue[] tagsToRemove) {
+    Set<RequestTagValue> tagsToAddSet = new LinkedHashSet<>(Arrays.asList(tagsToAdd));
+    for (RequestTagValue tagToRemove : tagsToRemove) {
+      Preconditions.checkArgument(
+          !tagsToAddSet.contains(tagToRemove), "tagsToAdd and tagsToRemove must not overlap");
+    }
+  }
+
   /**
    * Compares this request with another object.
    *

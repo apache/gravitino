@@ -66,6 +66,15 @@ public class VersioningFilter implements Filter {
     }
 
     @Override
+    public Enumeration<String> getHeaders(String name) {
+      String headerValue = customHeaders.get(name);
+      if (headerValue != null) {
+        return Collections.enumeration(Collections.singletonList(headerValue));
+      }
+      return ((HttpServletRequest) getRequest()).getHeaders(name);
+    }
+
+    @Override
     public Enumeration<String> getHeaderNames() {
       List<String> combinedHeaderNames = new ArrayList<>(customHeaders.keySet());
 
@@ -78,9 +87,10 @@ public class VersioningFilter implements Filter {
     }
   }
 
-  private static final Pattern ACCEPT_VERSION_REGEX =
+  private static final Pattern VERSIONED_JSON_MEDIA_TYPE_REGEX =
       Pattern.compile("application/vnd\\.gravitino\\.v(\\d+)\\+json");
   private static final String ACCEPT_VERSION_HEADER = "Accept";
+  private static final String CONTENT_TYPE_HEADER = "Content-Type";
 
   private static String getAcceptVersion(int version) {
     return String.format("application/vnd.gravitino.v%d+json", version);
@@ -93,34 +103,62 @@ public class VersioningFilter implements Filter {
   public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
       throws IOException, ServletException {
     HttpServletRequest req = (HttpServletRequest) request;
-    Enumeration<String> acceptHeader = req.getHeaders(ACCEPT_VERSION_HEADER);
-    while (acceptHeader.hasMoreElements()) {
-      String value = acceptHeader.nextElement();
-
-      // If version accept header is set, then we need to check if it is supported.
-      Matcher m = ACCEPT_VERSION_REGEX.matcher(value);
-      if (m.find()) {
-        int version = Integer.parseInt(m.group(1));
-
-        if (!ApiVersion.isSupportedVersion(version)) {
-          LOG.error("Unsupported version v{} in Request Header {}.", version, value);
-
-          HttpServletResponse resp = (HttpServletResponse) response;
-          resp.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
-        } else {
-          chain.doFilter(request, response);
-        }
-
+    Integer acceptVersion = versionFromHeaders(req.getHeaders(ACCEPT_VERSION_HEADER));
+    if (acceptVersion != null) {
+      if (isUnsupportedVersion(acceptVersion, response)) {
         return;
+      }
+
+      chain.doFilter(request, response);
+      return;
+    }
+
+    MutableHttpServletRequest mutableRequest = new MutableHttpServletRequest(req);
+    Integer contentTypeVersion = versionFromHeader(req.getHeader(CONTENT_TYPE_HEADER));
+    if (contentTypeVersion != null) {
+      if (isUnsupportedVersion(contentTypeVersion, response)) {
+        return;
+      }
+
+      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(contentTypeVersion));
+    } else {
+      ApiVersion defaultVersion = ApiVersion.defaultVersion();
+      mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(defaultVersion.version()));
+    }
+
+    chain.doFilter(mutableRequest, response);
+  }
+
+  private static Integer versionFromHeaders(Enumeration<String> headers) {
+    while (headers.hasMoreElements()) {
+      Integer version = versionFromHeader(headers.nextElement());
+      if (version != null) {
+        return version;
       }
     }
 
-    // If no version accept header not is set, then we need to set the latest version.
-    MutableHttpServletRequest mutableRequest = new MutableHttpServletRequest(req);
-    ApiVersion latest = ApiVersion.latestVersion();
-    mutableRequest.putHeader(ACCEPT_VERSION_HEADER, getAcceptVersion(latest.version()));
+    return null;
+  }
 
-    chain.doFilter(mutableRequest, response);
+  private static Integer versionFromHeader(String value) {
+    if (value == null) {
+      return null;
+    }
+
+    Matcher matcher = VERSIONED_JSON_MEDIA_TYPE_REGEX.matcher(value);
+    return matcher.find() ? Integer.parseInt(matcher.group(1)) : null;
+  }
+
+  private static boolean isUnsupportedVersion(int version, ServletResponse response)
+      throws IOException {
+    if (ApiVersion.isSupportedVersion(version)) {
+      return false;
+    }
+
+    LOG.error("Unsupported version v{} in request header.", version);
+    HttpServletResponse resp = (HttpServletResponse) response;
+    resp.sendError(HttpServletResponse.SC_NOT_ACCEPTABLE, "Unsupported version");
+    return true;
   }
 
   @Override

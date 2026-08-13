@@ -18,18 +18,25 @@
  */
 package org.apache.gravitino.client;
 
+import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.dto.responses.MetadataObjectListResponse;
 import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagAssignment;
+import org.apache.gravitino.tag.TagValueConstraint;
 
 /** Represents a generic tag. */
 class GenericTag implements Tag, Tag.AssociatedObjects {
+
+  private static final int MAX_TAG_VALUE_LENGTH = 256;
 
   private final TagDTO tagDTO;
 
@@ -59,6 +66,16 @@ class GenericTag implements Tag, Tag.AssociatedObjects {
   }
 
   @Override
+  public TagValueConstraint valueConstraint() {
+    return tagDTO.valueConstraint();
+  }
+
+  @Override
+  public Optional<TagAssignment> assignment() {
+    return tagDTO.assignment();
+  }
+
+  @Override
   public Optional<Boolean> inherited() {
     return tagDTO.inherited();
   }
@@ -80,6 +97,28 @@ class GenericTag implements Tag, Tag.AssociatedObjects {
             String.format(
                 "api/metalakes/%s/tags/%s/objects",
                 RESTUtils.encodeString(metalake), RESTUtils.encodeString(name())),
+            MetadataObjectListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+
+    resp.validate();
+    return resp.getMetadataObjects();
+  }
+
+  @Override
+  public MetadataObject[] objects(String value) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(value), "Tag assignment value must not be null or empty");
+    Preconditions.checkArgument(
+        value.length() <= MAX_TAG_VALUE_LENGTH,
+        "Tag assignment value must not exceed " + MAX_TAG_VALUE_LENGTH + " characters");
+
+    MetadataObjectListResponse resp =
+        restClient.get(
+            String.format(
+                "api/metalakes/%s/tags/%s/objects",
+                RESTUtils.encodeString(metalake), RESTUtils.encodeString(name())),
+            ImmutableMap.of("value", value),
             MetadataObjectListResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.tagErrorHandler());
