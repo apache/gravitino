@@ -100,6 +100,7 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -988,21 +989,33 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
 
-            if (isManagedStorageCatalog(catalogWrapper)) {
+            // Snapshot schema/fileset properties (write-through secret URNs) before entities are
+            // removed. store.delete(cascade) only soft-deletes meta rows and does not call secret
+            // providers; catalog/schema/fileset are the entities that currently own secrets.
+            List<Map<String, String>> schemaSecretPropertySnapshots = new ArrayList<>();
+            List<List<Map<String, String>>> filesetSecretPropertySnapshots = new ArrayList<>();
+            for (SchemaEntity schema : schemaEntities) {
+              schemaSecretPropertySnapshots.add(copyProperties(schema.properties()));
+              filesetSecretPropertySnapshots.add(snapshotFilesetProperties(schema));
+            }
+
+            boolean managedStorage = isManagedStorageCatalog(catalogWrapper);
+            if (managedStorage) {
               // For managed catalog, we need to call drop schema API to drop the underlying
               // entities as well as the related resource first. Directly deleting the metadata from
-              // the store is not enough.
-              schemaEntities.forEach(
-                  schema -> {
-                    try {
-                      catalogWrapper.doWithSchemaOps(
-                          ops -> ops.dropSchema(schema.nameIdentifier(), true));
-                    } catch (Exception e) {
-                      LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
-                      throw new RuntimeException(
-                          "Failed to drop schema " + schema.nameIdentifier(), e);
-                    }
-                  });
+              // the store is not enough. Delete secrets only after a successful drop.
+              for (int i = 0; i < schemaEntities.size(); i++) {
+                SchemaEntity schema = schemaEntities.get(i);
+                try {
+                  catalogWrapper.doWithSchemaOps(
+                      ops -> ops.dropSchema(schema.nameIdentifier(), true));
+                  deleteSecretsFromPropertySnapshots(
+                      schemaSecretPropertySnapshots.get(i), filesetSecretPropertySnapshots.get(i));
+                } catch (Exception e) {
+                  LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
+                  throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
+                }
+              }
             }
 
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
@@ -1013,6 +1026,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
+              // Unmanaged / mixed: children were removed only via store cascade — clean their
+              // secrets now. Managed path already cleaned per successful dropSchema above.
+              if (!managedStorage) {
+                for (int i = 0; i < schemaSecretPropertySnapshots.size(); i++) {
+                  deleteSecretsFromPropertySnapshots(
+                      schemaSecretPropertySnapshots.get(i), filesetSecretPropertySnapshots.get(i));
+                }
+              }
               secretManager.deleteSecretsFromProperties(catalogProperties);
             }
             catalogCache.invalidate(ident);
@@ -1026,6 +1047,52 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  /**
+   * Deletes write-through secrets for a schema and its fileset children using properties snapped
+   * before the entities were dropped. Entity drop must succeed before calling this.
+   */
+  private void deleteSecretsFromPropertySnapshots(
+      Map<String, String> schemaProperties, List<Map<String, String>> filesetPropertiesSnapshots) {
+    secretManager.deleteSecretsFromProperties(schemaProperties);
+    for (Map<String, String> filesetProperties : filesetPropertiesSnapshots) {
+      secretManager.deleteSecretsFromProperties(filesetProperties);
+    }
+  }
+
+  private static Map<String, String> copyProperties(Map<String, String> properties) {
+    return properties == null || properties.isEmpty()
+        ? Collections.emptyMap()
+        : new HashMap<>(properties);
+  }
+
+  /**
+   * Lists fileset properties under a schema for secret cleanup. Must run before the schema/filesets
+   * are deleted from the store.
+   */
+  private List<Map<String, String>> snapshotFilesetProperties(SchemaEntity schemaEntity) {
+    NameIdentifier schemaIdent = schemaEntity.nameIdentifier();
+    Namespace filesetNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    try {
+      List<FilesetEntity> filesets = store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
+      List<Map<String, String>> snapshots = new ArrayList<>(filesets.size());
+      for (FilesetEntity fileset : filesets) {
+        Map<String, String> props = copyProperties(fileset.properties());
+        if (!props.isEmpty()) {
+          snapshots.add(props);
+        }
+      }
+      return snapshots;
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to list fileset properties under schema {} for secret cleanup during catalog drop",
+          schemaIdent,
+          e);
+      return Collections.emptyList();
+    }
   }
 
   /**
