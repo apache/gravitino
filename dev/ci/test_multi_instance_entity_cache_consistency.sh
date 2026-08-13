@@ -112,6 +112,8 @@ HTTP_CODE=""
 RESPONSE_BODY=""
 JOB_ID=""
 JOB_SCRIPT=""
+CASE_PREWARMED=true
+CASE_MUTATION_STARTED=true
 
 auth_header() {
   printf 'Basic %s' "$(jq -rn --arg credentials "$1:" '$credentials | @base64')"
@@ -218,17 +220,60 @@ section() {
 
 consistency_case() {
   CONSISTENCY_CASES=$((CONSISTENCY_CASES + 1))
+  CASE_PREWARMED=false
+  CASE_MUTATION_STARTED=false
   printf '\n  \033[1m[consistency case %d]\033[0m %s\n' "$CONSISTENCY_CASES" "$1"
+}
+
+restart_case() {
+  CONSISTENCY_CASES=$((CONSISTENCY_CASES + 1))
+  CASE_PREWARMED=true
+  CASE_MUTATION_STARTED=false
+  printf '\n  \033[1m[restart case %d]\033[0m %s\n' "$CONSISTENCY_CASES" "$1"
+}
+
+prewarm_value() {
+  local desc="$1" base="$2" path="$3" filter="$4" expected="$5"
+  api "$base" GET "$path"
+  expect_value "$desc" "$filter" "$expected"
+  CASE_PREWARMED=true
+}
+
+prewarm_http() {
+  local desc="$1" base="$2" path="$3" expected="$4"
+  api "$base" GET "$path"
+  expect_http "$desc" "$expected"
+  CASE_PREWARMED=true
+}
+
+prewarm_one_of() {
+  local desc="$1" base="$2" path="$3" filter="$4"
+  shift 4
+  api "$base" GET "$path"
+  expect_one_of "$desc" "$filter" "$@"
+  CASE_PREWARMED=true
+}
+
+ensure_case_prewarmed() {
+  if [[ "$CASE_MUTATION_STARTED" == "false" ]]; then
+    if [[ "$CASE_PREWARMED" != "true" ]]; then
+      fail "consistency case mutated its source before explicitly prewarming the target cache"
+      return 1
+    fi
+    CASE_MUTATION_STARTED=true
+  fi
 }
 
 mutate_a() {
   local desc="$1" method="$2" path="$3" body="${4:-}"
+  ensure_case_prewarmed || return
   api "$INSTANCE_A" "$method" "$path" "$body"
   expect_http "$desc" 200
 }
 
 mutate_b() {
   local desc="$1" method="$2" path="$3" body="${4:-}"
+  ensure_case_prewarmed || return
   api "$INSTANCE_B" "$method" "$path" "$body"
   expect_http "$desc" 200
 }
@@ -286,10 +331,10 @@ fi
 section "METALAKE cache: alter, rename, disable/enable, and drop"
 mutate_a "create lifecycle metalake on A" POST /api/metalakes \
   "{\"name\":\"${LIFECYCLE_METALAKE}\",\"comment\":\"metalake-old\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${LIFECYCLE_METALAKE}"
-expect_value "warm metalake cache on B" '.metalake.comment' metalake-old
 
 consistency_case "METALAKE alter propagates A -> B"
+prewarm_value "B caches the old metalake before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${LIFECYCLE_METALAKE}" '.metalake.comment' metalake-old
 mutate_a "alter metalake comment on A" PUT "/api/metalakes/${LIFECYCLE_METALAKE}" \
   '{"updates":[{"@type":"updateComment","newComment":"metalake-new"}]}'
 wait_for_invalidation
@@ -297,6 +342,8 @@ api "$INSTANCE_B" GET "/api/metalakes/${LIFECYCLE_METALAKE}"
 expect_value "B sees altered metalake" '.metalake.comment' metalake-new
 
 consistency_case "METALAKE rename invalidates the old name on B"
+prewarm_value "B caches the pre-rename metalake" "$INSTANCE_B" \
+  "/api/metalakes/${LIFECYCLE_METALAKE}" '.metalake.comment' metalake-new
 mutate_a "rename metalake on A" PUT "/api/metalakes/${LIFECYCLE_METALAKE}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_METALAKE}\"}]}"
 wait_for_invalidation
@@ -308,6 +355,10 @@ api "$INSTANCE_B" GET "/api/metalakes/${RENAMED_METALAKE}"
 expect_value "B loads the renamed metalake" '.metalake.name' "$RENAMED_METALAKE"
 
 consistency_case "METALAKE disable blocks operations through B"
+prewarm_value "B caches the enabled metalake before A disables it" "$INSTANCE_B" \
+  "/api/metalakes/${RENAMED_METALAKE}" '.metalake.properties["in-use"]' true
+prewarm_http "B warms an operation under the enabled metalake" "$INSTANCE_B" \
+  "/api/metalakes/${RENAMED_METALAKE}/catalogs" 200
 mutate_a "disable metalake on A" PATCH "/api/metalakes/${RENAMED_METALAKE}" '{"inUse":false}'
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${RENAMED_METALAKE}"
@@ -316,6 +367,10 @@ api "$INSTANCE_B" GET "/api/metalakes/${RENAMED_METALAKE}/catalogs"
 expect_http "B rejects an operation under the disabled metalake" 409
 
 consistency_case "METALAKE enable restores operations through B"
+prewarm_value "B caches the disabled metalake before A enables it" "$INSTANCE_B" \
+  "/api/metalakes/${RENAMED_METALAKE}" '.metalake.properties["in-use"]' false
+prewarm_http "B warms the disabled operation state" "$INSTANCE_B" \
+  "/api/metalakes/${RENAMED_METALAKE}/catalogs" 409
 mutate_a "enable metalake on A" PATCH "/api/metalakes/${RENAMED_METALAKE}" '{"inUse":true}'
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${RENAMED_METALAKE}"
@@ -324,6 +379,8 @@ api "$INSTANCE_B" GET "/api/metalakes/${RENAMED_METALAKE}/catalogs"
 expect_http "B accepts an operation under the re-enabled metalake" 200
 
 consistency_case "METALAKE drop invalidates B"
+prewarm_value "B caches the enabled metalake before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${RENAMED_METALAKE}" '.metalake.properties["in-use"]' true
 mutate_a "drop metalake on A" DELETE "/api/metalakes/${RENAMED_METALAKE}?force=true"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${RENAMED_METALAKE}"
@@ -332,10 +389,10 @@ expect_http "B no longer serves the dropped metalake" 403
 section "METALAKE edge case: drop and recreate the same name in one poll window"
 mutate_a "create recreate-probe metalake on A" POST /api/metalakes \
   "{\"name\":\"${RECREATE_METALAKE}\",\"comment\":\"metalake-generation-1\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${RECREATE_METALAKE}"
-expect_value "warm first metalake generation on B" '.metalake.comment' metalake-generation-1
 
 consistency_case "METALAKE drop plus same-name recreate evicts the old generation"
+prewarm_value "B caches the first metalake generation" "$INSTANCE_B" \
+  "/api/metalakes/${RECREATE_METALAKE}" '.metalake.comment' metalake-generation-1
 mutate_a "drop first metalake generation on A" DELETE "/api/metalakes/${RECREATE_METALAKE}?force=true"
 mutate_a "recreate the same metalake name on A" POST /api/metalakes \
   "{\"name\":\"${RECREATE_METALAKE}\",\"comment\":\"metalake-generation-2\",\"properties\":{}}"
@@ -352,10 +409,10 @@ expect_value "B loads shared test metalake" '.metalake.name' "$MAIN_METALAKE"
 section "CATALOG cache: alter, rename, disable/enable, rebuild, and drop"
 mutate_a "create lifecycle catalog on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" \
   "{\"name\":\"${LIFECYCLE_CATALOG}\",\"type\":\"FILESET\",\"comment\":\"catalog-old\",\"properties\":{\"disable-filesystem-ops\":\"true\"}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}"
-expect_value "warm catalog cache on B" '.catalog.comment' catalog-old
 
 consistency_case "CATALOG alter propagates A -> B"
+prewarm_value "B caches the old catalog before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}" '.catalog.comment' catalog-old
 mutate_a "alter catalog comment on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}" \
   '{"updates":[{"@type":"updateComment","newComment":"catalog-new"}]}'
 wait_for_invalidation
@@ -363,6 +420,10 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATA
 expect_value "B sees altered catalog" '.catalog.comment' catalog-new
 
 consistency_case "CATALOG rename invalidates the old name and connector on B"
+prewarm_value "B caches the pre-rename catalog" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}" '.catalog.comment' catalog-new
+prewarm_http "B initializes the pre-rename catalog connector" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}/schemas" 200
 mutate_a "rename catalog on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_CATALOG}\"}]}"
 wait_for_invalidation
@@ -372,6 +433,10 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALO
 expect_value "B loads the renamed catalog" '.catalog.name' "$RENAMED_CATALOG"
 
 consistency_case "CATALOG disable rebuilds B's connector as unavailable"
+prewarm_value "B caches the enabled catalog before A disables it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}" '.catalog.properties["in-use"]' true
+prewarm_http "B initializes the enabled catalog connector" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}/schemas" 200
 mutate_a "disable catalog on A" PATCH "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}" '{"inUse":false}'
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}"
@@ -380,6 +445,10 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALO
 expect_http "B rebuilds the disabled catalog instance" 409
 
 consistency_case "CATALOG enable rebuilds B's connector as available"
+prewarm_value "B caches the disabled catalog before A enables it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}" '.catalog.properties["in-use"]' false
+prewarm_http "B caches the disabled catalog connector state" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}/schemas" 409
 mutate_a "enable catalog on A" PATCH "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}" '{"inUse":true}'
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}"
@@ -388,6 +457,10 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALO
 expect_http "B rebuilds the re-enabled catalog instance" 200
 
 consistency_case "CATALOG drop invalidates B's entity and connector caches"
+prewarm_value "B caches the enabled catalog before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}" '.catalog.properties["in-use"]' true
+prewarm_http "B initializes the catalog connector before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}/schemas" 200
 mutate_a "drop catalog on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}?force=true"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${RENAMED_CATALOG}"
@@ -396,10 +469,10 @@ expect_http "B invalidates dropped catalog" 404
 section "CATALOG edge case: drop and recreate the same name in one poll window"
 mutate_a "create recreate-probe catalog on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" \
   "{\"name\":\"${RECREATE_CATALOG}\",\"type\":\"FILESET\",\"comment\":\"catalog-generation-1\",\"properties\":{\"disable-filesystem-ops\":\"true\"}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${RECREATE_CATALOG}"
-expect_value "warm first catalog generation on B" '.catalog.comment' catalog-generation-1
 
 consistency_case "CATALOG drop plus same-name recreate evicts the old generation"
+prewarm_value "B caches the first catalog generation" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${RECREATE_CATALOG}" '.catalog.comment' catalog-generation-1
 mutate_a "drop first catalog generation on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${RECREATE_CATALOG}?force=true"
 mutate_a "recreate the same catalog name on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" \
   "{\"name\":\"${RECREATE_CATALOG}\",\"type\":\"FILESET\",\"comment\":\"catalog-generation-2\",\"properties\":{\"disable-filesystem-ops\":\"true\"}}"
@@ -425,10 +498,11 @@ mutate_a "create Kafka catalog" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" 
 section "SCHEMA cache: alter and drop"
 mutate_a "create Iceberg schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
   "{\"name\":\"${SCHEMA_NAME}\",\"comment\":\"schema-old\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}"
-expect_value "warm schema cache on B" '.schema.name' "$SCHEMA_NAME"
 
 consistency_case "SCHEMA alter propagates A -> B"
+prewarm_value "B caches the old schema before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.name' "$SCHEMA_NAME"
 mutate_a "alter schema property on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '{"updates":[{"@type":"setProperty","property":"cache-key","value":"schema-new"}]}'
 wait_for_invalidation
@@ -436,6 +510,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B sees altered schema" '.schema.properties["cache-key"]' schema-new
 
 consistency_case "SCHEMA keeps the latest of several alters inside one poll window"
+prewarm_value "B caches the schema before A performs rapid alters" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.properties["cache-key"]' schema-new
 mutate_a "set schema rapid value 1 on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '{"updates":[{"@type":"setProperty","property":"rapid-key","value":"schema-v1"}]}'
 mutate_a "set schema rapid value 2 on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
@@ -449,10 +526,11 @@ expect_value "B sees the latest schema value" '.schema.properties["rapid-key"]' 
 section "TABLE cache: alter, rename, and drop"
 mutate_a "create Iceberg table on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables" \
   "{\"name\":\"${TABLE_NAME}\",\"comment\":\"table-old\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}"
-expect_value "warm table cache on B" '.table.comment' table-old
 
 consistency_case "TABLE alter propagates A -> B"
+prewarm_value "B caches the old table before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
+  '.table.comment' table-old
 mutate_a "alter table comment on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
   '{"updates":[{"@type":"updateComment","newComment":"table-new"}]}'
 wait_for_invalidation
@@ -460,6 +538,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B sees altered table" '.table.comment' table-new
 
 consistency_case "TABLE rename invalidates the old name on B"
+prewarm_value "B caches the pre-rename table" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
+  '.table.comment' table-new
 mutate_a "rename table on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_TABLE}\"}]}"
 wait_for_invalidation
@@ -469,6 +550,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B loads the renamed table" '.table.name' "$RENAMED_TABLE"
 
 consistency_case "TABLE drop invalidates B"
+prewarm_value "B caches the renamed table before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RENAMED_TABLE}" \
+  '.table.name' "$RENAMED_TABLE"
 mutate_a "drop table on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RENAMED_TABLE}?purge=true"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RENAMED_TABLE}"
@@ -477,10 +561,11 @@ expect_http "B invalidates dropped table" 404
 section "TABLE edge case: drop and recreate the same name in one poll window"
 mutate_a "create first recreate-probe table generation on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables" \
   "{\"name\":\"${RECREATE_TABLE}\",\"comment\":\"table-generation-1\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}"
-expect_value "warm first table generation on B" '.table.comment' table-generation-1
 
 consistency_case "TABLE drop plus same-name recreate evicts the old generation"
+prewarm_value "B caches the first table generation" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" \
+  '.table.comment' table-generation-1
 mutate_a "drop first table generation on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}?purge=true"
 mutate_a "recreate the same table name on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables" \
   "{\"name\":\"${RECREATE_TABLE}\",\"comment\":\"table-generation-2\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
@@ -492,10 +577,11 @@ mutate_a "remove recreate-probe table" DELETE "/api/metalakes/${MAIN_METALAKE}/c
 section "VIEW cache: alter, rename, and drop"
 mutate_a "create Iceberg view on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views" \
   "{\"name\":\"${VIEW_NAME}\",\"comment\":\"view-old\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 1 AS id\"}],\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}"
-expect_value "warm view cache on B" '.view.comment' view-old
 
 consistency_case "VIEW alter propagates A -> B"
+prewarm_value "B caches the old view before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
+  '.view.comment' view-old
 mutate_a "alter view property on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
   '{"updates":[{"@type":"setProperty","property":"cache-key","value":"view-new"}]}'
 wait_for_invalidation
@@ -503,6 +589,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B sees altered view" '.view.properties["cache-key"]' view-new
 
 consistency_case "VIEW rename invalidates the old name on B"
+prewarm_value "B caches the pre-rename view" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
+  '.view.properties["cache-key"]' view-new
 mutate_a "rename view on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_VIEW}\"}]}"
 wait_for_invalidation
@@ -512,12 +601,18 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B loads the renamed view" '.view.name' "$RENAMED_VIEW"
 
 consistency_case "VIEW drop invalidates B"
+prewarm_value "B caches the renamed view before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
+  '.view.name' "$RENAMED_VIEW"
 mutate_a "drop view on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}"
 expect_http "B invalidates dropped view" 404
 
 consistency_case "SCHEMA drop invalidates B"
+prewarm_value "B caches the schema immediately before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.properties["rapid-key"]' schema-v3
 mutate_a "drop the warmed schema on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}"
@@ -528,12 +623,14 @@ mutate_a "create cascade schema on A" POST "/api/metalakes/${MAIN_METALAKE}/cata
   "{\"name\":\"${CASCADE_SCHEMA}\",\"comment\":\"cascade schema\",\"properties\":{}}"
 mutate_a "create cascade descendant fileset on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${CASCADE_SCHEMA}/filesets" \
   "{\"name\":\"${CASCADE_FILESET}\",\"type\":\"EXTERNAL\",\"comment\":\"cascade fileset\",\"storageLocation\":\"file:///tmp/gravitino-cascade-fileset-${SUFFIX}\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${CASCADE_SCHEMA}"
-expect_value "warm cascade schema cache on B" '.schema.name' "$CASCADE_SCHEMA"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${CASCADE_SCHEMA}/filesets/${CASCADE_FILESET}"
-expect_value "warm cascade descendant cache on B" '.fileset.name' "$CASCADE_FILESET"
 
 consistency_case "SCHEMA cascade drop invalidates its cached descendant"
+prewarm_value "B caches the cascade schema before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${CASCADE_SCHEMA}" \
+  '.schema.name' "$CASCADE_SCHEMA"
+prewarm_value "B caches the descendant fileset before A drops its schema" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${CASCADE_SCHEMA}/filesets/${CASCADE_FILESET}" \
+  '.fileset.name' "$CASCADE_FILESET"
 mutate_a "cascade-drop schema on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${CASCADE_SCHEMA}?cascade=true"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${CASCADE_SCHEMA}"
@@ -559,22 +656,10 @@ mutate_a "create grandchild table on A" POST "/api/metalakes/${MAIN_METALAKE}/ca
 mutate_a "create sibling view on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}/views" \
   "{\"name\":\"${HIER_VIEW}\",\"comment\":\"hierarchical view\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 1 AS id\"}],\"properties\":{}}"
 
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}"
-expect_value "warm hierarchical catalog cache on B" '.catalog.name' "$ICEBERG_CATALOG"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}"
-expect_value "warm parent schema cache on B" '.schema.name' "$HIER_PARENT"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}"
-expect_value "warm child schema cache on B" '.schema.name' "$HIER_CHILD"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}"
-expect_value "warm grandchild schema cache on B" '.schema.name' "$HIER_GRANDCHILD"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}"
-expect_value "warm sibling schema cache on B" '.schema.name' "$HIER_SIBLING"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}/tables/${HIER_TABLE}"
-expect_value "warm grandchild table cache on B" '.table.name' "$HIER_TABLE"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}/views/${HIER_VIEW}"
-expect_value "warm sibling view cache on B" '.view.name' "$HIER_VIEW"
-
 consistency_case "SCHEMA alter invalidates a cached top-level parent"
+prewarm_value "B caches the top-level parent before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
+  '.schema.name' "$HIER_PARENT"
 mutate_a "alter hierarchical parent on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"parent-new"}]}'
 wait_for_invalidation
@@ -582,6 +667,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B sees altered parent schema" '.schema.properties["level-key"]' parent-new
 
 consistency_case "SCHEMA alter invalidates a cached middle-level child"
+prewarm_value "B caches the middle-level child before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
+  '.schema.name' "$HIER_CHILD"
 mutate_a "alter hierarchical child on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"child-new"}]}'
 wait_for_invalidation
@@ -589,6 +677,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B sees altered child schema" '.schema.properties["level-key"]' child-new
 
 consistency_case "SCHEMA alter invalidates a cached grandchild"
+prewarm_value "B caches the grandchild before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
+  '.schema.name' "$HIER_GRANDCHILD"
 mutate_a "alter hierarchical grandchild on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"grandchild-new"}]}'
 wait_for_invalidation
@@ -596,6 +687,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B sees altered grandchild schema" '.schema.properties["level-key"]' grandchild-new
 
 consistency_case "SCHEMA alter invalidates a cached sibling branch"
+prewarm_value "B caches the sibling branch before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
+  '.schema.name' "$HIER_SIBLING"
 mutate_a "alter hierarchical sibling on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"sibling-new"}]}'
 wait_for_invalidation
@@ -603,6 +697,27 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_value "B sees altered sibling schema" '.schema.properties["level-key"]' sibling-new
 
 consistency_case "CATALOG force drop recursively invalidates the full schema tree"
+prewarm_value "B caches the hierarchical catalog before A force-drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}" \
+  '.catalog.name' "$ICEBERG_CATALOG"
+prewarm_value "B re-caches the altered parent before the recursive drop" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
+  '.schema.properties["level-key"]' parent-new
+prewarm_value "B re-caches the altered child before the recursive drop" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
+  '.schema.properties["level-key"]' child-new
+prewarm_value "B re-caches the altered grandchild before the recursive drop" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
+  '.schema.properties["level-key"]' grandchild-new
+prewarm_value "B re-caches the altered sibling before the recursive drop" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
+  '.schema.properties["level-key"]' sibling-new
+prewarm_value "B caches the grandchild table before the recursive drop" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}/tables/${HIER_TABLE}" \
+  '.table.name' "$HIER_TABLE"
+prewarm_value "B caches the sibling view before the recursive drop" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}/views/${HIER_VIEW}" \
+  '.view.name' "$HIER_VIEW"
 mutate_a "force-drop hierarchical catalog on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}?force=true"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}"
@@ -644,10 +759,11 @@ mutate_a "create fileset schema on A" POST "/api/metalakes/${MAIN_METALAKE}/cata
   "{\"name\":\"${FILESET_SCHEMA}\",\"comment\":\"fileset schema\",\"properties\":{}}"
 mutate_a "create fileset on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets" \
   "{\"name\":\"${FILESET_NAME}\",\"type\":\"EXTERNAL\",\"comment\":\"fileset-old\",\"storageLocation\":\"file:///tmp/gravitino-fileset-${SUFFIX}\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}"
-expect_value "warm fileset cache on B" '.fileset.comment' fileset-old
 
 consistency_case "FILESET alter propagates A -> B"
+prewarm_value "B caches the old fileset before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}" \
+  '.fileset.comment' fileset-old
 mutate_a "alter fileset comment on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}" \
   '{"updates":[{"@type":"updateComment","newComment":"fileset-new"}]}'
 wait_for_invalidation
@@ -655,6 +771,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALO
 expect_value "B sees altered fileset" '.fileset.comment' fileset-new
 
 consistency_case "FILESET rename invalidates the old name on B"
+prewarm_value "B caches the pre-rename fileset" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}" \
+  '.fileset.comment' fileset-new
 mutate_a "rename fileset on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_FILESET}\"}]}"
 wait_for_invalidation
@@ -664,6 +783,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALO
 expect_value "B loads the renamed fileset" '.fileset.name' "$RENAMED_FILESET"
 
 consistency_case "FILESET drop invalidates B"
+prewarm_value "B caches the renamed fileset before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${RENAMED_FILESET}" \
+  '.fileset.name' "$RENAMED_FILESET"
 mutate_a "drop fileset on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${RENAMED_FILESET}"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${RENAMED_FILESET}"
@@ -672,10 +794,11 @@ expect_http "B invalidates dropped fileset" 404
 section "FILESET edge case: drop and recreate the same name in one poll window"
 mutate_a "create first recreate-probe fileset generation on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets" \
   "{\"name\":\"${RECREATE_FILESET}\",\"type\":\"EXTERNAL\",\"comment\":\"fileset-generation-1\",\"storageLocation\":\"file:///tmp/gravitino-fileset-recreate-1-${SUFFIX}\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${RECREATE_FILESET}"
-expect_value "warm first fileset generation on B" '.fileset.comment' fileset-generation-1
 
 consistency_case "FILESET drop plus same-name recreate evicts the old generation"
+prewarm_value "B caches the first fileset generation" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${RECREATE_FILESET}" \
+  '.fileset.comment' fileset-generation-1
 mutate_a "drop first fileset generation on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${RECREATE_FILESET}"
 mutate_a "recreate the same fileset name on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets" \
   "{\"name\":\"${RECREATE_FILESET}\",\"type\":\"EXTERNAL\",\"comment\":\"fileset-generation-2\",\"storageLocation\":\"file:///tmp/gravitino-fileset-recreate-2-${SUFFIX}\",\"properties\":{}}"
@@ -686,10 +809,11 @@ expect_value "B loads the second fileset generation" '.fileset.comment' fileset-
 section "TOPIC cache: alter and drop"
 mutate_a "create Kafka topic on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics" \
   "{\"name\":\"${TOPIC_NAME}\",\"comment\":\"topic-old\",\"properties\":{\"partition-count\":\"1\",\"replication-factor\":\"1\"}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}"
-expect_value "warm topic cache on B" '.topic.comment' topic-old
 
 consistency_case "TOPIC alter propagates A -> B"
+prewarm_value "B caches the old topic before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
+  '.topic.comment' topic-old
 mutate_a "alter topic comment on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
   '{"updates":[{"@type":"updateComment","newComment":"topic-new"}]}'
 wait_for_invalidation
@@ -697,6 +821,9 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}
 expect_value "B sees altered topic" '.topic.comment' topic-new
 
 consistency_case "TOPIC drop invalidates B"
+prewarm_value "B caches the altered topic before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
+  '.topic.comment' topic-new
 mutate_a "drop topic on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}"
@@ -705,10 +832,10 @@ expect_http "B invalidates dropped topic" 404
 section "TAG cache: alter, rename, and drop"
 mutate_a "create tag on A" POST "/api/metalakes/${MAIN_METALAKE}/tags" \
   "{\"name\":\"${TAG_NAME}\",\"comment\":\"tag-old\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/tags/${TAG_NAME}"
-expect_value "warm tag cache on B" '.tag.comment' tag-old
 
 consistency_case "TAG alter propagates A -> B"
+prewarm_value "B caches the old tag before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${TAG_NAME}" '.tag.comment' tag-old
 mutate_a "alter tag comment on A" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${TAG_NAME}" \
   '{"updates":[{"@type":"updateComment","newComment":"tag-new"}]}'
 wait_for_invalidation
@@ -716,6 +843,8 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/tags/${TAG_NAME}"
 expect_value "B sees altered tag" '.tag.comment' tag-new
 
 consistency_case "TAG rename invalidates the old name on B"
+prewarm_value "B caches the pre-rename tag" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${TAG_NAME}" '.tag.comment' tag-new
 mutate_a "rename tag on A" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${TAG_NAME}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_TAG}\"}]}"
 wait_for_invalidation
@@ -725,6 +854,8 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/tags/${RENAMED_TAG}"
 expect_value "B loads the renamed tag" '.tag.name' "$RENAMED_TAG"
 
 consistency_case "TAG drop invalidates B"
+prewarm_value "B caches the renamed tag before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${RENAMED_TAG}" '.tag.name' "$RENAMED_TAG"
 mutate_a "drop tag on A" DELETE "/api/metalakes/${MAIN_METALAKE}/tags/${RENAMED_TAG}"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/tags/${RENAMED_TAG}"
@@ -733,10 +864,10 @@ expect_http "B invalidates dropped tag" 404
 section "TAG edge cases: same-name recreate and rapid updates"
 mutate_a "create first recreate-probe tag generation on A" POST "/api/metalakes/${MAIN_METALAKE}/tags" \
   "{\"name\":\"${RECREATE_TAG}\",\"comment\":\"tag-generation-1\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/tags/${RECREATE_TAG}"
-expect_value "warm first tag generation on B" '.tag.comment' tag-generation-1
 
 consistency_case "TAG drop plus same-name recreate evicts the old generation"
+prewarm_value "B caches the first tag generation" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${RECREATE_TAG}" '.tag.comment' tag-generation-1
 mutate_a "drop first tag generation on A" DELETE "/api/metalakes/${MAIN_METALAKE}/tags/${RECREATE_TAG}"
 mutate_a "recreate the same tag name on A" POST "/api/metalakes/${MAIN_METALAKE}/tags" \
   "{\"name\":\"${RECREATE_TAG}\",\"comment\":\"tag-generation-2\",\"properties\":{}}"
@@ -746,10 +877,10 @@ expect_value "B loads the second tag generation" '.tag.comment' tag-generation-2
 
 mutate_a "create rapid-update tag on A" POST "/api/metalakes/${MAIN_METALAKE}/tags" \
   "{\"name\":\"${LATEST_TAG}\",\"comment\":\"tag-v0\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/tags/${LATEST_TAG}"
-expect_value "warm rapid-update tag on B" '.tag.comment' tag-v0
 
 consistency_case "TAG keeps the latest of several alters inside one poll window"
+prewarm_value "B caches the tag before A performs rapid alters" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${LATEST_TAG}" '.tag.comment' tag-v0
 mutate_a "set rapid tag value 1 on A" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${LATEST_TAG}" \
   '{"updates":[{"@type":"updateComment","newComment":"tag-v1"}]}'
 mutate_a "set rapid tag value 2 on A" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${LATEST_TAG}" \
@@ -764,10 +895,10 @@ section "POLICY cache: alter, rename, disable/enable, and drop"
 POLICY_BODY=$(jq -nc --arg name "$POLICY_NAME" \
   '{name:$name,comment:"policy-old",policyType:"custom",enabled:true,content:{customRules:{retentionDays:30},supportedObjectTypes:["CATALOG","SCHEMA","TABLE"],properties:{owner:"platform"}}}')
 mutate_a "create policy on A" POST "/api/metalakes/${MAIN_METALAKE}/policies" "$POLICY_BODY"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}"
-expect_value "warm policy cache on B" '.policy.comment' policy-old
 
 consistency_case "POLICY alter propagates A -> B"
+prewarm_value "B caches the old policy before A alters it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}" '.policy.comment' policy-old
 mutate_a "alter policy comment on A" PUT "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}" \
   '{"updates":[{"@type":"updateComment","newComment":"policy-new"}]}'
 wait_for_invalidation
@@ -775,6 +906,8 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}"
 expect_value "B sees altered policy" '.policy.comment' policy-new
 
 consistency_case "POLICY rename invalidates the old name on B"
+prewarm_value "B caches the pre-rename policy" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}" '.policy.comment' policy-new
 mutate_a "rename policy on A" PUT "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_POLICY}\"}]}"
 wait_for_invalidation
@@ -784,18 +917,24 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY
 expect_value "B loads the renamed policy" '.policy.name' "$RENAMED_POLICY"
 
 consistency_case "POLICY disable propagates A -> B"
+prewarm_value "B caches the enabled policy before A disables it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}" '.policy.enabled' true
 mutate_a "disable policy on A" PATCH "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}" '{"enable":false}'
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}"
 expect_value "B sees disabled policy state" '.policy.enabled' false
 
 consistency_case "POLICY enable propagates A -> B"
+prewarm_value "B caches the disabled policy before A enables it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}" '.policy.enabled' false
 mutate_a "enable policy on A" PATCH "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}" '{"enable":true}'
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}"
 expect_value "B sees enabled policy state" '.policy.enabled' true
 
 consistency_case "POLICY drop invalidates B"
+prewarm_value "B caches the enabled policy before A drops it" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}" '.policy.enabled' true
 mutate_a "drop policy on A" DELETE "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}"
 wait_for_invalidation
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/policies/${RENAMED_POLICY}"
@@ -804,10 +943,10 @@ expect_http "B invalidates dropped policy" 404
 section "Reverse direction: mutate B and invalidate warmed caches on A"
 mutate_a "create reverse-direction tag" POST "/api/metalakes/${MAIN_METALAKE}/tags" \
   "{\"name\":\"${REVERSE_TAG}\",\"comment\":\"reverse-tag-old\",\"properties\":{}}"
-api "$INSTANCE_A" GET "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}"
-expect_value "warm reverse-direction tag cache on A" '.tag.comment' reverse-tag-old
 
 consistency_case "TAG alter propagates B -> A"
+prewarm_value "A caches the old tag before B alters it" "$INSTANCE_A" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}" '.tag.comment' reverse-tag-old
 mutate_b "alter reverse-direction tag on B" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}" \
   '{"updates":[{"@type":"updateComment","newComment":"reverse-tag-new"}]}'
 wait_for_invalidation "instance A"
@@ -815,6 +954,8 @@ api "$INSTANCE_A" GET "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}"
 expect_value "A sees the tag altered through B" '.tag.comment' reverse-tag-new
 
 consistency_case "TAG rename propagates B -> A"
+prewarm_value "A caches the pre-rename tag" "$INSTANCE_A" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}" '.tag.comment' reverse-tag-new
 mutate_b "rename reverse-direction tag on B" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_REVERSE_TAG}\"}]}"
 wait_for_invalidation "instance A"
@@ -825,10 +966,11 @@ expect_value "A loads the tag renamed through B" '.tag.name' "$RENAMED_REVERSE_T
 
 mutate_a "create reverse-direction fileset" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets" \
   "{\"name\":\"${REVERSE_FILESET}\",\"type\":\"EXTERNAL\",\"comment\":\"reverse-fileset-old\",\"storageLocation\":\"file:///tmp/gravitino-reverse-fileset-${SUFFIX}\",\"properties\":{}}"
-api "$INSTANCE_A" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${REVERSE_FILESET}"
-expect_value "warm reverse-direction fileset cache on A" '.fileset.comment' reverse-fileset-old
 
 consistency_case "FILESET alter propagates B -> A"
+prewarm_value "A caches the old fileset before B alters it" "$INSTANCE_A" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${REVERSE_FILESET}" \
+  '.fileset.comment' reverse-fileset-old
 mutate_b "alter reverse-direction fileset on B" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${REVERSE_FILESET}" \
   '{"updates":[{"@type":"updateComment","newComment":"reverse-fileset-new"}]}'
 wait_for_invalidation "instance A"
@@ -836,6 +978,9 @@ api "$INSTANCE_A" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALO
 expect_value "A sees the fileset altered through B" '.fileset.comment' reverse-fileset-new
 
 consistency_case "FILESET rename propagates B -> A"
+prewarm_value "A caches the pre-rename fileset" "$INSTANCE_A" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${REVERSE_FILESET}" \
+  '.fileset.comment' reverse-fileset-new
 mutate_b "rename reverse-direction fileset on B" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${REVERSE_FILESET}" \
   "{\"updates\":[{\"@type\":\"rename\",\"newName\":\"${RENAMED_REVERSE_FILESET}\"}]}"
 wait_for_invalidation "instance A"
@@ -847,16 +992,18 @@ expect_value "A loads the fileset renamed through B" '.fileset.name' "$RENAMED_R
 REVERSE_POLICY_BODY=$(jq -nc --arg name "$REVERSE_POLICY" \
   '{name:$name,comment:"reverse-policy",policyType:"custom",enabled:true,content:{customRules:{retentionDays:30},supportedObjectTypes:["CATALOG","SCHEMA","TABLE"],properties:{owner:"platform"}}}')
 mutate_a "create reverse-direction policy" POST "/api/metalakes/${MAIN_METALAKE}/policies" "$REVERSE_POLICY_BODY"
-api "$INSTANCE_A" GET "/api/metalakes/${MAIN_METALAKE}/policies/${REVERSE_POLICY}"
-expect_value "warm reverse-direction policy cache on A" '.policy.enabled' true
 
 consistency_case "POLICY disable propagates B -> A"
+prewarm_value "A caches the enabled policy before B disables it" "$INSTANCE_A" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${REVERSE_POLICY}" '.policy.enabled' true
 mutate_b "disable reverse-direction policy on B" PATCH "/api/metalakes/${MAIN_METALAKE}/policies/${REVERSE_POLICY}" '{"enable":false}'
 wait_for_invalidation "instance A"
 api "$INSTANCE_A" GET "/api/metalakes/${MAIN_METALAKE}/policies/${REVERSE_POLICY}"
 expect_value "A sees the policy disabled through B" '.policy.enabled' false
 
 consistency_case "POLICY enable propagates B -> A"
+prewarm_value "A caches the disabled policy before B enables it" "$INSTANCE_A" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${REVERSE_POLICY}" '.policy.enabled' false
 mutate_b "enable reverse-direction policy on B" PATCH "/api/metalakes/${MAIN_METALAKE}/policies/${REVERSE_POLICY}" '{"enable":true}'
 wait_for_invalidation "instance A"
 api "$INSTANCE_A" GET "/api/metalakes/${MAIN_METALAKE}/policies/${REVERSE_POLICY}"
@@ -870,18 +1017,21 @@ BURST_POLICY_BODY=$(jq -nc --arg name "$BURST_POLICY" \
 mutate_a "create burst policy" POST "/api/metalakes/${MAIN_METALAKE}/policies" "$BURST_POLICY_BODY"
 mutate_a "create burst fileset" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets" \
   "{\"name\":\"${BURST_FILESET}\",\"type\":\"EXTERNAL\",\"comment\":\"burst-fileset-old\",\"storageLocation\":\"file:///tmp/gravitino-burst-fileset-${SUFFIX}\",\"properties\":{}}"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}"
-expect_value "warm burst catalog cache on B" '.catalog.comment' "Fileset cache test"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}"
-expect_value "warm burst schema cache on B" '.schema.name' "$FILESET_SCHEMA"
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${BURST_FILESET}"
-expect_value "warm burst fileset cache on B" '.fileset.comment' burst-fileset-old
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/tags/${BURST_TAG}"
-expect_value "warm burst tag cache on B" '.tag.comment' burst-tag-old
-api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/policies/${BURST_POLICY}"
-expect_value "warm burst policy cache on B" '.policy.comment' burst-policy-old
 
 consistency_case "CATALOG, SCHEMA, FILESET, TAG, and POLICY invalidate in one batch"
+prewarm_value "B caches the catalog before the cross-type batch" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}" \
+  '.catalog.comment' "Fileset cache test"
+prewarm_value "B caches the schema before the cross-type batch" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}" \
+  '.schema.name' "$FILESET_SCHEMA"
+prewarm_value "B caches the fileset before the cross-type batch" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${BURST_FILESET}" \
+  '.fileset.comment' burst-fileset-old
+prewarm_value "B caches the tag before the cross-type batch" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${BURST_TAG}" '.tag.comment' burst-tag-old
+prewarm_value "B caches the policy before the cross-type batch" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${BURST_POLICY}" '.policy.comment' burst-policy-old
 mutate_a "alter burst catalog on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}" \
   '{"updates":[{"@type":"updateComment","newComment":"burst-catalog-new"}]}'
 mutate_a "alter burst schema on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}" \
@@ -923,10 +1073,9 @@ else
 fi
 
 if [[ -n "$JOB_ID" ]]; then
-  api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}"
-  expect_one_of "warm job cache on B" '.job.status' queued started
-
   consistency_case "JOB cancellation status propagates A -> B"
+  prewarm_one_of "B caches the running job before A cancels it" "$INSTANCE_B" \
+    "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}" '.job.status' queued started
   mutate_a "cancel job on A" POST "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}"
   wait_for_invalidation
   api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}"
@@ -942,7 +1091,9 @@ if [[ "$RUN_RESTART_TEST" == "true" ]]; then
 
   if [[ -x "${INSTANCE_B_HOME}/bin/gravitino.sh" ]]; then
     "${INSTANCE_B_HOME}/bin/gravitino.sh" stop
-    consistency_case "Restarted B initializes at the current change-log high-water mark"
+    # This is intentionally a cold-start check: stopping B discards its local
+    # cache, so the scenario validates change-log high-water initialization.
+    restart_case "Restarted B initializes at the current change-log high-water mark"
     mutate_a "alter probe while B is stopped" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${RESTART_TAG}" \
       '{"updates":[{"@type":"updateComment","newComment":"restart-current"}]}'
     GRAVITINO_DEBUG_OPTS= "${INSTANCE_B_HOME}/bin/gravitino.sh" start
@@ -956,6 +1107,8 @@ if [[ "$RUN_RESTART_TEST" == "true" ]]; then
     expect_value "restarted B loads current state without history replay" '.tag.comment' restart-current
 
     consistency_case "Restarted B resumes polling new changes"
+    prewarm_value "restarted B caches the current tag before A alters it" "$INSTANCE_B" \
+      "/api/metalakes/${MAIN_METALAKE}/tags/${RESTART_TAG}" '.tag.comment' restart-current
     mutate_a "alter warmed probe after B restart" PUT "/api/metalakes/${MAIN_METALAKE}/tags/${RESTART_TAG}" \
       '{"updates":[{"@type":"updateComment","newComment":"restart-future"}]}'
     wait_for_invalidation
