@@ -33,6 +33,8 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.dto.SchemaDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -223,14 +225,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   }
 
   /**
-   * Loads schema properties with secret URNs resolved to plaintext.
+   * Loads a schema with secret URNs resolved to plaintext in {@link Schema#properties()}.
    *
    * @param ident The identifier of the schema.
-   * @return Resolved plaintext properties.
+   * @return The schema with resolved plaintext properties.
    * @throws NoSuchSchemaException If the schema does not exist.
    */
   @Override
-  public Map<String, String> loadSchemaResolvedProperties(NameIdentifier ident)
+  public Schema loadSchemaWithResolvedProperties(NameIdentifier ident)
       throws NoSuchSchemaException {
     return TreeLockUtils.doWithTreeLock(
         ident,
@@ -243,14 +245,21 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                   c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
                   NoSuchSchemaException.class);
           Map<String, String> rawProperties = schema.properties();
-          return doWithCatalog(
-              catalogIdent,
-              c ->
-                  c.doWithPropertiesMeta(
-                      p ->
-                          SecretPropertyUtils.buildResolvedProperties(
-                              secretManager, rawProperties, p.schemaPropertiesMetadata())),
-              IllegalArgumentException.class);
+          Map<String, String> resolved =
+              doWithCatalog(
+                  catalogIdent,
+                  c ->
+                      c.doWithPropertiesMeta(
+                          p ->
+                              SecretPropertyUtils.buildResolvedProperties(
+                                  secretManager, rawProperties, p.schemaPropertiesMetadata())),
+                  IllegalArgumentException.class);
+          return SchemaDTO.builder()
+              .withName(schema.name())
+              .withComment(schema.comment())
+              .withProperties(resolved)
+              .withAudit(DTOConverters.toDTO(schema.auditInfo()))
+              .build();
         });
   }
 

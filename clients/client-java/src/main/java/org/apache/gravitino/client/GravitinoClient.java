@@ -133,9 +133,9 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
-  public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+  public Catalog loadCatalogWithResolvedProperties(String catalogName)
       throws NoSuchCatalogException {
-    return getMetalake().loadCatalogResolvedProperties(catalogName);
+    return getMetalake().loadCatalogWithResolvedProperties(catalogName);
   }
 
   @Override

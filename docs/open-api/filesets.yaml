@@ -79,7 +79,12 @@ paths:
         - fileset
       summary: Get fileset
       operationId: loadFileset
-      description: Returns the specified fileset object
+      description: >
+        Returns the specified fileset object. When query parameter view=resolved is provided,
+        secret URNs in fileset properties are resolved to plaintext for connector / runtime use.
+        Credential-vending keys are omitted.
+      parameters:
+        - $ref: "./catalogs.yaml#/components/parameters/resolvedView"
       responses:
         "200":
           $ref: "#/components/responses/FilesetResponse"
@@ -154,45 +159,6 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/filesets/{fileset}/properties:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/catalog"
-      - $ref: "./openapi.yaml#/components/parameters/schema"
-      - $ref: "./openapi.yaml#/components/parameters/fileset"
-    get:
-      tags:
-        - fileset
-      summary: Get resolved fileset properties
-      operationId: loadFilesetResolvedProperties
-      description: >
-        Returns fileset properties with secret URNs resolved to plaintext for connector / runtime
-        use. Credential-vending keys are omitted. Query parameter view=resolved is required.
-      parameters:
-        - $ref: "./catalogs.yaml#/components/parameters/resolvedView"
-      responses:
-        "200":
-          $ref: "./catalogs.yaml#/components/responses/PropertyMapResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The target fileset does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchCatalogException:
-                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
-                NoSuchSchemaException:
-                  $ref: "./schemas.yaml#/components/examples/NoSuchSchemaException"
-                NoSuchFilesetException:
-                  $ref: "#/components/examples/NoSuchFilesetException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

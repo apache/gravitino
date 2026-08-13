@@ -167,7 +167,9 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
     this.sparkCatalog =
         createAndInitSparkCatalog(
-            name, options, gravitinoCatalogManager.loadCatalogResolvedProperties(name));
+            name,
+            options,
+            gravitinoCatalogManager.loadCatalogWithResolvedProperties(name).properties());
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
     this.sparkTypeConverter = getSparkTypeConverter();

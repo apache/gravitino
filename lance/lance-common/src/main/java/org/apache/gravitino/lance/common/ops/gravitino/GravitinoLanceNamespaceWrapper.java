@@ -129,9 +129,8 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return catalogOperator.loadCatalog(catalogName);
   }
 
-  Map<String, String> loadCatalogResolvedProperties(String catalogName)
-      throws NoSuchCatalogException {
-    return catalogOperator.loadCatalogResolvedProperties(catalogName);
+  Catalog loadCatalogWithResolvedProperties(String catalogName) throws NoSuchCatalogException {
+    return catalogOperator.loadCatalogWithResolvedProperties(catalogName);
   }
 
   Catalog createCatalog(
@@ -204,13 +203,14 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return catalog.asSchemas().loadSchema(schemaName);
   }
 
-  Map<String, String> loadSchemaResolvedProperties(Catalog catalog, String schemaName) {
+  Schema loadSchemaWithResolvedProperties(Catalog catalog, String schemaName) {
     SchemaDispatcher schemaDispatcher = currentSchemaDispatcher();
     if (schemaDispatcher != null) {
-      return schemaDispatcher.loadSchemaResolvedProperties(schemaIdent(catalog.name(), schemaName));
+      return schemaDispatcher.loadSchemaWithResolvedProperties(
+          schemaIdent(catalog.name(), schemaName));
     }
 
-    return catalog.asSchemas().loadSchemaResolvedProperties(schemaName);
+    return catalog.asSchemas().loadSchemaWithResolvedProperties(schemaName);
   }
 
   Schema createSchema(
@@ -313,8 +313,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
 
-    Map<String, String> loadCatalogResolvedProperties(String catalogName)
-        throws NoSuchCatalogException;
+    Catalog loadCatalogWithResolvedProperties(String catalogName) throws NoSuchCatalogException;
 
     Catalog createCatalog(
         String catalogName,
@@ -421,9 +420,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
 
     @Override
-    public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+    public Catalog loadCatalogWithResolvedProperties(String catalogName)
         throws NoSuchCatalogException {
-      return catalogDispatcher.loadCatalogResolvedProperties(
+      return catalogDispatcher.loadCatalogWithResolvedProperties(
           NameIdentifierUtil.ofCatalog(metalakeName, catalogName));
     }
 
@@ -484,9 +483,9 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
 
     @Override
-    public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+    public Catalog loadCatalogWithResolvedProperties(String catalogName)
         throws NoSuchCatalogException {
-      return getClient().loadCatalogResolvedProperties(catalogName);
+      return getClient().loadCatalogWithResolvedProperties(catalogName);
     }
 
     @Override

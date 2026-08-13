@@ -37,7 +37,6 @@ from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
 from gravitino.dto.responses.file_location_response import FileLocationResponse
 from gravitino.dto.responses.fileset_response import FilesetResponse
-from gravitino.dto.responses.property_map_response import PropertyMapResponse
 from gravitino.exceptions.handlers.fileset_error_handler import FILESET_ERROR_HANDLER
 from gravitino.name_identifier import NameIdentifier
 from gravitino.namespace import Namespace
@@ -137,8 +136,8 @@ class FilesetCatalog(
 
         return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
-    def load_fileset_resolved_properties(self, ident: NameIdentifier) -> Dict[str, str]:
-        """Load fileset properties with secret URNs resolved to plaintext.
+    def load_fileset_with_resolved_properties(self, ident: NameIdentifier) -> Fileset:
+        """Load fileset with secret URNs resolved to plaintext in properties.
 
         Args:
             ident: A fileset identifier in schema.fileset format.
@@ -147,7 +146,7 @@ class FilesetCatalog(
             NoSuchFilesetException If the fileset does not exist.
 
         Returns:
-            Resolved plaintext properties for connector / runtime use.
+            The fileset with resolved plaintext properties.
         """
         self.check_fileset_name_identifier(ident)
 
@@ -155,13 +154,13 @@ class FilesetCatalog(
 
         resp = self.rest_client.get(
             f"{self.format_fileset_request_path(full_namespace)}/"
-            f"{encode_string(ident.name())}/properties",
+            f"{encode_string(ident.name())}",
             params={"view": "resolved"},
             error_handler=FILESET_ERROR_HANDLER,
         )
-        props_resp = PropertyMapResponse.from_json(resp.body, infer_missing=True)
-        props_resp.validate()
-        return props_resp.properties()
+        fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
+        fileset_resp.validate()
+        return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
     def create_fileset(
         self,

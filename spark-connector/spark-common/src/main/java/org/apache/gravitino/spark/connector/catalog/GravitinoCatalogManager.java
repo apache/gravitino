@@ -76,13 +76,13 @@ public class GravitinoCatalogManager {
   }
 
   /**
-   * Load catalog properties with secret URNs resolved to plaintext.
+   * Load catalog with secret URNs resolved to plaintext in {@link Catalog#properties()}.
    *
    * @param name catalog name
-   * @return resolved plaintext properties
+   * @return catalog with resolved plaintext properties
    */
-  public Map<String, String> loadCatalogResolvedProperties(String name) {
-    return gravitinoClient.loadCatalogResolvedProperties(name);
+  public Catalog loadCatalogWithResolvedProperties(String name) {
+    return gravitinoClient.loadCatalogWithResolvedProperties(name);
   }
 
   public void loadRelationalCatalogs() {

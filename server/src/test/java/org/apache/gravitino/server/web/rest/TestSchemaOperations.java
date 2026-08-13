@@ -58,7 +58,6 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -300,27 +299,29 @@ public class TestSchemaOperations extends BaseOperationsTest {
   @Test
   public void testLoadSchemaResolvedProperties() {
     Map<String, String> resolved = ImmutableMap.of("key", "plaintext-value");
-    when(dispatcher.loadSchemaResolvedProperties(any())).thenReturn(resolved);
+    Schema mockSchema = mockSchema("schema1", "comment", resolved);
+    when(dispatcher.loadSchemaWithResolvedProperties(any())).thenReturn(mockSchema);
 
     Response resp =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1/properties")
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
             .queryParam("view", "resolved")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    PropertyMapResponse propertyMapResponse = resp.readEntity(PropertyMapResponse.class);
-    Assertions.assertEquals(0, propertyMapResponse.getCode());
-    Assertions.assertEquals(resolved, propertyMapResponse.getProperties());
+    SchemaResponse schemaResponse = resp.readEntity(SchemaResponse.class);
+    Assertions.assertEquals(0, schemaResponse.getCode());
+    Assertions.assertEquals(resolved, schemaResponse.getSchema().properties());
 
-    Response missingView =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1/properties")
+    Response invalidView =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
+            .queryParam("view", "invalid")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), missingView.getStatus());
-    ErrorResponse errorResponse = missingView.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invalidView.getStatus());
+    ErrorResponse errorResponse = invalidView.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
   }
 

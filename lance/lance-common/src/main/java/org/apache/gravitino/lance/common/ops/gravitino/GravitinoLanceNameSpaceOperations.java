@@ -136,12 +136,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     switch (nsId.levels()) {
       case 1:
-        Optional.ofNullable(namespaceWrapper.loadCatalogResolvedProperties(catalog.name()))
+        Optional.ofNullable(namespaceWrapper.loadCatalogWithResolvedProperties(catalog.name()))
+            .map(Catalog::properties)
             .ifPresent(properties::putAll);
         break;
       case 2:
         String schemaName = nsId.levelAtListPos(1);
-        Optional.ofNullable(namespaceWrapper.loadSchemaResolvedProperties(catalog, schemaName))
+        Optional.ofNullable(namespaceWrapper.loadSchemaWithResolvedProperties(catalog, schemaName))
+            .map(Schema::properties)
             .ifPresent(properties::putAll);
         break;
       default:

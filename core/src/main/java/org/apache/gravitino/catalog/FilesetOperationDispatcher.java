@@ -29,6 +29,8 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
+import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -111,14 +113,14 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   }
 
   /**
-   * Loads fileset properties with secret URNs resolved to plaintext.
+   * Loads a fileset with secret URNs resolved to plaintext in {@link Fileset#properties()}.
    *
    * @param ident The identifier of the fileset.
-   * @return Resolved plaintext properties.
+   * @return The fileset with resolved plaintext properties.
    * @throws NoSuchFilesetException If the fileset does not exist.
    */
   @Override
-  public Map<String, String> loadFilesetResolvedProperties(NameIdentifier ident)
+  public Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
       throws NoSuchFilesetException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     return TreeLockUtils.doWithTreeLock(
@@ -131,14 +133,23 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
                   NoSuchFilesetException.class);
           Map<String, String> rawProperties = fileset.properties();
-          return doWithCatalog(
-              catalogIdent,
-              c ->
-                  c.doWithPropertiesMeta(
-                      p ->
-                          SecretPropertyUtils.buildResolvedProperties(
-                              secretManager, rawProperties, p.filesetPropertiesMetadata())),
-              IllegalArgumentException.class);
+          Map<String, String> resolved =
+              doWithCatalog(
+                  catalogIdent,
+                  c ->
+                      c.doWithPropertiesMeta(
+                          p ->
+                              SecretPropertyUtils.buildResolvedProperties(
+                                  secretManager, rawProperties, p.filesetPropertiesMetadata())),
+                  IllegalArgumentException.class);
+          return FilesetDTO.builder()
+              .name(fileset.name())
+              .comment(fileset.comment())
+              .type(fileset.type())
+              .storageLocations(fileset.storageLocations())
+              .properties(resolved)
+              .audit(DTOConverters.toDTO(fileset.auditInfo()))
+              .build();
         });
   }
 

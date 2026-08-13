@@ -132,9 +132,9 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public Map<String, String> loadFilesetResolvedProperties(NameIdentifier ident)
+  public Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
       throws NoSuchFilesetException {
-    return dispatcher.loadFilesetResolvedProperties(ident);
+    return dispatcher.loadFilesetWithResolvedProperties(ident);
   }
 
   @Override

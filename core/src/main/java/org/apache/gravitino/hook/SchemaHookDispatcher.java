@@ -161,9 +161,9 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   }
 
   @Override
-  public Map<String, String> loadSchemaResolvedProperties(NameIdentifier ident)
+  public Schema loadSchemaWithResolvedProperties(NameIdentifier ident)
       throws NoSuchSchemaException {
-    return dispatcher.loadSchemaResolvedProperties(ident);
+    return dispatcher.loadSchemaWithResolvedProperties(ident);
   }
 
   @Override

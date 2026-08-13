@@ -179,13 +179,13 @@ public class GravitinoCatalogManager {
   }
 
   /**
-   * Load catalog properties with secret URNs resolved to plaintext.
+   * Load catalog with secret URNs resolved to plaintext in {@link Catalog#properties()}.
    *
    * @param name Catalog name
-   * @return Resolved plaintext properties
+   * @return Catalog with resolved plaintext properties
    */
-  public Map<String, String> loadCatalogResolvedProperties(String name) {
-    return metalake.loadCatalogResolvedProperties(name);
+  public Catalog loadCatalogWithResolvedProperties(String name) {
+    return metalake.loadCatalogWithResolvedProperties(name);
   }
 
   /**

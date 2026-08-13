@@ -63,7 +63,6 @@ import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
-import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -414,27 +413,30 @@ public class TestCatalogOperations extends BaseOperationsTest {
   public void testLoadCatalogResolvedProperties() {
     Map<String, String> resolved =
         ImmutableMap.of("jdbc-url", "jdbc:mysql://localhost/db", "jdbc-password", "secret");
-    when(manager.loadCatalogResolvedProperties(any())).thenReturn(resolved);
+    TestCatalog catalog = buildCatalogWithProperties("metalake1", "catalog1", resolved);
+    when(manager.loadCatalogWithResolvedProperties(any())).thenReturn(catalog);
 
     Response resp =
-        target("/metalakes/metalake1/catalogs/catalog1/properties")
+        target("/metalakes/metalake1/catalogs/catalog1")
             .queryParam("view", "resolved")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    PropertyMapResponse propertyMapResponse = resp.readEntity(PropertyMapResponse.class);
-    Assertions.assertEquals(0, propertyMapResponse.getCode());
-    Assertions.assertEquals(resolved, propertyMapResponse.getProperties());
+    CatalogResponse catalogResponse = resp.readEntity(CatalogResponse.class);
+    Assertions.assertEquals(0, catalogResponse.getCode());
+    Assertions.assertTrue(
+        catalogResponse.getCatalog().properties().entrySet().containsAll(resolved.entrySet()));
 
-    Response missingView =
-        target("/metalakes/metalake1/catalogs/catalog1/properties")
+    Response invalidView =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .queryParam("view", "invalid")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), missingView.getStatus());
-    ErrorResponse errorResponse = missingView.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invalidView.getStatus());
+    ErrorResponse errorResponse = invalidView.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
   }
 
@@ -616,6 +618,24 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  private static TestCatalog buildCatalogWithProperties(
+      String metalake, String catalogName, Map<String, String> properties) {
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(catalogName)
+            .withComment("comment")
+            .withNamespace(Namespace.of(metalake))
+            .withProperties(properties)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {

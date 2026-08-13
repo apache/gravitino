@@ -79,7 +79,12 @@ paths:
         - schema
       summary: Get schema
       operationId: loadSchema
-      description: Returns the specified schema in the specified catalog and metalake
+      description: >
+        Returns the specified schema in the specified catalog and metalake. When query parameter
+        view=resolved is provided, secret URNs in schema properties are resolved to plaintext for
+        connector / runtime use. Credential-vending keys are omitted.
+      parameters:
+        - $ref: "./catalogs.yaml#/components/parameters/resolvedView"
       responses:
         "200":
           $ref: "#/components/responses/SchemaResponse"
@@ -148,42 +153,6 @@ paths:
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-  /metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/properties:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/catalog"
-      - $ref: "./openapi.yaml#/components/parameters/schema"
-    get:
-      tags:
-        - schema
-      summary: Get resolved schema properties
-      operationId: loadSchemaResolvedProperties
-      description: >
-        Returns schema properties with secret URNs resolved to plaintext for connector / runtime
-        use. Credential-vending keys are omitted. Query parameter view=resolved is required.
-      parameters:
-        - $ref: "./catalogs.yaml#/components/parameters/resolvedView"
-      responses:
-        "200":
-          $ref: "./catalogs.yaml#/components/responses/PropertyMapResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The target schema does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchCatalogException:
-                  $ref: "./catalogs.yaml#/components/examples/NoSuchCatalogException"
-                NoSuchSchemaException:
-                  $ref: "#/components/examples/NoSuchSchemaException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

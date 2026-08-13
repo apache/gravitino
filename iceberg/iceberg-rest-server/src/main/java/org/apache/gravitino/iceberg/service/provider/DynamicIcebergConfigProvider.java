@@ -122,8 +122,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
                   .toPlaintextProperties(
                       ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
     } else {
-      catalogProperties =
-          new HashMap<>(getCatalogFetcher().loadCatalogResolvedProperties(catalogName));
+      Catalog resolved = getCatalogFetcher().loadCatalogWithResolvedProperties(catalogName);
+      catalogProperties = new HashMap<>(resolved.properties());
       if (catalog instanceof SupportsCredentials) {
         Arrays.stream(((SupportsCredentials) catalog).getCredentials())
             .filter(c -> c instanceof JdbcCredential)
@@ -271,8 +271,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   interface CatalogFetcher extends Closeable {
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
 
-    Map<String, String> loadCatalogResolvedProperties(String catalogName)
-        throws NoSuchCatalogException;
+    Catalog loadCatalogWithResolvedProperties(String catalogName) throws NoSuchCatalogException;
 
     @Override
     default void close() {}
@@ -307,10 +306,10 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     }
 
     @Override
-    public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+    public Catalog loadCatalogWithResolvedProperties(String catalogName)
         throws NoSuchCatalogException {
       NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalake, catalogName);
-      return catalogDispatcher.loadCatalogResolvedProperties(catalogIdent);
+      return catalogDispatcher.loadCatalogWithResolvedProperties(catalogIdent);
     }
   }
 
@@ -336,9 +335,9 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     }
 
     @Override
-    public Map<String, String> loadCatalogResolvedProperties(String catalogName)
+    public Catalog loadCatalogWithResolvedProperties(String catalogName)
         throws NoSuchCatalogException {
-      return getGravitinoClient().loadCatalogResolvedProperties(catalogName);
+      return getGravitinoClient().loadCatalogWithResolvedProperties(catalogName);
     }
 
     @Override

@@ -577,14 +577,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Loads catalog properties with secret URNs resolved to plaintext.
+   * Loads a catalog with secret URNs resolved to plaintext in {@link Catalog#properties()}.
    *
    * @param ident The identifier of the catalog.
-   * @return Resolved plaintext properties.
+   * @return The catalog with resolved plaintext properties.
    * @throws NoSuchCatalogException If the specified catalog does not exist.
    */
   @Override
-  public Map<String, String> loadCatalogResolvedProperties(NameIdentifier ident)
+  public Catalog loadCatalogWithResolvedProperties(NameIdentifier ident)
       throws NoSuchCatalogException {
     return TreeLockUtils.doWithTreeLock(
         ident,
@@ -595,10 +595,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           baseCatalog.checkMetalakeInUse();
           Map<String, String> rawProperties = baseCatalog.entity().getProperties();
           try {
-            return wrapper.doWithPropertiesMeta(
-                meta ->
-                    SecretPropertyUtils.buildResolvedProperties(
-                        secretManager, rawProperties, meta.catalogPropertiesMetadata()));
+            Map<String, String> resolved =
+                wrapper.doWithPropertiesMeta(
+                    meta ->
+                        SecretPropertyUtils.buildResolvedProperties(
+                            secretManager, rawProperties, meta.catalogPropertiesMetadata()));
+            return wrapper.catalog().entity().toCatalogInfoWithResolvedProps(resolved);
           } catch (RuntimeException e) {
             throw e;
           } catch (Exception e) {

@@ -20,7 +20,6 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
-import java.util.Map;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
@@ -53,7 +52,6 @@ import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
-import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -265,49 +263,23 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalogName) {
+          String catalogName,
+      @QueryParam("view") String view) {
     LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-      Catalog catalog = catalogDispatcher.loadCatalog(ident);
+      Catalog catalog;
+      if (view == null || view.isBlank()) {
+        catalog = catalogDispatcher.loadCatalog(ident);
+      } else if ("resolved".equals(view)) {
+        catalog = catalogDispatcher.loadCatalogWithResolvedProperties(ident);
+      } else {
+        return Utils.illegalArguments("Query parameter 'view' must be 'resolved' when provided");
+      }
       Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
       LOG.info("Catalog loaded: {}.{}", metalakeName, catalogName);
       return response;
 
-    } catch (Exception e) {
-      return ExceptionHandlers.handleCatalogException(
-          OperationType.LOAD, catalogName, metalakeName, e);
-    }
-  }
-
-  @GET
-  @Path("{catalog}/properties")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "load-catalog-properties." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "load-catalog-properties", absolute = true)
-  @AuthorizationExpression(
-      expression = "ANY_USE_CATALOG || ANY(OWNER, METALAKE, CATALOG)",
-      accessMetadataType = MetadataObject.Type.CATALOG)
-  public Response loadCatalogResolvedProperties(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalakeName,
-      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalogName,
-      @QueryParam("view") String view) {
-    LOG.info(
-        "Received load catalog resolved properties request for catalog: {}.{}",
-        metalakeName,
-        catalogName);
-    try {
-      if (!"resolved".equals(view)) {
-        return Utils.illegalArguments(
-            "Query parameter 'view' must be 'resolved' for catalog properties");
-      }
-      NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-      Map<String, String> properties = catalogDispatcher.loadCatalogResolvedProperties(ident);
-      Response response = Utils.ok(new PropertyMapResponse(properties));
-      LOG.info("Catalog resolved properties loaded: {}.{}", metalakeName, catalogName);
-      return response;
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
           OperationType.LOAD, catalogName, metalakeName, e);

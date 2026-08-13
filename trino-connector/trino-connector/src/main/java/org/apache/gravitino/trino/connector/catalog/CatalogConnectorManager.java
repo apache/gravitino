@@ -249,12 +249,8 @@ public class CatalogConnectorManager {
         .forEach(
             (String catalogName) -> {
               try {
-                Catalog catalog = metalake.loadCatalog(catalogName);
-                GravitinoCatalog gravitinoCatalog =
-                    new GravitinoCatalog(
-                        metalake.name(),
-                        catalog,
-                        metalake.loadCatalogResolvedProperties(catalogName));
+                Catalog catalog = metalake.loadCatalogWithResolvedProperties(catalogName);
+                GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(gravitinoCatalog);

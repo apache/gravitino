@@ -60,6 +60,19 @@ public interface FilesetCatalog {
   Fileset loadFileset(NameIdentifier ident) throws NoSuchFilesetException;
 
   /**
+   * Loads a fileset with secret URNs resolved to plaintext in {@link Fileset#properties()}.
+   *
+   * @param ident A fileset identifier.
+   * @return The fileset with resolved plaintext properties.
+   * @throws NoSuchFilesetException If the fileset does not exist.
+   */
+  default Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
+      throws NoSuchFilesetException {
+    throw new UnsupportedOperationException(
+        "Loading fileset with resolved properties is not supported by this catalog");
+  }
+
+  /**
    * Check if a fileset exists using an {@link NameIdentifier} from the catalog.
    *
    * @param ident A fileset identifier.

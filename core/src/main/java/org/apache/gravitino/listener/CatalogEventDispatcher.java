@@ -130,10 +130,10 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   }
 
   @Override
-  public Map<String, String> loadCatalogResolvedProperties(NameIdentifier ident)
+  public Catalog loadCatalogWithResolvedProperties(NameIdentifier ident)
       throws NoSuchCatalogException {
     // Dedicated audit events for resolved-properties reads are optional (design Phase 3).
-    return dispatcher.loadCatalogResolvedProperties(ident);
+    return dispatcher.loadCatalogWithResolvedProperties(ident);
   }
 
   @Override

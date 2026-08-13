@@ -72,9 +72,9 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public Map<String, String> loadFilesetResolvedProperties(NameIdentifier ident)
+  public Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
       throws NoSuchFilesetException {
-    return dispatcher.loadFilesetResolvedProperties(normalizeCaseSensitive(ident));
+    return dispatcher.loadFilesetWithResolvedProperties(normalizeCaseSensitive(ident));
   }
 
   @Override

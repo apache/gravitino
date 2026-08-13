@@ -62,7 +62,6 @@ import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.FileLocationResponse;
 import org.apache.gravitino.dto.responses.FilesetResponse;
-import org.apache.gravitino.dto.responses.PropertyMapResponse;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
@@ -247,27 +246,30 @@ public class TestFilesetOperations extends BaseOperationsTest {
   @Test
   public void testLoadFilesetResolvedProperties() {
     Map<String, String> resolved = ImmutableMap.of("k1", "plaintext-v1");
-    when(dispatcher.loadFilesetResolvedProperties(any())).thenReturn(resolved);
+    Fileset mockFileset =
+        mockFileset("fileset1", Fileset.Type.MANAGED, "comment", "mock location", resolved);
+    when(dispatcher.loadFilesetWithResolvedProperties(any())).thenReturn(mockFileset);
 
     Response resp =
-        target(filesetPath(metalake, catalog, schema) + "fileset1/properties")
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
             .queryParam("view", "resolved")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
 
-    PropertyMapResponse propertyMapResponse = resp.readEntity(PropertyMapResponse.class);
-    Assertions.assertEquals(0, propertyMapResponse.getCode());
-    Assertions.assertEquals(resolved, propertyMapResponse.getProperties());
+    FilesetResponse filesetResponse = resp.readEntity(FilesetResponse.class);
+    Assertions.assertEquals(0, filesetResponse.getCode());
+    Assertions.assertEquals(resolved, filesetResponse.getFileset().properties());
 
-    Response missingView =
-        target(filesetPath(metalake, catalog, schema) + "fileset1/properties")
+    Response invalidView =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .queryParam("view", "invalid")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), missingView.getStatus());
-    ErrorResponse errorResponse = missingView.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invalidView.getStatus());
+    ErrorResponse errorResponse = invalidView.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
   }
 
