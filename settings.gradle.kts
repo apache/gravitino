@@ -86,7 +86,6 @@ if (!skipTrinoConnector) {
 } else {
   println("Skipping trino-connector modules since skipTrinoConnector is set to true")
 }
-include("spark-connector:spark-common")
 if (scalaVersion == "2.12") {
   // flink only support scala 2.12
   include("flink-connector:flink-common")

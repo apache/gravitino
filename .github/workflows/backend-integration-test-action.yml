@@ -72,7 +72,6 @@ jobs:
             -x :flink-connector:flink-1.18:test -x :flink-connector:flink-runtime-1.18:test \
             -x :flink-connector:flink-1.19:test -x :flink-connector:flink-runtime-1.19:test \
             -x :flink-connector:flink-1.20:test -x :flink-connector:flink-runtime-1.20:test \
-            -x :spark-connector:spark-common:test \
             -x :spark-connector:spark-3.5:test \
             -x :spark-connector:spark-runtime-3.5:test \
             -x :trino-connector:integration-test:test -x :trino-connector:trino-connector:test \
