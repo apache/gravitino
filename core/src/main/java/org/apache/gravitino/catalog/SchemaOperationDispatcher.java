@@ -175,11 +175,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                           schema.properties()));
             }
 
+            // Persist properties (including secret URNs) in the entity store so cleanup still works
+            // when the underlying catalog does not retain schema properties.
             SchemaEntity schemaEntity =
                 SchemaEntity.builder()
                     .withId(uid)
                     .withName(ident.name())
                     .withNamespace(ident.namespace())
+                    .withProperties(updatedProperties)
                     .withAuditInfo(
                         AuditInfo.builder()
                             .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
@@ -459,6 +462,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             .withId(uid)
             .withName(identifier.name())
             .withNamespace(identifier.namespace())
+            .withProperties(
+                schema.properties() == null ? Collections.emptyMap() : schema.properties())
             .withAuditInfo(
                 AuditInfo.builder()
                     .withCreator(schema.auditInfo().creator())
