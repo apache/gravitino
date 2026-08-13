@@ -37,7 +37,7 @@ class TagDTO(Tag):
         default=None, metadata=config(field_name="allowedValues")
     )
     _assignment_values: Optional[list[str]] = field(
-        default=None, metadata=config(field_name="values")
+        default=None, metadata=config(field_name="assignmentValues")
     )
 
     _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))

@@ -22,7 +22,10 @@ from gravitino.api.metadata_objects import MetadataObject, MetadataObjects
 from gravitino.api.tag import Tag
 from gravitino.client.generic_tag import GenericTag
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
-from gravitino.dto.requests.tag_associate_request import TagsAssociateRequest
+from gravitino.dto.requests.tag_associate_request import (
+    TagNamesAssociateRequest,
+    TagsAssociateRequest,
+)
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
     TagNamesListResponse,
@@ -174,7 +177,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
                 call_args.args[0],
             )
 
-            param = TagsAssociateRequest(["tagA"], ["tagB"])
+            param = TagNamesAssociateRequest(["tagA"], ["tagB"])
 
             mock_post.assert_called_once_with(
                 "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
@@ -220,6 +223,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
             mock_post.assert_called_once_with(
                 "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
                 json=param,
+                headers=MetadataObjectTagOperations.TAG_VALUES_JSON_HEADER,
                 error_handler=TAG_ERROR_HANDLER,
             )
 
@@ -251,6 +255,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
             mock_post.assert_called_once_with(
                 "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
                 json=param,
+                headers=MetadataObjectTagOperations.TAG_VALUES_JSON_HEADER,
                 error_handler=TAG_ERROR_HANDLER,
             )
 

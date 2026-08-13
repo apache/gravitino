@@ -48,7 +48,7 @@ class TestTagDTO(unittest.TestCase):
         self.assertEqual(deser_dict["properties"], {"key1": "value1", "key2": "value2"})
         self.assertTrue(deser_dict["inherited"])
         self.assertEqual(["finance", "risk"], deser_dict["allowedValues"])
-        self.assertEqual(["finance"], deser_dict["values"])
+        self.assertEqual(["finance"], deser_dict["assignmentValues"])
         self.assertEqual(deser_dict["audit"]["creator"], "test_user")
         self.assertEqual(deser_dict["audit"]["createTime"], "2022-01-01T00:00:00Z")
 

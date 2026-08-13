@@ -63,6 +63,50 @@ class TagValuePairRequest(RESTRequest):
 
 @dataclass_json
 @dataclass
+class TagNamesAssociateRequest(RESTRequest):
+    """Represents a request to associate tag names."""
+
+    _tags_to_add: Optional[list[str]] = field(
+        default=None, metadata=config(field_name="tagsToAdd")
+    )
+    _tags_to_remove: Optional[list[str]] = field(
+        default=None, metadata=config(field_name="tagsToRemove")
+    )
+
+    @property
+    def tags_to_add(self) -> Optional[list[str]]:
+        """Gets the tags to add."""
+        return self._tags_to_add
+
+    @property
+    def tags_to_remove(self) -> Optional[list[str]]:
+        """Gets the tags to remove."""
+        return self._tags_to_remove
+
+    def validate(self) -> None:
+        """Validates the request."""
+        Precondition.check_argument(
+            bool(self._tags_to_add) or bool(self._tags_to_remove),
+            "tagsToAdd and tagsToRemove cannot both be null or empty",
+        )
+
+        self._validate_tag_names(self._tags_to_add, "tagsToAdd")
+        self._validate_tag_names(self._tags_to_remove, "tagsToRemove")
+
+    def _validate_tag_names(
+        self, tag_names: Optional[list[str]], field_name: str
+    ) -> None:
+        if tag_names is None:
+            return
+
+        Precondition.check_argument(
+            all(StringUtils.is_not_blank(tag_name) for tag_name in tag_names),
+            f"{field_name} must not contain null or empty tag names",
+        )
+
+
+@dataclass_json
+@dataclass
 class TagsAssociateRequest(RESTRequest):
     """Represents a request to associate tags."""
 

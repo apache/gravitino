@@ -20,6 +20,7 @@ import json as _json
 import unittest
 
 from gravitino.dto.requests.tag_associate_request import (
+    TagNamesAssociateRequest,
     TagsAssociateRequest,
     TagValuePairRequest,
 )
@@ -27,6 +28,36 @@ from gravitino.exceptions.base import IllegalArgumentException
 
 
 class TestTagsAssociateRequest(unittest.TestCase):
+    def test_create_tag_names_request(self) -> None:
+        request = TagNamesAssociateRequest(["tag_to_add"], ["tag_to_remove"])
+        json_str = _json.dumps(
+            {
+                "tagsToAdd": ["tag_to_add"],
+                "tagsToRemove": ["tag_to_remove"],
+            }
+        )
+
+        self.assertEqual(json_str, request.to_json())
+        deserialized_request = TagNamesAssociateRequest.from_json(json_str)
+
+        self.assertTrue(isinstance(deserialized_request, TagNamesAssociateRequest))
+        self.assertEqual(["tag_to_add"], deserialized_request.tags_to_add)
+        self.assertEqual(["tag_to_remove"], deserialized_request.tags_to_remove)
+
+    def test_tag_names_request_validate(self) -> None:
+        invalid_request1 = TagNamesAssociateRequest(None, None)
+        invalid_request2 = TagNamesAssociateRequest(["tag_to_add", " "], None)
+        invalid_request3 = TagNamesAssociateRequest([], [])
+
+        with self.assertRaises(IllegalArgumentException):
+            invalid_request1.validate()
+
+        with self.assertRaises(IllegalArgumentException):
+            invalid_request2.validate()
+
+        with self.assertRaises(IllegalArgumentException):
+            invalid_request3.validate()
+
     def test_create_request(self) -> None:
         request = TagsAssociateRequest(
             [

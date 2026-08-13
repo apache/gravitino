@@ -17,6 +17,7 @@
 
 from gravitino.dto.requests.tag_create_request import TagCreateRequest
 from gravitino.dto.requests.tag_associate_request import (
+    TagNamesAssociateRequest,
     TagsAssociateRequest,
     TagValuePairRequest,
 )
@@ -25,6 +26,7 @@ from gravitino.dto.requests.tag_updates_request import TagUpdatesRequest
 
 __all__ = [
     "TagCreateRequest",
+    "TagNamesAssociateRequest",
     "TagsAssociateRequest",
     "TagValuePairRequest",
     "TagUpdatesRequest",
