@@ -44,6 +44,7 @@ echo "${EXPECTED_SHA1}  ${JDBC_JAR}" | sha1sum --check
 # The entity-cache consistency test uses an Iceberg JDBC catalog. Catalogs have
 # isolated class loaders, so the driver must also be present in the catalog's
 # own libs directory before the distribution is copied for instance B.
+mkdir -p distribution/package/catalogs/lakehouse-iceberg/libs
 cp "${JDBC_JAR}" distribution/package/catalogs/lakehouse-iceberg/libs/
 
 # ---------------------------------------------------------------------------
