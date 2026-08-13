@@ -18,12 +18,15 @@ from __future__ import annotations
 
 import json as _json
 import unittest
+from datetime import datetime, timezone
 
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.tag_dto import TagDTO
 
 
 class TestTagDTO(unittest.TestCase):
+    AUDIT_TIME = datetime(2022, 1, 1, tzinfo=timezone.utc)
+
     def test_create_tag_dto(self):
         builder = TagDTO.builder()
         tag_dto = (
@@ -35,7 +38,7 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value2",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .audit_info(AuditDTO("test_user", self.AUDIT_TIME))
             .inherited(True)
             .build()
         )
@@ -46,7 +49,7 @@ class TestTagDTO(unittest.TestCase):
         self.assertEqual(deser_dict["properties"], {"key1": "value1", "key2": "value2"})
         self.assertTrue(deser_dict["inherited"])
         self.assertEqual(deser_dict["audit"]["creator"], "test_user")
-        self.assertEqual(deser_dict["audit"]["createTime"], 1640995200000)
+        self.assertEqual(deser_dict["audit"]["createTime"], "2022-01-01T00:00:00Z")
 
     def test_equality_and_hash(self):
         builder = TagDTO.builder()
@@ -59,7 +62,7 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value2",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .audit_info(AuditDTO("test_user", self.AUDIT_TIME))
             .inherited(True)
             .build()
         )
@@ -72,7 +75,7 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value2",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .audit_info(AuditDTO("test_user", self.AUDIT_TIME))
             .inherited(True)
             .build()
         )
@@ -85,7 +88,7 @@ class TestTagDTO(unittest.TestCase):
                     "key2": "value3",
                 }
             )
-            .audit_info(AuditDTO("test_user", 1640995200000))
+            .audit_info(AuditDTO("test_user", self.AUDIT_TIME))
             .inherited(False)
             .build()
         )

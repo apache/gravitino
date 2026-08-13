@@ -45,7 +45,6 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.helper.SchemaIds;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
@@ -65,7 +64,6 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -227,12 +225,6 @@ public class SchemaMetaService {
         newEntity.id(),
         oldSchemaEntity.id());
 
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String oldFullName =
-        NameIdentifierUtil.ofSchema(metalakeName, catalogName, oldSchemaEntity.name()).toString();
-    boolean isRenamed = !Objects.equals(oldSchemaEntity.name(), newEntity.name());
-
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -246,18 +238,6 @@ public class SchemaMetaService {
                             oldSchemaPO));
             if (updated == 0) {
               throw schemaWriteFailure(identifier, oldSchemaPO);
-            }
-          },
-          () -> {
-            if (isRenamed) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.SCHEMA.name(),
-                          oldFullName,
-                          OperateType.ALTER));
             }
           });
     } catch (RuntimeException re) {
@@ -275,13 +255,8 @@ public class SchemaMetaService {
   public boolean deleteSchema(NameIdentifier identifier, boolean cascade) {
     NameIdentifierUtil.checkSchema(identifier);
 
-    String schemaName = identifier.name();
     SchemaPO schemaPO = getSchemaPOByIdentifier(identifier);
     Long schemaId = schemaPO.getSchemaId();
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaFullName =
-        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName).toString();
 
     if (cascade) {
       AtomicReference<List<Long>> schemaIds = new AtomicReference<>();
@@ -359,17 +334,7 @@ public class SchemaMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class,
-                  mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds.get())),
-          () -> {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.SCHEMA.name(),
-                        schemaFullName,
-                        OperateType.DROP));
-          });
+                  mapper -> mapper.softDeleteViewMetasBySchemaIds(schemaIds.get())));
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
@@ -404,17 +369,7 @@ public class SchemaMetaService {
                   PolicyMetadataObjectRelMapper.class,
                   mapper ->
                       mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                          schemaId, MetadataObject.Type.SCHEMA.name())),
-          () -> {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.SCHEMA.name(),
-                        schemaFullName,
-                        OperateType.DROP));
-          });
+                          schemaId, MetadataObject.Type.SCHEMA.name())));
     }
     return true;
   }

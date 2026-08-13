@@ -730,7 +730,8 @@ pair-level delta instead of replacing the complete value list:
 Adding a non-null pair to a tag with an active null row is a changed logical assignment: the null row
 is soft-deleted and the non-null row is inserted in the same transaction. Adding a null pair to a tag
 with active non-null rows is accepted only when the request's removals remove all remaining
-non-null rows for that tag; otherwise it fails with `409 Conflict`.
+non-null rows for that tag; otherwise it fails with `400 Bad Request` as an invalid assignment
+transition.
 
 Name-only reads must use distinct tag names because a valued assignment can now have multiple
 physical rows. Detailed reads must group relation rows by logical assignment before building
@@ -811,9 +812,9 @@ TagValuePair[] tagsToRemove();
 | Assignment value is not in the tag's configured allowed values | `400 Bad Request` |
 | `tagsToAdd` and `tagsToRemove` contain the same exact pair | `400 Bad Request` |
 | `tagsToAdd` contains both a valueless pair and non-null value pairs for the same tag | `400 Bad Request` |
-| Adding a valueless pair while non-null values remain active for the same tag | `409 Conflict` |
+| Adding a valueless pair while non-null values remain active for the same tag | `400 Bad Request` |
 | `value` query parameter is blank or longer than 256 characters | `400 Bad Request` |
-| `tagsToAdd` or `tagsToRemove` references a tag that does not exist | `404 Not Found` |
+| `tagsToAdd` or `tagsToRemove` references a tag that does not exist | `200 OK`; no relation row is inserted or deleted |
 | `tagsToAdd` targets an already active pair | `200 OK`; no relation row is inserted |
 | `tagsToRemove` targets a missing pair | `200 OK`; no relation row is deleted |
 

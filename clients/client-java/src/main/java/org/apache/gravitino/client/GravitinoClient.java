@@ -70,6 +70,7 @@ import org.apache.gravitino.policy.PolicyOperations;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
+import org.apache.gravitino.tag.TagValueConstraint;
 
 /**
  * Apache Gravitino Client for a user to interact with the Gravitino API, allowing the client to
@@ -593,6 +594,16 @@ public class GravitinoClient extends GravitinoClientBase
   public Tag createTag(String name, String comment, Map<String, String> properties)
       throws TagAlreadyExistsException {
     return getMetalake().createTag(name, comment, properties);
+  }
+
+  @Override
+  public Tag createTag(
+      String name,
+      String comment,
+      Map<String, String> properties,
+      TagValueConstraint valueConstraint)
+      throws TagAlreadyExistsException {
+    return getMetalake().createTag(name, comment, properties, valueConstraint);
   }
 
   @Override
