@@ -126,6 +126,13 @@ class TestSettingTokenMasking(unittest.TestCase):
         setting = Setting(metalake="ml", token="")
         self.assertNotIn("***", str(setting))
 
+    def test_whitespace_only_token_shows_empty_in_str(self):
+        """A whitespace-only token is anonymous on the wire, so do not mask it
+        as a configured identity."""
+        setting = Setting(metalake="ml", token="   ")
+        self.assertEqual(startup_authorization(setting), "")
+        self.assertNotIn("***", str(setting))
+
 
 class TestTokenArgParsing(unittest.TestCase):
     """Verify --token CLI argument and GRAVITINO_TOKEN env var precedence."""

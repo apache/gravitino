@@ -47,7 +47,9 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     tls_key: str = ""
 
     def __str__(self) -> str:
-        token_display = "***" if self.token else ""
+        # Mirror startup_authorization: a whitespace-only token is anonymous on
+        # the wire, so it must not be logged as a configured identity.
+        token_display = "***" if self.token.strip() else ""
         return (
             f"Setting(metalake={self.metalake}, gravitino_uri={self.gravitino_uri}, "
             f"tags={self.tags}, transport={self.transport}, mcp_url={self.mcp_url}, "
