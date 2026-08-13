@@ -1076,23 +1076,22 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     Namespace filesetNs =
         Namespace.of(
             schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    List<Map<String, String>> snapshots = new ArrayList<>();
     try {
       List<FilesetEntity> filesets = store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
-      List<Map<String, String>> snapshots = new ArrayList<>(filesets.size());
       for (FilesetEntity fileset : filesets) {
         Map<String, String> props = copyProperties(fileset.properties());
         if (!props.isEmpty()) {
           snapshots.add(props);
         }
       }
-      return snapshots;
     } catch (Exception e) {
       LOG.warn(
           "Failed to list fileset properties under schema {} for secret cleanup during catalog drop",
           schemaIdent,
           e);
-      return Collections.emptyList();
     }
+    return snapshots;
   }
 
   /**
