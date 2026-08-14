@@ -168,7 +168,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
-    secretManager.writeSecrets(secretMaterials);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
     // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
@@ -183,10 +182,11 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         ident,
         LockType.WRITE,
         () -> {
-          // Same pattern as CatalogManager.createCatalog: only roll back secrets when the
-          // underlying create did not succeed (needClean stays true).
+          // Same pattern as CatalogManager.createCatalog: writeSecrets inside the locked try;
+          // only roll back when the underlying create did not succeed (needClean stays true).
           boolean needClean = true;
           try {
+            secretManager.writeSecrets(secretMaterials);
             Fileset createdFileset =
                 doWithCatalog(
                     catalogIdent,
