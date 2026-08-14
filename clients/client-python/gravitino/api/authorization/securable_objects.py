@@ -37,8 +37,10 @@ class SecurableObject(MetadataObject, ABC):
         - CATALOG
         - SCHEMA
         - TABLE
+        - VIEW
         - FILESET
         - TOPIC
+        - FUNCTION
         - METALAKE
 
     Use the helper class `SecurableObjects` to construct the securable object you need.
@@ -65,6 +67,12 @@ class SecurableObject(MetadataObject, ABC):
         - REST API:
             full_name="catalog1.schema1.table1", type="TABLE"
 
+    View:
+        - Python code:
+            SecurableObjects.of_view(schema, "view1", privileges)
+        - REST API:
+            full_name="catalog1.schema1.view1", type="VIEW"
+
     Topic:
         - Python code:
             SecurableObjects.topic("catalog1", "schema1", "topic1")
@@ -76,6 +84,12 @@ class SecurableObject(MetadataObject, ABC):
             SecurableObjects.fileset("catalog1", "schema1", "fileset1")
         - REST API:
             full_name="catalog1.schema1.fileset1", type="FILESET"
+
+    Function:
+        - Python code:
+            SecurableObjects.of_function(schema, "function1", privileges)
+        - REST API:
+            full_name="catalog1.schema1.function1", type="FUNCTION"
 
     Metalake:
         - Python code:
@@ -244,6 +258,29 @@ class SecurableObjects:
         )
 
     @staticmethod
+    def of_view(
+        schema: SecurableObject,
+        view: str,
+        privileges: list[Privilege],
+    ) -> SecurableObjectImpl:
+        """Create a view securable object.
+
+        Args:
+            schema (SecurableObject): The schema securable object.
+            view (str): The view name.
+            privileges (list[Privilege]): The privileges of the view.
+
+        Returns:
+            SecurableObjectImpl: The created view securable object.
+        """
+        names = [*schema.full_name().split("."), view]
+        return SecurableObjects.of(
+            MetadataObject.Type.VIEW,
+            names,
+            privileges,
+        )
+
+    @staticmethod
     def of_topic(
         schema: SecurableObject,
         topic: str,
@@ -311,6 +348,29 @@ class SecurableObjects:
         names = [*schema.full_name().split("."), model]
         return SecurableObjects.of(
             MetadataObject.Type.MODEL,
+            names,
+            privileges,
+        )
+
+    @staticmethod
+    def of_function(
+        schema: SecurableObject,
+        function: str,
+        privileges: list[Privilege],
+    ) -> SecurableObjectImpl:
+        """Create a function securable object.
+
+        Args:
+            schema (SecurableObject): The schema securable object.
+            function (str): The function name.
+            privileges (list[Privilege]): The privileges of the function.
+
+        Returns:
+            SecurableObjectImpl: The created function securable object.
+        """
+        names = [*schema.full_name().split("."), function]
+        return SecurableObjects.of(
+            MetadataObject.Type.FUNCTION,
             names,
             privileges,
         )
