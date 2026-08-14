@@ -20,6 +20,7 @@
 package org.apache.gravitino.iceberg.integration.test;
 
 import com.google.common.collect.ImmutableList;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -37,6 +38,7 @@ import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.iceberg.exceptions.ForbiddenException;
 import org.apache.spark.SparkException;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,6 +54,12 @@ import org.junit.jupiter.api.Test;
 public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAuthorizationIT {
 
   protected static final String SCHEMA_NAME = "schema";
+  private static final String NARROWED_ROLE_NAME = "narrowed_select_role";
+
+  @Override
+  protected String narrowedCatalogActiveRoles() {
+    return NARROWED_ROLE_NAME;
+  }
 
   @BeforeEach
   void revokePrivilege() {
@@ -83,14 +91,6 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
   public abstract Map<String, String> getCustomProperties();
 
   /**
-   * Downloads cloud-specific bundle JARs (e.g., iceberg-aws-bundle, iceberg-gcp-bundle). Subclasses
-   * implement this to download the appropriate bundle for their cloud provider.
-   *
-   * @throws Exception if download fails
-   */
-  protected abstract void downloadCloudBundleJar() throws Exception;
-
-  /**
    * Copies cloud-specific bundle JARs to the Iceberg REST server libs directory. Subclasses
    * implement this to copy the appropriate bundle (e.g., "aws", "gcp", "azure").
    */
@@ -105,10 +105,9 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
   protected abstract String getCloudProviderName();
 
   /**
-   * Sets up cloud-specific bundle JARs by downloading and copying them. This method should be
-   * called from subclass {@code startIntegrationTest()} methods before calling {@code
-   * super.startIntegrationTest()}, because the server resolves the cloud {@code FileIO} from its
-   * classpath while starting.
+   * Copies the cloud-specific bundle JARs into place. This method should be called from subclass
+   * {@code startIntegrationTest()} methods before calling {@code super.startIntegrationTest()},
+   * because the server resolves the cloud {@code FileIO} from its classpath while starting.
    *
    * <p>Skips setup if running in embedded mode.
    */
@@ -116,12 +115,26 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
     if (ITUtils.isEmbedded()) {
       return;
     }
-    try {
-      downloadCloudBundleJar();
-    } catch (Exception e) {
-      throw new RuntimeException("Failed to download cloud bundle JAR", e);
-    }
     copyCloudBundleJar();
+  }
+
+  /** Subclasses call this after {@code super.startIntegrationTest()}. */
+  protected void createSchemaIfAbsent() {
+    if (!catalogClientWithAllPrivilege.asSchemas().schemaExists(SCHEMA_NAME)) {
+      catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
+    }
+  }
+
+  @AfterAll
+  public void stopIntegrationTest() throws IOException, InterruptedException {
+    // super drops the metalake, so it has to run even when setup failed part way through.
+    try {
+      // The Iceberg JDBC backend is shared with sibling ITs; Iceberg has no cascading drop.
+      clearTable();
+      catalogClientWithAllPrivilege.asSchemas().dropSchema(SCHEMA_NAME, false);
+    } finally {
+      super.stopIntegrationTest();
+    }
   }
 
   @Test
@@ -205,6 +218,50 @@ public abstract class IcebergRESTCloudTokenAuthorizationBaseIT extends IcebergAu
 
     rows = sql("SELECT *,_file FROM %s", tableName);
     Assertions.assertEquals(2, rows.size());
+  }
+
+  @Test
+  void testActiveRolesNarrowCloudToken() {
+    String tableName = "test_narrowed_" + getCloudProviderName();
+    createTable(SCHEMA_NAME, tableName);
+
+    grantNarrowedSelectRole();
+    grantModifyTableRole(tableName);
+
+    // Every held role is active, so the vended credential can write.
+    sql("INSERT INTO %s VALUES (1,1),(2,2)", tableName);
+
+    // Narrowed to the select-only role the caller gets a read-only credential, so the write fails
+    // inside Spark instead of being rejected by Gravitino.
+    Assertions.assertThrows(
+        SparkException.class,
+        () ->
+            sql(
+                "INSERT INTO %s.%s.%s VALUES (3,3)",
+                NARROWED_SPARK_CATALOG_NAME, SCHEMA_NAME, tableName));
+
+    List<Object[]> rows =
+        sql("SELECT * FROM %s.%s.%s", NARROWED_SPARK_CATALOG_NAME, SCHEMA_NAME, tableName);
+    Assertions.assertEquals(2, rows.size());
+  }
+
+  /**
+   * The narrowed catalog names this role in a static header, so it has to carry every privilege the
+   * read path needs; narrowing deactivates the per-test USE_SCHEMA role.
+   */
+  private void grantNarrowedSelectRole() {
+    SecurableObject catalogObject =
+        SecurableObjects.ofCatalog(
+            GRAVITINO_CATALOG_NAME, ImmutableList.of(Privileges.UseCatalog.allow()));
+    SecurableObject schemaObject =
+        SecurableObjects.ofSchema(
+            catalogObject,
+            SCHEMA_NAME,
+            ImmutableList.of(Privileges.UseSchema.allow(), Privileges.SelectTable.allow()));
+    metalakeClientWithAllPrivilege.createRole(
+        NARROWED_ROLE_NAME, new HashMap<>(), ImmutableList.of(catalogObject, schemaObject));
+    metalakeClientWithAllPrivilege.grantRolesToUser(
+        ImmutableList.of(NARROWED_ROLE_NAME), NORMAL_USER);
   }
 
   protected void grantUseSchemaRole(String schema) {
