@@ -80,7 +80,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager, mock(FilesetDispatcher.class));
     tableOperationDispatcher =
         new TableOperationDispatcher(
             catalogManager,

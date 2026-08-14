@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
@@ -32,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -65,6 +65,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperationDispatcher.class);
 
+  private final FilesetDispatcher filesetDispatcher;
+
   /**
    * Creates a new SchemaOperationDispatcher instance.
    *
@@ -72,13 +74,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * @param store The EntityStore instance to be used for schema operations.
    * @param idGenerator The IdGenerator instance to be used for schema operations.
    * @param secretManager The SecretManager instance to be used for secret operations.
+   * @param filesetDispatcher The fileset dispatcher used to drop filesets on cascade schema drop.
    */
   public SchemaOperationDispatcher(
       CatalogManager catalogManager,
       EntityStore store,
       IdGenerator idGenerator,
-      SecretManager secretManager) {
+      SecretManager secretManager,
+      FilesetDispatcher filesetDispatcher) {
     super(catalogManager, store, idGenerator, secretManager);
+    this.filesetDispatcher = Preconditions.checkNotNull(filesetDispatcher);
   }
 
   /**
@@ -379,7 +384,18 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     // Cascade: drop filesets via FilesetDispatcher first so each fileset cleans its own
     // write-through secrets. Do this before the catalog lock to avoid nested TreeLocks.
     if (cascade) {
-      dropFilesetsUnderSchema(ident);
+      Namespace filesetNs =
+          Namespace.of(ident.namespace().level(0), ident.namespace().level(1), ident.name());
+      List<FilesetEntity> filesets;
+      try {
+        filesets = store.list(filesetNs, FilesetEntity.class, FILESET);
+      } catch (IOException e) {
+        throw new RuntimeException("Failed to list filesets under schema " + ident, e);
+      }
+      for (FilesetEntity fileset : filesets) {
+        filesetDispatcher.dropFileset(
+            ofFileset(filesetNs.level(0), filesetNs.level(1), filesetNs.level(2), fileset.name()));
+      }
     }
 
     return TreeLockUtils.doWithTreeLock(
@@ -389,11 +405,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // Schema secret URNs live on SchemaEntity in the store (catalog loadSchema may omit
           // them).
           Map<String, String> schemaProperties = new HashMap<>();
-          SchemaEntity schemaEntityForCleanup = getEntity(ident, SCHEMA, SchemaEntity.class);
-          if (schemaEntityForCleanup != null
-              && schemaEntityForCleanup.properties() != null
-              && !schemaEntityForCleanup.properties().isEmpty()) {
-            schemaProperties = new HashMap<>(schemaEntityForCleanup.properties());
+          SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
+          if (schemaEntity != null
+              && schemaEntity.properties() != null
+              && !schemaEntity.properties().isEmpty()) {
+            schemaProperties = new HashMap<>(schemaEntity.properties());
           }
 
           boolean droppedFromCatalog =
@@ -442,31 +458,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           }
           return droppedFromCatalog;
         });
-  }
-
-  /**
-   * Drops all filesets under the schema through {@link FilesetDispatcher}, so each fileset cleans
-   * up its own write-through secrets.
-   */
-  private void dropFilesetsUnderSchema(NameIdentifier schemaIdent) {
-    Namespace filesetNs =
-        Namespace.of(
-            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
-    List<FilesetEntity> filesets;
-    try {
-      filesets = store.list(filesetNs, FilesetEntity.class, FILESET);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to list filesets under schema " + schemaIdent, e);
-    }
-    if (filesets.isEmpty()) {
-      return;
-    }
-    FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().internalFilesetDispatcher();
-    for (FilesetEntity fileset : filesets) {
-      NameIdentifier filesetIdent =
-          ofFileset(filesetNs.level(0), filesetNs.level(1), filesetNs.level(2), fileset.name());
-      filesetDispatcher.dropFileset(filesetIdent);
-    }
   }
 
   /**

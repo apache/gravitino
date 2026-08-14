@@ -74,7 +74,6 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -371,6 +370,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @SuppressWarnings("UnusedVariable")
   private final SecretManager secretManager;
 
+  private FilesetDispatcher filesetDispatcher;
+
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
@@ -434,6 +435,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } else {
       this.catalogChangeLogListener = null;
     }
+  }
+
+  /**
+   * Sets the {@link FilesetDispatcher} used when force-dropping a catalog. Must be called after the
+   * fileset dispatcher is constructed (CatalogManager is created first).
+   *
+   * @param filesetDispatcher The fileset dispatcher.
+   */
+  public void setFilesetDispatcher(FilesetDispatcher filesetDispatcher) {
+    this.filesetDispatcher = Preconditions.checkNotNull(filesetDispatcher);
   }
 
   /**
@@ -994,7 +1005,22 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             // Drop filesets via FilesetDispatcher first so each fileset cleans its own
             // write-through secrets. Do not snapshot/delete fileset secrets here.
             for (SchemaEntity schema : schemaEntities) {
-              dropFilesetsUnderSchema(schema.nameIdentifier());
+              NameIdentifier schemaIdent = schema.nameIdentifier();
+              Namespace filesetNs =
+                  Namespace.of(
+                      schemaIdent.namespace().level(0),
+                      schemaIdent.namespace().level(1),
+                      schemaIdent.name());
+              List<FilesetEntity> filesets =
+                  store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
+              for (FilesetEntity fileset : filesets) {
+                filesetDispatcher.dropFileset(
+                    ofFileset(
+                        filesetNs.level(0),
+                        filesetNs.level(1),
+                        filesetNs.level(2),
+                        fileset.name()));
+              }
             }
 
             // Snapshot schema properties (write-through secret URNs) before entities are removed.
@@ -1057,31 +1083,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return properties == null || properties.isEmpty()
         ? Collections.emptyMap()
         : new HashMap<>(properties);
-  }
-
-  /**
-   * Drops all filesets under the schema through {@link FilesetDispatcher}, so each fileset cleans
-   * up its own write-through secrets.
-   */
-  private void dropFilesetsUnderSchema(NameIdentifier schemaIdent) {
-    Namespace filesetNs =
-        Namespace.of(
-            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
-    List<FilesetEntity> filesets;
-    try {
-      filesets = store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
-    } catch (IOException e) {
-      throw new RuntimeException("Failed to list filesets under schema " + schemaIdent, e);
-    }
-    if (filesets.isEmpty()) {
-      return;
-    }
-    FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().internalFilesetDispatcher();
-    for (FilesetEntity fileset : filesets) {
-      NameIdentifier filesetIdent =
-          ofFileset(filesetNs.level(0), filesetNs.level(1), filesetNs.level(2), fileset.name());
-      filesetDispatcher.dropFileset(filesetIdent);
-    }
   }
 
   /**

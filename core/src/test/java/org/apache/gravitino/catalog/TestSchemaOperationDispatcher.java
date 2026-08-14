@@ -71,7 +71,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     dispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager, mock(FilesetDispatcher.class));
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(Configs.TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -426,7 +427,8 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   public void testCreateWithSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       SchemaOperationDispatcher d =
-          new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
+          new SchemaOperationDispatcher(
+              catalogManager, entityStore, idGenerator, secrets, mock(FilesetDispatcher.class));
       NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_1");
       Map<String, String> props = ImmutableMap.of("k1", "v1");
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
