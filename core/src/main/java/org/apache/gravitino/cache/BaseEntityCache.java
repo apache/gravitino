@@ -45,15 +45,12 @@ public abstract class BaseEntityCache implements EntityCache {
    * SupportsEntityStoreCache#put(Entity)} for the contract. New entity types are excluded by
    * default until their invalidation behavior has been validated.
    *
-   * <p>{@code USER}, {@code GROUP} and {@code ROLE} are materialized with relation-derived data
-   * joined in at load time: a role carries its securable objects, and a user/group carries its role
-   * names. A mutation on the entity itself invalidates its own key through the write path, but this
-   * embedded data also goes stale through a mutation on a different entity. For example, deleting
-   * or renaming a securable object changes a role's materialized form, and deleting or renaming a
-   * role changes a user's/group's role names. Such a mutation touches neither this entity's own key
-   * nor any hierarchy ancestor of it, so neither the write-path invalidation nor a prefix cascade
-   * over the entity hierarchy would evict it. Caching them would therefore serve stale
-   * authorization data.
+   * <p>Only self-contained entities are cacheable: a stale copy of one is at worst cosmetically old
+   * (an old comment, property, or job status), never a wrong pointer, and each can be invalidated
+   * with a single one-to-one key drop. Every other type is read straight from the store.
+   * User/group/role embed relation-derived data that a per-node cache cannot invalidate;
+   * model/model version and function carry a load-bearing pointer that would be silently wrong if
+   * served stale.
    */
   private static final Set<Entity.EntityType> CACHEABLE_TYPES =
       Sets.immutableEnumSet(
@@ -61,19 +58,12 @@ public abstract class BaseEntityCache implements EntityCache {
           Entity.EntityType.CATALOG,
           Entity.EntityType.SCHEMA,
           Entity.EntityType.TABLE,
-          Entity.EntityType.VIEW,
-          Entity.EntityType.COLUMN,
-          Entity.EntityType.FILESET,
           Entity.EntityType.TOPIC,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.FILESET,
           Entity.EntityType.TAG,
-          Entity.EntityType.MODEL,
-          Entity.EntityType.MODEL_VERSION,
           Entity.EntityType.POLICY,
-          Entity.EntityType.TABLE_STATISTIC,
-          Entity.EntityType.JOB_TEMPLATE,
-          Entity.EntityType.JOB,
-          Entity.EntityType.AUDIT,
-          Entity.EntityType.FUNCTION);
+          Entity.EntityType.JOB);
 
   protected final Config cacheConfig;
 
@@ -86,6 +76,18 @@ public abstract class BaseEntityCache implements EntityCache {
     Preconditions.checkArgument(config != null, "Config must not be null");
 
     this.cacheConfig = config;
+  }
+
+  /**
+   * {@inheritDoc}
+   *
+   * <p>Defaults to {@link Coherence#LOCAL_PER_NODE}: an in-memory, per-node cache whose changes
+   * must be propagated to the other nodes. A shared implementation must override this to return
+   * {@link Coherence#SHARED}.
+   */
+  @Override
+  public Coherence coherence() {
+    return Coherence.LOCAL_PER_NODE;
   }
 
   /**

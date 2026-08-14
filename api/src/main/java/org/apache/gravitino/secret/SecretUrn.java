@@ -70,6 +70,18 @@ public final class SecretUrn {
   }
 
   /**
+   * Returns the property key encoded as the last identifier segment.
+   *
+   * <p>Gravitino secret URNs end with the entity property key that stores the URN (see {@link
+   * #buildWriteThrough}). Identifier segments are validated when the URN is parsed or built.
+   *
+   * @return the property key
+   */
+  public String propertyKey() {
+    return identifierSegments.get(identifierSegments.size() - 1);
+  }
+
+  /**
    * Builds a write-through secret URN for an entity property secret.
    *
    * <p>Required attributes: {@link SecretConstants#ATTR_ENTITY_TYPE}, {@link

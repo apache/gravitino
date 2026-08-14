@@ -48,6 +48,26 @@ public class TestTagValuesAssociateRequest {
     TagValuesAssociateRequest validRequest =
         new TagValuesAssociateRequest(new TagValue[] {TagValue.of("data_domain", "finance")}, null);
     Assertions.assertDoesNotThrow(validRequest::validate);
+    Assertions.assertArrayEquals(new TagValue[0], validRequest.tagValuesToRemove());
+
+    TagValuesAssociateRequest emptyRequest = new TagValuesAssociateRequest(null, null);
+    Assertions.assertThrows(IllegalArgumentException.class, emptyRequest::validate);
+
+    TagValuesAssociateRequest nullFieldRequest =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"tagsToAdd\":[{\"name\":\"data_domain\"}],\"tagsToRemove\":null}",
+                TagValuesAssociateRequest.class);
+    Assertions.assertDoesNotThrow(nullFieldRequest::validate);
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldRequest.tagValuesToRemove());
+
+    TagValuesAssociateRequest nullFieldsRequest =
+        JsonUtils.objectMapper()
+            .readValue(
+                "{\"tagsToAdd\":null,\"tagsToRemove\":null}", TagValuesAssociateRequest.class);
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldsRequest.tagValuesToAdd());
+    Assertions.assertArrayEquals(new TagValue[0], nullFieldsRequest.tagValuesToRemove());
+    Assertions.assertThrows(IllegalArgumentException.class, nullFieldsRequest::validate);
 
     TagValuesAssociateRequest blankNameRequest =
         JsonUtils.objectMapper()
@@ -62,6 +82,26 @@ public class TestTagValuesAssociateRequest {
                 "{\"tagsToAdd\":[{\"name\":\"data_domain\",\"value\":\" \"}]}",
                 TagValuesAssociateRequest.class);
     Assertions.assertThrows(IllegalArgumentException.class, blankValueRequest::validate);
+  }
+
+  @Test
+  public void testTagValuesAssociateRequestRejectsOverlappingPairs() {
+    TagValuesAssociateRequest exactPairOverlap =
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.of("data_domain", "finance"), TagValue.noValue("owner")},
+            new TagValue[] {TagValue.of("data_domain", "finance")});
+    Assertions.assertThrows(IllegalArgumentException.class, exactPairOverlap::validate);
+
+    TagValuesAssociateRequest noValueOverlap =
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.noValue("owner")}, new TagValue[] {TagValue.noValue("owner")});
+    Assertions.assertThrows(IllegalArgumentException.class, noValueOverlap::validate);
+
+    TagValuesAssociateRequest differentValue =
+        new TagValuesAssociateRequest(
+            new TagValue[] {TagValue.of("data_domain", "finance")},
+            new TagValue[] {TagValue.of("data_domain", "risk")});
+    Assertions.assertDoesNotThrow(differentValue::validate);
   }
 
   @Test
