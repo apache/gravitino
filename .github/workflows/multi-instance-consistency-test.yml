@@ -2,8 +2,13 @@ name: Multi-Instance Consistency Test
 
 # Verifies that entity and authorization caches propagate changes correctly
 # between two Gravitino instances backed by the same MySQL entity store. The
-# entity test warms one instance, mutates the other, and verifies the target
-# after one entity-change-log poll interval plus a small scheduling buffer.
+# entity test warms one instance, mutates the other, and then re-reads the
+# target until it converges or the convergence deadline expires.
+#
+# The entity test opens with a stale-read control that requires the target to
+# serve a cached value before the poller runs. If that control fails, the cache
+# is not actually caching and the remaining assertions prove nothing, so treat
+# a failure there as a configuration problem rather than a propagation bug.
 #
 # The test plans and assertions live in the two test scripts under dev/ci/.
 
@@ -82,7 +87,13 @@ jobs:
           INSTANCE_B_HOME: distribution/package-b
           ADMIN_USER: admin
           KAFKA_BOOTSTRAP_SERVERS: localhost:9092
+          # Only the stale-read control sleeps; keep it near one poll interval
+          # so it observes the pre-invalidation state.
           POLL_WAIT_SECS: 1.5
+          # Convergence budget for every other case. A healthy node converges in
+          # about a second and never spends this, so a generous value buys
+          # resilience to CI scheduling hiccups at no cost on green runs.
+          AWAIT_TIMEOUT_SECS: 30
           RUN_RESTART_TEST: true
         run: bash dev/ci/test_multi_instance_entity_cache_consistency.sh
 
