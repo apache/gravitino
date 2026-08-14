@@ -377,25 +377,11 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         catalogIdent,
         LockType.WRITE,
         () -> {
-          // Capture persisted properties (including write-through secret URNs) before drop so we
-          // can clean provider material after a successful delete. External-ref URNs are skipped by
-          // deleteSecretsFromProperties. Fileset children are cascade-deleted without going through
-          // FilesetOperationDispatcher, so snapshot their properties here too.
-          Map<String, String> schemaProperties = null;
-          try {
-            Schema schema =
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
-                    NoSuchSchemaException.class);
-            schemaProperties = schema.properties();
-          } catch (NoSuchSchemaException e) {
-            LOG.debug("Schema {} does not exist when preparing drop cleanup", ident);
-          } catch (Exception e) {
-            // Secret cleanup is best-effort; unexpected load failures must not block drop.
-            LOG.warn(
-                "Failed to load schema {} before drop; secret cleanup may be skipped", ident, e);
-          }
+          // Capture properties (including write-through secret URNs) from the entity store before
+          // drop — same source as CatalogManager.dropCatalog (catalog entity properties). Catalog
+          // loadSchema() may omit custom properties/URNs. Fileset children are cascade-deleted
+          // without FilesetOperationDispatcher, so snapshot their store properties here too.
+          Map<String, String> schemaProperties = loadSchemaPropertiesForSecretCleanup(ident);
           List<Map<String, String>> filesetPropertySnapshots = snapshotFilesetProperties(ident);
 
           boolean droppedFromCatalog =
@@ -464,6 +450,24 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       }
     }
     return newProps;
+  }
+
+  /**
+   * Loads schema properties from the entity store for secret cleanup, matching {@code
+   * CatalogManager.dropCatalog} which reads catalog properties from {@link
+   * org.apache.gravitino.meta.CatalogEntity}. Returns an empty map when the entity is missing or
+   * has no properties; failures are logged and must not block drop.
+   */
+  private Map<String, String> loadSchemaPropertiesForSecretCleanup(NameIdentifier ident) {
+    try {
+      SchemaEntity entity = getEntity(ident, SCHEMA, SchemaEntity.class);
+      if (entity != null && entity.properties() != null && !entity.properties().isEmpty()) {
+        return new HashMap<>(entity.properties());
+      }
+    } catch (Exception e) {
+      LOG.warn("Failed to load schema entity {} for secret cleanup", ident, e);
+    }
+    return new HashMap<>();
   }
 
   /**
