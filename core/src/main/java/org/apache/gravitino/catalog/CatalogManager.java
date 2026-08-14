@@ -597,9 +597,20 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           try {
             Map<String, String> resolved =
                 wrapper.doWithPropertiesMeta(
-                    meta ->
-                        SecretPropertyUtils.buildResolvedProperties(
-                            secretManager, rawProperties, meta.catalogPropertiesMetadata()));
+                    meta -> {
+                      Map<String, String> props =
+                          Maps.newHashMap(
+                              SecretPropertyUtils.buildResolvedProperties(
+                                  secretManager, rawProperties, meta.catalogPropertiesMetadata()));
+                      // Match BaseCatalog#properties(): reserved in-use default is not always
+                      // persisted on the entity.
+                      props.putIfAbsent(
+                          PROPERTY_IN_USE,
+                          meta.catalogPropertiesMetadata()
+                              .getDefaultValue(PROPERTY_IN_USE)
+                              .toString());
+                      return props;
+                    });
             return wrapper.catalog().entity().toCatalogInfoWithResolvedProps(resolved);
           } catch (RuntimeException e) {
             throw e;
