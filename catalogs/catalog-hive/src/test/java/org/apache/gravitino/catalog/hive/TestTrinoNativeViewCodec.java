@@ -132,7 +132,7 @@ class TestTrinoNativeViewCodec {
         TrinoNativeViewCodec.toTrinoTypeString(
             Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get())));
     Assertions.assertEquals(
-        "row(a integer,b varchar)",
+        "row(\"a\" integer,\"b\" varchar)",
         TrinoNativeViewCodec.toTrinoTypeString(
             Types.StructType.of(
                 Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
@@ -149,6 +149,18 @@ class TestTrinoNativeViewCodec {
         TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withTimeZone(6)));
     Assertions.assertEquals(
         "time(6)", TrinoNativeViewCodec.toTrinoTypeString(Types.TimeType.of(6)));
+  }
+
+  @Test
+  void testToTrinoTypeStringWidensUnsignedIntegralTypes() {
+    Assertions.assertEquals(
+        "smallint", TrinoNativeViewCodec.toTrinoTypeString(Types.ByteType.unsigned()));
+    Assertions.assertEquals(
+        "integer", TrinoNativeViewCodec.toTrinoTypeString(Types.ShortType.unsigned()));
+    Assertions.assertEquals(
+        "bigint", TrinoNativeViewCodec.toTrinoTypeString(Types.IntegerType.unsigned()));
+    Assertions.assertEquals(
+        "decimal(20,0)", TrinoNativeViewCodec.toTrinoTypeString(Types.LongType.unsigned()));
   }
 
   @Test
@@ -232,6 +244,16 @@ class TestTrinoNativeViewCodec {
   }
 
   @Test
+  void testToTrinoTypeStringQuotesReservedKeywordRowFieldName() {
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("select", Types.IntegerType.get()));
+    String encoded = TrinoNativeViewCodec.toTrinoTypeString(structType);
+    Assertions.assertEquals("row(\"select\" integer)", encoded);
+    Assertions.assertEquals(structType, TrinoNativeViewCodec.fromTrinoTypeString(encoded));
+  }
+
+  @Test
   void testFromTrinoTypeStringRejectsAnonymousRowField() {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -268,6 +290,13 @@ class TestTrinoNativeViewCodec {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
         () -> TrinoNativeViewCodec.fromTrinoTypeString("json"));
+  }
+
+  @Test
+  void testFromTrinoTypeStringRejectsTimeWithTimeZone() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> TrinoNativeViewCodec.fromTrinoTypeString("time(3) with time zone"));
   }
 
   @Test

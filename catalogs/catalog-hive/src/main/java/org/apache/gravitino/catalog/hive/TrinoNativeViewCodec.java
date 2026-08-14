@@ -28,7 +28,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -54,7 +53,6 @@ final class TrinoNativeViewCodec {
   private static final String VIEW_PREFIX = "/* Presto View: ";
   private static final String VIEW_SUFFIX = " */";
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Pattern SIMPLE_IDENTIFIER = Pattern.compile("[a-z_][a-z0-9_]*");
   // Trino's default time/timestamp precision (milliseconds) when none is specified.
   private static final int DEFAULT_PRECISION = 3;
 
@@ -222,13 +220,15 @@ final class TrinoNativeViewCodec {
       case BOOLEAN:
         return "boolean";
       case BYTE:
-        return "tinyint";
+        // Trino has no unsigned integer types; widen to the next size up to preserve range,
+        // matching GeneralDataTypeTransformer's Gravitino-to-Trino type mapping.
+        return ((Types.ByteType) type).signed() ? "tinyint" : "smallint";
       case SHORT:
-        return "smallint";
+        return ((Types.ShortType) type).signed() ? "smallint" : "integer";
       case INTEGER:
-        return "integer";
+        return ((Types.IntegerType) type).signed() ? "integer" : "bigint";
       case LONG:
-        return "bigint";
+        return ((Types.LongType) type).signed() ? "bigint" : "decimal(20,0)";
       case FLOAT:
         return "real";
       case DOUBLE:
@@ -286,11 +286,12 @@ final class TrinoNativeViewCodec {
     }
   }
 
-  /** Quotes a row field name if it is not a plain lowercase identifier Trino can parse bare. */
+  /**
+   * Quotes a row field name, matching Trino's own {@code NamedTypeSignature}, which always quotes
+   * named row fields unconditionally; a plain-looking name can still be a reserved keyword (e.g.
+   * {@code select}), which Trino cannot parse unquoted.
+   */
   private static String rowFieldName(String name) {
-    if (SIMPLE_IDENTIFIER.matcher(name).matches()) {
-      return name;
-    }
     return "\"" + name.replace("\"", "\"\"") + "\"";
   }
 
@@ -339,6 +340,11 @@ final class TrinoNativeViewCodec {
       return Types.FixedCharType.of(Integer.parseInt(innerContent(s)));
     }
     if (lower.startsWith("time(")) {
+      if (lower.endsWith("with time zone")) {
+        throw new UnsupportedOperationException(
+            "Unsupported Trino type: TIME WITH TIME ZONE has no Gravitino equivalent: "
+                + typeString);
+      }
       return Types.TimeType.of(parsePrecision(s));
     }
     if (lower.startsWith("timestamp(")) {
