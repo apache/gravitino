@@ -381,7 +381,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           // drop — same source as CatalogManager.dropCatalog (catalog entity properties). Catalog
           // loadSchema() may omit custom properties/URNs. Fileset children are cascade-deleted
           // without FilesetOperationDispatcher, so snapshot their store properties here too.
-          Map<String, String> schemaProperties = loadSchemaPropertiesForSecretCleanup(ident);
+          Map<String, String> schemaProperties = new HashMap<>();
+          SchemaEntity schemaEntityForCleanup = getEntity(ident, SCHEMA, SchemaEntity.class);
+          if (schemaEntityForCleanup != null
+              && schemaEntityForCleanup.properties() != null
+              && !schemaEntityForCleanup.properties().isEmpty()) {
+            schemaProperties = new HashMap<>(schemaEntityForCleanup.properties());
+          }
           List<Map<String, String>> filesetPropertySnapshots = snapshotFilesetProperties(ident);
 
           boolean droppedFromCatalog =
@@ -450,24 +456,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       }
     }
     return newProps;
-  }
-
-  /**
-   * Loads schema properties from the entity store for secret cleanup, matching {@code
-   * CatalogManager.dropCatalog} which reads catalog properties from {@link
-   * org.apache.gravitino.meta.CatalogEntity}. Returns an empty map when the entity is missing or
-   * has no properties; failures are logged and must not block drop.
-   */
-  private Map<String, String> loadSchemaPropertiesForSecretCleanup(NameIdentifier ident) {
-    try {
-      SchemaEntity entity = getEntity(ident, SCHEMA, SchemaEntity.class);
-      if (entity != null && entity.properties() != null && !entity.properties().isEmpty()) {
-        return new HashMap<>(entity.properties());
-      }
-    } catch (Exception e) {
-      LOG.warn("Failed to load schema entity {} for secret cleanup", ident, e);
-    }
-    return new HashMap<>();
   }
 
   /**
