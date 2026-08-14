@@ -26,6 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.apache.arrow.vector.complex.MapVector;
@@ -205,6 +207,195 @@ public class TestLanceDataTypeConverter {
     ArrowType.Timestamp tsArrow = (ArrowType.Timestamp) arrowType;
     assertEquals(TimeUnit.MICROSECOND, tsArrow.getUnit());
     assertEquals("UTC", tsArrow.getTimezone());
+  }
+
+  @Test
+  public void testNanosecondTimestampRoundTrip() {
+    Types.TimestampType timestampNs = Types.TimestampType.withoutTimeZone(9);
+    Types.TimestampType timestampTzNs = Types.TimestampType.withTimeZone(9);
+
+    Field timestampField = CONVERTER.toArrowField("timestamp_ns", timestampNs, true);
+    Field timestampTzField = CONVERTER.toArrowField("timestamptz_ns", timestampTzNs, true);
+
+    assertEquals(
+        new ArrowType.Timestamp(TimeUnit.NANOSECOND, null),
+        timestampField.getFieldType().getType());
+    assertEquals(
+        new ArrowType.Timestamp(TimeUnit.NANOSECOND, "UTC"),
+        timestampTzField.getFieldType().getType());
+    assertEquals(timestampNs, CONVERTER.toGravitino(timestampField));
+    assertEquals(timestampTzNs, CONVERTER.toGravitino(timestampTzField));
+  }
+
+  @Test
+  public void testNonUtcTimestampPreservesTimezoneAsExternalType() {
+    Field field =
+        Field.nullable(
+            "event_time", new ArrowType.Timestamp(TimeUnit.NANOSECOND, "America/Los_Angeles"));
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("event_time", converted, true));
+  }
+
+  @Test
+  public void testVariantTypeIsRejectedAndArrowExtensionsRemainExternal() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class, () -> CONVERTER.fromGravitino(Types.VariantType.get()));
+    assertTrue(exception.getMessage().contains("exact native representation"));
+
+    Field nativeVariant =
+        new Field(
+            "payload",
+            new FieldType(
+                true,
+                ArrowType.Struct.INSTANCE,
+                null,
+                Map.of("ARROW:extension:name", "arrow.parquet.variant")),
+            List.of(
+                Field.notNullable("metadata", ArrowType.Binary.INSTANCE),
+                Field.nullable("value", ArrowType.Binary.INSTANCE)));
+    Type converted = CONVERTER.toGravitino(nativeVariant);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(nativeVariant, CONVERTER.toArrowField("payload", converted, true));
+  }
+
+  @Test
+  public void testUnknownTypeRoundTripAndNullability() {
+    Field field = CONVERTER.toArrowField("unknown_value", Types.NullType.get(), true);
+
+    assertEquals(ArrowType.Null.INSTANCE, field.getType());
+    assertTrue(field.isNullable());
+    assertEquals(Types.NullType.get(), CONVERTER.toGravitino(field));
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.toArrowField("unknown_value", Types.NullType.get(), false));
+    assertTrue(exception.getMessage().contains("Null columns must be nullable"));
+  }
+
+  @Test
+  public void testGeometryTypeRoundTripAsGeoArrowWkb() {
+    Types.GeometryType geometry = Types.GeometryType.of("EPSG:3857");
+
+    Field field = CONVERTER.toArrowField("shape", geometry, true);
+
+    assertEquals(ArrowType.Binary.INSTANCE, field.getType());
+    assertEquals("geoarrow.wkb", field.getMetadata().get("ARROW:extension:name"));
+    assertEquals("{\"crs\":\"EPSG:3857\"}", field.getMetadata().get("ARROW:extension:metadata"));
+    assertEquals(geometry, CONVERTER.toGravitino(field));
+
+    IllegalArgumentException exception =
+        assertThrows(IllegalArgumentException.class, () -> CONVERTER.fromGravitino(geometry));
+    assertTrue(exception.getMessage().contains("requires GeoArrow field metadata"));
+  }
+
+  @Test
+  public void testGeometryProjJsonCrsRoundTrip() {
+    String projJson = "{\"type\":\"ProjectedCRS\",\"name\":\"WGS 84 / Pseudo-Mercator\"}";
+    Types.GeometryType geometry = Types.GeometryType.of(projJson);
+
+    Field field = CONVERTER.toArrowField("shape", geometry, true);
+
+    assertEquals("{\"crs\":" + projJson + "}", field.getMetadata().get("ARROW:extension:metadata"));
+    assertEquals(geometry, CONVERTER.toGravitino(field));
+  }
+
+  @ParameterizedTest
+  @CsvSource({"spherical", "vincenty", "thomas", "andoyer", "karney"})
+  public void testGeographyTypeRoundTripAsGeoArrowWkb(String edgeAlgorithm) {
+    Types.GeographyType geography = Types.GeographyType.of("EPSG:4326", edgeAlgorithm);
+
+    Field field = CONVERTER.toArrowField("shape", geography, true);
+
+    assertEquals(ArrowType.Binary.INSTANCE, field.getType());
+    assertEquals("geoarrow.wkb", field.getMetadata().get("ARROW:extension:name"));
+    assertEquals(
+        String.format("{\"crs\":\"EPSG:4326\",\"edges\":\"%s\"}", edgeAlgorithm),
+        field.getMetadata().get("ARROW:extension:metadata"));
+    assertEquals(geography, CONVERTER.toGravitino(field));
+  }
+
+  @Test
+  public void testUnsupportedGeoArrowEdgesRemainExternal() {
+    Field field =
+        new Field(
+            "shape",
+            new FieldType(
+                true,
+                ArrowType.Binary.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name",
+                    "geoarrow.wkb",
+                    "ARROW:extension:metadata",
+                    "{\"crs\":\"EPSG:4326\",\"edges\":\"rhumb\"}")),
+            null);
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("shape", converted, true));
+  }
+
+  @Test
+  public void testGeoArrowRepresentationMetadataRemainsExternal() {
+    Field field =
+        new Field(
+            "shape",
+            new FieldType(
+                true,
+                ArrowType.Binary.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name",
+                    "geoarrow.wkb",
+                    "ARROW:extension:metadata",
+                    "{\"crs\":\"EPSG:4326\",\"crs_type\":\"authority_code\",\"edges\":\"karney\"}")),
+            null);
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("shape", converted, true));
+  }
+
+  @Test
+  public void testGeoArrowCustomFieldMetadataRemainsExternal() {
+    Field field =
+        new Field(
+            "shape",
+            new FieldType(
+                true,
+                ArrowType.Binary.INSTANCE,
+                null,
+                Map.of(
+                    "ARROW:extension:name",
+                    "geoarrow.wkb",
+                    "ARROW:extension:metadata",
+                    "{\"crs\":\"EPSG:4326\",\"edges\":\"karney\"}",
+                    "producer",
+                    "native-client")),
+            null);
+
+    Type converted = CONVERTER.toGravitino(field);
+
+    assertInstanceOf(Types.ExternalType.class, converted);
+    assertEquals(field, CONVERTER.toArrowField("shape", converted, true));
+  }
+
+  @Test
+  public void testGeographyRequiresFieldMetadata() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> CONVERTER.fromGravitino(Types.GeographyType.crs84()));
+
+    assertTrue(exception.getMessage().contains("requires GeoArrow field metadata"));
   }
 
   @Test

@@ -252,6 +252,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(location), "Table location must be specified");
 
+    // Validate every field before EXIST_OK or OVERWRITE can return, drop metadata, or purge a
+    // dataset. Conversion failures must never leave a partial mutation.
+    convertColumnsToArrowSchema(columns);
+
     // Extract creation mode from properties
     CreationMode mode =
         Optional.ofNullable(properties.get(LANCE_CREATION_MODE))
