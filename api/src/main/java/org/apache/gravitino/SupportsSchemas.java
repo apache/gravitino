@@ -115,6 +115,8 @@ public interface SupportsSchemas {
   /**
    * Loads a schema with secret URNs resolved to plaintext in {@link Schema#properties()}.
    *
+   * <p>The returned schema is intended for reading resolved properties.
+   *
    * @param schemaName The name of the schema.
    * @return The schema with resolved plaintext properties.
    * @throws NoSuchSchemaException If the schema does not exist.

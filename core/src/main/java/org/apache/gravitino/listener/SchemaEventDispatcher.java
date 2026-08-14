@@ -131,7 +131,21 @@ public class SchemaEventDispatcher implements SchemaDispatcher {
   @Override
   public Schema loadSchemaWithResolvedProperties(NameIdentifier ident)
       throws NoSuchSchemaException {
-    return dispatcher.loadSchemaWithResolvedProperties(ident);
+    eventBus.dispatchEvent(new LoadSchemaPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      Schema schema = dispatcher.loadSchemaWithResolvedProperties(ident);
+      // Do not put resolved plaintext into audit payloads.
+      eventBus.dispatchEvent(
+          new LoadSchemaEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              new SchemaInfo(schema.name(), schema.comment(), Map.of(), schema.auditInfo())));
+      return schema;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new LoadSchemaFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override

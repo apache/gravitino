@@ -257,7 +257,7 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the default load catalog response. Credential-vending keys remain omitted from `loadCatalogWithResolvedProperties` / `?view=resolved` — use the [credential vending API](security/credential-vending.md). Secret-manager-backed connection secrets (for example JDBC password URNs) can be resolved via that API.
 :::
 
 ## Schema

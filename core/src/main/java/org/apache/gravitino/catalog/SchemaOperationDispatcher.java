@@ -227,6 +227,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   /**
    * Loads a schema with secret URNs resolved to plaintext in {@link Schema#properties()}.
    *
+   * <p>This path resolves from the connector {@code loadSchema} property map and returns a
+   * properties-focused {@link Schema} view. It does not run the full import / {@code
+   * EntityCombinedSchema} combine path used by {@link #loadSchema(NameIdentifier)}.
+   *
    * @param ident The identifier of the schema.
    * @return The schema with resolved plaintext properties.
    * @throws NoSuchSchemaException If the schema does not exist.

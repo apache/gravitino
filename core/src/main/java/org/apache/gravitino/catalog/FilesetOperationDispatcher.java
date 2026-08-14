@@ -115,6 +115,11 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   /**
    * Loads a fileset with secret URNs resolved to plaintext in {@link Fileset#properties()}.
    *
+   * <p>This path resolves from the connector {@code loadFileset} property map and returns a
+   * properties-focused {@link Fileset} view. It does not apply the {@code EntityCombinedFileset}
+   * hidden-property wrapping used by {@link #loadFileset(NameIdentifier)} (hidden keys are still
+   * filtered inside {@link SecretPropertyUtils#buildResolvedProperties}).
+   *
    * @param ident The identifier of the fileset.
    * @return The fileset with resolved plaintext properties.
    * @throws NoSuchFilesetException If the fileset does not exist.

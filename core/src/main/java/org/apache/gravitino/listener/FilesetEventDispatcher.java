@@ -134,7 +134,27 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
   @Override
   public Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
       throws NoSuchFilesetException {
-    return dispatcher.loadFilesetWithResolvedProperties(ident);
+    eventBus.dispatchEvent(new LoadFilesetPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      Fileset fileset = dispatcher.loadFilesetWithResolvedProperties(ident);
+      // Do not put resolved plaintext into audit payloads.
+      eventBus.dispatchEvent(
+          new LoadFilesetEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              new FilesetInfo(
+                  fileset.name(),
+                  fileset.comment(),
+                  fileset.type(),
+                  fileset.storageLocations(),
+                  Map.of(),
+                  fileset.auditInfo())));
+      return fileset;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new LoadFilesetFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override

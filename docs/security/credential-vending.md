@@ -399,7 +399,7 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from `GET /api/metalakes/{metalake}/catalogs/{catalog}`. Clients written against earlier releases that read those properties directly lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response. Credential-vending keys stay omitted even with `?view=resolved`. Secret-manager-backed connection secrets (for example URN-backed `jdbc-password`) can be resolved via `GET .../catalogs/{catalog}?view=resolved` / `loadCatalogWithResolvedProperties`. Clients written against earlier releases that read those properties directly from the default load lose access to them.
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 

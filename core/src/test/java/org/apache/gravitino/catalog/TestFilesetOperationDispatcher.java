@@ -374,6 +374,40 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
     }
   }
 
+  @Test
+  public void testLoadWithResolvedProperties() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(9100L);
+      IdGenerator ids = nextId::getAndIncrement;
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
+      NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_resolved_fs");
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
+          .createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
+
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_resolved_fs", "fs_r1");
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+      Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
+      filesets.createMultipleLocationFileset(
+          ident,
+          "comment",
+          Fileset.Type.MANAGED,
+          locations,
+          ImmutableMap.of("k1", "v1"),
+          bindings,
+          Map.of());
+
+      Fileset omitted = filesets.loadFileset(ident);
+      Assertions.assertFalse(omitted.properties().containsKey("k2"));
+      Assertions.assertEquals("v1", omitted.properties().get("k1"));
+
+      Fileset resolved = filesets.loadFilesetWithResolvedProperties(ident);
+      Assertions.assertEquals("s3cr3t", resolved.properties().get("k2"));
+      Assertions.assertEquals("v1", resolved.properties().get("k1"));
+      Assertions.assertTrue(filesets.dropFileset(ident));
+    }
+  }
+
   private static SecretManager memorySecretManager() {
     Config c = new Config(false) {};
     Properties p = new Properties();

@@ -287,6 +287,11 @@ public class TestGravitinoLanceNamespaceWrapper {
           }
 
           @Override
+          public Catalog loadCatalogWithResolvedProperties(String catalogName) {
+            return expectedCatalog;
+          }
+
+          @Override
           public Catalog createCatalog(
               String catalogName,
               Catalog.Type type,

@@ -72,6 +72,10 @@ public interface SupportsCatalogs {
    * <p>Credential-vending keys are omitted (use credentials API). Legacy hidden plaintext secrets
    * are omitted. Default {@link #loadCatalog(NameIdentifier)} omit behavior is unchanged.
    *
+   * <p>The returned catalog is a properties-focused view (typically {@code CatalogInfo}) and may
+   * not support {@code asSchemas()}, {@code asTableCatalog()}, or other capability accessors. Use
+   * {@link #loadCatalog(NameIdentifier)} when those operations are required.
+   *
    * @param ident the identifier of the catalog
    * @return the catalog with resolved plaintext properties
    * @throws NoSuchCatalogException If the catalog does not exist.

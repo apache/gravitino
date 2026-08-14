@@ -63,7 +63,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. For secret-manager-backed values, authorized callers can use `loadCatalogWithResolvedProperties` / `GET .../catalogs/{catalog}?view=resolved` to obtain plaintext. Credential-vending keys remain omitted from that path — use the [credential vending API](security/credential-vending.md) instead.
 :::
 
 ## Schema

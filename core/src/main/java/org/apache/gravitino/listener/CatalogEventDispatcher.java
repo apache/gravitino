@@ -132,8 +132,27 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
   @Override
   public Catalog loadCatalogWithResolvedProperties(NameIdentifier ident)
       throws NoSuchCatalogException {
-    // Dedicated audit events for resolved-properties reads are optional (design Phase 3).
-    return dispatcher.loadCatalogWithResolvedProperties(ident);
+    eventBus.dispatchEvent(new LoadCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident));
+    try {
+      Catalog catalog = dispatcher.loadCatalogWithResolvedProperties(ident);
+      // Do not put resolved plaintext into audit payloads.
+      eventBus.dispatchEvent(
+          new LoadCatalogEvent(
+              PrincipalUtils.getCurrentUserName(),
+              ident,
+              new CatalogInfo(
+                  catalog.name(),
+                  catalog.type(),
+                  catalog.provider(),
+                  catalog.comment(),
+                  Map.of(),
+                  catalog.auditInfo())));
+      return catalog;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new LoadCatalogFailureEvent(PrincipalUtils.getCurrentUserName(), ident, e));
+      throw e;
+    }
   }
 
   @Override

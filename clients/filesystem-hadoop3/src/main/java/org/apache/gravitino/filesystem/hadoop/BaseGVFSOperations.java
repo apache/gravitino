@@ -726,7 +726,7 @@ public abstract class BaseGVFSOperations implements Closeable {
           filesetIdent);
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
-      Map<String, String> allProperties = getAllProperties(filesetIdent, fileset.properties());
+      Map<String, String> allProperties = getAllProperties(filesetIdent);
       allProperties.putAll(
           FilesetUtil.getUserDefinedFileSystemConfigs(
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
@@ -961,19 +961,25 @@ public abstract class BaseGVFSOperations implements Closeable {
     return cacheBuilder.build();
   }
 
-  private Map<String, String> getAllProperties(
-      NameIdentifier filesetIdent, Map<String, String> filesetProperties) {
+  private Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
     Map<String, String> allProperties = new HashMap<>();
-    Catalog catalog =
-        (Catalog)
-            getFilesetCatalog(
-                NameIdentifier.of(
-                    filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
-    allProperties.putAll(catalog.properties());
-
-    Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
-    allProperties.putAll(schema.properties());
-    allProperties.putAll(filesetProperties);
+    String catalogName = filesetIdent.namespace().level(1);
+    String schemaName = filesetIdent.namespace().level(2);
+    Catalog catalog = getGravitinoClient().loadCatalogWithResolvedProperties(catalogName);
+    if (catalog.properties() != null) {
+      allProperties.putAll(catalog.properties());
+    }
+    Schema schema = catalog.asSchemas().loadSchemaWithResolvedProperties(schemaName);
+    if (schema.properties() != null) {
+      allProperties.putAll(schema.properties());
+    }
+    Fileset resolvedFileset =
+        catalog
+            .asFilesetCatalog()
+            .loadFilesetWithResolvedProperties(NameIdentifier.of(schemaName, filesetIdent.name()));
+    if (resolvedFileset.properties() != null) {
+      allProperties.putAll(resolvedFileset.properties());
+    }
     allProperties.putAll(extractNonDefaultConfig(conf));
     return allProperties;
   }

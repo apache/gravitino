@@ -65,11 +65,19 @@ public interface SupportsCatalogs {
    * <p>Credential-vending keys are omitted (use the credentials API). Legacy hidden plaintext
    * secrets are omitted. Default {@link #loadCatalog(String)} property omit behavior is unchanged.
    *
+   * <p>The returned catalog is intended for reading resolved properties. Server-side / in-process
+   * callers may receive a properties-focused view that does not support {@code asSchemas()}, {@code
+   * asTableCatalog()}, etc. HTTP clients rebuild an operable catalog from the response DTO.
+   *
    * @param catalogName the name of the catalog
    * @return the catalog with resolved plaintext properties
    * @throws NoSuchCatalogException If the catalog does not exist.
    */
-  Catalog loadCatalogWithResolvedProperties(String catalogName) throws NoSuchCatalogException;
+  default Catalog loadCatalogWithResolvedProperties(String catalogName)
+      throws NoSuchCatalogException {
+    throw new UnsupportedOperationException(
+        "Loading catalog with resolved properties is not supported");
+  }
 
   /**
    * Check if a catalog exists.
