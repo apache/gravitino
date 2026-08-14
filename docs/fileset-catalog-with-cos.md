@@ -30,13 +30,17 @@ Once the server is up and running, you can proceed to configure the Fileset cata
 
 In addition to the basic configurations mentioned in [Fileset catalog properties](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with COS:
 
-| Configuration item      | Description                                                                                                                                                                                                                                                                                                                                                                                                                    | Default value | Required |
-|-------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
-| `cos-region`            | The region of the Tencent Cloud COS bucket, e.g. `ap-guangzhou`, `ap-shanghai`.                                                                                                                                                                                                                                                                                                                                                | (none)        | Yes      |
-| `cos-endpoint`          | The endpoint *suffix* of the Tencent Cloud COS service (mapped to `fs.cosn.bucket.endpoint_suffix`). It is a host suffix, not a full URL — e.g. `cos.ap-guangzhou.myqcloud.com`, **not** `https://cos.ap-guangzhou.myqcloud.com`. Optional; when not set, hadoop-cos derives it from `cos-region` (`cos.${region}.myqcloud.com`). Set this only if you need to point to a non-public endpoint (e.g. an internal/VPC endpoint). | (none)        | No       |
-| `cos-access-key-id`     | The static access key ID (Tencent Cloud `SecretId`) used to access COS data.                                                                                                                                                                                                                                                                                                                                                   | (none)        | Yes      |
-| `cos-secret-access-key` | The static secret access key (Tencent Cloud `SecretKey`) used to access COS data.                                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      |
-| `credential-providers`  | The credential provider types, separated by comma. The currently supported value is `cos-secret-key`. Setting this enables credential vending provided by the Gravitino server, so the GVFS client no longer needs `cos-access-key-id` / `cos-secret-access-key` locally. See [cos-credential-vending](#fileset-with-credential-vending) below for details.                                                                    | (none)        | No       |
+| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Default value | Required |
+|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `cos-region`                  | The region of the Tencent Cloud COS bucket, e.g. `ap-guangzhou`, `ap-shanghai`.                                                                                                                                                                                                                                                                                                                                                                                       | (none)        | Yes      |
+| `cos-endpoint`                | The endpoint *suffix* of the Tencent Cloud COS service (mapped to `fs.cosn.bucket.endpoint_suffix`). It is a host suffix, not a full URL — e.g. `cos.ap-guangzhou.myqcloud.com`, **not** `https://cos.ap-guangzhou.myqcloud.com`. Optional; when not set, hadoop-cos derives it from `cos-region` (`cos.${region}.myqcloud.com`). Set this only if you need to point to a non-public endpoint (e.g. an internal/VPC endpoint).                                        | (none)        | No       |
+| `cos-access-key-id`           | The static access key ID (Tencent Cloud `SecretId`) used to access COS data.                                                                                                                                                                                                                                                                                                                                                                                          | (none)        | Yes      |
+| `cos-secret-access-key`       | The static secret access key (Tencent Cloud `SecretKey`) used to access COS data.                                                                                                                                                                                                                                                                                                                                                                                     | (none)        | Yes      |
+| `credential-providers`        | The credential provider types, separated by comma. The currently supported values are `cos-secret-key` (static AK/SK vended by the server) and `cos-token` (short-lived STS token issued via CAM `AssumeRole`). Setting this enables credential vending provided by the Gravitino server, so the GVFS client no longer needs `cos-access-key-id` / `cos-secret-access-key` locally. See [cos-credential-vending](#fileset-with-credential-vending) below for details. | (none)        | No       |
+| `cos-role-arn`                | The CAM role ARN that the Gravitino server assumes when issuing STS temporary credentials, e.g. `qcs::cam::uin/100012345678:roleName/GravitinoCOSAccess`. Required only when `credential-providers` includes `cos-token`.                                                                                                                                                                                                                                             | (none)        | No       |
+| `cos-app-id`                  | The numeric Tencent Cloud AppId of the bucket owner (the trailing segment of the bucket name, e.g. `1250000000`). Required only when `credential-providers` includes `cos-token`; used to build the resource ARN in the STS session policy.                                                                                                                                                                                                                           | (none)        | No       |
+| `cos-external-id`             | Optional `ExternalId` propagated to the STS `AssumeRole` call to lock the role's trust policy to Gravitino. Only meaningful when `credential-providers` includes `cos-token`.                                                                                                                                                                                                                                                                                         | (none)        | No       |
+| `cos-token-expire-in-secs`    | The COS STS token expire time in seconds. Must not exceed the role's max session duration. Only meaningful when `credential-providers` includes `cos-token`.                                                                                                                                                                                                                                                                                                          | 3600          | No       |
 
 :::note
 The fileset catalog automatically loads filesystem providers on the classpath. The COS provider
@@ -471,17 +475,14 @@ For other use cases of the Java GVFS client, refer to the [Gravitino Virtual Fil
 
 ## Fileset with Credential Vending
 
-Gravitino supports credential vending for the COS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access COS fileset without providing authentication information like `cos-access-key-id` and `cos-secret-access-key` in the GVFS client configuration.
+Since 2.0.0, Gravitino supports credential vending for the COS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access COS fileset without providing authentication information like `cos-access-key-id` and `cos-secret-access-key` in the GVFS client configuration.
 
 The currently supported credential providers are listed below:
 
-| Credential provider | Description                                                                                                                                                                | Vended credential type |
-|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|
-| `cos-secret-key`    | The Gravitino server hands out the static `cos-access-key-id` / `cos-secret-access-key` configured on the catalog. Useful for centralising credentials on the server side. | Static AK/SK           |
-
-:::note
-STS-token-based credential vending (`cos-token`) for COS, including role-arn / assume-role configuration, will be added in a follow-up release. Until then, only the static `cos-secret-key` provider is available.
-:::
+| Credential provider | Description                                                                                                                                                                                                                                                                                                                                                                                        | Vended credential type |
+|---------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------|
+| `cos-secret-key`    | The Gravitino server hands out the static `cos-access-key-id` / `cos-secret-access-key` configured on the catalog. Useful for centralising credentials on the server side.                                                                                                                                                                                                                         | Static AK/SK           |
+| `cos-token`         | The Gravitino server calls Tencent Cloud CAM `AssumeRole` and hands out a short-lived STS triple (`TmpSecretId` / `TmpSecretKey` / `SessionToken`), scoped down to the fileset paths that the client requested. Requires `cos-role-arn` and `cos-app-id` on the catalog and CAM permissions (`sts:AssumeRole` / `cam:GetFederationToken`) on the account whose AK/SK is configured on the catalog. | Short-lived STS token  |
 
 ### Create a COS Fileset Catalog with Credential Vending
 
@@ -502,6 +503,31 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
+
+To enable STS-based credential vending instead (recommended for production, since the AK/SK on the catalog never leaves the server), switch `credential-providers` to `cos-token` and add the CAM role wiring. The AK/SK below is the *server-side* account used to call `sts:AssumeRole`; the vended clients will only ever see the short-lived session token issued for the requested fileset paths:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "cos-catalog-with-sts-vending",
+  "type": "FILESET",
+  "comment": "This is a COS fileset catalog with STS credential vending",
+  "properties": {
+    "location": "cosn://my-bucket-1250000000/root",
+    "cos-region": "ap-guangzhou",
+    "cos-access-key-id": "server_access_key",
+    "cos-secret-access-key": "server_secret_key",
+    "credential-providers": "cos-token",
+    "cos-role-arn": "qcs::cam::uin/100012345678:roleName/GravitinoCOSAccess",
+    "cos-app-id": "1250000000",
+    "cos-token-expire-in-secs": "1800"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs
+```
+
+:::note
+When using `cos-token`, the CAM role referenced by `cos-role-arn` must (1) trust the Gravitino server principal (or use `cos-external-id` for stricter matching) and (2) have COS read/write permissions on the bucket paths you plan to expose. Gravitino narrows the vended token further via a session policy that only allows the fileset's own read/write locations, so the role can be as broad as your organisation's policies allow — the effective permission is the intersection.
+:::
 
 ### Access a COS Fileset with Credential Vending
 
