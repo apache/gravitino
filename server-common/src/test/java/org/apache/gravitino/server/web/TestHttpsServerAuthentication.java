@@ -22,7 +22,6 @@ package org.apache.gravitino.server.web;
 import static org.apache.gravitino.server.web.TestTlsServerUtils.TEST_STORE_PASSWORD;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.fail;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -36,7 +35,6 @@ import java.security.KeyStore;
 import java.time.Duration;
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLHandshakeException;
 import javax.net.ssl.TrustManagerFactory;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -119,7 +117,7 @@ public class TestHttpsServerAuthentication {
         assertThrows(
             Exception.class, () -> client.send(request, HttpResponse.BodyHandlers.ofString()));
 
-    assertHandshakeFailure(exception);
+    TestTlsServerUtils.assertHandshakeFailure(exception);
   }
 
   @Test
@@ -138,7 +136,7 @@ public class TestHttpsServerAuthentication {
         assertThrows(
             Exception.class, () -> client.send(request, HttpResponse.BodyHandlers.ofString()));
 
-    assertHandshakeFailure(exception);
+    TestTlsServerUtils.assertHandshakeFailure(exception);
   }
 
   @Test
@@ -156,7 +154,7 @@ public class TestHttpsServerAuthentication {
         assertThrows(
             Exception.class, () -> client.send(request, HttpResponse.BodyHandlers.ofString()));
 
-    assertHandshakeFailure(exception);
+    TestTlsServerUtils.assertHandshakeFailure(exception);
   }
 
   @Test
@@ -177,7 +175,7 @@ public class TestHttpsServerAuthentication {
 
   @Test
   public void testHttpWithoutCustomTlsConfiguration() throws Exception {
-    int port = startHttpServer(jettyServer, createTestServlet(), TEST_PATH);
+    int port = TestTlsServerUtils.startHttpServer(jettyServer, createTestServlet(), TEST_PATH);
 
     HttpRequest request =
         HttpRequest.newBuilder()
@@ -191,21 +189,6 @@ public class TestHttpsServerAuthentication {
 
     assertEquals(HttpServletResponse.SC_OK, response.statusCode());
     assertEquals(TEST_RESPONSE, response.body());
-  }
-
-  public static int startHttpServer(JettyServer server, HttpServlet servlet, String servletPath)
-      throws Exception {
-
-    int port = RESTUtils.findAvailablePort(5000, 6000);
-
-    Config config = new Config(false) {};
-    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
-
-    server.initialize(JettyServerConfig.fromConfig(config), "test", false);
-    server.start();
-    server.addServlet(servlet, servletPath);
-
-    return port;
   }
 
   private static HttpClient createHttpsClient(Path trustStorePath, Path clientKeyStorePath)
@@ -265,19 +248,5 @@ public class TestHttpsServerAuthentication {
         response.getWriter().write(SERVLET_RESPONSE);
       }
     };
-  }
-
-  private static void assertHandshakeFailure(Throwable throwable) {
-    Throwable current = throwable;
-
-    while (current != null) {
-      if (current instanceof SSLHandshakeException) {
-        return;
-      }
-
-      current = current.getCause();
-    }
-
-    fail("Expected an SSL handshake failure, but received: " + throwable, throwable);
   }
 }
