@@ -176,34 +176,40 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
-    try {
-      Fileset createdFileset =
-          TreeLockUtils.doWithTreeLock(
-              // Lock at fileset level (not schema level) to allow concurrent fileset creation.
-              // Trade-off: listFilesets() may temporarily miss in-progress creations until
-              // complete.
-              ident,
-              LockType.WRITE,
-              () ->
-                  doWithCatalog(
-                      catalogIdent,
-                      c ->
-                          c.doWithFilesetOps(
-                              f ->
-                                  f.createMultipleLocationFileset(
-                                      ident, comment, type, storageLocations, updatedProperties)),
-                      NoSuchSchemaException.class,
-                      FilesetAlreadyExistsException.class));
-      return EntityCombinedFileset.of(createdFileset)
-          .withHiddenProperties(
-              getHiddenPropertyNames(
-                  catalogIdent,
-                  HasPropertyMetadata::filesetPropertiesMetadata,
-                  createdFileset.properties()));
-    } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(secretMaterials);
-      throw e;
-    }
+    return TreeLockUtils.doWithTreeLock(
+        // Lock at fileset level (not schema level) to allow concurrent fileset creation.
+        // Trade-off: listFilesets() may temporarily miss in-progress creations until
+        // complete.
+        ident,
+        LockType.WRITE,
+        () -> {
+          // Same pattern as CatalogManager.createCatalog: only roll back secrets when the
+          // underlying create did not succeed (needClean stays true).
+          boolean needClean = true;
+          try {
+            Fileset createdFileset =
+                doWithCatalog(
+                    catalogIdent,
+                    c ->
+                        c.doWithFilesetOps(
+                            f ->
+                                f.createMultipleLocationFileset(
+                                    ident, comment, type, storageLocations, updatedProperties)),
+                    NoSuchSchemaException.class,
+                    FilesetAlreadyExistsException.class);
+            needClean = false;
+            return EntityCombinedFileset.of(createdFileset)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        catalogIdent,
+                        HasPropertyMetadata::filesetPropertiesMetadata,
+                        createdFileset.properties()));
+          } finally {
+            if (needClean) {
+              secretManager.rollbackSecrets(secretMaterials);
+            }
+          }
+        });
   }
 
   /**
