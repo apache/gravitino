@@ -22,7 +22,8 @@ package org.apache.gravitino.spark.connector.plugin;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
-import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
+import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
+import org.apache.gravitino.spark.connector.catalog.SparkCatalogs;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf;
@@ -61,10 +62,10 @@ public class TestGravitinoDriverPlugin {
   }
 
   /**
-   * Paimon publishes no paimon-spark artifact for every Spark version this connector supports, so
-   * the Paimon classes are absent from some builds. Registering the Paimon session extension there
-   * would fail SparkSession construction, so the plugin must skip it exactly when the adaptor
-   * reports no Paimon catalog for the running Spark version.
+   * Paimon publishes no paimon-spark artifact for every Spark version and Scala version this
+   * connector supports, so the Paimon classes are absent from some builds. Registering the Paimon
+   * session extension there would fail SparkSession construction, so the plugin must skip it
+   * exactly when this build declares no Paimon catalog.
    */
   @Test
   void testPaimonExtensionFollowsCatalogAvailability() {
@@ -76,7 +77,7 @@ public class TestGravitinoDriverPlugin {
 
     String extensions = sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
     boolean paimonSupported =
-        CatalogNameAdaptor.getCatalogName(GravitinoDriverPlugin.PAIMON_PROVIDER) != null;
+        SparkCatalogs.classNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON);
     Assertions.assertEquals(
         paimonSupported,
         extensions.contains(GravitinoDriverPlugin.PAIMON_SPARK_EXTENSIONS),
