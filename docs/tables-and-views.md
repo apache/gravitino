@@ -43,6 +43,101 @@ across catalogs and each provider maps them to its own.
 Where a provider cannot represent a type, the provider's own page says so. Type mapping is the most
 common place two catalogs of different providers differ.
 
+#### Table Column Type
+
+Gravitino supports the following column types. A catalog may support only a subset; see the
+provider's page for its type mapping.
+
+| Type                      | Java                                                                    | JSON                                                                                                                               |
+|---------------------------|-------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
+| Boolean                   | `Types.BooleanType.get()`                                               | `"boolean"`                                                                                                                        |
+| Byte                      | `Types.ByteType.get()`                                                  | `"byte"`                                                                                                                           |
+| Unsigned Byte             | `Types.ByteType.unsigned()`                                             | `"byte unsigned"`                                                                                                                  |
+| Short                     | `Types.ShortType.get()`                                                 | `"short"`                                                                                                                          |
+| Unsigned Short            | `Types.ShortType.unsigned()`                                            | `"short unsigned"`                                                                                                                 |
+| Integer                   | `Types.IntegerType.get()`                                               | `"integer"`                                                                                                                        |
+| Unsigned Integer          | `Types.IntegerType.unsigned()`                                          | `"integer unsigned"`                                                                                                               |
+| Long                      | `Types.LongType.get()`                                                  | `"long"`                                                                                                                           |
+| Unsigned Long             | `Types.LongType.unsigned()`                                             | `"long unsigned"`                                                                                                                  |
+| Float                     | `Types.FloatType.get()`                                                 | `"float"`                                                                                                                          |
+| Double                    | `Types.DoubleType.get()`                                                | `"double"`                                                                                                                         |
+| Decimal(precision, scale) | `Types.DecimalType.of(precision, scale)`                                | `"decimal(p,s)"`                                                                                                                   |
+| String                    | `Types.StringType.get()`                                                | `"string"`                                                                                                                         |
+| FixedChar(length)         | `Types.FixedCharType.of(length)`                                        | `"char(l)"`                                                                                                                        |
+| VarChar(length)           | `Types.VarCharType.of(length)`                                          | `"varchar(l)"`                                                                                                                     |
+| Timestamp                 | `Types.TimestampType.withoutTimeZone()`                                 | `"timestamp"`                                                                                                                      |
+| Timestamp(p)              | `Types.TimestampType.withoutTimeZone(p)`                                | `"timestamp(p)"`                                                                                                                   |
+| TimestampWithTimezone     | `Types.TimestampType.withTimeZone()`                                    | `"timestamp_tz"`                                                                                                                   |
+| TimestampWithTimezone(p)  | `Types.TimestampType.withTimeZone(p)`                                   | `"timestamp_tz(p)"`                                                                                                                |
+| Date                      | `Types.DateType.get()`                                                  | `"date"`                                                                                                                           |
+| Time                      | `Types.TimeType.get()`                                                  | `"time"`                                                                                                                           |
+| Time(p)                   | `Types.TimeType.of(p)`                                                  | `"time(p)"`                                                                                                                        |
+| IntervalToYearMonth       | `Types.IntervalYearType.get()`                                          | `"interval_year"`                                                                                                                  |
+| IntervalToDayTime         | `Types.IntervalDayType.get()`                                           | `"interval_day"`                                                                                                                   |
+| Fixed(length)             | `Types.FixedType.of(length)`                                            | `"fixed(l)"`                                                                                                                       |
+| Binary                    | `Types.BinaryType.get()`                                                | `"binary"`                                                                                                                         |
+| List                      | `Types.ListType.of(Types.IntegerType.get(), true)`                       | `{"type":"list","containsNull":true,"elementType":"integer"}`                                                                |
+| Map                       | `Types.MapType.of(Types.StringType.get(), Types.IntegerType.get(), true)` | `{"type":"map","keyType":"string","valueType":"integer","valueContainsNull":true}`                                       |
+| Struct                    | `Types.StructType.of(Types.StructType.Field.of("id", Types.IntegerType.get(), false, null))` | `{"type":"struct","fields":[{"name":"id","type":"integer","nullable":false}]}`                            |
+| Union                     | `Types.UnionType.of(Types.IntegerType.get(), Types.StringType.get())`    | `{"type":"union","types":["integer","string"]}`                                                                              |
+| UUID                      | `Types.UUIDType.get()`                                                  | `"uuid"`                                                                                                                           |
+| Variant                   | `Types.VariantType.get()`                                               | `"variant"`                                                                                                                        |
+| Null                      | `Types.NullType.get()`                                                  | `"null"`                                                                                                                           |
+| Geometry                  | `Types.GeometryType.crs84()`                                            | `"geometry"`                                                                                                                       |
+| Geography                 | `Types.GeographyType.crs84()`                                           | `"geography"`                                                                                                                      |
+
+Decimal precision is in the range 1-38, and scale is in the range 0-precision. The optional
+precision for time and timestamp types is in the range 0-12.
+
+##### Null type
+
+The null type represents a column that holds only null values and whose concrete type is not yet
+known. It is intended to be promoted to a concrete type through schema evolution before data is
+written. Support is connector-specific.
+
+##### External type
+
+An external type represents a catalog type that is not part of the Gravitino type system. It keeps
+the external catalog's type string so clients can inspect it without losing information.
+
+```json
+{
+  "type": "external",
+  "catalogString": "user-defined"
+}
+```
+
+```java
+String typeString = ((ExternalType) type).catalogString();
+```
+
+##### Unparsed type
+
+An unparsed type preserves forward compatibility when a client does not recognize a type returned
+by the server. The client retains the serialized value instead of failing deserialization.
+
+```json
+{
+  "type": "unparsed",
+  "unparsedType": "unknown-type"
+}
+```
+
+```java
+String unparsedValue = ((UnparsedType) type).unparsedType();
+```
+
+#### Table Column Default Value
+
+A column default can be a [literal](./expression.md#literal) or an
+[expression](./expression.md). The underlying catalog applies it to new rows, and support depends
+on the catalog provider.
+
+#### Table Column Auto-increment
+
+An auto-increment column asks the underlying catalog to generate values for new rows. Support and
+restrictions are provider-specific, so check the provider's table capabilities before enabling it.
+
 ### Table Properties
 
 Properties are provider-specific and carry what the source system needs, such as the file format for
