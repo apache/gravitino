@@ -80,7 +80,7 @@ When using Gravitino authorization for Hive with Apache Ranger, see the [Authori
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
 Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
@@ -103,7 +103,7 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema Operations
 
-see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
+see [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations).
 
 ## Table
 
@@ -159,7 +159,7 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `union`             |
 
 :::info
-1. The data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
+1. The data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type from the Hive catalog.
 2. Using the `struct` data type with field comments will throw an error, as it does not work for Hive tables (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
 :::
 
