@@ -45,10 +45,15 @@
 # Those fields would converge even with the cache disabled and the poller
 # stopped. The audit block is the opposite: EntityCombined*#auditInfo() merges
 # the entity's audit over the catalog's with overwrite=true, so
-# audit.lastModifiedTime (bumped by every alter) and audit.createTime (new on
-# every recreate) are served from the entity cache alone. Externally backed
-# cases therefore assert on audit, and treat name/comment/properties as an
-# end-to-end check only.
+# audit.lastModifiedTime is served from the entity cache alone. Externally
+# backed alter cases therefore assert on it, and treat name/comment/properties
+# as an end-to-end check only.
+#
+# Two properties of that field drive how the cases are written. It is null until
+# the first alter (creation sets only creator and createTime), so each such
+# section primes it once before the case starts. And it is unusable across a
+# same-name recreate, where the reloaded entity comes back null; see the note in
+# the TABLE recreate case.
 #
 # Covered cache entity types and mutations:
 #   METALAKE  alter, rename, disable/enable, drop
@@ -703,6 +708,11 @@ mutate_a "create Kafka catalog" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" 
 section "SCHEMA cache: alter and drop"
 mutate_a "create Iceberg schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
   "{\"name\":\"${SCHEMA_NAME}\",\"comment\":\"schema-old\",\"properties\":{}}"
+# Creating an entity sets only creator and createTime, so audit.lastModifiedTime
+# stays null until the first alter. The audit probes below need a non-null
+# baseline to mean anything, so prime the field here, outside the case.
+mutate_a "prime schema audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
 
 consistency_case "SCHEMA alter propagates A -> B"
 prewarm_value "B caches the old schema before A alters it" "$INSTANCE_B" \
@@ -735,6 +745,9 @@ await_value "B sees the latest schema value" "$INSTANCE_B" \
 section "TABLE cache: alter, rename, and drop"
 mutate_a "create Iceberg table on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables" \
   "{\"name\":\"${TABLE_NAME}\",\"comment\":\"table-old\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
+# Prime audit.lastModifiedTime; see the note in the SCHEMA section.
+mutate_a "prime table audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
+  '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
 
 consistency_case "TABLE alter propagates A -> B"
 prewarm_value "B caches the old table before A alters it" "$INSTANCE_B" \
@@ -778,25 +791,25 @@ consistency_case "TABLE drop plus same-name recreate evicts the old generation"
 prewarm_value "B caches the first table generation" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" \
   '.table.comment' table-generation-1
-# The recreated table is a different entity with a different creation time. If B
-# kept the first generation's entity, the catalog side would show generation 2
-# while the audit side still showed generation 1.
-STALE_TABLE_CREATED=$(read_field "$INSTANCE_B" \
-  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" \
-  '.table.audit.createTime')
+# No audit probe here, unlike the other externally backed cases. A same-name
+# recreate of an Iceberg table comes back from B with a null audit block, so
+# audit.createTime cannot distinguish "the stale entity was evicted" from "no
+# entity was resolved at all". AuditInfo#merge runs with overwrite=true, so a
+# null entity audit blanks the catalog-side values rather than falling back to
+# them; that is worth chasing separately before relying on audit here.
 mutate_a "drop first table generation on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}?purge=true"
 mutate_a "recreate the same table name on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables" \
   "{\"name\":\"${RECREATE_TABLE}\",\"comment\":\"table-generation-2\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
 await_value "B loads the second table generation" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" '.table.comment' table-generation-2
-await_changed "B does not serve the first generation's cached entity" "$INSTANCE_B" \
-  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" \
-  '.table.audit.createTime' "$STALE_TABLE_CREATED"
 mutate_a "remove recreate-probe table" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}?purge=true"
 
 section "VIEW cache: alter, rename, and drop"
 mutate_a "create Iceberg view on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views" \
   "{\"name\":\"${VIEW_NAME}\",\"comment\":\"view-old\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 1 AS id\"}],\"properties\":{}}"
+# Prime audit.lastModifiedTime; see the note in the SCHEMA section.
+mutate_a "prime view audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
+  '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
 
 consistency_case "VIEW alter propagates A -> B"
 prewarm_value "B caches the old view before A alters it" "$INSTANCE_B" \
@@ -1020,7 +1033,12 @@ await_value "B loads the second fileset generation" "$INSTANCE_B" \
 
 section "TOPIC cache: alter and drop"
 mutate_a "create Kafka topic on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics" \
-  "{\"name\":\"${TOPIC_NAME}\",\"comment\":\"topic-old\",\"properties\":{\"partition-count\":\"1\",\"replication-factor\":\"1\"}}"
+  "{\"name\":\"${TOPIC_NAME}\",\"comment\":\"topic-priming\",\"properties\":{\"partition-count\":\"1\",\"replication-factor\":\"1\"}}"
+# Prime audit.lastModifiedTime; see the note in the SCHEMA section. Kafka
+# validates topic properties against its own config keys, so prime through the
+# comment rather than an arbitrary property.
+mutate_a "prime topic audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
+  '{"updates":[{"@type":"updateComment","newComment":"topic-old"}]}'
 
 consistency_case "TOPIC alter propagates A -> B"
 prewarm_value "B caches the old topic before A alters it" "$INSTANCE_B" \
