@@ -81,6 +81,6 @@ public interface SchemaDispatcher extends SupportsSchemas {
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("Creating a schema with secrets is not supported");
   }
 }

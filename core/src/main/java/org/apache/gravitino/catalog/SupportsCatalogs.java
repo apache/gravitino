@@ -143,7 +143,7 @@ public interface SupportsCatalogs {
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("Creating a catalog with secrets is not supported");
   }
 
   /**
