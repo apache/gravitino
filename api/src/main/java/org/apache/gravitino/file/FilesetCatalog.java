@@ -258,6 +258,6 @@ public interface FilesetCatalog {
    */
   default String getFileLocation(NameIdentifier ident, String subPath, String locationName)
       throws NoSuchFilesetException, NoSuchLocationNameException {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("Getting file location is not supported");
   }
 }
