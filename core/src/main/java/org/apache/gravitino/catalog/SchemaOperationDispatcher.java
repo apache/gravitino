@@ -334,8 +334,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .withName(schemaEntity.name())
                                   .withNamespace(ident.namespace())
                                   .withProperties(
-                                      propertiesForSchemaEntityAlter(
-                                          schemaEntity, alteredSchema, changes))
+                                      propertiesForSchemaEntityAlter(schemaEntity, changes))
                                   .withAuditInfo(
                                       AuditInfo.builder()
                                           .withCreator(schemaEntity.auditInfo().creator())
@@ -443,28 +442,23 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   }
 
   /**
-   * Builds properties to persist on {@link SchemaEntity} after alter. Starts from the existing
-   * entity properties (so write-through secret URNs are not dropped when the catalog omits them),
-   * overlays catalog-returned properties, then applies set/remove changes.
+   * Builds properties to persist on {@link SchemaEntity} after alter, matching catalog alter: start
+   * from existing entity properties and apply set/remove changes so write-through secret URNs are
+   * preserved when the underlying catalog omits them.
    */
   private static Map<String, String> propertiesForSchemaEntityAlter(
-      SchemaEntity existing, Schema alteredSchema, SchemaChange[] changes) {
-    Map<String, String> merged = new HashMap<>();
-    if (existing.properties() != null) {
-      merged.putAll(existing.properties());
-    }
-    if (alteredSchema.properties() != null) {
-      merged.putAll(alteredSchema.properties());
-    }
+      SchemaEntity existing, SchemaChange[] changes) {
+    Map<String, String> newProps =
+        existing.properties() == null ? new HashMap<>() : new HashMap<>(existing.properties());
     for (SchemaChange change : changes) {
       if (change instanceof SchemaChange.SetProperty) {
         SchemaChange.SetProperty setProperty = (SchemaChange.SetProperty) change;
-        merged.put(setProperty.getProperty(), setProperty.getValue());
+        newProps.put(setProperty.getProperty(), setProperty.getValue());
       } else if (change instanceof SchemaChange.RemoveProperty) {
-        merged.remove(((SchemaChange.RemoveProperty) change).getProperty());
+        newProps.remove(((SchemaChange.RemoveProperty) change).getProperty());
       }
     }
-    return merged;
+    return newProps;
   }
 
   /**
