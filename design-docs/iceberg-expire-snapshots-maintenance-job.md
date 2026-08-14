@@ -32,7 +32,7 @@
 ## 1. Background
 
 Without periodic snapshot expiration, Iceberg table metadata grows
-indefinitely — accumulating snapshot JSON files and manifest lists that
+indefinitely - accumulating snapshot JSON files and manifest lists that
 slow down table operations and waste storage. The existing built-in
 maintenance jobs (`builtin-iceberg-rewrite-data-files` for data compaction
 and `builtin-iceberg-update-stats` for metrics) address data file
@@ -54,11 +54,13 @@ job execution.
 1. Add a new built-in policy type `system_iceberg_snapshot_expiration` for
    declarative snapshot expiration configuration.
 2. Add a strategy handler that evaluates when snapshot expiration should
-   run based on table statistics (snapshot count, age).
-3. Add a job adapter that converts strategy evaluation results into job
+   run, based on the snapshot count read from Iceberg table metadata.
+3. Expose that snapshot count as a reserved Iceberg table property so the
+   handler needs no statistics collection.
+4. Add a job adapter that converts strategy evaluation results into job
    configurations.
-4. Add the Spark job that executes Iceberg's `expire_snapshots` procedure.
-5. Ensure the full flow works end-to-end: policy → strategy → job
+5. Add the Spark job that executes Iceberg's `expire_snapshots` procedure.
+6. Ensure the full flow works end-to-end: policy → strategy → job
    submission → Spark execution.
 
 ---
@@ -66,7 +68,7 @@ job execution.
 ## 3. Non-Goals
 
 - Orphan file removal (separate Iceberg procedure, separate issue).
-- Automatic policy creation — users must explicitly create and attach
+- Automatic policy creation - users must explicitly create and attach
   policies.
 - Changes to the Optimizer scheduling framework itself.
 
@@ -127,9 +129,10 @@ compaction pattern.
                            ↓
 ┌──────────────────────────────────────────────────────────────┐
 │  SnapshotExpirationStrategyHandler                           │
-│    extends BaseExpressionStrategyHandler                     │
-│    dataRequirements: {TABLE_METADATA, TABLE_STATISTICS}      │
-│    Evaluates: snapshot count ≥ threshold                     │
+│    implements StrategyHandler                                │
+│    dataRequirements: {TABLE_METADATA}                        │
+│    Reads `snapshot-count` from table metadata properties      │
+│    Evaluates: snapshot count ≥ minSnapshotCount               │
 │    Returns: StrategyEvaluation with score + context          │
 └──────────────────────────┬───────────────────────────────────┘
                            ↓
@@ -155,7 +158,7 @@ compaction pattern.
 
 ---
 
-### 5.2 Layer 1 — Policy Definition (`api/`)
+### 5.2 Layer 1 - Policy Definition (`api/`)
 
 #### 5.2.1 New Policy Type
 
@@ -188,52 +191,88 @@ public class IcebergSnapshotExpirationContent implements PolicyContent {
   public static final String JOB_TEMPLATE_NAME_VALUE =
       "builtin-iceberg-expire-snapshots";
 
-  // Configurable fields — all independently optional
-  @Nullable private final Long olderThanDays;
-  @Nullable private final Long retainLast;
+  // Configurable fields - all independently optional
+  @Nullable private final Long olderThanDays;   // no Gravitino default
+  @Nullable private final Long retainLast;      // no Gravitino default
   @Nullable private final Boolean streamResults;
   private final long minSnapshotCount;    // trigger threshold, default: 10
 
-  // Trigger / score expressions
-  public static final String TRIGGER_EXPR =
-      "custom-snapshot-count >= minSnapshotCount";
-  public static final String SCORE_EXPR =
-      "custom-snapshot-count";
+  // Rule keys
+  public static final String MIN_SNAPSHOT_COUNT_KEY = "minSnapshotCount";
 
-  // Defaults (applied when field is null)
-  public static final long DEFAULT_OLDER_THAN_DAYS     = 5;
-  public static final long DEFAULT_RETAIN_LAST         = 1;
-  public static final boolean DEFAULT_STREAM_RESULTS   = false;
+  // Defaults
+  public static final boolean DEFAULT_STREAM_RESULTS   = true;
   public static final long DEFAULT_MIN_SNAPSHOT_COUNT  = 10;
 }
 ```
 
-#### 5.2.3 Policy Content Fields
+`olderThanDays` and `retainLast` deliberately have **no Gravitino-side
+default**. See [§5.2.3](#523-expiration-parameters-and-defaults).
 
-All expiration parameters are **independently optional**. A user may
-specify only `olderThanDays`, only `retainLast`, or both — the job adapter
-will only pass set parameters to the Spark procedure. This matches the
-Iceberg `expire_snapshots` procedure semantics, where each parameter is
-independent.
+#### 5.2.3 Expiration Parameters and Defaults
 
-| Field             | Type      | Required | Default | Description                                                  |
-| ----------------- | --------- | -------- | ------- | ------------------------------------------------------------ |
-| `olderThanDays`   | `Long`    | No       | 5       | Expire snapshots older than this many days                    |
-| `retainLast`      | `Long`    | No       | 1       | Minimum number of snapshots to always retain                  |
-| `streamResults`   | `Boolean` | No       | false   | Whether to stream deletion results (useful for large tables)  |
-| `minSnapshotCount`| `long`    | No       | 10      | Trigger threshold — only run when snapshot count exceeds this |
+Both expiration conditions are **independently optional**. A user may
+specify only `olderThanDays`, only `retainLast`, or both - the job adapter
+omits an unset condition from the procedure call rather than filling it in
+with a Gravitino default. (`streamResults` is different: it is a transport
+knob rather than an expiration condition, so it is always passed - see
+[§5.2.4](#524-why-streamresults-defaults-to-true).)
+
+**Why no Gravitino default for `olderThanDays` / `retainLast`:** Iceberg
+already defines defaults for both, sourced from table properties:
+
+| Procedure argument | Iceberg fallback (table property)         | Iceberg default |
+| ------------------ | ----------------------------------------- | --------------- |
+| `older_than`       | `history.expire.max-snapshot-age-ms`      | 5 days          |
+| `retain_last`      | `history.expire.min-snapshots-to-keep`    | 1               |
+
+If Gravitino injected its own defaults, a policy that only sets
+`retainLast` would silently also apply age-based expiration, and a
+per-table `history.expire.*` property set by the table owner would be
+overridden by the policy. Omitting unset parameters keeps a single
+condition meaningful on its own and keeps table-level Iceberg
+configuration authoritative.
+
+| Field             | Type      | Required | Default                                       | Description                                                  |
+| ----------------- | --------- | -------- | --------------------------------------------- | ------------------------------------------------------------ |
+| `olderThanDays`   | `Long`    | No       | unset - falls back to Iceberg table property  | Expire snapshots older than this many days                    |
+| `retainLast`      | `Long`    | No       | unset - falls back to Iceberg table property  | Minimum number of snapshots to always retain                  |
+| `streamResults`   | `Boolean` | No       | `true`                                        | Stream deleted-file rows to the driver by RDD partition       |
+| `minSnapshotCount`| `long`    | No       | 10                                            | Trigger threshold - only run once the snapshot count reaches this |
 
 **Usage scenarios:**
 
-- **Only `olderThanDays`:** Expire snapshots older than N days, keep the
-  Iceberg default for `retain_last` (1).
-- **Only `retainLast`:** Keep at most N snapshots regardless of age (all
-  older ones are expired).
+- **Only `olderThanDays`:** Expire snapshots older than N days; the number
+  retained follows `history.expire.min-snapshots-to-keep` (Iceberg
+  default 1).
+- **Only `retainLast`:** Keep at least N snapshots; the age cutoff follows
+  `history.expire.max-snapshot-age-ms` (Iceberg default 5 days).
 - **Both:** Expire snapshots older than N days, but always keep at least M
   snapshots.
-- **Neither:** Use defaults (expire > 5 days, retain at least 1).
+- **Neither:** Pure Iceberg behavior - expiration is governed entirely by
+  the table's `history.expire.*` properties.
 
-#### 5.2.4 Example Policy Creation
+#### 5.2.4 Why `streamResults` Defaults to `true`
+
+Iceberg's `stream_results` controls how the list of deleted files reaches
+the Spark driver: when `false` (the procedure's own default) the full file
+list is collected to the driver in one result set; when `true` the rows are
+streamed by RDD partition, which is what the Iceberg documentation
+recommends to avoid driver OOM on large deletions.
+
+Setting it to `false` buys very little here: this job consumes only the
+summary counts (`deleted_data_files_count` and friends), never the
+individual file rows, so materializing the whole list on the driver has no
+downstream benefit. The only cost of streaming is slightly more per-
+partition overhead on small tables, which is negligible relative to the
+snapshot expiration itself.
+
+Because the job runs unattended and on tables of unknown size, we default
+`streamResults` to `true` for robustness - deliberately differing from the
+procedure default - while keeping the field configurable for parity with
+the procedure and for operators who want the collected form.
+
+#### 5.2.5 Example Policy Creation
 
 ```json
 POST /metalakes/default/policies
@@ -255,7 +294,7 @@ A user may also specify only one parameter:
 {
   "name": "retain_only_policy",
   "type": "system_iceberg_snapshot_expiration",
-  "comment": "Keep at most 5 snapshots",
+  "comment": "Always keep at least 5 snapshots",
   "enabled": true,
   "content": {
     "retainLast": 5
@@ -265,17 +304,20 @@ A user may also specify only one parameter:
 
 ---
 
-### 5.3 Layer 2 — Strategy Handler (`maintenance/optimizer/`)
+### 5.3 Layer 2 - Strategy Handler (`maintenance/optimizer/`)
 
 #### 5.3.1 Strategy Handler
 
 ```java
 // NEW: maintenance/optimizer/src/main/java/…/handler/snapshot/
 //      SnapshotExpirationStrategyHandler.java
-public class SnapshotExpirationStrategyHandler
-    extends BaseExpressionStrategyHandler {
+public class SnapshotExpirationStrategyHandler implements StrategyHandler {
 
   public static final String NAME = "iceberg-snapshot-expiration";
+
+  private NameIdentifier nameIdentifier;
+  private Strategy strategy;
+  private Table tableMetadata;
 
   @Override
   public String strategyType() {
@@ -284,33 +326,66 @@ public class SnapshotExpirationStrategyHandler
 
   @Override
   public Set<DataRequirement> dataRequirements() {
-    return ImmutableSet.of(
-        DataRequirement.TABLE_METADATA,
-        DataRequirement.TABLE_STATISTICS);
-    // No PARTITION_STATISTICS — snapshot expiration is table-level
+    // Table metadata alone is enough: snapshot count comes from the
+    // table's reserved properties. No statistics are needed.
+    return EnumSet.of(DataRequirement.TABLE_METADATA);
   }
 
   @Override
-  protected JobExecutionContext buildJobExecutionContext(
-      NameIdentifier nameIdentifier,
-      Strategy strategy,
-      Table table,
-      List<PartitionPath> partitions,
-      Map<String, String> jobOptions) {
-    return new SnapshotExpirationJobContext(
-        nameIdentifier, jobOptions, strategy.jobTemplateName());
+  public void initialize(StrategyHandlerContext context) {
+    Preconditions.checkArgument(
+        context.tableMetadata().isPresent(), "Table metadata is null");
+    this.nameIdentifier = context.nameIdentifier();
+    this.strategy = context.strategy();
+    this.tableMetadata = context.tableMetadata().get();
   }
+
+  @Override
+  public boolean shouldTrigger() {
+    OptionalLong snapshotCount = snapshotCount();
+    return snapshotCount.isPresent()
+        && snapshotCount.getAsLong() >= minSnapshotCount(strategy);
+  }
+
+  @Override
+  public StrategyEvaluation evaluate() {
+    // Score is the snapshot count: tables with more snapshots come first.
+    return new StrategyEvaluationImpl(
+        snapshotCount().getAsLong(),
+        new SnapshotExpirationJobContext(
+            nameIdentifier, strategy.jobOptions(), strategy.jobTemplateName()));
+  }
+
+  // Reads the `snapshot-count` reserved property from table metadata.
+  private OptionalLong snapshotCount() { … }
 }
 ```
 
-**Key design decision:** Snapshot expiration operates at the **table
-level**, not partition level. Unlike compaction, which scores and selects
-individual partitions, `expire_snapshots` always processes the entire
-table's snapshot history. Therefore:
+**Key design decision 1 - table level, not partition level.** Unlike
+compaction, which scores and selects individual partitions,
+`expire_snapshots` always processes the entire table's snapshot history.
+Therefore no partition scoring or selection logic is needed, and
+`dataRequirements()` excludes `PARTITION_STATISTICS`.
 
-- `dataRequirements()` excludes `PARTITION_STATISTICS`.
-- No partition scoring / selection logic is needed.
-- The trigger expression evaluates table-level snapshot count only.
+**Key design decision 2 - trigger on table metadata, not statistics.**
+Snapshot count is already part of Iceberg table metadata and needs no scan,
+so the handler reads it from the metadata the Recommender already loads (see
+[§6](#6-snapshot-count-from-table-metadata)) instead of depending on a
+collected statistic. Two consequences:
+
+- The handler implements `StrategyHandler` directly rather than extending
+  `BaseExpressionStrategyHandler`. The base class builds its expression
+  context from table/partition statistics plus numeric strategy rules only,
+  so metadata-derived values are not addressable from `trigger-expr` /
+  `score-expr`. With a single table-level condition, the expression
+  machinery buys nothing, so the handler compares snapshot count against
+  `minSnapshotCount` in `shouldTrigger()` and returns it as the score.
+- Expiration no longer depends on `builtin-iceberg-update-stats` having run
+  recently, and it cannot act on a stale snapshot count.
+
+If the `snapshot-count` property is absent (for example, a non-Iceberg table
+or an older catalog), `shouldTrigger()` logs and returns `false` rather than
+guessing.
 
 #### 5.3.2 Job Execution Context
 
@@ -337,12 +412,13 @@ handler classes are looked up by strategy type name.
 
 ---
 
-### 5.4 Layer 3 — Job Adapter (`maintenance/optimizer/`)
+### 5.4 Layer 3 - Job Adapter (`maintenance/optimizer/`)
 
 #### 5.4.1 Job Adapter
 
-The adapter only passes parameters that were explicitly set in the policy
-content, allowing each to work independently:
+The adapter passes only the expiration conditions that were explicitly set
+in the policy content, so each works independently, and always passes
+`stream_results`:
 
 ```java
 // NEW: maintenance/optimizer/src/main/java/…/job/
@@ -379,10 +455,13 @@ public class GravitinoSnapshotExpirationJobAdapter
       config.put("retain_last", opts.get("retainLast"));
     }
 
-    // Only pass stream_results if explicitly configured
-    if (opts.containsKey("streamResults")) {
-      config.put("stream_results", opts.get("streamResults"));
-    }
+    // stream_results always has a value: policy setting, or `true`
+    config.put(
+        "stream_results",
+        opts.getOrDefault(
+            "streamResults",
+            String.valueOf(
+                IcebergSnapshotExpirationContent.DEFAULT_STREAM_RESULTS)));
 
     return config;
   }
@@ -404,7 +483,7 @@ private static final Map<String, Class<? extends GravitinoJobAdapter>>
 
 ---
 
-### 5.5 Layer 4 — Spark Job (`maintenance/jobs/`) — Already Implemented
+### 5.5 Layer 4 - Spark Job (`maintenance/jobs/`) - Already Implemented
 
 `IcebergExpireSnapshotsJob` is implemented in PR
 [#11206](https://github.com/apache/gravitino/pull/11206):
@@ -424,24 +503,52 @@ private static final Map<String, Class<? extends GravitinoJobAdapter>>
 - **Tests:** 40 unit tests covering template metadata, argument parsing,
   procedure call building, escaping, and input validation
 
-The job already handles partial parameters gracefully — only parameters
+The job already handles partial parameters gracefully - only parameters
 that are non-empty are included in the procedure call.
 
 ---
 
-## 6. Statistics Requirements
+## 6. Snapshot Count from Table Metadata
 
-The strategy handler needs a **snapshot count** statistic to evaluate
-whether expiration should be triggered.
+The trigger input is the table's **snapshot count**. It is taken from table
+metadata rather than from a collected statistic.
 
-| Statistic Name          | Type   | Source                 | Description                      |
-| ----------------------- | ------ | ---------------------- | -------------------------------- |
-| `custom-snapshot-count` | `Long` | Iceberg table metadata | Number of snapshots in the table |
+**Why not a statistic.** The alternative would be a `custom-snapshot-count`
+statistic produced by `builtin-iceberg-update-stats` (which today derives
+its statistics from the Iceberg `.files` metadata table). That would make
+expiration depend on the stats job having run recently, and the trigger
+would evaluate a snapshot count that is stale by up to one stats interval -
+for a metric that is free to read from metadata.
 
-**Open question:** Does the current statistics provider already collect
-snapshot count? If not, we may need to extend
-`IcebergUpdateStatsAndMetricsJob` or the statistics provider to include
-snapshot metadata statistics.
+**What is available today.** The Recommender loads table metadata through
+`GravitinoTableMetadataProvider`, which returns a Gravitino `Table` over
+REST. For Iceberg tables, `IcebergTable` merges in the reserved properties
+built by `IcebergTablePropertiesUtil.buildReservedProperties(TableMetadata)`
+- currently `format`, `provider`, `current-snapshot-id`, `location`,
+`format-version`, `sort-order`, `identifier-fields`. Snapshot count is not
+among them, so the handler cannot read it yet.
+
+**Proposed change.** Expose snapshot count as one more reserved Iceberg
+table property. `TableMetadata.snapshots()` is already in memory when the
+properties are built, so this costs no I/O and no scan:
+
+| Property         | Type   | Source                        | Description                      |
+| ---------------- | ------ | ----------------------------- | -------------------------------- |
+| `snapshot-count` | `long` | `TableMetadata.snapshots()`   | Number of snapshots in the table |
+
+This requires:
+
+1. A `SNAPSHOT_COUNT` constant in `IcebergConstants` and a reserved entry in
+   `IcebergTablePropertiesMetadata` (reserved, like `current-snapshot-id`, so
+   users cannot set it).
+2. Populating it in `IcebergTablePropertiesUtil.buildReservedProperties`.
+
+Being reserved and read-only, the property is a safe addition: it shows up
+in `loadTable` responses and is rejected on create/alter.
+
+An unset or non-numeric `snapshot-count` is treated as "unknown" - the
+handler does not trigger, so a non-Iceberg table attached to the policy is
+skipped rather than mis-evaluated.
 
 ---
 
@@ -462,6 +569,9 @@ snapshot metadata statistics.
 | File                                                    | Change                                                   |
 | ------------------------------------------------------- | -------------------------------------------------------- |
 | `api/…/policy/Policy.java`                              | Add `ICEBERG_SNAPSHOT_EXPIRATION` to `BuiltInType` enum  |
+| `catalog-common/…/iceberg/IcebergConstants.java`         | Add `SNAPSHOT_COUNT` constant                            |
+| `catalogs/catalog-lakehouse-iceberg/…/IcebergTablePropertiesMetadata.java` | Add reserved `snapshot-count` property entry |
+| `catalogs/catalog-lakehouse-iceberg/…/utils/IcebergTablePropertiesUtil.java` | Populate `snapshot-count` from `TableMetadata.snapshots()` |
 | `maintenance/optimizer/…/job/GravitinoJobSubmitter.java` | Register expire-snapshots adapter in `jobAdapters` map   |
 | `maintenance/jobs/…/BuiltInJobTemplateProvider.java`     | Register `IcebergExpireSnapshotsJob` (in PR #11206)      |
 | Handler registry                                        | Register `SnapshotExpirationStrategyHandler`             |
@@ -471,8 +581,9 @@ snapshot metadata statistics.
 | File                                             | Description                         |
 | ------------------------------------------------ | ----------------------------------- |
 | `TestIcebergSnapshotExpirationContent.java`      | Policy content unit tests           |
-| `TestSnapshotExpirationStrategyHandler.java`     | Strategy handler unit tests         |
+| `TestSnapshotExpirationStrategyHandler.java`     | Strategy handler unit tests, including missing / non-numeric `snapshot-count` |
 | `TestGravitinoSnapshotExpirationJobAdapter.java` | Job adapter unit tests              |
+| `TestIcebergTable.java` (existing)               | Assert `snapshot-count` is exposed and reserved |
 | `TestIcebergExpireSnapshotsJob.java`             | Spark job unit tests (in PR #11206) |
 
 ---
@@ -483,21 +594,23 @@ snapshot metadata statistics.
 | ----------------- | ------------------------------------------------------------------------------------ | ------------ |
 | **PR 1** (this)   | Design document                                                                      | None         |
 | **PR 2** (ready)  | Job layer: `IcebergExpireSnapshotsJob` + `BuiltInJobTemplateProvider` + tests        | PR 1         |
-| **PR 3**          | Policy layer: `IcebergSnapshotExpirationContent` + `Policy.BuiltInType` + tests      | PR 2         |
-| **PR 4**          | Strategy + Adapter: handler, context, adapter, submitter registration + tests         | PR 3         |
+| **PR 3**          | Metadata layer: reserved `snapshot-count` Iceberg table property + tests             | PR 1         |
+| **PR 4**          | Policy layer: `IcebergSnapshotExpirationContent` + `Policy.BuiltInType` + tests      | PR 2         |
+| **PR 5**          | Strategy + Adapter: handler, context, adapter, submitter registration + tests         | PR 3, PR 4   |
 
-PRs 3 and 4 can be combined into a single PR if preferred.
+PR 3 is independent of PR 2 and can land in parallel. PRs 4 and 5 can be
+combined into a single PR if preferred.
 
 ---
 
 ## 9. Open Questions
 
-1. **Snapshot count statistics** — Is `custom-snapshot-count` already
-   collected by the statistics provider, or does this need to be added?
-2. **Trigger expression complexity** — Should we support additional trigger
-   conditions beyond snapshot count (e.g., oldest snapshot age, total
-   metadata size)?
-3. **PR granularity** — Single PR for all remaining layers or split
+1. **Trigger conditions** - Should we support conditions beyond snapshot
+   count (e.g., oldest snapshot age, total metadata size)? Oldest snapshot
+   age would need a second reserved property
+   (`oldest-snapshot-timestamp-ms`); it is equally free to compute from
+   `TableMetadata`, so it can be added later without redesign.
+2. **PR granularity** - Single PR for all remaining layers or split
    per-layer?
 
 ---
@@ -510,7 +623,8 @@ PRs 3 and 4 can be combined into a single PR if preferred.
 | Strategy type     | `iceberg-data-compaction`                                      | `iceberg-snapshot-expiration`           |
 | Job template      | `builtin-iceberg-rewrite-data-files`                           | `builtin-iceberg-expire-snapshots`      |
 | Scope             | Per-partition (scored, top-N selected)                          | Whole table                             |
-| Data requirements | `TABLE_METADATA` + `TABLE_STATISTICS` + `PARTITION_STATISTICS` | `TABLE_METADATA` + `TABLE_STATISTICS`   |
-| Trigger metric    | `custom-data-file-mse`, `custom-delete-file-number`            | `custom-snapshot-count`                 |
+| Handler base      | `BaseExpressionStrategyHandler` (expression-driven)             | `StrategyHandler` (single metadata check) |
+| Data requirements | `TABLE_METADATA` + `TABLE_STATISTICS` + `PARTITION_STATISTICS` | `TABLE_METADATA`                        |
+| Trigger input     | `custom-data-file-mse`, `custom-delete-file-number` (statistics) | `snapshot-count` (table metadata property) |
 | Iceberg procedure | `rewrite_data_files`                                           | `expire_snapshots`                      |
-| Key parameters    | strategy, sort-order, where, options (all required)             | older_than, retain_last, stream_results (all independently optional) |
+| Key parameters    | strategy, sort-order, where, options (all required)             | older_than, retain_last (independently optional, fall back to Iceberg table properties), stream_results (defaults to `true`) |
