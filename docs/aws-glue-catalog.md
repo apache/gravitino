@@ -136,6 +136,18 @@ The following table lists the data types mapped from the Glue catalog to Graviti
 Data types not listed above map to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)**, which represents an unresolvable data type from the Glue catalog.
 :::
 
+#### V3 Type Write Compatibility
+
+AWS Glue stores column types as strings and does not validate their downstream compatibility. Gravitino therefore rejects V3 types that neither the Hive-format nor Iceberg-format table path can preserve safely.
+
+| Gravitino Data Type                  | Hive-format Tables | Iceberg-format Tables | Write Behavior |
+|--------------------------------------|--------------------|-----------------------|----------------|
+| `timestamp(9)` / `timestamp_tz(9)`  | Not supported      | Not supported         | Rejected before the Glue API is called. Iceberg supports at most microsecond precision, and Hive-format Glue metadata does not safely preserve an explicit nanosecond precision. |
+| `variant`                            | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path defines a Variant column type. |
+| `unknown`                            | Not supported      | Not supported         | Rejected before the Glue API is called because both table paths require a concrete column type. |
+| `geometry(crs)`                      | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path preserves Geometry CRS semantics. |
+| `geography(crs, algorithm)`          | Not supported      | Not supported         | Rejected before the Glue API is called because neither table path preserves Geography CRS and edge-algorithm semantics. |
+
 ### Table Properties
 
 The following table lists predefined properties for Glue tables. Additional key-value properties pass through to the underlying Glue database.
