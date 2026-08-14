@@ -1064,7 +1064,7 @@ COMMENT ON TABLE entity_change_log IS 'Append-only log of entity structural chan
 COMMENT ON COLUMN entity_change_log.id IS 'auto increment id';
 COMMENT ON COLUMN entity_change_log.metalake_name IS 'metalake name';
 COMMENT ON COLUMN entity_change_log.entity_type IS 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW';
-COMMENT ON COLUMN entity_change_log.entity_full_name IS 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.';
+COMMENT ON COLUMN entity_change_log.entity_full_name IS 'Encoded full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.';
 COMMENT ON COLUMN entity_change_log.operate_type IS 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.';
 COMMENT ON COLUMN entity_change_log.created_at IS 'timestamp of the change in millis';
 

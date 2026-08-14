@@ -700,6 +700,16 @@ public class TestTagManager {
     Assertions.assertEquals(
         0, tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "pii").length);
 
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE, tableObject, null, new TagValue[] {TagValue.noValue(tag.name())});
+    Tag dataDomainInfo = tagManager.getTagForMetadataObject(METALAKE, tableObject, tag.name());
+    Assertions.assertArrayEquals(
+        new String[] {"finance", "risk"}, dataDomainInfo.assignment().get().values());
+
+    Assertions.assertArrayEquals(
+        new MetadataObject[] {tableObject},
+        tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "finance"));
+
     Tag ownerTag = tagManager.createTag(METALAKE, "owner", null, null);
     tagManager.associateTagValuesForMetadataObject(
         METALAKE, tableObject, new TagValue[] {TagValue.noValue(ownerTag.name())}, null);
@@ -714,10 +724,48 @@ public class TestTagManager {
         new MetadataObject[] {tableObject},
         tagManager.listMetadataObjectsForTag(METALAKE, ownerTag.name(), "team-a"));
 
+    Tag noValueIdempotentTag = tagManager.createTag(METALAKE, "no_value_idempotent", null, null);
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE,
+        tableObject,
+        new TagValue[] {TagValue.noValue(noValueIdempotentTag.name())},
+        null);
+    Assertions.assertDoesNotThrow(
+        () ->
+            tagManager.associateTagValuesForMetadataObject(
+                METALAKE,
+                tableObject,
+                new TagValue[] {TagValue.noValue(noValueIdempotentTag.name())},
+                null));
+
     Assertions.assertTrue(
         tagInfos[0].valueConstraint().type() == TagValueConstraint.Type.ALLOWED_VALUES);
     Assertions.assertArrayEquals(
         new String[] {"finance", "risk"}, tagInfos[0].valueConstraint().allowedValues());
+  }
+
+  @Test
+  public void testV1RemoveValuedTagByName() {
+    Tag tag =
+        tagManager.createTag(
+            METALAKE, "v1_remove_valued", null, null, TagValueConstraint.ofAllowedValues("dev"));
+    MetadataObject tableObject =
+        NameIdentifierUtil.toMetadataObject(
+            NameIdentifierUtil.ofTable(METALAKE, CATALOG, SCHEMA, TABLE), Entity.EntityType.TABLE);
+
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE, tableObject, new TagValue[] {TagValue.of(tag.name(), "dev")}, null);
+    Assertions.assertArrayEquals(
+        new MetadataObject[] {tableObject},
+        tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "dev"));
+
+    tagManager.associateTagsForMetadataObject(
+        METALAKE, tableObject, null, new String[] {tag.name()});
+
+    Assertions.assertEquals(
+        0, tagManager.listTagsInfoForMetadataObject(METALAKE, tableObject).length);
+    Assertions.assertEquals(
+        0, tagManager.listMetadataObjectsForTag(METALAKE, tag.name(), "dev").length);
   }
 
   @Test

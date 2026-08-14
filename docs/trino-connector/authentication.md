@@ -36,7 +36,7 @@ gravitino.user=admin
 
 ### Basic Authentication
 
-Basic authentication uses HTTP Basic credentials against the Gravitino built-in IDP. The Gravitino
+Basic authentication uses HTTP Basic credentials against the Gravitino local user store. The Gravitino
 server must have Basic authentication enabled. See
 [How to authenticate](../security/how-to-authenticate.md#basic-mode) for server-side setup.
 
@@ -47,7 +47,7 @@ connector.name=gravitino
 gravitino.metalake=metalake
 gravitino.uri=http://localhost:8090
 
-# Basic authentication with built-in IDP
+# Basic authentication with local user store
 gravitino.client.authType=basic
 gravitino.client.basic.username=admin
 gravitino.client.basic.password=YourSecureGravitinoPassword
@@ -58,8 +58,8 @@ gravitino.client.basic.password=YourSecureGravitinoPassword
 | Property                          | Description                                                     | Default value | Required                   |
 |-----------------------------------|-----------------------------------------------------------------|---------------|----------------------------|
 | `gravitino.client.authType`       | Authentication type: `simple`, `basic`, `oauth2`, or `kerberos` | (none)        | Yes (to enable Basic)      |
-| `gravitino.client.basic.username` | Built-in IDP username                                           | (none)        | Yes if authType is `basic` |
-| `gravitino.client.basic.password` | Built-in IDP password                                           | (none)        | Yes if authType is `basic` |
+| `gravitino.client.basic.username` | Local user store username                                           | (none)        | Yes if authType is `basic` |
+| `gravitino.client.basic.password` | Local user store password                                           | (none)        | Yes if authType is `basic` |
 
 ### OAuth2 Authentication
 
@@ -184,5 +184,5 @@ gravitino.client.session.forwardUser=true
 ### See Also
 
 - [Gravitino Server Authentication Configuration](../security/how-to-authenticate.md)
-- [How to use the built-in IDP](../security/how-to-use-built-in-idp.md)
+- [Local users and groups](../security/local-users-and-groups.md)
 - [Trino Connector Configuration](./configuration.md)

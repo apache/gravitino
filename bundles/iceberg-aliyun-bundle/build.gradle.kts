@@ -32,10 +32,14 @@ dependencies {
   implementation(libs.sun.activation)
   // Include Gravitino Aliyun credential providers (OSSSecretKeyProvider, etc.) for credential vending
   implementation(project(":bundles:aliyun"))
+
+  testImplementation(libs.junit.jupiter.api)
+  testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
 tasks.withType(ShadowJar::class.java) {
   isZip64 = true
+  includeEmptyDirs = false
   configurations = listOf(project.configurations.runtimeClasspath.get())
   archiveClassifier.set("")
 
@@ -48,10 +52,36 @@ tasks.withType(ShadowJar::class.java) {
     exclude(project(":catalogs:hadoop-common"))
   }
 
+  // :bundles:aliyun pulls Jackson into this fat jar. Relocate it so the bundle remains
+  // self-contained without exposing com.fasterxml.jackson classes on the server classpath.
+  relocate(
+    "com.fasterxml.jackson",
+    "org.apache.gravitino.iceberg.aliyun.shaded.com.fasterxml.jackson"
+  )
+
+  // POM metadata is not relocated by shadow and would still advertise the original
+  // Jackson coordinates.
+  exclude("META-INF/maven/com.fasterxml.jackson.core/**")
+  exclude("META-INF/maven/com.fasterxml.jackson.datatype/**")
+  exclude("META-INF/maven/com.fasterxml.jackson.module/**")
+  exclude("META-INF/maven/com.fasterxml.jackson/**")
+
   mergeServiceFiles()
 }
 
 tasks.jar {
   dependsOn(tasks.named("shadowJar"))
   archiveClassifier.set("empty")
+}
+
+tasks.test {
+  val shadowJar = tasks.named<ShadowJar>("shadowJar")
+  dependsOn(shadowJar)
+  inputs.file(shadowJar.flatMap { it.archiveFile })
+  doFirst {
+    systemProperty(
+      "shadowJarPath",
+      shadowJar.get().archiveFile.get().asFile.absolutePath
+    )
+  }
 }

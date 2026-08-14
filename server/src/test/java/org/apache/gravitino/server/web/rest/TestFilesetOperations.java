@@ -252,7 +252,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
             "mock comment",
             "mock location",
             ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createMultipleLocationFileset(any(), any(), any(), any(), any()))
+    when(dispatcher.createMultipleLocationFileset(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(fileset);
 
     FilesetCreateRequest req =
@@ -299,7 +299,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
             "mock comment",
             locations,
             ImmutableMap.of("k1", "v1"));
-    when(dispatcher.createMultipleLocationFileset(any(), any(), any(), any(), any()))
+    when(dispatcher.createMultipleLocationFileset(any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(fileset);
 
     req =
@@ -331,7 +331,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
     // Test throw NoSuchSchemaException
     doThrow(new NoSuchSchemaException("mock error"))
         .when(dispatcher)
-        .createMultipleLocationFileset(any(), any(), any(), any(), any());
+        .createMultipleLocationFileset(any(), any(), any(), any(), any(), any(), any());
 
     Response resp1 =
         target(filesetPath(metalake, catalog, schema))
@@ -348,7 +348,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
     // Test throw FilesetAlreadyExistsException
     doThrow(new FilesetAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createMultipleLocationFileset(any(), any(), any(), any(), any());
+        .createMultipleLocationFileset(any(), any(), any(), any(), any(), any(), any());
 
     Response resp2 =
         target(filesetPath(metalake, catalog, schema))
@@ -366,7 +366,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(dispatcher)
-        .createMultipleLocationFileset(any(), any(), any(), any(), any());
+        .createMultipleLocationFileset(any(), any(), any(), any(), any(), any(), any());
 
     Response resp3 =
         target(filesetPath(metalake, catalog, schema))
@@ -384,7 +384,7 @@ public class TestFilesetOperations extends BaseOperationsTest {
     // Test throw Error
     doThrow(new Error("mock error"))
         .when(dispatcher)
-        .createMultipleLocationFileset(any(), any(), any(), any(), any());
+        .createMultipleLocationFileset(any(), any(), any(), any(), any(), any(), any());
     Response resp4 =
         target(filesetPath(metalake, catalog, schema))
             .request(MediaType.APPLICATION_JSON_TYPE)

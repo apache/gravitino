@@ -28,6 +28,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.junit.jupiter.api.Assertions;
@@ -84,6 +85,20 @@ public class TestCatalogChangeLogListener {
                         4L, "metalake", "SCHEMA", "metalake.cat.sch", OperateType.ALTER, 0L))));
 
     verify(catalogCache, never()).invalidate(any());
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testInvalidatesCatalogWithDotsInsideNameLevels() {
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
+    NameIdentifier ident = NameIdentifier.of("meta.lake", "cat.alog");
+    when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+    listener.onEntityChange(List.of(change(1L, EntityChangeLogNameIdentifierCodec.encode(ident))));
+
+    verify(catalogCache).invalidate(ident);
   }
 
   private static EntityChangeRecord change(long id, String fullName) {

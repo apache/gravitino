@@ -27,7 +27,7 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of PostgreSQL (12.x, 13.x, 14.x, 15.x, 16.x).
 - Supports DDL operation for PostgreSQL schemas and tables.
 - Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value). and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](./tables-and-views.md#table-column-default-value). and [auto-increment](./tables-and-views.md#table-column-auto-increment).
 
 ### Catalog Properties
 
@@ -60,7 +60,7 @@ In PostgreSQL, the database corresponds to the Gravitino catalog, and the schema
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
 Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
@@ -81,7 +81,7 @@ Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden 
 
 ### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
@@ -90,7 +90,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - The Gravitino table corresponds to the PostgreSQL table.
 - Supports DDL operation for PostgreSQL tables.
 - Supports index.
-- Support [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Support [column default value](./tables-and-views.md#table-column-default-value) and [auto-increment](./tables-and-views.md#table-column-auto-increment).
 - Doesn't support table property settings.
 
 ### Table Column Types
@@ -117,7 +117,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 :::info
 PostgreSQL doesn't support Gravitino `Fixed` `Struct` `Map` `IntervalDay` `IntervalYear` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.
 :::
 
 ### Table Column Auto-Increment

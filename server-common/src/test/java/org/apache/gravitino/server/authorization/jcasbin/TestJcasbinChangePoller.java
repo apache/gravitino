@@ -24,7 +24,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.cache.GravitinoCache;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
@@ -82,6 +84,20 @@ public class TestJcasbinChangePoller {
   }
 
   @Test
+  void testChangeLogFullNamePreservesDotsInsideNameLevels() {
+    NameIdentifier ident =
+        NameIdentifier.of("ml1", "cat.with.dot", "schema.with.dot", "table.with.dot");
+
+    MetadataObject metadataObject =
+        JcasbinChangeListener.metadataObjectFromChangeLog(
+            "ml1", EntityChangeLogNameIdentifierCodec.encode(ident), MetadataObject.Type.TABLE);
+
+    Assertions.assertEquals("cat.with.dot.schema.with.dot", metadataObject.parent());
+    Assertions.assertEquals("table.with.dot", metadataObject.name());
+    Assertions.assertEquals(MetadataObject.Type.TABLE, metadataObject.type());
+  }
+
+  @Test
   void testPollEntityChangesCoalescesContainerPrefixes() {
     RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
@@ -98,6 +114,54 @@ public class TestJcasbinChangePoller {
         List.of(
             key("ml1", "CATALOG", "cat1", ""),
             key("ml1", "CATALOG", "cat2", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
+        metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
+  void testVirtualNamespaceTypesAreSkippedWithoutFailingTheBatch() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // TAG/POLICY/JOB live in a virtual namespace, so their change-log full name has more levels
+    // than MetadataObjects.of() accepts. They must be skipped, not blow up the whole batch.
+    Assertions.assertDoesNotThrow(
+        () ->
+            poller.onEntityChange(
+                List.of(
+                    change(1L, MetadataObject.Type.TAG, "ml1.system.tag.pii"),
+                    change(2L, MetadataObject.Type.POLICY, "ml1.system.policy.retention"),
+                    change(3L, MetadataObject.Type.JOB, "ml1.system.job.job1"),
+                    change(4L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"))));
+
+    // The one mappable record in the batch is still applied.
+    Assertions.assertEquals(
+        List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
+        metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
+  void testUnmappableRecordDoesNotFailTheBatch() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // A record whose full name cannot be turned into a MetadataObject of the declared type must be
+    // logged and skipped; a poison row must never take the node down via the poller's EXIT action.
+    Assertions.assertDoesNotThrow(
+        () ->
+            poller.onEntityChange(
+                List.of(
+                    change(1L, MetadataObject.Type.TABLE, "ml1.cat1"),
+                    change(2L, MetadataObject.Type.TABLE, "gravitino:v1:9:1:a"),
+                    change(3L, MetadataObject.Type.TABLE, "ml1.cat1.sch1.tbl1"))));
+
+    Assertions.assertEquals(
+        List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
         metadataIdCache.invalidatedPrefixes);
     Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
   }

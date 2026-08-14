@@ -140,7 +140,7 @@ You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows
 | `--gravitino-uri` | The URI of Gravitino server.                                                     | `http://127.0.0.1:8090`     | No       |
 | `--transport`     | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).     | `stdio`                     | No       |
 | `--mcp-url`       | The URL of MCP server if using HTTP transport.                                   | `http://127.0.0.1:8000/mcp` | No       |
-| `--token`         | OAuth2 Bearer token for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. | none (anonymous)            | No       |
+| `--token`         | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication.   | none (anonymous)            | No       |
 | `--tls-cert`      | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.          | none                        | No       |
 | `--tls-key`       | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.         | none                        | No       |
 
@@ -150,10 +150,26 @@ By default the MCP server talks to Gravitino anonymously. There are two ways to 
 
 ### Static startup token (stdio and HTTP)
 
-Pass `--token` (or set the `GRAVITINO_TOKEN` environment variable) to authenticate the server with a static OAuth2 Bearer token. The value is treated as a Bearer token and sent as `Authorization: Bearer <token>`. The token is masked in the server's log output.
+Pass `--token` (or set the `GRAVITINO_TOKEN` environment variable) to authenticate the server with a static credential. The token is masked in the server's log output.
+
+A bare value is treated as an OAuth2 token and sent as `Authorization: Bearer <token>`. A value that already begins with an HTTP authentication scheme is forwarded with that scheme preserved, so the credential can match whatever `gravitino.authenticators` the server is configured with:
+
+| `--token` value             | `Authorization` header sent    |
+|-----------------------------|--------------------------------|
+| `abc`                       | `Bearer abc`                   |
+| `Bearer abc`                | `Bearer abc`                   |
+| `Basic dXNlcjpwYXNz`        | `Basic dXNlcjpwYXNz`           |
+| `Custom credentials`        | `Custom credentials`           |
+| empty or whitespace only    | none (anonymous)               |
+
+The built-in scheme names (`Basic`, `Bearer`, `Negotiate`) are recognized case-insensitively and normalized to the capitalization Gravitino's authenticators expect; a custom scheme name is forwarded unchanged.
+
+Because a bare token is only Bearer-prefixed when it carries no scheme, a static credential whose value contains a space and begins with a scheme-like word is interpreted as scheme plus credential. Quote such values with an explicit scheme (for example `--token "Bearer my secret"`) to keep them Bearer tokens.
 
 ```shell
 uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 --token <your-token>
+# or, against a server configured with `gravitino.authenticators = basic`
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 --token "Basic $(printf '%s' 'user:password' | base64)"
 # or
 export GRAVITINO_TOKEN=<your-token>
 uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
