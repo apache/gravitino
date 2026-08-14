@@ -23,13 +23,17 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.OwnerInfo;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthorizationRequestContext {
@@ -326,5 +330,18 @@ public class TestAuthorizationRequestContext {
     AuthorizationRequestContext context = new AuthorizationRequestContext();
     context.setOriginalAuthorizationExpression("OWNER && HAS_PRIVILEGE");
     assertEquals("OWNER && HAS_PRIVILEGE", context.getOriginalAuthorizationExpression());
+  }
+
+  @Test
+  public void testActiveRolesInitializedFromPrincipal() throws Exception {
+    // With no active roles on the current principal, a new context defaults to ALL (no narrowing).
+    assertEquals(ActiveRoles.all(), new AuthorizationRequestContext().getActiveRoles());
+
+    // A new context picks up the active roles carried by the current UserPrincipal.
+    ActiveRoles named = ActiveRoles.of(Arrays.asList("analyst"));
+    UserPrincipal principal = new UserPrincipal("tester").withActiveRoles(named);
+    ActiveRoles seen =
+        PrincipalUtils.doAs(principal, () -> new AuthorizationRequestContext().getActiveRoles());
+    assertEquals(named, seen);
   }
 }

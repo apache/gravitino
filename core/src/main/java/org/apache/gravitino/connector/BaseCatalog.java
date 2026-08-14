@@ -48,6 +48,7 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -209,6 +210,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     }
 
     return ops;
+  }
+
+  /**
+   * Whether to validate this catalog against its backend at create time rather than on first use.
+   *
+   * @return {@code true} to validate at create; {@code false} (default) to defer
+   */
+  public boolean shouldValidateOnCreate() {
+    return false;
   }
 
   public void checkMetalakeAndCatalogInUse() {
@@ -449,7 +459,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
           tempProperties
               .entrySet()
-              .removeIf(entry -> catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+              .removeIf(
+                  entry ->
+                      catalogPropertiesMetadata().isHiddenProperty(entry.getKey())
+                          || SecretPropertyUtils.isSecretProperty(
+                              entry.getKey(), entry.getValue()));
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());

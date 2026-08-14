@@ -25,7 +25,7 @@ import shutil
 
 import requests
 
-from gravitino import GravitinoAdminClient
+from gravitino import GravitinoAdminClient, GravitinoClient
 from gravitino.exceptions.base import GravitinoRuntimeException
 from tests.integration.config import Config
 
@@ -150,6 +150,77 @@ class IntegrationTestEnv(unittest.TestCase):
         if gravitino_server_running:
             logger.error("Can't stop Gravitino server!")
 
+    @staticmethod
+    def create_gravitino_client(metalake_name: str) -> GravitinoClient:
+        return GravitinoClient(uri="http://localhost:8090", metalake_name=metalake_name)
+
+    @classmethod
+    def create_metalake_client(
+        cls,
+        admin_client: GravitinoAdminClient,
+        metalake_name: str,
+        comment: str = "",
+    ) -> GravitinoClient:
+        admin_client.create_metalake(metalake_name, comment=comment, properties={})
+        return cls.create_gravitino_client(metalake_name)
+
+    @staticmethod
+    def drop_test_metalake(
+        admin_client: GravitinoAdminClient, metalake_name: str, log_prefix: str = ""
+    ):
+        try:
+            dropped = admin_client.drop_metalake(metalake_name, force=True)
+            if log_prefix:
+                logger.info(
+                    "%s: drop metalake %s[%s]", log_prefix, metalake_name, dropped
+                )
+            else:
+                logger.info("Drop metalake %s[%s]", metalake_name, dropped)
+        except GravitinoRuntimeException:
+            if log_prefix:
+                logger.warning(
+                    "%s: failed to drop metalake %s", log_prefix, metalake_name
+                )
+            else:
+                logger.warning("Failed to drop metalake %s", metalake_name)
+
+    @classmethod
+    def configure_authorization(
+        cls,
+        enabled: bool,
+        service_admins: str | None = "anonymous",
+        append: bool = True,
+    ):
+        cls._get_gravitino_home()
+        config = {"gravitino.authorization.enable": str(enabled).lower()}
+        if service_admins is not None:
+            config["gravitino.authorization.serviceAdmins"] = service_admins
+        conf_path = os.path.join(cls.gravitino_home, "conf", "gravitino.conf")
+        cls._reset_conf(config, conf_path)
+        if append:
+            cls._append_conf(config, conf_path)
+
+    @classmethod
+    def set_up_authorization_test_env(
+        cls, service_admins: str | None = "anonymous"
+    ) -> GravitinoAdminClient:
+        cls.configure_authorization(True, service_admins)
+        if cls.use_external_gravitino():
+            cls.restart_server()
+        else:
+            cls.setUpClass()
+        return GravitinoAdminClient(uri="http://localhost:8090")
+
+    @classmethod
+    def tear_down_authorization_test_env(
+        cls, service_admins: str | None = "anonymous", append: bool = True
+    ):
+        cls.configure_authorization(False, service_admins, append)
+        if cls.use_external_gravitino():
+            cls.restart_server()
+        else:
+            cls.tearDownClass()
+
     @classmethod
     def restart_server(cls):
         logger.info("Restarting Gravitino server...")
@@ -240,3 +311,53 @@ class IntegrationTestEnv(unittest.TestCase):
         with open(conf_path, mode="w", encoding="utf-8") as file:
             for line in filtered_lines:
                 file.write(line)
+
+
+class MetalakeTestMixin:
+    """Provide common metalake setup and cleanup for integration tests."""
+
+    def setUp(self):  # pylint: disable=invalid-name
+        super().setUp()
+        self.init_test_env()
+
+    def tearDown(self):  # pylint: disable=invalid-name
+        try:
+            self.clean_test_data()
+        finally:
+            super().tearDown()
+
+    def init_test_env(self):
+        self.gravitino_client = self.create_metalake_client(
+            self.gravitino_admin_client, self.metalake_name
+        )
+
+    def clean_test_data(self):
+        self.gravitino_client = self.create_gravitino_client(self.metalake_name)
+        self.drop_test_metalake(self.gravitino_admin_client, self.metalake_name)
+
+
+class AuthorizationIntegrationTestEnv(IntegrationTestEnv):
+    """Provide common authorization integration test environment."""
+
+    _metalake_name: str = ""
+    _metalake_comment: str = ""
+    _gravitino_admin_client: GravitinoAdminClient = None
+    _gravitino_client: GravitinoClient = None
+
+    @classmethod
+    def setUpClass(cls):
+        cls._gravitino_admin_client = cls.set_up_authorization_test_env()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tear_down_authorization_test_env()
+
+    def setUp(self):
+        self._gravitino_client = self.create_metalake_client(
+            self._gravitino_admin_client,
+            self._metalake_name,
+            comment=self._metalake_comment,
+        )
+
+    def tearDown(self):
+        self.drop_test_metalake(self._gravitino_admin_client, self._metalake_name)

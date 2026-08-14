@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.auth.IllegalActiveRolesException;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.authentication.AuthenticationFilter;
@@ -65,6 +66,12 @@ public class LanceAuthenticationFilter extends AuthenticationFilter {
       message = exception.getMessage();
       if (message == null || message.isEmpty()) {
         message = "Access denied";
+      }
+    } else if (exception instanceof IllegalActiveRolesException) {
+      status = HttpServletResponse.SC_BAD_REQUEST;
+      message = exception.getMessage();
+      if (message == null || message.isEmpty()) {
+        message = "Bad request";
       }
     } else {
       status = HttpServletResponse.SC_INTERNAL_SERVER_ERROR;

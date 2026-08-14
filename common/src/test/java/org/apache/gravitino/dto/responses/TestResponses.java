@@ -245,6 +245,16 @@ public class TestResponses {
   }
 
   @Test
+  void testOptimisticLockConflictErrorResponse() throws IllegalArgumentException {
+    ErrorResponse error =
+        ErrorResponse.optimisticLockConflict(
+            "OptimisticLockException", "optimistic lock conflict", null);
+    error.validate(); // No exception thrown
+    assertEquals(ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE, error.getCode());
+    assertEquals("OptimisticLockException", error.getType());
+  }
+
+  @Test
   void testNonEmptyErrorResponse() throws IllegalArgumentException {
     ErrorResponse error = ErrorResponse.nonEmpty("error type", "non empty error");
     error.validate(); // No exception thrown
@@ -285,7 +295,7 @@ public class TestResponses {
   void testUserResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    UserDTO user = UserDTO.builder().withName("user1").withAudit(audit).build();
+    UserDTO user = UserDTO.builder().withId(1L).withName("user1").withAudit(audit).build();
     UserResponse response = new UserResponse(user);
     response.validate(); // No exception thrown
   }
@@ -300,7 +310,7 @@ public class TestResponses {
   void testGroupResponse() throws IllegalArgumentException {
     AuditDTO audit =
         AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build();
-    GroupDTO group = GroupDTO.builder().withName("group1").withAudit(audit).build();
+    GroupDTO group = GroupDTO.builder().withId(1L).withName("group1").withAudit(audit).build();
     GroupResponse response = new GroupResponse(group);
     response.validate(); // No exception thrown
   }

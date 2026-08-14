@@ -130,6 +130,7 @@ import org.apache.gravitino.rel.partitions.RangePartition;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.stats.Statistic;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValueConstraint;
 
 /** Utility class for converting between DTOs and domain objects. */
 public class DTOConverters {
@@ -493,6 +494,7 @@ public class DTOConverters {
     }
 
     return UserDTO.builder()
+        .withId(user.id())
         .withName(user.name())
         .withExternalId(user.externalId())
         .withEnabled(user.enabled())
@@ -513,6 +515,7 @@ public class DTOConverters {
     }
 
     return GroupDTO.builder()
+        .withId(group.id())
         .withName(group.name())
         .withExternalId(group.externalId())
         .withRoles(group.roles())
@@ -607,10 +610,27 @@ public class DTOConverters {
             .withName(tag.name())
             .withComment(tag.comment())
             .withProperties(tag.properties())
+            .withAllowedValues(allowedValuesForDTO(tag.valueConstraint()))
+            .withAssignmentValues(
+                tag.assignment().map(assignment -> assignment.values()).orElse(null))
             .withAudit(toDTO(tag.auditInfo()))
             .withInherited(inherited);
 
     return builder.build();
+  }
+
+  private static String[] allowedValuesForDTO(TagValueConstraint valueConstraint) {
+    TagValueConstraint normalizedConstraint =
+        valueConstraint == null ? TagValueConstraint.anyValue() : valueConstraint;
+    switch (normalizedConstraint.type()) {
+      case ANY_VALUE:
+        return null;
+      case NO_VALUE:
+      case ALLOWED_VALUES:
+        return normalizedConstraint.allowedValues();
+      default:
+        throw new IllegalArgumentException("Unknown tag value constraint: " + normalizedConstraint);
+    }
   }
 
   /**

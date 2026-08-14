@@ -24,6 +24,7 @@ import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.storage.relational.EntityChangeLogListener;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,13 @@ import org.slf4j.LoggerFactory;
  *
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
+ *
+ * <p>This listener never propagates a failure to the poller, so the poller never retries a batch
+ * for it. That is deliberate: local-mutation de-duplication ({@link
+ * CatalogManager#consumeLocalMutation}) is single-shot, so re-delivering an already-applied batch
+ * would invalidate a catalog this process mutated itself and close its still-in-use {@code
+ * IsolatedClassLoader}. Dropping an invalidation is the cheaper failure: the catalog cache expires
+ * on access, so staleness is bounded by {@code gravitino.catalog.cache.evictionIntervalMs}.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
@@ -64,17 +72,33 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
         NameIdentifier ident = identOpt.get();
 
         if (catalogManager.consumeLocalMutation(ident)) {
-          LOG.debug("Skipping catalog cache invalidation for local mutation: {}", ident);
+          LOG.debug(
+              "Skipping catalog cache invalidation for local mutation: {}, change log id {}",
+              ident,
+              change.getId());
           continue;
         }
 
-        LOG.debug("Invalidating catalog cache due to entity change log: {}", ident);
+        // Logged at INFO on purpose: this tears down the cached catalog, including its connection
+        // pool and isolated classloader, and it is the main cross-node effect of the change log.
+        // CatalogManager logs the matching "Closing catalog" line when the eviction runs.
+        LOG.info(
+            "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
+            ident,
+            change.getOperateType(),
+            change.getId());
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
+        // Deliberately not rethrown: see the class javadoc. A dropped invalidation only costs
+        // bounded staleness here, while a retry of an already-applied batch can tear down a
+        // catalog that is still in use.
         LOG.warn(
-            "Failed to process catalog change log record: fullName={}, entityType={}",
+            "Failed to process catalog change log record: id={}, fullName={}, entityType={}, "
+                + "operateType={}",
+            change.getId(),
             change.getFullName(),
             change.getEntityType(),
+            change.getOperateType(),
             e);
       }
     }
@@ -93,11 +117,17 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       return Optional.empty();
     }
 
-    String[] names = change.getFullName().split("\\.");
-    if (names.length != 2) {
+    NameIdentifier ident;
+    try {
+      ident = EntityChangeLogNameIdentifierCodec.decode(change.getFullName());
+    } catch (IllegalArgumentException e) {
       LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());
       return Optional.empty();
     }
-    return Optional.of(NameIdentifier.of(names[0], names[1]));
+    if (ident.namespace().length() != 1) {
+      LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());
+      return Optional.empty();
+    }
+    return Optional.of(ident);
   }
 }

@@ -23,6 +23,7 @@ from typing import Dict, cast
 from unittest.mock import MagicMock, patch
 
 from gravitino.api.rel.column import Column
+from gravitino.api.rel.dialects import Dialects
 from gravitino.api.rel.expressions.distributions.distributions import Distributions
 from gravitino.api.rel.expressions.distributions.strategy import Strategy
 from gravitino.api.rel.expressions.expression import Expression
@@ -41,6 +42,7 @@ from gravitino.api.rel.indexes.indexes import Indexes
 from gravitino.api.rel.partitions.partition import Partition
 from gravitino.api.rel.partitions.partitions import Partitions
 from gravitino.api.rel.table import Table
+from gravitino.api.rel.sql_representation import SQLRepresentation
 from gravitino.api.rel.types.types import Types
 from gravitino.dto.rel.column_dto import ColumnDTO
 from gravitino.dto.rel.distribution_dto import DistributionDTO
@@ -71,6 +73,7 @@ from gravitino.dto.rel.partitions.identity_partition_dto import IdentityPartitio
 from gravitino.dto.rel.partitions.list_partition_dto import ListPartitionDTO
 from gravitino.dto.rel.partitions.range_partition_dto import RangePartitionDTO
 from gravitino.dto.rel.sort_order_dto import SortOrderDTO
+from gravitino.dto.rel.sql_representation_dto import SQLRepresentationDTO
 from gravitino.dto.rel.table_dto import TableDTO
 from gravitino.dto.util.dto_converters import DTOConverters
 from gravitino.exceptions.base import IllegalArgumentException
@@ -261,6 +264,16 @@ class TestDTOConverters(unittest.TestCase):
         converted = DTOConverters.from_dto(sort_order_dto)
         self.assertTrue(converted == expected)
 
+    def test_from_dto_sql_representation(self):
+        representation_dto = SQLRepresentationDTO(Dialects.TRINO, "SELECT 1")
+
+        converted = DTOConverters.from_dto(representation_dto)
+
+        self.assertEqual(
+            SQLRepresentation(Dialects.TRINO, "SELECT 1"),
+            converted,
+        )
+
     def test_from_dto_column(self):
         column_name = "test_column"
         column_data_type = Types.IntegerType.get()
@@ -412,6 +425,20 @@ class TestDTOConverters(unittest.TestCase):
         converted = DTOConverters.from_dtos(sort_order_dtos)
         self.assertListEqual(converted, expected)
 
+    def test_from_dtos_representations(self):
+        representation_dtos = [
+            SQLRepresentationDTO(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentationDTO(Dialects.SPARK, "SELECT 2"),
+        ]
+        expected = [
+            SQLRepresentation(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentation(Dialects.SPARK, "SELECT 2"),
+        ]
+
+        converted = DTOConverters.from_dtos(representation_dtos)
+
+        self.assertListEqual(converted, expected)
+
     def test_from_dtos_partitioning(self):
         field_name = ["score"]
         field_names = [field_name]
@@ -542,6 +569,16 @@ class TestDTOConverters(unittest.TestCase):
     def test_to_dto_raise_exception(self):
         with self.assertRaisesRegex(IllegalArgumentException, "Unsupported type"):
             DTOConverters.to_dto("test")
+
+    def test_to_dto_sql_representation(self):
+        representation = SQLRepresentation(Dialects.TRINO, "SELECT 1")
+
+        dto = DTOConverters.to_dto(representation)
+
+        self.assertIsInstance(dto, SQLRepresentationDTO)
+        self.assertEqual(Dialects.TRINO, dto.dialect())
+        self.assertEqual("SELECT 1", dto.sql())
+        self.assertIs(dto, DTOConverters.to_dto(dto))
 
     def test_to_dto_range_partition(self):
         converted = DTOConverters.to_dto(
@@ -731,6 +768,21 @@ class TestDTOConverters(unittest.TestCase):
             self.assertEqual(converted.name(), expected.name())
             self.assertListEqual(converted.field_names(), expected.field_names())
 
+        self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
+
+    def test_to_dtos_representations(self):
+        representations = [
+            SQLRepresentation(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentation(Dialects.SPARK, "SELECT 2"),
+        ]
+        expected_dtos = [
+            SQLRepresentationDTO(Dialects.TRINO, "SELECT 1"),
+            SQLRepresentationDTO(Dialects.SPARK, "SELECT 2"),
+        ]
+
+        converted_dtos = DTOConverters.to_dtos(representations)
+
+        self.assertListEqual(converted_dtos, expected_dtos)
         self.assertListEqual(DTOConverters.to_dtos(converted_dtos), converted_dtos)
 
     def test_to_dtos_single_field_transforms(self):

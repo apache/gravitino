@@ -55,6 +55,8 @@ import org.apache.gravitino.listener.api.event.LoadFilesetEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadFilesetPreEvent;
 import org.apache.gravitino.listener.api.info.FilesetInfo;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -135,7 +137,9 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
       String comment,
       Fileset.Type type,
       Map<String, String> storageLocations,
-      Map<String, String> properties)
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     FilesetInfo createFileRequest =
         new FilesetInfo(ident.name(), comment, type, storageLocations, properties, null);
@@ -144,7 +148,7 @@ public class FilesetEventDispatcher implements FilesetDispatcher {
     try {
       Fileset fileset =
           dispatcher.createMultipleLocationFileset(
-              ident, comment, type, storageLocations, properties);
+              ident, comment, type, storageLocations, properties, secretBindings, secretReferences);
       eventBus.dispatchEvent(
           new CreateFilesetEvent(
               PrincipalUtils.getCurrentUserName(), ident, new FilesetInfo(fileset)));

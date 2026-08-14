@@ -27,7 +27,9 @@ from mcp_server.client import (
 )
 from mcp_server.client.fileset_operation import FilesetOperation
 from mcp_server.client.job_operation import JobOperation
+from mcp_server.client.partition_operation import PartitionOperation
 from mcp_server.client.statistic_operation import StatisticOperation
+from mcp_server.client.view_operation import ViewOperation
 
 
 class MockOperation(GravitinoOperation):
@@ -63,6 +65,12 @@ class MockOperation(GravitinoOperation):
 
     def as_policy_operation(self) -> PolicyOperation:
         return MockPolicyOperation()
+
+    def as_partition_operation(self) -> PartitionOperation:
+        return MockPartitionOperation()
+
+    def as_view_operation(self) -> ViewOperation:
+        return MockViewOperation()
 
 
 class MockCatalogOperation(CatalogOperation):
@@ -440,3 +448,39 @@ class MockStatisticOperation(StatisticOperation):
             f"mock_statistics_for_partition: {metalake_name}, {metadata_type}, {metadata_fullname},"
             f" {from_partition_name}, {to_partition_name}, {from_inclusive}, {to_inclusive}"
         )
+
+
+class MockPartitionOperation(PartitionOperation):
+    async def list_of_partitions(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        details: bool = False,
+    ) -> str:
+        return (
+            f"mock_partitions: {catalog_name}, {schema_name}, {table_name}, "
+            f"{details}"
+        )
+
+    async def get_partition(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        partition_name: str,
+    ) -> str:
+        return (
+            f"mock_partition: {catalog_name}, {schema_name}, {table_name}, "
+            f"{partition_name}"
+        )
+
+
+class MockViewOperation(ViewOperation):
+    async def list_of_views(self, catalog_name: str, schema_name: str) -> str:
+        return f"mock_views: {catalog_name}, {schema_name}"
+
+    async def load_view(
+        self, catalog_name: str, schema_name: str, view_name: str
+    ) -> str:
+        return f"mock_view: {catalog_name}, {schema_name}, {view_name}"

@@ -393,7 +393,9 @@ public class PolicyManager implements PolicyDispatcher {
                     entityType,
                     policyIdent);
           } catch (NoSuchEntityException e) {
-            if (e.getMessage().contains("No such entity")) {
+            // The store reports a missing policy and a missing metadata object with the same
+            // exception type, so the message is the only thing that tells them apart.
+            if (isMissingEntity(e, Entity.EntityType.POLICY, policyName)) {
               throw new NoSuchPolicyException(
                   e, "Policy %s does not exist for metadata object %s", policyName, metadataObject);
             } else {
@@ -518,5 +520,19 @@ public class PolicyManager implements PolicyDispatcher {
     builder.withContent(newContent);
 
     return builder.build();
+  }
+
+  /**
+   * Tells a "the related entity does not exist" failure apart from a "the metadata object does not
+   * exist" one. The store signals both with {@link NoSuchEntityException}, so the message built by
+   * the relational services is the only discriminator; it is rebuilt here from the same constant
+   * and the same lowercasing behavior they use.
+   */
+  private static boolean isMissingEntity(
+      NoSuchEntityException e, Entity.EntityType type, String name) {
+    String expected =
+        String.format(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, type.name().toLowerCase(), name);
+    return expected.equals(e.getMessage());
   }
 }
