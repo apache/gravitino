@@ -76,7 +76,10 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
-    String typeName = TypeUtils.stripNullable(typeBean.getTypeName());
+    // ClickHouse allows LowCardinality wrapping Nullable: LowCardinality(Nullable(String)).
+    // Nullable(LowCardinality(X)) is invalid in ClickHouse and not handled here.
+    String typeName = TypeUtils.stripLowCardinality(typeBean.getTypeName());
+    typeName = TypeUtils.stripNullable(typeName);
 
     Integer dateTimePrecision = TypeUtils.extractDateTimePrecision(typeName);
     if (dateTimePrecision != null) {
@@ -89,6 +92,16 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
 
     if (typeName.startsWith("FixedString(")) {
       typeName = "FixedString";
+    }
+
+    // ClickHouse normalizes Enum to Enum8/Enum16, so "Enum8(...)" never matches "Enum".
+    // Return directly as ExternalType to preserve the full parameterized form.
+    // Use stripped typeName (not typeBean.getTypeName()) to avoid preserving
+    // Nullable/LowCardinality
+    // wrappers that were already stripped above. Consistent with wide integer ExternalType
+    // handling.
+    if (typeName.startsWith(ENUM)) {
+      return Types.ExternalType.of(typeName);
     }
 
     switch (typeName) {
@@ -108,10 +121,20 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
         return Types.IntegerType.unsigned();
       case UINT64:
         return Types.LongType.unsigned();
+      case INT128:
+      case INT256:
+      case UINT128:
+      case UINT256:
+        // ClickHouse native wide integer types with no corresponding Gravitino built-in type.
+        return Types.ExternalType.of(typeName);
       case FLOAT32:
         return Types.FloatType.get();
       case FLOAT64:
         return Types.DoubleType.get();
+      case BFLOAT16:
+        // Lossy: Gravitino has no half-precision float type. Use ExternalType to preserve
+        // round-trip (BFloat16 → ExternalType("BFloat16") → BFloat16).
+        return Types.ExternalType.of(BFLOAT16);
       case DECIMAL:
         int precision = typeBean.getColumnSize();
         int scale = typeBean.getScale();
@@ -126,6 +149,11 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
               String.format("Decimal scale %s is out of range [0, %s]", scale, precision));
         }
 
+        // ClickHouse supports Decimal up to precision 76 (Decimal128=38, Decimal256=76),
+        // but Gravitino core DecimalType enforces precision <= 38. Use ExternalType for larger.
+        if (precision > 38) {
+          return Types.ExternalType.of(String.format("%s(%s,%s)", DECIMAL, precision, scale));
+        }
         return Types.DecimalType.of(precision, scale);
       case STRING:
         return Types.StringType.get();
@@ -133,7 +161,9 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
         return Types.FixedCharType.of(typeBean.getColumnSize());
       case DATE:
         return Types.DateType.get();
-        // No type mapping for date32, we will use external type to handle it.
+      case DATE32:
+        // Date32 supports 1900-2299 vs Date's 1970-2149. Use ExternalType to preserve round-trip.
+        return Types.ExternalType.of(DATE32);
       case DATETIME:
         // Default is 0 precision
         return Types.TimestampType.withoutTimeZone(0);
@@ -141,6 +171,10 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
         return Types.BooleanType.get();
       case UUID:
         return Types.UUIDType.get();
+      case IPV4:
+        return Types.ExternalType.of(IPV4);
+      case IPV6:
+        return Types.ExternalType.of(IPV6);
       default:
         return Types.ExternalType.of(typeBean.getTypeName());
     }
@@ -164,9 +198,12 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       return STRING;
     } else if (type instanceof Types.DateType) {
       return DATE;
-    } else if (type instanceof Types.TimestampType) {
-      // Gravitino timestamp type maps to ClickHouse DateTime with precision 0, and
-      // Use the external type to handle DateTime64
+    } else if (type instanceof Types.TimestampType timestampType) {
+      // Gravitino timestamp type maps to ClickHouse DateTime with precision 0.
+      // For precision > 0, use DateTime64(N).
+      if (timestampType.precision() > 0) {
+        return DATETIME64 + "(" + timestampType.precision() + ")";
+      }
       return DATETIME;
     } else if (type instanceof Types.TimeType) {
       return TIME;

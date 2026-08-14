@@ -35,9 +35,14 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.SchemaDTO;
 import org.apache.gravitino.dto.file.FilesetDTO;
+import org.apache.gravitino.dto.function.FunctionDTO;
+import org.apache.gravitino.dto.function.FunctionDefinitionDTO;
 import org.apache.gravitino.dto.messaging.TopicDTO;
 import org.apache.gravitino.dto.rel.ColumnDTO;
+import org.apache.gravitino.dto.rel.SQLRepresentationDTO;
 import org.apache.gravitino.dto.rel.TableDTO;
+import org.apache.gravitino.dto.rel.ViewDTO;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.requests.TagsAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
@@ -47,16 +52,24 @@ import org.apache.gravitino.dto.tag.TagDTO;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.file.Fileset;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockserver.model.HttpRequest;
+import org.mockserver.verify.VerificationTimes;
 
 public class TestSupportTags extends TestBase {
 
@@ -77,6 +90,10 @@ public class TestSupportTags extends TestBase {
   private static Fileset genericFileset;
 
   private static Topic genericTopic;
+
+  private static View genericView;
+
+  private static Function genericFunction;
 
   @BeforeAll
   public static void setUp() throws Exception {
@@ -171,6 +188,41 @@ public class TestSupportTags extends TestBase {
                 .build(),
             client.restClient(),
             Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericView =
+        new GenericView(
+            ViewDTO.builder()
+                .withName("view1")
+                .withComment("comment1")
+                .withColumns(new ColumnDTO[0])
+                .withRepresentations(
+                    new SQLRepresentationDTO[] {
+                      SQLRepresentationDTO.builder()
+                          .withDialect(Dialects.TRINO)
+                          .withSql("SELECT 1")
+                          .build()
+                    })
+                .withProperties(Collections.emptyMap())
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
+
+    genericFunction =
+        new GenericFunction(
+            FunctionDTO.builder()
+                .withName("function1")
+                .withFunctionType(FunctionType.SCALAR)
+                .withComment("comment1")
+                .withDeterministic(true)
+                .withDefinitions(
+                    new FunctionDefinitionDTO[] {
+                      FunctionDefinitionDTO.builder().withReturnType(Types.StringType.get()).build()
+                    })
+                .withAudit(AuditDTO.builder().withCreator("test").build())
+                .build(),
+            client.restClient(),
+            Namespace.of(METALAKE_NAME, "catalog1", "schema1"));
   }
 
   @Test
@@ -225,6 +277,21 @@ public class TestSupportTags extends TestBase {
   }
 
   @Test
+  public void testListTagsForView() throws JsonProcessingException {
+    testListTags(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testListTagsForFunction() throws JsonProcessingException {
+    testListTags(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
+  }
+
+  @Test
   public void testListTagsInfoForCatalog() throws JsonProcessingException {
     testListTagsInfo(
         relationalCatalog.supportsTags(),
@@ -273,6 +340,21 @@ public class TestSupportTags extends TestBase {
     testListTagsInfo(
         genericTopic.supportsTags(),
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
+  }
+
+  @Test
+  public void testListTagsInfoForView() throws JsonProcessingException {
+    testListTagsInfo(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testListTagsInfoForFunction() throws JsonProcessingException {
+    testListTagsInfo(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
   }
 
   @Test
@@ -327,6 +409,21 @@ public class TestSupportTags extends TestBase {
   }
 
   @Test
+  public void testGetTagForView() throws JsonProcessingException {
+    testGetTag(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testGetTagForFunction() throws JsonProcessingException {
+    testGetTag(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
+  }
+
+  @Test
   public void testAssociateTagsForCatalog() throws JsonProcessingException {
     testAssociateTags(
         relationalCatalog.supportsTags(),
@@ -375,6 +472,21 @@ public class TestSupportTags extends TestBase {
     testAssociateTags(
         genericTopic.supportsTags(),
         MetadataObjects.of("catalog1.schema1", genericTopic.name(), MetadataObject.Type.TOPIC));
+  }
+
+  @Test
+  public void testAssociateTagsForView() throws JsonProcessingException {
+    testAssociateTags(
+        genericView.supportsTags(),
+        MetadataObjects.of("catalog1.schema1", genericView.name(), MetadataObject.Type.VIEW));
+  }
+
+  @Test
+  public void testAssociateTagsForFunction() throws JsonProcessingException {
+    testAssociateTags(
+        genericFunction.supportsTags(),
+        MetadataObjects.of(
+            "catalog1.schema1", genericFunction.name(), MetadataObject.Type.FUNCTION));
   }
 
   private void testListTags(SupportsTags supportsTags, MetadataObject metadataObject)
@@ -532,6 +644,23 @@ public class TestSupportTags extends TestBase {
 
     String[] actualTags = supportsTags.associateTags(tagsToAdd, tagsToRemove);
     Assertions.assertArrayEquals(tagsToAdd, actualTags);
+
+    TagValue[] tagValuesToAdd =
+        new TagValue[] {TagValue.noValue("tag1"), TagValue.of("tag2", "finance")};
+    TagValue[] tagValuesToRemove = new TagValue[] {TagValue.of("tag3", "risk")};
+    TagValuesAssociateRequest valueRequest =
+        new TagValuesAssociateRequest(tagValuesToAdd, tagValuesToRemove);
+    buildMockResource(Method.POST, path, valueRequest, resp, SC_OK);
+
+    String[] actualValueTags = supportsTags.associateTags(tagValuesToAdd, tagValuesToRemove);
+    Assertions.assertArrayEquals(tagsToAdd, actualValueTags);
+    mockServer.verify(
+        HttpRequest.request(path)
+            .withMethod(Method.POST.name())
+            .withHeader(HttpHeaders.ACCEPT, "application/vnd.gravitino.v2+json")
+            .withHeader(HttpHeaders.CONTENT_TYPE, "application/vnd.gravitino.v2+json")
+            .withBody(MAPPER.writeValueAsString(valueRequest)),
+        VerificationTimes.once());
 
     // Test throw internal error
     ErrorResponse errorResp1 = ErrorResponse.internalError("mock error");

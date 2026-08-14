@@ -1,0 +1,366 @@
+<!--
+  Licensed to the Apache Software Foundation (ASF) under one
+  or more contributor license agreements.  See the NOTICE file
+  distributed with this work for additional information
+  regarding copyright ownership.  The ASF licenses this file
+  to you under the Apache License, Version 2.0 (the
+  "License"); you may not use this file except in compliance
+  with the License.  You may obtain a copy of the License at
+
+   http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing,
+  software distributed under the License is distributed on an
+  "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+  KIND, either express or implied.  See the License for the
+  specific language governing permissions and limitations
+  under the License.
+-->
+
+# Design: Role Assumption (SET ROLE) — Narrowing Effective Permissions
+
+| Field | Value |
+| ---------- | ------------------------------------------------------------------------- |
+| Status     | Draft |
+| Authors    | @bharos |
+| Created    | 2026-06-24 |
+| Discussion | [#10894](https://github.com/apache/gravitino/discussions/10894) |
+| Scope      | Native authorization path (Iceberg REST catalog + native Gravitino API) |
+
+---
+
+## 1. Summary
+
+When a user holds multiple roles, Gravitino always enforces the union of all of them. A workload has no
+way to run with a narrower subset of the access its identity could reach.
+
+This document proposes **role assumption** — the analog of Snowflake's `USE ROLE` and Hive's `SET ROLE`.
+A caller declares which role(s) should be active for a request, Gravitino verifies the caller actually
+holds them, and authorization is evaluated against only that active set. The feature can only *reduce* a
+caller's effective permissions, never expand them. If no role is declared, behavior is exactly as it is
+today.
+
+The mechanism is intentionally simple: a request header, `X-Gravitino-Active-Roles`, carries the active
+role(s), and the server narrows enforcement to match — across access checks, list results, and credential
+vending alike. Section 3 defines the header and its values; Section 4 explains how the server enforces
+it. Transport is the easy part — the common instinct is to treat this as "just a Trino change," but the
+substance is server-side.
+
+---
+
+## 2. Motivation
+
+### 2.1 The problem
+
+A pipeline or AI agent that only needs 5 tables still runs with access to every table (say 105) its
+identity can reach. If that workload misbehaves — a logic bug, a bad query, a leaked credential, or an
+LLM agent over-reaching — the blast radius is everything the identity could touch, and out-of-scope
+access **succeeds silently** instead of being denied and surfaced.
+
+### 2.2 Why it matters now
+
+A few things make this worth doing now. It gives workloads real runtime least-privilege: a job can drop
+to exactly the access it needs without anyone having to mint a separate narrowly-scoped identity for it.
+It also produces a much cleaner audit signal — with narrowing on, out-of-scope access turns into a hard
+deny you can alert on, instead of a successful-but-unexpected access buried in the logs. AI agents are
+the sharpest version of the same need: you want an agent to operate inside a declared, minimal scope and
+to fail the moment it steps outside it. There's also a concrete migration angle — Hive's SQL Standard
+Authorization supports `SET ROLE`, so teams moving HMS tables to Iceberg behind Gravitino lose that
+capability today, and this restores it.
+
+### 2.3 Goals
+
+- Let a caller narrow the active role set for the native authorization path (Iceberg REST + native
+  API).
+- Guarantee narrowing is **subtractive only** — it can never grant access the caller lacks.
+- Apply the narrowing consistently everywhere authorization is consulted: direct access checks **and**
+  list-result filtering **and** credential vending.
+- Be **fully backward compatible**: no declared role ⇒ today's union behavior, byte-for-byte.
+
+### 2.4 Non-goals (initial)
+
+- Dynamic in-session `SET ROLE` switching mid-connection (deferred to a later phase — see Section 11).
+- Narrowing for **pushdown-authorized** catalogs (Hive/JDBC via Ranger/JDBC plugins), where
+  enforcement happens in the external system — see Section 6.
+- Changing how ownership is modeled (its *interaction* with narrowing is an explicit open decision —
+  see Section 5).
+- Write/`CREATE` semantics (which role owns newly created objects) — flagged for forward-compat only.
+
+---
+
+## 3. The active-role header
+
+The interface is a single request header:
+
+```
+X-Gravitino-Active-Roles: <value>
+```
+
+The caller sets it to declare which of its roles should be active for that request. The server validates
+the value against the roles the caller actually holds, then evaluates authorization against only those
+roles.
+
+### 3.1 Accepted values
+
+A value is either a role name, a comma-separated list of role names, or one of the reserved keywords
+`ALL` / `NONE`:
+
+| Value | Meaning |
+|---|---|
+| `<role>` (e.g. `analyst`) | Activate a single named role. |
+| `<role>,<role>` (e.g. `analyst,reader`) | Activate a list of roles; effective access is the union of just these. |
+| `ALL` | Activate every role the caller holds — identical to today's behavior. |
+| `NONE` | Activate no roles; all role-derived access is denied. |
+| *(header absent)* | Same as `ALL` — fully backward compatible. |
+
+Here `analyst` and `reader` are example role names, not keywords; only `ALL` and `NONE` are reserved.
+This mirrors the vocabulary users already know from Hive (`SET ROLE role | ALL | NONE`) and Snowflake
+(`USE SECONDARY ROLES ALL | NONE`).
+
+`NONE` is the only way to express the *empty* active set. An absent header already means `ALL`, so
+without an explicit keyword there is no way to declare "use none of my roles" — running with only
+ownership/baseline access. That mode is genuinely useful: owner-only execution for a job or agent that
+should touch nothing its roles grant, and verifying deny paths (confirming what is reachable with no
+role active). It costs nothing to support — an empty active set simply means no role policies are
+consulted.
+
+### 3.2 Examples
+
+A reporting job that should only ever read through its `analyst` role:
+
+```
+GET /iceberg/v1/namespaces/sales/tables
+X-Gravitino-Active-Roles: analyst
+```
+
+Declaring a role the caller does not actually hold is rejected — this is what keeps the feature
+subtractive:
+
+```
+X-Gravitino-Active-Roles: admin     →  403 Forbidden   (caller is not a member of admin)
+```
+
+### 3.3 Semantics
+
+- **Subtractive only.** The server validates membership first, so the header can never grant access the
+  caller lacks — at most it removes roles from the evaluated set.
+- **Consistent everywhere.** The narrowed set applies to every authorization decision in the request:
+  direct access checks, the filtering of list results, and the privileges used for credential vending.
+- **Backward compatible.** No header (or `ALL`) means today's union behavior, unchanged.
+
+### 3.4 Validation and error handling
+
+The header is parsed and validated before any authorization runs, and there are two distinct failure
+classes:
+
+- **Malformed value → `400 Bad Request`.** The value is syntactically invalid — an empty entry (e.g. a
+  trailing comma `analyst,`), a reserved keyword combined with anything else (`ALL,analyst`,
+  `NONE,reader`, `ALL,NONE`), or an unrecognized keyword. `ALL` and `NONE` are exclusive: each must
+  appear alone. Surrounding whitespace is trimmed and duplicate names collapse, so `analyst, analyst `
+  is fine; role names are matched exactly (case-sensitive), since that's how they're stored.
+- **Unauthorized role → `403 Forbidden`.** The value is well-formed but names a role the caller does not
+  currently hold. A **non-existent role and a role the caller simply isn't granted are treated
+  identically** — both are "not in your effective set" and both 403. We deliberately don't distinguish
+  them, so the response can't be used to probe which role names exist.
+
+This is a **fail-closed** choice: any unknown or unheld role rejects the whole request rather than being
+silently dropped. Silent dropping would be *safe* in the escalation sense — narrowing can only ever
+remove roles, so an ignored role could never grant access — but it would turn a typo into a confusing
+partial or total loss of access that's hard to debug. Rejecting surfaces the mistake immediately. (A
+role that's deleted or revoked mid-flight is just the non-existent / not-held case on the next request:
+it drops out of the effective set and a header naming it returns 403.)
+
+---
+
+## 4. How the server enforces narrowing
+
+Without an `X-Gravitino-Active-Roles` header, Gravitino evaluates each operation against the user's full
+set of roles — those granted directly plus those inherited from groups. The header narrows that set for
+the request:
+
+1. **Resolve** the caller's effective roles the normal way — direct grants plus group-inherited ones.
+   Say that's `{analyst, editor, auditor}`.
+2. **Validate** the header against that set. The declared role must be one the caller actually holds; a
+   role they don't hold — including one that doesn't exist — is rejected (see Section 3.4 for the exact
+   `400` vs `403` rules). This is the guardrail that keeps narrowing *subtractive* — you can reduce what
+   you use, never assume a role you were never granted.
+3. **Enforce** using only the validated active role(s). With `X-Gravitino-Active-Roles: analyst`, the
+   request is evaluated as `analyst` alone; `editor` and `auditor` are simply not consulted.
+
+So the active set is `(roles named in the header) ∩ (the caller's effective roles)` — always a subset,
+never a way to widen or switch into a role you don't hold. Because it keys on the role and not how the
+role was acquired, a role held only through a group works exactly the same — group-based authorization is
+covered with nothing extra.
+
+This needs **no change to the Casbin model**. Authorization is already checked with the user as the
+subject, and a grouping rule expands the user to all their roles — that expansion is the union. Since
+policies are written against *roles*, the same enforcer is instead called with each active *role* as the
+subject. Narrowing is just that change of subject, and deny rules run over the same active subset, so
+deny-wins is preserved — an explicit deny on an active role still denies.
+
+The one identity-derived exception is **ownership**: access a user (or their group) gets from *owning* an
+object comes from the ownership grant, not a role, so under the proposed default it still applies when
+roles are narrowed. Whether narrowing should also suppress owner access is the open decision in Section 5.
+
+Two implementation properties keep this correct. Narrowing is applied by *choosing which roles to
+evaluate* for the request — never by editing the user's bindings, since the enforcers are shared
+process-wide across all users. And it must reach **every** decision: list filtering and credential
+vending go through the same check as direct access, so a narrowed caller lists only what its active roles
+allow and is never vended a broader storage credential — provided vending is wired in deliberately, or
+the narrowing could be bypassed through the storage token.
+
+---
+
+## 5. Ownership — the key open decision
+
+There is one place where narrowing is not automatic, and it needs a decision from the community. In
+Gravitino, object **ownership** grants access directly to the owning user or group, independent of
+roles. Because most operations are allowed if the caller either holds a granting role *or* owns the
+object, an owner stays authorized no matter which roles are active.
+
+So narrowing roles does not, on its own, narrow the access a caller derives from ownership. This is the
+one spot where Gravitino differs from Snowflake, where ownership flows through the active (primary)
+role. The community needs to choose the semantics:
+
+- **Option A — ownership always applies.** Narrowing affects role-granted privileges only; you keep
+  access to objects you own. Simplest and least surprising for existing deployments, but a narrowed
+  workload could still reach objects it owns outside its declared scope.
+- **Option B — ownership is narrowed too.** When an active set is declared, ownership-derived access is
+  honored only if it is reachable through the active roles. A stronger least-privilege guarantee, but a
+  larger behavioral change.
+- **Option C — make it explicit.** A reserved value in the header grammar lets the caller opt ownership
+  in or out, mirroring Snowflake's primary-vs-secondary distinction.
+
+Proposed default: ship **Option A** for v1 — it delivers the read-narrowing that motivates the feature
+without surprising existing users — and design the grammar so Option C can be layered on later without a
+breaking change.
+
+---
+
+## 6. Scope & limitations
+
+Narrowing governs Gravitino's **native authorization path** — the Iceberg REST catalog and the native
+Gravitino API, which Gravitino enforces itself. It does **not** reach catalogs that delegate
+authorization to an external system: Hive, JDBC, and Hadoop SQL push enforcement down to Ranger or a
+JDBC authorization plugin, which evaluate against the mapped user and groups and never see the
+active-role declaration.
+
+This proposal is scoped to the Iceberg REST path, so that boundary is consistent — but it should be
+documented clearly so operators don't expect blanket coverage across every catalog type.
+
+---
+
+## 7. Transport — how each engine sends the active role
+
+The mechanism is a request header. Engines differ only in whether they can forward it:
+
+| Access path | Works today? | What's needed |
+|---|---|---|
+| Direct Gravitino API | ✅ Yes | Server-side change only |
+| **Spark** (via Iceberg REST) | ✅ Yes | No code change — a catalog config setting |
+| **Trino** (via Iceberg REST) | ✅ Yes (Trino ≥ 481) | Catalog config — `iceberg.rest-catalog.http-headers` (static) |
+| Native Java/Python client | ✅ Yes | Header passthrough; a first-class param is cleaner |
+
+**How each engine forwards the header — no code changes:**
+
+- **Spark** — Iceberg's REST catalog forwards any `header.*` catalog property as an HTTP header, so
+  `spark.sql.catalog.x.header.X-Gravitino-Active-Roles=<roles>` just works.
+- **Trino (≥ 481)** — set the catalog property
+  `iceberg.rest-catalog.http-headers=X-Gravitino-Active-Roles: <roles>` and Trino forwards it on every
+  REST call to Gravitino (added in [trinodb/trino#29132](https://github.com/trinodb/trino/pull/29132),
+  closing [#24236](https://github.com/trinodb/trino/issues/24236)). No connector patch or fork.
+
+**Static vs. dynamic.** Both of the above are **catalog-level and static** — the header is fixed in the
+catalog config and is identical for every user, session, and query on that catalog. That's enough to pin
+a catalog to a reduced role set, but it can't vary per session. Per-session narrowing (SQL `SET ROLE`)
+is Phase 3, and enforcing a scope the client can't override is the identity-bound token (Phase 2 /
+Section 8).
+
+---
+
+## 8. Security & trust boundaries
+
+It's worth being honest about what the header does and doesn't protect against.
+
+The header is a *cooperative* control. Because the server validates membership and only ever *removes*
+roles, it can never escalate access — a client that ignores or strips the header just falls back to its
+normal, already-granted access. That makes it a solid defense against *accidental* over-reach (a buggy
+job, a drifting agent), turning out-of-scope access into a hard, auditable deny, and it means the header
+doesn't need to be tamper-proof to be safe.
+
+What it doesn't do is constrain a principal that refuses to cooperate. Enforcing narrowing on an
+untrusted or compromised principal means binding the scope to the *identity* it's issued — e.g. a token
+whose claims carry only the active role — not a header it controls. Gravitino is the resource server, not
+the authorization server, so it shouldn't mint that token itself; the scoping would come from the IdP.
+Not all IdPs can do this (Azure Entra, for one, emits all of a user's groups with no per-role
+down-scoping), so this is a real complexity rather than a guaranteed option — noted here, to be detailed
+if there's interest.
+
+---
+
+## 9. Prior art
+
+For reference, how comparable systems expose the same capability:
+
+| System | Mechanism | Ownership of created objects |
+|---|---|---|
+| Snowflake | Primary role + secondary roles (`USE SECONDARY ROLES ALL \| NONE`) | Tied to the primary role |
+| Hive (SQL Std Auth) | `SET ROLE role \| ALL \| NONE` | Grant-based (n/a) |
+| PostgreSQL | `SET ROLE` / `SET SESSION AUTHORIZATION` | New objects owned by the current role |
+
+The relevant lesson is Snowflake's: it couples ownership to the active role. Gravitino couples ownership
+to the user or group directly, which is exactly why the ownership decision in Section 5 exists.
+
+---
+
+## 10. Options considered
+
+| Option | Narrows enforcement? | Enforces on uncooperative principal? | Engine support | Verdict |
+|---|---|---|---|---|
+| **A. Request header** (`X-Gravitino-Active-Roles`) — caller declares the active roles in an HTTP header | ✅ | ❌ (cooperative) | Spark ✅, API ✅, Trino ✅ (≥ 481, static) | **Phase 1** — ship first |
+| **B. Native API parameter** — same as A, exposed as a client call argument instead of a raw header | ✅ | ❌ | Native clients | Fold into A (nicer ergonomics) |
+| **C. IdP-issued scoped token** — active set comes from access-token claims, issued already-narrowed by the authorization server | ✅ | ✅ | Engine via bearer token | Depends on IdP support (Entra can't per-role); Gravitino stays the resource server |
+| **D. Dynamic SQL `SET ROLE`** — `SET ROLE` mid-session in Spark/Trino SQL, narrowing later queries | ✅ | depends | Needs per-engine session propagation | **Phase 3** — large; only if demand |
+| **E. Separate scoped catalogs/identities** — pre-provision a distinct narrow identity/catalog per job (today's workaround) | ✅ | ✅ | All | Operationally heavy; doesn't scale per-job — the thing we're replacing |
+
+---
+
+## 11. Phased rollout
+
+The work splits naturally into a few phases. Phase 1 is the server-side narrowing itself — validating
+the declared roles, enforcing per active role, and keeping list filtering and credential vending
+consistent — together with the header transport. That alone covers the native API and Spark today, and
+it's backward compatible, so it lands the motivating use cases without waiting on anything else. Trino
+(≥ 481) is covered too at the static/catalog level — it forwards the header via its
+`iceberg.rest-catalog.http-headers` config with no extra work; only per-session dynamic narrowing is
+deferred (Phase 3). Phase 2 binds the narrow scope to the caller's *identity* rather than a header — an IdP-issued scoped
+token — so it holds even against an uncooperative client and reaches Trino through the existing OAuth
+path. It depends on IdP capabilities (Gravitino doesn't mint the token), so it's a later, optional step.
+Phase 3 — dynamic in-session `SET ROLE` — is the largest piece, and only worth doing if there's real
+demand for switching roles mid-session.
+
+---
+
+## 12. Decisions needed from the community
+
+1. **Approach.** Adopt header-based, subtractive-only narrowing for the native path (Iceberg REST +
+   native API), landing Spark and the native API first?
+2. **Ownership semantics (Section 5) — the key decision.** When roles are narrowed, does access a
+   user gets from *owning* an object still apply?
+   - **A.** Ownership always applies — owners keep access regardless of active roles.
+   - **B.** Ownership is narrowed too — true least-privilege, but a larger behavioral change.
+   - **C.** Caller chooses, via the grammar — opt ownership in or out per request.
+   Proposed default: ship A, with the grammar designed so C can be added later without a breaking change.
+3. **v1 grammar.** Start with a single active role plus `ALL` / `NONE`, and add comma-separated lists
+   shortly after?
+4. **Standardization.** Static header forwarding already works generically (Spark `header.*`, Trino
+   `iceberg.rest-catalog.http-headers`). Pursue an Iceberg REST spec proposal (a standard header or
+   OAuth2 scope) so that *per-session* narrowing and uncooperative-principal enforcement also become
+   vendor-neutral across engines?
+5. **Enforcing on an uncooperative principal (Phase 2).** Agree the header is a cooperative control, and
+   that enforcing narrowing on an untrusted principal belongs in an IdP-issued scoped token — not minted
+   by Gravitino, which stays the resource server — accepting that IdP support for this varies?
+
+**Flagged for later (not a v1 decision):** when narrowed `CREATE` is eventually supported, which role
+owns newly created objects? Snowflake ties this to a primary role; noting it now only so the v1 grammar
+doesn't preclude that choice.

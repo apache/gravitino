@@ -43,11 +43,11 @@ export default function StyledToast() {
             {({ icon, message }) => (
               <>
                 {icon}
-                <div className='twc-flex twc-w-full twc-break-normal [&>div]:twc-justify-start'>{message}</div>
-                <div className='twc-flex twc-h-full'>
+                <div className='flex w-full break-normal [&>div]:justify-start'>{message}</div>
+                <div className='flex h-full'>
                   {t.type !== 'loading' && (
                     <button
-                      className='twc-border-0 twc-text-[#666] twc-w-6 twc-h-6 twc-justify-start twc-rounded-full twc-ring-primary-400 twc-transition hover:twc-bg-[#f8f8f8] focus:twc-outline-none focus-visible:twc-ring'
+                      className='h-6 w-6 justify-start rounded-full border-0 text-[#666] ring-primary-400 transition hover:bg-[#f8f8f8] focus:outline-none focus-visible:ring'
                       onClick={() => toast.dismiss(t.id)}
                     >
                       x

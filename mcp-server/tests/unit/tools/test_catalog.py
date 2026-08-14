@@ -45,3 +45,90 @@ class TestCatalogTool(unittest.TestCase):
                 self.assertEqual("mock_catalogs", result.content[0].text)
 
         asyncio.run(_test_list_catalogs(self.mcp))
+
+    def test_create_catalog(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_catalog",
+                    {
+                        "name": "cat1",
+                        "catalog_type": "relational",
+                        "provider": "hive",
+                        "comment": "c",
+                        "properties": {"k": "v"},
+                    },
+                )
+                self.assertEqual(
+                    "mock_catalog_created: cat1, relational, hive",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_catalog(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "rename", "newName": "cat2"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_catalog",
+                    {"catalog_name": "cat1", "updates": updates},
+                )
+                self.assertEqual(
+                    f"mock_catalog_altered: cat1 with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_drop_catalog(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "drop_catalog", {"catalog_name": "cat1"}
+                )
+                self.assertEqual(
+                    "mock_catalog_dropped: cat1, force=False",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_drop_catalog_force(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "drop_catalog", {"catalog_name": "cat1", "force": True}
+                )
+                self.assertEqual(
+                    "mock_catalog_dropped: cat1, force=True",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_set_catalog_in_use(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "set_catalog_in_use",
+                    {"catalog_name": "cat1", "in_use": False},
+                )
+                self.assertEqual(
+                    "mock_catalog_set_in_use: cat1, in_use=False",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_write_tools_exposed(self):
+        """Write tools must be present (authorization enforced by Gravitino)."""
+
+        async def _test(mcp_server):
+            names = {t.name for t in await mcp_server.list_tools()}
+            self.assertIn("create_catalog", names)
+            self.assertIn("alter_catalog", names)
+            self.assertIn("drop_catalog", names)
+            self.assertIn("set_catalog_in_use", names)
+
+        asyncio.run(_test(self.mcp))

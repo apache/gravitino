@@ -67,6 +67,12 @@ public class Constants {
   public static final String OSS_ESTABLISH_TIMEOUT_KEY = "fs.oss.connection.establish.timeout";
   public static final String OSS_MAX_ERROR_RETRIES_KEY = "fs.oss.attempts.maximum";
 
+  /** Maps to {@code CosNConfigKeys.COSN_CONNECTION_TIMEOUT}. hadoop-cos default is 10000 ms. */
+  public static final String COS_CONNECTION_TIMEOUT_KEY = "fs.cosn.connection.timeout";
+
+  /** Maps to {@code CosNConfigKeys.COSN_MAX_RETRIES_KEY}. hadoop-cos default is 200. */
+  public static final String COS_MAX_RETRIES_KEY = "fs.cosn.maxRetries";
+
   // Azure Blob Storage specific configuration keys, please see: AbfsConfiguration
   public static final String ADLS_MAX_RETRIES = "fs.azure.io.retry.max.retries";
 

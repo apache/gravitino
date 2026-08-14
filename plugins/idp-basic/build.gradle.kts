@@ -31,7 +31,6 @@ dependencies {
   implementation(project(":common"))
   implementation(project(":core"))
 
-  implementation(libs.bcprov.jdk18on)
   implementation(libs.bundles.jersey)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
@@ -75,10 +74,6 @@ tasks {
     from(layout.buildDirectory.dir("libs")) {
       include("gravitino-idp-basic-*.jar")
       exclude("*-javadoc.jar", "*-sources.jar")
-    }
-    // Argon2id password hashing; not bundled in the server distribution today.
-    from(configurations.runtimeClasspath) {
-      include("bcprov-jdk18on-*.jar")
     }
     into("$rootDir/distribution/package/libs")
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE

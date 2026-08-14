@@ -55,6 +55,10 @@ paths:
                 $ref: "#/components/examples/MysqlTableCreate"
               PostgresqlTableCreate:
                 $ref: "#/components/examples/PostgresqlTableCreate"
+              IcebergTableCreate:
+                $ref: "#/components/examples/IcebergTableCreate"
+              IcebergVariantTableCreate:
+                $ref: "#/components/examples/IcebergVariantTableCreate"
       responses:
         "200":
           $ref: "#/components/responses/TableResponse"
@@ -344,11 +348,9 @@ components:
         type: string
 
     ColumnDefaultValue:
-      $ref: "./expression.yaml#/components/schemas/FunctionArg"
+      allOf:
+        - $ref: "./expression.yaml#/components/schemas/FunctionArg"
       description: The default value of the column
-      required: false
-      nullable: true
-      default: null
 
     Column:
       type: object
@@ -522,10 +524,9 @@ components:
           description: The comment of the column to add
           nullable: true
         position:
-          $ref: "#/components/schemas/ColumnPosition"
+          allOf:
+            - $ref: "#/components/schemas/ColumnPosition"
           description: The position of the column to add
-          nullable: true
-          default: "default"
         nullable:
           type: boolean
           description: Whether the column to add is nullable
@@ -537,9 +538,9 @@ components:
           nullable: true
           default: false
         defaultValue:
-          $ref: "#/components/schemas/ColumnDefaultValue"
+          allOf:
+            - $ref: "#/components/schemas/ColumnDefaultValue"
           description: The default value of the column to add
-          nullable: true
       example: {
         "@type": "addColumn",
         "fieldName": [ "new_column" ],
@@ -996,6 +997,54 @@ components:
           }
         ],
         "properties": { }
+      }
+
+    IcebergTableCreate:
+      value: {
+        "name": "my_iceberg_table",
+        "comment": "This is my Iceberg table",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "comment": "id column comment",
+            "nullable": false
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "comment": "name column comment",
+            "nullable": true
+          }
+        ],
+        "properties": {
+          "format-version": "2"
+        },
+        indexes: [ ]
+      }
+
+    IcebergVariantTableCreate:
+      value: {
+        "name": "my_iceberg_variant_table",
+        "comment": "Iceberg table with a variant column, which requires format-version 3",
+        "columns": [
+          {
+            "name": "id",
+            "type": "integer",
+            "comment": "id column comment",
+            "nullable": false
+          },
+          {
+            "name": "payload",
+            "type": "variant",
+            "comment": "semi-structured payload column",
+            "nullable": true
+          }
+        ],
+        "properties": {
+          "format-version": "3"
+        },
+        indexes: [ ]
       }
 
     TableResponse:

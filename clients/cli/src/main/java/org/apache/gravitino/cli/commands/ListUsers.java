@@ -69,8 +69,23 @@ public class ListUsers extends Command {
   private User getUser(String user) {
     return new User() {
       @Override
+      public Long id() {
+        return null;
+      }
+
+      @Override
       public String name() {
         return user;
+      }
+
+      @Override
+      public String externalId() {
+        return null;
+      }
+
+      @Override
+      public boolean enabled() {
+        return true;
       }
 
       @Override

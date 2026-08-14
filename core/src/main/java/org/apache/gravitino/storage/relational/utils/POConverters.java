@@ -93,6 +93,7 @@ import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /** POConverters is a utility class to convert PO to Base and vice versa. */
@@ -956,6 +957,8 @@ public class POConverters {
       return builder
           .withUserId(userEntity.id())
           .withUserName(userEntity.name())
+          .withExternalId(userEntity.externalId())
+          .withEnabled(userEntity.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(userEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -983,6 +986,8 @@ public class POConverters {
           .withUserId(oldUserPO.getUserId())
           .withUserName(newUser.name())
           .withMetalakeId(oldUserPO.getMetalakeId())
+          .withExternalId(newUser.externalId())
+          .withEnabled(newUser.enabled())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newUser.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -1012,6 +1017,8 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
+              .withExternalId(userPO.getExternalId())
+              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1040,6 +1047,8 @@ public class POConverters {
               .withId(userPO.getUserId())
               .withName(userPO.getUserName())
               .withNamespace(namespace)
+              .withExternalId(userPO.getExternalId())
+              .withEnabled(userPO.getEnabled())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (StringUtils.isNotBlank(userPO.getRoleNames())) {
@@ -1096,6 +1105,7 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
+              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1124,6 +1134,7 @@ public class POConverters {
               .withId(groupPO.getGroupId())
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
+              .withExternalId(groupPO.getExternalId())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
 
@@ -1229,6 +1240,7 @@ public class POConverters {
       return builder
           .withGroupId(groupEntity.id())
           .withGroupName(groupEntity.name())
+          .withExternalId(groupEntity.externalId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(groupEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1255,6 +1267,7 @@ public class POConverters {
       return GroupPO.builder()
           .withGroupId(oldGroupPO.getGroupId())
           .withGroupName(newGroup.name())
+          .withExternalId(newGroup.externalId())
           .withMetalakeId(oldGroupPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newGroup.auditInfo()))
           .withCurrentVersion(nextVersion)
@@ -1401,6 +1414,10 @@ public class POConverters {
           .withName(tagPO.getTagName())
           .withNamespace(namespace)
           .withComment(tagPO.getComment())
+          .withAllowedValues(
+              tagPO.getAllowedValues() == null
+                  ? null
+                  : JsonUtils.anyFieldMapper().readValue(tagPO.getAllowedValues(), String[].class))
           .withProperties(JsonUtils.anyFieldMapper().readValue(tagPO.getProperties(), Map.class))
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(tagPO.getAuditInfo(), AuditInfo.class))
@@ -1421,6 +1438,7 @@ public class POConverters {
           .withTagName(tagEntity.name())
           .withComment(tagEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.properties()))
+          .withAllowedValues(serializeAllowedValues(tagEntity.valueConstraint()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(tagEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -1443,6 +1461,7 @@ public class POConverters {
           .withMetalakeId(oldTagPO.getMetalakeId())
           .withComment(newEntity.comment())
           .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.properties()))
+          .withAllowedValues(serializeAllowedValues(newEntity.valueConstraint()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newEntity.auditInfo()))
           .withCurrentVersion(nextVersion)
           .withLastVersion(nextVersion)
@@ -1453,8 +1472,35 @@ public class POConverters {
     }
   }
 
+  private static String serializeAllowedValues(TagValueConstraint valueConstraint)
+      throws JsonProcessingException {
+    String[] allowedValues = allowedValuesForStorage(valueConstraint);
+    return allowedValues == null
+        ? null
+        : JsonUtils.anyFieldMapper().writeValueAsString(allowedValues);
+  }
+
+  private static String[] allowedValuesForStorage(TagValueConstraint valueConstraint) {
+    // Storage encoding: null means ANY_VALUE, an empty array means NO_VALUE.
+    switch (valueConstraint.type()) {
+      case ANY_VALUE:
+        return null;
+      case NO_VALUE:
+      case ALLOWED_VALUES:
+        return valueConstraint.allowedValues();
+      default:
+        throw new IllegalArgumentException("Unknown tag value constraint: " + valueConstraint);
+    }
+  }
+
   public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
       Long tagId, Long metadataObjectId, String metadataObjectType) {
+    return initializeTagMetadataObjectRelPOWithVersion(
+        tagId, metadataObjectId, metadataObjectType, null);
+  }
+
+  public static TagMetadataObjectRelPO initializeTagMetadataObjectRelPOWithVersion(
+      Long tagId, Long metadataObjectId, String metadataObjectType, String tagValue) {
     try {
       AuditInfo auditInfo =
           AuditInfo.builder()
@@ -1466,6 +1512,7 @@ public class POConverters {
           .withTagId(tagId)
           .withMetadataObjectId(metadataObjectId)
           .withMetadataObjectType(metadataObjectType)
+          .withTagValue(tagValue == null ? "" : tagValue)
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)

@@ -23,6 +23,9 @@ JVM heap and metaspace are controlled by `GRAVITINO_MEM` (default `-Xms1024m -Xm
 
 Changelog
 
+- apache/gravitino:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
+
 - apache/gravitino:1.2.0
   - Built with Gravitino 1.2.0. For more information, see 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
 
@@ -86,6 +89,9 @@ Use `GRAVITINO_MEM` to size the JVM (default `-Xms1024m -Xmx1024m -XX:MaxMetaspa
 
 Changelog
 
+- apache/gravitino-iceberg-rest:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
+
 - apache/gravitino-iceberg-rest:1.2.0
   - Upgrade Iceberg to 1.10.1
   - Support view management and authorization
@@ -145,6 +151,9 @@ docker run --rm -d -p 8000:8000 apache/gravitino-mcp-server:latest --metalake te
 
 Changelog
 
+- apache/gravitino-mcp-server:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
+
 - apache/gravitino-mcp-server:1.2.0
   - Built with Gravitino 1.2.0. For more information, see 1.2.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.2.0).
 
@@ -179,6 +188,9 @@ Gravitino Lance REST server supports setting the following environment variables
 It's not advised to change `LANCE_REST_NAMESPACE_BACKEND`, `LANCE_REST_HOST` and `LANCE_REST_PORT` if you are not familiar with Gravitino Lance REST server and no special requirements.
 
 Changelog
+
+- apache/gravitino-lance-rest:1.3.0
+  - Built with Gravitino 1.3.0. For more information, see 1.3.0 [release notes](https://github.com/apache/gravitino/releases/tag/v1.3.0).
 
 - apache/gravitino-lance-rest:1.2.0
   - Supports delete and rename column operations
@@ -215,7 +227,10 @@ Changelog
 
 Changelog
 
-- apache/gravitino-playground:trino-435-gravitino-1.2.0
+- apache/gravitino-playground:trino-478-gravitino-1.3.0
+  - Use Gravitino release 1.3.0 Dockerfile to build the image.
+
+- apache/gravitino-playground:trino-478-gravitino-1.2.0
   - Use Gravitino release 1.2.0 Dockerfile to build the image.
 
 - apache/gravitino-playground:trino-435-gravitino-1.1.0

@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
@@ -42,6 +43,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
+import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
@@ -86,6 +88,43 @@ public class MetadataAuthzHelper {
    */
   private static final List<Entity.EntityType> REQUIRE_SCHEMA_EXISTS =
       Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
+
+  /**
+   * Registry of list-authorization short-circuits keyed by the listed object's entity type. Each
+   * entry pairs the per-object filter expression it applies to with the parent-scope expression to
+   * evaluate once and the privileges whose object-level denies would defeat the short-circuit.
+   */
+  private static final Map<Entity.EntityType, ListShortCircuit> LIST_SHORT_CIRCUITS =
+      Map.of(
+          Entity.EntityType.TABLE,
+          new ListShortCircuit(
+              AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+              AuthorizationExpressionConstants.TABLE_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION,
+              Set.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE)),
+          Entity.EntityType.SCHEMA,
+          new ListShortCircuit(
+              AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
+              AuthorizationExpressionConstants.SCHEMA_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION,
+              Set.of(Privilege.Name.USE_SCHEMA)),
+          Entity.EntityType.CATALOG,
+          new ListShortCircuit(
+              AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+              AuthorizationExpressionConstants.CATALOG_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION,
+              Set.of(Privilege.Name.USE_CATALOG)));
+
+  /** Immutable description of a single list-authorization short-circuit. */
+  private static final class ListShortCircuit {
+    private final String filterExpression;
+    private final String parentScopeExpression;
+    private final Set<Privilege.Name> denyPrivileges;
+
+    private ListShortCircuit(
+        String filterExpression, String parentScopeExpression, Set<Privilege.Name> denyPrivileges) {
+      this.filterExpression = filterExpression;
+      this.parentScopeExpression = parentScopeExpression;
+      this.denyPrivileges = denyPrivileges;
+    }
+  }
 
   private MetadataAuthzHelper() {}
 
@@ -167,9 +206,114 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
+    if (enableAuthorization() && nameIdentifiers.length > 0) {
+      String principalName = PrincipalUtils.getCurrentPrincipal().getName();
+      if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
+        // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
+        // the list visible, and no object-level deny exists, so the per-object authorization loop
+        // is skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
+        LOG.debug(
+            "List authorization short-circuit HIT for principal {}, entity type {} under metalake "
+                + "{}: all {} listed object(s) are visible via a parent-scope grant; skipping the "
+                + "per-object authorization loop.",
+            principalName,
+            entityType,
+            metalake,
+            nameIdentifiers.length);
+        return nameIdentifiers;
+      }
+      LOG.debug(
+          "List authorization short-circuit MISS for principal {}, entity type {} under metalake "
+              + "{} ({} object(s)); falling back to the per-object authorization loop.",
+          principalName,
+          entityType,
+          metalake,
+          nameIdentifiers.length);
+    }
     preloadToCache(entityType, nameIdentifiers);
     preloadOwner(entityType, nameIdentifiers);
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
+  }
+
+  /**
+   * Attempts the list-authorization short-circuit: when the listed objects all share one parent and
+   * the matching filter expression is granted at a parent scope, the whole list is visible unless
+   * an object-level deny may exist. Returns {@code true} only when it is safe to return every
+   * identifier without per-object authorization.
+   */
+  private static boolean allVisibleViaParentScope(
+      String metalake,
+      String expression,
+      Entity.EntityType entityType,
+      NameIdentifier[] nameIdentifiers) {
+    Principal principal = PrincipalUtils.getCurrentPrincipal();
+    ListShortCircuit spec = LIST_SHORT_CIRCUITS.get(entityType);
+    if (spec == null || !spec.filterExpression.equals(expression)) {
+      LOG.debug(
+          "Parent-scope short-circuit unavailable for principal {}, entity type {} under metalake "
+              + "{}: {}.",
+          principal.getName(),
+          entityType,
+          metalake,
+          spec == null
+              ? "no short-circuit spec is registered for this entity type"
+              : "the requested filter expression does not match the registered short-circuit "
+                  + "expression");
+      return false;
+    }
+
+    // The short-circuit reasons about a single parent scope, so every identifier must share it.
+    Namespace parent = nameIdentifiers[0].namespace();
+    for (NameIdentifier ident : nameIdentifiers) {
+      if (!ident.namespace().equals(parent)) {
+        LOG.debug(
+            "Parent-scope short-circuit skipped for principal {}, entity type {} under metalake "
+                + "{}: listed objects span multiple parent namespaces (e.g. {} vs {}).",
+            principal.getName(),
+            entityType,
+            metalake,
+            parent,
+            ident.namespace());
+        return false;
+      }
+    }
+
+    GravitinoAuthorizer authorizer =
+        GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
+    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
+    requestContext.setOriginalAuthorizationExpression(spec.parentScopeExpression);
+    Map<Entity.EntityType, NameIdentifier> metadataNames =
+        NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifiers[0]);
+
+    boolean parentGrantsAccess =
+        new AuthorizationExpressionEvaluator(spec.parentScopeExpression, authorizer)
+            .evaluate(metadataNames, requestContext, principal, Optional.empty());
+    if (!parentGrantsAccess) {
+      LOG.debug(
+          "Parent-scope short-circuit skipped for entity type {} under metalake {}: principal {} "
+              + "is not granted access at the parent scope, so per-object authorization is "
+              + "required.",
+          entityType,
+          metalake,
+          principal.getName());
+      return false;
+    }
+
+    // Parent scope grants access to every object; the only thing that can still hide one is a
+    // deny on these privileges (at the parent scope or on an individual object), so the
+    // short-circuit is only safe when no such deny may exist.
+    boolean hasDeny =
+        authorizer.hasDenyPolicy(principal, metalake, spec.denyPrivileges, requestContext);
+    if (hasDeny) {
+      LOG.debug(
+          "Parent-scope short-circuit disabled for entity type {} under metalake {}: principal {} "
+              + "holds a deny policy on {}, so per-object authorization is required.",
+          entityType,
+          metalake,
+          principal.getName(),
+          spec.denyPrivileges);
+    }
+    return !hasDeny;
   }
 
   /**
@@ -315,7 +459,7 @@ public class MetadataAuthzHelper {
                             : null;
                       });
                 } catch (Exception e) {
-                  LOG.error("GravitinoAuthorize error:{}", e.getMessage(), e);
+                  LOG.error("GravitinoAuthorizer error: {}", e.getMessage(), e);
                   return null;
                 }
               },

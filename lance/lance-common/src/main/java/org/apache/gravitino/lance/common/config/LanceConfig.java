@@ -22,6 +22,7 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.OverwriteDefaultConfig;
+import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
@@ -33,6 +34,8 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
   public static final String CONFIG_NAMESPACE_BACKEND = "namespace-backend";
   public static final String CONFIG_METALAKE = "metalake";
   public static final String CONFIG_URI = "uri";
+  public static final String CONFIG_AUTH_TYPE = "auth-type";
+  public static final String DEFAULT_SIMPLE_USERNAME = "lance-rest-server";
 
   public static final int DEFAULT_LANCE_REST_SERVICE_HTTP_PORT = 9101;
   public static final int DEFAULT_LANCE_REST_SERVICE_HTTPS_PORT = 9533;
@@ -60,6 +63,50 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
           .stringConf()
           .createWithDefault(GRAVITINO_URI);
 
+  public static final ConfigEntry<String> GRAVITINO_AUTH_TYPE =
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-" + CONFIG_AUTH_TYPE)
+          .doc(
+              "The auth type used when the Lance REST service communicates with the Gravitino "
+                  + "server. Supported values are `simple` and `oauth2`.")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault(AuthProperties.SIMPLE_AUTH_TYPE);
+
+  public static final ConfigEntry<String> GRAVITINO_SIMPLE_USERNAME =
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-simple.user-name")
+          .doc("The user name used when the auth type is `simple`")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .createWithDefault(DEFAULT_SIMPLE_USERNAME);
+
+  public static final ConfigEntry<String> GRAVITINO_OAUTH2_SERVER_URI =
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-oauth2.server-uri")
+          .doc("The OAuth2 server URI, required when the auth type is `oauth2`")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> GRAVITINO_OAUTH2_CREDENTIAL =
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-oauth2.credential")
+          .doc("The credential used to request the OAuth2 token, required for `oauth2`")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> GRAVITINO_OAUTH2_TOKEN_PATH =
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-oauth2.token-path")
+          .doc("The path on the OAuth2 server used to request the token, required for `oauth2`")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
+  public static final ConfigEntry<String> GRAVITINO_OAUTH2_SCOPE =
+      new ConfigBuilder(GRAVITINO_NAMESPACE_BACKEND + "-oauth2.scope")
+          .doc("The scope of the requested OAuth2 token, required for `oauth2`")
+          .version(ConfigConstants.VERSION_1_3_0)
+          .stringConf()
+          .create();
+
   public LanceConfig(Map<String, String> properties) {
     super(false);
     loadFromMap(properties, key -> true);
@@ -79,6 +126,10 @@ public class LanceConfig extends Config implements OverwriteDefaultConfig {
 
   public String getGravitinoMetalake() {
     return get(METALAKE_NAME);
+  }
+
+  public String getGravitinoAuthType() {
+    return get(GRAVITINO_AUTH_TYPE);
   }
 
   @Override

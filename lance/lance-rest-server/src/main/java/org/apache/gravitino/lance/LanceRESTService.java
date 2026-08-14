@@ -21,6 +21,7 @@ package org.apache.gravitino.lance;
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
 
 import java.lang.reflect.Constructor;
+import java.util.HashMap;
 import java.util.Map;
 import javax.servlet.Servlet;
 import org.apache.gravitino.GravitinoEnv;
@@ -28,10 +29,13 @@ import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
+import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.MetricsSource;
+import org.apache.gravitino.server.web.HealthAliasServlet;
 import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
@@ -63,16 +67,16 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
   @Override
   public void serviceInit(Map<String, String> properties, boolean auxMode) {
-    LanceConfig lanceConfig = new LanceConfig(properties);
+    LanceConfig lanceConfig = new LanceConfig(new HashMap<>(properties));
     JettyServerConfig serverConfig = JettyServerConfig.fromConfig(lanceConfig);
 
-    server = new JettyServer();
+    server = new LanceJettyServer();
     // Get MetricsSystem and EventBus from GravitinoEnv once at init time.
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     EventBus eventBus = GravitinoEnv.getInstance().eventBus();
     server.initialize(serverConfig, SERVICE_NAME, false);
 
-    this.lanceNamespace = loadNamespaceImpl(lanceConfig);
+    this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
 
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
@@ -94,9 +98,21 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     Servlet container = new ServletContainer(resourceConfig);
     server.addServlet(container, LANCE_SPEC);
     server.addFilter(
-        new HttpAuditFilter(eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER), LANCE_SPEC);
+        new HttpAuditFilter(
+            eventBus, EventSource.GRAVITINO_LANCE_REST_SERVER, new LanceHealthCheckPathMatcher()),
+        LANCE_SPEC);
     server.addCustomFilters(LANCE_SPEC);
     server.addSystemFilters(LANCE_SPEC);
+    if (auxMode) {
+      server.addFilter(
+          new LanceServiceIdentityFilter(lanceConfig.get(LanceConfig.GRAVITINO_SIMPLE_USERNAME)),
+          LANCE_SPEC);
+    }
+
+    // Root-level aliases for health checks to improve compatibility with various monitoring
+    // systems that expect a /health endpoint.
+    server.addServlet(new HealthAliasServlet("/lance"), "/health/*");
+    server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
     LOG.info(
         "Initialized Lance REST service for backend {} in {} mode",
@@ -129,15 +145,15 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     }
   }
 
-  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig) {
+  private NamespaceWrapper loadNamespaceImpl(LanceConfig lanceConfig, boolean auxMode) {
     String backendType = lanceConfig.get(NAMESPACE_BACKEND);
     LanceNamespaceBackend lanceNamespaceBackend = LanceNamespaceBackend.fromType(backendType);
 
     try {
       Constructor<? extends NamespaceWrapper> constructor =
-          lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class);
+          lanceNamespaceBackend.getWrapperClass().getConstructor(LanceConfig.class, boolean.class);
 
-      return constructor.newInstance(lanceConfig);
+      return constructor.newInstance(lanceConfig, auxMode);
     } catch (Exception e) {
       LOG.error("Error loading namespace implementation for backend type: {}", backendType, e);
       throw new RuntimeException("Failed to load namespace implementation", e);

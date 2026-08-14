@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 import lombok.Value;
@@ -42,6 +43,7 @@ import org.apache.gravitino.maintenance.optimizer.recommender.util.ExpressionEva
 import org.apache.gravitino.maintenance.optimizer.recommender.util.QLExpressionEvaluator;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StatisticsUtils;
 import org.apache.gravitino.maintenance.optimizer.recommender.util.StrategyUtils;
+import org.apache.gravitino.maintenance.optimizer.recommender.util.TableMetadataTriggerExpressionUtils;
 import org.apache.gravitino.rel.Table;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -65,6 +67,8 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   private Map<PartitionPath, List<StatisticEntry<?>>> partitionStatistics;
   private Table tableMetadata;
   private NameIdentifier nameIdentifier;
+  // Cached table-level context (table stats + metadata + rules), computed once per initialize().
+  private Map<String, Object> tableLevelContext;
 
   /** Create a handler that evaluates expressions with the default QL evaluator. */
   protected BaseExpressionStrategyHandler() {
@@ -79,6 +83,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     this.strategy = context.strategy();
     this.tableStatistics = context.tableStatistics();
     this.partitionStatistics = context.partitionStatistics();
+    this.tableLevelContext = buildTableLevelContext();
   }
 
   @Override
@@ -131,16 +136,30 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
       return false;
     }
     String triggerExpression = triggerExpression(strategy);
-    return partitionStatistics.values().stream()
-        .anyMatch(partitionStats -> evaluateBool(triggerExpression, partitionStats));
+
+    // Short-circuit: try to evaluate the trigger expression with table-level context only
+    // (no partition statistics). This relies on the QL engine's left-to-right short-circuit
+    // evaluation of && operators: if a table-level predicate appears first and evaluates to
+    // false, the engine returns false without resolving subsequent partition-level variables.
+    // Note: this optimization only works when the table-level predicate is positioned before the
+    // partition-level predicate, e.g. "sort_order_count > 0 && datafile_mse < limit" will
+    // short-circuit, but "datafile_mse < limit && sort_order_count > 0" will not.
+    Optional<Boolean> evaluationResultWithoutPartitions =
+        tryToEvaluateBool(triggerExpression, List.of());
+    // If the trigger expression can be evaluated with table-level variables only, return the
+    // result. Otherwise, evaluate the trigger expression for each partition.
+    return evaluationResultWithoutPartitions.orElseGet(
+        () ->
+            partitionStatistics.values().stream()
+                .anyMatch(partitionStats -> evaluateBool(triggerExpression, partitionStats)));
   }
 
   private boolean shouldTriggerForNonPartitionTable() {
-    return evaluateBool(triggerExpression(strategy), tableStatistics);
+    return evaluateBool(triggerExpression(strategy), List.of());
   }
 
   private StrategyEvaluation evaluateForNonPartitionTable() {
-    long score = evaluateLong(scoreExpression(strategy), tableStatistics);
+    long score = evaluateLong(scoreExpression(strategy), List.of());
     if (score <= 0) {
       return StrategyEvaluation.NO_EXECUTION;
     }
@@ -200,7 +219,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private long evaluateLong(String expression, List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = buildExpressionContext(strategy, statistics);
+    Map<String, Object> context = buildExpressionContext(statistics);
     try {
       return expressionEvaluator.evaluateLong(expression, context);
     } catch (RuntimeException e) {
@@ -210,7 +229,7 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
   }
 
   private boolean evaluateBool(String expression, List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = buildExpressionContext(strategy, statistics);
+    Map<String, Object> context = buildExpressionContext(statistics);
     try {
       return expressionEvaluator.evaluateBool(expression, context);
     } catch (RuntimeException e) {
@@ -219,10 +238,47 @@ public abstract class BaseExpressionStrategyHandler implements StrategyHandler {
     }
   }
 
-  private static Map<String, Object> buildExpressionContext(
-      Strategy strategy, List<StatisticEntry<?>> statistics) {
-    Map<String, Object> context = new HashMap<>();
+  private Optional<Boolean> tryToEvaluateBool(
+      String expression, List<StatisticEntry<?>> statistics) {
+    Map<String, Object> context = buildExpressionContext(statistics);
+    try {
+      return expressionEvaluator.tryToEvaluateBool(expression, context);
+    } catch (RuntimeException e) {
+      LOG.warn("Failed to evaluate expression '{}' with context {}", expression, context, e);
+      // Per ExpressionEvaluator#tryToEvaluateBool, a failed evaluation yields an empty Optional so
+      // the caller falls back to per-partition evaluation instead of treating it as "do not
+      // trigger".
+      return Optional.empty();
+    }
+  }
+
+  /**
+   * Build a combined evaluation context. The {@code statistics} argument varies per partition for
+   * partitioned tables; it is layered on top of the precomputed {@link #tableLevelContext} (table
+   * statistics, table metadata, and numeric rule values) so that {@code trigger-expr} and {@code
+   * score-expr} can reference all of them.
+   *
+   * @param statistics statistics of the unit being evaluated (a single partition, or empty for the
+   *     table-level evaluation)
+   * @return combined context
+   */
+  private Map<String, Object> buildExpressionContext(List<StatisticEntry<?>> statistics) {
+    Map<String, Object> context = new HashMap<>(tableLevelContext);
     context.putAll(StatisticsUtils.buildStatisticsContext(statistics));
+    return context;
+  }
+
+  /** Precompute the table-level context shared across all partition evaluations. */
+  private Map<String, Object> buildTableLevelContext() {
+    Map<String, Object> context = new HashMap<>();
+    context.putAll(StatisticsUtils.buildStatisticsContext(tableStatistics));
+    context.putAll(TableMetadataTriggerExpressionUtils.buildTableMetadataContext(tableMetadata));
+    context.putAll(getRulesExpressionContext(strategy));
+    return context;
+  }
+
+  private static Map<String, Object> getRulesExpressionContext(Strategy strategy) {
+    Map<String, Object> context = new HashMap<>();
     strategy
         .rules()
         .forEach(

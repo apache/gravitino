@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -36,11 +37,16 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -72,6 +78,7 @@ import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
+import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
@@ -84,6 +91,7 @@ import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.tag.TagValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,7 +101,7 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend {
+public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
@@ -313,6 +321,76 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> E getByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().getUserByExternalId(ident);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().getGroupByExternalId(ident);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateByExternalId(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().updateUserByExternalId(ident, updater);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update enabled by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getById(
+      NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        AuthorizationUtils.checkUserId(ident);
+        return (E)
+            UserMetaService.getInstance()
+                .getUserById(ident.namespace().level(0), Long.parseLong(ident.name()));
+      case GROUP:
+        AuthorizationUtils.checkGroupId(ident);
+        return (E)
+            GroupMetaService.getInstance()
+                .getGroupById(ident.namespace().level(0), Long.parseLong(ident.name()));
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get by id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        AuthorizationUtils.checkUserId(ident);
+        return (E)
+            UserMetaService.getInstance()
+                .updateUserById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
+      case GROUP:
+        AuthorizationUtils.checkGroupId(ident);
+        return (E)
+            GroupMetaService.getInstance()
+                .updateGroupById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update by id operation", entityType);
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> List<E> batchGet(
       List<NameIdentifier> identifiers, Entity.EntityType entityType) {
     if (identifiers == null || identifiers.isEmpty()) {
@@ -519,6 +597,12 @@ public class JDBCBackend implements RelationalBackend {
         throw new IllegalArgumentException(
             "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
     }
+  }
+
+  @Override
+  public int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit) {
+    return OrphanedMetadataObjectRelationService.getInstance()
+        .softDeleteOrphanedRelations(metadataObjectType, limit);
   }
 
   @Override
@@ -779,6 +863,89 @@ public class JDBCBackend implements RelationalBackend {
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
     }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
+      throws IOException {
+    if (!query.relationValue().isPresent()) {
+      return listEntitiesByRelation(
+          query.relationType(),
+          query.anchorIdentifier(),
+          query.anchorEntityType(),
+          query.allFields());
+    }
+
+    switch (query.relationType()) {
+      case TAG_METADATA_OBJECT_REL:
+        Preconditions.checkArgument(
+            query.anchorEntityType() == Entity.EntityType.TAG,
+            "Relation value filter is only supported when listing metadata objects for a tag");
+        return (List<E>)
+            TagMetaService.getInstance()
+                .listAssociatedMetadataObjectsForTag(
+                    query.anchorIdentifier(), query.relationValue().get());
+      default:
+        throw new IllegalArgumentException(
+            String.format(
+                "Relation value filter is not supported for relation type %s",
+                query.relationType()));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    switch (update.relationType()) {
+      case TAG_METADATA_OBJECT_REL:
+        return (List<E>)
+            TagMetaService.getInstance()
+                .associateTagValuesWithMetadataObject(
+                    update.sourceIdentifier(),
+                    update.sourceEntityType(),
+                    toTagValues(update.targetsToAdd()),
+                    toTagValues(update.targetsToRemove()));
+      default:
+        Preconditions.checkArgument(
+            !update.hasRelationValues(),
+            "Relation values are not supported for relation type %s",
+            update.relationType());
+        return updateEntityRelations(
+            update.relationType(),
+            update.sourceIdentifier(),
+            update.sourceEntityType(),
+            toNameIdentifiers(update.targetsToAdd()),
+            toNameIdentifiers(update.targetsToRemove()));
+    }
+  }
+
+  private static NameIdentifier[] toNameIdentifiers(RelationEdgeTarget[] relationTargets) {
+    if (relationTargets == null) {
+      return null;
+    }
+
+    return Arrays.stream(relationTargets)
+        .map(RelationEdgeTarget::nameIdentifier)
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static TagValue[] toTagValues(RelationEdgeTarget[] relationTargets) {
+    if (relationTargets == null) {
+      return null;
+    }
+
+    return Arrays.stream(relationTargets).map(JDBCBackend::toTagValue).toArray(TagValue[]::new);
+  }
+
+  private static TagValue toTagValue(RelationEdgeTarget relationTarget) {
+    Preconditions.checkArgument(
+        relationTarget.entityType() == Entity.EntityType.TAG,
+        "Relation target type must be TAG for tag metadata object relations, but is %s",
+        relationTarget.entityType());
+    return relationTarget
+        .relationValue()
+        .map(value -> TagValue.of(relationTarget.nameIdentifier().name(), value))
+        .orElseGet(() -> TagValue.noValue(relationTarget.nameIdentifier().name()));
   }
 
   @Override

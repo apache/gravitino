@@ -13,6 +13,7 @@ Apache Gravitino Trino connector index:
   - [Requirements](requirements.md)
   - [Installation](installation.md)
   - [Configuration](configuration.md)
+  - [Authentication](authentication.md)
   - [Supported catalogs](supported-catalog.md)
     - [Hive](catalog-hive.md)
     - [Iceberg](catalog-iceberg.md)

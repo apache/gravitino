@@ -56,7 +56,7 @@ public class GravitinoAuthorizerProvider implements Closeable {
                   (GravitinoAuthorizer)
                       Class.forName(authorizationImpl).getDeclaredConstructor().newInstance();
             } catch (Exception e) {
-              throw new IllegalArgumentException("Can not initialize GravitinoAuthorizer", e);
+              throw new IllegalArgumentException("Cannot initialize GravitinoAuthorizer", e);
             }
           } else {
             gravitinoAuthorizer = new PassThroughAuthorizer();

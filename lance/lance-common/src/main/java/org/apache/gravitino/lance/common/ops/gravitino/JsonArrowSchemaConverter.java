@@ -29,7 +29,13 @@ import org.lance.namespace.model.JsonArrowDataType;
 import org.lance.namespace.model.JsonArrowField;
 import org.lance.namespace.model.JsonArrowSchema;
 
-/** Converts Arrow schema to Lance Namespace JsonArrowSchema model. */
+/**
+ * Converts Arrow schema to Lance Namespace JsonArrowSchema model.
+ *
+ * <p>Adapted from Lance Namespace's {@code JsonArrowSchemaConverter} ({@code
+ * com.lancedb.lance.namespace.util.JsonArrowSchemaConverter} in the {@code
+ * com.lancedb:lance-namespace-core} artifact).
+ */
 class JsonArrowSchemaConverter {
 
   private JsonArrowSchemaConverter() {}

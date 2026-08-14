@@ -34,6 +34,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.Maps;
+import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -168,6 +169,90 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(Types.StringType.get(), loadedTable.columns()[1].dataType());
     Assertions.assertEquals("8", loadedTable.properties().get(LANCE_TABLE_VERSION));
     Assertions.assertFalse(loadedTable.properties().containsKey(LANCE_TABLE_DECLARED));
+  }
+
+  /**
+   * Reproduces the concurrent repair-on-load race seen in {@code LanceSparkRESTServiceIT}. When two
+   * loads repair the same table at once, the optimistic-locked {@code store.update} of the slower
+   * one matches zero rows and {@code TableMetaService} surfaces it as {@code IOException("Failed to
+   * update the entity")}. Before the CAS retry, {@code repairTableMetadata} rethrew it as a fatal
+   * {@code RuntimeException} (HTTP 500) instead of tolerating the concurrent update. This test
+   * asserts that the lost race is benign and load returns a usable table.
+   */
+  @Test
+  public void testLoadTableSurvivesConcurrentRepairVersionRace() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("concurrent-repair-table").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_DECLARED,
+                "true",
+                LANCE_STORAGE_OPTIONS_PREFIX + "endpoint",
+                "http://endpoint"));
+    // The winner of the race already repaired the table to the dataset schema and version.
+    TableEntity alreadyRepairedTableEntity =
+        tableEntity(
+            ident,
+            List.of(
+                ColumnEntity.builder()
+                    .withId(11L)
+                    .withName("id")
+                    .withDataType(Types.IntegerType.get())
+                    .withPosition(0)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build(),
+                ColumnEntity.builder()
+                    .withId(12L)
+                    .withName("name")
+                    .withDataType(Types.StringType.get())
+                    .withPosition(1)
+                    .withAuditInfo(AuditInfo.EMPTY)
+                    .build()),
+            Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "8"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(idGenerator.nextId()).thenReturn(10L, 11L);
+
+    // First repair attempt loses the optimistic-lock CAS (a concurrent load already bumped the
+    // version): TableMetaService surfaces exactly this IOException. The retry re-reads the winner's
+    // already-repaired entity, against which the idempotent updater succeeds.
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(new IOException("Failed to update the entity: " + ident))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(alreadyRepairedTableEntity);
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(
+            new Schema(
+                List.of(
+                    Field.nullable("id", new ArrowType.Int(32, true)),
+                    Field.nullable("name", new ArrowType.Utf8()))));
+    when(dataset.version()).thenReturn(8L);
+    Mockito.doReturn(dataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of("endpoint", "http://endpoint"));
+
+    // A lost repair race must not fail the load: the bounded CAS retry recovers and returns the
+    // repaired table instead of surfacing the first conflict as RuntimeException("Failed to repair
+    // table").
+    Table loadedTable =
+        Assertions.assertDoesNotThrow(
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident)));
+    Assertions.assertEquals(2, loadedTable.columns().length);
+    Assertions.assertEquals("id", loadedTable.columns()[0].name());
+    Assertions.assertEquals("name", loadedTable.columns()[1].name());
   }
 
   @Test

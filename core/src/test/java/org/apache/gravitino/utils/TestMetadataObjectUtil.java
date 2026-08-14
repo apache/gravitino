@@ -80,6 +80,11 @@ public class TestMetadataObjectUtil {
         Entity.EntityType.VIEW,
         MetadataObjectUtil.toEntityType(
             MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+
+    Assertions.assertEquals(
+        Entity.EntityType.FUNCTION,
+        MetadataObjectUtil.toEntityType(
+            MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION)));
   }
 
   @Test
@@ -147,6 +152,12 @@ public class TestMetadataObjectUtil {
         NameIdentifier.of("metalake", "catalog", "schema", "view"),
         MetadataObjectUtil.toEntityIdent(
             "metalake", MetadataObjects.of("catalog.schema", "view", MetadataObject.Type.VIEW)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "function"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake",
+            MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION)));
   }
 
   @Test

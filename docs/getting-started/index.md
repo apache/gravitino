@@ -171,7 +171,7 @@ Revise based on your environment.
    ```shell
    curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
      -H "Content-Type: application/json" \
-     -d '{"name":"my-metalake","comment":"Test metalake"}' \
+     -d '{"name":"my_metalake","comment":"Test metalake"}' \
      http://localhost:8090/api/metalakes
    ```
 
@@ -184,7 +184,7 @@ Revise based on your environment.
 
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
      -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes/my-metalake
+     http://localhost:8090/api/metalakes/my_metalake
    ```
 
    Note that if you are requesting a Metalake that doesn't exist, you'll get a
@@ -203,7 +203,7 @@ Revise based on your environment.
    ```shell
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
      -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes/my-metalake/catalogs
+     http://localhost:8090/api/metalakes/my_metalake/catalogs
    ```
 
    Create a new Hive catalog.
@@ -212,7 +212,7 @@ Revise based on your environment.
    curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
      -H "Content-Type: application/json" \
      -d '{"name":"my-catalog","comment":"Test catalog", "type":"RELATIONAL", "provider":"hive", "properties":{"metastore.uris":"thrift://localhost:9083"}}' \
-     http://localhost:8090/api/metalakes/my-metalake/catalogs
+     http://localhost:8090/api/metalakes/my_metalake/catalogs
    ```
 
    Verify that the catalog has been created:
@@ -220,7 +220,7 @@ Revise based on your environment.
    ```shell
    curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
      -H "Content-Type: application/json" \
-     http://localhost:8090/api/metalakes/my-metalake/catalogs
+     http://localhost:8090/api/metalakes/my_metalake/catalogs
    ```
 
    :::tip
