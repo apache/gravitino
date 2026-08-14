@@ -22,15 +22,17 @@ import static org.apache.gravitino.Entity.EntityType.FILESET;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
+import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
+import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -373,14 +375,19 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+
+    // Cascade: drop filesets via FilesetDispatcher first so each fileset cleans its own
+    // write-through secrets. Do this before the catalog lock to avoid nested TreeLocks.
+    if (cascade) {
+      dropFilesetsUnderSchema(ident);
+    }
+
     return TreeLockUtils.doWithTreeLock(
         catalogIdent,
         LockType.WRITE,
         () -> {
-          // Capture properties (including write-through secret URNs) from the entity store before
-          // drop — same source as CatalogManager.dropCatalog (catalog entity properties). Catalog
-          // loadSchema() may omit custom properties/URNs. Fileset children are cascade-deleted
-          // without FilesetOperationDispatcher, so snapshot their store properties here too.
+          // Schema secret URNs live on SchemaEntity in the store (catalog loadSchema may omit
+          // them).
           Map<String, String> schemaProperties = new HashMap<>();
           SchemaEntity schemaEntityForCleanup = getEntity(ident, SCHEMA, SchemaEntity.class);
           if (schemaEntityForCleanup != null
@@ -388,7 +395,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
               && !schemaEntityForCleanup.properties().isEmpty()) {
             schemaProperties = new HashMap<>(schemaEntityForCleanup.properties());
           }
-          List<Map<String, String>> filesetPropertySnapshots = snapshotFilesetProperties(ident);
 
           boolean droppedFromCatalog =
               doWithCatalog(
@@ -401,7 +407,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
           if (isManagedSchema) {
             if (droppedFromCatalog) {
-              deleteSecretsAfterSchemaDrop(schemaProperties, filesetPropertySnapshots);
+              secretManager.deleteSecretsFromProperties(schemaProperties);
             }
             return droppedFromCatalog;
           }
@@ -432,10 +438,35 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                       c -> c.doWithSchemaOps(s -> s.schemaExists(schemaIdent)),
                       RuntimeException.class));
           if (droppedFromCatalog) {
-            deleteSecretsAfterSchemaDrop(schemaProperties, filesetPropertySnapshots);
+            secretManager.deleteSecretsFromProperties(schemaProperties);
           }
           return droppedFromCatalog;
         });
+  }
+
+  /**
+   * Drops all filesets under the schema through {@link FilesetDispatcher}, so each fileset cleans
+   * up its own write-through secrets.
+   */
+  private void dropFilesetsUnderSchema(NameIdentifier schemaIdent) {
+    Namespace filesetNs =
+        Namespace.of(
+            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
+    List<FilesetEntity> filesets;
+    try {
+      filesets = store.list(filesetNs, FilesetEntity.class, FILESET);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list filesets under schema " + schemaIdent, e);
+    }
+    if (filesets.isEmpty()) {
+      return;
+    }
+    FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().internalFilesetDispatcher();
+    for (FilesetEntity fileset : filesets) {
+      NameIdentifier filesetIdent =
+          ofFileset(filesetNs.level(0), filesetNs.level(1), filesetNs.level(2), fileset.name());
+      filesetDispatcher.dropFileset(filesetIdent);
+    }
   }
 
   /**
@@ -456,44 +487,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       }
     }
     return newProps;
-  }
-
-  /**
-   * Deletes write-through secrets for a schema and its fileset children after the schema drop
-   * succeeded. Entity drop must happen before this call.
-   */
-  private void deleteSecretsAfterSchemaDrop(
-      Map<String, String> schemaProperties, List<Map<String, String>> filesetPropertySnapshots) {
-    secretManager.deleteSecretsFromProperties(schemaProperties);
-    for (Map<String, String> filesetProperties : filesetPropertySnapshots) {
-      secretManager.deleteSecretsFromProperties(filesetProperties);
-    }
-  }
-
-  /**
-   * Lists fileset properties under a schema for secret cleanup. Must run before the schema/filesets
-   * are deleted from the store.
-   */
-  private List<Map<String, String>> snapshotFilesetProperties(NameIdentifier schemaIdent) {
-    Namespace filesetNs =
-        Namespace.of(
-            schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
-    List<Map<String, String>> snapshots = new ArrayList<>();
-    try {
-      List<FilesetEntity> filesets = store.list(filesetNs, FilesetEntity.class, FILESET);
-      for (FilesetEntity fileset : filesets) {
-        Map<String, String> props = fileset.properties();
-        if (props != null && !props.isEmpty()) {
-          snapshots.add(new HashMap<>(props));
-        }
-      }
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to list fileset properties under schema {} for secret cleanup during schema drop",
-          schemaIdent,
-          e);
-    }
-    return snapshots;
   }
 
   private void importSchema(NameIdentifier identifier) {

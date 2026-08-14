@@ -25,6 +25,7 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
+import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -73,6 +74,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -989,28 +991,30 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
 
-            // Snapshot schema/fileset properties (write-through secret URNs) before entities are
-            // removed. store.delete(cascade) only soft-deletes meta rows and does not call secret
-            // providers; catalog/schema/fileset are the entities that currently own secrets.
+            // Drop filesets via FilesetDispatcher first so each fileset cleans its own
+            // write-through secrets. Do not snapshot/delete fileset secrets here.
+            for (SchemaEntity schema : schemaEntities) {
+              dropFilesetsUnderSchema(schema.nameIdentifier());
+            }
+
+            // Snapshot schema properties (write-through secret URNs) before entities are removed.
+            // store.delete(cascade) only soft-deletes meta rows and does not call secret providers.
             List<Map<String, String>> schemaSecretPropertySnapshots = new ArrayList<>();
-            List<List<Map<String, String>>> filesetSecretPropertySnapshots = new ArrayList<>();
             for (SchemaEntity schema : schemaEntities) {
               schemaSecretPropertySnapshots.add(copyProperties(schema.properties()));
-              filesetSecretPropertySnapshots.add(snapshotFilesetProperties(schema));
             }
 
             boolean managedStorage = isManagedStorageCatalog(catalogWrapper);
             if (managedStorage) {
               // For managed catalog, we need to call drop schema API to drop the underlying
               // entities as well as the related resource first. Directly deleting the metadata from
-              // the store is not enough. Delete secrets only after a successful drop.
+              // the store is not enough. Delete schema secrets only after a successful drop.
               for (int i = 0; i < schemaEntities.size(); i++) {
                 SchemaEntity schema = schemaEntities.get(i);
                 try {
                   catalogWrapper.doWithSchemaOps(
                       ops -> ops.dropSchema(schema.nameIdentifier(), true));
-                  deleteSecretsFromPropertySnapshots(
-                      schemaSecretPropertySnapshots.get(i), filesetSecretPropertySnapshots.get(i));
+                  secretManager.deleteSecretsFromProperties(schemaSecretPropertySnapshots.get(i));
                 } catch (Exception e) {
                   LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
                   throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
@@ -1026,12 +1030,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
-              // Unmanaged / mixed: children were removed only via store cascade — clean their
+              // Unmanaged / mixed: schemas were removed only via store cascade — clean their
               // secrets now. Managed path already cleaned per successful dropSchema above.
+              // Fileset secrets were already cleaned via FilesetDispatcher above.
               if (!managedStorage) {
-                for (int i = 0; i < schemaSecretPropertySnapshots.size(); i++) {
-                  deleteSecretsFromPropertySnapshots(
-                      schemaSecretPropertySnapshots.get(i), filesetSecretPropertySnapshots.get(i));
+                for (Map<String, String> schemaProperties : schemaSecretPropertySnapshots) {
+                  secretManager.deleteSecretsFromProperties(schemaProperties);
                 }
               }
               secretManager.deleteSecretsFromProperties(catalogProperties);
@@ -1049,18 +1053,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         });
   }
 
-  /**
-   * Deletes write-through secrets for a schema and its fileset children using properties snapped
-   * before the entities were dropped. Entity drop must succeed before calling this.
-   */
-  private void deleteSecretsFromPropertySnapshots(
-      Map<String, String> schemaProperties, List<Map<String, String>> filesetPropertiesSnapshots) {
-    secretManager.deleteSecretsFromProperties(schemaProperties);
-    for (Map<String, String> filesetProperties : filesetPropertiesSnapshots) {
-      secretManager.deleteSecretsFromProperties(filesetProperties);
-    }
-  }
-
   private static Map<String, String> copyProperties(Map<String, String> properties) {
     return properties == null || properties.isEmpty()
         ? Collections.emptyMap()
@@ -1068,30 +1060,28 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Lists fileset properties under a schema for secret cleanup. Must run before the schema/filesets
-   * are deleted from the store.
+   * Drops all filesets under the schema through {@link FilesetDispatcher}, so each fileset cleans
+   * up its own write-through secrets.
    */
-  private List<Map<String, String>> snapshotFilesetProperties(SchemaEntity schemaEntity) {
-    NameIdentifier schemaIdent = schemaEntity.nameIdentifier();
+  private void dropFilesetsUnderSchema(NameIdentifier schemaIdent) {
     Namespace filesetNs =
         Namespace.of(
             schemaIdent.namespace().level(0), schemaIdent.namespace().level(1), schemaIdent.name());
-    List<Map<String, String>> snapshots = new ArrayList<>();
+    List<FilesetEntity> filesets;
     try {
-      List<FilesetEntity> filesets = store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
-      for (FilesetEntity fileset : filesets) {
-        Map<String, String> props = copyProperties(fileset.properties());
-        if (!props.isEmpty()) {
-          snapshots.add(props);
-        }
-      }
-    } catch (Exception e) {
-      LOG.warn(
-          "Failed to list fileset properties under schema {} for secret cleanup during catalog drop",
-          schemaIdent,
-          e);
+      filesets = store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list filesets under schema " + schemaIdent, e);
     }
-    return snapshots;
+    if (filesets.isEmpty()) {
+      return;
+    }
+    FilesetDispatcher filesetDispatcher = GravitinoEnv.getInstance().internalFilesetDispatcher();
+    for (FilesetEntity fileset : filesets) {
+      NameIdentifier filesetIdent =
+          ofFileset(filesetNs.level(0), filesetNs.level(1), filesetNs.level(2), fileset.name());
+      filesetDispatcher.dropFileset(filesetIdent);
+    }
   }
 
   /**
