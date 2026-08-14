@@ -333,6 +333,9 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .withId(schemaEntity.id())
                                   .withName(schemaEntity.name())
                                   .withNamespace(ident.namespace())
+                                  .withProperties(
+                                      propertiesForSchemaEntityAlter(
+                                          schemaEntity, alteredSchema, changes))
                                   .withAuditInfo(
                                       AuditInfo.builder()
                                           .withCreator(schemaEntity.auditInfo().creator())
@@ -437,6 +440,31 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           }
           return droppedFromCatalog;
         });
+  }
+
+  /**
+   * Builds properties to persist on {@link SchemaEntity} after alter. Starts from the existing
+   * entity properties (so write-through secret URNs are not dropped when the catalog omits them),
+   * overlays catalog-returned properties, then applies set/remove changes.
+   */
+  private static Map<String, String> propertiesForSchemaEntityAlter(
+      SchemaEntity existing, Schema alteredSchema, SchemaChange[] changes) {
+    Map<String, String> merged = new HashMap<>();
+    if (existing.properties() != null) {
+      merged.putAll(existing.properties());
+    }
+    if (alteredSchema.properties() != null) {
+      merged.putAll(alteredSchema.properties());
+    }
+    for (SchemaChange change : changes) {
+      if (change instanceof SchemaChange.SetProperty) {
+        SchemaChange.SetProperty setProperty = (SchemaChange.SetProperty) change;
+        merged.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (change instanceof SchemaChange.RemoveProperty) {
+        merged.remove(((SchemaChange.RemoveProperty) change).getProperty());
+      }
+    }
+    return merged;
   }
 
   /**
