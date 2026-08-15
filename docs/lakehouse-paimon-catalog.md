@@ -199,10 +199,34 @@ Paimon Table primary key constraint should not be same with partition fields, th
 | `FixedChar`       | `Char`                       |
 | `Date`            | `Date`                       |
 | `Time(p)`         | `Time(p)`                    |
-| `Timestamp(p)`    | `LocalZonedTimestamp(p)`     |
-| `Timestamp_tz(p)` | `Timestamp(p)`               |
+| `Timestamp(p)`    | `Timestamp(p)`               |
+| `Timestamp_tz(p)` | `LocalZonedTimestamp(p)`     |
 | `Fixed`           | `Binary`                     |
 | `Binary`          | `VarBinary`                  |
+| `Variant`         | `Variant`                    |
+| `Unknown` (`NullType`) | Rejected before mutation |
+| `Geometry(crs)`   | Rejected before mutation     |
+| `Geography(crs, algorithm)` | Rejected before mutation |
+
+Paimon 1.2 supports timestamp precision from 0 through 9. Gravitino `Timestamp(9)` and
+`Timestamp_tz(9)` therefore round-trip losslessly as Paimon `Timestamp(9)` and
+`LocalZonedTimestamp(9)`, respectively. Higher precisions are rejected before table metadata is
+created or altered.
+
+Gravitino `Variant` maps directly to Paimon's native `Variant` logical type. The connector does not
+coerce Variant values to JSON strings or binary values.
+
+Paimon has nullable types but no null-only logical column type equivalent to Gravitino `Unknown`.
+Creating, adding, or changing a column to `Unknown` therefore returns an
+`IllegalArgumentException` before Paimon table metadata is changed.
+
+Paimon has no spatial logical type or field-level CRS metadata. Mapping Gravitino `Geometry` to
+Paimon `VarBinary` would preserve WKB bytes but lose the planar geometry and CRS semantics, so the
+connector rejects it before mutation.
+
+Paimon also has no spheroidal spatial type carrying both a CRS and an edge-interpolation algorithm.
+Mapping Gravitino `Geography` to `VarBinary` would discard that type metadata, so it is rejected
+before mutation as well.
 
 :::info
 Gravitino doesn't support Paimon `MultisetType` type.

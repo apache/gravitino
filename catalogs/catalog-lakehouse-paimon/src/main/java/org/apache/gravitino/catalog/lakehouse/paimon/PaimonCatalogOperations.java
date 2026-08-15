@@ -417,7 +417,7 @@ public class PaimonCatalogOperations
    * @param changes The changes to apply to the table.
    * @return The altered {@link GravitinoPaimonTable} instance.
    * @throws NoSuchTableException If the table with the provided identifier does not exist.
-   * @throws IllegalArgumentException This exception will not be thrown in this method.
+   * @throws IllegalArgumentException If a requested column type has no exact Paimon mapping.
    */
   @Override
   public GravitinoPaimonTable alterTable(NameIdentifier identifier, TableChange... changes)
@@ -665,7 +665,7 @@ public class PaimonCatalogOperations
    * @param changes The changes to apply to the table.
    * @return The altered {@link GravitinoPaimonTable} instance.
    * @throws NoSuchTableException If the table with the provided identifier does not exist.
-   * @throws IllegalArgumentException This exception will not be thrown in this method.
+   * @throws IllegalArgumentException If a requested column type has no exact Paimon mapping.
    */
   private GravitinoPaimonTable internalAlterTable(NameIdentifier identifier, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
@@ -676,6 +676,8 @@ public class PaimonCatalogOperations
       throw new NoSuchTableException(e, NO_SUCH_TABLE_EXCEPTION, paimonNameIdentifier);
     } catch (Catalog.ColumnNotExistException e) {
       throw new NoSuchColumnException(e, NO_SUCH_COLUMN_EXCEPTION, paimonNameIdentifier);
+    } catch (IllegalArgumentException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

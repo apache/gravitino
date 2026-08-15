@@ -92,6 +92,33 @@ public class TestTypeUtils {
   }
 
   @Test
+  void testNanosecondTimestampType() {
+    Type timestamp = Types.TimestampType.withoutTimeZone(9);
+    Type timestampTz = Types.TimestampType.withTimeZone(9);
+
+    assertEquals(DataTypes.TIMESTAMP(9), toPaimonType(timestamp));
+    assertEquals(DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(9), toPaimonType(timestampTz));
+    assertEquals(timestamp, fromPaimonType(DataTypes.TIMESTAMP(9)));
+    assertEquals(timestampTz, fromPaimonType(DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(9)));
+
+    Arrays.asList(Types.TimestampType.withoutTimeZone(10), Types.TimestampType.withTimeZone(10))
+        .forEach(
+            type -> {
+              IllegalArgumentException exception =
+                  assertThrowsExactly(IllegalArgumentException.class, () -> toPaimonType(type));
+              assertEquals(
+                  "Paimon supports Gravitino timestamp precision from 0 to 9, but got: 10.",
+                  exception.getMessage());
+            });
+  }
+
+  @Test
+  void testVariantType() {
+    assertEquals(DataTypes.VARIANT(), toPaimonType(Types.VariantType.get()));
+    assertEquals(Types.VariantType.get(), fromPaimonType(DataTypes.VARIANT()));
+  }
+
+  @Test
   void testUnparsedType() {
     Arrays.asList(
             DataTypes.CHAR(CharType.MAX_LENGTH), DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH))
@@ -100,16 +127,30 @@ public class TestTypeUtils {
 
   @Test
   void testUnsupportedType() {
-    // Test UnsupportedOperationException with IntervalYearType, IntervalDayType, FixedCharType,
-    // UUIDType, FixedType, UnionType, NullType for toPaimonType.
+    // Test UnsupportedOperationException with IntervalYearType, IntervalDayType, UUIDType,
+    // UnionType and UnparsedType for toPaimonType.
     Arrays.asList(
             Types.IntervalYearType.get(),
             Types.IntervalDayType.get(),
             Types.UUIDType.get(),
             Types.UnionType.of(Types.IntegerType.get()),
-            Types.NullType.get(),
             Types.UnparsedType.of("unparsed"))
         .forEach(this::checkUnsupportedType);
+  }
+
+  @Test
+  void testUnknownType() {
+    checkRejectedType(Types.NullType.get());
+  }
+
+  @Test
+  void testGeometryType() {
+    checkRejectedType(Types.GeometryType.of("EPSG:3857"));
+  }
+
+  @Test
+  void testGeographyType() {
+    checkRejectedType(Types.GeographyType.of("EPSG:4326", "karney"));
   }
 
   @Test
@@ -235,6 +276,14 @@ public class TestTypeUtils {
   private void checkUnsupportedType(Type type) {
     UnsupportedOperationException exception =
         assertThrowsExactly(UnsupportedOperationException.class, () -> toPaimonType(type));
+    assertEquals(
+        String.format("Paimon does not support Gravitino %s data type.", type.simpleString()),
+        exception.getMessage());
+  }
+
+  private void checkRejectedType(Type type) {
+    IllegalArgumentException exception =
+        assertThrowsExactly(IllegalArgumentException.class, () -> toPaimonType(type));
     assertEquals(
         String.format("Paimon does not support Gravitino %s data type.", type.simpleString()),
         exception.getMessage());
