@@ -97,6 +97,10 @@ public abstract class HiveShim {
   public abstract List<HivePartition> listPartitions(
       HiveTable table, List<String> filterPartitionValueList, short pageSize);
 
+  /** Fetches partitions by their names, used for batched stats aggregation. */
+  public abstract List<HivePartition> listPartitionsByNames(
+      HiveTable table, List<String> partitionNames);
+
   public abstract HivePartition getPartition(HiveTable table, String partitionName);
 
   public abstract HivePartition addPartition(HiveTable table, HivePartition partition);
