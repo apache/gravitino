@@ -1,0 +1,104 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.iceberg.common.idempotency;
+
+import java.io.Closeable;
+import java.util.Map;
+import java.util.Optional;
+import javax.annotation.Nullable;
+
+/**
+ * Storage for {@code Idempotency-Key} records, pluggable so that a deployment can trade durability
+ * for latency.
+ *
+ * <p>The server drives a store through a reserve-execute-finalize cycle: exactly one caller wins
+ * {@link #reserve}, executes the mutation, and then either {@link #finalizeRecord finalizes} the
+ * response for later replay or {@link #release releases} the reservation so the client can retry
+ * with the same key. Implementations must make {@link #reserve} atomic across every caller that can
+ * see the same storage, since that is the only thing standing between a retried request and a
+ * duplicate mutation.
+ *
+ * <p>Implementations must be thread-safe and are expected to have a public no-argument constructor
+ * so they can be loaded by class name.
+ */
+public interface IdempotencyStore extends Closeable {
+
+  /** Outcome of an attempt to claim a key. */
+  enum ReserveResult {
+    /** The key was newly claimed by this caller, which now owns the mutation. */
+    RESERVED,
+    /** The key is already reserved or finalized, so the request is a retry. */
+    DUPLICATE
+  }
+
+  /**
+   * Initializes the store from the Iceberg REST server configuration.
+   *
+   * @param properties the full Iceberg REST server configuration
+   */
+  void initialize(Map<String, String> properties);
+
+  /**
+   * Atomically attempts to claim a key.
+   *
+   * @param idempotencyKey the client-provided UUIDv7 key
+   * @param operationBinding request identity, for example {@code POST
+   *     /v1/cat1/namespaces/ns1/tables}
+   * @param expiresAtMs time after which the record may be purged, in unix epoch millis
+   * @return {@link ReserveResult#RESERVED} if newly claimed, {@link ReserveResult#DUPLICATE} if a
+   *     record for this key already exists
+   */
+  ReserveResult reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
+
+  /**
+   * Loads a finalized record for replay.
+   *
+   * @param idempotencyKey the client-provided key
+   * @return the record, or {@link Optional#empty()} if the key is unknown or still reserved by an
+   *     in-flight request
+   */
+  Optional<IdempotencyRecord> load(String idempotencyKey);
+
+  /**
+   * Marks a reserved key finalized, storing the response replayed to later retries.
+   *
+   * <p>A record that has already expired or been purged is not resurrected; the call is a no-op.
+   *
+   * @param idempotencyKey the client-provided key
+   * @param httpStatus HTTP status of the original response
+   * @param responseSummary serialized response body, {@code null} for responses without a body
+   */
+  void finalizeRecord(String idempotencyKey, int httpStatus, @Nullable String responseSummary);
+
+  /**
+   * Releases a reservation so the client can retry with the same key. Called when the mutation
+   * failed in a way the Iceberg REST spec treats as retryable, which is any {@code 5xx} response.
+   *
+   * @param idempotencyKey the client-provided key
+   */
+  void release(String idempotencyKey);
+
+  /**
+   * Purges records whose reuse window has elapsed.
+   *
+   * @param beforeMs cutoff in unix epoch millis; records expiring before this time are removed
+   * @return the number of records purged
+   */
+  int purgeExpired(long beforeMs);
+}
