@@ -88,7 +88,11 @@ public class TestIcebergConfigEndpointGating extends IcebergTestBase {
     Assertions.assertTrue(hasLoadTable, "Config must always advertise load table endpoint");
   }
 
-  /** Wrapper that overrides {@code supportsScanPlanOperations()} to return false. */
+  /**
+   * Wrapper that reports no scan-plan support, standing in for a federated catalog whose remote
+   * does not advertise {@code V1_SUBMIT_TABLE_SCAN_PLAN}. The remote lookup itself is covered by
+   * {@code TestCatalogWrapperForREST}; this only pins the {@code /v1/config} wiring.
+   */
   static class NoScanPlanCatalogWrapper extends CatalogWrapperForTest {
     public NoScanPlanCatalogWrapper(String catalogName, IcebergConfig icebergConfig) {
       super(catalogName, icebergConfig);

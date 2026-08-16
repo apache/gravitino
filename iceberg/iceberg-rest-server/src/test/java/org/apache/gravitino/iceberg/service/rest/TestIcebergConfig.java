@@ -128,8 +128,8 @@ public class TestIcebergConfig extends IcebergTestBase {
 
   @Test
   public void testConfigEndpointsContainScanPlanForNonRESTBackend() {
-    // Non-REST backends (memory, hive, jdbc) support server-side scan planning,
-    // so the scan plan endpoint must be advertised.
+    // Gravitino plans scans locally for non-REST backends (memory, hive, jdbc), so the scan plan
+    // endpoint must be advertised.
     String warehouseName = IcebergRestTestUtil.PREFIX;
     Map<String, String> queryParams = ImmutableMap.of("warehouse", warehouseName);
     Response resp =
