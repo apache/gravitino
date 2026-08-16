@@ -48,6 +48,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatche
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewHookDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
@@ -82,6 +83,7 @@ public class RESTService implements GravitinoAuxiliaryService {
 
   private IcebergCatalogWrapperManager icebergCatalogWrapperManager;
   private IcebergMetricsManager icebergMetricsManager;
+  private IcebergIdempotencyManager icebergIdempotencyManager;
   private Optional<IcebergCleanupManager> cleanupManager;
   private IcebergConfigProvider configProvider;
   private boolean auxMode;
@@ -126,6 +128,7 @@ public class RESTService implements GravitinoAuxiliaryService {
             skipAuthorizationForRestBackend,
             icebergCatalogWrapperManager);
     this.icebergMetricsManager = new IcebergMetricsManager(icebergConfig);
+    this.icebergIdempotencyManager = new IcebergIdempotencyManager(icebergConfig);
     if (auxMode) {
       // Async cleanup reuses the entity store's shared relational backend (connection pool +
       // per-backend SQL), which is only available when running embedded in the Gravitino server
@@ -192,6 +195,7 @@ public class RESTService implements GravitinoAuxiliaryService {
             }
             bind(icebergCatalogWrapperManager).to(IcebergCatalogWrapperManager.class).ranked(1);
             bind(icebergMetricsManager).to(IcebergMetricsManager.class).ranked(1);
+            bind(icebergIdempotencyManager).to(IcebergIdempotencyManager.class).ranked(1);
             cleanupManager.ifPresent(
                 manager -> bind(manager).to(IcebergCleanupManager.class).ranked(1));
             bind(icebergTableDispatcher).to(IcebergTableOperationDispatcher.class).ranked(1);
@@ -244,6 +248,7 @@ public class RESTService implements GravitinoAuxiliaryService {
         // Stop the components we already started so they don't outlive a failed startup.
         cleanupManager.ifPresent(IcebergCleanupManager::close);
         icebergMetricsManager.close();
+        icebergIdempotencyManager.close();
         throw new RuntimeException(e);
       }
     }
@@ -263,6 +268,9 @@ public class RESTService implements GravitinoAuxiliaryService {
     }
     if (icebergMetricsManager != null) {
       icebergMetricsManager.close();
+    }
+    if (icebergIdempotencyManager != null) {
+      icebergIdempotencyManager.close();
     }
     cleanupManager.ifPresent(IcebergCleanupManager::close);
   }

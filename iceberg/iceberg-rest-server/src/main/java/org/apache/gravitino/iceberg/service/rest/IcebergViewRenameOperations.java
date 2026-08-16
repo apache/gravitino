@@ -24,6 +24,8 @@ import com.google.common.annotations.VisibleForTesting;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.HeaderParam;
+import javax.ws.rs.HttpMethod;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -31,11 +33,13 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -57,10 +61,14 @@ public class IcebergViewRenameOperations {
   @Context private HttpServletRequest httpRequest;
 
   private IcebergViewOperationDispatcher viewOperationDispatcher;
+  private IcebergIdempotencyManager idempotencyManager;
 
   @Inject
-  public IcebergViewRenameOperations(IcebergViewOperationDispatcher viewOperationDispatcher) {
+  public IcebergViewRenameOperations(
+      IcebergViewOperationDispatcher viewOperationDispatcher,
+      IcebergIdempotencyManager idempotencyManager) {
     this.viewOperationDispatcher = viewOperationDispatcher;
+    this.idempotencyManager = idempotencyManager;
   }
 
   @POST
@@ -73,7 +81,16 @@ public class IcebergViewRenameOperations {
   public Response renameView(
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @IcebergAuthorizationMetadata(type = RequestType.RENAME_VIEW)
-          RenameTableRequest renameViewRequest) {
+          RenameTableRequest renameViewRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doRenameView(prefix, renameViewRequest));
+  }
+
+  private Response doRenameView(String prefix, RenameTableRequest renameViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     LOG.info(
         "Rename Iceberg view, catalog: {}, source: {}, destination: {}.",

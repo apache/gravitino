@@ -22,12 +22,14 @@ package org.apache.gravitino.iceberg.service.rest;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergTableOperationDispatcher;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 
 public class MockIcebergTableRenameOperations extends IcebergTableRenameOperations {
   @Inject
   public MockIcebergTableRenameOperations(
-      IcebergTableOperationDispatcher tableOperationDispatcher) {
-    super(tableOperationDispatcher);
+      IcebergTableOperationDispatcher tableOperationDispatcher,
+      IcebergIdempotencyManager idempotencyManager) {
+    super(tableOperationDispatcher, idempotencyManager);
   }
 
   // HTTP request is null in Jersey test, create a mock request
