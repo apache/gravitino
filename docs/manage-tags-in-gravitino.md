@@ -1,7 +1,6 @@
 ---
 title: "Manage Tags"
 slug: "/manage-tags-in-gravitino"
-date: 2024-07-24
 keyword: "tag management, tag, tags, Gravitino"
 license: "This software is licensed under the Apache License version 2."
 ---
@@ -11,55 +10,24 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 0.6.0, Gravitino introduces a new tag system that allows you to manage tags for
-metadata objects. Tags are a way to categorize and organize metadata objects in Gravitino.
-
-This document briefly introduces how to use tags in Gravitino by both Gravitino Java client and
-REST APIs. If you want to know more about the tag system in Gravitino, refer to the
-Javadoc and REST API documentation.
-
-Note that current tag system is a basic implementation, some advanced features will be added in
-the future versions.
-
-:::info
-1. Metadata objects are objects that are managed in Gravitino, such as `CATALOG`, `SCHEMA`, `TABLE`,
-   `VIEW`, `FUNCTION`, `FILESET`, `TOPIC`, `COLUMN`, `MODEL`, etc. A metadata object is combined by a
-   `type` and a dot-separated `name`. For example, a `CATALOG` object has a name "catalog1" with type
-   "CATALOG", a `SCHEMA` object has a name "catalog1.schema1" with type "SCHEMA", a `TABLE`
-   object has a name "catalog1.schema1.table1" with type "TABLE", a `COLUMN` object has a name 
-   "catalog1.schema1.table1.column1" with type "COLUMN".
-2. `CATALOG`, `SCHEMA`, `TABLE`, `VIEW`, `FUNCTION`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN`
-   objects can be tagged.
-3. Tags in Gravitino is inheritable, so listing tags of a metadata object will also list the
-   tags of its parent metadata objects. For example, listing tags of a `Table` will also list
-   the tags of its parent `Schema` and `Catalog`. For catalogs that support multi-level
-   (hierarchical) schemas, such as a schema named `a:b:c` (using the configured schema
-   separator), the intermediate parent schemas `a:b` and `a` are also part of the hierarchy, so
-   their tags are inherited as well.
-4. The same tag can be associated with both parent and child metadata objects. But when you list the
-   associated tags of a child metadata object, this tag will be included only once in the result
-   list with `inherited` value `false`.
-:::
+This page covers the Gravitino API for tags. For what a tag is, which object types can carry one, how inheritance
+resolves, and how to work with tags in the UI, see [Tags](./tags.md).
 
 ## Tag Operations
 
-### Create New Tags
+### Create a Tag
 
-The first step to manage tags is to create new tags. Create a tag by providing a
-name, optional comment, and properties.
+A tag needs a name, and can carry a comment and properties.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "name": "tag1",
-  "comment": "This is a tag",
-  "properties": {
-    "key1": "value1",
-    "key2": "value2"
-  }
+  -H "Content-Type: application/json" -d '{
+  "name": "pii",
+  "comment": "Personally identifiable information",
+  "properties": {"owner": "data-governance"}
 }' http://localhost:8090/api/metalakes/test/tags
 ```
 
@@ -68,8 +36,20 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 
 ```java
 GravitinoClient client = ...
-Tag tag =
-    client.createTag("tag1", "This is a tag", ImmutableMap.of("key1", "value1", "key2", "value2"));
+Tag tag = client.createTag(
+    "pii",
+    "Personally identifiable information",
+    ImmutableMap.of("owner", "data-governance"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+tag = client.create_tag(
+    tag_name="pii",
+    comment="Personally identifiable information",
+    properties={"owner": "data-governance"})
 ```
 
 </TabItem>
@@ -77,268 +57,271 @@ Tag tag =
 
 ### List Tags
 
-List all the tag names as well as tag objects in a metalake in Gravitino.
+Listing returns names, or full tag objects when `details=true` is set.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags
+  http://localhost:8090/api/metalakes/test/tags
 
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags?details=true
+  "http://localhost:8090/api/metalakes/test/tags?details=true"
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient client = ...
 String[] tagNames = client.listTags();
-
 Tag[] tags = client.listTagsInfo();
 ```
 
 </TabItem>
+<TabItem value="python" label="Python">
+
+```python
+tag_names = client.list_tags()
+tags = client.list_tags_info()
+```
+
+</TabItem>
 </Tabs>
 
-### Get a Tag by Name
-
-Get a tag by its name.
+### Get a Tag
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/tag1
+  http://localhost:8090/api/metalakes/test/tags/pii
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient client = ...
-Tag tag = client.getTag("tag1");
+Tag tag = client.getTag("pii");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+tag = client.get_tag("pii")
 ```
 
 </TabItem>
 </Tabs>
 
-### Update a Tag
+### Alter a Tag
 
-Gravitino allows you to update a tag by providing a new tag name, comment and properties.
+Changes are applied as a list in one request.
+
+| Change             | JSON                                                         | Java                                      | Python                                       |
+|--------------------|--------------------------------------------------------------|-------------------------------------------|----------------------------------------------|
+| Rename             | `{"@type":"rename","newName":"tag_renamed"}`                 | `TagChange.rename("tag_renamed")`         | `TagChange.rename("tag_renamed")`            |
+| Update the comment | `{"@type":"updateComment","newComment":"new_comment"}`       | `TagChange.updateComment("new_comment")`  | `TagChange.update_comment("new_comment")`    |
+| Set a property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TagChange.setProperty("key1", "value1")` | `TagChange.set_property("key1", "value1")`   |
+| Remove a property  | `{"@type":"removeProperty","property":"key1"}`               | `TagChange.removeProperty("key1")`        | `TagChange.remove_property("key1")`          |
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
+  -H "Content-Type: application/json" -d '{
   "updates": [
-    {
-      "@type": "rename",
-      "newName": "tag2"
-    },
-    {
-      "@type": "updateComment",
-      "newComment": "This is an updated tag"
-    },
-    {
-      "@type": "setProperty",
-      "property": "key3",
-      "value": "value3"
-    },
-    {
-      "@type": "removeProperty",
-      "property": "key1"
-    }
+    {"@type": "updateComment", "newComment": "Reviewed quarterly"},
+    {"@type": "setProperty", "property": "owner", "value": "privacy-office"}
   ]
-}' http://localhost:8090/api/metalakes/test/tags/tag1
+}' http://localhost:8090/api/metalakes/test/tags/pii
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient client = ...
 Tag tag = client.alterTag(
-    "tag1",
-    TagChange.rename("tag2"),
-    TagChange.updateComment("This is an updated tag"),
-    TagChange.setProperty("key3", "value3"),
-    TagChange.removeProperty("key1"));
+    "pii",
+    TagChange.updateComment("Reviewed quarterly"),
+    TagChange.setProperty("owner", "privacy-office"));
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+tag = client.alter_tag(
+    "pii",
+    TagChange.update_comment("Reviewed quarterly"),
+    TagChange.set_property("owner", "privacy-office"))
 ```
 
 </TabItem>
 </Tabs>
-
-Gravitino supports the following tag changes:
-
-| Supported modification | JSON                                                         | Java                                      |
-|------------------------|--------------------------------------------------------------|-------------------------------------------|
-| Rename a tag           | `{"@type":"rename","newName":"tag_renamed"}`                 | `TagChange.rename("tag_renamed")`         |
-| Update a comment       | `{"@type":"updateComment","newComment":"new_comment"}`       | `TagChange.updateComment("new_comment")`  |
-| Set a tag property     | `{"@type":"setProperty","property":"key1","value":"value1"}` | `TagChange.setProperty("key1", "value1")` |
-| Remove a tag property  | `{"@type":"removeProperty","property":"key1"}`               | `TagChange.removeProperty("key1")`        |
 
 ### Delete a Tag
 
-Delete a tag by its name.
+Deleting a tag also removes it from every object it was attached to.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X DELETE -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/tag2
+  http://localhost:8090/api/metalakes/test/tags/pii
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient client = ...
-client.deleteTag("tag2");
+client.deleteTag("pii");
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+client.delete_tag("pii")
 ```
 
 </TabItem>
 </Tabs>
 
-## Tag Associations
+## Object Operations
 
-Gravitino lets you associate and disassociate tags with metadata objects. The `CATALOG`, `SCHEMA`,
-`TABLE`, `VIEW`, `FUNCTION`, `FILESET`, `TOPIC`, `MODEL`, and `COLUMN` object types can be tagged.
+### Attach and Detach Tags
 
-### Associate and Disassociate Tags with a Metadata Object
-
-Associate and disassociate tags with a metadata object by providing the object type, object
-name and tag names.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags`.
+Both happen in one request, and either list can be omitted. The object type and full name go in the
+path, so the same call covers catalogs, schemas, tables, views, columns, filesets, topics, models,
+and functions.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "tagsToAdd": ["tag1", "tag2"],
-  "tagsToRemove": ["tag3"]
-}' http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags
+  -H "Content-Type: application/json" -d '{
+  "tagsToAdd": ["pii"],
+  "tagsToRemove": ["unreviewed"]
+}' http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/tags
 
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "tagsToAdd": ["tag1"]
-}' http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags
+  -H "Content-Type: application/json" -d '{
+  "tagsToAdd": ["pii"]
+}' http://localhost:8090/api/metalakes/test/objects/fileset/catalog1.schema1.raw_events/tags
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Catalog catalog1 = ...
-catalog1.supportsTags().associateTags(
-    new String[] {"tag1", "tag2"},
-    new String[] {"tag3"});
+Table customers = ...
+customers.supportsTags().associateTags(
+    new String[] {"pii"},
+    new String[] {"unreviewed"});
 
-Schema schema1 = ...
-schema1.supportsTags().associateTags(new String[] {"tag1"}， null);
+Fileset rawEvents = ...
+rawEvents.supportsTags().associateTags(new String[] {"pii"}, null);
+```
+
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+customers = ...
+customers.supports_tags().associate_tags(["pii"], ["unreviewed"])
+
+raw_events = ...
+raw_events.supports_tags().associate_tags(["pii"], None)
 ```
 
 </TabItem>
 </Tabs>
 
-### List Associated Tags for a Metadata Object
+### List Tags on an Object
 
-List all the tags associated with a metadata object. The tags in Gravitino are
-inheritable, so listing tags of a metadata object will also list the tags of its parent metadata
-objects, including the intermediate parent schemas of a multi-level (hierarchical) schema.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags`.
+The response includes tags inherited from ancestors. With `details=true` each tag carries an
+`inherited` field, which a plain name listing does not.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags
-
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags
-
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags?details=true
-
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags?details=true
+  "http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/tags?details=true"
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Catalog catalog1 = ...
-String[] tags = catalog1.supportsTags().listTags();
-Tag[] tagsInfo = catalog1.supportsTags().listTagsInfo();
+Table customers = ...
+String[] tagNames = customers.supportsTags().listTags();
+Tag[] tags = customers.supportsTags().listTagsInfo();
+```
 
-Schema schema1 = ...
-String[] tags = schema1.supportsTags().listTags();
-Tag[] tagsInfo = schema1.supportsTags().listTagsInfo();
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+customers = ...
+tag_names = customers.supports_tags().list_tags()
+tags = customers.supports_tags().list_tags_info()
 ```
 
 </TabItem>
 </Tabs>
 
-### Get an Associated Tag by Name for a Metadata Object
-
-Get an associated tag by its name for a metadata object.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/tags/{tagName}`.
+### Get One Tag on an Object
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/catalog/catalog1/tags/tag1
-
-curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/objects/schema/catalog1.schema1/tags/tag1
+  http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/tags/pii
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Catalog catalog1 = ...
-Tag tag = catalog1.supportsTags().getTag("tag1");
+Tag tag = customers.supportsTags().getTag("pii");
+```
 
-Schema schema1 = ...
-Tag tag = schema1.supportsTags().getTag("tag1");
+</TabItem>
+<TabItem value="python" label="Python">
+
+```python
+tag = customers.supports_tags().get_tag("pii")
 ```
 
 </TabItem>
 </Tabs>
 
-### List Metadata Objects Associated with a Tag
+### List Objects Carrying a Tag
 
-List all the metadata objects associated with a tag.
+The response lists direct attachments only, so a tag attached to a catalog returns that catalog
+rather than the objects beneath it.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
-http://localhost:8090/api/metalakes/test/tags/tag1/objects
+  http://localhost:8090/api/metalakes/test/tags/pii/objects
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Tag tag = ...
+Tag tag = client.getTag("pii");
 MetadataObject[] objects = tag.associatedObjects().objects();
 int count = tag.associatedObjects().count();
 ```

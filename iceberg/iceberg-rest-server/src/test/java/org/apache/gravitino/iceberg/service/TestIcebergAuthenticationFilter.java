@@ -28,6 +28,7 @@ import java.io.StringWriter;
 import javax.servlet.ServletRequest;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.auth.IllegalActiveRolesException;
 import org.apache.gravitino.exceptions.TokenExpiredException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.iceberg.rest.responses.ErrorResponse;
@@ -105,6 +106,25 @@ public class TestIcebergAuthenticationFilter {
     Assertions.assertEquals(401, errorResponse.code());
     Assertions.assertEquals("NotAuthorizedException", errorResponse.type());
     Assertions.assertEquals("The provided credentials did not support", errorResponse.message());
+  }
+
+  @Test
+  public void testIllegalActiveRolesReturnsBadRequest() throws Exception {
+    IcebergAuthenticationFilter filter = new IcebergAuthenticationFilter();
+
+    HttpServletResponse response = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(response.getWriter()).thenReturn(printWriter);
+
+    filter.sendAuthErrorResponse(
+        response, new IllegalActiveRolesException("malformed active-roles header"));
+
+    verify(response).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+
+    printWriter.flush();
+    ErrorResponse errorResponse = MAPPER.readValue(stringWriter.toString(), ErrorResponse.class);
+    Assertions.assertEquals(400, errorResponse.code());
   }
 
   @Test

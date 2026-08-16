@@ -17,7 +17,7 @@ Apache Gravitino provides the ability to manage OceanBase metadata.
 
 :::caution
 1. Gravitino saves some system information in schema and table comment, like `(From Gravitino, DO NOT EDIT: gravitino.v1.uid1078334182909406185)`, do not change or remove this message.
-2. Since 1.2.0, OceanBase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
+2. OceanBase catalog is not included in standard Gravitino distribution, but you can still build it from source if you need it. Check [build from source](./how-to-build.md) for more details.
 :::
 
 ## Catalog
@@ -28,7 +28,7 @@ Apache Gravitino provides the ability to manage OceanBase metadata.
 - Supports metadata management of OceanBase (4.x).
 - Supports DDL operation for OceanBase databases and tables.
 - Supports table index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Supports [column default value](./tables-and-views.md#table-column-default-value) and [auto-increment](./tables-and-views.md#table-column-auto-increment).
 
 ### Catalog Properties
 
@@ -39,15 +39,15 @@ Check the relevant data source configuration in [data source properties](https:/
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the OceanBase catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                           | Default value | Required | Since Version    |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881` or `jdbc:oceanbase://localhost:2881`              | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` or `com.oceanbase.jdbc.Driver`. | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc-user`             | The JDBC user name.                                                                                                                   | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc-password`         | The JDBC password.                                                                                                                    | (none)        | Yes      | 0.7.0-incubating |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                        | `2`           | No       | 0.7.0-incubating |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                       | `10`          | No       | 0.7.0-incubating |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                     | `30000`       | No       | 1.1.0            |
+| Configuration item      | Description                                                                                                                           | Default value | Required |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:2881` or `jdbc:oceanbase://localhost:2881`              | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` or `com.oceanbase.jdbc.Driver`. | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                                                                   | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                                                    | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                        | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                       | `10`          | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                     | `30000`       | No       |
 
 :::caution
 Before using the OceanBase Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-oceanbase/libs` directory.
@@ -84,10 +84,10 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
 :::
 
 ## Schema
@@ -105,7 +105,7 @@ Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden 
 
 ### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
@@ -114,7 +114,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Gravitino's table concept corresponds to the OceanBase table.
 - Supports DDL operation for OceanBase tables.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value) and [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment)..
+- Supports [column default value](./tables-and-views.md#table-column-default-value) and [auto-increment](./tables-and-views.md#table-column-auto-increment)..
 
 ### Table Properties
 
@@ -146,7 +146,7 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 
 :::info
 OceanBase doesn't support Gravitino `Boolean` `Fixed` `Struct` `List` `Map` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.
 :::
 
 ### Table Column Auto-Increment

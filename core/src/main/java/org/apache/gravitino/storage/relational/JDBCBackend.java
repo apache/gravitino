@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -36,11 +37,17 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.HasIdentifier;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationQuery;
+import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.cache.BaseEntityCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -63,6 +70,8 @@ import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.storage.relational.converters.SQLExceptionConverterFactory;
 import org.apache.gravitino.storage.relational.database.H2Database;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.service.CatalogMetaService;
 import org.apache.gravitino.storage.relational.service.FilesetMetaService;
 import org.apache.gravitino.storage.relational.service.FunctionMetaService;
@@ -72,6 +81,7 @@ import org.apache.gravitino.storage.relational.service.JobTemplateMetaService;
 import org.apache.gravitino.storage.relational.service.MetalakeMetaService;
 import org.apache.gravitino.storage.relational.service.ModelMetaService;
 import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
+import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
@@ -84,6 +94,9 @@ import org.apache.gravitino.storage.relational.service.TopicMetaService;
 import org.apache.gravitino.storage.relational.service.UserMetaService;
 import org.apache.gravitino.storage.relational.service.ViewMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -93,7 +106,7 @@ import org.slf4j.LoggerFactory;
  * syntax, please implement the SQL statements and methods in MyBatis Mapper separately and switch
  * according to the {@link Configs#ENTITY_RELATIONAL_JDBC_BACKEND_URL_KEY} parameter.
  */
-public class JDBCBackend implements RelationalBackend {
+public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationCleanup {
 
   private static final Logger LOG = LoggerFactory.getLogger(JDBCBackend.class);
 
@@ -175,52 +188,27 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public <E extends Entity & HasIdentifier> void insert(E e, boolean overwritten)
       throws EntityAlreadyExistsException, IOException {
-    if (e instanceof BaseMetalake) {
-      MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
-    } else if (e instanceof CatalogEntity) {
-      CatalogMetaService.getInstance().insertCatalog((CatalogEntity) e, overwritten);
-    } else if (e instanceof SchemaEntity) {
-      SchemaMetaService.getInstance().insertSchema((SchemaEntity) e, overwritten);
-    } else if (e instanceof TableEntity) {
-      TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
-    } else if (e instanceof FilesetEntity) {
-      FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
-    } else if (e instanceof TopicEntity) {
-      TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
-    } else if (e instanceof UserEntity) {
-      UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
-    } else if (e instanceof RoleEntity) {
-      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
-    } else if (e instanceof GroupEntity) {
-      GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
-    } else if (e instanceof TagEntity) {
-      TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
-    } else if (e instanceof ModelEntity) {
-      ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
-    } else if (e instanceof ModelVersionEntity) {
-      if (overwritten) {
-        LOG.warn(
-            "'overwritten' is not supported for model version meta, ignoring this flag and "
-                + "inserting the new model version.");
+    if (!overwritten || !BaseEntityCache.isCacheable(e.type())) {
+      insertEntity(e, overwritten);
+      return;
+    }
+
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      insertEntity(e, true);
+      insertEntityChange(e.nameIdentifier(), e.type(), OperateType.ALTER);
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
       }
-      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
-    } else if (e instanceof FunctionEntity) {
-      FunctionMetaService.getInstance().insertFunction((FunctionEntity) e, overwritten);
-    } else if (e instanceof PolicyEntity) {
-      PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
-    } else if (e instanceof JobTemplateEntity) {
-      JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
-    } else if (e instanceof JobEntity) {
-      JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
-    } else if (e instanceof ViewEntity) {
-      ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
-    } else if (e instanceof GenericEntity) {
-      GenericEntity genericEntity = (GenericEntity) e;
-      throw new UnsupportedEntityTypeException(
-          "Unsupported entity type: %s for insert operation", genericEntity.type());
-    } else {
-      throw new UnsupportedEntityTypeException(
-          "Unsupported entity type: %s for insert operation", e.getClass());
+      committed = true;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
     }
   }
 
@@ -228,42 +216,27 @@ public class JDBCBackend implements RelationalBackend {
   public <E extends Entity & HasIdentifier> E update(
       NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
-    switch (entityType) {
-      case METALAKE:
-        return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
-      case CATALOG:
-        return (E) CatalogMetaService.getInstance().updateCatalog(ident, updater);
-      case SCHEMA:
-        return (E) SchemaMetaService.getInstance().updateSchema(ident, updater);
-      case TABLE:
-        return (E) TableMetaService.getInstance().updateTable(ident, updater);
-      case FILESET:
-        return (E) FilesetMetaService.getInstance().updateFileset(ident, updater);
-      case TOPIC:
-        return (E) TopicMetaService.getInstance().updateTopic(ident, updater);
-      case USER:
-        return (E) UserMetaService.getInstance().updateUser(ident, updater);
-      case GROUP:
-        return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
-      case ROLE:
-        return (E) RoleMetaService.getInstance().updateRole(ident, updater);
-      case TAG:
-        return (E) TagMetaService.getInstance().updateTag(ident, updater);
-      case MODEL:
-        return (E) ModelMetaService.getInstance().updateModel(ident, updater);
-      case MODEL_VERSION:
-        return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
-      case FUNCTION:
-        return (E) FunctionMetaService.getInstance().updateFunction(ident, updater);
-      case POLICY:
-        return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
-      case JOB_TEMPLATE:
-        return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
-      case VIEW:
-        return (E) ViewMetaService.getInstance().updateView(ident, updater);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for update operation", entityType);
+    if (!BaseEntityCache.isCacheable(entityType)) {
+      return updateEntity(ident, entityType, updater);
+    }
+
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      E updatedEntity = updateEntity(ident, entityType, updater);
+      insertEntityChange(ident, entityType, OperateType.ALTER);
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return updatedEntity;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
     }
   }
 
@@ -337,6 +310,48 @@ public class JDBCBackend implements RelationalBackend {
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update enabled by external id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E getById(
+      NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        AuthorizationUtils.checkUserId(ident);
+        return (E)
+            UserMetaService.getInstance()
+                .getUserById(ident.namespace().level(0), Long.parseLong(ident.name()));
+      case GROUP:
+        AuthorizationUtils.checkGroupId(ident);
+        return (E)
+            GroupMetaService.getInstance()
+                .getGroupById(ident.namespace().level(0), Long.parseLong(ident.name()));
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for get by id operation", entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException {
+    switch (entityType) {
+      case USER:
+        AuthorizationUtils.checkUserId(ident);
+        return (E)
+            UserMetaService.getInstance()
+                .updateUserById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
+      case GROUP:
+        AuthorizationUtils.checkGroupId(ident);
+        return (E)
+            GroupMetaService.getInstance()
+                .updateGroupById(ident.namespace().level(0), Long.parseLong(ident.name()), updater);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update by id operation", entityType);
     }
   }
 
@@ -420,44 +435,29 @@ public class JDBCBackend implements RelationalBackend {
   @Override
   public boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException {
-    switch (entityType) {
-      case METALAKE:
-        return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
-      case CATALOG:
-        return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
-      case SCHEMA:
-        return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
-      case TABLE:
-        return TableMetaService.getInstance().deleteTable(ident);
-      case FILESET:
-        return FilesetMetaService.getInstance().deleteFileset(ident);
-      case TOPIC:
-        return TopicMetaService.getInstance().deleteTopic(ident);
-      case USER:
-        return UserMetaService.getInstance().deleteUser(ident);
-      case GROUP:
-        return GroupMetaService.getInstance().deleteGroup(ident);
-      case ROLE:
-        return RoleMetaService.getInstance().deleteRole(ident);
-      case TAG:
-        return TagMetaService.getInstance().deleteTag(ident);
-      case MODEL:
-        return ModelMetaService.getInstance().deleteModel(ident);
-      case MODEL_VERSION:
-        return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
-      case FUNCTION:
-        return FunctionMetaService.getInstance().deleteFunction(ident);
-      case POLICY:
-        return PolicyMetaService.getInstance().deletePolicy(ident);
-      case JOB_TEMPLATE:
-        return JobTemplateMetaService.getInstance().deleteJobTemplate(ident);
-      case JOB:
-        return JobMetaService.getInstance().deleteJob(ident);
-      case VIEW:
-        return ViewMetaService.getInstance().deleteView(ident);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for delete operation", entityType);
+    if (!BaseEntityCache.isCacheable(entityType)) {
+      return deleteEntity(ident, entityType, cascade);
+    }
+
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      boolean deleted = deleteEntity(ident, entityType, cascade);
+      if (deleted) {
+        insertEntityChange(ident, entityType, OperateType.DROP);
+      }
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return deleted;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
     }
   }
 
@@ -547,6 +547,12 @@ public class JDBCBackend implements RelationalBackend {
         throw new IllegalArgumentException(
             "Unsupported entity type when collectAndRemoveLegacyData: " + entityType);
     }
+  }
+
+  @Override
+  public int softDeleteOrphanedRelations(MetadataObject.Type metadataObjectType, int limit) {
+    return OrphanedMetadataObjectRelationService.getInstance()
+        .softDeleteOrphanedRelations(metadataObjectType, limit);
   }
 
   @Override
@@ -810,6 +816,89 @@ public class JDBCBackend implements RelationalBackend {
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> List<E> listEntitiesByRelation(RelationQuery query)
+      throws IOException {
+    if (!query.relationValue().isPresent()) {
+      return listEntitiesByRelation(
+          query.relationType(),
+          query.anchorIdentifier(),
+          query.anchorEntityType(),
+          query.allFields());
+    }
+
+    switch (query.relationType()) {
+      case TAG_METADATA_OBJECT_REL:
+        Preconditions.checkArgument(
+            query.anchorEntityType() == Entity.EntityType.TAG,
+            "Relation value filter is only supported when listing metadata objects for a tag");
+        return (List<E>)
+            TagMetaService.getInstance()
+                .listAssociatedMetadataObjectsForTag(
+                    query.anchorIdentifier(), query.relationValue().get());
+      default:
+        throw new IllegalArgumentException(
+            String.format(
+                "Relation value filter is not supported for relation type %s",
+                query.relationType()));
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> List<E> updateEntityRelations(RelationUpdate update)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    switch (update.relationType()) {
+      case TAG_METADATA_OBJECT_REL:
+        return (List<E>)
+            TagMetaService.getInstance()
+                .associateTagValuesWithMetadataObject(
+                    update.sourceIdentifier(),
+                    update.sourceEntityType(),
+                    toTagValues(update.targetsToAdd()),
+                    toTagValues(update.targetsToRemove()));
+      default:
+        Preconditions.checkArgument(
+            !update.hasRelationValues(),
+            "Relation values are not supported for relation type %s",
+            update.relationType());
+        return updateEntityRelations(
+            update.relationType(),
+            update.sourceIdentifier(),
+            update.sourceEntityType(),
+            toNameIdentifiers(update.targetsToAdd()),
+            toNameIdentifiers(update.targetsToRemove()));
+    }
+  }
+
+  private static NameIdentifier[] toNameIdentifiers(RelationEdgeTarget[] relationTargets) {
+    if (relationTargets == null) {
+      return null;
+    }
+
+    return Arrays.stream(relationTargets)
+        .map(RelationEdgeTarget::nameIdentifier)
+        .toArray(NameIdentifier[]::new);
+  }
+
+  private static TagValue[] toTagValues(RelationEdgeTarget[] relationTargets) {
+    if (relationTargets == null) {
+      return null;
+    }
+
+    return Arrays.stream(relationTargets).map(JDBCBackend::toTagValue).toArray(TagValue[]::new);
+  }
+
+  private static TagValue toTagValue(RelationEdgeTarget relationTarget) {
+    Preconditions.checkArgument(
+        relationTarget.entityType() == Entity.EntityType.TAG,
+        "Relation target type must be TAG for tag metadata object relations, but is %s",
+        relationTarget.entityType());
+    return relationTarget
+        .relationValue()
+        .map(value -> TagValue.of(relationTarget.nameIdentifier().name(), value))
+        .orElseGet(() -> TagValue.noValue(relationTarget.nameIdentifier().name()));
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E getEntityByRelation(
       Type relType,
       NameIdentifier srcIdentifier,
@@ -866,6 +955,154 @@ public class JDBCBackend implements RelationalBackend {
           throw new IllegalArgumentException("Unknown JDBC type: " + jdbcType);
       }
     }
+  }
+
+  private <E extends Entity & HasIdentifier> void insertEntity(E e, boolean overwritten)
+      throws EntityAlreadyExistsException, IOException {
+    if (e instanceof BaseMetalake) {
+      MetalakeMetaService.getInstance().insertMetalake((BaseMetalake) e, overwritten);
+    } else if (e instanceof CatalogEntity) {
+      CatalogMetaService.getInstance().insertCatalog((CatalogEntity) e, overwritten);
+    } else if (e instanceof SchemaEntity) {
+      SchemaMetaService.getInstance().insertSchema((SchemaEntity) e, overwritten);
+    } else if (e instanceof TableEntity) {
+      TableMetaService.getInstance().insertTable((TableEntity) e, overwritten);
+    } else if (e instanceof FilesetEntity) {
+      FilesetMetaService.getInstance().insertFileset((FilesetEntity) e, overwritten);
+    } else if (e instanceof TopicEntity) {
+      TopicMetaService.getInstance().insertTopic((TopicEntity) e, overwritten);
+    } else if (e instanceof UserEntity) {
+      UserMetaService.getInstance().insertUser((UserEntity) e, overwritten);
+    } else if (e instanceof RoleEntity) {
+      RoleMetaService.getInstance().insertRole((RoleEntity) e, overwritten);
+    } else if (e instanceof GroupEntity) {
+      GroupMetaService.getInstance().insertGroup((GroupEntity) e, overwritten);
+    } else if (e instanceof TagEntity) {
+      TagMetaService.getInstance().insertTag((TagEntity) e, overwritten);
+    } else if (e instanceof ModelEntity) {
+      ModelMetaService.getInstance().insertModel((ModelEntity) e, overwritten);
+    } else if (e instanceof ModelVersionEntity) {
+      if (overwritten) {
+        LOG.warn(
+            "'overwritten' is not supported for model version meta, ignoring this flag and "
+                + "inserting the new model version.");
+      }
+      ModelVersionMetaService.getInstance().insertModelVersion((ModelVersionEntity) e);
+    } else if (e instanceof FunctionEntity) {
+      FunctionMetaService.getInstance().insertFunction((FunctionEntity) e, overwritten);
+    } else if (e instanceof PolicyEntity) {
+      PolicyMetaService.getInstance().insertPolicy((PolicyEntity) e, overwritten);
+    } else if (e instanceof JobTemplateEntity) {
+      JobTemplateMetaService.getInstance().insertJobTemplate((JobTemplateEntity) e, overwritten);
+    } else if (e instanceof JobEntity) {
+      JobMetaService.getInstance().insertJob((JobEntity) e, overwritten);
+    } else if (e instanceof ViewEntity) {
+      ViewMetaService.getInstance().insertView((ViewEntity) e, overwritten);
+    } else if (e instanceof GenericEntity) {
+      GenericEntity genericEntity = (GenericEntity) e;
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for insert operation", genericEntity.type());
+    } else {
+      throw new UnsupportedEntityTypeException(
+          "Unsupported entity type: %s for insert operation", e.getClass());
+    }
+  }
+
+  private <E extends Entity & HasIdentifier> E updateEntity(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
+    switch (entityType) {
+      case METALAKE:
+        return (E) MetalakeMetaService.getInstance().updateMetalake(ident, updater);
+      case CATALOG:
+        return (E) CatalogMetaService.getInstance().updateCatalog(ident, updater);
+      case SCHEMA:
+        return (E) SchemaMetaService.getInstance().updateSchema(ident, updater);
+      case TABLE:
+        return (E) TableMetaService.getInstance().updateTable(ident, updater);
+      case FILESET:
+        return (E) FilesetMetaService.getInstance().updateFileset(ident, updater);
+      case TOPIC:
+        return (E) TopicMetaService.getInstance().updateTopic(ident, updater);
+      case USER:
+        return (E) UserMetaService.getInstance().updateUser(ident, updater);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().updateGroup(ident, updater);
+      case ROLE:
+        return (E) RoleMetaService.getInstance().updateRole(ident, updater);
+      case TAG:
+        return (E) TagMetaService.getInstance().updateTag(ident, updater);
+      case MODEL:
+        return (E) ModelMetaService.getInstance().updateModel(ident, updater);
+      case MODEL_VERSION:
+        return (E) ModelVersionMetaService.getInstance().updateModelVersion(ident, updater);
+      case FUNCTION:
+        return (E) FunctionMetaService.getInstance().updateFunction(ident, updater);
+      case POLICY:
+        return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
+      case JOB_TEMPLATE:
+        return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
+      case VIEW:
+        return (E) ViewMetaService.getInstance().updateView(ident, updater);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for update operation", entityType);
+    }
+  }
+
+  private boolean deleteEntity(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
+      throws IOException {
+    switch (entityType) {
+      case METALAKE:
+        return MetalakeMetaService.getInstance().deleteMetalake(ident, cascade);
+      case CATALOG:
+        return CatalogMetaService.getInstance().deleteCatalog(ident, cascade);
+      case SCHEMA:
+        return SchemaMetaService.getInstance().deleteSchema(ident, cascade);
+      case TABLE:
+        return TableMetaService.getInstance().deleteTable(ident);
+      case FILESET:
+        return FilesetMetaService.getInstance().deleteFileset(ident);
+      case TOPIC:
+        return TopicMetaService.getInstance().deleteTopic(ident);
+      case USER:
+        return UserMetaService.getInstance().deleteUser(ident);
+      case GROUP:
+        return GroupMetaService.getInstance().deleteGroup(ident);
+      case ROLE:
+        return RoleMetaService.getInstance().deleteRole(ident);
+      case TAG:
+        return TagMetaService.getInstance().deleteTag(ident);
+      case MODEL:
+        return ModelMetaService.getInstance().deleteModel(ident);
+      case MODEL_VERSION:
+        return ModelVersionMetaService.getInstance().deleteModelVersion(ident);
+      case FUNCTION:
+        return FunctionMetaService.getInstance().deleteFunction(ident);
+      case POLICY:
+        return PolicyMetaService.getInstance().deletePolicy(ident);
+      case JOB_TEMPLATE:
+        return JobTemplateMetaService.getInstance().deleteJobTemplate(ident);
+      case JOB:
+        return JobMetaService.getInstance().deleteJob(ident);
+      case VIEW:
+        return ViewMetaService.getInstance().deleteView(ident);
+      default:
+        throw new UnsupportedEntityTypeException(
+            "Unsupported entity type: %s for delete operation", entityType);
+    }
+  }
+
+  private static void insertEntityChange(
+      NameIdentifier ident, Entity.EntityType entityType, OperateType operateType) {
+    SessionUtils.doWithoutCommit(
+        EntityChangeLogMapper.class,
+        mapper ->
+            mapper.insertEntityChange(
+                NameIdentifierUtil.getMetalake(ident),
+                entityType.name(),
+                EntityChangeLogNameIdentifierCodec.encode(ident),
+                operateType));
   }
 
   /** Start JDBC database if necessary. For example, start the H2 database if the backend is H2. */

@@ -19,9 +19,14 @@
 package org.apache.gravitino.flink.connector.utils;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.options.Options;
+import org.apache.paimon.utils.HadoopUtils;
 
+/** Utility methods for Flink connector properties. */
 public class PropertyUtils {
 
   public static final String HIVE_PREFIX = "hive.";
@@ -29,6 +34,12 @@ public class PropertyUtils {
   public static final String FS_PREFIX = "fs.";
   public static final String DFS_PREFIX = "dfs.";
 
+  /**
+   * Gets Hadoop and Hive properties.
+   *
+   * @param properties the source properties
+   * @return Hadoop and Hive properties
+   */
   public static Map<String, String> getHadoopAndHiveProperties(Map<String, String> properties) {
     if (properties == null) {
       return Collections.emptyMap();
@@ -42,5 +53,44 @@ public class PropertyUtils {
                     || entry.getKey().startsWith(DFS_PREFIX)
                     || entry.getKey().startsWith(HIVE_PREFIX))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+  }
+
+  /**
+   * Extracts Hadoop configuration from the given options and removes Hadoop-prefixed options.
+   *
+   * <p>Options with the {@code hadoop.} prefix are written to Hadoop configuration without the
+   * prefix. Options with the {@code fs.} or {@code dfs.} prefix are written as-is.
+   *
+   * @param options mutable options to extract Hadoop configuration from
+   * @return Hadoop configuration containing extracted Hadoop options
+   */
+  public static Configuration extractHadoopConfiguration(Map<String, String> options) {
+    Map<String, String> hadoopProps = new HashMap<>();
+    options
+        .entrySet()
+        .removeIf(
+            entry -> {
+              String hadoopKey = toHadoopConfKey(entry.getKey());
+              if (hadoopKey == null) {
+                return false;
+              }
+
+              hadoopProps.put(hadoopKey, entry.getValue());
+              return true;
+            });
+
+    Configuration conf = HadoopUtils.getHadoopConfiguration(Options.fromMap(options));
+    hadoopProps.forEach(conf::set);
+    return conf;
+  }
+
+  private static String toHadoopConfKey(String key) {
+    if (key.startsWith(HADOOP_PREFIX)) {
+      return key.substring(HADOOP_PREFIX.length());
+    } else if (key.startsWith(FS_PREFIX) || key.startsWith(DFS_PREFIX)) {
+      return key;
+    }
+
+    return null;
   }
 }

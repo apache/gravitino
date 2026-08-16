@@ -24,3 +24,15 @@ ALTER TABLE `group_meta` ADD COLUMN `external_id` VARCHAR(256) DEFAULT NULL COMM
 
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_mid_ueid_del` ON `user_meta` (`metalake_id`, `external_id`, `deleted_at`);
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_mid_geid_del` ON `group_meta` (`metalake_id`, `external_id`, `deleted_at`);
+
+ALTER TABLE `table_column_version_info`
+    ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
+
+ALTER TABLE `tag_meta` ADD COLUMN `allowed_values` CLOB DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;
+
+ALTER TABLE `tag_relation_meta` DROP INDEX `uk_ti_mi_del`;
+
+ALTER TABLE `tag_relation_meta` ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
+
+CREATE UNIQUE INDEX IF NOT EXISTS `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
+CREATE INDEX IF NOT EXISTS `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);

@@ -24,6 +24,7 @@ import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.util.Arrays;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -78,11 +79,11 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
 
   protected static void prepareTable() throws IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     tableOperationDispatcher =
-        new TableOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new TableOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     partitionOperationDispatcher =
-        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new PartitionOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -93,7 +94,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
         GravitinoEnv.getInstance(), "schemaDispatcher", schemaOperationDispatcher, true);
 
     NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema(metalake, catalog, SCHEMA);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
     Column[] columns =
         new Column[] {
           Column.of("col1", Types.StringType.get()), Column.of("col2", Types.StringType.get())

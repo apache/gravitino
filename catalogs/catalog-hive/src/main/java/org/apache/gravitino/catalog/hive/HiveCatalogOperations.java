@@ -89,7 +89,6 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
-import org.apache.gravitino.utils.ClassLoaderResourceCleanerUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -197,7 +196,6 @@ public class HiveCatalogOperations
       clientPool.close();
       clientPool = null;
     }
-    ClassLoaderResourceCleanerUtils.closeClassLoaderResource(this.getClass().getClassLoader());
   }
 
   /**

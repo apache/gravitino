@@ -20,18 +20,26 @@ FROM python:3.10
 
 LABEL maintainer="dev@gravitino.apache.org"
 
-WORKDIR /root/mcp-server
+WORKDIR /opt/mcp-server
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
 
-COPY packages/mcp-server /root/mcp-server
+COPY --chmod=775 packages/mcp-server /opt/mcp-server
 
-COPY start-mcp-server.sh /root/mcp-server
+COPY --chmod=775 start-mcp-server.sh /opt/mcp-server
+
+# uv defaults its cache to $HOME/.cache/uv, which a non-root user cannot create.
+ENV UV_CACHE_DIR=/opt/mcp-server/.cache/uv
 
 RUN uv venv
 
 RUN uv sync
 
 RUN uv pip install -e .
+
+RUN chmod -R 775 /opt/mcp-server \
+    && useradd -u 1000 -g 0 -M -s /sbin/nologin gravitino
+
+USER 1000
 
 ENTRYPOINT ["/bin/bash", "start-mcp-server.sh"]

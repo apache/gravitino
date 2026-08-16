@@ -73,14 +73,29 @@ public class TestDorisTableOperationsSqlGeneration {
 
     public String createTableSql(
         String tableName, JdbcColumn[] columns, Distribution distribution) {
+      return createTableSql(tableName, columns, distribution, "comment");
+    }
+
+    public String createTableSql(
+        String tableName, JdbcColumn[] columns, Distribution distribution, String comment) {
       return generateCreateTableSql(
           tableName,
           columns,
-          "comment",
+          comment,
           Collections.emptyMap(),
           Transforms.EMPTY_TRANSFORM,
           distribution,
           Indexes.EMPTY_INDEXES);
+    }
+
+    public String alterTableSql(String tableName, TableChange... changes) {
+      return generateAlterTableSql("database", tableName, changes);
+    }
+
+    @Override
+    protected JdbcTable getOrCreateTable(
+        String databaseName, String tableName, JdbcTable lazyLoadCreateTable) {
+      return JdbcTable.builder().withName(tableName).build();
     }
 
     public String createTableSqlWithIndexes(
@@ -146,6 +161,52 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertTrue(
         sql.contains("DEFAULT " + converter.fromGravitino(col1.defaultValue())),
         "Should contain DEFAULT value but was: " + sql);
+  }
+
+  @Test
+  public void testEscapeCommentsInGeneratedSql() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+    String tableComment = "owner\"; DROP TABLE marker; --";
+    String columnComment = "owner's comment; DROP TABLE marker; --";
+    JdbcColumn column =
+        JdbcColumn.builder()
+            .withName("col1")
+            .withType(Types.IntegerType.get())
+            .withComment(columnComment)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("col1"));
+
+    String createSql =
+        mockOps.createTableSql("test_table", new JdbcColumn[] {column}, distribution, tableComment);
+    Assertions.assertTrue(
+        createSql.contains("COMMENT \"owner\"\"; DROP TABLE marker; --\""), createSql);
+    Assertions.assertTrue(
+        createSql.contains("COMMENT 'owner''s comment; DROP TABLE marker; --'"), createSql);
+
+    String alterSql =
+        mockOps.alterTableSql(
+            "test_table", TableChange.updateColumnComment(new String[] {"col1"}, columnComment));
+    Assertions.assertTrue(
+        alterSql.contains("MODIFY COLUMN `col1` COMMENT 'owner''s comment; DROP TABLE marker; --'"),
+        alterSql);
+  }
+
+  @Test
+  public void testEscapeAddColumnCommentInGeneratedSql() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    String comment = "owner\\'s \"comment\"; --";
+
+    String alterSql =
+        ops.alterTableSql(
+            "test_table",
+            TableChange.addColumn(new String[] {"col2"}, Types.IntegerType.get(), comment));
+
+    Assertions.assertTrue(alterSql.contains("ADD COLUMN `col2`"), alterSql);
+    Assertions.assertTrue(alterSql.contains("COMMENT 'owner\\\\''s \"comment\"; --'"), alterSql);
   }
 
   @Test

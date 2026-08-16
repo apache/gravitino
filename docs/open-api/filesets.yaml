@@ -231,7 +231,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The name of the storage location
       responses:
         "200":
@@ -347,6 +346,22 @@ components:
           default: {}
           additionalProperties:
               type: string
+        secretBindings:
+          type: object
+          description: >
+            Optional map of property key to write-through binding. Persisted value
+            becomes a URN.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretBinding"
+        secretReferences:
+          type: object
+          description: >
+            Optional map of property key to secret locator. Server builds and
+            persists the URN. Must not overlap with secretBindings.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretReference"
 
     FilesetUpdatesRequest:
       type: object

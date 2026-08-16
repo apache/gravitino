@@ -33,6 +33,7 @@ import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic view. */
 class GenericView implements View, SupportsTags {
@@ -113,6 +114,11 @@ class GenericView implements View, SupportsTags {
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove)
       throws TagAlreadyAssociatedException {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 

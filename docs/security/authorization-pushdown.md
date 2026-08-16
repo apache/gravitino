@@ -1,99 +1,98 @@
 ---
 title: "Authorization Pushdown"
 slug: "/security/authorization-pushdown"
-keyword: "security"
+keywords:
+  - security
+  - authorization
+  - ranger
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Introduction
+## Overview
 
-![authorization pushdown](../assets/security/authorization-pushdown.png)
+Authorization pushdown applies a grant made in Gravitino to Apache Ranger, so the permission is enforced where the data is rather than only inside Gravitino. An engine that reads the table directly is still subject to it.
 
-Gravitino offers a set of authorization frameworks that integrate with various underlying data source permission systems, such as MySQL's native permission management and Apache Ranger for big data. These frameworks align with Gravitino's own authorization model and methodology.
-Gravitino manages different data sources through Catalogs, and when a user performs an authorization operation on data within a Catalog, Gravitino invokes the Authorization Plugin module for that Catalog.
-This module translates Gravitino's authorization model into the permission rules of the underlying data source. The permissions are then enforced by the underlying permission system via the respective client, such as JDBC or the Apache Ranger client.
+Pushdown is configured per catalog with the `authorization-provider` property. Set it to `ranger` when the catalog's permissions live in a single Ranger service, or to `chain` when one catalog needs its grants applied in more than one. A catalog without the property manages access in Gravitino alone.
 
-### Ranger Hadoop SQL Plugin
+Gravitino resolves which catalog holds the object being granted on, hands the operation to that catalog's plugin, and the plugin maps the Gravitino privilege onto Ranger's model and writes it through the Ranger admin REST API. The plugin interface is not specific to Ranger, so other permission systems can be added, and Ranger is what ships today.
 
-To use the Ranger Hadoop SQL Plugin, you need to configure the following properties:
+Once a catalog is configured, grants are made through the ordinary [authorization REST API](https://gravitino.apache.org/docs/latest/api/rest/grant-role-to-user). No separate pushdown call exists.
 
-| Property Name                                         | Description                                                                                                                                          | Default Value                     | Required | Since Version    |
-|-------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|----------|------------------|
-| `authorization-provider`                              | Providers to use to implement authorization plugin such as `ranger`.                                                                                 | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.admin.url`                      | The Apache Ranger web URIs.                                                                                                                          | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.service.type`                   | The Apache Ranger service type. Supports `HadoopSQL` or `HDFS`.                                                                                      | (none)                            | No       | 0.8.0-incubating |
-| `authorization.ranger.auth.type`                      | The Apache Ranger authentication type `simple` or `kerberos`.                                                                                        | `simple`                          | No       | 0.6.0-incubating |
-| `authorization.ranger.username`                       | The Apache Ranger admin web login username (auth type=simple), or kerberos principal(auth type=kerberos), Need have Ranger administrator permission. | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.password`                       | The Apache Ranger admin web login user password (auth type=simple), or path of the keytab file(auth type=kerberos)                                   | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.service.name`                   | The Apache Ranger service name.                                                                                                                      | (none)                            | No       | 0.6.0-incubating |
-| `authorization.ranger.service.create-if-absent`       | If this property is true and the Ranger service doesn't exist, Gravitino will create a Ranger service                                                | false                             | No       | 0.9.0-incubating |
-| `authorization.ranger.jdbc.driverClassName`           | The property is used to specify driver class name when creating Ranger HadoopSQL service                                                             | `org.apache.hive.jdbc.HiveDrive`  | No       | 0.9.0-incubating |
-| `authorization.ranger.jdbc.url`                       | The property is used to specify jdbc url when creating Ranger HadoopSQL service                                                                      | `jdbc:hive2://127.0.0.1:8081`     | No       | 0.9.0-incubating |
-| `authorization.ranger.hadoop.security.authentication` | The property is used to specify Hadoop security authentication when creating Ranger HDFS service                                                     | `simple`                          | No       | 0.9.0-incubating |
-| `authorization.ranger.hadoop.rpc.protection`          | The property is used to specify Hadoop rpc protection when creating Ranger HDFS service                                                              | `authentication`                  | No       | 0.9.0-incubating |
-| `authorization.ranger.fs.default.name`                | The property is used to specify default filesystem when creating Ranger HDFS service                                                                 | `hdfs://127.0.0.1:8090`           | No       | 0.9.0-incubating |
+## Ranger
 
-:::caution
-The Gravitino Ranger authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
-:::
+The Ranger provider covers two Ranger service types. `HadoopSQL` governs schemas, tables, and columns for the Hive, Iceberg, and Paimon catalogs. `HDFS` governs paths, which is what a fileset catalog needs. A catalog selects one of them with `authorization.ranger.service.type`.
 
-Once you have used the correct configuration, you can perform authorization operations by calling Gravitino [authorization RESTful API](https://gravitino.apache.org/docs/latest/api/rest/grant-role-to-user).
+Spark reaches these catalogs through the Kyuubi authorization plugin. That plugin cannot push updates or deletes for a Paimon catalog.
 
-Gravitino will initially create three roles in Apache Ranger:
+### Configuration
 
-- GRAVITINO_METALAKE_OWNER_ROLE: Includes users and user groups designated as metalake owners, corresponding to the owner's privileges in Ranger policies.
-- GRAVITINO_CATALOG_OWNER_ROLE: Includes users and user groups designated as catalog owners, corresponding to the owner's privileges in Ranger policies.
-- GRAVITINO_OWNER_ROLE: Used to label Ranger policy items related to schema and table owner privileges. It does not include any users or user groups.
+| Property Name                                         | Description                                                                                                    | Default Value                     |
+|-------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|-----------------------------------|
+| `authorization-provider`                              | Set to `ranger` to push grants into Apache Ranger                                                              | (none)                            |
+| `authorization.ranger.admin.url`                      | The Ranger admin web URI                                                                                       | (none)                            |
+| `authorization.ranger.service.type`                   | `HadoopSQL` or `HDFS`                                                                                          | (none)                            |
+| `authorization.ranger.service.name`                   | The Ranger service to write policies into                                                                      | (none)                            |
+| `authorization.ranger.auth.type`                      | `simple` or `kerberos`                                                                                         | `simple`                          |
+| `authorization.ranger.username`                       | Ranger admin login username, or the Kerberos principal. Requires Ranger administrator permission               | (none)                            |
+| `authorization.ranger.password`                       | Ranger admin login password, or the path to the keytab file                                                    | (none)                            |
+| `authorization.ranger.service.create-if-absent`       | Creates the Ranger service when it does not already exist                                                      | `false`                           |
 
-#### Configure the Ranger Hadoop SQL Plugin
+The remaining properties apply only when `create-if-absent` is `true`, since they describe the service Gravitino creates.
 
-Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
-The Ranger service is accessible at `172.0.0.100:6080`, with the username `Jack` and the password `PWD123`.
-To add this Hive service to Gravitino using the Hive catalog, you'll need to configure the following parameters.
+| Property Name                                         | Description                                                              | Default Value                     |
+|-------------------------------------------------------|--------------------------------------------------------------------------|-----------------------------------|
+| `authorization.ranger.jdbc.driverClassName`           | Driver class for a new HadoopSQL service                                 | `org.apache.hive.jdbc.HiveDriver` |
+| `authorization.ranger.jdbc.url`                       | JDBC URL for a new HadoopSQL service                                     | `jdbc:hive2://127.0.0.1:8081`     |
+| `authorization.ranger.hadoop.security.authentication` | Hadoop security authentication for a new HDFS service                    | `simple`                          |
+| `authorization.ranger.hadoop.security.authorization`  | Hadoop security authorization for a new HDFS service                     | (none)                            |
+| `authorization.ranger.hadoop.rpc.protection`          | Hadoop RPC protection for a new HDFS service                             | `authentication`                  |
+| `authorization.ranger.fs.default.name`                | Default filesystem for a new HDFS service                                | `hdfs://127.0.0.1:8090`           |
+
+### Example
+
+A Hive service is already managed by a Ranger service named `hiveRepo`, and Ranger is reachable at `172.0.0.100:6080`. Adding that Hive service to Gravitino as a Hive catalog with pushdown enabled takes the following catalog properties.
 
 ```properties
 authorization-provider=ranger
 authorization.ranger.admin.url=172.0.0.100:6080
 authorization.ranger.auth.type=simple
-authorization.ranger.username=Jack
-authorization.ranger.password=PWD123
+authorization.ranger.username={ranger_admin_user}
+authorization.ranger.password={ranger_admin_password}
 authorization.ranger.service.type=HadoopSQL
 authorization.ranger.service.name=hiveRepo
 ```
 
-:::caution
-Gravitino 0.8.0 only supports the authorization Apache Ranger Hive service , Apache Iceberg service and Apache Paimon Service. 
-Spark can use Kyuubi authorization plugin to access Gravitino's catalog. But the plugin can't support to update or delete data for Paimon catalog.
-More data source authorization is under development.
-:::
+### Roles Gravitino Creates
 
-### Chain Authorization Plugin
+Gravitino creates three roles in Ranger and manages their membership itself, so treat them as owned by Gravitino rather than editing them in the Ranger UI.
 
-Gravitino supports chaining multiple authorization plugins to secure one catalog.
-The authorization plugin chain is defined in the `authorization.chain.plugins` property, with the plugin names separated by commas.
-When a user performs an authorization operation on data within a catalog, the chained plugin will apply the authorization rules for every plugin defined in the chain.
+| Role                            | Purpose                                                                                          |
+|---------------------------------|---------------------------------------------------------------------------------------------------|
+| `GRAVITINO_METALAKE_OWNER_ROLE` | Holds the users and groups that own the metalake, carrying owner privileges in Ranger policies    |
+| `GRAVITINO_CATALOG_OWNER_ROLE`  | Holds the users and groups that own the catalog, carrying owner privileges in Ranger policies     |
+| `GRAVITINO_OWNER_ROLE`          | Labels the policy items covering schema and table owner privileges, and holds no members          |
 
-To use the chained authorization plugin, you need to configure the following properties:
+## Chaining Plugins
 
-| Property Name                                             | Description                                                                            | Default Value | Required                    | Since Version    |
-|-----------------------------------------------------------|----------------------------------------------------------------------------------------|---------------|-----------------------------|------------------|
-| `authorization-provider`                                  | Providers to use to implement authorization plugin such as `chain`                     | (none)        | No                          | 0.8.0-incubating |
-| `authorization.chain.plugins`                             | The comma-separated list of plugin names, like `${plugin-name1},${plugin-name2},...`   | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.admin.url`     | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.service.type`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.service.name`  | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.username`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
-| `authorization.chain.${plugin-name}.ranger.password`      | The Ranger authorization plugin properties of the `${plugin-name}`                     | (none)        | Yes if you use chain plugin | 0.8.0-incubating |
+One catalog often needs permissions applied in more than one place. A Hive catalog storing its data on HDFS needs both the table grant in the HadoopSQL service and the corresponding path grant in the HDFS service, or an engine reading the files directly bypasses the table permission.
 
-:::caution
-The Gravitino chain authorization plugin only supports the Apache Ranger HadoopSQL Plugin and Apache Ranger HDFS Plugin.
-The properties of every chained authorization plugin should use `authorization.chain.${plugin-name}` as the prefix.
-:::
+The `chain` provider handles this. Set `authorization.chain.plugins` to a comma-separated list of names you choose, then configure each named plugin with `authorization.chain.{plugin_name}` as its property prefix. Every plugin in the chain is applied on each authorization operation.
 
-#### Configure the Chain Authorization Plugin
+| Property Name                                            | Description                                                    |
+|----------------------------------------------------------|-----------------------------------------------------------------|
+| `authorization-provider`                                 | Set to `chain` to apply several plugins to this catalog         |
+| `authorization.chain.plugins`                            | Comma-separated plugin names, each naming a prefix below        |
+| `authorization.chain.{plugin_name}.ranger.admin.url`     | The admin URI for that plugin                                   |
+| `authorization.chain.{plugin_name}.ranger.service.type`  | `HadoopSQL` or `HDFS` for that plugin                           |
+| `authorization.chain.{plugin_name}.ranger.service.name`  | The Ranger service for that plugin                              |
+| `authorization.chain.{plugin_name}.ranger.username`      | The Ranger admin login username for that plugin                 |
+| `authorization.chain.{plugin_name}.ranger.password`      | The Ranger admin login password for that plugin                 |
 
-Suppose you have an Apache Hive service in your datacenter and have created a `hiveRepo` in Apache Ranger to manage its permissions.
-The Apache Hive service will use HDFS to store its data. You have created a `hdfsRepo` in Apache Ranger to manage HDFS's permissions.
+The names in `authorization.chain.plugins` are labels rather than plugin types, so any name works as long as it matches the prefix used by its properties. Every plugin in a chain is a Ranger plugin, since Ranger is the only provider available to chain.
+
+### Example
+
+The Hive service is managed by the Ranger service `hiveRepo` and its underlying HDFS storage by `hdfsRepo`. Chaining the two keeps the table grant and the path grant in step.
 
 ```properties
 authorization-provider=chain
@@ -102,12 +101,17 @@ authorization.chain.hive.ranger.admin.url=http://ranger-service:6080
 authorization.chain.hive.ranger.service.type=HadoopSQL
 authorization.chain.hive.ranger.service.name=hiveRepo
 authorization.chain.hive.ranger.auth.type=simple
-authorization.chain.hive.ranger.username=Jack
-authorization.chain.hive.ranger.password=PWD123
+authorization.chain.hive.ranger.username={ranger_admin_user}
+authorization.chain.hive.ranger.password={ranger_admin_password}
 authorization.chain.hdfs.ranger.admin.url=http://ranger-service:6080
 authorization.chain.hdfs.ranger.service.type=HDFS
 authorization.chain.hdfs.ranger.service.name=hdfsRepo
 authorization.chain.hdfs.ranger.auth.type=simple
-authorization.chain.hdfs.ranger.username=Jack
-authorization.chain.hdfs.ranger.password=PWD123
+authorization.chain.hdfs.ranger.username={ranger_admin_user}
+authorization.chain.hdfs.ranger.password={ranger_admin_password}
 ```
+
+## Further Reading
+
+- [Access Control](access-control.md) for the Gravitino privilege model that pushdown translates from
+- [Authorization REST API](https://gravitino.apache.org/docs/latest/api/rest/grant-role-to-user) for making the grants
