@@ -50,6 +50,7 @@ import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewEventDispatche
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationExecutor;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.metrics.IcebergMetricsManager;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
@@ -95,10 +96,38 @@ public class IcebergRestTestUtil {
 
   public static ResourceConfig getIcebergResourceConfig(
       Class c, boolean bindIcebergTableOps, List<EventListenerPlugin> eventListenerPlugins) {
+    return getIcebergResourceConfig(
+        c, bindIcebergTableOps, eventListenerPlugins, Collections.emptyMap());
+  }
+
+  /**
+   * Builds a test resource config.
+   *
+   * @param c the resource class under test
+   * @param bindIcebergTableOps whether to bind the catalog and dispatcher stack
+   * @param eventListenerPlugins event listeners to attach to the event bus
+   * @param serverConf extra Iceberg REST server configuration, for example to enable idempotency
+   * @return the configured Jersey resource config
+   */
+  public static ResourceConfig getIcebergResourceConfig(
+      Class c,
+      boolean bindIcebergTableOps,
+      List<EventListenerPlugin> eventListenerPlugins,
+      Map<String, String> serverConf) {
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(c);
     resourceConfig.register(IcebergObjectMapperProvider.class).register(JacksonFeature.class);
     resourceConfig.register(IcebergExceptionMapper.class);
+
+    IcebergIdempotencyManager icebergIdempotencyManager =
+        new IcebergIdempotencyManager(new IcebergConfig(serverConf));
+    resourceConfig.register(
+        new AbstractBinder() {
+          @Override
+          protected void configure() {
+            bind(icebergIdempotencyManager).to(IcebergIdempotencyManager.class).ranked(2);
+          }
+        });
 
     if (DEBUG_SERVER_LOG_ENABLED) {
       resourceConfig.register(
