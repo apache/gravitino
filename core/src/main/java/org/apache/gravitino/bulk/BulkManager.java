@@ -30,21 +30,6 @@ import org.apache.gravitino.exceptions.NotInUseException;
 /** Manages best-effort bulk operations. */
 public class BulkManager {
 
-  /** The request field checked by a bulk operation. */
-  public enum BulkRequestField {
-    /** The users field in a bulk user add request. */
-    USERS("users"),
-
-    /** The names field in a bulk remove request. */
-    NAMES("names");
-
-    private final String fieldName;
-
-    BulkRequestField(String fieldName) {
-      this.fieldName = fieldName;
-    }
-  }
-
   private final int maxBulkItems;
 
   /**
@@ -62,15 +47,15 @@ public class BulkManager {
   /**
    * Checks whether the request item size exceeds the configured bulk limit.
    *
-   * @param field The request field.
+   * @param fieldName The request field name.
    * @param size The request item size.
    */
-  public void checkBulkSize(BulkRequestField field, int size) {
+  public void checkBulkSize(String fieldName, int size) {
     if (size > maxBulkItems) {
       throw new IllegalArgumentException(
           String.format(
               "\"%s\" size %d exceeds the maximum allowed bulk items %d",
-              field.fieldName, size, maxBulkItems));
+              fieldName, size, maxBulkItems));
     }
   }
 

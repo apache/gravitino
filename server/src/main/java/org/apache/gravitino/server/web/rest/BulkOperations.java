@@ -41,7 +41,6 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.BulkManager;
-import org.apache.gravitino.bulk.BulkManager.BulkRequestField;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.BulkRemoveRequest;
@@ -62,6 +61,9 @@ import org.apache.gravitino.server.web.Utils;
 @NameBindings.AccessControlInterfaces
 @Path("/bulk/metalakes/{metalake}")
 public class BulkOperations {
+
+  private static final String USERS_FIELD_NAME = "users";
+  private static final String NAMES_FIELD_NAME = "names";
 
   private final BulkManager bulkManager;
   private final AccessControlDispatcher accessControlDispatcher;
@@ -98,7 +100,7 @@ public class BulkOperations {
           httpRequest,
           () -> {
             request.validate();
-            bulkManager.checkBulkSize(BulkRequestField.USERS, request.getUsers().length);
+            bulkManager.checkBulkSize(USERS_FIELD_NAME, request.getUsers().length);
             MetalakeManager.checkMetalakeInUse(metalake);
             List<BulkItemResult<User>> results =
                 accessControlDispatcher.addUsers(
@@ -150,7 +152,7 @@ public class BulkOperations {
           httpRequest,
           () -> {
             request.validate();
-            bulkManager.checkBulkSize(BulkRequestField.NAMES, request.getNames().length);
+            bulkManager.checkBulkSize(NAMES_FIELD_NAME, request.getNames().length);
             MetalakeManager.checkMetalakeInUse(metalake);
             Optional<Owner> metalakeOwner =
                 ownerDispatcher.getOwner(
