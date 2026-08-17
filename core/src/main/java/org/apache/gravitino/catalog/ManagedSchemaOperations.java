@@ -117,6 +117,8 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
                     .build())
             .build();
     try {
+      // Insert only. Overwriting used to hide a lost race: two servers creating the same schema
+      // name would both "succeed", and the second one silently replaced the first one's schema.
       store().put(schemaEntity, false /* overwrite */);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to create schema " + ident, ioe);

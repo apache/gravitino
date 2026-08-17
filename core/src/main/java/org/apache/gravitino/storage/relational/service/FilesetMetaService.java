@@ -166,6 +166,8 @@ public class FilesetMetaService {
 
       // insert both fileset meta table and version table
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the fileset cannot be
+          // written below a schema that is being dropped.
           () ->
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(

@@ -126,6 +126,8 @@ public class TableMetaService {
       AtomicReference<TablePO> tablePORef = new AtomicReference<>();
       TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the table cannot be
+          // written below a schema that is being dropped.
           () ->
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(
@@ -202,6 +204,8 @@ public class TableMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Only a rename that moves the table to another schema needs a lock here, and it is the
+            // new parent that has to stay alive, not the old one.
             if (isSchemaChanged) {
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(

@@ -123,6 +123,13 @@ public interface SchemaMetaMapper {
       method = "softDeleteSchemaMetasBySchemaIds")
   Integer softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
+  /**
+   * Soft-deletes a schema, but only while it still carries the given version.
+   *
+   * @param schemaId the ID of the schema to delete
+   * @param currentVersion the version the caller read before deciding to delete
+   * @return 1 when the schema was deleted, 0 when it changed or is already gone
+   */
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "softDeleteSchemaMetaBySchemaIdAndVersion")

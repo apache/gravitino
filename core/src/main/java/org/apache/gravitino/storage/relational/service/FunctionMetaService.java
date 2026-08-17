@@ -115,6 +115,8 @@ public class FunctionMetaService {
       FunctionPO po = initializeFunctionPO(functionEntity, builder);
 
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the function cannot be
+          // written below a schema that is being dropped.
           () ->
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(

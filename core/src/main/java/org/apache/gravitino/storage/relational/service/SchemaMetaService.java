@@ -166,6 +166,10 @@ public class SchemaMetaService {
         rowsToInsert.add(schemaEntity);
       }
 
+      // Everything below runs in one transaction, and it starts by locking the parent catalog row.
+      // That lock is what stops a catalog drop from running at the same time as this insert. A
+      // plain name is enough with a shared lock; a nested name needs an exclusive one, see
+      // lockCatalogForSchemaCreate.
       SessionUtils.doMultipleWithCommit(
           () -> lockCatalogForSchemaCreate(catalogPO, rowsToInsert.size() > 1),
           () ->
@@ -175,6 +179,10 @@ public class SchemaMetaService {
                     int n = rowsToInsert.size();
                     List<SchemaPO> missingAncestorPOs = new ArrayList<>();
                     if (n > 1) {
+                      // Only insert the ancestors that are not there yet. Reading them inside the
+                      // transaction is safe because the exclusive catalog lock is already held, so
+                      // no other request can add the same ancestor between this read and the
+                      // insert below.
                       SchemaEntity firstAncestor = rowsToInsert.get(0);
                       Namespace ancestorNs = firstAncestor.namespace();
                       List<String> ancestorNames =
@@ -198,6 +206,9 @@ public class SchemaMetaService {
                     if (!missingAncestorPOs.isEmpty()) {
                       ops.batchInsertPOs(mapper, missingAncestorPOs, false);
                     }
+                    // The schema the caller actually asked for. Ancestors above are filled in
+                    // silently, but this row must obey the caller's choice: with overwrite off, a
+                    // name that is already taken fails instead of replacing the existing schema.
                     SchemaEntity leafRow = rowsToInsert.get(n - 1);
                     SchemaPO leafPO =
                         POConverters.initializeSchemaPOWithVersion(
@@ -228,6 +239,9 @@ public class SchemaMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // The UPDATE only matches the row while it still carries the version read above, and it
+            // writes the next version. Two servers that started from the same schema therefore
+            // cannot both apply their change: the slower one updates no row.
             int updated =
                 SessionUtils.getWithoutCommit(
                     SchemaMetaMapper.class,
@@ -237,6 +251,8 @@ public class SchemaMetaService {
                             POConverters.updateSchemaPOWithVersion(oldSchemaPO, newEntity),
                             oldSchemaPO));
             if (updated == 0) {
+              // Zero rows has two possible causes: someone else changed the schema, or the schema
+              // is gone. schemaWriteFailure tells them apart and picks the right error.
               throw schemaWriteFailure(identifier, oldSchemaPO);
             }
           });
@@ -262,6 +278,10 @@ public class SchemaMetaService {
       AtomicReference<List<Long>> schemaIds = new AtomicReference<>();
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Take the parent catalog lock first, then delete this schema, and only then look at
+            // its descendants. Schema creation takes the same catalog lock, so once we hold it no
+            // schema can appear or disappear under us. Every overlapping drop grabs the locks in
+            // this same order, which is what keeps two cascades from deadlocking each other.
             lockCatalogForSchemaDelete(identifier, schemaPO);
             deleteSchemaWithVersion(identifier, schemaPO);
             List<SchemaPO> descendants = listDescendantSchemaPOs(schemaPO);
@@ -338,6 +358,11 @@ public class SchemaMetaService {
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Delete the schema first and check that it was empty afterwards. The order matters:
+            // the delete locks the schema row, and every child write locks that same row first, so
+            // a table or view being created either lands before this delete and shows up in the
+            // check, or it waits for this transaction. Checking first would leave a gap for a child
+            // to appear in between. A non-empty result throws, which rolls the delete back.
             lockCatalogForSchemaDelete(identifier, schemaPO);
             deleteSchemaWithVersion(identifier, schemaPO);
             checkSchemaIsEmpty(identifier, schemaPO);
@@ -374,6 +399,10 @@ public class SchemaMetaService {
     return true;
   }
 
+  /**
+   * Soft-deletes the schema only while it still carries the version the caller read. A drop that
+   * lost the race must not delete a schema it never looked at.
+   */
   private void deleteSchemaWithVersion(NameIdentifier identifier, SchemaPO observedSchemaPO) {
     int deleted =
         SessionUtils.getWithoutCommit(
@@ -419,6 +448,21 @@ public class SchemaMetaService {
         mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.SCHEMA));
   }
 
+  /**
+   * Holds the parent catalog row for the rest of the transaction, so a schema cannot be created
+   * below a catalog that is being dropped. Dropping a catalog locks this same row, so the two can
+   * never run at the same time: the loser either finds the catalog gone or inserts below a catalog
+   * that is still there.
+   *
+   * <p>A plain schema name only needs a shared lock, so many schemas can be created under one
+   * catalog at once. A nested name is different: this request may have to create the missing
+   * ancestors, and two requests can both find the same ancestor missing and both insert it. A
+   * shared lock does not stop that, so the ancestor case takes an exclusive lock and serializes
+   * every other schema create under the catalog until it finishes.
+   *
+   * <p>The name and the metalake are compared again because the caller looked the catalog up by
+   * name: if the row now has another name, the catalog named in the request no longer exists.
+   */
   private void lockCatalogForSchemaCreate(
       CatalogPO observedCatalogPO, boolean createsImplicitAncestors) {
     CatalogPO currentCatalogPO =
@@ -438,6 +482,12 @@ public class SchemaMetaService {
     }
   }
 
+  /**
+   * Holds the parent catalog row while a schema is dropped. The lock is exclusive here, because a
+   * drop removes descendants and must not run next to another drop or create under the same
+   * catalog. Taking the catalog before any schema row also gives every drop the same lock order, so
+   * two overlapping cascades cannot deadlock.
+   */
   private void lockCatalogForSchemaDelete(NameIdentifier identifier, SchemaPO observedSchemaPO) {
     CatalogPO currentCatalogPO =
         SessionUtils.getWithoutCommit(
@@ -453,6 +503,12 @@ public class SchemaMetaService {
     }
   }
 
+  /**
+   * Holds the parent schema row while a table, view, fileset, function, model, or topic is written,
+   * so a child cannot be added below a schema that is going away. The lock is shared, so children
+   * of the same schema can still be written in parallel; dropping the schema takes the row
+   * exclusively and therefore waits for them.
+   */
   void lockSchemaForEntityWrite(
       NameIdentifier entityIdentifier,
       Long observedSchemaId,
@@ -474,11 +530,18 @@ public class SchemaMetaService {
     }
   }
 
+  /**
+   * Decides which error a failed compare-and-set should report. The write matched no row either
+   * because somebody else changed the schema, which is a conflict, or because the schema was
+   * deleted or renamed away, which is a missing entity.
+   */
   private RuntimeException schemaWriteFailure(
       NameIdentifier identifier, SchemaPO observedSchemaPO) {
-    // This re-read is deliberately a locking read, for the same reason as in MetalakeMetaService:
-    // a plain SELECT under MySQL REPEATABLE READ returns this transaction's snapshot, which cannot
-    // tell a stale-version conflict apart from an entity another writer already removed.
+    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
+    // The locking read additionally waits for a writer that is still in flight, so a delete or
+    // rename that has not committed yet is reported as a missing schema instead of as a stale
+    // version conflict. The lock is taken on the error path of a transaction that is about to roll
+    // back.
     SchemaPO currentSchemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class,
@@ -502,6 +565,10 @@ public class SchemaMetaService {
         identifier.name());
   }
 
+  /**
+   * Soft-deletes the nested schemas below the dropped one, each guarded by the version read in the
+   * same transaction.
+   */
   private void deleteDescendantSchemasWithVersions(
       NameIdentifier schemaIdentifier, List<SchemaPO> descendants) {
     if (descendants.isEmpty()) {
@@ -510,12 +577,18 @@ public class SchemaMetaService {
     int deleted =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(descendants));
+    // A smaller count means one of these schemas was altered by a request that did not take the
+    // catalog lock. Never commit half a cascade: roll the whole transaction back instead.
     if (deleted != descendants.size()) {
       throw ExceptionUtils.concurrentChildModification(
           Entity.EntityType.SCHEMA, Entity.EntityType.SCHEMA, schemaIdentifier);
     }
   }
 
+  /**
+   * Checks that nothing is left under the schema. Views and functions are included: they used to be
+   * missing here, which let a non-cascade drop leave their rows behind with no parent.
+   */
   private void checkSchemaIsEmpty(NameIdentifier identifier, SchemaPO schemaPO) {
     boolean hasDescendantSchemas = !listDescendantSchemaPOs(schemaPO).isEmpty();
     boolean hasTables =

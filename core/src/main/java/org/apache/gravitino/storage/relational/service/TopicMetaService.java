@@ -73,6 +73,8 @@ public class TopicMetaService {
       TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
 
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the topic cannot be
+          // written below a schema that is being dropped.
           () ->
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(

@@ -281,6 +281,14 @@ public class SchemaMetaBaseSQLProvider {
         + "</script>";
   }
 
+  /**
+   * Builds SQL that updates a schema only if nobody changed it in the meantime.
+   *
+   * <p>The WHERE clause used to repeat every column. Comparing the version alone is enough now,
+   * because every update moves the version forward, and it also avoids a MySQL trap: MySQL reports
+   * zero affected rows when an UPDATE writes the values a row already has, which the old SQL could
+   * not tell apart from a real conflict.
+   */
   public String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return "UPDATE "

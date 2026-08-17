@@ -99,6 +99,8 @@ public class ModelMetaService {
       ModelPO po = POConverters.initializeModelPO(modelEntity, builder);
 
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the model cannot be
+          // written below a schema that is being dropped.
           () ->
               SchemaMetaService.getInstance()
                   .lockSchemaForEntityWrite(
