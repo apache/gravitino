@@ -39,10 +39,10 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client       | Python client              | Description                                                                                                                                                                                                                                                                              | Required        |
-|-------------------------------|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
-| `gcs-service-account-file`    | `gcs_service_account_file` | Path of the GCS service account JSON file.                                                                                                                                                                                                                                               | Yes             |
-| `credential-providers`        | (n/a)                      | The credential provider types, separated by comma. Possible values are `gcs-token`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#gcs) for the extra properties each provider takes. | No              |
+| Catalog and Java client    | Python client              | Description                                                                                                                                                                                                                                                                              | Required |
+|----------------------------|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `gcs-service-account-file` | `gcs_service_account_file` | Path of the GCS service account JSON file.                                                                                                                                                                                                                                               | Yes      |
+| `credential-providers`     | (n/a)                      | The credential provider types, separated by comma. Possible values are `gcs-token`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#gcs) for the extra properties each provider takes. | No       |
 
 :::note
 The service account file must be readable by the Gravitino server process for the catalog, and by
@@ -229,7 +229,7 @@ by environment:
 
 | Environment            | Jar providing the Google Cloud Storage filesystem                                                                                                                                                                                           |
 |------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-gcp-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle), a fat jar bundling the Google Cloud Storage filesystem implementation and its dependencies |
+| No Hadoop installed    | [`gravitino-gcp-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-gcp-bundle), a fat jar bundling the Google Cloud Storage filesystem implementation and its dependencies                                          |
 | Hadoop already present | [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar), published by Google and not part of the Apache Hadoop distribution |
 
 The artifacts in full:

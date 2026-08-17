@@ -39,11 +39,11 @@ These properties are needed in addition to the shared
 the GVFS clients, so they are listed together here — note that the Python client spells them with
 underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client       | Python client                | Description                                                                                                                                                                                                                                                                                                     | Required        |
-|-------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
-| `azure-storage-account-name`  | `azure_storage_account_name` | Account name of the Azure Blob Storage.                                                                                                                                                                                                                                                                         | Yes             |
-| `azure-storage-account-key`   | `azure_storage_account_key`  | Account key of the Azure Blob Storage.                                                                                                                                                                                                                                                                          | Yes             |
-| `credential-providers`        | (n/a)                        | The credential provider types, separated by comma. Possible values are `adls-token`, `azure-account-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#adls) for the extra properties each provider takes. | No              |
+| Catalog and Java client      | Python client                | Description                                                                                                                                                                                                                                                                                                     | Required |
+|------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `azure-storage-account-name` | `azure_storage_account_name` | Account name of the Azure Blob Storage.                                                                                                                                                                                                                                                                         | Yes      |
+| `azure-storage-account-key`  | `azure_storage_account_key`  | Account key of the Azure Blob Storage.                                                                                                                                                                                                                                                                          | Yes      |
+| `credential-providers`       | (n/a)                        | The credential provider types, separated by comma. Possible values are `adls-token`, `azure-account-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#adls) for the extra properties each provider takes. | No       |
 
 :::note
 Azure Data Lake Storage is also known as Azure Blob Storage (ABS). The location uses the `abfss://`
@@ -231,10 +231,10 @@ Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, 
 on Maven Central, plus the Azure Data Lake Storage filesystem implementation. Only the latter
 differs by environment:
 
-| Environment            | Jar providing the Azure Data Lake Storage filesystem                                                                                                                                          |
-|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Environment            | Jar providing the Azure Data Lake Storage filesystem                                                                                                                                                      |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | No Hadoop installed    | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle), a fat jar bundling the Azure Data Lake Storage filesystem implementation and its dependencies |
-| Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                      |
+| Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                                  |
 
 The artifacts in full:
 
