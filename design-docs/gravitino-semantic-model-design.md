@@ -165,9 +165,12 @@ Field
 ```
 
 - Dataset names are unique within a Semantic Model. Field names are unique within each Dataset.
-- `source` is a three-part `NameIdentifier` in the form `catalog.schema.name`. The request already
-  identifies the metalake, so cross-catalog references within that metalake are allowed while
-  cross-metalake references are not.
+- `source` is a three-part `NameIdentifier`. For Ossie interchange, Gravitino separates its catalog,
+  schema, and entity segments with `.`. A segment containing `.` or a backtick is enclosed in
+  backticks, and embedded backticks are escaped by doubling them. For example, the segments
+  `sales.eu`, `mart`, and `orders` are encoded as `` `sales.eu`.mart.orders ``. Import uses the same
+  quote-aware grammar. The request already identifies the metalake, so cross-catalog references
+  within that metalake are allowed while cross-metalake references are not.
 - A source must resolve to either a Table or a logical View. The semantic definition does not need
   to declare which of those two types it references; validation succeeds when either entity exists.
 - Apache Ossie does not currently define cross-model dataset references. Therefore, a Semantic Model
@@ -215,7 +218,7 @@ Expression
   dialects: DialectExpression[1..*]
 
 DialectExpression
-  dialect: Dialect
+  dialect: string
   expression: string
 
 Dimension
@@ -233,19 +236,29 @@ CustomExtension
   vendor_name: string
   data: string
 
-Dialect = "ANSI_SQL" | "SNOWFLAKE" | "MDX" | "TABLEAU"
-          | "DATABRICKS" | "MAQL" | "BIGQUERY"
-
 DataType = "String" | "Integer" | "Decimal" | "Float" | "Boolean"
            | "Date" | "Time" | "DateTime" | "DateTimeTz" | "Opaque"
 ```
 
+- `DataType` is an Ossie-derived logical type vocabulary and is deliberately independent of
+  `org.apache.gravitino.rel.types.Type`. Java enum constants use upper snake case, such as
+  `DataType.DECIMAL`, and serialize to the exact Ossie wire values, such as `"Decimal"`. Gravitino
+  does not infer or convert these values from source column types.
 - Every Expression has at least one DialectExpression.
-- Each dialect appears at most once in an Expression and each expression string is non-empty.
+- Dialect identifiers are non-empty strings. `ANSI_SQL`, `SNOWFLAKE`, `MDX`, `TABLEAU`,
+  `DATABRICKS`, `MAQL`, and `BIGQUERY` are well-known values exposed by the Java API through
+  `Dialects`; other identifiers are accepted and preserved without normalization, translation, or
+  fallback.
+- Each dialect identifier appears at most once in an Expression and each expression string is
+  non-empty.
 - Unknown model fields are rejected where the pinned Ossie schema sets `additionalProperties` to
   `false`.
 - Every supported `custom_extensions` array and every additional AI-context property is retained
   losslessly.
+- The Java API represents `AIContext` as an immutable wrapper containing exactly one `String` or
+  `AIContextObject`, created through overloaded `AIContext.of` factories. `AIContextObject` exposes
+  unknown JSON-compatible fields through `Map<String, Object> additionalProperties`; the selected
+  variant and all standard and additional fields participate in equality and JSON round-tripping.
 
 #### Validation
 
@@ -261,8 +274,8 @@ if any check fails, no change is persisted.
    caller cannot access.
 
 Invalid definitions return `400`. Missing sources or source columns are invalid definitions. A
-temporarily unavailable source catalog returns `503` so the caller can retry. Authorization failures
-return `403`.
+connection failure while accessing a source catalog returns `502` with `CONNECTION_FAILED_CODE`.
+Authorization failures return `403`.
 
 Catalog changes do not automatically revalidate stored Semantic Models. A later source rename,
 drop, or schema change can therefore leave a previously valid definition with an unavailable
@@ -277,7 +290,7 @@ engine and remain outside the metadata write path.
 #### Ossie Compatibility
 
 The public API is a Gravitino contract derived from Ossie, not a stored YAML or JSON document. For
-schema conformance, the server projects a candidate object into an in-memory Ossie document:
+compatibility validation, the server projects a candidate object into an in-memory Ossie document:
 
 ```yaml
 version: 0.2.0.dev0
@@ -289,14 +302,16 @@ semantic_model:
         source: sales.mart.orders
 ```
 
-The projection maps the entity name to `SemanticModel.name`, `comment` to `description`, and each
-source `NameIdentifier` to its three-part string. The request path supplies the metalake and is not
-serialized into Ossie.
+The projection maps the entity name to `SemanticModel.name`, `comment` to `description`, and encodes
+each source `NameIdentifier` using the reversible source grammar above. The request path supplies the
+metalake and is not serialized into Ossie.
 
 The request path does not invoke the upstream Python validator or create an intermediate YAML
-string. The implementation validates the in-memory projection against a bundled copy of the pinned
-JSON Schema, then runs Gravitino-specific model-local and catalog checks. Upstream validation tools
-are used in conformance tests for generated YAML and JSON.
+string. The implementation validates the in-memory projection against a Gravitino profile derived
+from the bundled copy of the pinned JSON Schema, then runs Gravitino-specific model-local and
+catalog checks. The profile preserves the pinned structural constraints while treating dialect
+identifiers as open non-empty strings. Upstream validation tools are used in conformance tests for
+generated YAML and JSON.
 
 The entity carries no per-model Ossie specification version. Each Gravitino release pins one exact
 upstream schema commit and defines the supported read and write contract. Updating that schema
@@ -306,8 +321,10 @@ requires a separate design; it should not be inferred from `custom_extensions`.
 
 ### API and Lifecycle
 
-`Catalog` exposes `asSemanticModelCatalog()`. Because definitions are stored by Gravitino, support
-does not depend on whether the underlying connector implements a semantic-model capability.
+`Catalog.asSemanticModelCatalog()` is supported only for `Catalog.Type.RELATIONAL`; other catalog
+types throw `UnsupportedOperationException`. Because definitions are stored by Gravitino, this
+support does not depend on whether the underlying relational connector implements a semantic-model
+capability.
 
 ```text
 SemanticModelCatalog
@@ -360,7 +377,7 @@ Expression orderAmountExpression =
         .withDialects(
             new DialectExpression[] {
               DialectExpression.builder()
-                  .withDialect(Dialect.ANSI_SQL)
+                  .withDialect(Dialects.ANSI_SQL)
                   .withExpression("order_amount")
                   .build()
             })
@@ -385,7 +402,7 @@ Expression totalRevenueExpression =
         .withDialects(
             new DialectExpression[] {
               DialectExpression.builder()
-                  .withDialect(Dialect.ANSI_SQL)
+                  .withDialect(Dialects.ANSI_SQL)
                   .withExpression("SUM(orders.order_amount)")
                   .build()
             })
@@ -399,8 +416,17 @@ Metric totalRevenue =
         .withDatatype(DataType.DECIMAL)
         .build();
 
+AIContext aiContext =
+    AIContext.of(
+        AIContextObject.builder()
+            .withInstructions("Use certified metrics only")
+            .withSynonyms(new String[] {"sales"})
+            .withAdditionalProperties(Map.of("audience", "finance"))
+            .build());
+
 SemanticModelDefinition definition =
     SemanticModelDefinition.builder()
+        .withAIContext(aiContext)
         .withDatasets(new Dataset[] {orders})
         .withMetrics(new Metric[] {totalRevenue})
         .build();
@@ -439,17 +465,19 @@ POST /api/metalakes/{metalake}/catalogs/{catalog}/schemas/{schema}/semantic-mode
 {
   "name": "sales_model",
   "comment": "Governed sales definitions",
-  "datasets": [
-    {
-      "name": "orders",
-      "source": {
-        "namespace": ["sales", "mart"],
-        "name": "orders"
+  "definition": {
+    "datasets": [
+      {
+        "name": "orders",
+        "source": {
+          "namespace": ["sales", "mart"],
+          "name": "orders"
+        }
       }
-    }
-  ],
-  "relationships": [],
-  "metrics": [],
+    ],
+    "relationships": [],
+    "metrics": []
+  },
   "properties": {}
 }
 ```
@@ -580,9 +608,10 @@ identity, lifecycle, or authorization.
 #### Version and Lifecycle Behavior
 
 - Create writes the identity row and version 1 snapshot in one transaction.
-- Alter writes a complete new snapshot, increments `last_version`, and advances `current_version` in
-  the same transaction. Rename also updates `semantic_model_meta.semantic_model_name`; the version
-  snapshot retains the name at the time of the change.
+- Alter follows Gravitino's existing version-based OCC mechanism: it atomically writes a new
+  snapshot, increments `last_version`, and advances `current_version` with CAS. A conflict rolls back
+  and returns `409` with `OPTIMISTIC_LOCK_CONFLICT_CODE`. Rename also updates
+  `semantic_model_meta.semantic_model_name`.
 - Load joins `semantic_model_meta.current_version` to the matching snapshot and returns only the
   current Semantic Model.
 - Owner, tag, and policy changes use their existing governance stores and do not create Semantic
@@ -590,7 +619,10 @@ identity, lifecycle, or authorization.
 - Older snapshots follow the configured EntityStore version-retention and garbage-collection rules.
   The current API does not expose version identifiers, historical loads, or rollback, and storage of
   version rows does not guarantee permanent history retention.
-- Drop soft-deletes the identity and version rows under the existing retention rules.
+- Drop follows Gravitino's existing version-based OCC mechanism and soft-deletes the identity and
+  version rows under the existing retention rules. A stale conflict returns `409` with
+  `OPTIMISTIC_LOCK_CONFLICT_CODE`, while an already-missing Semantic Model preserves the idempotent
+  `false` result.
 - Schema and catalog non-empty checks include Semantic Models. Cascade or force deletion of a parent
   removes the contained Semantic Models through the normal parent lifecycle.
 - Deleting a referenced source in another schema or catalog does not delete the Semantic Model.
@@ -604,16 +636,16 @@ not depend on the JSON encoding or version bookkeeping used by the relational me
 
 Semantic Models are new securable metadata objects. The design introduces:
 
-| Privilege                 | Purpose                                           |
-| ------------------------- | ------------------------------------------------- |
+| Privilege               | Purpose                                           |
+|-------------------------|---------------------------------------------------|
 | `CREATE_SEMANTIC_MODEL` | Create a Semantic Model under a schema            |
-| `USE_SEMANTIC_MODEL`    | Discover and load the model definition            |
+| `SELECT_SEMANTIC_MODEL` | Discover and load the model definition            |
 | `MODIFY_SEMANTIC_MODEL` | Rename or alter the model definition and metadata |
 
 - **Create.** A metalake or catalog owner may create directly; a schema owner also requires
   `USE_CATALOG`; otherwise, the caller requires `USE_CATALOG`, `USE_SCHEMA`, and
   `CREATE_SEMANTIC_MODEL`.
-- **List and load.** Return only models on which the caller has `USE_SEMANTIC_MODEL`,
+- **List and load.** Return only models on which the caller has `SELECT_SEMANTIC_MODEL`,
   `MODIFY_SEMANTIC_MODEL`, or ownership.
 - **Alter.** Requires `MODIFY_SEMANTIC_MODEL` or ownership.
 - **Drop.** A metalake or catalog owner may drop directly; a schema owner also requires
@@ -632,7 +664,7 @@ compiler or execution engine must authorize referenced data using the effective 
 - Existing `TableCatalog` and `ViewCatalog` APIs are unchanged. Semantic Models are not merged into
   Table or View listings.
 - Underlying connectors do not persist, list, load, or filter Semantic Models. The Gravitino server
-  handles the dedicated lifecycle uniformly for every catalog that supports schemas.
+  handles the dedicated lifecycle uniformly for every relational catalog.
 - Engine connectors that do not understand semantic models observe no new relational objects.
 - Semantic-aware tools, UIs, AI agents, and future compilers use `SemanticModelCatalog` or its REST
   resource explicitly.
@@ -652,19 +684,19 @@ will be addressed in a separate design as the upstream capability evolves.
 
 Each task includes focused tests for the behavior it introduces.
 
-| Phase | Task | Priority |
-|-------|------|----------|
-| **I. Core Infrastructure** | | |
-| | Define Semantic Model identity, structured Java APIs, exceptions, and change types | P0 |
-| | Add EntityStore persistence, relational schemas and upgrade scripts, version lifecycle, and parent lifecycle | P0 |
-| | Implement Ossie-compatible and catalog-aware validation | P0 |
-| | Add server-side services, REST resources, and OpenAPI definitions | P0 |
-| **II. Governance and Security** | | |
-| | Add privileges, ownership, and authorization filtering | P1 |
-| | Add audit, tag, and policy integration | P1 |
-| | Add lifecycle event integration | P1 |
-| **III. Clients, Documentation, and UX** | | |
-| | Add Java client support | P0 |
-| | Add Python client support | P0 |
-| | Add Ossie conformance fixtures and interoperability documentation | P1 |
-| | Add UI support for discovering, viewing, and managing Semantic Models as a separate schema object category | P2 |
+| Phase                                   | Task                                                                                                         | Priority |
+|-----------------------------------------|--------------------------------------------------------------------------------------------------------------|----------|
+| **I. Core Infrastructure**              |                                                                                                              |          |
+|                                         | Define Semantic Model identity, structured Java APIs, exceptions, and change types                           | P0       |
+|                                         | Add EntityStore persistence, relational schemas and upgrade scripts, version lifecycle, and parent lifecycle | P0       |
+|                                         | Implement Ossie-compatible and catalog-aware validation                                                      | P0       |
+|                                         | Add server-side services, REST resources, and OpenAPI definitions                                            | P0       |
+| **II. Governance and Security**         |                                                                                                              |          |
+|                                         | Add privileges, ownership, and authorization filtering                                                       | P1       |
+|                                         | Add audit, tag, and policy integration                                                                       | P1       |
+|                                         | Add lifecycle event integration                                                                              | P1       |
+| **III. Clients, Documentation, and UX** |                                                                                                              |          |
+|                                         | Add Java client support                                                                                      | P0       |
+|                                         | Add Python client support                                                                                    | P0       |
+|                                         | Add Ossie conformance fixtures and interoperability documentation                                            | P1       |
+|                                         | Add UI support for discovering, viewing, and managing Semantic Models as a separate schema object category   | P2       |
