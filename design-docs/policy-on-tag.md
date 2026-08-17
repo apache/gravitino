@@ -648,6 +648,30 @@ objectTagMappings:
       - maintenance_standard
 ```
 
+
+### ABAC Evolution Boundary
+
+Policy-on-tag is still the first milestone toward tag-driven ABAC. Phase 1 intentionally keeps
+policy selection deterministic and simple: `Policy -> Tag -> Metadata Object`. The resolver, REST
+response shape, and provenance model should still leave room for later ABAC selectors without
+changing every policy consumer.
+
+The expected evolution path is:
+
+1. Fixed policy-to-tag relations select policies by effective tag definition.
+2. Effective tag assignments carry values such as `data_domain = ["finance"]` and preserve those
+   values in source provenance.
+3. Future tag-expression policies may match predicates such as `hasTag("pii")` or
+   `tagValue("data_domain") contains "finance"`.
+4. Future principal-aware selectors may include user, group, or role context, but that matching
+   logic belongs to the selector layer, not to TMS or other policy consumers.
+5. The object policy response continues to expose which selector or tag source caused a policy to
+   match so enforcement, audit, and debugging remain explainable.
+
+This design does not define the expression language, principal matching rules, or engine-specific
+row filter and column mask content. It only keeps the resolver boundary compatible with those later
+steps.
+
 ---
 
 ## Task Breakdown
@@ -665,6 +689,8 @@ objectTagMappings:
       policy lookup.
 - [ ] Define object policy response redaction using the existing tag and policy authorization model.
 - [ ] Add a shared fail-closed conflict helper for row filter or column mask enforcement consumers.
+- [ ] Keep the resolver and response provenance model compatible with future tag-expression ABAC
+      selectors.
 - [ ] Integrate TMS with `ObjectPolicyResolver` instead of direct object policy relations.
 - [ ] Add migration tooling or documentation for moving direct object policy relations to
       policy-to-tag relations and tag assignments.
