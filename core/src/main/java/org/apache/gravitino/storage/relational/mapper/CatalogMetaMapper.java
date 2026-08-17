@@ -98,6 +98,13 @@ public interface CatalogMetaMapper {
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO);
 
+  /**
+   * Soft-deletes a catalog, but only while it still carries the given version.
+   *
+   * @param catalogId the ID of the catalog to delete
+   * @param currentVersion the version the caller read before deciding to delete
+   * @return 1 when the catalog was deleted, 0 when it changed or is already gone
+   */
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
       method = "softDeleteCatalogMetasByCatalogId")

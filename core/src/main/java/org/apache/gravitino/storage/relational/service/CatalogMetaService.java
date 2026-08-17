@@ -181,6 +181,9 @@ public class CatalogMetaService {
       NameIdentifierUtil.checkCatalog(catalogEntity.nameIdentifier());
 
       String metalakeName = NameIdentifierUtil.getMetalake(catalogEntity.nameIdentifier());
+      // This read runs before the transaction below, so it only tells us the metalake ID and name
+      // we start from. The metalake may still be dropped or renamed right after it. That is why
+      // lockMetalakeForCatalogCreate checks the row again inside the transaction.
       MetalakePO metalakePO =
           SessionUtils.getWithoutCommit(
               MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
@@ -236,6 +239,9 @@ public class CatalogMetaService {
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // The UPDATE only matches the row if its version is still the one we read above, and
+            // it writes the next version. So two servers that read the same catalog cannot both
+            // apply their change: the second one updates no row.
             int updated =
                 SessionUtils.getWithoutCommit(
                     CatalogMetaMapper.class,
@@ -245,6 +251,8 @@ public class CatalogMetaService {
                                 oldCatalogPO, newEntity, oldCatalogPO.getMetalakeId()),
                             oldCatalogPO));
             if (updated == 0) {
+              // Zero rows can mean two different things: someone else changed the catalog, or the
+              // catalog is gone. Let catalogWriteFailure tell them apart and pick the error.
               throw catalogWriteFailure(identifier, oldCatalogPO);
             }
           });
@@ -264,12 +272,17 @@ public class CatalogMetaService {
     NameIdentifierUtil.checkCatalog(identifier);
 
     String catalogName = identifier.name();
+    // Read the whole row, not just the ID, because the delete below needs the version we saw.
     CatalogPO catalogPO = getCatalogPOByName(identifier.namespace().level(0), catalogName);
     long catalogId = catalogPO.getCatalogId();
 
     if (cascade) {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Delete the parent first, then its children. The parent delete locks the catalog row,
+            // and schema writes lock that same row before they touch a schema, so no schema can be
+            // added or removed after this point. Anything that goes wrong later in this
+            // transaction rolls this soft delete back with it.
             deleteCatalogWithVersion(identifier, catalogPO);
             deleteSchemasWithVersions(identifier, catalogId);
           },
@@ -339,6 +352,13 @@ public class CatalogMetaService {
     } else {
       SessionUtils.doMultipleWithCommit(
           () -> {
+            // Delete the catalog first and check for schemas afterwards. This order looks odd, but
+            // it is what makes the check safe: the delete locks the catalog row, and schema
+            // creation locks the same row before inserting. So a create either finishes before this
+            // delete, in which case the check below sees its schema, or it waits until this
+            // transaction ends. Checking first would leave a gap where a schema can be inserted
+            // between the check and the delete. If the check does find a schema, the exception
+            // rolls the soft delete back.
             deleteCatalogWithVersion(identifier, catalogPO);
             List<SchemaPO> schemaPOs =
                 SessionUtils.getWithoutCommit(
@@ -381,6 +401,10 @@ public class CatalogMetaService {
     return true;
   }
 
+  /**
+   * Soft-deletes the catalog only if its version is still the one the caller read. A drop that
+   * loses the race to another writer must not delete a catalog it never saw.
+   */
   private void deleteCatalogWithVersion(NameIdentifier identifier, CatalogPO observedCatalogPO) {
     int deleted =
         SessionUtils.getWithoutCommit(
@@ -393,6 +417,19 @@ public class CatalogMetaService {
     }
   }
 
+  /**
+   * Holds the parent metalake row for the rest of the transaction, so the catalog cannot be created
+   * below a metalake that is going away.
+   *
+   * <p>The lock is shared, not exclusive: many catalogs can be created under the same metalake at
+   * the same time. Dropping a metalake takes an exclusive lock on this row, so a drop and a create
+   * cannot overlap. Whoever gets the row first wins, and the loser either sees the metalake gone or
+   * inserts under a metalake that is still there.
+   *
+   * <p>The name is compared again because the ID alone cannot tell a rename apart: the caller
+   * looked the metalake up by name, so a renamed row means the name in the request no longer
+   * exists.
+   */
   private void lockMetalakeForCatalogCreate(MetalakePO observedMetalakePO) {
     MetalakePO currentMetalakePO =
         SessionUtils.getWithoutCommit(
@@ -408,6 +445,11 @@ public class CatalogMetaService {
     }
   }
 
+  /**
+   * Decides which error a failed compare-and-set should report. The write matched no row either
+   * because someone else changed the catalog, which is a conflict, or because the catalog was
+   * deleted or renamed away, which is a missing entity.
+   */
   private RuntimeException catalogWriteFailure(
       NameIdentifier identifier, CatalogPO observedCatalogPO) {
     // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
@@ -429,6 +471,10 @@ public class CatalogMetaService {
     return ExceptionUtils.concurrentModification(Entity.EntityType.CATALOG, identifier);
   }
 
+  /**
+   * Soft-deletes every schema of the catalog, each one guarded by the version read here. The caller
+   * must already hold the catalog row, so no schema can appear or disappear in between.
+   */
   private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {
     List<SchemaPO> schemaPOs =
         SessionUtils.getWithoutCommit(
@@ -439,6 +485,8 @@ public class CatalogMetaService {
     int deleted =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
+    // A smaller count means one of these schemas was altered by someone who did not take the
+    // catalog row lock. Never commit half a cascade: roll the whole transaction back instead.
     if (deleted != schemaPOs.size()) {
       throw ExceptionUtils.concurrentChildModification(
           Entity.EntityType.SCHEMA, Entity.EntityType.CATALOG, catalogIdentifier);

@@ -195,15 +195,23 @@ public class CatalogMetaBaseSQLProvider {
         + " catalog_comment = #{catalogMeta.catalogComment},"
         + " properties = #{catalogMeta.properties},"
         + " audit_info = #{catalogMeta.auditInfo},"
-        // An overwrite must advance the OCC token rather than reset it to the initial version,
-        // otherwise a concurrent alter or drop holding an older version could still pass its
-        // compare-and-set. last_version is assigned first so that both columns derive from the
-        // pre-update current_version.
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. last_version is assigned first, so both columns are computed from the
+        // version the row had before this statement.
         + " last_version = current_version + 1,"
         + " current_version = current_version + 1,"
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 
+  /**
+   * Builds SQL that updates a catalog only if nobody changed it in the meantime.
+   *
+   * <p>The WHERE clause used to repeat every column. Comparing the version alone is enough now,
+   * because every update moves the version forward, and it also avoids a MySQL trap: MySQL reports
+   * zero affected rows when an UPDATE writes the values a row already has, which the old SQL could
+   * not tell apart from a real conflict.
+   */
   public String updateCatalogMeta(
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO) {
