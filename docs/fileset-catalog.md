@@ -8,16 +8,6 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-<<<<<<< HEAD
-Fileset catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
-the storage location of the fileset. It supports the local filesystem and HDFS.
-Gravitino supports [S3](fileset-catalog-with-s3.md), [GCS](fileset-catalog-with-gcs.md),
-[OSS](fileset-catalog-with-oss.md) and [Azure Blob Storage](fileset-catalog-with-adls.md) through Fileset catalog.
-
-The rest of this document will use HDFS or local file as an example to illustrate how to use the Fileset catalog.
-For S3, GCS, OSS and Azure Blob Storage, the configuration is similar to HDFS,
-refer to the corresponding document for more details.
-=======
 The fileset catalog manages the storage location of a fileset through a Hadoop Compatible File
 System (HCFS). It supports the local filesystem and HDFS out of the box, and Amazon S3, Google Cloud
 Storage, Azure Data Lake Storage, Alibaba Cloud OSS and Tencent Cloud COS once the matching bundle
@@ -27,7 +17,6 @@ This page is the shared reference: the properties every backend accepts, how the
 catalog to schema to fileset, and how to plug in a custom filesystem. It uses HDFS and the local
 filesystem in its examples. For a runnable end-to-end example on a cloud backend, follow the page for
 that backend listed under [Fileset Catalog with Cloud Storage](#fileset-catalog-with-cloud-storage).
->>>>>>> eff51a38c ([MINOR] docs(fileset): Restructure the fileset catalog pages around a runnable path (#12434))
 
 Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
@@ -86,16 +75,6 @@ The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
 
 ### Fileset Catalog with Cloud Storage
 
-<<<<<<< HEAD
-In the current implementation, the fileset uses the HDFS protocol to access its location. If users use S3, GCS, OSS,
-or Azure Blob Storage, they can also configure the `config.resources` to specify custom configuration
-files.
-
-- For S3, refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
-- For GCS, refer to [Fileset-catalog-with-gcs](./fileset-catalog-with-gcs.md) for more details.
-- For OSS, refer to [Fileset-catalog-with-oss](./fileset-catalog-with-oss.md) for more details.
-- For Azure Blob Storage, refer to [Fileset-catalog-with-adls](./fileset-catalog-with-adls.md) for more details.
-=======
 For Java and Hadoop-based access, Fileset uses the Hadoop Compatible File System (HCFS) interface.
 Each cloud backend provides its own Hadoop `FileSystem` implementation, such as S3A for Amazon S3.
 Put the matching bundle jar on the classpath and set the credential properties for that backend.
@@ -113,7 +92,6 @@ own page with a runnable end-to-end example.
 A catalog may hold locations in more than one backend at the same time, as long as every bundle jar
 involved is on the classpath. Cloud backends also accept `config.resources` to pass custom
 configuration files to the underlying filesystem client.
->>>>>>> eff51a38c ([MINOR] docs(fileset): Restructure the fileset catalog pages around a runnable path (#12434))
 
 ### Implement a Custom HCFS File System Fileset
 
