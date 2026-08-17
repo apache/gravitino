@@ -88,7 +88,8 @@ public class PolicyOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-policies." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-policies", absolute = true)
-  @AuthorizationExpression(expression = "")
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LIST_POLICY_AUTHORIZATION_EXPRESSION)
   public Response listPolicies(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

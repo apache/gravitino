@@ -257,6 +257,9 @@ public class AuthorizationExpressionConstants {
   public static final String LOAD_TAG_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 
+  public static final String LIST_TAG_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::APPLY_TAG";
+
   public static final String APPLY_TAG_AUTHORIZATION_EXPRESSION =
       "METALAKE::OWNER || TAG::OWNER || ANY_APPLY_TAG";
 
@@ -264,6 +267,9 @@ public class AuthorizationExpressionConstants {
       """
           METALAKE::OWNER || POLICY::OWNER || ANY_APPLY_POLICY
           """;
+
+  public static final String LIST_POLICY_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || METALAKE::APPLY_POLICY";
 
   /**
    * Special case: "METALAKE_USER" is used here as a unique authorization token, not a logical

@@ -91,7 +91,8 @@ public class TagOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-tags", absolute = true)
-  @AuthorizationExpression(expression = "")
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LIST_TAG_AUTHORIZATION_EXPRESSION)
   public Response listTags(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
