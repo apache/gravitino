@@ -145,6 +145,16 @@ class DTOConverters:
             return CatalogUpdateRequest.RemoveCatalogPropertyRequest(
                 change.get_property()
             )
+        if isinstance(change, CatalogChange.SetSecretBinding):
+            binding = change.binding()
+            return CatalogUpdateRequest.SetCatalogSecretBindingRequest(
+                change.property(), binding.provider, binding.plaintext
+            )
+        if isinstance(change, CatalogChange.SetSecretReference):
+            reference = change.reference()
+            return CatalogUpdateRequest.SetCatalogSecretReferenceRequest(
+                change.property(), reference.provider, reference.attributes
+            )
 
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 

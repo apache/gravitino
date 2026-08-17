@@ -57,6 +57,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -926,23 +927,41 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           try {
-            CatalogEntity updatedCatalog =
-                store.update(
-                    ident,
-                    CatalogEntity.class,
-                    EntityType.CATALOG,
-                    catalog -> {
-                      CatalogEntity.Builder newCatalogBuilder =
-                          newCatalogBuilder(ident.namespace(), catalog);
+            AtomicReference<List<SecretMaterial>> writtenSecretMaterials =
+                new AtomicReference<>(List.of());
+            boolean secretUpdateCommitted = false;
+            CatalogEntity updatedCatalog;
+            try {
+              updatedCatalog =
+                  store.update(
+                      ident,
+                      CatalogEntity.class,
+                      EntityType.CATALOG,
+                      catalog -> {
+                        Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+                            prepareCatalogSecretChanges(
+                                catalog.getProperties(), catalog.id(), changes);
+                        writtenSecretMaterials.set(secretResult.getRight());
+                        CatalogChange[] effectiveChanges = secretResult.getLeft();
 
-                      Map<String, String> newProps =
-                          catalog.getProperties() == null
-                              ? new HashMap<>()
-                              : new HashMap<>(catalog.getProperties());
-                      newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
+                        CatalogEntity.Builder newCatalogBuilder =
+                            newCatalogBuilder(ident.namespace(), catalog);
 
-                      return newCatalogBuilder.build();
-                    });
+                        Map<String, String> newProps =
+                            catalog.getProperties() == null
+                                ? new HashMap<>()
+                                : new HashMap<>(catalog.getProperties());
+                        newCatalogBuilder =
+                            updateEntity(newCatalogBuilder, newProps, effectiveChanges);
+
+                        return newCatalogBuilder.build();
+                      });
+              secretUpdateCommitted = true;
+            } finally {
+              if (!secretUpdateCommitted) {
+                secretManager.rollbackSecrets(writtenSecretMaterials.get());
+              }
+            }
             // Invalidate after store.update() so that any background thread that tries to reload
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
@@ -1227,6 +1246,56 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     return mergeConf(newProperties, catalogSpecificConfig);
   }
 
+  /**
+   * Rewrites catalog changes that involve secrets into plain setProperty / removeProperty, writing
+   * secrets as needed. Rolls back any written materials if preparation fails.
+   *
+   * @param currentProperties current catalog properties (may be null)
+   * @param entityId catalog entity id
+   * @param changes catalog changes
+   * @return effective changes and written write-through materials
+   */
+  private Pair<CatalogChange[], List<SecretMaterial>> prepareCatalogSecretChanges(
+      @Nullable Map<String, String> currentProperties, long entityId, CatalogChange... changes) {
+    Map<String, String> working =
+        currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
+    List<CatalogChange> out = new ArrayList<>(changes.length);
+    List<SecretMaterial> written = new ArrayList<>();
+    try {
+      for (CatalogChange change : changes) {
+        if (change instanceof CatalogChange.SetSecretBinding) {
+          CatalogChange.SetSecretBinding c = (CatalogChange.SetSecretBinding) change;
+          String urn =
+              secretManager.alterSetSecretBinding(
+                  working, "catalog", entityId, c.getProperty(), c.getBinding(), written);
+          out.add(CatalogChange.setProperty(c.getProperty(), urn));
+        } else if (change instanceof CatalogChange.SetSecretReference) {
+          CatalogChange.SetSecretReference c = (CatalogChange.SetSecretReference) change;
+          String urn =
+              secretManager.alterSetSecretReference(
+                  working, "catalog", entityId, c.getProperty(), c.getReference());
+          out.add(CatalogChange.setProperty(c.getProperty(), urn));
+        } else if (change instanceof CatalogChange.SetProperty) {
+          CatalogChange.SetProperty c = (CatalogChange.SetProperty) change;
+          String value =
+              secretManager.alterSetProperty(
+                  working, "catalog", entityId, c.getProperty(), c.getValue());
+          out.add(CatalogChange.setProperty(c.getProperty(), value));
+        } else if (change instanceof CatalogChange.RemoveProperty) {
+          CatalogChange.RemoveProperty c = (CatalogChange.RemoveProperty) change;
+          secretManager.alterRemoveProperty(working, "catalog", entityId, c.getProperty());
+          out.add(change);
+        } else {
+          out.add(change);
+        }
+      }
+      return Pair.of(out.toArray(new CatalogChange[0]), List.copyOf(written));
+    } catch (RuntimeException e) {
+      secretManager.rollbackSecrets(written);
+      throw e;
+    }
+  }
+
   private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
       CatalogChange... catalogChanges) {
     Map<String, String> upserts = Maps.newHashMap();
@@ -1238,6 +1307,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               if (catalogChange instanceof SetProperty) {
                 SetProperty setProperty = (SetProperty) catalogChange;
                 upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (catalogChange instanceof CatalogChange.SetSecretBinding) {
+                CatalogChange.SetSecretBinding setSecretBinding =
+                    (CatalogChange.SetSecretBinding) catalogChange;
+                upserts.put(
+                    setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
+              } else if (catalogChange instanceof CatalogChange.SetSecretReference) {
+                CatalogChange.SetSecretReference setSecretReference =
+                    (CatalogChange.SetSecretReference) catalogChange;
+                upserts.put(setSecretReference.getProperty(), setSecretReference.getProperty());
               } else if (catalogChange instanceof RemoveProperty) {
                 RemoveProperty removeProperty = (RemoveProperty) catalogChange;
                 deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
