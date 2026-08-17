@@ -137,9 +137,9 @@ public class POConverters {
    */
   public static MetalakePO updateMetalakePOWithVersion(
       MetalakePO oldMetalakePO, BaseMetalake newMetalake) {
-    Long lastVersion = oldMetalakePO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Every metadata update advances the OCC token. Both version columns stay aligned because
+    // metalakes do not retain independently addressable historical versions.
+    Long nextVersion = oldMetalakePO.getCurrentVersion() + 1;
     try {
       return MetalakePO.builder()
           .withMetalakeId(newMetalake.id())

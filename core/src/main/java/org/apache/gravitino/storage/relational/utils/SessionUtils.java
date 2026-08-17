@@ -111,6 +111,15 @@ public class SessionUtils {
     SqlSessions.getSqlSession();
   }
 
+  /**
+   * Returns whether the current thread is already participating in a transaction.
+   *
+   * @return {@code true} when the current thread has an active transaction
+   */
+  public static boolean isInTransaction() {
+    return SqlSessions.hasActiveSession();
+  }
+
   public static void commitTransaction() {
     SqlSessions.commitAndCloseSqlSession();
   }

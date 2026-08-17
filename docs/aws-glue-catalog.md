@@ -52,7 +52,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
 Sensitive catalog properties such as `aws-access-key-id` and `aws-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
@@ -70,7 +70,7 @@ The Glue catalog defines no predefined schema properties beyond `comment`. Addit
 
 ### Schema Operations
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
+See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations).
 
 ## Table
 
@@ -133,7 +133,7 @@ The following table lists the data types mapped from the Glue catalog to Graviti
 | `uniontype`           | `union`             |
 
 :::info
-Data types not listed above map to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)**, which represents an unresolvable data type from the Glue catalog.
+Data types not listed above map to Gravitino **[External Type](./tables-and-views.md#external-type)**, which represents an unresolvable data type from the Glue catalog.
 :::
 
 ### Table Properties
