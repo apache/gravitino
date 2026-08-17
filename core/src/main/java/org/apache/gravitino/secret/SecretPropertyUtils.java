@@ -41,8 +41,8 @@ public final class SecretPropertyUtils {
    * Property keys owned by credential vending ({@code SupportsCredentials} / credential providers),
    * plus JDBC connection identity keys that are delivered via {@code JdbcCredential}.
    *
-   * <p>These keys are omitted from {@link #buildSecretProperties}; callers should use {@code
-   * getCredentials} instead.
+   * <p>These keys are omitted from {@link #buildSecrets}; callers should use {@code getCredentials}
+   * instead.
    */
   public static final Set<String> CREDENTIAL_VENDING_PROPERTY_KEYS =
       ImmutableSet.of(
@@ -75,7 +75,7 @@ public final class SecretPropertyUtils {
 
   /**
    * Returns whether a property key is owned by credential vending (or JDBC credential delivery) and
-   * must be omitted from secret-properties delivery.
+   * must be omitted from secrets delivery.
    *
    * @param key the property key
    * @return true when the key is a credential-vending property
@@ -113,7 +113,7 @@ public final class SecretPropertyUtils {
    * @param rawProperties raw entity properties (may be null)
    * @return a new secret plaintext property map; never null
    */
-  public static Map<String, String> buildSecretProperties(
+  public static Map<String, String> buildSecrets(
       SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
     Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
     if (rawProperties == null || rawProperties.isEmpty()) {
@@ -140,18 +140,17 @@ public final class SecretPropertyUtils {
    * Merges base properties with secret plaintext properties.
    *
    * <p>Returns a new mutable map containing all entries from {@code base}, then overlays {@code
-   * secretProperties}. Null maps are treated as empty.
+   * secrets}. Null maps are treated as empty.
    *
    * @param base non-secret / default-load properties (may be null)
-   * @param secretProperties secret plaintext properties from {@link #buildSecretProperties} (may be
-   *     null)
+   * @param secrets secret plaintext properties from {@link #buildSecrets} (may be null)
    * @return a new mutable merged property map; never null
    */
   public static Map<String, String> mergeProperties(
-      @Nullable Map<String, String> base, @Nullable Map<String, String> secretProperties) {
+      @Nullable Map<String, String> base, @Nullable Map<String, String> secrets) {
     Map<String, String> merged = copyEntityProperties(base);
-    if (secretProperties != null && !secretProperties.isEmpty()) {
-      merged.putAll(secretProperties);
+    if (secrets != null && !secrets.isEmpty()) {
+      merged.putAll(secrets);
     }
     return merged;
   }

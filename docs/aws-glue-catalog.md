@@ -55,7 +55,7 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime. Other secret-manager-backed properties can be retrieved via `getSecretProperties` / `GET .../objects/{type}/{fullName}/secret-properties`.
+Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime. Other secret-manager-backed properties can be retrieved via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema

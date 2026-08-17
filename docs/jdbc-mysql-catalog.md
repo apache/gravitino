@@ -87,7 +87,7 @@ Returning null for TIMESTAMP type precision. Driver version: mysql-connector-jav
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) for JDBC identity. Other secret-manager-backed properties can be retrieved via `getSecretProperties` / `GET .../objects/{type}/{fullName}/secret-properties`.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) for JDBC identity. Other secret-manager-backed properties can be retrieved via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema

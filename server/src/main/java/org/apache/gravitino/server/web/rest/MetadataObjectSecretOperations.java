@@ -38,7 +38,7 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.dto.responses.SecretPropertiesResponse;
+import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
@@ -51,7 +51,7 @@ import org.apache.gravitino.utils.MetadataObjectUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@Path("/metalakes/{metalake}/objects/{type}/{fullName}/secret-properties")
+@Path("/metalakes/{metalake}/objects/{type}/{fullName}/secrets")
 public class MetadataObjectSecretOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(MetadataObjectSecretOperations.class);
@@ -73,16 +73,16 @@ public class MetadataObjectSecretOperations {
 
   @GET
   @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "get-secret-properties." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "get-secret-properties", absolute = true)
+  @Timed(name = "get-secrets." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-secrets", absolute = true)
   @AuthorizationExpression(expression = AuthorizationExpressionConstants.CAN_ACCESS_METADATA)
-  public Response getSecretProperties(
+  public Response getSecrets(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName) {
     LOG.info(
-        "Received get secret-properties request for object type: {}, full name: {} under metalake: {}",
+        "Received get secrets request for object type: {}, full name: {} under metalake: {}",
         type,
         fullName,
         metalake);
@@ -101,9 +101,9 @@ public class MetadataObjectSecretOperations {
 
             NameIdentifier identifier = MetadataObjectUtil.toEntityIdent(metalake, object);
             Entity.EntityType entityType = MetadataObjectUtil.toEntityType(object);
-            Map<String, String> secretProperties =
-                secretPropertyOperationDispatcher.getSecretProperties(identifier, entityType);
-            return Utils.ok(new SecretPropertiesResponse(secretProperties));
+            Map<String, String> secrets =
+                secretPropertyOperationDispatcher.getSecrets(identifier, entityType);
+            return Utils.ok(new SecretsResponse(secrets));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleCredentialException(OperationType.GET, fullName, e);

@@ -15,14 +15,32 @@
 # specific language governing permissions and limitations
 # under the License.
 
-from abc import ABC, abstractmethod
 from typing import Dict
+from dataclasses import dataclass, field
+from dataclasses_json import config
+
+from gravitino.dto.responses.base_response import BaseResponse
+from gravitino.exceptions.base import IllegalArgumentException
 
 
-class SupportsSecretProperties(ABC):
-    """Interface to retrieve secret-manager plaintext properties."""
+@dataclass
+class SecretsResponse(BaseResponse):
+    """Response for secret properties."""
 
-    @abstractmethod
-    def get_secret_properties(self) -> Dict[str, str]:
-        """Return secret-manager plaintext properties for this metadata object."""
-        pass
+    _secrets: Dict[str, str] = field(
+        metadata=config(field_name="secrets")
+    )
+
+    def secrets(self) -> Dict[str, str]:
+        return self._secrets
+
+    def validate(self):
+        """Validates the response data.
+
+        Raises:
+            IllegalArgumentException if secrets are None.
+        """
+        super().validate()
+
+        if self._secrets is None:
+            raise IllegalArgumentException('"secrets" must not be null')

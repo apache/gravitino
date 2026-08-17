@@ -28,12 +28,12 @@ import java.util.Map;
  * org.apache.gravitino.credential.SupportsCredentials} instead. Normal non-secret properties are
  * not included; combine with {@code load*().properties()} on the client.
  */
-public interface SupportsSecretProperties {
+public interface SupportsSecrets {
 
   /**
    * Returns secret-manager plaintext properties for this metadata object.
    *
    * @return a map of property key to resolved plaintext value; never null, may be empty
    */
-  Map<String, String> getSecretProperties();
+  Map<String, String> getSecrets();
 }

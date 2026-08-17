@@ -111,7 +111,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     // server. Call propertiesWithCredentialProviders() then SecretManager.toPlaintextProperties
     // so URNs become plaintext while credential-provider keys remain for provider detection.
     //
-    // Standalone mode: merge loadCatalog().properties() with getSecretProperties(), then inject
+    // Standalone mode: merge loadCatalog().properties() with getSecrets(), then inject
     // JdbcCredential fields from getCredentials() when present.
     Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
@@ -125,7 +125,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
       catalogProperties =
           new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
       try {
-        catalogProperties.putAll(catalog.supportsSecretProperties().getSecretProperties());
+        catalogProperties.putAll(catalog.supportsSecrets().getSecrets());
       } catch (UnsupportedOperationException ignored) {
         // Catalog does not support secret property operations.
       }

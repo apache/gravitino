@@ -253,7 +253,7 @@ public class CatalogConnectorManager {
                 Catalog catalog = metalake.loadCatalog(catalogName);
                 Map<String, String> properties =
                     new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-                properties.putAll(catalog.supportsSecretProperties().getSecretProperties());
+                properties.putAll(catalog.supportsSecrets().getSecrets());
                 GravitinoCatalog gravitinoCatalog =
                     new GravitinoCatalog(metalake.name(), catalog, properties);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {

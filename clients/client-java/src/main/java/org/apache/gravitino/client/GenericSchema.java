@@ -31,14 +31,14 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
-import org.apache.gravitino.secret.SupportsSecretProperties;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic schema. */
 class GenericSchema
-    implements Schema, SupportsTags, SupportsRoles, SupportsPolicies, SupportsSecretProperties {
+    implements Schema, SupportsTags, SupportsRoles, SupportsPolicies, SupportsSecrets {
 
   private final SchemaDTO schemaDTO;
 
@@ -76,13 +76,13 @@ class GenericSchema
   }
 
   @Override
-  public SupportsSecretProperties supportsSecretProperties() {
+  public SupportsSecrets supportsSecrets() {
     return this;
   }
 
   @Override
-  public Map<String, String> getSecretProperties() {
-    return objectSecretOperations.getSecretProperties();
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override

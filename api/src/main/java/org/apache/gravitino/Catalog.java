@@ -30,7 +30,7 @@ import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
-import org.apache.gravitino.secret.SupportsSecretProperties;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -289,12 +289,11 @@ public interface Catalog extends Auditable {
   }
 
   /**
-   * @return the {@link SupportsSecretProperties} if the catalog supports secret property
-   *     operations.
+   * @return the {@link SupportsSecrets} if the catalog supports secret property operations.
    * @throws UnsupportedOperationException if the catalog does not support secret property
    *     operations.
    */
-  default SupportsSecretProperties supportsSecretProperties() throws UnsupportedOperationException {
+  default SupportsSecrets supportsSecrets() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support secret property operations");
   }
 }

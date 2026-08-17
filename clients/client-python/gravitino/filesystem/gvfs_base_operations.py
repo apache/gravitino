@@ -500,7 +500,7 @@ class BaseGVFSOperations(ABC):
     ) -> Dict[str, str]:
         """Merge properties from catalog, schema, fileset, options, and configs.
 
-        Combines default load*.properties() with get_secret_properties() so secret URNs
+        Combines default load*.properties() with get_secrets() so secret URNs
         become plaintext for FS access. Credential-vending keys remain omitted — use
         get_credentials instead.
 
@@ -516,11 +516,11 @@ class BaseGVFSOperations(ABC):
             NameIdentifier.of(schema_name, fileset_ident.name())
         )
         fileset_props = dict(catalog.properties() or {})
-        fileset_props.update(catalog.get_secret_properties())
+        fileset_props.update(catalog.get_secrets())
         fileset_props.update(schema.properties() or {})
-        fileset_props.update(schema.get_secret_properties())
+        fileset_props.update(schema.get_secrets())
         fileset_props.update(fileset.properties() or {})
-        fileset_props.update(fileset.get_secret_properties())
+        fileset_props.update(fileset.get_secrets())
         if self._options:
             fileset_props.update(self._options)
         # Get user-defined configurations for the actual location

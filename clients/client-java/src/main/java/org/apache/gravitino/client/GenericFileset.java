@@ -36,7 +36,7 @@ import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
-import org.apache.gravitino.secret.SupportsSecretProperties;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
@@ -47,7 +47,7 @@ class GenericFileset
         SupportsTags,
         SupportsRoles,
         SupportsCredentials,
-        SupportsSecretProperties,
+        SupportsSecrets,
         SupportsPolicies {
 
   private final FilesetDTO filesetDTO;
@@ -127,7 +127,7 @@ class GenericFileset
   }
 
   @Override
-  public SupportsSecretProperties supportsSecretProperties() {
+  public SupportsSecrets supportsSecrets() {
     return this;
   }
 
@@ -188,8 +188,8 @@ class GenericFileset
   }
 
   @Override
-  public Map<String, String> getSecretProperties() {
-    return objectSecretOperations.getSecretProperties();
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override

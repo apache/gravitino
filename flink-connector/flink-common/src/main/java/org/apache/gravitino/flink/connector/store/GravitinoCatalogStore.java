@@ -103,7 +103,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
           catalogFactory.catalogPropertiesConverter();
       Map<String, String> catalogProperties =
           new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-      catalogProperties.putAll(catalog.supportsSecretProperties().getSecretProperties());
+      catalogProperties.putAll(catalog.supportsSecrets().getSecrets());
       Map<String, String> flinkCatalogProperties =
           catalogPropertiesConverter.toFlinkCatalogProperties(catalogProperties);
       CatalogDescriptor descriptor =

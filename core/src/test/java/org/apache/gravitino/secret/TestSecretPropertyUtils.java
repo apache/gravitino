@@ -83,7 +83,7 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testBuildSecretProperties() {
+  void testBuildSecrets() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put("jdbc-url", "jdbc:mysql://localhost/db");
@@ -108,7 +108,7 @@ public class TestSecretPropertyUtils {
       entityProps.put("s3-secret-access-key", "SECRET");
       entityProps.put("visible", "ok");
 
-      Map<String, String> secrets = SecretPropertyUtils.buildSecretProperties(sm, entityProps);
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
 
       // Only non-credential-vending secret URNs
       Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
@@ -122,10 +122,10 @@ public class TestSecretPropertyUtils {
   }
 
   @Test
-  void testBuildSecretPropertiesNullAndEmpty() {
+  void testBuildSecretsNullAndEmpty() {
     try (SecretManager sm = memorySecretManager()) {
-      Assertions.assertTrue(SecretPropertyUtils.buildSecretProperties(sm, null).isEmpty());
-      Assertions.assertTrue(SecretPropertyUtils.buildSecretProperties(sm, Map.of()).isEmpty());
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null).isEmpty());
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of()).isEmpty());
     }
   }
 

@@ -133,7 +133,7 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
   Map<String, String> catalogPropertiesWithSecrets(Catalog catalog) {
     Map<String, String> properties =
         new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-    properties.putAll(getCatalogSecretProperties(catalog.name()));
+    properties.putAll(getCatalogSecrets(catalog.name()));
     return properties;
   }
 
@@ -141,30 +141,27 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     Schema schema = loadSchema(catalog, schemaName);
     Map<String, String> properties =
         new HashMap<>(schema.properties() == null ? Map.of() : schema.properties());
-    properties.putAll(getSchemaSecretProperties(catalog.name(), schemaName));
+    properties.putAll(getSchemaSecrets(catalog.name(), schemaName));
     return properties;
   }
 
-  private Map<String, String> getCatalogSecretProperties(String catalogName) {
+  private Map<String, String> getCatalogSecrets(String catalogName) {
     org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
         currentSecretPropertyDispatcher();
     if (dispatcher != null) {
-      return dispatcher.getSecretProperties(
+      return dispatcher.getSecrets(
           NameIdentifierUtil.ofCatalog(metalakeName, catalogName), Entity.EntityType.CATALOG);
     }
-    return loadCatalog(catalogName).supportsSecretProperties().getSecretProperties();
+    return loadCatalog(catalogName).supportsSecrets().getSecrets();
   }
 
-  private Map<String, String> getSchemaSecretProperties(String catalogName, String schemaName) {
+  private Map<String, String> getSchemaSecrets(String catalogName, String schemaName) {
     org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
         currentSecretPropertyDispatcher();
     if (dispatcher != null) {
-      return dispatcher.getSecretProperties(
-          schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA);
+      return dispatcher.getSecrets(schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA);
     }
-    return loadSchema(loadCatalog(catalogName), schemaName)
-        .supportsSecretProperties()
-        .getSecretProperties();
+    return loadSchema(loadCatalog(catalogName), schemaName).supportsSecrets().getSecrets();
   }
 
   private org.apache.gravitino.secret.SecretPropertyOperationDispatcher

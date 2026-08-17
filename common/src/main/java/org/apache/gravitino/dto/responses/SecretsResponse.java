@@ -29,34 +29,34 @@ import lombok.ToString;
 @Getter
 @ToString
 @EqualsAndHashCode(callSuper = true)
-public class SecretPropertiesResponse extends BaseResponse {
+public class SecretsResponse extends BaseResponse {
 
-  @JsonProperty("secretProperties")
-  private final Map<String, String> secretProperties;
+  @JsonProperty("secrets")
+  private final Map<String, String> secrets;
 
   /**
-   * Creates a new SecretPropertiesResponse.
+   * Creates a new SecretsResponse.
    *
-   * @param secretProperties The secret properties map.
+   * @param secrets The secret properties map.
    */
-  public SecretPropertiesResponse(Map<String, String> secretProperties) {
+  public SecretsResponse(Map<String, String> secrets) {
     super(0);
-    this.secretProperties = secretProperties;
+    this.secrets = secrets;
   }
 
   /**
    * This is the constructor that is used by Jackson deserializer to create an instance of
-   * SecretPropertiesResponse.
+   * SecretsResponse.
    */
-  public SecretPropertiesResponse() {
+  public SecretsResponse() {
     super();
-    this.secretProperties = null;
+    this.secrets = null;
   }
 
   @Override
   public void validate() throws IllegalArgumentException {
     super.validate();
 
-    Preconditions.checkArgument(secretProperties != null, "\"secretProperties\" must not be null");
+    Preconditions.checkArgument(secrets != null, "\"secrets\" must not be null");
   }
 }

@@ -122,8 +122,8 @@ class BaseSchemaCatalog(
 
         self.validate()
 
-    def get_secret_properties(self) -> Dict[str, str]:
-        return self._object_secret_operations.get_secret_properties()
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()
 
     def as_schemas(self):
         return self

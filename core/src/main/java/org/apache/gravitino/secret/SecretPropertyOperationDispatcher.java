@@ -36,10 +36,10 @@ import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /**
- * Dispatches secret-properties requests for catalog, schema, and fileset metadata objects.
+ * Dispatches secrets requests for catalog, schema, and fileset metadata objects.
  *
  * <p>Loads raw entity properties (including secret URNs) from the entity store / catalog entity,
- * then resolves only secret-manager URNs via {@link SecretPropertyUtils#buildSecretProperties}.
+ * then resolves only secret-manager URNs via {@link SecretPropertyUtils#buildSecrets}.
  */
 public class SecretPropertyOperationDispatcher extends OperationDispatcher {
 
@@ -66,10 +66,9 @@ public class SecretPropertyOperationDispatcher extends OperationDispatcher {
    * @param entityType The entity type (CATALOG, SCHEMA, or FILESET).
    * @return secret plaintext properties; never null
    */
-  public Map<String, String> getSecretProperties(
-      NameIdentifier identifier, Entity.EntityType entityType) {
+  public Map<String, String> getSecrets(NameIdentifier identifier, Entity.EntityType entityType) {
     Map<String, String> rawProperties = loadRawProperties(identifier, entityType);
-    return SecretPropertyUtils.buildSecretProperties(secretManager, rawProperties);
+    return SecretPropertyUtils.buildSecrets(secretManager, rawProperties);
   }
 
   private Map<String, String> loadRawProperties(

@@ -18,7 +18,7 @@ from typing import Dict, List, Optional
 
 from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.supports_credentials import SupportsCredentials
-from gravitino.api.secret.supports_secret_properties import SupportsSecretProperties
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
@@ -40,7 +40,7 @@ from gravitino.utils import HTTPClient
 class GenericFileset(
     Fileset,
     SupportsCredentials,
-    SupportsSecretProperties,
+    SupportsSecrets,
     SupportsTags,
 ):
     _fileset: FilesetDTO
@@ -97,8 +97,8 @@ class GenericFileset(
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
 
-    def get_secret_properties(self) -> Dict[str, str]:
-        return self._object_secret_operations.get_secret_properties()
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()
 
     def list_tags(self) -> List[str]:
         return self._object_tag_operations.list_tags()

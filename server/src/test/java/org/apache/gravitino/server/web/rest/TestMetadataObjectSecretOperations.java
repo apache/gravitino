@@ -31,7 +31,7 @@ import javax.ws.rs.core.Response;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
-import org.apache.gravitino.dto.responses.SecretPropertiesResponse;
+import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
@@ -84,55 +84,54 @@ public class TestMetadataObjectSecretOperations extends JerseyTest {
   }
 
   @Test
-  public void testGetSecretPropertiesForCatalog() {
-    testGetSecretPropertiesForObject(MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG));
+  public void testGetSecretsForCatalog() {
+    testGetSecretsForObject(MetadataObjects.parse("catalog", MetadataObject.Type.CATALOG));
   }
 
   @Test
-  public void testGetSecretPropertiesForSchema() {
-    testGetSecretPropertiesForObject(
-        MetadataObjects.parse("catalog.schema", MetadataObject.Type.SCHEMA));
+  public void testGetSecretsForSchema() {
+    testGetSecretsForObject(MetadataObjects.parse("catalog.schema", MetadataObject.Type.SCHEMA));
   }
 
   @Test
-  public void testGetSecretPropertiesForFileset() {
-    testGetSecretPropertiesForObject(
+  public void testGetSecretsForFileset() {
+    testGetSecretsForObject(
         MetadataObjects.parse("catalog.schema.fileset", MetadataObject.Type.FILESET));
   }
 
-  private void testGetSecretPropertiesForObject(MetadataObject metadataObject) {
-    when(secretPropertyOperationDispatcher.getSecretProperties(any(), any(Entity.EntityType.class)))
+  private void testGetSecretsForObject(MetadataObject metadataObject) {
+    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
         .thenReturn(Map.of("custom-secret", "plaintext"));
 
     Response response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())
             .path(metadataObject.fullName())
-            .path("/secret-properties")
+            .path("/secrets")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    SecretPropertiesResponse secretResponse = response.readEntity(SecretPropertiesResponse.class);
+    SecretsResponse secretResponse = response.readEntity(SecretsResponse.class);
     Assertions.assertEquals(0, secretResponse.getCode());
-    Assertions.assertEquals("plaintext", secretResponse.getSecretProperties().get("custom-secret"));
+    Assertions.assertEquals("plaintext", secretResponse.getSecrets().get("custom-secret"));
 
-    when(secretPropertyOperationDispatcher.getSecretProperties(any(), any(Entity.EntityType.class)))
+    when(secretPropertyOperationDispatcher.getSecrets(any(), any(Entity.EntityType.class)))
         .thenReturn(Map.of());
     response =
         target(basePath(metalake))
             .path(metadataObject.type().toString())
             .path(metadataObject.fullName())
-            .path("/secret-properties")
+            .path("/secrets")
             .request(MediaType.APPLICATION_JSON_TYPE)
             .accept("application/vnd.gravitino.v1+json")
             .get();
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    secretResponse = response.readEntity(SecretPropertiesResponse.class);
+    secretResponse = response.readEntity(SecretsResponse.class);
     Assertions.assertEquals(0, secretResponse.getCode());
-    Assertions.assertTrue(secretResponse.getSecretProperties().isEmpty());
+    Assertions.assertTrue(secretResponse.getSecrets().isEmpty());
   }
 
   private String basePath(String metalake) {

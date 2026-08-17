@@ -18,8 +18,8 @@
 from typing import Dict
 
 from gravitino.api.metadata_object import MetadataObject
-from gravitino.api.secret.supports_secret_properties import SupportsSecretProperties
-from gravitino.dto.responses.secret_properties_response import SecretPropertiesResponse
+from gravitino.api.secret.supports_secrets import SupportsSecrets
+from gravitino.dto.responses.secrets_response import SecretsResponse
 from gravitino.exceptions.handlers.credential_error_handler import (
     CREDENTIAL_ERROR_HANDLER,
 )
@@ -27,7 +27,7 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 
-class MetadataObjectSecretOperations(SupportsSecretProperties):
+class MetadataObjectSecretOperations(SupportsSecrets):
     _rest_client: HTTPClient
     _request_path: str
 
@@ -42,14 +42,14 @@ class MetadataObjectSecretOperations(SupportsSecretProperties):
         metadata_object_fullname = metadata_object.full_name()
         self._request_path = (
             f"api/metalakes/{encode_string(metalake_name)}/objects/{metadata_object_type}/"
-            f"{encode_string(metadata_object_fullname)}/secret-properties"
+            f"{encode_string(metadata_object_fullname)}/secrets"
         )
 
-    def get_secret_properties(self) -> Dict[str, str]:
+    def get_secrets(self) -> Dict[str, str]:
         resp = self._rest_client.get(
             self._request_path,
             error_handler=CREDENTIAL_ERROR_HANDLER,
         )
-        secret_resp = SecretPropertiesResponse.from_json(resp.body, infer_missing=True)
+        secret_resp = SecretsResponse.from_json(resp.body, infer_missing=True)
         secret_resp.validate()
-        return secret_resp.secret_properties()
+        return secret_resp.secrets()

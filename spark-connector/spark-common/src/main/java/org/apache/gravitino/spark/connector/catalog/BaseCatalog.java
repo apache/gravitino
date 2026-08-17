@@ -171,7 +171,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
                 ? Map.of()
                 : gravitinoCatalogClient.properties());
     catalogProperties.putAll(
-        gravitinoCatalogClient.supportsSecretProperties().getSecretProperties());
+        gravitinoCatalogClient.supportsSecrets().getSecrets());
     this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();

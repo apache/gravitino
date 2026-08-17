@@ -53,7 +53,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
-import org.apache.gravitino.secret.SupportsSecretProperties;
+import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
  * Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
@@ -61,9 +61,7 @@ import org.apache.gravitino.secret.SupportsSecretProperties;
  * metalake.
  */
 class FilesetCatalog extends BaseSchemaCatalog
-    implements org.apache.gravitino.file.FilesetCatalog,
-        SupportsCredentials,
-        SupportsSecretProperties {
+    implements org.apache.gravitino.file.FilesetCatalog, SupportsCredentials, SupportsSecrets {
 
   FilesetCatalog(
       Namespace namespace,
@@ -295,13 +293,13 @@ class FilesetCatalog extends BaseSchemaCatalog
   }
 
   @Override
-  public SupportsSecretProperties supportsSecretProperties() throws UnsupportedOperationException {
+  public SupportsSecrets supportsSecrets() throws UnsupportedOperationException {
     return this;
   }
 
   @Override
-  public Map<String, String> getSecretProperties() {
-    return objectSecretOperations.getSecretProperties();
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @VisibleForTesting

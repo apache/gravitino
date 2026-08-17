@@ -22,40 +22,40 @@ import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
 import org.apache.gravitino.MetadataObject;
-import org.apache.gravitino.dto.responses.SecretPropertiesResponse;
+import org.apache.gravitino.dto.responses.SecretsResponse;
 import org.apache.gravitino.rest.RESTUtils;
-import org.apache.gravitino.secret.SupportsSecretProperties;
+import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
- * The implementation of {@link SupportsSecretProperties}. This interface will be composited into
- * catalog, schema, and fileset to provide secret property operations for these metadata objects.
+ * The implementation of {@link SupportsSecrets}. This interface will be composited into catalog,
+ * schema, and fileset to provide secret property operations for these metadata objects.
  */
-class MetadataObjectSecretOperations implements SupportsSecretProperties {
+class MetadataObjectSecretOperations implements SupportsSecrets {
 
   private final RESTClient restClient;
 
-  private final String secretPropertiesRequestPath;
+  private final String secretsRequestPath;
 
   MetadataObjectSecretOperations(
       String metalakeName, MetadataObject metadataObject, RESTClient restClient) {
     this.restClient = restClient;
-    this.secretPropertiesRequestPath =
+    this.secretsRequestPath =
         String.format(
-            "api/metalakes/%s/objects/%s/%s/secret-properties",
+            "api/metalakes/%s/objects/%s/%s/secrets",
             RESTUtils.encodeString(metalakeName),
             metadataObject.type().name().toLowerCase(Locale.ROOT),
             RESTUtils.encodeString(metadataObject.fullName()));
   }
 
   @Override
-  public Map<String, String> getSecretProperties() {
-    SecretPropertiesResponse resp =
+  public Map<String, String> getSecrets() {
+    SecretsResponse resp =
         restClient.get(
-            secretPropertiesRequestPath,
-            SecretPropertiesResponse.class,
+            secretsRequestPath,
+            SecretsResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.credentialErrorHandler());
     resp.validate();
-    return resp.getSecretProperties();
+    return resp.getSecrets();
   }
 }
