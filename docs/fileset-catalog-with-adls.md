@@ -43,15 +43,7 @@ underscores while the catalog and the Java client use hyphens.
 |-------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|
 | `azure-storage-account-name`  | `azure_storage_account_name` | Account name of the Azure Blob Storage.                                                                                                                                                                                                                                                                         | Yes             |
 | `azure-storage-account-key`   | `azure_storage_account_key`  | Account key of the Azure Blob Storage.                                                                                                                                                                                                                                                                          | Yes             |
-| `filesystem-providers`        | (n/a)                        | (deprecated) The filesystem providers to add. Set it to `abs` when the fileset is backed by ADLS, or to a comma separated string containing `abs`, such as `oss,abs,s3`, to support several kinds of fileset at once.                                                                                           | No (deprecated) |
-| `default-filesystem-provider` | (n/a)                        | (deprecated) The filesystem provider used when the location URI carries no scheme. Defaults to `builtin-local`; setting it to `abs` allows the `abfss://` prefix to be omitted from the location.                                                                                                               | No (deprecated) |
 | `credential-providers`        | (n/a)                        | The credential provider types, separated by comma. Possible values are `adls-token`, `azure-account-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#adls) for the extra properties each provider takes. | No              |
-
-:::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
-automatically loads the filesystem providers found on the classpath, including the built-in
-providers and the cloud providers carried by a bundle jar such as `gravitino-azure-bundle`.
-:::
 
 :::note
 Azure Data Lake Storage is also known as Azure Blob Storage (ABS). The location uses the `abfss://`
@@ -241,14 +233,14 @@ differs by environment:
 
 | Environment            | Jar providing the Azure Data Lake Storage filesystem                                                                                                                                          |
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle), a fat jar bundling `hadoop-azure` (3.3.1) and the packages it needs to reach ADLS |
+| No Hadoop installed    | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle), a fat jar bundling the Azure Data Lake Storage filesystem implementation and its dependencies |
 | Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                      |
 
 The artifacts in full:
 
 - [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle):
   a "fat" jar that includes the `gravitino-azure` functionality together with every dependency it needs,
-  such as `hadoop-azure` (3.3.1) and the packages it needs to reach ADLS. Use it when the environment has no pre-existing Hadoop setup.
+  such as `hadoop-azure` and the packages it needs to reach ADLS. Use it when the environment has no pre-existing Hadoop setup.
 - [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
   `gravitino-azure` functionality. Java and Hadoop-based clients require it to access Gravitino
@@ -448,7 +440,8 @@ fs.ls("gvfs://fileset/adls_catalog/adls_schema/example_fileset/")
 
 ### pandas
 
-pandas reaches the same paths through `storage_options`.
+pandas reaches the same paths through `storage_options`. Use the `fs` instance from the preceding
+GVFS example to discover the generated Spark part file.
 
 ```python
 import pandas as pd
@@ -462,8 +455,18 @@ storage_options = {
     }
 }
 
-ds = pd.read_csv("gvfs://fileset/adls_catalog/adls_schema/example_fileset/people/part-00000.csv",
-                 storage_options=storage_options)
+csv_path = next(
+    f"gvfs://{path}"
+    for path in fs.ls(
+        "gvfs://fileset/adls_catalog/adls_schema/example_fileset/people",
+        detail=False,
+    )
+    if (
+        path.rsplit("/", 1)[-1].startswith("part-")
+        and path.endswith(".csv")
+    )
+)
+ds = pd.read_csv(csv_path, storage_options=storage_options)
 ds.head()
 ```
 

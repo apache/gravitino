@@ -75,9 +75,11 @@ The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
 
 ### Fileset Catalog with Cloud Storage
 
-A fileset always reaches its location through the HDFS protocol, so a cloud backend is a matter of
-putting the right bundle jar on the classpath and setting the credential properties for that
-backend. Each backend has its own page with a runnable end-to-end example.
+For Java and Hadoop-based access, each cloud backend uses its own Hadoop `FileSystem`
+implementation, such as S3A for Amazon S3, rather than the HDFS protocol. Put the matching bundle
+jar on the classpath and set the credential properties for that backend. Python clients use
+fsspec-based implementations and do not require these jars. Each backend has its own page with a
+runnable end-to-end example.
 
 | Storage backend                                           | Bundle jar                 | Location scheme | Backend properties                                                         |
 |-----------------------------------------------------------|----------------------------|-----------------|----------------------------------------------------------------------------|

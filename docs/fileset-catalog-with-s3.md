@@ -44,23 +44,19 @@ underscores while the catalog and the Java client use hyphens.
 | `s3-endpoint`                 | `s3_endpoint`          | Endpoint of the S3 service. S3-compatible storage such as MinIO always needs it.                                                                                                                                                                                                                                    | Yes, except for the Python client against AWS S3 |
 | `s3-access-key-id`            | `s3_access_key_id`     | Access key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
 | `s3-secret-access-key`        | `s3_secret_access_key` | Secret key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
-| `filesystem-providers`        | (n/a)                  | (deprecated) The filesystem providers to add. Set it to `s3` when the fileset is backed by S3, or to a comma separated string containing `s3`, such as `gs,s3`, to support several kinds of fileset at once.                                                                                                        | No (deprecated)                                  |
-| `default-filesystem-provider` | (n/a)                  | (deprecated) The filesystem provider used when the location URI carries no scheme. Defaults to `builtin-local`; setting it to `s3` allows the `s3a://` prefix to be omitted from the location.                                                                                                                      | No (deprecated)                                  |
 | `credential-providers`        | (n/a)                  | The credential provider types, separated by comma. Possible values are `s3-token`, `s3-secret-key`, `aws-irsa`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#s3) for the extra properties each provider takes. | No                                               |
-
-:::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog
-automatically loads the filesystem providers found on the classpath, including the built-in
-providers and the cloud providers carried by a bundle jar such as `gravitino-aws-bundle`.
-:::
 
 :::note
 - The location must start with `s3a://`, not `s3://`. The `hadoop-aws` library does not support the
   `s3://` scheme.
-- For MinIO and other S3-compatible services, set `s3-endpoint` to that service and, if the service
-  requires path-style access (`s3-path-style-access`), add
-  `gravitino.bypass.fs.s3a.path.style.access=true` to
-  `${GRAVITINO_HOME}/catalogs/fileset/conf/fileset.conf`.
+- For MinIO and other S3-compatible services, set `s3-endpoint` to that service. If it requires
+  path-style access, add `gravitino.bypass.fs.s3a.path.style.access=true` to
+  `${GRAVITINO_HOME}/catalogs/fileset/conf/fileset.conf` for server-side operations. Also set
+  `s3-path-style-access=true` on a GVFS Java client, or
+  `spark.hadoop.s3-path-style-access=true` in Spark. For the Python GVFS client, pass
+  `config_kwargs={"s3": {"addressing_style": "path"}}` to
+  `GravitinoVirtualFileSystem`; for pandas, add the same `config_kwargs` entry at the top level
+  of `storage_options`.
 :::
 
 Schema and fileset properties are documented on the shared page: see
@@ -249,14 +245,14 @@ environment:
 
 | Environment            | Jar providing the Amazon S3 filesystem                                                                                                                          |
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), a fat jar bundling `hadoop-aws` (3.3.1) and the AWS SDK |
+| No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), a fat jar bundling the Amazon S3 filesystem implementation and the AWS SDK |
 | Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                    |
 
 The artifacts in full:
 
 - [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle):
   a "fat" jar that includes the `gravitino-aws` functionality together with every dependency it needs,
-  such as `hadoop-aws` (3.3.1) and the AWS SDK. Use it when the environment has no pre-existing Hadoop setup.
+  such as `hadoop-aws` and the AWS SDK. Use it when the environment has no pre-existing Hadoop setup.
 - [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
   `gravitino-aws` functionality. Java and Hadoop-based clients require it to access Gravitino
@@ -462,7 +458,8 @@ fs.ls("gvfs://fileset/s3_catalog/s3_schema/example_fileset/")
 
 ### pandas
 
-pandas reaches the same paths through `storage_options`.
+pandas reaches the same paths through `storage_options`. Use the `fs` instance from the preceding
+GVFS example to discover the generated Spark part file.
 
 ```python
 import pandas as pd
@@ -477,8 +474,18 @@ storage_options = {
     }
 }
 
-ds = pd.read_csv("gvfs://fileset/s3_catalog/s3_schema/example_fileset/people/part-00000.csv",
-                 storage_options=storage_options)
+csv_path = next(
+    f"gvfs://{path}"
+    for path in fs.ls(
+        "gvfs://fileset/s3_catalog/s3_schema/example_fileset/people",
+        detail=False,
+    )
+    if (
+        path.rsplit("/", 1)[-1].startswith("part-")
+        and path.endswith(".csv")
+    )
+)
+ds = pd.read_csv(csv_path, storage_options=storage_options)
 ds.head()
 ```
 

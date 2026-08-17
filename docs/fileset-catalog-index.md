@@ -16,8 +16,9 @@ Gravitino Fileset catalog index includes the following chapters:
 
 ## Fileset Catalog with Cloud Storage
 
-Each cloud backend has its own page with a runnable end-to-end example, from installing the bundle
-jar to reading the fileset with Spark, the Hadoop shell, Python and pandas:
+Each cloud backend has its own page with a runnable end-to-end example covering catalog setup and
+Java/Hadoop data access. The S3, GCS, ADLS, and OSS pages also cover Python and pandas; COS
+currently has no Python data-plane implementation:
 
 - [Using Fileset catalog to manage Amazon S3](./fileset-catalog-with-s3.md).
 - [Using Fileset catalog to manage Google Cloud Storage](./fileset-catalog-with-gcs.md).
