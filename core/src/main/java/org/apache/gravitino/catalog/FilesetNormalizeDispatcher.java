@@ -72,12 +72,6 @@ public class FilesetNormalizeDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchFilesetException {
-    return dispatcher.loadFilesetWithResolvedProperties(normalizeCaseSensitive(ident));
-  }
-
-  @Override
   public boolean filesetExists(NameIdentifier ident) {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.

@@ -237,31 +237,6 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Load the catalog with secret URNs resolved to plaintext in {@link Catalog#properties()}.
-   *
-   * @param catalogName The name of the catalog.
-   * @return The catalog with resolved plaintext properties.
-   * @throws NoSuchCatalogException if the catalog with specified name does not exist.
-   */
-  @Override
-  public Catalog loadCatalogWithResolvedProperties(String catalogName)
-      throws NoSuchCatalogException {
-    CatalogResponse resp =
-        restClient.get(
-            String.format(
-                API_METALAKES_CATALOGS_PATH,
-                RESTUtils.encodeString(this.name()),
-                RESTUtils.encodeString(catalogName)),
-            ImmutableMap.of("view", "resolved"),
-            CatalogResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.catalogErrorHandler());
-    resp.validate();
-
-    return DTOConverters.toCatalog(this.name(), resp.getCatalog(), restClient);
-  }
-
-  /**
    * Create a new catalog with specified identifier, type, comment and properties.
    *
    * @param catalogName The identifier of the catalog.

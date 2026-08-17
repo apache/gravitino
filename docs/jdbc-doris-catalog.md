@@ -84,7 +84,7 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. For secret-manager-backed values, authorized callers can use `loadCatalogWithResolvedProperties` / `GET .../catalogs/{catalog}?view=resolved` to obtain plaintext. Credential-vending keys remain omitted from that path — use the [credential vending API](security/credential-vending.md) instead.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) for JDBC identity. Other secret-manager-backed properties can be retrieved via `getSecretProperties` / `GET .../objects/{type}/{fullName}/secret-properties`.
 :::
 
 ## Schema

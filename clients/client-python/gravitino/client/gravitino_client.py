@@ -96,9 +96,6 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
     def load_catalog(self, name: str) -> Catalog:
         return self.get_metalake().load_catalog(name)
 
-    def load_catalog_with_resolved_properties(self, name: str) -> Catalog:
-        return self.get_metalake().load_catalog_with_resolved_properties(name)
-
     def create_catalog(
         self,
         name: str,

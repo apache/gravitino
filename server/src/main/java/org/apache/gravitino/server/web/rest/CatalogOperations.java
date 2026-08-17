@@ -263,19 +263,11 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalakeName,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
-          String catalogName,
-      @QueryParam("view") String view) {
+          String catalogName) {
     LOG.info("Received load catalog request for catalog: {}.{}", metalakeName, catalogName);
     try {
       NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
-      Catalog catalog;
-      if (view == null || view.isBlank()) {
-        catalog = catalogDispatcher.loadCatalog(ident);
-      } else if ("resolved".equals(view)) {
-        catalog = catalogDispatcher.loadCatalogWithResolvedProperties(ident);
-      } else {
-        return Utils.illegalArguments("Query parameter 'view' must be 'resolved' when provided");
-      }
+      Catalog catalog = catalogDispatcher.loadCatalog(ident);
       Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
       LOG.info("Catalog loaded: {}.{}", metalakeName, catalogName);
       return response;

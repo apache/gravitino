@@ -83,6 +83,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   private final MetadataObjectPolicyOperations objectPolicyOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   protected final MetadataObjectCredentialOperations objectCredentialOperations;
+  protected final MetadataObjectSecretOperations objectSecretOperations;
   private final FunctionCatalogOperations functionOperations;
 
   BaseSchemaCatalog(
@@ -114,6 +115,8 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(
             catalogNamespace.level(0), metadataObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(catalogNamespace.level(0), metadataObject, restClient);
     this.functionOperations =
         new FunctionCatalogOperations(restClient, catalogNamespace, this.name());
   }
@@ -209,27 +212,6 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     SchemaResponse resp =
         restClient.get(
             formatSchemaRequestPath(schemaNamespace()) + "/" + RESTUtils.encodeString(schemaName),
-            SchemaResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.schemaErrorHandler());
-    resp.validate();
-
-    return new GenericSchema(resp.getSchema(), restClient, catalogNamespace.level(0), this.name());
-  }
-
-  /**
-   * Load the schema with secret URNs resolved to plaintext in {@link Schema#properties()}.
-   *
-   * @param schemaName The name of the schema.
-   * @return The schema with resolved plaintext properties.
-   * @throws NoSuchSchemaException if the schema with specified identifier does not exist.
-   */
-  @Override
-  public Schema loadSchemaWithResolvedProperties(String schemaName) throws NoSuchSchemaException {
-    SchemaResponse resp =
-        restClient.get(
-            formatSchemaRequestPath(schemaNamespace()) + "/" + RESTUtils.encodeString(schemaName),
-            Collections.singletonMap("view", "resolved"),
             SchemaResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.schemaErrorHandler());

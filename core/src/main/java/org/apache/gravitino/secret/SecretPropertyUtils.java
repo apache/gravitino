@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.connector.PropertiesMetadata;
 
 /**
  * Helpers for secret-related entity property handling and request validation.
@@ -39,12 +38,11 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 public final class SecretPropertyUtils {
 
   /**
-   * Property keys owned by credential vending ({@code SupportsCredentials} / credential providers).
-   * These must be omitted from the resolved-properties HTTP delivery API; callers should use {@code
-   * getCredentials} instead.
+   * Property keys owned by credential vending ({@code SupportsCredentials} / credential providers),
+   * plus JDBC connection identity keys that are delivered via {@code JdbcCredential}.
    *
-   * <p>Does <b>not</b> include {@code jdbc-user} / {@code jdbc-password}: those are secret-manager
-   * connection secrets and must appear as plaintext when URN-backed.
+   * <p>These keys are omitted from {@link #buildSecretProperties}; callers should use {@code
+   * getCredentials} instead.
    */
   public static final Set<String> CREDENTIAL_VENDING_PROPERTY_KEYS =
       ImmutableSet.of(
@@ -68,13 +66,16 @@ public final class SecretPropertyUtils {
           // GCS static credential material
           "gcs-service-account-file",
           "gcs-credential-path",
-          "gcs-credential-file-path");
+          "gcs-credential-file-path",
+          // JDBC connection identity (JdbcCredential)
+          "jdbc-user",
+          "jdbc-password");
 
   private SecretPropertyUtils() {}
 
   /**
-   * Returns whether a property key is owned by credential vending and must be omitted from resolved
-   * plaintext property delivery.
+   * Returns whether a property key is owned by credential vending (or JDBC credential delivery) and
+   * must be omitted from secret-properties delivery.
    *
    * @param key the property key
    * @return true when the key is a credential-vending property
@@ -95,31 +96,30 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Builds a resolved plaintext property map for connectors / Lance / IRC.
+   * Builds a map of secret-manager plaintext properties only.
    *
    * <p>Starting from raw entity properties:
    *
    * <ol>
-   *   <li>Omit credential-vending keys (use {@code getCredentials}).
+   *   <li>Include only entries where {@link #isSecretProperty} is true.
+   *   <li>Omit credential-vending keys including {@code jdbc-user} / {@code jdbc-password} (use
+   *       {@code getCredentials}).
    *   <li>Resolve secret URN values to plaintext via {@link SecretManager#readSecret}.
-   *   <li>Omit legacy hidden plaintext secrets ({@link PropertiesMetadata#isHiddenProperty}).
-   *   <li>Include all other entries unchanged.
    * </ol>
+   *
+   * <p>Normal non-secret properties are not included.
    *
    * @param secretManager secret manager used to resolve URNs
    * @param rawProperties raw entity properties (may be null)
-   * @param propertiesMetadata catalog/schema/fileset property metadata (may be null)
-   * @return a new resolved property map; never null
+   * @return a new secret plaintext property map; never null
    */
-  public static Map<String, String> buildResolvedProperties(
-      SecretManager secretManager,
-      @Nullable Map<String, String> rawProperties,
-      @Nullable PropertiesMetadata propertiesMetadata) {
+  public static Map<String, String> buildSecretProperties(
+      SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
     Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
     if (rawProperties == null || rawProperties.isEmpty()) {
       return Map.of();
     }
-    Map<String, String> resolved = new HashMap<>();
+    Map<String, String> secrets = new HashMap<>();
     for (Map.Entry<String, String> entry : rawProperties.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
@@ -130,15 +130,30 @@ public final class SecretPropertyUtils {
         continue;
       }
       if (isSecretProperty(key, value)) {
-        resolved.put(key, secretManager.readSecret(SecretUrn.parse(value)));
-        continue;
+        secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
       }
-      if (propertiesMetadata != null && propertiesMetadata.isHiddenProperty(key)) {
-        continue;
-      }
-      resolved.put(key, value);
     }
-    return resolved;
+    return secrets;
+  }
+
+  /**
+   * Merges base properties with secret plaintext properties.
+   *
+   * <p>Returns a new mutable map containing all entries from {@code base}, then overlays {@code
+   * secretProperties}. Null maps are treated as empty.
+   *
+   * @param base non-secret / default-load properties (may be null)
+   * @param secretProperties secret plaintext properties from {@link #buildSecretProperties} (may be
+   *     null)
+   * @return a new mutable merged property map; never null
+   */
+  public static Map<String, String> mergeProperties(
+      @Nullable Map<String, String> base, @Nullable Map<String, String> secretProperties) {
+    Map<String, String> merged = copyEntityProperties(base);
+    if (secretProperties != null && !secretProperties.isEmpty()) {
+      merged.putAll(secretProperties);
+    }
+    return merged;
   }
 
   /**

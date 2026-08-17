@@ -72,12 +72,6 @@ public class FilesetHookDispatcher implements FilesetDispatcher {
   }
 
   @Override
-  public Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchFilesetException {
-    return dispatcher.loadFilesetWithResolvedProperties(ident);
-  }
-
-  @Override
   public Fileset createMultipleLocationFileset(
       NameIdentifier ident,
       String comment,

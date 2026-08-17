@@ -27,6 +27,7 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.authorization.SupportsRoles;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecretProperties;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -271,5 +272,15 @@ public interface Fileset extends Auditable {
    */
   default SupportsCredentials supportsCredentials() {
     throw new UnsupportedOperationException("Fileset does not support credential operations.");
+  }
+
+  /**
+   * @return The {@link SupportsSecretProperties} if the fileset supports secret property
+   *     operations.
+   * @throws UnsupportedOperationException If the fileset does not support secret property
+   *     operations.
+   */
+  default SupportsSecretProperties supportsSecretProperties() {
+    throw new UnsupportedOperationException("Fileset does not support secret property operations.");
   }
 }

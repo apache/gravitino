@@ -297,35 +297,6 @@ public class TestSchemaOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testLoadSchemaResolvedProperties() {
-    Map<String, String> resolved = ImmutableMap.of("key", "plaintext-value");
-    Schema mockSchema = mockSchema("schema1", "comment", resolved);
-    when(dispatcher.loadSchemaWithResolvedProperties(any())).thenReturn(mockSchema);
-
-    Response resp =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
-            .queryParam("view", "resolved")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    SchemaResponse schemaResponse = resp.readEntity(SchemaResponse.class);
-    Assertions.assertEquals(0, schemaResponse.getCode());
-    Assertions.assertEquals(resolved, schemaResponse.getSchema().properties());
-
-    Response invalidView =
-        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas/schema1")
-            .queryParam("view", "invalid")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invalidView.getStatus());
-    ErrorResponse errorResponse = invalidView.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
-  }
-
-  @Test
   public void testLoadSchema() {
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
     when(dispatcher.loadSchema(any())).thenReturn(mockSchema);

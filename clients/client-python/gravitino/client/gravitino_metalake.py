@@ -210,32 +210,6 @@ class GravitinoMetalake(
             self.name(), catalog_resp.catalog(), self.rest_client
         )
 
-    def load_catalog_with_resolved_properties(self, name: str) -> Catalog:
-        """Load catalog with secret URNs resolved to plaintext in properties.
-
-        Args:
-            name: The name of the catalog.
-
-        Raises:
-            NoSuchCatalogException if the catalog with specified name does not exist.
-
-        Returns:
-            The catalog with resolved plaintext properties.
-        """
-        url = self.API_METALAKES_CATALOGS_PATH.format(
-            encode_string(self.name()), encode_string(name)
-        )
-        response = self.rest_client.get(
-            url,
-            params={"view": "resolved"},
-            error_handler=CATALOG_ERROR_HANDLER,
-        )
-        catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
-        catalog_resp.validate()
-        return DTOConverters.to_catalog(
-            self.name(), catalog_resp.catalog(), self.rest_client
-        )
-
     def create_catalog(
         self,
         name: str,

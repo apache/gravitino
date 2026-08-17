@@ -33,8 +33,6 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
-import org.apache.gravitino.dto.SchemaDTO;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -45,7 +43,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.SchemaEntityCleaner;
@@ -222,49 +219,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     }
 
     return schema;
-  }
-
-  /**
-   * Loads a schema with secret URNs resolved to plaintext in {@link Schema#properties()}.
-   *
-   * <p>This path resolves from the connector {@code loadSchema} property map and returns a
-   * properties-focused {@link Schema} view. It does not run the full import / {@code
-   * EntityCombinedSchema} combine path used by {@link #loadSchema(NameIdentifier)}.
-   *
-   * @param ident The identifier of the schema.
-   * @return The schema with resolved plaintext properties.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   */
-  @Override
-  public Schema loadSchemaWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchSchemaException {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () -> {
-          NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          Schema schema =
-              doWithCatalog(
-                  catalogIdent,
-                  c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
-                  NoSuchSchemaException.class);
-          Map<String, String> rawProperties = schema.properties();
-          Map<String, String> resolved =
-              doWithCatalog(
-                  catalogIdent,
-                  c ->
-                      c.doWithPropertiesMeta(
-                          p ->
-                              SecretPropertyUtils.buildResolvedProperties(
-                                  secretManager, rawProperties, p.schemaPropertiesMetadata())),
-                  IllegalArgumentException.class);
-          return SchemaDTO.builder()
-              .withName(schema.name())
-              .withComment(schema.comment())
-              .withProperties(resolved)
-              .withAudit(DTOConverters.toDTO(schema.auditInfo()))
-              .build();
-        });
   }
 
   /**

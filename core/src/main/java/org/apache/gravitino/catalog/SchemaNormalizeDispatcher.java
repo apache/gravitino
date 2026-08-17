@@ -84,12 +84,6 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   }
 
   @Override
-  public Schema loadSchemaWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchSchemaException {
-    return dispatcher.loadSchemaWithResolvedProperties(normalizeCaseSensitive(ident));
-  }
-
-  @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
     // The constraints of the name spec may be more strict than underlying catalog,

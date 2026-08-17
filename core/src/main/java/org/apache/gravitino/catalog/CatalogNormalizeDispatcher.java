@@ -72,12 +72,6 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
-  public Catalog loadCatalogWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchCatalogException {
-    return dispatcher.loadCatalogWithResolvedProperties(ident);
-  }
-
-  @Override
   public boolean catalogExists(NameIdentifier ident) {
     return dispatcher.catalogExists(ident);
   }

@@ -36,6 +36,9 @@ from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
 )
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
+)
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.catalog_dto import CatalogDTO
@@ -76,6 +79,9 @@ class BaseSchemaCatalog(
     # The metadata object credential operations
     _object_credential_operations: MetadataObjectCredentialOperations
 
+    # The metadata object secret property operations
+    _object_secret_operations: MetadataObjectSecretOperations
+
     _function_operations: FunctionCatalogOperations
 
     def __init__(
@@ -104,6 +110,9 @@ class BaseSchemaCatalog(
         self._object_credential_operations = MetadataObjectCredentialOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
+        self._object_secret_operations = MetadataObjectSecretOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
         self._function_operations = FunctionCatalogOperations(
             rest_client, catalog_namespace, self.name()
         )
@@ -112,6 +121,9 @@ class BaseSchemaCatalog(
         )
 
         self.validate()
+
+    def get_secret_properties(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secret_properties()
 
     def as_schemas(self):
         return self
@@ -215,34 +227,6 @@ class BaseSchemaCatalog(
 
         return GenericSchema(
             schema_response.schema(),
-            self.rest_client,
-            self._catalog_namespace.level(0),
-            self._name,
-        )
-
-    def load_schema_with_resolved_properties(self, schema_name: str) -> Schema:
-        """Load schema with secret URNs resolved to plaintext in properties.
-
-        Args:
-            schema_name: The name of the schema.
-
-        Raises:
-            NoSuchSchemaException if the schema with specified identifier does not exist.
-
-        Returns:
-            The schema with resolved plaintext properties.
-        """
-        resp = self.rest_client.get(
-            BaseSchemaCatalog.format_schema_request_path(self._schema_namespace())
-            + "/"
-            + encode_string(schema_name),
-            params={"view": "resolved"},
-            error_handler=SCHEMA_ERROR_HANDLER,
-        )
-        schema_resp = SchemaResponse.from_json(resp.body, infer_missing=True)
-        schema_resp.validate()
-        return GenericSchema(
-            schema_resp.schema(),
             self.rest_client,
             self._catalog_namespace.level(0),
             self._name,

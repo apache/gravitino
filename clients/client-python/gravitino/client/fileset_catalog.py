@@ -24,6 +24,7 @@ from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 from gravitino.api.catalog import Catalog
 from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.supports_credentials import SupportsCredentials
+from gravitino.api.secret.supports_secret_properties import SupportsSecretProperties
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.api.secret import SecretBinding, SecretReference
@@ -50,7 +51,7 @@ _EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class FilesetCatalog(
-    BaseSchemaCatalog, SupportsCredentials
+    BaseSchemaCatalog, SupportsCredentials, SupportsSecretProperties
 ):  # pylint: disable=too-many-ancestors
     """
     Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
@@ -134,32 +135,6 @@ class FilesetCatalog(
         fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
         fileset_resp.validate()
 
-        return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
-
-    def load_fileset_with_resolved_properties(self, ident: NameIdentifier) -> Fileset:
-        """Load fileset with secret URNs resolved to plaintext in properties.
-
-        Args:
-            ident: A fileset identifier in schema.fileset format.
-
-        Raises:
-            NoSuchFilesetException If the fileset does not exist.
-
-        Returns:
-            The fileset with resolved plaintext properties.
-        """
-        self.check_fileset_name_identifier(ident)
-
-        full_namespace = self._get_fileset_full_namespace(ident.namespace())
-
-        resp = self.rest_client.get(
-            f"{self.format_fileset_request_path(full_namespace)}/"
-            f"{encode_string(ident.name())}",
-            params={"view": "resolved"},
-            error_handler=FILESET_ERROR_HANDLER,
-        )
-        fileset_resp = FilesetResponse.from_json(resp.body, infer_missing=True)
-        fileset_resp.validate()
         return GenericFileset(fileset_resp.fileset(), self.rest_client, full_namespace)
 
     def create_fileset(
@@ -428,3 +403,9 @@ class FilesetCatalog(
 
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
+
+    def support_secret_properties(self) -> SupportsSecretProperties:
+        return self
+
+    def get_secret_properties(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secret_properties()

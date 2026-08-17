@@ -103,12 +103,6 @@ public class TestDynamicIcebergConfigProvider {
             }
             return catalog;
           }
-
-          @Override
-          public Catalog loadCatalogWithResolvedProperties(String catalogName)
-              throws NoSuchCatalogException {
-            return loadCatalog(catalogName);
-          }
         };
     provider.setCatalogFetcher(mockFetcher);
   }
@@ -307,8 +301,6 @@ public class TestDynamicIcebergConfigProvider {
         };
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.properties()).thenReturn(catalogProperties);
-    Mockito.when(mockInternalCatalogDispatcher.loadCatalogWithResolvedProperties(catalogIdent))
-        .thenReturn(mockCatalog);
 
     // Set the mock CatalogDispatchers to GravitinoEnv
     FieldUtils.writeField(
@@ -331,7 +323,6 @@ public class TestDynamicIcebergConfigProvider {
 
     Assertions.assertTrue(icebergConfig.isPresent());
     Mockito.verify(mockInternalCatalogDispatcher).loadCatalog(catalogIdent);
-    Mockito.verify(mockInternalCatalogDispatcher).loadCatalogWithResolvedProperties(catalogIdent);
     Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
   }
 
@@ -537,8 +528,6 @@ public class TestDynamicIcebergConfigProvider {
         };
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
     Mockito.when(mockCatalog.properties()).thenReturn(catalogProperties);
-    Mockito.when(mockInternalCatalogDispatcher.loadCatalogWithResolvedProperties(catalogIdent))
-        .thenReturn(mockCatalog);
 
     // Set the mock CatalogDispatchers to GravitinoEnv
     FieldUtils.writeField(

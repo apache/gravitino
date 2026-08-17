@@ -31,6 +31,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -129,8 +130,50 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return catalogOperator.loadCatalog(catalogName);
   }
 
-  Catalog loadCatalogWithResolvedProperties(String catalogName) throws NoSuchCatalogException {
-    return catalogOperator.loadCatalogWithResolvedProperties(catalogName);
+  Map<String, String> catalogPropertiesWithSecrets(Catalog catalog) {
+    Map<String, String> properties =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    properties.putAll(getCatalogSecretProperties(catalog.name()));
+    return properties;
+  }
+
+  Map<String, String> schemaPropertiesWithSecrets(Catalog catalog, String schemaName) {
+    Schema schema = loadSchema(catalog, schemaName);
+    Map<String, String> properties =
+        new HashMap<>(schema.properties() == null ? Map.of() : schema.properties());
+    properties.putAll(getSchemaSecretProperties(catalog.name(), schemaName));
+    return properties;
+  }
+
+  private Map<String, String> getCatalogSecretProperties(String catalogName) {
+    org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
+        currentSecretPropertyDispatcher();
+    if (dispatcher != null) {
+      return dispatcher.getSecretProperties(
+          NameIdentifierUtil.ofCatalog(metalakeName, catalogName), Entity.EntityType.CATALOG);
+    }
+    return loadCatalog(catalogName).supportsSecretProperties().getSecretProperties();
+  }
+
+  private Map<String, String> getSchemaSecretProperties(String catalogName, String schemaName) {
+    org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
+        currentSecretPropertyDispatcher();
+    if (dispatcher != null) {
+      return dispatcher.getSecretProperties(
+          schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA);
+    }
+    return loadSchema(loadCatalog(catalogName), schemaName)
+        .supportsSecretProperties()
+        .getSecretProperties();
+  }
+
+  private org.apache.gravitino.secret.SecretPropertyOperationDispatcher
+      currentSecretPropertyDispatcher() {
+    try {
+      return GravitinoEnv.getInstance().secretPropertyOperationDispatcher();
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   Catalog createCatalog(
@@ -201,16 +244,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
 
     return catalog.asSchemas().loadSchema(schemaName);
-  }
-
-  Schema loadSchemaWithResolvedProperties(Catalog catalog, String schemaName) {
-    SchemaDispatcher schemaDispatcher = currentSchemaDispatcher();
-    if (schemaDispatcher != null) {
-      return schemaDispatcher.loadSchemaWithResolvedProperties(
-          schemaIdent(catalog.name(), schemaName));
-    }
-
-    return catalog.asSchemas().loadSchemaWithResolvedProperties(schemaName);
   }
 
   Schema createSchema(
@@ -312,8 +345,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     Catalog[] listCatalogsInfo() throws NoSuchMetalakeException;
 
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
-
-    Catalog loadCatalogWithResolvedProperties(String catalogName) throws NoSuchCatalogException;
 
     Catalog createCatalog(
         String catalogName,
@@ -420,13 +451,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     }
 
     @Override
-    public Catalog loadCatalogWithResolvedProperties(String catalogName)
-        throws NoSuchCatalogException {
-      return catalogDispatcher.loadCatalogWithResolvedProperties(
-          NameIdentifierUtil.ofCatalog(metalakeName, catalogName));
-    }
-
-    @Override
     public Catalog createCatalog(
         String catalogName,
         Catalog.Type type,
@@ -480,12 +504,6 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
       return getClient().loadCatalog(catalogName);
-    }
-
-    @Override
-    public Catalog loadCatalogWithResolvedProperties(String catalogName)
-        throws NoSuchCatalogException {
-      return getClient().loadCatalogWithResolvedProperties(catalogName);
     }
 
     @Override

@@ -202,22 +202,15 @@ public class FilesetOperations {
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
-      @QueryParam("view") String view) {
+      @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET)
+          String fileset) {
     LOG.info("Received load fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            if (view != null && !view.isBlank() && !"resolved".equals(view)) {
-              return Utils.illegalArguments(
-                  "Query parameter 'view' must be 'resolved' when provided");
-            }
             NameIdentifier ident = NameIdentifierUtil.ofFileset(metalake, catalog, schema, fileset);
-            Fileset t =
-                "resolved".equals(view)
-                    ? dispatcher.loadFilesetWithResolvedProperties(ident)
-                    : dispatcher.loadFileset(ident);
+            Fileset t = dispatcher.loadFileset(ident);
             Response response = Utils.ok(new FilesetResponse(DTOConverters.toDTO(t)));
             LOG.info("Fileset loaded: {}.{}.{}.{}", metalake, catalog, schema, fileset);
             return response;

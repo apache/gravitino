@@ -410,37 +410,6 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testLoadCatalogResolvedProperties() {
-    Map<String, String> resolved =
-        ImmutableMap.of("jdbc-url", "jdbc:mysql://localhost/db", "jdbc-password", "secret");
-    TestCatalog catalog = buildCatalogWithProperties("metalake1", "catalog1", resolved);
-    when(manager.loadCatalogWithResolvedProperties(any())).thenReturn(catalog);
-
-    Response resp =
-        target("/metalakes/metalake1/catalogs/catalog1")
-            .queryParam("view", "resolved")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-    CatalogResponse catalogResponse = resp.readEntity(CatalogResponse.class);
-    Assertions.assertEquals(0, catalogResponse.getCode());
-    Assertions.assertTrue(
-        catalogResponse.getCatalog().properties().entrySet().containsAll(resolved.entrySet()));
-
-    Response invalidView =
-        target("/metalakes/metalake1/catalogs/catalog1")
-            .queryParam("view", "invalid")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invalidView.getStatus());
-    ErrorResponse errorResponse = invalidView.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
-  }
-
-  @Test
   public void testAlterCatalog() {
     TestCatalog catalog = buildCatalog("metalake1", "catalog2");
 

@@ -161,12 +161,6 @@ public class SchemaHookDispatcher implements SchemaDispatcher {
   }
 
   @Override
-  public Schema loadSchemaWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchSchemaException {
-    return dispatcher.loadSchemaWithResolvedProperties(ident);
-  }
-
-  @Override
   public Schema alterSchema(NameIdentifier ident, SchemaChange... changes)
       throws NoSuchSchemaException {
     // Schema doesn't support to rename operation now. So we don't need to change

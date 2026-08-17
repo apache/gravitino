@@ -113,20 +113,6 @@ public interface SupportsSchemas {
   Schema loadSchema(String schemaName) throws NoSuchSchemaException;
 
   /**
-   * Loads a schema with secret URNs resolved to plaintext in {@link Schema#properties()}.
-   *
-   * <p>The returned schema is intended for reading resolved properties.
-   *
-   * @param schemaName The name of the schema.
-   * @return The schema with resolved plaintext properties.
-   * @throws NoSuchSchemaException If the schema does not exist.
-   */
-  default Schema loadSchemaWithResolvedProperties(String schemaName) throws NoSuchSchemaException {
-    throw new UnsupportedOperationException(
-        "Loading schema with resolved properties is not supported by this catalog");
-  }
-
-  /**
    * Apply the metadata change to a schema in the catalog.
    *
    * @param schemaName The name of the schema.

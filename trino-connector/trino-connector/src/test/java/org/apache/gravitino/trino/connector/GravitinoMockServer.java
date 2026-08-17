@@ -222,7 +222,6 @@ public class GravitinoMockServer implements AutoCloseable {
         };
     when(metaLake.loadCatalog(anyString())).thenAnswer(loadCatalogAnswer);
     // Connectors load catalogs with secrets resolved for backend configuration.
-    when(metaLake.loadCatalogWithResolvedProperties(anyString())).thenAnswer(loadCatalogAnswer);
     when(metaLake.listCatalogsInfo())
         .thenAnswer(
             new Answer<Catalog[]>() {

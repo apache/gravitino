@@ -107,7 +107,6 @@ import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.secret.SecretManager;
-import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -573,50 +572,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           BaseCatalog baseCatalog = loadCatalogAndWrap(ident).catalog();
           baseCatalog.checkMetalakeInUse();
           return baseCatalog;
-        });
-  }
-
-  /**
-   * Loads a catalog with secret URNs resolved to plaintext in {@link Catalog#properties()}.
-   *
-   * @param ident The identifier of the catalog.
-   * @return The catalog with resolved plaintext properties.
-   * @throws NoSuchCatalogException If the specified catalog does not exist.
-   */
-  @Override
-  public Catalog loadCatalogWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchCatalogException {
-    return TreeLockUtils.doWithTreeLock(
-        ident,
-        LockType.READ,
-        () -> {
-          CatalogWrapper wrapper = loadCatalogAndWrap(ident);
-          BaseCatalog baseCatalog = wrapper.catalog();
-          baseCatalog.checkMetalakeInUse();
-          Map<String, String> rawProperties = baseCatalog.entity().getProperties();
-          try {
-            Map<String, String> resolved =
-                wrapper.doWithPropertiesMeta(
-                    meta -> {
-                      Map<String, String> props =
-                          Maps.newHashMap(
-                              SecretPropertyUtils.buildResolvedProperties(
-                                  secretManager, rawProperties, meta.catalogPropertiesMetadata()));
-                      // Match BaseCatalog#properties(): reserved in-use default is not always
-                      // persisted on the entity.
-                      props.putIfAbsent(
-                          PROPERTY_IN_USE,
-                          meta.catalogPropertiesMetadata()
-                              .getDefaultValue(PROPERTY_IN_USE)
-                              .toString());
-                      return props;
-                    });
-            return wrapper.catalog().entity().toCatalogInfoWithResolvedProps(resolved);
-          } catch (RuntimeException e) {
-            throw e;
-          } catch (Exception e) {
-            throw new RuntimeException(e);
-          }
         });
   }
 

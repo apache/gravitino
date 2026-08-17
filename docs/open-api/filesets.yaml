@@ -79,12 +79,7 @@ paths:
         - fileset
       summary: Get fileset
       operationId: loadFileset
-      description: >
-        Returns the specified fileset object. When query parameter view=resolved is provided,
-        secret URNs in fileset properties are resolved to plaintext for connector / runtime use.
-        Credential-vending keys are omitted.
-      parameters:
-        - $ref: "./catalogs.yaml#/components/parameters/resolvedView"
+      description: Returns the specified fileset object.
       responses:
         "200":
           $ref: "#/components/responses/FilesetResponse"

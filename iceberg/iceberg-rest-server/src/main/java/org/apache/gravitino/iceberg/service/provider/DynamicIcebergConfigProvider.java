@@ -111,8 +111,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     // server. Call propertiesWithCredentialProviders() then SecretManager.toPlaintextProperties
     // so URNs become plaintext while credential-provider keys remain for provider detection.
     //
-    // Standalone mode: fetch resolved properties over HTTP (credential-vending keys omitted),
-    // then inject JdbcCredential fields from getCredentials() when present.
+    // Standalone mode: merge loadCatalog().properties() with getSecretProperties(), then inject
+    // JdbcCredential fields from getCredentials() when present.
     Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
       catalogProperties =
@@ -122,8 +122,13 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
                   .toPlaintextProperties(
                       ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
     } else {
-      Catalog resolved = getCatalogFetcher().loadCatalogWithResolvedProperties(catalogName);
-      catalogProperties = new HashMap<>(resolved.properties());
+      catalogProperties =
+          new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+      try {
+        catalogProperties.putAll(catalog.supportsSecretProperties().getSecretProperties());
+      } catch (UnsupportedOperationException ignored) {
+        // Catalog does not support secret property operations.
+      }
       if (catalog instanceof SupportsCredentials) {
         Arrays.stream(((SupportsCredentials) catalog).getCredentials())
             .filter(c -> c instanceof JdbcCredential)
@@ -271,8 +276,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   interface CatalogFetcher extends Closeable {
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
 
-    Catalog loadCatalogWithResolvedProperties(String catalogName) throws NoSuchCatalogException;
-
     @Override
     default void close() {}
   }
@@ -304,13 +307,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
       NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalake, catalogName);
       return catalogDispatcher.loadCatalog(catalogIdent);
     }
-
-    @Override
-    public Catalog loadCatalogWithResolvedProperties(String catalogName)
-        throws NoSuchCatalogException {
-      NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalake, catalogName);
-      return catalogDispatcher.loadCatalogWithResolvedProperties(catalogIdent);
-    }
   }
 
   /**
@@ -332,12 +328,6 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
       return getGravitinoClient().loadCatalog(catalogName);
-    }
-
-    @Override
-    public Catalog loadCatalogWithResolvedProperties(String catalogName)
-        throws NoSuchCatalogException {
-      return getGravitinoClient().loadCatalogWithResolvedProperties(catalogName);
     }
 
     @Override

@@ -244,36 +244,6 @@ public class TestFilesetOperations extends BaseOperationsTest {
   }
 
   @Test
-  public void testLoadFilesetResolvedProperties() {
-    Map<String, String> resolved = ImmutableMap.of("k1", "plaintext-v1");
-    Fileset mockFileset =
-        mockFileset("fileset1", Fileset.Type.MANAGED, "comment", "mock location", resolved);
-    when(dispatcher.loadFilesetWithResolvedProperties(any())).thenReturn(mockFileset);
-
-    Response resp =
-        target(filesetPath(metalake, catalog, schema) + "fileset1")
-            .queryParam("view", "resolved")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-
-    FilesetResponse filesetResponse = resp.readEntity(FilesetResponse.class);
-    Assertions.assertEquals(0, filesetResponse.getCode());
-    Assertions.assertEquals(resolved, filesetResponse.getFileset().properties());
-
-    Response invalidView =
-        target(filesetPath(metalake, catalog, schema) + "fileset1")
-            .queryParam("view", "invalid")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), invalidView.getStatus());
-    ErrorResponse errorResponse = invalidView.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
-  }
-
-  @Test
   public void testCreateFileset() {
     Fileset fileset =
         mockFileset(

@@ -154,12 +154,7 @@ paths:
         - catalog
       summary: Get catalog
       operationId: loadCatalog
-      description: >
-        Returns the specified catalog information in the specified metalake. When query parameter
-        view=resolved is provided, secret URNs in catalog properties are resolved to plaintext for
-        connector / runtime use. Credential-vending keys are omitted.
-      parameters:
-        - $ref: "#/components/parameters/resolvedView"
+      description: Returns the specified catalog information in the specified metalake.
       responses:
         "200":
           $ref: "#/components/responses/CatalogResponse"
@@ -273,18 +268,6 @@ components:
       schema:
         type: boolean
         default: false
-
-    resolvedView:
-      name: view
-      in: query
-      description: >
-        Optional property view type. When set to "resolved", secret URNs in entity properties are
-        resolved to plaintext for connector / runtime use.
-      required: false
-      schema:
-        type: string
-        enum:
-          - resolved
 
   schemas:
 

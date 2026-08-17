@@ -174,22 +174,14 @@ public class SchemaOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
-      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
-      @QueryParam("view") String view) {
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
     LOG.info("Received load schema request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
-            if (view != null && !view.isBlank() && !"resolved".equals(view)) {
-              return Utils.illegalArguments(
-                  "Query parameter 'view' must be 'resolved' when provided");
-            }
             NameIdentifier ident = NameIdentifierUtil.ofSchema(metalake, catalog, schema);
-            Schema s =
-                "resolved".equals(view)
-                    ? dispatcher.loadSchemaWithResolvedProperties(ident)
-                    : dispatcher.loadSchema(ident);
+            Schema s = dispatcher.loadSchema(ident);
             Response response = Utils.ok(new SchemaResponse(DTOConverters.toDTO(s)));
             LOG.info("Schema loaded: {}.{}.{}", metalake, catalog, s.name());
             return response;

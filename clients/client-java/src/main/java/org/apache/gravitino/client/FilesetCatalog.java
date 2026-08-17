@@ -53,6 +53,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
+import org.apache.gravitino.secret.SupportsSecretProperties;
 
 /**
  * Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
@@ -60,7 +61,9 @@ import org.apache.gravitino.secret.SecretReference;
  * metalake.
  */
 class FilesetCatalog extends BaseSchemaCatalog
-    implements org.apache.gravitino.file.FilesetCatalog, SupportsCredentials {
+    implements org.apache.gravitino.file.FilesetCatalog,
+        SupportsCredentials,
+        SupportsSecretProperties {
 
   FilesetCatalog(
       Namespace namespace,
@@ -126,30 +129,6 @@ class FilesetCatalog extends BaseSchemaCatalog
             ErrorHandlers.filesetErrorHandler());
     resp.validate();
 
-    return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
-  }
-
-  /**
-   * Load the fileset with secret URNs resolved to plaintext in {@link Fileset#properties()}.
-   *
-   * @param ident A fileset identifier in {@code schema.fileset} format.
-   * @return The fileset with resolved plaintext properties.
-   * @throws NoSuchFilesetException If the fileset does not exist.
-   */
-  @Override
-  public Fileset loadFilesetWithResolvedProperties(NameIdentifier ident)
-      throws NoSuchFilesetException {
-    checkFilesetNameIdentifier(ident);
-
-    Namespace fullNamespace = getFilesetFullNamespace(ident.namespace());
-    FilesetResponse resp =
-        restClient.get(
-            formatFilesetRequestPath(fullNamespace) + "/" + RESTUtils.encodeString(ident.name()),
-            Collections.singletonMap("view", "resolved"),
-            FilesetResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.filesetErrorHandler());
-    resp.validate();
     return new GenericFileset(resp.getFileset(), restClient, fullNamespace);
   }
 
@@ -313,6 +292,16 @@ class FilesetCatalog extends BaseSchemaCatalog
   @Override
   public Credential[] getCredentials() {
     return objectCredentialOperations.getCredentials();
+  }
+
+  @Override
+  public SupportsSecretProperties supportsSecretProperties() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecretProperties() {
+    return objectSecretOperations.getSecretProperties();
   }
 
   @VisibleForTesting

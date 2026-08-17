@@ -99,7 +99,7 @@ Download the corresponding JDBC driver and place it to the `catalogs/lakehouse-p
 Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are hidden from the default load catalog response. Secret-manager-backed `jdbc-user` / `jdbc-password` can be loaded via `loadCatalogWithResolvedProperties` / `?view=resolved`. Credential-vending keys such as `s3-access-key-id` remain omitted there — use the [credential vending API](security/credential-vending.md).
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) for JDBC identity. Other secret-manager-backed properties can be retrieved via `getSecretProperties` / `GET .../objects/{type}/{fullName}/secret-properties`.
 :::
 
 ## Schema

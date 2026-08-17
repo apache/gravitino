@@ -498,10 +498,11 @@ class BaseGVFSOperations(ABC):
         fileset_ident: NameIdentifier,
         actual_location: str,
     ) -> Dict[str, str]:
-        """Merge resolved properties from catalog, schema, fileset, options, and configs.
+        """Merge properties from catalog, schema, fileset, options, and configs.
 
-        Uses load_*_with_resolved_properties so secret URNs become plaintext for FS access.
-        Credential-vending keys remain omitted from those APIs.
+        Combines default load*.properties() with get_secret_properties() so secret URNs
+        become plaintext for FS access. Credential-vending keys remain omitted — use
+        get_credentials instead.
 
         :param fileset_ident: The fileset identifier
         :param actual_location: The actual storage location
@@ -509,16 +510,17 @@ class BaseGVFSOperations(ABC):
         """
         catalog_name = fileset_ident.namespace().level(1)
         schema_name = fileset_ident.namespace().level(2)
-        catalog = self._get_gravitino_client().load_catalog_with_resolved_properties(
-            catalog_name
-        )
-        schema = catalog.as_schemas().load_schema_with_resolved_properties(schema_name)
-        fileset = catalog.as_fileset_catalog().load_fileset_with_resolved_properties(
+        catalog = self._get_gravitino_client().load_catalog(catalog_name)
+        schema = catalog.as_schemas().load_schema(schema_name)
+        fileset = catalog.as_fileset_catalog().load_fileset(
             NameIdentifier.of(schema_name, fileset_ident.name())
         )
         fileset_props = dict(catalog.properties() or {})
+        fileset_props.update(catalog.get_secret_properties())
         fileset_props.update(schema.properties() or {})
+        fileset_props.update(schema.get_secret_properties())
         fileset_props.update(fileset.properties() or {})
+        fileset_props.update(fileset.get_secret_properties())
         if self._options:
             fileset_props.update(self._options)
         # Get user-defined configurations for the actual location

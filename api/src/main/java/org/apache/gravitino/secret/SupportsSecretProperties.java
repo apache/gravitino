@@ -16,15 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.secret;
 
-package org.apache.gravitino.catalog;
-
-import org.apache.gravitino.connector.SupportsSchemas;
+import java.util.Map;
 
 /**
- * {@code SchemaDispatcher} interface acts as a specialization of the {@link SupportsSchemas}
- * interface. This interface is designed to potentially add custom behaviors or operations related
- * to dispatching or handling schema-related events or actions that are not covered by the standard
- * {@code SupportsSchemas} operations.
+ * Interface to retrieve secret-manager plaintext properties for a metadata object.
+ *
+ * <p>Only secret-URN property values are resolved and returned. Credential-vending keys (including
+ * {@code jdbc-user} / {@code jdbc-password}) are omitted — use {@link
+ * org.apache.gravitino.credential.SupportsCredentials} instead. Normal non-secret properties are
+ * not included; combine with {@code load*().properties()} on the client.
  */
-public interface SchemaDispatcher extends SupportsSchemas {}
+public interface SupportsSecretProperties {
+
+  /**
+   * Returns secret-manager plaintext properties for this metadata object.
+   *
+   * @return a map of property key to resolved plaintext value; never null, may be empty
+   */
+  Map<String, String> getSecretProperties();
+}

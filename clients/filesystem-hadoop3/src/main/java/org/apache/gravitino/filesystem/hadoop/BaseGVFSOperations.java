@@ -965,21 +965,22 @@ public abstract class BaseGVFSOperations implements Closeable {
     Map<String, String> allProperties = new HashMap<>();
     String catalogName = filesetIdent.namespace().level(1);
     String schemaName = filesetIdent.namespace().level(2);
-    Catalog catalog = getGravitinoClient().loadCatalogWithResolvedProperties(catalogName);
+    Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
     if (catalog.properties() != null) {
       allProperties.putAll(catalog.properties());
     }
-    Schema schema = catalog.asSchemas().loadSchemaWithResolvedProperties(schemaName);
+    allProperties.putAll(catalog.supportsSecretProperties().getSecretProperties());
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
     if (schema.properties() != null) {
       allProperties.putAll(schema.properties());
     }
-    Fileset resolvedFileset =
-        catalog
-            .asFilesetCatalog()
-            .loadFilesetWithResolvedProperties(NameIdentifier.of(schemaName, filesetIdent.name()));
-    if (resolvedFileset.properties() != null) {
-      allProperties.putAll(resolvedFileset.properties());
+    allProperties.putAll(schema.supportsSecretProperties().getSecretProperties());
+    Fileset fileset =
+        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
+    if (fileset.properties() != null) {
+      allProperties.putAll(fileset.properties());
     }
+    allProperties.putAll(fileset.supportsSecretProperties().getSecretProperties());
     allProperties.putAll(extractNonDefaultConfig(conf));
     return allProperties;
   }
