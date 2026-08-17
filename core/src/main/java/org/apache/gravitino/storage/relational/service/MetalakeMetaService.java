@@ -182,6 +182,8 @@ public class MetalakeMetaService {
                     MetalakeMetaMapper.class,
                     mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
             if (updated == 0) {
+              // The row may have a new version, or it may have been deleted or renamed. Re-read it
+              // to return the correct conflict or missing-entity error.
               throw metalakeWriteFailure(
                   ident, oldMetalakePO.getMetalakeId(), oldMetalakePO.getMetalakeName());
             }
@@ -215,6 +217,8 @@ public class MetalakeMetaService {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
             () -> {
+              // Take the parent lock before the child snapshot, so catalog creation cannot add a
+              // child after the snapshot. A later failure rolls back this soft delete as well.
               deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
               deleteCatalogsWithVersions(ident, metalakeId);
               deleteSchemasWithVersions(ident, listSchemaPOsForCascade(metalakeId));
@@ -322,6 +326,12 @@ public class MetalakeMetaService {
       } else {
         SessionUtils.doMultipleWithCommit(
             () -> {
+              // Delete the metalake before checking its children. The UPDATE takes an exclusive
+              // lock on the metalake row, and catalog creation locks the same row before inserting.
+              // If creation gets its lock first, this delete waits and the check below sees the new
+              // catalog. If this delete gets the lock first, creation waits until this transaction
+              // commits or rolls back. Checking first would allow a catalog to be inserted between
+              // the check and this delete. A non-empty result rolls back the soft delete.
               deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
               List<CatalogPO> catalogPOs =
                   SessionUtils.getWithoutCommit(
@@ -397,12 +407,11 @@ public class MetalakeMetaService {
 
   private RuntimeException metalakeWriteFailure(
       NameIdentifier identifier, Long metalakeId, String observedName) {
-    // This re-read is deliberately a locking read. Under MySQL REPEATABLE READ a plain SELECT
-    // returns this transaction's snapshot, which still shows a row that a concurrent writer has
-    // already deleted or renamed away, so a stale-version conflict and a missing entity would be
-    // indistinguishable. A locking read observes the latest committed row instead. It costs no
-    // extra waiting in practice: the compare-and-set above is an UPDATE that already queued on the
-    // same row lock, so the competing writer has committed by the time control reaches here.
+    // Use a locking read to see the latest committed row. Under MySQL REPEATABLE READ, a plain
+    // SELECT can return an old snapshot that still contains a row another writer already deleted
+    // or renamed. We would then report a version conflict instead of a missing metalake. The CAS
+    // UPDATE above already waits for the same row lock, so the other writer has finished before
+    // this read runs.
     MetalakePO currentMetalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId));
@@ -417,6 +426,10 @@ public class MetalakeMetaService {
   }
 
   private void deleteCatalogsWithVersions(NameIdentifier metalakeIdentifier, Long metalakeId) {
+    // Lock all catalog rows before taking the schema snapshot. Schema creation and deletion lock
+    // their parent catalog, so they cannot add or remove a schema after this point. A schema alter
+    // can still run, but the version check below detects it. Taking parent locks before child rows
+    // also keeps the same lock order for every metalake cascade.
     List<CatalogPO> catalogPOs =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
@@ -428,6 +441,8 @@ public class MetalakeMetaService {
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,
             mapper -> mapper.softDeleteCatalogMetasWithVersion(catalogPOs));
+    // Never commit a partial cascade. A smaller count means that a catalog no longer matches the
+    // ID and version read above, so the outer transaction must roll back all deletes.
     if (deleted != catalogPOs.size()) {
       throw ExceptionUtils.concurrentChildModification(
           Entity.EntityType.CATALOG, Entity.EntityType.METALAKE, metalakeIdentifier);
@@ -447,6 +462,8 @@ public class MetalakeMetaService {
     int deleted =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
+    // The version check protects this snapshot from a schema alter that does not use the parent
+    // catalog lock. Roll back the whole cascade instead of silently losing that schema change.
     if (deleted != schemaPOs.size()) {
       throw ExceptionUtils.concurrentChildModification(
           Entity.EntityType.SCHEMA, Entity.EntityType.METALAKE, metalakeIdentifier);

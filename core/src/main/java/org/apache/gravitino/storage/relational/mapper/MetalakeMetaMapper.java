@@ -71,11 +71,21 @@ public interface MetalakeMetaMapper {
       method = "insertMetalakeMetaOnDuplicateKeyUpdate")
   void insertMetalakeMetaOnDuplicateKeyUpdate(@Param("metalakeMeta") MetalakePO metalakePO);
 
+  /**
+   * Updates an active metalake only when its OCC version still matches the observed version.
+   *
+   * @return the number of updated rows
+   */
   @UpdateProvider(type = MetalakeMetaSQLProviderFactory.class, method = "updateMetalakeMeta")
   Integer updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
 
+  /**
+   * Soft-deletes an active metalake only when its OCC version still matches.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "softDeleteMetalakeMetaByMetalakeId")
