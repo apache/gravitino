@@ -25,7 +25,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.security.ConnectorIdentity;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -257,6 +259,63 @@ public class TestGravitinoAuthProvider {
     assertThrows(
         UnsupportedOperationException.class,
         () -> GravitinoAuthProvider.buildForSession(config, session));
+  }
+
+  @Test
+  public void testBuildForSessionOAuth2() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
+
+    ConnectorSession session = mock(ConnectorSession.class);
+    when(session.getUser()).thenReturn("alice");
+    when(session.getIdentity())
+        .thenReturn(
+            ConnectorIdentity.forUser("alice")
+                .withExtraCredentials(ImmutableMap.of("token", "forwarded-user-jwt"))
+                .build());
+
+    GravitinoAdminClient client = GravitinoAuthProvider.buildForSession(config, session);
+    assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildForSessionOAuth2WithCustomCredentialKey() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true",
+                GravitinoAuthProvider.USER_TOKEN_CREDENTIAL_KEY, "access_token"));
+
+    ConnectorSession session = mock(ConnectorSession.class);
+    when(session.getUser()).thenReturn("alice");
+    when(session.getIdentity())
+        .thenReturn(
+            ConnectorIdentity.forUser("alice")
+                .withExtraCredentials(ImmutableMap.of("access_token", "alice-jwt"))
+                .build());
+
+    GravitinoAdminClient client = GravitinoAuthProvider.buildForSession(config, session);
+    assertNotNull(client);
+  }
+
+  @Test
+  public void testBuildForSessionOAuth2ThrowsWhenTokenMissing() {
+    GravitinoConfig config =
+        buildConfig(
+            ImmutableMap.of(
+                GravitinoAuthProvider.AUTH_TYPE_KEY, "oauth2",
+                GravitinoAuthProvider.FORWARD_SESSION_USER_KEY, "true"));
+
+    ConnectorSession session = mock(ConnectorSession.class);
+    when(session.getUser()).thenReturn("alice");
+    when(session.getIdentity()).thenReturn(ConnectorIdentity.forUser("alice").build());
+
+    assertThrows(
+        TrinoException.class, () -> GravitinoAuthProvider.buildForSession(config, session));
   }
 
   private GravitinoConfig buildConfig(ImmutableMap<String, String> authConfig) {
