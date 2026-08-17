@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.audit;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Assertions;
@@ -41,5 +42,74 @@ public class TestCallerContext {
     } finally {
       CallerContext.CallerContextHolder.remove();
     }
+  }
+
+  @Test
+  public void testContextIsDefensivelyCopied() {
+    Map<String, String> contextMap = new HashMap<>();
+    contextMap.put("test", "test");
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+
+    // Mutating the original map after build must not affect the stored context.
+    contextMap.put("added-after-build", "value");
+    contextMap.remove("test");
+
+    Assertions.assertEquals(1, callerContext.context().size());
+    Assertions.assertEquals("test", callerContext.context().get("test"));
+    Assertions.assertFalse(callerContext.context().containsKey("added-after-build"));
+  }
+
+  @Test
+  public void testContextIsUnmodifiable() {
+    Map<String, String> contextMap = new HashMap<>();
+    contextMap.put("test", "test");
+    CallerContext callerContext = CallerContext.builder().withContext(contextMap).build();
+
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> callerContext.context().put("k", "v"));
+  }
+
+  @Test
+  public void testNullContextStillRejectedOnBuild() {
+    CallerContext.Builder builder = CallerContext.builder().withContext(null);
+    Assertions.assertThrows(IllegalArgumentException.class, builder::build);
+  }
+
+  @Test
+  public void testEmptyContextIsAllowed() {
+    CallerContext callerContext = CallerContext.builder().withContext(new HashMap<>()).build();
+    Assertions.assertTrue(callerContext.context().isEmpty());
+  }
+
+  @Test
+  public void testReusingBuilderDoesNotMutateAlreadyBuiltContext() {
+    Map<String, String> first = new HashMap<>();
+    first.put("k", "v1");
+    CallerContext.Builder builder = CallerContext.builder().withContext(first);
+    CallerContext built = builder.build();
+
+    // Reusing the same builder to set a different context must not affect the already-built
+    // instance, which is now an independent immutable value object.
+    Map<String, String> second = new HashMap<>();
+    second.put("k", "v2");
+    builder.withContext(second);
+
+    Assertions.assertEquals("v1", built.context().get("k"));
+  }
+
+  @Test
+  public void testContextEqualsAcrossMutatedSourceMap() {
+    Map<String, String> source = new HashMap<>();
+    source.put("k", "v");
+    CallerContext expected = CallerContext.builder().withContext(source).build();
+
+    // Mutating the source after building must not change equality against a context built from the
+    // original contents.
+    source.put("k2", "v2");
+    CallerContext actual =
+        CallerContext.builder().withContext(Collections.singletonMap("k", "v")).build();
+
+    Assertions.assertEquals(expected, actual);
+    Assertions.assertEquals(expected.hashCode(), actual.hashCode());
   }
 }
