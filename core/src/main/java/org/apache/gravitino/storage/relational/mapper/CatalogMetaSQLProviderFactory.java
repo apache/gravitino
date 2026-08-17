@@ -54,7 +54,9 @@ public class CatalogMetaSQLProviderFactory {
   static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {
     @Override
     public String selectCatalogMetaByIdForShare(Long catalogId) {
-      // H2 has no shared row-lock syntax, so use an exclusive lock in tests.
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Schema
+      // creations under one catalog therefore serialize on H2, and a slow creation can make a
+      // concurrent one hit H2's lock timeout instead of a clean conflict.
       return selectCatalogMetaByIdForUpdate(catalogId);
     }
   }
