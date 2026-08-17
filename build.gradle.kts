@@ -1216,6 +1216,7 @@ tasks {
       ":catalogs:catalog-glue:copyLibAndConfig",
       ":catalogs:catalog-hive:copyLibAndConfig",
       ":catalogs:catalog-jdbc-doris:copyLibAndConfig",
+      ":catalogs:catalog-jdbc-generic:copyLibAndConfig",
       ":catalogs:catalog-jdbc-mysql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-postgresql:copyLibAndConfig",
       ":catalogs:catalog-jdbc-starrocks:copyLibAndConfig",
