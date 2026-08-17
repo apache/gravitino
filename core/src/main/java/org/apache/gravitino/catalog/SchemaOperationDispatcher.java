@@ -18,14 +18,10 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.apache.gravitino.Entity.EntityType.FILESET;
 import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
-import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
-import com.google.common.base.Preconditions;
-import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.HashMap;
@@ -48,7 +44,6 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
-import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
@@ -65,8 +60,6 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
   private static final Logger LOG = LoggerFactory.getLogger(SchemaOperationDispatcher.class);
 
-  private final FilesetDispatcher filesetDispatcher;
-
   /**
    * Creates a new SchemaOperationDispatcher instance.
    *
@@ -74,16 +67,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    * @param store The EntityStore instance to be used for schema operations.
    * @param idGenerator The IdGenerator instance to be used for schema operations.
    * @param secretManager The SecretManager instance to be used for secret operations.
-   * @param filesetDispatcher The fileset dispatcher used to drop filesets on cascade schema drop.
    */
   public SchemaOperationDispatcher(
       CatalogManager catalogManager,
       EntityStore store,
       IdGenerator idGenerator,
-      SecretManager secretManager,
-      FilesetDispatcher filesetDispatcher) {
+      SecretManager secretManager) {
     super(catalogManager, store, idGenerator, secretManager);
-    this.filesetDispatcher = Preconditions.checkNotNull(filesetDispatcher);
   }
 
   /**
@@ -380,33 +370,14 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   @Override
   public boolean dropSchema(NameIdentifier ident, boolean cascade) throws NonEmptySchemaException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-
-    // Cascade: drop filesets via FilesetDispatcher first so each fileset cleans its own
-    // write-through secrets. Do this before the catalog lock to avoid nested TreeLocks.
-    if (cascade) {
-      Namespace filesetNs =
-          Namespace.of(ident.namespace().level(0), ident.namespace().level(1), ident.name());
-      List<FilesetEntity> filesets;
-      try {
-        filesets = store.list(filesetNs, FilesetEntity.class, FILESET);
-      } catch (NoSuchEntityException e) {
-        // Schema may only exist in the underlying catalog (e.g. managed Hive schema).
-        filesets = Collections.emptyList();
-      } catch (IOException e) {
-        throw new RuntimeException("Failed to list filesets under schema " + ident, e);
-      }
-      for (FilesetEntity fileset : filesets) {
-        filesetDispatcher.dropFileset(
-            ofFileset(filesetNs.level(0), filesetNs.level(1), filesetNs.level(2), fileset.name()));
-      }
-    }
-
     return TreeLockUtils.doWithTreeLock(
         catalogIdent,
         LockType.WRITE,
         () -> {
           // Schema secret URNs live on SchemaEntity in the store (catalog loadSchema may omit
-          // them).
+          // them). Fileset write-through secrets on cascade are cleaned in
+          // FilesetCatalogOperations.dropSchema (which already lists child filesets for FS
+          // cleanup).
           Map<String, String> schemaProperties = new HashMap<>();
           SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
           if (schemaEntity != null

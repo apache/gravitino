@@ -754,11 +754,9 @@ public class GravitinoEnv {
     FilesetEventDispatcher filesetEventDispatcher =
         new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
     this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
-    catalogManager.setFilesetDispatcher(filesetNormalizeDispatcher);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(
-            catalogManager, entityStore, idGenerator, secretManager, filesetNormalizeDispatcher);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalSchemaDispatcher = schemaOperationDispatcher;
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);

@@ -25,7 +25,6 @@ import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePro
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.connector.BaseCatalogPropertiesMetadata.PROPERTY_METALAKE_IN_USE;
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
-import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -101,7 +100,6 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelCatalog;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -370,8 +368,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @SuppressWarnings("UnusedVariable")
   private final SecretManager secretManager;
 
-  private FilesetDispatcher filesetDispatcher;
-
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
@@ -435,16 +431,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } else {
       this.catalogChangeLogListener = null;
     }
-  }
-
-  /**
-   * Sets the {@link FilesetDispatcher} used when force-dropping a catalog. Must be called after the
-   * fileset dispatcher is constructed (CatalogManager is created first).
-   *
-   * @param filesetDispatcher The fileset dispatcher.
-   */
-  public void setFilesetDispatcher(FilesetDispatcher filesetDispatcher) {
-    this.filesetDispatcher = Preconditions.checkNotNull(filesetDispatcher);
   }
 
   /**
@@ -1002,29 +988,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
 
-            // Drop filesets via FilesetDispatcher first so each fileset cleans its own
-            // write-through secrets. Do not snapshot/delete fileset secrets here.
-            for (SchemaEntity schema : schemaEntities) {
-              NameIdentifier schemaIdent = schema.nameIdentifier();
-              Namespace filesetNs =
-                  Namespace.of(
-                      schemaIdent.namespace().level(0),
-                      schemaIdent.namespace().level(1),
-                      schemaIdent.name());
-              List<FilesetEntity> filesets =
-                  store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
-              for (FilesetEntity fileset : filesets) {
-                filesetDispatcher.dropFileset(
-                    ofFileset(
-                        filesetNs.level(0),
-                        filesetNs.level(1),
-                        filesetNs.level(2),
-                        fileset.name()));
-              }
-            }
-
             // Snapshot schema properties (write-through secret URNs) before entities are removed.
             // store.delete(cascade) only soft-deletes meta rows and does not call secret providers.
+            // Fileset secrets on cascade are cleaned inside FilesetCatalogOperations.dropSchema.
             List<Map<String, String>> schemaSecretPropertySnapshots = new ArrayList<>();
             for (SchemaEntity schema : schemaEntities) {
               schemaSecretPropertySnapshots.add(copyProperties(schema.properties()));
@@ -1058,7 +1024,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               markLocalMutation(ident);
               // Unmanaged / mixed: schemas were removed only via store cascade — clean their
               // secrets now. Managed path already cleaned per successful dropSchema above.
-              // Fileset secrets were already cleaned via FilesetDispatcher above.
               if (!managedStorage) {
                 for (Map<String, String> schemaProperties : schemaSecretPropertySnapshots) {
                   secretManager.deleteSecretsFromProperties(schemaProperties);

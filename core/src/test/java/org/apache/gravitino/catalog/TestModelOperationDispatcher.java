@@ -67,12 +67,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     modelOperationDispatcher =
         new ModelOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(
-            catalogManager,
-            entityStore,
-            idGenerator,
-            secretManager,
-            Mockito.mock(FilesetDispatcher.class));
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
   }
 
   @Test

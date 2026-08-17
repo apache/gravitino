@@ -79,8 +79,7 @@ public class TestPartitionOperationDispatcher extends TestOperationDispatcher {
 
   protected static void prepareTable() throws IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(
-            catalogManager, entityStore, idGenerator, secretManager, mock(FilesetDispatcher.class));
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     tableOperationDispatcher =
         new TableOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     partitionOperationDispatcher =

@@ -59,8 +59,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
     filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(
-            catalogManager, entityStore, idGenerator, secretManager, filesetOperationDispatcher);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
   }
 
   public static FilesetOperationDispatcher getFilesetOperationDispatcher() {
@@ -333,7 +332,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       IdGenerator ids = nextId::getAndIncrement;
       FilesetOperationDispatcher filesets =
           new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
-      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets, filesets)
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
           .createSchema(
               NameIdentifier.of(metalake, catalog, "schema_secret_fileset"),
               "comment",
