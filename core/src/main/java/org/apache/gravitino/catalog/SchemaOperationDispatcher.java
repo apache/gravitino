@@ -386,11 +386,12 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     if (cascade) {
       Namespace filesetNs =
           Namespace.of(ident.namespace().level(0), ident.namespace().level(1), ident.name());
-      List<FilesetEntity> filesets = Collections.emptyList();
+      List<FilesetEntity> filesets;
       try {
         filesets = store.list(filesetNs, FilesetEntity.class, FILESET);
       } catch (NoSuchEntityException e) {
         // Schema may only exist in the underlying catalog (e.g. managed Hive schema).
+        filesets = Collections.emptyList();
       } catch (IOException e) {
         throw new RuntimeException("Failed to list filesets under schema " + ident, e);
       }
