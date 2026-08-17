@@ -42,6 +42,10 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByCatalogId")
   List<SchemaPO> listSchemaPOsByCatalogId(@Param("catalogId") Long catalogId);
 
+  /** Lists all active schemas in a metalake. */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "listSchemaPOsByMetalakeId")
+  List<SchemaPO> listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
       method = "listSchemaPOsByFullQualifiedName")
@@ -109,13 +113,18 @@ public interface SchemaMetaMapper {
 
   @UpdateProvider(
       type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByMetalakeId")
-  Integer softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
-
-  @UpdateProvider(
-      type = SchemaMetaSQLProviderFactory.class,
       method = "softDeleteSchemaMetasByCatalogId")
   Integer softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId);
+
+  /**
+   * Soft-deletes schemas whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
+  @UpdateProvider(
+      type = SchemaMetaSQLProviderFactory.class,
+      method = "softDeleteSchemaMetasWithVersion")
+  Integer softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs);
 
   @DeleteProvider(
       type = SchemaMetaSQLProviderFactory.class,

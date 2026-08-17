@@ -150,8 +150,8 @@ public class TestJcasbinChangePoller {
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // A record whose full name cannot be turned into a MetadataObject of the declared type must be
-    // logged and skipped; a poison row must never take the node down via the poller's EXIT action.
+    // If the full name does not match the type in the record, we cannot build a cache key from it.
+    // Log it, skip it, and keep handling the rest of the batch.
     Assertions.assertDoesNotThrow(
         () ->
             poller.onEntityChange(
@@ -164,6 +164,105 @@ public class TestJcasbinChangePoller {
         List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "TABLE", "tbl1", "")),
         metadataIdCache.invalidatedPrefixes);
     Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
+  void testLeafTypesAreInvalidatedByExactKey() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(List.of(change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1")));
+
+    // A FILESET has nothing nested under it, so it is removed by its exact key, not by prefix.
+    Assertions.assertEquals(
+        List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FILESET", "fs1")),
+        metadataIdCache.invalidatedKeys);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(0, metadataIdCache.invalidateAllCalls);
+  }
+
+  @Test
+  void testSuccessfulBatchDoesNotClearTheCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"),
+            change(2L, MetadataObject.Type.FILESET, "ml1.cat2.sch1.fs1")));
+
+    Assertions.assertEquals(0, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(0, ownerRelCache.invalidateAllCalls);
+  }
+
+  @Test
+  void testFailedPrefixInvalidationClearsTheWholeMetadataIdCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failPrefixInvalidation = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // The batch is handed out once and never sent again, so the listener has to fix things here.
+    Assertions.assertDoesNotThrow(
+        () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllInsideBatchCalls);
+    // The owner cache has its own poller, so a change-log failure must not wipe it as well.
+    Assertions.assertEquals(0, ownerRelCache.invalidateAllCalls);
+  }
+
+  @Test
+  void testFailedLeafInvalidationClearsTheWholeMetadataIdCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failKeyInvalidation = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    Assertions.assertDoesNotThrow(
+        () ->
+            poller.onEntityChange(
+                List.of(change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllInsideBatchCalls);
+  }
+
+  @Test
+  void testFailedInvalidationBatchClearsTheWholeMetadataIdCache() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failInvalidationBatch = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // The failure can also happen while taking the cache's batch lock, before any key is touched.
+    Assertions.assertDoesNotThrow(
+        () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
+    Assertions.assertEquals(0, metadataIdCache.invalidateAllInsideBatchCalls);
+  }
+
+  @Test
+  void testFailedClearPropagatesToThePoller() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    metadataIdCache.failPrefixInvalidation = true;
+    metadataIdCache.failInvalidateAll = true;
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+
+    // There is nothing else to try here, so the poller just logs it and keeps reading.
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
+
+    Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
   }
 
   @Test
@@ -188,6 +287,14 @@ public class TestJcasbinChangePoller {
     private final List<K> invalidatedKeys = new ArrayList<>();
     private final List<String> invalidatedPrefixes = new ArrayList<>();
 
+    private int invalidateAllCalls;
+    private int invalidateAllInsideBatchCalls;
+    private boolean invalidationBatchActive;
+    private boolean failKeyInvalidation;
+    private boolean failPrefixInvalidation;
+    private boolean failInvalidationBatch;
+    private boolean failInvalidateAll;
+
     @Override
     public Optional<V> getIfPresent(K key) {
       return Optional.empty();
@@ -198,15 +305,42 @@ public class TestJcasbinChangePoller {
 
     @Override
     public void invalidate(K key) {
+      if (failKeyInvalidation) {
+        throw new RuntimeException("invalidate failed");
+      }
       invalidatedKeys.add(key);
     }
 
     @Override
-    public void invalidateAll() {}
+    public void invalidateAll() {
+      invalidateAllCalls++;
+      if (invalidationBatchActive) {
+        invalidateAllInsideBatchCalls++;
+      }
+      if (failInvalidateAll) {
+        throw new RuntimeException("invalidateAll failed");
+      }
+    }
 
     @Override
     public void invalidateByPrefix(String prefix) {
+      if (failPrefixInvalidation) {
+        throw new RuntimeException("invalidateByPrefix failed");
+      }
       invalidatedPrefixes.add(prefix);
+    }
+
+    @Override
+    public void runInvalidationBatch(Runnable batch) {
+      if (failInvalidationBatch) {
+        throw new RuntimeException("invalidation batch failed");
+      }
+      invalidationBatchActive = true;
+      try {
+        batch.run();
+      } finally {
+        invalidationBatchActive = false;
+      }
     }
 
     @Override

@@ -80,7 +80,7 @@ When using Gravitino authorization for Hive with Apache Ranger, see the [Authori
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
 Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
@@ -103,7 +103,7 @@ The following table lists predefined schema properties for the Hive database. Ad
 
 ### Schema Operations
 
-see [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations).
+see [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations).
 
 ## Table
 
@@ -159,7 +159,7 @@ The following table lists the data types mapped from the Hive catalog to Graviti
 | `uniontype`                 | `union`             |
 
 :::info
-1. The data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type from the Hive catalog.
+1. The data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type from the Hive catalog.
 2. Using the `struct` data type with field comments will throw an error, as it does not work for Hive tables (see [HIVE-26593](https://issues.apache.org/jira/browse/HIVE-26593)).
 :::
 
@@ -241,9 +241,11 @@ Support for altering partitions is under development.
 
 - Supports list, create, load, alter, and drop for views stored in the Hive Metastore Service as `VIRTUAL_VIEW`.
 - Each view must contain exactly one SQL representation.
-- Supports creating views with the `hive`, `flink`, or `spark` dialect.
-- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `flink`, `spark`, or `trino` dialect.
+- Supports creating views with the `hive`, `trino`, `flink`, or `spark` dialect.
+- When loading an existing HMS view, Gravitino automatically detects whether the view uses the `hive`, `trino`, `flink`, or `spark` dialect.
 - For the `hive` and `flink` dialects, `defaultCatalog` and `defaultSchema` must be `null`.
+- For the `trino` dialect, `defaultSchema` requires `defaultCatalog` to also be set (a schema without a catalog cannot be represented).
+- The `trino` dialect requires at least one output column, and is stored using Trino's own native "Presto View" Hive Metastore encoding, so a view created through Gravitino is interoperable with a native Trino/Presto Hive connector pointed at the same Hive Metastore, and vice versa. The HMS `presto_view` property this relies on is reserved and managed internally based on the view's dialect; it cannot be set or removed directly. Gravitino's view model cannot represent a native Trino view's owner, `runAsInvoker`, or SQL path, so replacing an existing native view that has a non-default value for any of them is rejected rather than silently discarding it.
 - The `flink` dialect requires at least one view property with the prefix `flink.` to be set. The Flink connector automatically sets `flink.schema.num-columns`; when using the REST API directly, set at least one `flink.*` property explicitly.
 - The `spark` dialect requires the view property `spark.sql.create.version` to be set; without it the view round-trips as the `hive` dialect on reload.
 

@@ -47,6 +47,12 @@ public interface MetalakeMetaMapper {
   @SelectProvider(type = MetalakeMetaSQLProviderFactory.class, method = "selectMetalakeMetaById")
   MetalakePO selectMetalakeMetaById(@Param("metalakeId") Long metalakeId);
 
+  /** Selects and locks an active metalake by ID for the current transaction. */
+  @SelectProvider(
+      type = MetalakeMetaSQLProviderFactory.class,
+      method = "selectMetalakeMetaByIdForUpdate")
+  MetalakePO selectMetalakeMetaByIdForUpdate(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "listMetalakePOsByMetalakeIds")
@@ -65,15 +71,26 @@ public interface MetalakeMetaMapper {
       method = "insertMetalakeMetaOnDuplicateKeyUpdate")
   void insertMetalakeMetaOnDuplicateKeyUpdate(@Param("metalakeMeta") MetalakePO metalakePO);
 
+  /**
+   * Updates an active metalake only when its OCC version still matches the observed version.
+   *
+   * @return the number of updated rows
+   */
   @UpdateProvider(type = MetalakeMetaSQLProviderFactory.class, method = "updateMetalakeMeta")
   Integer updateMetalakeMeta(
       @Param("newMetalakeMeta") MetalakePO newMetalakePO,
       @Param("oldMetalakeMeta") MetalakePO oldMetalakePO);
 
+  /**
+   * Soft-deletes an active metalake only when its OCC version still matches.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(
       type = MetalakeMetaSQLProviderFactory.class,
       method = "softDeleteMetalakeMetaByMetalakeId")
-  Integer softDeleteMetalakeMetaByMetalakeId(@Param("metalakeId") Long metalakeId);
+  Integer softDeleteMetalakeMetaByMetalakeId(
+      @Param("metalakeId") Long metalakeId, @Param("currentVersion") Long currentVersion);
 
   @DeleteProvider(
       type = MetalakeMetaSQLProviderFactory.class,

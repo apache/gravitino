@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector.security;
 
 import com.google.common.base.Preconditions;
+import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
 import java.util.Locale;
@@ -29,6 +30,7 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +56,18 @@ public class GravitinoAuthProvider {
    */
   public static final String FORWARD_SESSION_USER_KEY =
       GravitinoClientConfiguration.GRAVITINO_CLIENT_CONFIG_PREFIX + "session.forwardUser";
+
+  /**
+   * Configuration key naming the Trino session extra-credential that carries the end user's
+   * forwarded IdP access token. Defaults to {@value #DEFAULT_USER_TOKEN_CREDENTIAL_KEY}. Query
+   * engines differ in how they label the forwarded token, so this is configurable rather than
+   * fixed.
+   */
+  public static final String USER_TOKEN_CREDENTIAL_KEY =
+      "gravitino.client.session.userTokenCredentialKey";
+
+  /** Default extra-credential name used when {@link #USER_TOKEN_CREDENTIAL_KEY} is not set. */
+  public static final String DEFAULT_USER_TOKEN_CREDENTIAL_KEY = "token";
 
   /** Built-in IdP username configuration key for Basic authentication. */
   public static final String BASIC_USERNAME_KEY =
@@ -165,8 +179,10 @@ public class GravitinoAuthProvider {
    * connector session. This is the entry point for the per-user client cache when {@code
    * forwardUser=true}.
    *
-   * <p>Currently only {@code authType=simple} is supported: the Trino session username is used as
-   * the Gravitino simple-auth identity.
+   * <p>For {@code authType=simple} the Trino session username is used as the Gravitino simple-auth
+   * identity. For {@code authType=oauth2} the end-user IdP token forwarded into the connector
+   * session (extra-credential key {@code token}) is presented to Gravitino as the bearer token, so
+   * the server authorizes against the end user rather than a shared service identity.
    *
    * @param config the Gravitino connector configuration
    * @param session the current Trino connector session
@@ -196,13 +212,38 @@ public class GravitinoAuthProvider {
 
     GravitinoAdminClient.AdminClientBuilder builder = GravitinoAdminClient.builder(uri);
 
-    if (authType != AuthType.SIMPLE) {
-      throw new UnsupportedOperationException(
-          "Auth type "
-              + authType
-              + " does not support session forwarding. Only simple is supported.");
+    switch (authType) {
+      case SIMPLE:
+        builder.withSimpleAuth(session.getUser());
+        break;
+      case OAUTH2:
+        {
+          String credentialKey =
+              clientConfig.getOrDefault(
+                  USER_TOKEN_CREDENTIAL_KEY, DEFAULT_USER_TOKEN_CREDENTIAL_KEY);
+          String userToken = session.getIdentity().getExtraCredentials().get(credentialKey);
+          if (StringUtils.isBlank(userToken)) {
+            throw new TrinoException(
+                GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+                "No forwarded user token found in session extra-credentials under key '"
+                    + credentialKey
+                    + "'. The Trino coordinator must populate this extra-credential with the "
+                    + "caller's OAuth2 access token, e.g. Starburst Enterprise's "
+                    + "http-server.authentication.type=DELEGATED-OAUTH2; open-source Trino does not "
+                    + "support this yet. If the coordinator labels the forwarded token differently, "
+                    + "set "
+                    + USER_TOKEN_CREDENTIAL_KEY
+                    + " to match.");
+          }
+          builder.withOAuth(new StaticUserTokenProvider(userToken));
+        }
+        break;
+      default:
+        throw new UnsupportedOperationException(
+            "Auth type "
+                + authType
+                + " does not support session forwarding. Only simple and oauth2 are supported.");
     }
-    builder.withSimpleAuth(session.getUser());
 
     removeAuthSpecificKeys(clientConfig);
     builder.withClientConfig(clientConfig);
@@ -233,6 +274,7 @@ public class GravitinoAuthProvider {
     clientConfig.remove(KERBEROS_PRINCIPAL_KEY);
     clientConfig.remove(KERBEROS_KEYTAB_FILE_PATH_KEY);
     clientConfig.remove(FORWARD_SESSION_USER_KEY);
+    clientConfig.remove(USER_TOKEN_CREDENTIAL_KEY);
     clientConfig.remove(SESSION_CACHE_MAX_SIZE_KEY);
     clientConfig.remove(SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY);
   }
