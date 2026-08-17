@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.service.rest;
 
+import java.util.Collections;
 import java.util.Map;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.Response;
@@ -40,7 +41,7 @@ public class TestIcebergConfigEndpointGating extends IcebergTestBase {
     return IcebergRestTestUtil.getIcebergResourceConfig(
         IcebergConfigOperations.class,
         true,
-        java.util.Collections.emptyList(),
+        Collections.emptyList(),
         NoScanPlanWrapperManager::new);
   }
 
