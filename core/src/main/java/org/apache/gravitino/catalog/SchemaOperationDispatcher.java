@@ -26,11 +26,13 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -307,12 +309,57 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         ident,
         LockType.WRITE,
         () -> {
-          validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
-          Schema alteredSchema =
+          Schema currentSchema =
               doWithCatalog(
                   catalogIdent,
-                  c -> c.doWithSchemaOps(s -> s.alterSchema(ident, changes)),
+                  c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
                   NoSuchSchemaException.class);
+          // Prefer SchemaEntity properties for secret URNs (catalog loadSchema may omit them).
+          SchemaEntity schemaEntityForSecrets = getEntity(ident, SCHEMA, SchemaEntity.class);
+          Map<String, String> currentProperties;
+          if (schemaEntityForSecrets != null
+              && schemaEntityForSecrets.properties() != null
+              && !schemaEntityForSecrets.properties().isEmpty()) {
+            currentProperties = new HashMap<>(schemaEntityForSecrets.properties());
+          } else if (currentSchema.properties() != null) {
+            currentProperties = new HashMap<>(currentSchema.properties());
+          } else {
+            currentProperties = new HashMap<>();
+          }
+
+          validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
+
+          StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
+          long entityIdForSecrets;
+          if (currentStringId != null) {
+            entityIdForSecrets = currentStringId.id();
+          } else if (schemaEntityForSecrets != null) {
+            entityIdForSecrets = schemaEntityForSecrets.id();
+          } else {
+            entityIdForSecrets = 0L;
+          }
+
+          List<SecretMaterial> writtenSecretMaterials = List.of();
+          boolean alterCommitted = false;
+          Schema alteredSchema;
+          SchemaChange[] effectiveChanges;
+          try {
+            Pair<SchemaChange[], List<SecretMaterial>> secretResult =
+                prepareSchemaSecretChanges(currentProperties, entityIdForSecrets, changes);
+            writtenSecretMaterials = secretResult.getRight();
+            effectiveChanges = secretResult.getLeft();
+
+            alteredSchema =
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithSchemaOps(s -> s.alterSchema(ident, effectiveChanges)),
+                    NoSuchSchemaException.class);
+            alterCommitted = true;
+          } finally {
+            if (!alterCommitted) {
+              secretManager.rollbackSecrets(writtenSecretMaterials);
+            }
+          }
 
           // If the Schema is maintained by the Gravitino's store, we don't have to alter again.
           boolean isManagedSchema = isManagedEntity(catalogIdent, Capability.Scope.SCHEMA);
@@ -361,7 +408,8 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                                   .withName(schemaEntity.name())
                                   .withNamespace(ident.namespace())
                                   .withProperties(
-                                      propertiesForSchemaEntityAlter(schemaEntity, changes))
+                                      propertiesForSchemaEntityAlter(
+                                          schemaEntity, effectiveChanges))
                                   .withAuditInfo(
                                       AuditInfo.builder()
                                           .withCreator(schemaEntity.auditInfo().creator())
@@ -612,5 +660,55 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                 HasPropertyMetadata::schemaPropertiesMetadata,
                 schema.properties()))
         .withImported(schemaEntity != null);
+  }
+
+  /**
+   * Rewrites schema changes that involve secrets into plain setProperty / removeProperty, writing
+   * secrets as needed. Rolls back any written materials if preparation fails.
+   *
+   * @param currentProperties current schema properties (may be null)
+   * @param entityId schema entity id
+   * @param changes schema changes
+   * @return effective changes and written write-through materials
+   */
+  private Pair<SchemaChange[], List<SecretMaterial>> prepareSchemaSecretChanges(
+      @Nullable Map<String, String> currentProperties, long entityId, SchemaChange... changes) {
+    Map<String, String> properties =
+        currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
+    List<SchemaChange> out = new ArrayList<>(changes.length);
+    List<SecretMaterial> written = new ArrayList<>();
+    try {
+      for (SchemaChange change : changes) {
+        if (change instanceof SchemaChange.SetSecretBinding) {
+          SchemaChange.SetSecretBinding c = (SchemaChange.SetSecretBinding) change;
+          String urn =
+              secretManager.alterSetSecretBinding(
+                  properties, "schema", entityId, c.getProperty(), c.getBinding(), written);
+          out.add(SchemaChange.setProperty(c.getProperty(), urn));
+        } else if (change instanceof SchemaChange.SetSecretReference) {
+          SchemaChange.SetSecretReference c = (SchemaChange.SetSecretReference) change;
+          String urn =
+              secretManager.alterSetSecretReference(
+                  properties, "schema", entityId, c.getProperty(), c.getReference());
+          out.add(SchemaChange.setProperty(c.getProperty(), urn));
+        } else if (change instanceof SchemaChange.SetProperty) {
+          SchemaChange.SetProperty c = (SchemaChange.SetProperty) change;
+          String value =
+              secretManager.alterSetProperty(
+                  properties, "schema", entityId, c.getProperty(), c.getValue());
+          out.add(SchemaChange.setProperty(c.getProperty(), value));
+        } else if (change instanceof SchemaChange.RemoveProperty) {
+          SchemaChange.RemoveProperty c = (SchemaChange.RemoveProperty) change;
+          secretManager.alterRemoveProperty(properties, "schema", entityId, c.getProperty());
+          out.add(change);
+        } else {
+          out.add(change);
+        }
+      }
+      return Pair.of(out.toArray(new SchemaChange[0]), List.copyOf(written));
+    } catch (RuntimeException e) {
+      secretManager.rollbackSecrets(written);
+      throw e;
+    }
   }
 }
