@@ -442,7 +442,7 @@ To configure the Gravitino client, use properties prefixed with `gvfs_gravitino_
 
 :::note
 When users work with a multi-cluster fileset catalog, they can configure separate sets of properties for the base paths
-of the different clusters, using the `fs.path.config.<name>` properties described above.
+of the different clusters, using the `fs_path_config_<name>` properties described above.
 
 For example, a complex catalog structure might look like this:
 

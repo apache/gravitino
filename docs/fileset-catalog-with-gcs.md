@@ -229,10 +229,11 @@ The fileset is now addressable as
 
 ## Access the Fileset
 
-### Client jars
+### Java client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
-plus the Google Cloud Storage filesystem implementation. Only the latter differs by environment:
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Google Cloud Storage filesystem implementation. Only the latter differs
+by environment:
 
 | Environment            | Jar providing the Google Cloud Storage filesystem                                                                                                                                                                                           |
 |------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -246,7 +247,8 @@ The artifacts in full:
   such as `gcs-connector` (hadoop3-2.2.22). Use it when the environment has no pre-existing Hadoop setup.
 - [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
-  `gravitino-gcp` functionality. It is required for accessing Gravitino filesets in every environment.
+  `gravitino-gcp` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
 - [`gcs-connector-hadoop3-2.2.22-shaded.jar`](https://github.com/GoogleCloudDataproc/hadoop-connectors/releases/download/v2.2.22/gcs-connector-hadoop3-2.2.22-shaded.jar):
   the standard Hadoop dependencies for Google Cloud Storage access, published by Google and not part
   of the Apache Hadoop distribution. Supply them yourself when running inside an existing Hadoop
@@ -463,7 +465,7 @@ each provider takes.
 
 The supported provider is `gcs-token`, which vends a short-lived token.
 
-### Configure the catalog
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -479,6 +481,28 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
+Create the schema and fileset in the credential-vending catalog:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "gcs_schema",
+  "comment": "A schema in the Google Cloud Storage credential-vending catalog",
+  "properties": {
+    "location": "gs://bucket/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/gcs_catalog_with_vending/schemas
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "gs://bucket/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/gcs_catalog_with_vending/schemas/gcs_schema/filesets
+```
+
 ### Access without local credentials
 
 Enable vending on the client and drop the credential properties.
@@ -492,7 +516,8 @@ conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
 // No need to set gcs-service-account-file
 
-Path filesetPath = new Path("gvfs://fileset/gcs_catalog/gcs_schema/example_fileset/new_dir");
+Path filesetPath = new Path(
+    "gvfs://fileset/gcs_catalog_with_vending/gcs_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ```

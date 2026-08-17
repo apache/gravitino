@@ -241,10 +241,11 @@ The fileset is now addressable as
 
 ## Access the Fileset
 
-### Client jars
+### Java client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
-plus the Amazon S3 filesystem implementation. Only the latter differs by environment:
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Amazon S3 filesystem implementation. Only the latter differs by
+environment:
 
 | Environment            | Jar providing the Amazon S3 filesystem                                                                                                                          |
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -258,7 +259,8 @@ The artifacts in full:
   such as `hadoop-aws` (3.3.1) and the AWS SDK. Use it when the environment has no pre-existing Hadoop setup.
 - [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
-  `gravitino-aws` functionality. It is required for accessing Gravitino filesets in every environment.
+  `gravitino-aws` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
 - `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`: the standard Hadoop
   dependencies for Amazon S3 access, shipped with Hadoop under
   `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself when running inside an existing
@@ -490,11 +492,12 @@ out a credential per request, so clients never hold cloud keys of their own. See
 [S3 credentials](./security/credential-vending.md#s3) for the properties
 each provider takes.
 
-The supported providers are `s3-token`, which vends a short-lived STS token, and
-`s3-secret-key`, which vends the static access key configured on the catalog. The example below uses
-`s3-token`.
+The supported providers are `s3-token`, which vends a short-lived STS token;
+`s3-secret-key`, which vends the static access key configured on the catalog; and `aws-irsa`, which
+vends credentials from an IAM role for service accounts and currently reads the web identity token
+from a file. The example below uses `s3-token`.
 
-### Configure the catalog
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -512,6 +515,28 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "s3-role-arn": "arn:aws:iam::123456789012:role/gravitino-fileset"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+```
+
+Create the schema and fileset in the credential-vending catalog:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "s3_schema",
+  "comment": "A schema in the Amazon S3 credential-vending catalog",
+  "properties": {
+    "location": "s3a://bucket/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/s3_catalog_with_vending/schemas
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "s3a://bucket/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/s3_catalog_with_vending/schemas/s3_schema/filesets
 ```
 
 The `s3-token` provider needs two more catalog properties.
@@ -534,7 +559,8 @@ conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
 // No need to set s3-access-key-id or s3-secret-access-key
 
-Path filesetPath = new Path("gvfs://fileset/s3_catalog/s3_schema/example_fileset/new_dir");
+Path filesetPath = new Path(
+    "gvfs://fileset/s3_catalog_with_vending/s3_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ```

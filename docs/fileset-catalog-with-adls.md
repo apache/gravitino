@@ -233,10 +233,11 @@ The fileset is now addressable as
 
 ## Access the Fileset
 
-### Client jars
+### Java client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
-plus the Azure Data Lake Storage filesystem implementation. Only the latter differs by environment:
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Azure Data Lake Storage filesystem implementation. Only the latter
+differs by environment:
 
 | Environment            | Jar providing the Azure Data Lake Storage filesystem                                                                                                                                          |
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -250,7 +251,8 @@ The artifacts in full:
   such as `hadoop-azure` (3.3.1) and the packages it needs to reach ADLS. Use it when the environment has no pre-existing Hadoop setup.
 - [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
-  `gravitino-azure` functionality. It is required for accessing Gravitino filesets in every environment.
+  `gravitino-azure` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
 - `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and
   `wildfly-openssl-1.0.7.Final.jar`: the standard Hadoop dependencies for Azure Data Lake Storage
   access, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself
@@ -479,7 +481,7 @@ The supported providers are `adls-token`, which vends a short-lived token, and
 `azure-account-key`, which vends the static account key configured on the catalog. The example below
 uses `adls-token`.
 
-### Configure the catalog
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -497,6 +499,28 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "azure-client-secret": "The Azure client secret key"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+```
+
+Create the schema and fileset in the credential-vending catalog:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "adls_schema",
+  "comment": "A schema in the Azure Data Lake Storage credential-vending catalog",
+  "properties": {
+    "location": "abfss://container@account-name.dfs.core.windows.net/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/adls_catalog_with_vending/schemas
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "abfss://container@account-name.dfs.core.windows.net/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/adls_catalog_with_vending/schemas/adls_schema/filesets
 ```
 
 The `adls-token` provider needs three more catalog properties.
@@ -520,7 +544,8 @@ conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
 // No need to set azure-storage-account-name or azure-storage-account-key
 
-Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/example_fileset/new_dir");
+Path filesetPath = new Path(
+    "gvfs://fileset/adls_catalog_with_vending/adls_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ```

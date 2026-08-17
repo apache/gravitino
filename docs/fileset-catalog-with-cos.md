@@ -239,10 +239,11 @@ The fileset is now addressable as
 
 ## Access the Fileset
 
-### Client jars
+### Java client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
-plus the Tencent Cloud COS filesystem implementation. Only the latter differs by environment:
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Tencent Cloud COS filesystem implementation. Only the latter differs by
+environment:
 
 | Environment            | Jar providing the Tencent Cloud COS filesystem                                                                                                                                                      |
 |------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -256,7 +257,8 @@ The artifacts in full:
   such as `hadoop-cos` and the Tencent Cloud COS Java SDK. Use it when the environment has no pre-existing Hadoop setup.
 - [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
-  `gravitino-tencent` functionality. It is required for accessing Gravitino filesets in every environment.
+  `gravitino-tencent` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
 - `hadoop-cos-3.3.0-8.3.23.jar` and `cos_api-bundle-5.6.227.jar`: the standard Hadoop dependencies
   for Tencent Cloud COS access, published by Tencent Cloud on Maven Central and, unlike `hadoop-aws`
   or `hadoop-aliyun`, not part of the Apache Hadoop distribution. Supply them yourself when running
@@ -432,66 +434,26 @@ ${HADOOP_HOME}/bin/hadoop fs -ls gvfs://fileset/cos_catalog/cos_schema/example_f
 ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/cos_catalog/cos_schema/example_fileset
 ```
 
-### GVFS Python client
+### GVFS Python client and pandas
 
-```bash
-pip install apache-gravitino==${GRAVITINO_VERSION}
-```
+:::note
+The GVFS Python client does not yet ship a COS storage handler. It cannot read or write
+COS-backed filesets through `gvfs.GravitinoVirtualFileSystem` or pandas
+`read_csv("gvfs://...")`. Use the GVFS Java client, Spark, or `hadoop fs` for COS data access.
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Tencent Cloud COS
-properties in `options`, spelled with underscores.
+This limitation does not affect the Python `GravitinoClient` metadata API. It can still create,
+inspect, update, and delete COS catalogs, schemas, and filesets as shown in
+[Create the Catalog, Schema, and Fileset](#create-the-catalog-schema-and-fileset).
+:::
 
-```python
-from gravitino import gvfs
-
-options = {
-    "cache_size": 20,
-    "cache_expired_time": 3600,
-    "auth_type": "simple",
-    "cos_region": "ap-guangzhou",
-    "cos_endpoint": "cos.ap-guangzhou.myqcloud.com",
-    "cos_access_key_id": "access_key",
-    "cos_secret_access_key": "secret_key",
-}
-
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
-                                     metalake_name="metalake",
-                                     options=options)
-fs.ls("gvfs://fileset/cos_catalog/cos_schema/example_fileset/")
-```
-
-### pandas
-
-pandas reaches the same paths through `storage_options`.
-
-```python
-import pandas as pd
-
-storage_options = {
-    "server_uri": "http://localhost:8090",
-    "metalake_name": "metalake",
-    "options": {
-        "cos_region": "ap-guangzhou",
-        "cos_endpoint": "cos.ap-guangzhou.myqcloud.com",
-        "cos_access_key_id": "access_key",
-        "cos_secret_access_key": "secret_key",
-    }
-}
-
-ds = pd.read_csv("gvfs://fileset/cos_catalog/cos_schema/example_fileset/people/part-00000.csv",
-                 storage_options=storage_options)
-ds.head()
-```
-
-For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
+For further Java client use cases, see
+[Gravitino Virtual File System](./how-to-use-gvfs.md).
 
 ## Credential Vending
 
 With credential vending the catalog holds the Tencent Cloud COS credentials and the Gravitino server hands
 out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the general mechanism and
-[COS credentials](./security/credential-vending.md#) for the properties
-each provider takes.
+[Credential Vending](./security/credential-vending.md) for the general mechanism.
 
 The supported provider is `cos-secret-key`, which vends the static
 `cos-access-key-id` / `cos-secret-access-key` configured on the catalog.
@@ -501,7 +463,7 @@ STS-token-based vending (`cos-token`), including role-arn and assume-role config
 added in a follow-up release. Until then only `cos-secret-key` is available.
 :::
 
-### Configure the catalog
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -520,6 +482,28 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
+Create the schema and fileset in the credential-vending catalog:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "cos_schema",
+  "comment": "A schema in the Tencent Cloud COS credential-vending catalog",
+  "properties": {
+    "location": "cosn://my-bucket-1250000000/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/cos_catalog_with_vending/schemas
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "cosn://my-bucket-1250000000/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/cos_catalog_with_vending/schemas/cos_schema/filesets
+```
+
 ### Access without local credentials
 
 Enable vending on the client and drop the credential properties.
@@ -533,7 +517,8 @@ conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
 // No need to set cos-access-key-id or cos-secret-access-key
 
-Path filesetPath = new Path("gvfs://fileset/cos_catalog/cos_schema/example_fileset/new_dir");
+Path filesetPath = new Path(
+    "gvfs://fileset/cos_catalog_with_vending/cos_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ```
@@ -550,13 +535,5 @@ spark = (SparkSession.builder
     .getOrCreate())
 ```
 
-```python
-options = {
-    "auth_type": "simple",
-    "enable_credential_vending": True,
-    # No need to set cos-access-key-id or cos-secret-access-key
-}
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
-                                     metalake_name="metalake",
-                                     options=options)
-```
+The GVFS Python client cannot access COS-backed filesets; see
+[GVFS Python client and pandas](#gvfs-python-client-and-pandas).

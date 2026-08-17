@@ -232,10 +232,11 @@ The fileset is now addressable as
 
 ## Access the Fileset
 
-### Client jars
+### Java client jars
 
-Every client needs `gravitino-filesystem-hadoop3-runtime`, which is published on Maven Central,
-plus the Alibaba Cloud OSS filesystem implementation. Only the latter differs by environment:
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Alibaba Cloud OSS filesystem implementation. Only the latter differs by
+environment:
 
 | Environment            | Jar providing the Alibaba Cloud OSS filesystem                                                                                                                                |
 |------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -249,7 +250,8 @@ The artifacts in full:
   such as `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss`. Use it when the environment has no pre-existing Hadoop setup.
 - [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
   a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
-  `gravitino-aliyun` functionality. It is required for accessing Gravitino filesets in every environment.
+  `gravitino-aliyun` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
 - `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`: the
   standard Hadoop dependencies for Alibaba Cloud OSS access, shipped with Hadoop under
   `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself when running inside an existing
@@ -486,7 +488,7 @@ The supported providers are `oss-token`, which vends a short-lived STS token, an
 `oss-secret-key`, which vends the static access key configured on the catalog. The example below uses
 `oss-token`.
 
-### Configure the catalog
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -504,6 +506,28 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     "oss-role-arn": "The ARN of the role that grants access to the OSS data"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
+```
+
+Create the schema and fileset in the credential-vending catalog:
+
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "oss_schema",
+  "comment": "A schema in the Alibaba Cloud OSS credential-vending catalog",
+  "properties": {
+    "location": "oss://bucket/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/oss_catalog_with_vending/schemas
+
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "oss://bucket/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/oss_catalog_with_vending/schemas/oss_schema/filesets
 ```
 
 The `oss-token` provider needs two more catalog properties.
@@ -526,7 +550,8 @@ conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
 // No need to set oss-access-key-id or oss-secret-access-key
 
-Path filesetPath = new Path("gvfs://fileset/oss_catalog/oss_schema/example_fileset/new_dir");
+Path filesetPath = new Path(
+    "gvfs://fileset/oss_catalog_with_vending/oss_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
 ```
