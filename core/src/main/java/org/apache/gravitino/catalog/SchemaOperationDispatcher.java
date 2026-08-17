@@ -383,12 +383,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
 
     // Cascade: drop filesets via FilesetDispatcher first so each fileset cleans its own
     // write-through secrets. Do this before the catalog lock to avoid nested TreeLocks.
-    if (cascade) {
+    // Only schemas present in the entity store can own FilesetEntity children; managed catalog
+    // schemas (e.g. Hive) may exist only in the underlying catalog and must not fail listing.
+    if (cascade && getEntity(ident, SCHEMA, SchemaEntity.class) != null) {
       Namespace filesetNs =
           Namespace.of(ident.namespace().level(0), ident.namespace().level(1), ident.name());
       List<FilesetEntity> filesets;
       try {
         filesets = store.list(filesetNs, FilesetEntity.class, FILESET);
+      } catch (NoSuchEntityException e) {
+        filesets = Collections.emptyList();
       } catch (IOException e) {
         throw new RuntimeException("Failed to list filesets under schema " + ident, e);
       }
