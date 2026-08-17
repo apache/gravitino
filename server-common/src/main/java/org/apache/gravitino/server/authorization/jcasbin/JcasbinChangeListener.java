@@ -225,15 +225,16 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * change starts emitting the new post-rename name, this invalidation will silently miss and stale
    * entries will only clear via LRU eviction.
    *
-   * <p><b>Poison-row tolerance:</b> a record this listener cannot map is logged and skipped rather
-   * than propagated. Such a row names no cache key, so skipping it leaves no stale entry behind.
+   * <p><b>Bad rows:</b> a record this listener cannot understand is logged and skipped instead of
+   * being thrown up. Such a row does not point at any cache key, so skipping it leaves nothing
+   * stale behind.
    *
-   * <p><b>Self-healing:</b> the poller dispatches each batch once and never replays it, so a failed
-   * invalidation must be recovered here or {@code metadataIdCache} would serve a stale name→id
-   * mapping to authorization decisions until the entry's TTL expires. The whole {@code
-   * metadataIdCache} is therefore cleared instead: it is pure derived state, a strict superset of
-   * the invalidation that failed and of the rest of the batch, and repopulating it only costs the
-   * name→id lookups it caches.
+   * <p><b>Recovering from a failure:</b> the poller hands each batch over only once and never sends
+   * it again, so a failed removal has to be handled here. Otherwise {@code metadataIdCache} would
+   * keep an out-of-date name&#8594;id entry and hand it to authorization checks until that entry's
+   * TTL runs out. So the whole {@code metadataIdCache} is cleared instead. That is safe: everything
+   * in it can be looked up again, and clearing it also covers the entry that failed plus the rest
+   * of the batch. The only cost is redoing those name&#8594;id lookups.
    *
    * <p>The {@code synchronized} modifier is defensive — see the note on {@link #pollOwnerChanges()}
    * for the rationale. The single-threaded scheduler already prevents overlapping runs in
@@ -330,9 +331,9 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
     if (prefixes.isEmpty() && leafKeys.isEmpty()) {
       return;
     }
-    // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
-    // a half-applied state. If an individual invalidation fails, clear the whole cache before
-    // releasing that lock. Fall back to an unlocked clear only if the batch callback never starts.
+    // Take the cache's exclusive lock for the whole batch, so a reader never sees a state where
+    // part of the batch has been removed and part has not. If removing one key fails, clear the
+    // whole cache while we still hold the lock. If we never got the lock at all, clear without it.
     boolean[] batchStarted = {false};
     try {
       metadataIdCache.runInvalidationBatch(

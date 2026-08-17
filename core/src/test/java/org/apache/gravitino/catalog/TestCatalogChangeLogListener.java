@@ -19,8 +19,10 @@
 package org.apache.gravitino.catalog;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -34,6 +36,7 @@ import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.MockedStatic;
 
 public class TestCatalogChangeLogListener {
 
@@ -53,16 +56,18 @@ public class TestCatalogChangeLogListener {
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
-    // Nothing is left to try locally. Propagating is safe now that the poller only logs a listener
-    // failure: it never replays the batch, which is what used to be dangerous here, because
-    // consumeLocalMutation() is single-shot and a replay would classify a local mutation as remote.
+    // There is nothing else we can do here, so let the exception go up. That is fine now: the
+    // poller only logs it and never sends the batch again. Re-sending was the dangerous part,
+    // because consumeLocalMutation() works only once and a second pass would mistake a change made
+    // by this node for one made by another node.
     Assertions.assertThrows(
         RuntimeException.class,
         () ->
             listener.onEntityChange(
                 List.of(change(1L, "metalake.failing"), change(2L, "metalake.later_local"))));
 
-    // All markers are consumed before eviction starts, even when both eviction and recovery fail.
+    // The "made by this node" marks are all read before any removal starts, even when both the
+    // removal and the clear fail.
     verify(catalogManager).consumeLocalMutation(laterLocal);
     verify(catalogCache).invalidateAll();
   }
@@ -92,8 +97,8 @@ public class TestCatalogChangeLogListener {
                     change(2L, "metalake.later_remote"),
                     change(3L, "metalake.later_local"))));
 
-    // The later local marker is consumed before eviction starts. The clear is then a superset of
-    // the failed eviction and all remote records, so no additional eviction is needed.
+    // The later local mark is read before any removal starts. Clearing the whole cache then covers
+    // both the removal that failed and every remote record, so nothing else has to be removed.
     verify(catalogManager).consumeLocalMutation(laterLocal);
     verify(catalogCache).invalidateAll();
     verify(catalogCache, never()).invalidate(laterRemote);
@@ -117,7 +122,8 @@ public class TestCatalogChangeLogListener {
 
     verify(catalogCache).invalidate(first);
     verify(catalogCache).invalidate(second);
-    // Clearing closes in-use IsolatedClassLoaders, so it must stay off the normal path.
+    // Clearing closes IsolatedClassLoaders that are still in use, so it must never happen during
+    // normal operation.
     verify(catalogCache, never()).invalidateAll();
   }
 
@@ -133,7 +139,8 @@ public class TestCatalogChangeLogListener {
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
-    // A row that names no catalog leaves nothing stale, so it must not escalate to a clear.
+    // A row that does not point at any catalog leaves nothing stale, so it must not cause a
+    // whole-cache clear.
     Assertions.assertDoesNotThrow(
         () ->
             listener.onEntityChange(
@@ -161,8 +168,8 @@ public class TestCatalogChangeLogListener {
 
     CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
 
-    // An unknown origin is treated as remote: an unnecessary targeted eviction is safer than
-    // permanently skipping a real remote change after the poller advances its cursor.
+    // When we cannot tell which node made the change, assume another node did. Removing one entry
+    // for nothing is cheaper than missing a real remote change, which we would never see again.
     Assertions.assertDoesNotThrow(
         () ->
             listener.onEntityChange(
@@ -210,6 +217,37 @@ public class TestCatalogChangeLogListener {
     listener.onEntityChange(List.of(change(1L, EntityChangeLogNameIdentifierCodec.encode(ident))));
 
     verify(catalogCache).invalidate(ident);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void testUnexpectedDecodeFailureSkipsOnlyThatRecord() {
+    CatalogManager catalogManager = mock(CatalogManager.class);
+    Cache<NameIdentifier, CatalogWrapper> catalogCache = mock(Cache.class);
+    NameIdentifier healthy = NameIdentifier.of("metalake", "healthy");
+
+    when(catalogManager.getCatalogCache()).thenReturn(catalogCache);
+    when(catalogManager.consumeLocalMutation(any())).thenReturn(false);
+
+    CatalogChangeLogListener listener = new CatalogChangeLogListener(catalogManager);
+
+    // The codec throws IllegalArgumentException today, but that is an implementation detail two
+    // calls down. If it ever throws something else, one bad row must still be skipped instead of
+    // aborting the batch and dropping the invalidations already collected for the other rows.
+    try (MockedStatic<EntityChangeLogNameIdentifierCodec> codec =
+        mockStatic(EntityChangeLogNameIdentifierCodec.class, CALLS_REAL_METHODS)) {
+      codec
+          .when(() -> EntityChangeLogNameIdentifierCodec.decode("metalake.boom"))
+          .thenThrow(new IllegalStateException("codec blew up"));
+
+      Assertions.assertDoesNotThrow(
+          () ->
+              listener.onEntityChange(
+                  List.of(change(1L, "metalake.boom"), change(2L, "metalake.healthy"))));
+    }
+
+    verify(catalogCache).invalidate(healthy);
+    verify(catalogCache, never()).invalidateAll();
   }
 
   private static EntityChangeRecord change(long id, String fullName) {

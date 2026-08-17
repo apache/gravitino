@@ -150,8 +150,8 @@ public class TestJcasbinChangePoller {
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // A record whose full name cannot be turned into a MetadataObject of the declared type names no
-    // cache key, so it must be logged and skipped without discarding the rest of the batch.
+    // If the full name does not match the type in the record, we cannot build a cache key from it.
+    // Log it, skip it, and keep handling the rest of the batch.
     Assertions.assertDoesNotThrow(
         () ->
             poller.onEntityChange(
@@ -174,7 +174,7 @@ public class TestJcasbinChangePoller {
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
     poller.onEntityChange(List.of(change(1L, MetadataObject.Type.FILESET, "ml1.cat1.sch1.fs1")));
 
-    // A FILESET has no nested metadata objects, so it is removed by exact key, not by prefix.
+    // A FILESET has nothing nested under it, so it is removed by its exact key, not by prefix.
     Assertions.assertEquals(
         List.of(key("ml1", "CATALOG", "cat1", "SCHEMA", "sch1", "FILESET", "fs1")),
         metadataIdCache.invalidatedKeys);
@@ -205,13 +205,13 @@ public class TestJcasbinChangePoller {
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // The poller dispatches a batch once and never replays it, so the listener must recover here.
+    // The batch is handed out once and never sent again, so the listener has to fix things here.
     Assertions.assertDoesNotThrow(
         () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
 
     Assertions.assertEquals(1, metadataIdCache.invalidateAllCalls);
     Assertions.assertEquals(1, metadataIdCache.invalidateAllInsideBatchCalls);
-    // The owner cache is driven by its own poller, so a change-log failure must not clear it.
+    // The owner cache has its own poller, so a change-log failure must not wipe it as well.
     Assertions.assertEquals(0, ownerRelCache.invalidateAllCalls);
   }
 
@@ -240,7 +240,7 @@ public class TestJcasbinChangePoller {
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // The failure can also come from the cache's batch lock itself, before any key is touched.
+    // The failure can also happen while taking the cache's batch lock, before any key is touched.
     Assertions.assertDoesNotThrow(
         () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));
 
@@ -257,7 +257,7 @@ public class TestJcasbinChangePoller {
 
     JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
 
-    // Nothing is left to try locally, so the poller logs it and keeps the cursor moving.
+    // There is nothing else to try here, so the poller just logs it and keeps reading.
     Assertions.assertThrows(
         RuntimeException.class,
         () -> poller.onEntityChange(List.of(change(1L, MetadataObject.Type.CATALOG, "ml1.cat1"))));

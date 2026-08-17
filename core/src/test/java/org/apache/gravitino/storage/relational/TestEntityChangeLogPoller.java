@@ -101,9 +101,44 @@ public class TestEntityChangeLogPoller {
       poller.pollChanges();
     }
 
-    // Each batch is dispatched exactly once: the throwing listener never sees a batch again, the
-    // healthy listener sees every batch, and the cursor keeps advancing past both batches.
+    // Each batch is handed out exactly once: the failing listener never gets a batch a second
+    // time, the healthy listener still gets every batch, and the read position moves past both.
     Assertions.assertEquals(2, throwingListenerCalls.get());
+    Assertions.assertEquals(List.of(first, second), received);
+    verify(mapper).selectEntityChanges(1L, MAX_ROWS);
+    verify(mapper).selectEntityChanges(2L, MAX_ROWS);
+  }
+
+  @Test
+  void testListenerThrowingErrorDoesNotKillThePoller() {
+    EntityChangeLogMapper mapper = mock(EntityChangeLogMapper.class);
+    EntityChangeRecord first = change(1L, "CATALOG", "ml1.cat1");
+    EntityChangeRecord second = change(2L, "CATALOG", "ml1.cat2");
+    when(mapper.selectEntityChanges(0L, MAX_ROWS)).thenReturn(List.of(first));
+    when(mapper.selectEntityChanges(1L, MAX_ROWS)).thenReturn(List.of(second));
+    when(mapper.selectEntityChanges(2L, MAX_ROWS)).thenReturn(List.of());
+
+    List<EntityChangeRecord> received = new ArrayList<>();
+
+    try (MockedStatic<SessionUtils> sessionUtils = mockStatic(SessionUtils.class)) {
+      mockSessionUtils(sessionUtils, mapper);
+
+      EntityChangeLogPoller poller = new EntityChangeLogPoller(1);
+      // A listener that clears its catalog cache can close an IsolatedClassLoader that is still in
+      // use, and a request holding a class from it then fails with NoClassDefFoundError, an Error
+      // rather than an Exception. pollChanges() is the task given to scheduleWithFixedDelay(), so
+      // anything escaping it would cancel every future poll and freeze invalidation process-wide.
+      poller.registerListener(
+          changes -> {
+            throw new NoClassDefFoundError("closed isolated classloader");
+          });
+      poller.registerListener(received::addAll);
+
+      Assertions.assertDoesNotThrow(poller::pollChanges);
+      Assertions.assertDoesNotThrow(poller::pollChanges);
+      Assertions.assertDoesNotThrow(poller::pollChanges);
+    }
+
     Assertions.assertEquals(List.of(first, second), received);
     verify(mapper).selectEntityChanges(1L, MAX_ROWS);
     verify(mapper).selectEntityChanges(2L, MAX_ROWS);

@@ -36,24 +36,27 @@ import org.slf4j.LoggerFactory;
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
  *
- * <p>The poller requires each listener to be self-healing, and this one recovers the same way
- * {@code EntityCacheChangeLogListener} and {@code JcasbinChangeListener} do: a failed eviction
- * clears the whole catalog cache, which is a strict superset of the eviction that failed and of the
- * rest of the batch. A malformed row is skipped instead, because it names no catalog and so leaves
- * nothing stale.
+ * <p>The poller hands each batch to a listener only once, so a listener has to clean up after
+ * itself when it fails. This one does what {@code EntityCacheChangeLogListener} and {@code
+ * JcasbinChangeListener} do: if removing one catalog from the cache fails, it clears the whole
+ * catalog cache, which also covers the entry it failed to remove and the rest of the batch. A row
+ * that cannot be parsed is simply skipped, because it does not point at any catalog and so cannot
+ * leave anything stale.
  *
- * <p>The listener consumes local-mutation markers for the whole batch before evicting anything. A
- * failed eviction or clear therefore cannot strand a marker that would make a later remote change
- * look local. If the clear itself fails, the exception reaches the poller, which logs it at {@code
- * ERROR} and advances its cursor; the affected catalog can then remain stale until it expires.
+ * <p>Before removing anything, the listener first goes through the whole batch and marks off the
+ * changes this node made itself. Doing it in that order means a later failure cannot leave one of
+ * those marks behind, which would otherwise make a future change from another node look like a
+ * local one. If the clear itself fails, the exception goes up to the poller, which logs it at
+ * {@code ERROR} and moves on, and the catalog stays stale until it expires.
  *
- * <p><b>Cost of the clear:</b> evicting a cached catalog closes its {@code CatalogWrapper}, which
- * tears down the connection pool and the {@code IsolatedClassLoader}. A whole-cache clear therefore
- * also closes catalogs this process is actively serving; requests holding classes from a closed
- * loader can fail with {@code NoClassDefFoundError}, the failure mode of #11739. This is accepted
- * deliberately so that a stale catalog is never served: the alternative left this node serving the
- * changed catalog from cache for up to {@code gravitino.catalog.cache.evictionIntervalMs}. The
- * clear runs only on a failed eviction, which is off the normal path.
+ * <p><b>What clearing costs:</b> dropping a catalog from the cache closes its {@code
+ * CatalogWrapper}, which shuts down its connection pool and its {@code IsolatedClassLoader}.
+ * Clearing the whole cache therefore also closes catalogs this process is serving right now, and
+ * requests still using classes from a closed classloader can fail with {@code NoClassDefFoundError}
+ * (that is the bug in #11739). We accept this on purpose so a changed catalog is never served from
+ * a stale cache; without it, this node would keep serving the old catalog for up to {@code
+ * gravitino.catalog.cache.evictionIntervalMs}. The clear only happens when a normal removal failed,
+ * never during normal operation.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
@@ -80,8 +83,8 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
 
       Optional<NameIdentifier> identOpt = catalogIdentifier(change);
       if (identOpt.isEmpty()) {
-        // Already logged. A row that names no catalog cannot leave a stale entry behind, so it is
-        // skipped rather than escalated to a cache clear.
+        // Already logged. This row does not point at any catalog, so there is nothing stale to
+        // clean up. Just skip it instead of clearing the cache.
         continue;
       }
       NameIdentifier ident = identOpt.get();
@@ -90,9 +93,9 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       try {
         localMutation = catalogManager.consumeLocalMutation(ident);
       } catch (RuntimeException e) {
-        // The identifier is valid, so this record may name a remote mutation. Treating an unknown
-        // origin as remote can cause an unnecessary eviction, but skipping it can leave a stale
-        // catalog cached after the poller advances its cursor.
+        // We could not tell whether this change came from this node or another one. The name is
+        // valid, so assume it came from another node: the worst case is one extra cache removal,
+        // while skipping it could leave an old catalog cached forever.
         LOG.error(
             "Failed to check local mutation state for catalog {}, treating change log record id {} "
                 + "as remote to avoid serving stale metadata",
@@ -116,9 +119,9 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
     for (CatalogInvalidation invalidation : remoteInvalidations) {
       EntityChangeRecord change = invalidation.change;
       NameIdentifier ident = invalidation.ident;
-      // Logged at INFO on purpose: this tears down the cached catalog, including its connection
-      // pool and isolated classloader, and it is the main cross-node effect of the change log.
-      // CatalogManager logs the matching "Closing catalog" line when the eviction runs.
+      // INFO on purpose: dropping the catalog from the cache also closes its connection pool and
+      // its isolated classloader, and this is the main thing the change log does across nodes.
+      // CatalogManager prints the matching "Closing catalog" line when the removal happens.
       LOG.info(
           "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
           ident,
@@ -128,9 +131,9 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       try {
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
-        // The poller dispatches a batch once and never replays it, so dropping this eviction would
-        // serve the catalog stale until the eviction interval expires. The whole cache is cleared
-        // instead; see the class javadoc for the classloader cost this accepts.
+        // This batch will never be sent again, so giving up here would keep serving the old
+        // catalog until it expires on its own. Clear the whole cache instead; see the class
+        // javadoc for the classloader cost that comes with it.
         LOG.error(
             "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "
                 + "avoid serving it stale; catalogs in use by this node are closed as a result",
@@ -169,8 +172,11 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
     NameIdentifier ident;
     try {
       ident = EntityChangeLogNameIdentifierCodec.decode(change.getFullName());
-    } catch (IllegalArgumentException e) {
-      LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());
+    } catch (RuntimeException e) {
+      // Catch every unchecked exception, not just IllegalArgumentException: if a future version of
+      // the codec throws something else, one bad row must still be skipped instead of aborting the
+      // whole batch, which would drop the invalidations already collected for the other rows.
+      LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName(), e);
       return Optional.empty();
     }
     if (ident.namespace().length() != 1) {

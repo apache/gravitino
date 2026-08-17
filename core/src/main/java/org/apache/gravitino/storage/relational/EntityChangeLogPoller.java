@@ -35,30 +35,31 @@ import org.slf4j.LoggerFactory;
 /**
  * Global poller for {@code entity_change_log}.
  *
- * <p>The poller owns the single high-water mark for a Gravitino server process. Each consumed batch
- * is dispatched once to every registered listener and the cursor then advances unconditionally, so
- * a failing listener never delays the batch for the others: pausing the shared cursor would degrade
- * cache coherence process-wide because of one listener.
+ * <p>There is one poller per Gravitino server process, and it keeps one read position (the id of
+ * the last row it has read). It reads a batch of rows, hands that batch to every listener once, and
+ * then always moves the read position forward, even if a listener failed. The read position is
+ * shared by all listeners, so holding it back to retry one listener would stop every other listener
+ * from seeing new changes, and all the caches in this process would fall behind.
  *
- * <p>Listeners must therefore be self-healing: a listener that cannot apply a batch has to recover
- * locally, because it will not see that batch again. The three registered listeners recover as
- * follows:
+ * <p>Because a batch is handed out only once and is never sent again, every listener must be able
+ * to fix itself when it fails. The usual way to do that is to clear its whole cache: clearing
+ * everything also covers whatever the listener failed to remove, so nothing stale is left behind.
+ * The three listeners registered today do exactly that:
  *
  * <ul>
- *   <li>{@code EntityCacheChangeLogListener} clears its whole entity cache, a strict superset of
- *       the invalidations it missed.
- *   <li>{@code JcasbinChangeListener} clears its whole {@code metadataIdCache} for the same reason;
- *       a stale name&#8594;id mapping there would feed authorization decisions.
- *   <li>{@code CatalogChangeLogListener} clears its whole catalog cache as well. Note that this
- *       closes the {@code IsolatedClassLoader} of every cached catalog, including catalogs this
- *       process is actively serving (the failure mode of #11739); it is accepted so that a changed
- *       catalog is never served stale. The clear runs only on a failed eviction.
+ *   <li>{@code EntityCacheChangeLogListener} clears its whole entity cache.
+ *   <li>{@code JcasbinChangeListener} clears its whole {@code metadataIdCache}. A stale
+ *       name&#8594;id entry there would be used by authorization checks.
+ *   <li>{@code CatalogChangeLogListener} clears its whole catalog cache. Clearing it also closes
+ *       the {@code IsolatedClassLoader} of every cached catalog, including catalogs this process is
+ *       currently serving (that is the bug in #11739). We accept that cost so a changed catalog is
+ *       never served from a stale cache, and the clear only happens when a normal removal failed.
  * </ul>
  *
- * <p>A listener that can do neither must not be registered here.
+ * <p>Do not register a listener here if it cannot recover on its own.
  *
- * <p>Every listener failure is logged at {@code ERROR}, so a listener whose local recovery is
- * failing stays visible in the logs even though the poller keeps making progress.
+ * <p>Every listener failure is logged at {@code ERROR}, so a listener that keeps failing stays
+ * visible in the logs even though the poller keeps going.
  */
 public class EntityChangeLogPoller implements AutoCloseable {
 
@@ -173,7 +174,12 @@ public class EntityChangeLogPoller implements AutoCloseable {
   void pollChanges() {
     try {
       doPollChanges();
-    } catch (Exception e) {
+    } catch (Throwable e) {
+      // Catch Throwable, not Exception: this method is the task handed to
+      // scheduleWithFixedDelay(), and anything that escapes it cancels all future runs for good,
+      // silently. An Error is reachable here, for example a NoClassDefFoundError thrown by a
+      // listener that touched a closed IsolatedClassLoader. Losing the poller would stop cache
+      // invalidation for every listener in this process, so we log and let the next cycle run.
       if (handleInterruptIfAny(e, "Entity change poll")) {
         return;
       }
@@ -284,9 +290,9 @@ public class EntityChangeLogPoller implements AutoCloseable {
   }
 
   /**
-   * Dispatches the batch to every listener that is still registered. A listener failure is logged
-   * and then dropped: the listener is responsible for its own local recovery, and the cursor
-   * advances either way.
+   * Hands the batch to every listener that is still registered. If a listener throws, the error is
+   * only logged: each listener is expected to clean up after itself, and the read position moves
+   * forward either way.
    */
   private void notifyListeners(BatchDelivery delivery) {
     for (EntityChangeLogListener listener : delivery.targetListeners) {
@@ -306,7 +312,10 @@ public class EntityChangeLogPoller implements AutoCloseable {
             listener.getClass().getName(),
             delivery.firstChangeId(),
             delivery.lastChangeId);
-      } catch (Exception e) {
+      } catch (Throwable e) {
+        // Throwable, not Exception: a listener recovering by clearing its cache can close an
+        // IsolatedClassLoader that is still in use and surface a NoClassDefFoundError, which is an
+        // Error. One listener doing that must not take down the whole poller.
         LOG.error(
             "Entity change log listener {} failed to consume batch id range [{}, {}]; the batch is "
                 + "not retried, so the listener is responsible for local recovery",
