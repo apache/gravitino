@@ -195,8 +195,12 @@ public class CatalogMetaBaseSQLProvider {
         + " catalog_comment = #{catalogMeta.catalogComment},"
         + " properties = #{catalogMeta.properties},"
         + " audit_info = #{catalogMeta.auditInfo},"
-        + " current_version = #{catalogMeta.currentVersion},"
-        + " last_version = #{catalogMeta.lastVersion},"
+        // An overwrite must advance the OCC token rather than reset it to the initial version,
+        // otherwise a concurrent alter or drop holding an older version could still pass its
+        // compare-and-set. last_version is assigned first so that both columns derive from the
+        // pre-update current_version.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 

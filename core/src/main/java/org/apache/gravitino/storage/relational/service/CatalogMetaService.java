@@ -410,8 +410,10 @@ public class CatalogMetaService {
 
   private RuntimeException catalogWriteFailure(
       NameIdentifier identifier, CatalogPO observedCatalogPO) {
-    // Use a locking read to see the latest row. A plain MySQL read may use an old snapshot and
-    // report a conflict after the catalog is gone.
+    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
+    // The locking read additionally waits for a writer that is still in flight, so a rename or
+    // delete that has not committed yet is classified as not-found instead of as a stale-version
+    // conflict. The lock is taken on the error path of a transaction that is about to roll back.
     CatalogPO currentCatalogPO =
         SessionUtils.getWithoutCommit(
             CatalogMetaMapper.class,

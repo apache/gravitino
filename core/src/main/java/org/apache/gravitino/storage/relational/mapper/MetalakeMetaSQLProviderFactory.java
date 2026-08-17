@@ -54,7 +54,9 @@ public class MetalakeMetaSQLProviderFactory {
   static class MetalakeMetaH2Provider extends MetalakeMetaBaseSQLProvider {
     @Override
     public String selectMetalakeMetaByIdForShare(Long metalakeId) {
-      // H2 does not support shared row locks, so tests use an exclusive lock.
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Catalog
+      // creations under one metalake therefore serialize on H2, and a slow creation can make a
+      // concurrent one hit H2's lock timeout instead of a clean conflict.
       return selectMetalakeMetaByIdForUpdate(metalakeId);
     }
   }

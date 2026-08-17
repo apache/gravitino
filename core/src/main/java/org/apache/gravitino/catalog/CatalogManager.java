@@ -985,7 +985,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
           } catch (NoSuchEntityException ignored) {
-            // Another server deleted the catalog during this request. Clear the stale cache entry.
+            // Another server deleted the catalog after it was loaded above, so a later store read
+            // such as listing its schemas no longer finds it. The drop stays idempotent, but the
+            // wrapper cached by loadCatalogAndWrap has to be discarded. store.delete itself never
+            // reaches here: it maps a missing entity to false on its own.
             catalogCache.invalidate(ident);
             return false;
           } catch (GravitinoRuntimeException e) {

@@ -87,8 +87,12 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " catalog_comment = #{catalogMeta.catalogComment},"
         + " properties = #{catalogMeta.properties},"
         + " audit_info = #{catalogMeta.auditInfo},"
-        + " current_version = #{catalogMeta.currentVersion},"
-        + " last_version = #{catalogMeta.lastVersion},"
+        // An overwrite must advance the OCC token rather than reset it to the initial version,
+        // otherwise a concurrent alter or drop holding an older version could still pass its
+        // compare-and-set. Unqualified column references resolve to the existing row, and
+        // PostgreSQL evaluates every assignment against that row.
+        + " current_version = current_version + 1,"
+        + " last_version = current_version + 1,"
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 

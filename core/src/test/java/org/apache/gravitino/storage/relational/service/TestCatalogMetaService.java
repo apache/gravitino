@@ -291,6 +291,38 @@ public class TestCatalogMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteInsertAdvancesCurrentVersion() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_overwrite_occ",
+            auditInfo);
+    backend.insert(catalog, false);
+    CatalogPO initialPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+
+    backend.insert(catalog, true);
+
+    CatalogPO overwrittenPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
+    assertEquals(
+        overwrittenPO.getCurrentVersion().longValue(), overwrittenPO.getLastVersion().longValue());
+
+    // A writer that observed the catalog before the overwrite must not pass its compare-and-set.
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(
+                    catalog.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
   public void testAlterReportsOptimisticLockConflict() throws IOException {
     CatalogEntity catalog =
         createCatalog(

@@ -45,9 +45,11 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -864,7 +866,7 @@ public class TestCatalogManager {
         ImmutableMap.of(
             PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
     manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
-    store.throwMissingForCatalogDelete = true;
+    store.throwMissingCatalogForSchemaList = true;
 
     Assertions.assertFalse(manager.dropCatalog(ident, true));
     Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
@@ -1004,7 +1006,7 @@ public class TestCatalogManager {
     private final AtomicReference<EntityChangeLogListener> unregisteredListener =
         new AtomicReference<>();
     private boolean returnFalseForCatalogDelete;
-    private boolean throwMissingForCatalogDelete;
+    private boolean throwMissingCatalogForSchemaList;
 
     @Override
     public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
@@ -1012,13 +1014,21 @@ public class TestCatalogManager {
       if (returnFalseForCatalogDelete && entityType == EntityType.CATALOG) {
         return false;
       }
-      if (throwMissingForCatalogDelete && entityType == EntityType.CATALOG) {
+      return super.delete(ident, entityType, cascade);
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> List<E> list(
+        Namespace namespace, Class<E> cl, EntityType entityType) throws IOException {
+      // Mirrors the relational store: listing the schemas of a catalog that another server has
+      // already deleted resolves the parent catalog id first and reports the catalog as missing.
+      if (throwMissingCatalogForSchemaList && entityType == EntityType.SCHEMA) {
         throw new NoSuchEntityException(
             NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
             EntityType.CATALOG.name().toLowerCase(),
-            ident.toString());
+            namespace.level(namespace.length() - 1));
       }
-      return super.delete(ident, entityType, cascade);
+      return super.list(namespace, cl, entityType);
     }
 
     @Override
