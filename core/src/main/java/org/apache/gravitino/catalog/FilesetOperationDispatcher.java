@@ -235,12 +235,27 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         TreeLockUtils.doWithTreeLock(
             nameIdentifierForLock,
             LockType.WRITE,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
-                    NoSuchFilesetException.class,
-                    IllegalArgumentException.class));
+            () -> {
+              // Raw catalog-ops properties still contain write-through URNs (dispatcher load hides
+              // them). Capture before alter so RemoveProperty / overwrite can clean provider
+              // material.
+              Map<String, String> propertiesBefore =
+                  doWithCatalog(
+                          catalogIdent,
+                          c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+                          NoSuchFilesetException.class)
+                      .properties();
+
+              Fileset altered =
+                  doWithCatalog(
+                      catalogIdent,
+                      c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
+                      NoSuchFilesetException.class,
+                      IllegalArgumentException.class);
+
+              deleteWriteThroughSecretsRemovedByAlter(propertiesBefore, changes);
+              return altered;
+            });
 
     return EntityCombinedFileset.of(alteredFileset)
         .withHiddenProperties(
@@ -248,6 +263,33 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 alteredFileset.properties()));
+  }
+
+  /**
+   * Deletes write-through secrets whose property key was removed or whose URN value was overwritten
+   * by {@link FilesetChange}. External-reference URNs are left untouched by {@link
+   * SecretManager#deleteSecretsFromProperties}.
+   */
+  private void deleteWriteThroughSecretsRemovedByAlter(
+      Map<String, String> propertiesBefore, FilesetChange... changes) {
+    if (propertiesBefore == null || propertiesBefore.isEmpty() || changes == null) {
+      return;
+    }
+    for (FilesetChange change : changes) {
+      if (change instanceof FilesetChange.RemoveProperty) {
+        String key = ((FilesetChange.RemoveProperty) change).getProperty();
+        String oldValue = propertiesBefore.get(key);
+        if (oldValue != null) {
+          secretManager.deleteSecretsFromProperties(Map.of(key, oldValue));
+        }
+      } else if (change instanceof FilesetChange.SetProperty) {
+        FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) change;
+        String oldValue = propertiesBefore.get(setProperty.getProperty());
+        if (oldValue != null && !oldValue.equals(setProperty.getValue())) {
+          secretManager.deleteSecretsFromProperties(Map.of(setProperty.getProperty(), oldValue));
+        }
+      }
+    }
   }
 
   /**
