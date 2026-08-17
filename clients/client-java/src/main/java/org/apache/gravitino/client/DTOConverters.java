@@ -263,6 +263,19 @@ class DTOConverters {
     } else if (change instanceof FilesetChange.RemoveProperty) {
       return new FilesetUpdateRequest.RemoveFilesetPropertiesRequest(
           ((FilesetChange.RemoveProperty) change).getProperty());
+    } else if (change instanceof FilesetChange.SetSecretBinding) {
+      FilesetChange.SetSecretBinding setSecretBinding = (FilesetChange.SetSecretBinding) change;
+      return new FilesetUpdateRequest.SetFilesetSecretBindingRequest(
+          setSecretBinding.getProperty(),
+          setSecretBinding.getBinding().provider(),
+          setSecretBinding.getBinding().plaintext());
+    } else if (change instanceof FilesetChange.SetSecretReference) {
+      FilesetChange.SetSecretReference setSecretReference =
+          (FilesetChange.SetSecretReference) change;
+      return new FilesetUpdateRequest.SetFilesetSecretReferenceRequest(
+          setSecretReference.getProperty(),
+          setSecretReference.getReference().provider(),
+          setSecretReference.getReference().attributes());
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
