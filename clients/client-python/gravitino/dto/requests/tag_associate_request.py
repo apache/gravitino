@@ -86,8 +86,8 @@ class TagNamesAssociateRequest(RESTRequest):
     def validate(self) -> None:
         """Validates the request."""
         Precondition.check_argument(
-            bool(self._tags_to_add) or bool(self._tags_to_remove),
-            "tagsToAdd and tagsToRemove cannot both be null or empty",
+            self._tags_to_add is not None or self._tags_to_remove is not None,
+            "tagsToAdd and tagsToRemove cannot both be null",
         )
 
         self._validate_tag_names(self._tags_to_add, "tagsToAdd")
@@ -140,6 +140,7 @@ class TagsAssociateRequest(RESTRequest):
 
         self._validate_pairs(self._tags_to_add, "tagsToAdd")
         self._validate_pairs(self._tags_to_remove, "tagsToRemove")
+        self._validate_no_intersection()
 
     def _normalize_pairs(
         self, pairs: list[str | dict[str, Optional[str]] | TagValuePairRequest] | None
@@ -174,3 +175,15 @@ class TagsAssociateRequest(RESTRequest):
         )
         for pair in pairs:
             pair.validate()
+
+    def _validate_no_intersection(self) -> None:
+        if not self._tags_to_add or not self._tags_to_remove:
+            return
+
+        tags_to_add = {(pair.name, pair.value) for pair in self._tags_to_add}
+        tags_to_remove = {(pair.name, pair.value) for pair in self._tags_to_remove}
+
+        Precondition.check_argument(
+            not tags_to_add.intersection(tags_to_remove),
+            "tagsToAdd and tagsToRemove must not contain the same tag-value pair",
+        )

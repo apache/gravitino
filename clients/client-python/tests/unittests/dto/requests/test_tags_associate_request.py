@@ -45,18 +45,16 @@ class TestTagsAssociateRequest(unittest.TestCase):
         self.assertEqual(["tag_to_remove"], deserialized_request.tags_to_remove)
 
     def test_tag_names_request_validate(self) -> None:
+        TagNamesAssociateRequest([], []).validate()
+
         invalid_request1 = TagNamesAssociateRequest(None, None)
         invalid_request2 = TagNamesAssociateRequest(["tag_to_add", " "], None)
-        invalid_request3 = TagNamesAssociateRequest([], [])
 
         with self.assertRaises(IllegalArgumentException):
             invalid_request1.validate()
 
         with self.assertRaises(IllegalArgumentException):
             invalid_request2.validate()
-
-        with self.assertRaises(IllegalArgumentException):
-            invalid_request3.validate()
 
     def test_create_request(self) -> None:
         request = TagsAssociateRequest(
@@ -93,6 +91,11 @@ class TestTagsAssociateRequest(unittest.TestCase):
         self.assertEqual("value2", deserialized_request.tags_to_remove[1].value)
 
     def test_associate_request_validate(self) -> None:
+        TagsAssociateRequest(
+            [{"name": "data_domain", "value": "finance"}],
+            [{"name": "data_domain", "value": "risk"}],
+        ).validate()
+
         invalid_request1 = TagsAssociateRequest(
             None, None
         )  # pyright: ignore[reportArgumentType]
@@ -103,6 +106,11 @@ class TestTagsAssociateRequest(unittest.TestCase):
             [{"name": "tag_to_add_1", "value": " "}], None
         )
         invalid_request4 = TagsAssociateRequest([], [])
+        invalid_request5 = TagsAssociateRequest(
+            [{"name": "data_domain", "value": "finance"}],
+            [{"name": "data_domain", "value": "finance"}],
+        )
+        invalid_request6 = TagsAssociateRequest(["pii"], ["pii"])
 
         with self.assertRaises(IllegalArgumentException):
             invalid_request1.validate()
@@ -115,3 +123,9 @@ class TestTagsAssociateRequest(unittest.TestCase):
 
         with self.assertRaises(IllegalArgumentException):
             invalid_request4.validate()
+
+        with self.assertRaises(IllegalArgumentException):
+            invalid_request5.validate()
+
+        with self.assertRaises(IllegalArgumentException):
+            invalid_request6.validate()

@@ -185,6 +185,32 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
                 error_handler=TAG_ERROR_HANDLER,
             )
 
+    def test_associate_tags_allows_empty_lists(self) -> None:
+        tag_operations = MetadataObjectTagOperations(
+            TestMetadataObjectTagOperations.METALAKE_NAME,
+            MetadataObjects.of(
+                ["catalog", "schema", "table"],
+                MetadataObject.Type.TABLE,
+            ),
+            TestMetadataObjectTagOperations.REST_CLIENT,
+        )
+        json_str = TagNamesListResponse(0, ["tagA"]).to_json()
+        mock_resp = mock_base.mock_http_response(json_str)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=mock_resp,
+        ) as mock_post:
+            tags = tag_operations.associate_tags([], [])
+
+            self.assertEqual(["tagA"], tags)
+            param = TagNamesAssociateRequest([], [])
+            mock_post.assert_called_once_with(
+                "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
+                json=param,
+                error_handler=TAG_ERROR_HANDLER,
+            )
+
     def test_assign_tag_values(self) -> None:
         tag_operations = MetadataObjectTagOperations(
             TestMetadataObjectTagOperations.METALAKE_NAME,
