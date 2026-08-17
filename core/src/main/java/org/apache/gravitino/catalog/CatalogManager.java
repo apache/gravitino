@@ -1011,12 +1011,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                       schemaIdent.namespace().level(0),
                       schemaIdent.namespace().level(1),
                       schemaIdent.name());
-              List<FilesetEntity> filesets;
-              try {
-                filesets = store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
-              } catch (NoSuchEntityException e) {
-                continue;
-              }
+              List<FilesetEntity> filesets =
+                  store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
               for (FilesetEntity fileset : filesets) {
                 filesetDispatcher.dropFileset(
                     ofFileset(
