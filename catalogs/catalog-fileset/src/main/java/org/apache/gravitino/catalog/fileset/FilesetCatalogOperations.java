@@ -835,14 +835,21 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
 
       boolean dropped = super.dropSchema(ident, cascade);
-      if (disableFSOps) {
-        return dropped;
-      }
-
-      // If the schema entity is failed to be deleted, we should not delete the storage location
-      // and return false immediately.
+      // If the schema entity is failed to be deleted, we should not delete secrets / storage
+      // locations and return false immediately.
       if (!dropped) {
         return false;
+      }
+
+      // Cascade (and empty-schema) drops bypass FilesetOperationDispatcher.dropFileset, so clean
+      // write-through secrets here using the entity properties captured before the store delete.
+      secretManager.deleteSecretsFromProperties(schemaEntity.properties());
+      for (FilesetEntity fileset : filesets) {
+        secretManager.deleteSecretsFromProperties(fileset.properties());
+      }
+
+      if (disableFSOps) {
+        return true;
       }
 
       // Delete all the managed filesets no matter whether the storage location is under the
