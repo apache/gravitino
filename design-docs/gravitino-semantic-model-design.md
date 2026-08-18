@@ -247,8 +247,9 @@ DataType = "String" | "Integer" | "Decimal" | "Float" | "Boolean"
 - Every Expression has at least one DialectExpression.
 - Dialect identifiers are non-empty strings. `ANSI_SQL`, `SNOWFLAKE`, `MDX`, `TABLEAU`,
   `DATABRICKS`, `MAQL`, and `BIGQUERY` are well-known values exposed by the Java API through
-  `Dialects`; other identifiers are accepted and preserved without normalization, translation, or
-  fallback.
+  `org.apache.gravitino.semantic.Dialects`; other identifiers are accepted and preserved without
+  normalization, translation, or fallback. Dialect identifiers are compared exactly and
+  case-sensitively, so `trino` and `TRINO` are distinct.
 - Each dialect identifier appears at most once in an Expression and each expression string is
   non-empty.
 - Unknown model fields are rejected where the pinned Ossie schema sets `additionalProperties` to
@@ -310,8 +311,8 @@ The request path does not invoke the upstream Python validator or create an inte
 string. The implementation validates the in-memory projection against a Gravitino profile derived
 from the bundled copy of the pinned JSON Schema, then runs Gravitino-specific model-local and
 catalog checks. The profile preserves the pinned structural constraints while treating dialect
-identifiers as open non-empty strings. Upstream validation tools are used in conformance tests for
-generated YAML and JSON.
+identifiers as open non-empty strings. Upstream validation tools are used only in compatibility
+fixtures that contain Ossie-defined dialects.
 
 The entity carries no per-model Ossie specification version. Each Gravitino release pins one exact
 upstream schema commit and defines the supported read and write contract. Updating that schema
@@ -608,9 +609,11 @@ identity, lifecycle, or authorization.
 #### Version and Lifecycle Behavior
 
 - Create writes the identity row and version 1 snapshot in one transaction.
-- Alter follows Gravitino's existing version-based OCC mechanism: it atomically writes a new
-  snapshot, increments `last_version`, and advances `current_version` with CAS. A conflict rolls back
-  and returns `409` with `OPTIMISTIC_LOCK_CONFLICT_CODE`. Rename also updates
+- Alter follows Gravitino's existing version-based OCC mechanism. It atomically writes a new
+  snapshot, increments `last_version`, and advances `current_version` with a server-internal CAS. A
+  transaction-level CAS conflict rolls back and returns `409` with
+  `OPTIMISTIC_LOCK_CONFLICT_CODE`. Because alter requests do not carry a caller-observed version,
+  cross-request read-modify-write is last-write-wins. Rename also updates
   `semantic_model_meta.semantic_model_name`.
 - Load joins `semantic_model_meta.current_version` to the matching snapshot and returns only the
   current Semantic Model.
@@ -620,9 +623,9 @@ identity, lifecycle, or authorization.
   The current API does not expose version identifiers, historical loads, or rollback, and storage of
   version rows does not guarantee permanent history retention.
 - Drop follows Gravitino's existing version-based OCC mechanism and soft-deletes the identity and
-  version rows under the existing retention rules. A stale conflict returns `409` with
-  `OPTIMISTIC_LOCK_CONFLICT_CODE`, while an already-missing Semantic Model preserves the idempotent
-  `false` result.
+  version rows under the existing retention rules. A transaction-level OCC conflict returns `409`
+  with `OPTIMISTIC_LOCK_CONFLICT_CODE`, while an already-missing Semantic Model preserves the
+  idempotent `false` result.
 - Schema and catalog non-empty checks include Semantic Models. Cascade or force deletion of a parent
   removes the contained Semantic Models through the normal parent lifecycle.
 - Deleting a referenced source in another schema or catalog does not delete the Semantic Model.
@@ -698,5 +701,7 @@ Each task includes focused tests for the behavior it introduces.
 | **III. Clients, Documentation, and UX** |                                                                                                              |          |
 |                                         | Add Java client support                                                                                      | P0       |
 |                                         | Add Python client support                                                                                    | P0       |
+|                                         | Add read-only MCP server tools for listing and loading schema-scoped Semantic Models                         | P1       |
 |                                         | Add Ossie conformance fixtures and interoperability documentation                                            | P1       |
+|                                         | Add MCP server tools for creating, altering, and dropping Semantic Models                                    | P2       |
 |                                         | Add UI support for discovering, viewing, and managing Semantic Models as a separate schema object category   | P2       |
