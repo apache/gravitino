@@ -364,9 +364,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final IdGenerator idGenerator;
 
-  // Held for create-time secret writes; consumed by the entity-secrets create follow-up.
-  @SuppressWarnings("UnusedVariable")
   private final SecretManager secretManager;
+
+  // Set after construction: CatalogManager is created before SchemaDispatcher (circular dep).
+  private SchemaDispatcher schemaDispatcher;
 
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
@@ -431,6 +432,16 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } else {
       this.catalogChangeLogListener = null;
     }
+  }
+
+  /**
+   * Sets the {@link SchemaDispatcher} used when force-dropping a managed catalog. Must be called
+   * after the schema dispatcher is constructed (CatalogManager is created first).
+   *
+   * @param schemaDispatcher The schema dispatcher.
+   */
+  public void setSchemaDispatcher(SchemaDispatcher schemaDispatcher) {
+    this.schemaDispatcher = Preconditions.checkNotNull(schemaDispatcher);
   }
 
   /**
@@ -988,25 +999,27 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
 
-            // Snapshot schema properties (write-through secret URNs) before entities are removed.
-            // store.delete(cascade) only soft-deletes meta rows and does not call secret providers.
-            // Fileset secrets on cascade are cleaned inside FilesetCatalogOperations.dropSchema.
+            // Snapshot schema properties before entities are removed. Unmanaged catalogs only
+            // remove schemas via store cascade (no SchemaDispatcher), so secrets must be cleaned
+            // here. Managed catalogs go through SchemaDispatcher.dropSchema, which cleans schema
+            // secrets; fileset secrets are cleaned in FilesetCatalogOperations.dropSchema.
+            boolean managedStorage = isManagedStorageCatalog(catalogWrapper);
             List<Map<String, String>> schemaSecretPropertySnapshots = new ArrayList<>();
-            for (SchemaEntity schema : schemaEntities) {
-              schemaSecretPropertySnapshots.add(copyProperties(schema.properties()));
+            if (!managedStorage) {
+              for (SchemaEntity schema : schemaEntities) {
+                schemaSecretPropertySnapshots.add(copyProperties(schema.properties()));
+              }
             }
 
-            boolean managedStorage = isManagedStorageCatalog(catalogWrapper);
-            if (managedStorage) {
-              // For managed catalog, we need to call drop schema API to drop the underlying
-              // entities as well as the related resource first. Directly deleting the metadata from
-              // the store is not enough. Delete schema secrets only after a successful drop.
-              for (int i = 0; i < schemaEntities.size(); i++) {
-                SchemaEntity schema = schemaEntities.get(i);
+            if (managedStorage && !schemaEntities.isEmpty()) {
+              Preconditions.checkState(
+                  schemaDispatcher != null,
+                  "SchemaDispatcher must be set before force-dropping a managed catalog");
+              // Drop via SchemaDispatcher so schema (and fileset) write-through secrets are cleaned
+              // by the normal dropSchema path. Direct doWithSchemaOps would bypass that cleanup.
+              for (SchemaEntity schema : schemaEntities) {
                 try {
-                  catalogWrapper.doWithSchemaOps(
-                      ops -> ops.dropSchema(schema.nameIdentifier(), true));
-                  secretManager.deleteSecretsFromProperties(schemaSecretPropertySnapshots.get(i));
+                  schemaDispatcher.dropSchema(schema.nameIdentifier(), true);
                 } catch (Exception e) {
                   LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
                   throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
@@ -1023,7 +1036,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             if (deleted) {
               markLocalMutation(ident);
               // Unmanaged / mixed: schemas were removed only via store cascade — clean their
-              // secrets now. Managed path already cleaned per successful dropSchema above.
+              // secrets now. Managed path already cleaned via SchemaDispatcher.dropSchema above.
               if (!managedStorage) {
                 for (Map<String, String> schemaProperties : schemaSecretPropertySnapshots) {
                   secretManager.deleteSecretsFromProperties(schemaProperties);
