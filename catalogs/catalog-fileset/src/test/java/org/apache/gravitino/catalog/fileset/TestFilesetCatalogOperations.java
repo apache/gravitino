@@ -3343,8 +3343,9 @@ public class TestFilesetCatalogOperations {
 
       Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
 
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> secretManager.readSecret(schemaUrn));
+      // Catalog ops only cleans fileset secrets on cascade; schema secrets are left to
+      // SchemaOperationDispatcher.
+      Assertions.assertEquals("schema-secret", secretManager.readSecret(schemaUrn));
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secretManager.readSecret(filesetUrn));
     }

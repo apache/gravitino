@@ -376,8 +376,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         () -> {
           // Schema secret URNs live on SchemaEntity in the store (catalog loadSchema may omit
           // them). Fileset write-through secrets on cascade are cleaned in
-          // FilesetCatalogOperations.dropSchema (which already lists child filesets for FS
-          // cleanup).
+          // FilesetCatalogOperations.dropSchema after FS cleanup.
           Map<String, String> schemaProperties = new HashMap<>();
           SchemaEntity schemaEntity = getEntity(ident, SCHEMA, SchemaEntity.class);
           if (schemaEntity != null

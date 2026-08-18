@@ -935,12 +935,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         }
       }
 
-      // Cascade (and empty-schema) drops bypass FilesetOperationDispatcher.dropFileset, so clean
-      // write-through secrets here using the entity properties captured before the store delete.
-      // Must run after FS cleanup above, which still resolves URNs to plaintext.
-      secretManager.deleteSecretsFromProperties(schemaEntity.properties());
-      for (FilesetEntity fileset : filesets) {
-        secretManager.deleteSecretsFromProperties(fileset.properties());
+      // Cascade store.delete removes fileset entities without going through
+      // FilesetOperationDispatcher.dropFileset, so clean fileset write-through secrets here using
+      // properties captured before the store delete. Must run after FS cleanup above, which still
+      // resolves URNs to plaintext. Schema secrets are cleaned by SchemaOperationDispatcher.
+      if (cascade) {
+        for (FilesetEntity fileset : filesets) {
+          secretManager.deleteSecretsFromProperties(fileset.properties());
+        }
       }
 
       LOG.info("Deleted schema {}", ident);
