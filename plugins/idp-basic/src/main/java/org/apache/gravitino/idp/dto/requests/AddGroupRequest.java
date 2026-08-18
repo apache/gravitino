@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.idp.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -40,6 +41,7 @@ public class AddGroupRequest implements RESTRequest {
   private final String group;
 
   @JsonProperty("comment")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
   private final String comment;
 
   /** Default constructor for AddGroupRequest. (Used for Jackson deserialization.) */

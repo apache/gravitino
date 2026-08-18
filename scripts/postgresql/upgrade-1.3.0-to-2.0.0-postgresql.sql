@@ -38,7 +38,7 @@ COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON strin
 ALTER TABLE tag_relation_meta ADD COLUMN IF NOT EXISTS tag_value VARCHAR(256) NOT NULL DEFAULT '';
 COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value, empty string means no value';
 
-ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(256) DEFAULT '';
+ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
 COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
 
 ALTER TABLE tag_relation_meta DROP CONSTRAINT IF EXISTS tag_relation_meta_tag_id_metadata_object_id_metadata_object_key;

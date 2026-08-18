@@ -194,6 +194,7 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP group.
    */
   public IdpGroup addGroup(String groupName, String comment) throws IOException {
+    IdpCredentialValidator.validateGroupComment(comment);
     String normalizedComment = comment == null ? "" : comment;
     GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName, normalizedComment));
     return new IdpGroup(groupName, Collections.emptyList(), normalizedComment);

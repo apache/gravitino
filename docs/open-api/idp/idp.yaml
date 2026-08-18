@@ -359,7 +359,7 @@ components:
           description: The name of the local user store group
         comment:
           type: string
-          maxLength: 256
+          maxLength: 1024
           description: Optional description of the local user store group
         users:
           type: array
@@ -413,7 +413,7 @@ components:
           description: The group name to add.
         comment:
           type: string
-          maxLength: 256
+          maxLength: 1024
           description: Optional description of the group.
 
     GroupMembershipChangeRequest:

@@ -42,6 +42,7 @@ public class IdpGroupDTO {
   private String name;
 
   @JsonProperty("comment")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
   private String comment = "";
 
   @JsonProperty("users")
@@ -80,7 +81,7 @@ public class IdpGroupDTO {
    * @return The comment of the built-in IdP group DTO, or an empty string if none.
    */
   public String comment() {
-    return comment;
+    return comment == null ? "" : comment;
   }
 
   /**

@@ -144,6 +144,12 @@ public class TestIdpUserGroupManager {
     Assertions.assertEquals("on-call rotation", commented.comment());
     Assertions.assertEquals("on-call rotation", manager.getGroup("testAddGroupComment").comment());
 
+    Assertions.assertDoesNotThrow(
+        () -> manager.addGroup("testAddGroupMaxComment", "a".repeat(1024)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.addGroup("testAddGroupTooLongComment", "a".repeat(1025)));
+
     Assertions.assertThrows(AlreadyExistsException.class, () -> manager.addGroup("testAddGroup"));
   }
 

@@ -67,9 +67,9 @@ public class TestAddGroupRequest {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new AddGroupRequest("a".repeat(129)).validate());
     Assertions.assertDoesNotThrow(
-        () -> new AddGroupRequest("test_group", "a".repeat(256)).validate());
+        () -> new AddGroupRequest("test_group", "a".repeat(1024)).validate());
     Assertions.assertThrows(
         IllegalArgumentException.class,
-        () -> new AddGroupRequest("test_group", "a".repeat(257)).validate());
+        () -> new AddGroupRequest("test_group", "a".repeat(1025)).validate());
   }
 }

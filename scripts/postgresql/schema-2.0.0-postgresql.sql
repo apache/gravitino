@@ -459,7 +459,7 @@ COMMENT ON COLUMN idp_user_meta.deleted_at IS 'idp user deleted at';
 CREATE TABLE IF NOT EXISTS idp_group_meta (
     group_id BIGINT NOT NULL,
     group_name VARCHAR(128) NOT NULL,
-    group_comment VARCHAR(256) DEFAULT '',
+    group_comment VARCHAR(1024) DEFAULT '',
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
