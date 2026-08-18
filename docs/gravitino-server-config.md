@@ -488,6 +488,53 @@ server, are documented with those services. See
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
 
+### Key Management
+
+The server talks to KMS instances you name in `gravitino.conf`. Each name is one configured
+instance. Each instance declares the KMS API it speaks. That API selects the `KmsClientFactory`
+implementation on the classpath. Two names may share one API, which is how you run more than one
+AWS or Azure vault.
+
+The list is empty by default, and then the server has no KMS clients. Naming a provider without a
+factory for its API, or without a valid API, fails startup. Client construction validates local
+configuration only; the first call to the provider is a later key inspection, not startup.
+
+| Configuration Item                      | Description                                                                                                                                                                 | Default Value |
+|-----------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.kms.providers`               | Comma-separated KMS instance names. Each name must match `[A-Za-z0-9][A-Za-z0-9_-]*` and cannot contain `.`. Duplicates fail startup.                                       | (empty)       |
+| `gravitino.kms.provider.<name>.api`     | Required KMS API identifier for that instance. Lowercase kebab-case with no surrounding whitespace, matched exactly, for example `aws-kms`. Values are never normalized.    | (none)        |
+| `gravitino.kms.provider.<name>.<key>`   | Any other property under that name is passed to the factory for that API. Nested dots in `<key>` are allowed, as in `endpoint.region`.                                      | (none)        |
+
+Every name in `providers` needs a matching `.api`. A `gravitino.kms.provider.<name>.*` key for a
+name that is not in the list, or any other `gravitino.kms.*` key, fails startup.
+
+`api` is the protocol, not the instance. Set it to the identifier the factory reports from
+`KmsClientFactory.api()`. Identifiers already used by factories include `aws-kms`,
+`google-cloud-kms`, and `azure-key-vault`. A custom factory may use any other lowercase kebab-case
+value. The server does not ship a factory for every identifier; put the matching implementation on
+the classpath or startup fails with no factory for that API.
+
+Callers name the instance and the key. They do not send `api`. The server already bound
+`aws-prod` to `aws-kms` at startup.
+
+```text
+# conf/gravitino.conf
+gravitino.kms.providers = aws-prod, aws-dr, azure-eu
+
+gravitino.kms.provider.aws-prod.api = aws-kms
+gravitino.kms.provider.aws-prod.endpoint.region = us-west-2
+
+gravitino.kms.provider.aws-dr.api = aws-kms
+gravitino.kms.provider.aws-dr.endpoint.region = eu-central-1
+
+gravitino.kms.provider.azure-eu.api = azure-key-vault
+gravitino.kms.provider.azure-eu.endpoint.vault = payments-eu
+```
+
+That configuration builds three clients: two `aws-kms` instances and one `azure-key-vault`
+instance. The remaining `endpoint.*` keys are examples of factory properties, not a closed schema;
+each factory documents the keys it accepts.
+
 ## Catalog Properties
 
 Catalog properties configure one catalog rather than the server. They come from two places: a
