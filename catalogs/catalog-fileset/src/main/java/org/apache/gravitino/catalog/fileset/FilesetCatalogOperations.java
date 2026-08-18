@@ -839,7 +839,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         // No FS cleanup; still remove fileset write-through secrets when cascade deleted them.
         // Schema secrets are cleaned by SchemaOperationDispatcher.
         if (dropped && cascade) {
-          deleteFilesetSecrets(filesets);
+          for (FilesetEntity fileset : filesets) {
+            secretManager.deleteSecretsFromProperties(fileset.properties());
+          }
         }
         return dropped;
       }
@@ -945,7 +947,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // clean fileset secrets after FS ops (still need plaintext for mergeUpLevelConfigurations).
       // Schema secrets are cleaned by SchemaOperationDispatcher.
       if (cascade) {
-        deleteFilesetSecrets(filesets);
+        for (FilesetEntity fileset : filesets) {
+          secretManager.deleteSecretsFromProperties(fileset.properties());
+        }
       }
 
       LOG.info("Deleted schema {}", ident);
@@ -1008,16 +1012,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
-    }
-  }
-
-  /**
-   * Deletes write-through secrets for fileset entities whose metadata was cascade-removed from the
-   * store. Schema secrets are cleaned by SchemaOperationDispatcher.
-   */
-  private void deleteFilesetSecrets(List<FilesetEntity> filesets) {
-    for (FilesetEntity fileset : filesets) {
-      secretManager.deleteSecretsFromProperties(fileset.properties());
     }
   }
 

@@ -745,7 +745,7 @@ public class GravitinoEnv {
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
-    // Fileset dispatcher (created before schema for historical wiring order).
+    // Fileset dispatcher is created before schema dispatcher so schema can take it directly.
     FilesetOperationDispatcher filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     FilesetNormalizeDispatcher filesetNormalizeDispatcher =
@@ -756,13 +756,12 @@ public class GravitinoEnv {
     this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager, filesetNormalizeDispatcher);
     this.internalSchemaDispatcher = schemaOperationDispatcher;
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
     this.internalSchemaDispatcher = schemaNormalizeDispatcher;
-    // Managed catalog force-drop goes through SchemaDispatcher so schema secrets are cleaned there.
-    catalogManager.setSchemaDispatcher(schemaNormalizeDispatcher);
     SchemaEventDispatcher schemaEventDispatcher =
         new SchemaEventDispatcher(eventBus, schemaNormalizeDispatcher);
     this.schemaDispatcher = new SchemaHookDispatcher(schemaEventDispatcher);
