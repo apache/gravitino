@@ -35,7 +35,7 @@ final class KmsConfig {
 
   private static final String PROVIDERS = "providers";
   private static final String PROVIDER_PREFIX = "provider.";
-  private static final String API = "api";
+  private static final String CLASS_NAME = "className";
   private static final Pattern PROVIDER_NAME_PATTERN = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_-]*");
 
   private final Map<String, ProviderConfig> providers;
@@ -116,22 +116,15 @@ final class KmsConfig {
     Map<String, ProviderConfig> providerConfigs = new LinkedHashMap<>();
 
     for (String provider : configuredProviders) {
-      String apiKey = PROVIDER_PREFIX + provider + "." + API;
+      String classNameKey = PROVIDER_PREFIX + provider + "." + CLASS_NAME;
       Map<String, String> properties = propertiesByProvider.get(provider);
-      String apiValue = properties.remove(API);
-      if (apiValue == null || apiValue.trim().isEmpty()) {
+      String className = properties.remove(CLASS_NAME);
+      if (className == null || className.trim().isEmpty()) {
         throw new KmsConfigurationException(
-            "KMS API property '%s%s' cannot be blank", KMS_CONFIG_PREFIX, apiKey);
-      }
-      String api;
-      try {
-        api = KmsApiIdentifiers.requireValid(apiValue);
-      } catch (IllegalArgumentException e) {
-        throw new KmsConfigurationException(
-            e, "Invalid KMS API property '%s%s': %s", KMS_CONFIG_PREFIX, apiKey, e.getMessage());
+            "KMS className property '%s%s' cannot be blank", KMS_CONFIG_PREFIX, classNameKey);
       }
 
-      providerConfigs.put(provider, new ProviderConfig(api, properties));
+      providerConfigs.put(provider, new ProviderConfig(className.trim(), properties));
     }
 
     return Collections.unmodifiableMap(providerConfigs);
@@ -143,16 +136,16 @@ final class KmsConfig {
   }
 
   static final class ProviderConfig {
-    private final String api;
+    private final String className;
     private final Map<String, String> properties;
 
-    private ProviderConfig(String api, Map<String, String> properties) {
-      this.api = api;
+    private ProviderConfig(String className, Map<String, String> properties) {
+      this.className = className;
       this.properties = Collections.unmodifiableMap(new LinkedHashMap<>(properties));
     }
 
-    String api() {
-      return api;
+    String className() {
+      return className;
     }
 
     Map<String, String> properties() {

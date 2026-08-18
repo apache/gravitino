@@ -28,8 +28,8 @@ import org.apache.gravitino.annotation.DeveloperApi;
  * Identifies a key owned by a named KMS provider.
  *
  * <p>Contains no credentials, key material, or protocol identifier. The provider name is the
- * configured instance handle ({@code gravitino.kms.providers}). The server binds that name to a KMS
- * API in {@code gravitino.kms.provider.<name>.api} and resolves a client from {@code
+ * configured instance handle ({@code gravitino.kms.providers}). The server loads that name's
+ * factory from {@code gravitino.kms.provider.<name>.className} and resolves a client from {@code
  * KmsClientRegistry}.
  */
 @DeveloperApi

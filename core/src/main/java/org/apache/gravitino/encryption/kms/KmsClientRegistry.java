@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceLoader;
 import org.apache.gravitino.Config;
 
 /** Creates, resolves, and owns server-private KMS clients by configured provider. */
@@ -33,37 +32,36 @@ public final class KmsClientRegistry implements AutoCloseable {
   private volatile boolean closed;
 
   /**
-   * Loads configuration and available {@link KmsClientFactory} implementations, then creates one
-   * client for each configured provider.
+   * Loads configuration and creates one client for each configured provider by instantiating {@code
+   * gravitino.kms.provider.<name>.className}.
    *
    * @param config Gravitino server configuration
-   * @throws IllegalArgumentException if configuration or factory discovery is invalid
+   * @throws IllegalArgumentException if configuration or factory construction is invalid
    */
   public KmsClientRegistry(Config config) {
-    this(config, loadFactories());
+    this(config, KmsClientRegistry::loadFactory);
   }
 
-  KmsClientRegistry(Config config, Iterable<KmsClientFactory> factories) {
+  KmsClientRegistry(Config config, FactoryLoader loader) {
     KmsConfig kmsConfig = new KmsConfig(config);
     if (kmsConfig.providers().isEmpty()) {
       this.clients = Collections.emptyMap();
       return;
     }
 
-    if (factories == null) {
-      throw new IllegalArgumentException("KMS client factories cannot be null");
+    if (loader == null) {
+      throw new IllegalArgumentException("KMS client factory loader cannot be null");
     }
 
-    Map<String, KmsClientFactory> factoriesByApi = indexFactories(factories);
-    this.clients = createClients(kmsConfig.providers(), factoriesByApi);
+    this.clients = createClients(kmsConfig.providers(), loader);
   }
 
   /**
    * Resolves the client configured for a key reference.
    *
    * <p>The registry owns the returned client. Callers must not close it or use it after the
-   * registry is closed. Lookup is by {@link KmsReference#provider()} only; the provider's API was
-   * bound at startup from {@code gravitino.kms.provider.<name>.api}.
+   * registry is closed. Lookup is by {@link KmsReference#provider()} only; the provider's factory
+   * was loaded at startup from {@code gravitino.kms.provider.<name>.className}.
    *
    * @param reference key whose provider name selects the client
    * @return client configured for the reference
@@ -88,50 +86,54 @@ public final class KmsClientRegistry implements AutoCloseable {
     }
   }
 
-  private static Map<String, KmsClientFactory> indexFactories(
-      Iterable<KmsClientFactory> factories) {
-    Map<String, KmsClientFactory> factoriesByApi = new LinkedHashMap<>();
-    for (KmsClientFactory factory : factories) {
-      if (factory == null) {
-        throw new IllegalArgumentException("KMS client factory cannot be null");
-      }
-      String api = KmsApiIdentifiers.requireValid(factory.api());
-      KmsClientFactory existing = factoriesByApi.putIfAbsent(api, factory);
-      if (existing != null) {
-        throw new IllegalArgumentException(
-            String.format("Multiple KMS client factories support API '%s'", api));
-      }
-    }
-    return factoriesByApi;
+  /** Loads a {@link KmsClientFactory} from a configured class name. */
+  @FunctionalInterface
+  interface FactoryLoader {
+    /**
+     * Instantiates the factory named by {@code className}.
+     *
+     * @param className factory class name
+     * @return the factory
+     */
+    KmsClientFactory load(String className);
   }
 
-  private static Iterable<KmsClientFactory> loadFactories() {
-    ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
-    if (classLoader == null) {
-      classLoader = KmsClientRegistry.class.getClassLoader();
+  private static KmsClientFactory loadFactory(String className) {
+    try {
+      Object instance = Class.forName(className).getDeclaredConstructor().newInstance();
+      if (!(instance instanceof KmsClientFactory)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "KMS factory class '%s' does not implement KmsClientFactory", className));
+      }
+      return (KmsClientFactory) instance;
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException(
+          String.format("No KMS client factory class '%s'", className), e);
+    } catch (ReflectiveOperationException e) {
+      throw new IllegalArgumentException(
+          String.format("Failed to create KMS client factory '%s'", className), e);
     }
-    return ServiceLoader.load(KmsClientFactory.class, classLoader);
   }
 
   private static Map<String, KmsClient> createClients(
-      Map<String, KmsConfig.ProviderConfig> providerConfigs,
-      Map<String, KmsClientFactory> factoriesByApi) {
+      Map<String, KmsConfig.ProviderConfig> providerConfigs, FactoryLoader loader) {
     Map<String, KmsClient> clients = new LinkedHashMap<>();
     try {
       providerConfigs.forEach(
           (provider, providerConfig) -> {
-            KmsClientFactory factory = factoriesByApi.get(providerConfig.api());
+            KmsClientFactory factory = loader.load(providerConfig.className());
             if (factory == null) {
-              throw new IllegalArgumentException(
+              throw new IllegalStateException(
                   String.format(
-                      "No KMS client factory supports API '%s' for provider '%s'",
-                      providerConfig.api(), provider));
+                      "KMS client factory '%s' returned null", providerConfig.className()));
             }
             KmsClient client = factory.create(provider, providerConfig.properties());
             if (client == null) {
               throw new IllegalStateException(
                   String.format(
-                      "KMS client factory for API '%s' returned null", providerConfig.api()));
+                      "KMS client factory '%s' returned a null client",
+                      providerConfig.className()));
             }
             clients.put(provider, client);
           });

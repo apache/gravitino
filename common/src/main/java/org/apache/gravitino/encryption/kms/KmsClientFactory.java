@@ -29,7 +29,8 @@ public interface KmsClientFactory {
    * Returns the exact KMS API identifier implemented by this factory.
    *
    * <p>Identifiers use lowercase kebab-case with no surrounding whitespace ({@link
-   * KmsApiIdentifiers}) and are matched exactly against {@code gravitino.kms.provider.<name>.api}.
+   * KmsApiIdentifiers}). The server loads this factory from {@code
+   * gravitino.kms.provider.<name>.className}, not by matching this identifier.
    *
    * @return the KMS API identifier
    */

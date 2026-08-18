@@ -21,6 +21,7 @@ package org.apache.gravitino.encryption.kms;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 
 /** In-memory KMS client for contract and consumer tests. */
 public final class FakeKmsClient implements KmsClient {
@@ -34,7 +35,7 @@ public final class FakeKmsClient implements KmsClient {
    * @param provider configured provider accepted by the client
    */
   public FakeKmsClient(String provider) {
-    if (provider == null || provider.trim().isEmpty()) {
+    if (StringUtils.isBlank(provider)) {
       throw new IllegalArgumentException("KMS provider cannot be blank");
     }
     this.provider = provider.trim();
