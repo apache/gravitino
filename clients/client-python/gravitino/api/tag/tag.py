@@ -92,23 +92,21 @@ class Tag(Auditable):
         """
         raise NotImplementedError()
 
-    @abstractmethod
     def allowed_values(self) -> Optional[list[str]]:
         """Get the allowed values for this tag.
 
         Returns:
             Optional[list[str]]: The allowed values, or None if values are unrestricted.
         """
-        raise NotImplementedError()
+        return None
 
-    @abstractmethod
     def assignment_values(self) -> Optional[list[str]]:
         """Get assignment values when this tag is loaded from a metadata object.
 
         Returns:
             Optional[list[str]]: The assignment values, or None if not assignment-scoped.
         """
-        raise NotImplementedError()
+        return None
 
     @abstractmethod
     def inherited(self) -> Optional[bool]:

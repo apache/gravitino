@@ -63,8 +63,8 @@ class TagValuePairRequest(RESTRequest):
 
 @dataclass_json
 @dataclass
-class TagNamesAssociateRequest(RESTRequest):
-    """Represents a request to associate tag names."""
+class TagsAssociateRequest(RESTRequest):
+    """Represents a request to associate tags."""
 
     _tags_to_add: Optional[list[str]] = field(
         default=None, metadata=config(field_name="tagsToAdd")
@@ -107,8 +107,8 @@ class TagNamesAssociateRequest(RESTRequest):
 
 @dataclass_json
 @dataclass
-class TagsAssociateRequest(RESTRequest):
-    """Represents a request to associate tags."""
+class TagValuesAssociateRequest(RESTRequest):
+    """Represents a request to associate tag-value pairs."""
 
     _tags_to_add: Optional[list[TagValuePairRequest]] = field(
         default=None, metadata=config(field_name="tagsToAdd")

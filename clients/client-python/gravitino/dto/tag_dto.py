@@ -33,16 +33,15 @@ class TagDTO(Tag):
     _name: str = field(metadata=config(field_name="name"))
     _comment: str = field(metadata=config(field_name="comment"))
     _properties: dict[str, str] = field(metadata=config(field_name="properties"))
+    _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))
+    _inherited: Optional[bool] = field(
+        default=None, metadata=config(field_name="inherited")
+    )
     _allowed_values: Optional[list[str]] = field(
         default=None, metadata=config(field_name="allowedValues")
     )
     _assignment_values: Optional[list[str]] = field(
         default=None, metadata=config(field_name="assignmentValues")
-    )
-
-    _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))
-    _inherited: Optional[bool] = field(
-        default=None, metadata=config(field_name="inherited")
     )
 
     def __eq__(self, other: object):
@@ -184,11 +183,11 @@ class TagDTO(Tag):
 
         def build(self) -> TagDTO:
             return TagDTO(
-                self._name,
-                self._comment,
-                self._properties,
-                self._allowed_values,
-                self._assignment_values,
-                self._audit,
-                self._inherited,
+                _name=self._name,
+                _comment=self._comment,
+                _properties=self._properties,
+                _audit=self._audit,
+                _inherited=self._inherited,
+                _allowed_values=self._allowed_values,
+                _assignment_values=self._assignment_values,
             )

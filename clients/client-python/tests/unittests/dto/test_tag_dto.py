@@ -52,6 +52,15 @@ class TestTagDTO(unittest.TestCase):
         self.assertEqual(deser_dict["audit"]["creator"], "test_user")
         self.assertEqual(deser_dict["audit"]["createTime"], "2022-01-01T00:00:00Z")
 
+    def test_positional_constructor_keeps_audit_and_inherited_compatibility(self):
+        audit = AuditDTO("test_user", "2022-01-01T00:00:00Z")
+        tag_dto = TagDTO("test_tag", "test_comment", {}, audit, False)
+
+        self.assertEqual(audit, tag_dto.audit_info())
+        self.assertFalse(tag_dto.inherited())
+        self.assertIsNone(tag_dto.allowed_values())
+        self.assertIsNone(tag_dto.assignment_values())
+
     def test_equality_and_hash(self):
         builder = TagDTO.builder()
         tag_dto1 = (

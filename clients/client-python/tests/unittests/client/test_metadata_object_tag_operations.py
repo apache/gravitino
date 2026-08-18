@@ -23,8 +23,8 @@ from gravitino.api.tag import Tag
 from gravitino.client.generic_tag import GenericTag
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.requests.tag_associate_request import (
-    TagNamesAssociateRequest,
     TagsAssociateRequest,
+    TagValuesAssociateRequest,
 )
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
@@ -177,7 +177,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
                 call_args.args[0],
             )
 
-            param = TagNamesAssociateRequest(["tagA"], ["tagB"])
+            param = TagsAssociateRequest(["tagA"], ["tagB"])
 
             mock_post.assert_called_once_with(
                 "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
@@ -204,7 +204,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
             tags = tag_operations.associate_tags([], [])
 
             self.assertEqual(["tagA"], tags)
-            param = TagNamesAssociateRequest([], [])
+            param = TagsAssociateRequest([], [])
             mock_post.assert_called_once_with(
                 "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
                 json=param,
@@ -237,7 +237,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
             )
 
             self.assertEqual(["data_domain"], tags)
-            param = TagsAssociateRequest(
+            param = TagValuesAssociateRequest(
                 [
                     {"name": "data_domain", "value": "finance"},
                     {"name": "data_domain", "value": "risk"},
@@ -274,7 +274,7 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
             )
 
             self.assertEqual(["data_domain"], tags)
-            param = TagsAssociateRequest(
+            param = TagValuesAssociateRequest(
                 [{"name": "data_domain", "value": "finance"}], None
             )
 

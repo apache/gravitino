@@ -22,9 +22,9 @@ from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.client.generic_tag import GenericTag
 from gravitino.dto.requests.tag_associate_request import (
-    TagNamesAssociateRequest,
     TagsAssociateRequest,
     TagValuePairRequest,
+    TagValuesAssociateRequest,
 )
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
@@ -128,7 +128,7 @@ class MetadataObjectTagOperations(SupportsTags):
             list[str | dict[str, str | None] | TagValuePairRequest] | None
         ) = None,
     ) -> list[str]:
-        associate_request = TagsAssociateRequest(tags_to_add, tags_to_remove)
+        associate_request = TagValuesAssociateRequest(tags_to_add, tags_to_remove)
         associate_request.validate()
 
         response = self.rest_client.post(
@@ -148,7 +148,7 @@ class MetadataObjectTagOperations(SupportsTags):
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:
-        associate_request = TagNamesAssociateRequest(tags_to_add, tags_to_remove)
+        associate_request = TagsAssociateRequest(tags_to_add, tags_to_remove)
         associate_request.validate()
 
         response = self.rest_client.post(

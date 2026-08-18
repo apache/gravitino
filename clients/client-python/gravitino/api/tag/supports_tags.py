@@ -20,6 +20,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from gravitino.api.tag.tag import Tag
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class SupportsTags(ABC):
@@ -61,7 +62,6 @@ class SupportsTags(ABC):
         """
         pass
 
-    @abstractmethod
     def assign_tags(
         self,
         tags_to_add: list[str | dict[str, str | None]] | None = None,
@@ -73,10 +73,13 @@ class SupportsTags(ABC):
             tags_to_add: The tag-value pairs to be added to the object.
             tags_to_remove: The tag-value pairs to be removed from the object.
 
+        Raises:
+            UnsupportedOperationException: The assign_tags method is not supported.
+
         Returns:
             list[str]: The tag names directly associated with the object after assignment.
         """
-        pass
+        raise UnsupportedOperationException("The assign_tags method is not supported.")
 
     @abstractmethod
     def associate_tags(
