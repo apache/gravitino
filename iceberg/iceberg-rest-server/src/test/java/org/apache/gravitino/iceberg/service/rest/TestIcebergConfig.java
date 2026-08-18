@@ -25,6 +25,7 @@ import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -45,7 +46,9 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ConfigResponse response = resp.readEntity(ConfigResponse.class);
-    Assertions.assertEquals(0, response.defaults().size());
+    Assertions.assertEquals(1, response.defaults().size());
+    Assertions.assertEquals(
+        "PT30M", response.defaults().get(IcebergIdempotencyManager.IDEMPOTENCY_KEY_LIFETIME));
     Assertions.assertEquals(0, response.overrides().size());
   }
 
@@ -58,7 +61,9 @@ public class TestIcebergConfig extends IcebergTestBase {
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
 
     ConfigResponse response = resp.readEntity(ConfigResponse.class);
-    Assertions.assertEquals(0, response.defaults().size());
+    Assertions.assertEquals(1, response.defaults().size());
+    Assertions.assertEquals(
+        "PT30M", response.defaults().get(IcebergIdempotencyManager.IDEMPOTENCY_KEY_LIFETIME));
     Assertions.assertEquals(0, response.overrides().size());
   }
 
@@ -84,7 +89,9 @@ public class TestIcebergConfig extends IcebergTestBase {
             IcebergConstants.ICEBERG_OSS_ENDPOINT,
             "https://oss-endpoint.example.com",
             IcebergConstants.ICEBERG_S3_PATH_STYLE_ACCESS,
-            "true");
+            "true",
+            IcebergIdempotencyManager.IDEMPOTENCY_KEY_LIFETIME,
+            "PT30M");
     Assertions.assertEquals(expectedConfig, response.defaults());
     Assertions.assertEquals(0, response.overrides().size());
   }
