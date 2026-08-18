@@ -103,8 +103,7 @@ public final class KmsClientRegistry implements AutoCloseable {
       Object instance = Class.forName(className).getDeclaredConstructor().newInstance();
       if (!(instance instanceof KmsClientFactory)) {
         throw new IllegalArgumentException(
-            String.format(
-                "KMS factory class '%s' does not implement KmsClientFactory", className));
+            String.format("KMS factory class '%s' does not implement KmsClientFactory", className));
       }
       return (KmsClientFactory) instance;
     } catch (ClassNotFoundException e) {

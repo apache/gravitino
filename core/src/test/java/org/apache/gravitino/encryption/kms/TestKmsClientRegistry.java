@@ -91,8 +91,10 @@ public class TestKmsClientRegistry {
     KmsClientRegistry registry =
         new KmsClientRegistry(
             config(
-                "gravitino.kms.providers", "primary",
-                "gravitino.kms.provider.primary.className", AWS_FACTORY),
+                "gravitino.kms.providers",
+                "primary",
+                "gravitino.kms.provider.primary.className",
+                AWS_FACTORY),
             loader(Map.of(AWS_FACTORY, new RecordingFactory())));
 
     Assertions.assertThrows(
@@ -130,8 +132,10 @@ public class TestKmsClientRegistry {
   void testRejectsMissingFactoryClass() {
     Config awsConfig =
         config(
-            "gravitino.kms.providers", "primary",
-            "gravitino.kms.provider.primary.className", AWS_FACTORY);
+            "gravitino.kms.providers",
+            "primary",
+            "gravitino.kms.provider.primary.className",
+            AWS_FACTORY);
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new KmsClientRegistry(awsConfig, loader(Map.of())));
@@ -187,7 +191,8 @@ public class TestKmsClientRegistry {
         IllegalStateException.class,
         () ->
             new KmsClientRegistry(
-                awsConfig, loader(Map.of(AWS_FACTORY, awsFactory, GCP_FACTORY, nullClientFactory))));
+                awsConfig,
+                loader(Map.of(AWS_FACTORY, awsFactory, GCP_FACTORY, nullClientFactory))));
     Assertions.assertEquals(1, awsFactory.closeCount.get());
   }
 
