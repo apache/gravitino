@@ -172,7 +172,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Release.Name }}-postgresql
+                  name: {{ default (printf "%s-postgresql" .Release.Name) .Values.postgresql.existingSecretName }}
                   key: password
           volumeMounts:
             - mountPath: /scripts
@@ -234,6 +234,9 @@ spec:
         {{- toYaml .Values.affinity | nindent 8 }}
       tolerations:
         {{- toYaml .Values.tolerations | nindent 8 }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . }}
+      {{- end }}
       volumes:
         - name: gravitino-conf
           configMap:
