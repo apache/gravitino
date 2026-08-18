@@ -46,8 +46,7 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
    * Name of the supporting index created on {@value JdbcUtil#CATALOG_TABLE_VIEW_NAME} for
    * PostgreSQL backends. See {@link #maybeCreateNamespaceIndex(Map)} for why it's needed.
    */
-  private static final String NAMESPACE_INDEX_NAME =
-      "gravitino_iceberg_tables_namespace_pattern";
+  private static final String NAMESPACE_INDEX_NAME = "gravitino_iceberg_tables_namespace_pattern";
 
   private static final String POSTGRESQL_PRODUCT_NAME = "PostgreSQL";
 

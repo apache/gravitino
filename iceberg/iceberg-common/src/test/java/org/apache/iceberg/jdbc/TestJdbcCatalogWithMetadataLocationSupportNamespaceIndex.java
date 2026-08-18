@@ -62,8 +62,7 @@ public class TestJdbcCatalogWithMetadataLocationSupportNamespaceIndex {
 
   @Test
   void testIndexCreatedByDefault() throws Exception {
-    String jdbcUrl =
-        postgreSQLContainer.getJdbcUrl(TestDatabaseName.PG_ICEBERG_NAMESPACE_INDEX_IT);
+    String jdbcUrl = postgreSQLContainer.getJdbcUrl(TestDatabaseName.PG_ICEBERG_NAMESPACE_INDEX_IT);
 
     JdbcCatalogWithMetadataLocationSupport catalog =
         new JdbcCatalogWithMetadataLocationSupport(true);
@@ -75,8 +74,7 @@ public class TestJdbcCatalogWithMetadataLocationSupportNamespaceIndex {
 
   @Test
   void testIndexCreationCanBeDisabled() throws Exception {
-    String jdbcUrl =
-        postgreSQLContainer.getJdbcUrl(TestDatabaseName.PG_ICEBERG_NAMESPACE_INDEX_IT);
+    String jdbcUrl = postgreSQLContainer.getJdbcUrl(TestDatabaseName.PG_ICEBERG_NAMESPACE_INDEX_IT);
 
     Map<String, String> properties = newProperties(jdbcUrl);
     properties.put(IcebergConstants.ICEBERG_JDBC_CREATE_NAMESPACE_INDEX, "false");
@@ -96,8 +94,7 @@ public class TestJdbcCatalogWithMetadataLocationSupportNamespaceIndex {
                 jdbcUrl, postgreSQLContainer.getUsername(), postgreSQLContainer.getPassword());
         Statement stmt = conn.createStatement();
         ResultSet rs =
-            stmt.executeQuery(
-                "SELECT 1 FROM pg_indexes WHERE indexname = '" + INDEX_NAME + "'")) {
+            stmt.executeQuery("SELECT 1 FROM pg_indexes WHERE indexname = '" + INDEX_NAME + "'")) {
       return rs.next();
     }
   }
