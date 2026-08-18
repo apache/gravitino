@@ -271,13 +271,13 @@ object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on 
 | Job          |                         | Owner                                  | Owner           |                                           |
 
 Bulk user access-control APIs use the same privileges as the matching single-user operations. These
-bulk operations are authorized once before processing the request. Bulk user add requests report
+bulk operations are authorized once before processing the request. Bulk user requests report
 item-level failures in `errors`.
 
-| API                                                 | Required privilege                          | Request field |
-|-----------------------------------------------------|---------------------------------------------|---------------|
-| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`   | `users`       |
-| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`   | `names`       |
+| API                                                | Required privilege                        |
+|----------------------------------------------------|-------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`    | `OWNER` of the metalake or `MANAGE_USERS` |
+| `POST /api/bulk/metalakes/{metalake}/users/remove` | `OWNER` of the metalake or `MANAGE_USERS` |
 
 For example, add users in bulk:
 
@@ -304,30 +304,6 @@ curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/remove" 
   -d '{
   "names": ["analyst", "developer"]
 }'
-```
-
-The same bulk add request can be sent from Java with `HttpClient`:
-
-```java
-String gravitino = "http://localhost:8090";
-String metalake = "example";
-String users =
-    """
-    {
-      "users": [
-        {"name": "analyst"},
-        {"name": "developer", "externalId": "developer@example.com", "enabled": true}
-      ]
-    }
-    """;
-
-HttpRequest request =
-    HttpRequest.newBuilder()
-        .uri(URI.create(String.format("%s/api/bulk/metalakes/%s/users/add", gravitino, metalake)))
-        .header("Accept", "application/vnd.gravitino.v1+json")
-        .header("Content-Type", "application/json")
-        .POST(HttpRequest.BodyPublishers.ofString(users))
-        .build();
 ```
 
 Granting or revoking a privilege on an object takes `MANAGE_GRANTS` on that object or an ancestor.
