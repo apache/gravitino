@@ -117,7 +117,8 @@ public class TestFilesetHookDispatcher extends TestOperationDispatcher {
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     FilesetDispatcher mockFilesetDispatcher = Mockito.mock(FilesetDispatcher.class);
     Mockito.when(
-            mockFilesetDispatcher.createMultipleLocationFileset(any(), any(), any(), any(), any()))
+            mockFilesetDispatcher.createMultipleLocationFileset(
+                any(), any(), any(), any(), any(), any(), any()))
         .thenReturn(Mockito.mock(Fileset.class));
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);

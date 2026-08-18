@@ -18,15 +18,16 @@
  */
 package org.apache.gravitino.catalog.hive;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
-import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -52,7 +53,8 @@ final class TrinoNativeViewCodec {
   private static final String VIEW_PREFIX = "/* Presto View: ";
   private static final String VIEW_SUFFIX = " */";
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final Pattern SIMPLE_IDENTIFIER = Pattern.compile("[a-z_][a-z0-9_]*");
+  // Trino's default time/timestamp precision (milliseconds) when none is specified.
+  private static final int DEFAULT_PRECISION = 3;
 
   private TrinoNativeViewCodec() {}
 
@@ -78,6 +80,10 @@ final class TrinoNativeViewCodec {
     @Nullable final String comment;
     @Nullable final String owner;
     final boolean runAsInvoker;
+    // Trino's SQL path setting for the view; Gravitino's view model has no equivalent, so this is
+    // only populated on decode() (to let callers detect and reject a non-empty path) and is always
+    // written back empty by encode().
+    final List<String> path;
 
     ViewDefinition(
         String originalSql,
@@ -86,7 +92,8 @@ final class TrinoNativeViewCodec {
         List<ViewColumn> columns,
         @Nullable String comment,
         @Nullable String owner,
-        boolean runAsInvoker) {
+        boolean runAsInvoker,
+        List<String> path) {
       this.originalSql = originalSql;
       this.catalog = catalog;
       this.schema = schema;
@@ -94,6 +101,7 @@ final class TrinoNativeViewCodec {
       this.comment = comment;
       this.owner = owner;
       this.runAsInvoker = runAsInvoker;
+      this.path = path;
     }
   }
 
@@ -125,7 +133,7 @@ final class TrinoNativeViewCodec {
     byte[] bytes;
     try {
       bytes = MAPPER.writeValueAsBytes(root);
-    } catch (Exception e) {
+    } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to encode Trino native view definition", e);
     }
     return VIEW_PREFIX + Base64.getEncoder().encodeToString(bytes) + VIEW_SUFFIX;
@@ -152,7 +160,7 @@ final class TrinoNativeViewCodec {
     JsonNode root;
     try {
       root = MAPPER.readTree(bytes);
-    } catch (Exception e) {
+    } catch (IOException e) {
       throw new IllegalArgumentException("Failed to decode Trino native view definition", e);
     }
 
@@ -178,6 +186,11 @@ final class TrinoNativeViewCodec {
           "Not a valid Trino native view: 'originalSql' field is missing or null");
     }
 
+    List<String> path = new ArrayList<>();
+    for (JsonNode pathNode : root.path("path")) {
+      path.add(pathNode.asText());
+    }
+
     return new ViewDefinition(
         originalSql,
         textOrNull(root, "catalog"),
@@ -185,7 +198,8 @@ final class TrinoNativeViewCodec {
         columns,
         textOrNull(root, "comment"),
         textOrNull(root, "owner"),
-        root.path("runAsInvoker").asBoolean(true));
+        root.path("runAsInvoker").asBoolean(true),
+        path);
   }
 
   @Nullable
@@ -206,13 +220,15 @@ final class TrinoNativeViewCodec {
       case BOOLEAN:
         return "boolean";
       case BYTE:
-        return "tinyint";
+        // Trino has no unsigned integer types; widen to the next size up to preserve range,
+        // matching GeneralDataTypeTransformer's Gravitino-to-Trino type mapping.
+        return ((Types.ByteType) type).signed() ? "tinyint" : "smallint";
       case SHORT:
-        return "smallint";
+        return ((Types.ShortType) type).signed() ? "smallint" : "integer";
       case INTEGER:
-        return "integer";
+        return ((Types.IntegerType) type).signed() ? "integer" : "bigint";
       case LONG:
-        return "bigint";
+        return ((Types.LongType) type).signed() ? "bigint" : "decimal(20,0)";
       case FLOAT:
         return "real";
       case DOUBLE:
@@ -225,14 +241,19 @@ final class TrinoNativeViewCodec {
         return "char(" + ((Types.FixedCharType) type).length() + ")";
       case DATE:
         return "date";
+      case TIME:
+        Types.TimeType timeType = (Types.TimeType) type;
+        int timePrecision = timeType.hasPrecisionSet() ? timeType.precision() : DEFAULT_PRECISION;
+        return "time(" + timePrecision + ")";
       case TIMESTAMP:
         Types.TimestampType timestampType = (Types.TimestampType) type;
-        if (timestampType.hasTimeZone()) {
-          throw new UnsupportedOperationException(
-              "Unsupported conversion to Trino type: TIMESTAMP WITH TIME ZONE is not supported by "
-                  + "Hive-backed views");
-        }
-        return "timestamp(6)";
+        int timestampPrecision =
+            timestampType.hasPrecisionSet() ? timestampType.precision() : DEFAULT_PRECISION;
+        return timestampType.hasTimeZone()
+            ? "timestamp(" + timestampPrecision + ") with time zone"
+            : "timestamp(" + timestampPrecision + ")";
+      case UUID:
+        return "uuid";
       case DECIMAL:
         Types.DecimalType decimalType = (Types.DecimalType) type;
         return "decimal(" + decimalType.precision() + "," + decimalType.scale() + ")";
@@ -265,11 +286,12 @@ final class TrinoNativeViewCodec {
     }
   }
 
-  /** Quotes a row field name if it is not a plain lowercase identifier Trino can parse bare. */
+  /**
+   * Quotes a row field name, matching Trino's own {@code NamedTypeSignature}, which always quotes
+   * named row fields unconditionally; a plain-looking name can still be a reserved keyword (e.g.
+   * {@code select}), which Trino cannot parse unquoted.
+   */
   private static String rowFieldName(String name) {
-    if (SIMPLE_IDENTIFIER.matcher(name).matches()) {
-      return name;
-    }
     return "\"" + name.replace("\"", "\"\"") + "\"";
   }
 
@@ -306,6 +328,8 @@ final class TrinoNativeViewCodec {
         return Types.DateType.get();
       case "varbinary":
         return Types.BinaryType.get();
+      case "uuid":
+        return Types.UUIDType.get();
       default:
         break;
     }
@@ -315,14 +339,18 @@ final class TrinoNativeViewCodec {
     if (lower.startsWith("char(")) {
       return Types.FixedCharType.of(Integer.parseInt(innerContent(s)));
     }
-    if (lower.startsWith("timestamp(")) {
+    if (lower.startsWith("time(")) {
       if (lower.endsWith("with time zone")) {
         throw new UnsupportedOperationException(
-            "Unsupported Trino type: TIMESTAMP WITH TIME ZONE is not supported by Hive-backed "
-                + "views: "
+            "Unsupported Trino type: TIME WITH TIME ZONE has no Gravitino equivalent: "
                 + typeString);
       }
-      return Types.TimestampType.withoutTimeZone();
+      return Types.TimeType.of(parsePrecision(s));
+    }
+    if (lower.startsWith("timestamp(")) {
+      return lower.endsWith("with time zone")
+          ? Types.TimestampType.withTimeZone(parsePrecision(s))
+          : Types.TimestampType.withoutTimeZone(parsePrecision(s));
     }
     if (lower.startsWith("decimal(")) {
       String[] parts = splitTopLevel(innerContent(s));
@@ -350,6 +378,17 @@ final class TrinoNativeViewCodec {
 
   private static String innerContent(String s) {
     return s.substring(s.indexOf('(') + 1, s.length() - 1);
+  }
+
+  /**
+   * Extracts the integer precision from a type string of the form {@code name(N)[ trailing text]},
+   * e.g. {@code timestamp(3) with time zone}; unlike {@link #innerContent}, this does not assume
+   * the string ends with the closing parenthesis.
+   */
+  private static int parsePrecision(String s) {
+    int openIdx = s.indexOf('(');
+    int closeIdx = s.indexOf(')', openIdx);
+    return Integer.parseInt(s.substring(openIdx + 1, closeIdx).trim());
   }
 
   /**
@@ -386,14 +425,27 @@ final class TrinoNativeViewCodec {
     return Types.StructType.Field.nullableField(fieldName, fromTrinoTypeString(fieldType));
   }
 
-  /** Splits a comma-separated argument list, ignoring commas nested inside parentheses. */
+  /**
+   * Splits a comma-separated argument list, ignoring commas nested inside parentheses or inside a
+   * double-quoted row field name (which may itself contain commas, e.g. {@code row("a,b" integer)}
+   * ; a doubled {@code ""} inside the quotes is an escaped literal quote, not a terminator).
+   */
   private static String[] splitTopLevel(String s) {
     List<String> parts = new ArrayList<>();
     int depth = 0;
+    boolean inQuotes = false;
     int start = 0;
     for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);
-      if (c == '(') {
+      if (c == '"') {
+        if (inQuotes && i + 1 < s.length() && s.charAt(i + 1) == '"') {
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (inQuotes) {
+        // Ignore parentheses/commas inside a quoted field name.
+      } else if (c == '(') {
         depth++;
       } else if (c == ')') {
         depth--;

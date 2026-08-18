@@ -37,7 +37,8 @@ class TestTrinoNativeViewCodec {
                 new TrinoNativeViewCodec.ViewColumn("name", "varchar(50)", "name column")),
             "a view comment",
             null,
-            true);
+            true,
+            List.of());
 
     String encoded = TrinoNativeViewCodec.encode(definition);
     Assertions.assertTrue(encoded.startsWith("/* Presto View: "));
@@ -69,7 +70,8 @@ class TestTrinoNativeViewCodec {
             List.of(new TrinoNativeViewCodec.ViewColumn("_col0", "integer", null)),
             null,
             null,
-            true);
+            true,
+            List.of());
 
     TrinoNativeViewCodec.ViewDefinition decoded =
         TrinoNativeViewCodec.decode(TrinoNativeViewCodec.encode(definition));
@@ -106,8 +108,14 @@ class TestTrinoNativeViewCodec {
         "char(5)", TrinoNativeViewCodec.toTrinoTypeString(Types.FixedCharType.of(5)));
     Assertions.assertEquals("date", TrinoNativeViewCodec.toTrinoTypeString(Types.DateType.get()));
     Assertions.assertEquals(
-        "timestamp(6)",
+        "timestamp(3)",
         TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withoutTimeZone()));
+    Assertions.assertEquals(
+        "timestamp(3) with time zone",
+        TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withTimeZone()));
+    Assertions.assertEquals(
+        "time(3)", TrinoNativeViewCodec.toTrinoTypeString(Types.TimeType.get()));
+    Assertions.assertEquals("uuid", TrinoNativeViewCodec.toTrinoTypeString(Types.UUIDType.get()));
     Assertions.assertEquals(
         "decimal(10,2)", TrinoNativeViewCodec.toTrinoTypeString(Types.DecimalType.of(10, 2)));
     Assertions.assertEquals(
@@ -124,7 +132,7 @@ class TestTrinoNativeViewCodec {
         TrinoNativeViewCodec.toTrinoTypeString(
             Types.MapType.valueNullable(Types.StringType.get(), Types.IntegerType.get())));
     Assertions.assertEquals(
-        "row(a integer,b varchar)",
+        "row(\"a\" integer,\"b\" varchar)",
         TrinoNativeViewCodec.toTrinoTypeString(
             Types.StructType.of(
                 Types.StructType.Field.nullableField("a", Types.IntegerType.get()),
@@ -132,10 +140,27 @@ class TestTrinoNativeViewCodec {
   }
 
   @Test
-  void testToTrinoTypeStringRejectsTimestampWithTimeZone() {
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withTimeZone()));
+  void testToTrinoTypeStringPreservesExplicitPrecision() {
+    Assertions.assertEquals(
+        "timestamp(6)",
+        TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withoutTimeZone(6)));
+    Assertions.assertEquals(
+        "timestamp(6) with time zone",
+        TrinoNativeViewCodec.toTrinoTypeString(Types.TimestampType.withTimeZone(6)));
+    Assertions.assertEquals(
+        "time(6)", TrinoNativeViewCodec.toTrinoTypeString(Types.TimeType.of(6)));
+  }
+
+  @Test
+  void testToTrinoTypeStringWidensUnsignedIntegralTypes() {
+    Assertions.assertEquals(
+        "smallint", TrinoNativeViewCodec.toTrinoTypeString(Types.ByteType.unsigned()));
+    Assertions.assertEquals(
+        "integer", TrinoNativeViewCodec.toTrinoTypeString(Types.ShortType.unsigned()));
+    Assertions.assertEquals(
+        "bigint", TrinoNativeViewCodec.toTrinoTypeString(Types.IntegerType.unsigned()));
+    Assertions.assertEquals(
+        "decimal(20,0)", TrinoNativeViewCodec.toTrinoTypeString(Types.LongType.unsigned()));
   }
 
   @Test
@@ -162,8 +187,14 @@ class TestTrinoNativeViewCodec {
         Types.FixedCharType.of(5), TrinoNativeViewCodec.fromTrinoTypeString("char(5)"));
     Assertions.assertEquals(Types.DateType.get(), TrinoNativeViewCodec.fromTrinoTypeString("date"));
     Assertions.assertEquals(
-        Types.TimestampType.withoutTimeZone(),
+        Types.TimestampType.withoutTimeZone(6),
         TrinoNativeViewCodec.fromTrinoTypeString("timestamp(6)"));
+    Assertions.assertEquals(
+        Types.TimestampType.withTimeZone(6),
+        TrinoNativeViewCodec.fromTrinoTypeString("timestamp(6) with time zone"));
+    Assertions.assertEquals(
+        Types.TimeType.of(6), TrinoNativeViewCodec.fromTrinoTypeString("time(6)"));
+    Assertions.assertEquals(Types.UUIDType.get(), TrinoNativeViewCodec.fromTrinoTypeString("uuid"));
     Assertions.assertEquals(
         Types.DecimalType.of(10, 2), TrinoNativeViewCodec.fromTrinoTypeString("decimal(10,2)"));
     Assertions.assertEquals(
@@ -213,6 +244,16 @@ class TestTrinoNativeViewCodec {
   }
 
   @Test
+  void testToTrinoTypeStringQuotesReservedKeywordRowFieldName() {
+    Types.StructType structType =
+        Types.StructType.of(
+            Types.StructType.Field.nullableField("select", Types.IntegerType.get()));
+    String encoded = TrinoNativeViewCodec.toTrinoTypeString(structType);
+    Assertions.assertEquals("row(\"select\" integer)", encoded);
+    Assertions.assertEquals(structType, TrinoNativeViewCodec.fromTrinoTypeString(encoded));
+  }
+
+  @Test
   void testFromTrinoTypeStringRejectsAnonymousRowField() {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
@@ -220,24 +261,49 @@ class TestTrinoNativeViewCodec {
   }
 
   @Test
-  void testFromTrinoTypeStringRejectsTimestampWithTimeZone() {
-    Assertions.assertThrows(
-        UnsupportedOperationException.class,
-        () -> TrinoNativeViewCodec.fromTrinoTypeString("timestamp(3) with time zone"));
+  void testTimestampTimeAndUuidRoundTripWithToTrinoTypeString() {
+    Types.TimestampType timestamp = Types.TimestampType.withoutTimeZone(3);
+    Assertions.assertEquals(
+        timestamp,
+        TrinoNativeViewCodec.fromTrinoTypeString(
+            TrinoNativeViewCodec.toTrinoTypeString(timestamp)));
+
+    Types.TimestampType timestampWithTimeZone = Types.TimestampType.withTimeZone(3);
+    Assertions.assertEquals(
+        timestampWithTimeZone,
+        TrinoNativeViewCodec.fromTrinoTypeString(
+            TrinoNativeViewCodec.toTrinoTypeString(timestampWithTimeZone)));
+
+    Types.TimeType time = Types.TimeType.of(3);
+    Assertions.assertEquals(
+        time,
+        TrinoNativeViewCodec.fromTrinoTypeString(TrinoNativeViewCodec.toTrinoTypeString(time)));
+
+    Types.UUIDType uuid = Types.UUIDType.get();
+    Assertions.assertEquals(
+        uuid,
+        TrinoNativeViewCodec.fromTrinoTypeString(TrinoNativeViewCodec.toTrinoTypeString(uuid)));
   }
 
   @Test
   void testFromTrinoTypeStringRejectsUnknownType() {
     Assertions.assertThrows(
         UnsupportedOperationException.class,
-        () -> TrinoNativeViewCodec.fromTrinoTypeString("uuid"));
+        () -> TrinoNativeViewCodec.fromTrinoTypeString("json"));
+  }
+
+  @Test
+  void testFromTrinoTypeStringRejectsTimeWithTimeZone() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> TrinoNativeViewCodec.fromTrinoTypeString("time(3) with time zone"));
   }
 
   @Test
   void testDecodeRejectsEmptyColumns() {
     TrinoNativeViewCodec.ViewDefinition definition =
         new TrinoNativeViewCodec.ViewDefinition(
-            "SELECT 1", null, null, List.of(), null, null, true);
+            "SELECT 1", null, null, List.of(), null, null, true, List.of());
     String encoded = TrinoNativeViewCodec.encode(definition);
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> TrinoNativeViewCodec.decode(encoded));

@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -34,6 +33,10 @@ import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listSchemas(Namespace)})
+ * are assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   private final CatalogManager catalogManager;
   private final SchemaDispatcher dispatcher;
@@ -57,10 +60,7 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
               NameIdentifier.of(namespace.levels())));
     }
 
-    NameIdentifier[] identifiers = dispatcher.listSchemas(namespace);
-    // The constraints of the name spec may be more strict than underlying catalog,
-    // and for compatibility reasons, we only apply case-sensitive capabilities here.
-    return normalizeCaseSensitive(identifiers);
+    return dispatcher.listSchemas(namespace);
   }
 
   @Override
@@ -109,14 +109,5 @@ public class SchemaNormalizeDispatcher implements SchemaDispatcher {
   private NameIdentifier normalizeCaseSensitive(NameIdentifier schemaIdent) {
     Capability capabilities = getCapability(schemaIdent, catalogManager);
     return applyCaseSensitive(schemaIdent, Capability.Scope.SCHEMA, capabilities);
-  }
-
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] schemaIdents) {
-    if (ArrayUtils.isEmpty(schemaIdents)) {
-      return schemaIdents;
-    }
-
-    Capability capabilities = getCapability(schemaIdents[0], catalogManager);
-    return applyCaseSensitive(schemaIdents, Capability.Scope.SCHEMA, capabilities);
   }
 }

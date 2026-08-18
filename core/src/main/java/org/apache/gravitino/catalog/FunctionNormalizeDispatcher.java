@@ -22,7 +22,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCapabilities;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -37,6 +36,10 @@ import org.apache.gravitino.function.FunctionType;
 /**
  * {@code FunctionNormalizeDispatcher} normalizes function identifiers and namespaces by applying
  * case-sensitivity and other naming capabilities before delegating to the underlying dispatcher.
+ *
+ * <p>Note on list operations: names returned by list methods (e.g. {@link
+ * #listFunctions(Namespace)}) are assumed to already be in their canonical, legal form and are not
+ * re-normalized here.
  */
 public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   private final CatalogManager catalogManager;
@@ -50,8 +53,7 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   @Override
   public NameIdentifier[] listFunctions(Namespace namespace) throws NoSuchSchemaException {
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    NameIdentifier[] identifiers = dispatcher.listFunctions(caseSensitiveNs);
-    return normalizeCaseSensitive(identifiers);
+    return dispatcher.listFunctions(caseSensitiveNs);
   }
 
   @Override
@@ -100,15 +102,6 @@ public class FunctionNormalizeDispatcher implements FunctionDispatcher {
   private NameIdentifier normalizeCaseSensitive(NameIdentifier functionIdent) {
     Capability capabilities = getCapability(functionIdent, catalogManager);
     return applyCaseSensitive(functionIdent, Capability.Scope.FUNCTION, capabilities);
-  }
-
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] functionIdents) {
-    if (ArrayUtils.isEmpty(functionIdents)) {
-      return functionIdents;
-    }
-
-    Capability capabilities = getCapability(functionIdents[0], catalogManager);
-    return applyCaseSensitive(functionIdents, Capability.Scope.FUNCTION, capabilities);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier functionIdent) {

@@ -62,6 +62,22 @@ public interface SupportsEntityStoreCache {
   /**
    * Puts an entity into the cache.
    *
+   * <p><b>Implementations MUST cache only entity types explicitly approved by {@link
+   * BaseEntityCache#isCacheable(Entity.EntityType)}.</b> This allowlist is a correctness
+   * constraint, not an optimization: a new entity type may contain data that no existing
+   * invalidation path covers, so it must remain non-cacheable until its invalidation behavior has
+   * been validated. Implementations extending {@link BaseEntityCache} get this check for free.
+   *
+   * <p>Only self-contained entities are approved. User/group/role are deliberately excluded because
+   * they contain relation-derived data whose source can change through another entity. Model/model
+   * version and function are also excluded because they carry load-bearing pointers that must not
+   * be served stale. Other unapproved and newly introduced entity types go straight to the store
+   * until their invalidation behavior has been validated.
+   *
+   * <p>Implementations must also invoke {@link #invalidateOnKeyChange(Entity)} for every entity,
+   * including non-cacheable ones, since a non-cacheable entity may still invalidate a cacheable
+   * one.
+   *
    * @param entity The entity to cache
    * @param <E> The class of the entity
    */

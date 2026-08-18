@@ -131,6 +131,7 @@ import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagOperations;
+import org.apache.gravitino.tag.TagValueConstraint;
 
 /**
  * Apache Gravitino Metalake is the top-level metadata repository for users. It contains a list of
@@ -510,8 +511,46 @@ public class GravitinoMetalake extends MetalakeDTO
   @Override
   public Tag createTag(String name, String comment, Map<String, String> properties)
       throws TagAlreadyExistsException {
+    return createTag(name, comment, properties, TagValueConstraint.anyValue());
+  }
+
+  /**
+   * Create a tag under the current metalake with an assignment value constraint.
+   *
+   * @param name The name of the tag.
+   * @param comment The comment of the tag.
+   * @param properties The properties of the tag.
+   * @param valueConstraint The assignment value constraint of the tag.
+   * @return The created tag.
+   * @throws TagAlreadyExistsException If the tag already exists.
+   */
+  @Override
+  public Tag createTag(
+      String name,
+      String comment,
+      Map<String, String> properties,
+      TagValueConstraint valueConstraint)
+      throws TagAlreadyExistsException {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "tag name must not be null or empty");
-    TagCreateRequest req = new TagCreateRequest(name, comment, properties);
+    TagValueConstraint normalizedConstraint =
+        valueConstraint == null ? TagValueConstraint.anyValue() : valueConstraint;
+    String[] allowedValues;
+    switch (normalizedConstraint.type()) {
+      case ANY_VALUE:
+        allowedValues = null;
+        break;
+      case NO_VALUE:
+        allowedValues = new String[0];
+        break;
+      case ALLOWED_VALUES:
+        allowedValues = normalizedConstraint.allowedValues();
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Unknown tag value constraint: " + normalizedConstraint.type());
+    }
+
+    TagCreateRequest req = new TagCreateRequest(name, comment, properties, allowedValues);
     req.validate();
 
     TagResponse resp =
@@ -785,6 +824,35 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
+   * Adds a new User with an external identifier.
+   *
+   * @param user The name of the User.
+   * @param externalId The external identifier of the User.
+   * @param enabled Whether the User is enabled.
+   * @return The added User instance.
+   * @throws UserAlreadyExistsException If a User with the same name or external id already exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the User encounters storage issues.
+   */
+  public User addUser(String user, String externalId, boolean enabled)
+      throws UserAlreadyExistsException, NoSuchMetalakeException {
+    UserAddRequest req = new UserAddRequest(user, externalId, enabled);
+    req.validate();
+
+    UserResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_USERS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
+            req,
+            UserResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.userErrorHandler());
+    resp.validate();
+
+    return resp.getUser();
+  }
+
+  /**
    * Removes a User.
    *
    * @param user The name of the User.
@@ -885,6 +953,35 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   public Group addGroup(String group) throws GroupAlreadyExistsException, NoSuchMetalakeException {
     GroupAddRequest req = new GroupAddRequest(group);
+    req.validate();
+
+    GroupResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_GROUPS_PATH, RESTUtils.encodeString(this.name()), BLANK_PLACEHOLDER),
+            req,
+            GroupResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.groupErrorHandler());
+    resp.validate();
+
+    return resp.getGroup();
+  }
+
+  /**
+   * Adds a new Group with an external identifier.
+   *
+   * @param group The name of the Group.
+   * @param externalId The external identifier of the Group.
+   * @return The Added Group instance.
+   * @throws GroupAlreadyExistsException If a Group with the same name or external id already
+   *     exists.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Group encounters storage issues.
+   */
+  public Group addGroup(String group, String externalId)
+      throws GroupAlreadyExistsException, NoSuchMetalakeException {
+    GroupAddRequest req = new GroupAddRequest(group, externalId);
     req.validate();
 
     GroupResponse resp =

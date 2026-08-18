@@ -43,7 +43,17 @@ public interface Entity extends Serializable {
 
   /**
    * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
-   * when operating on users by external id (for example, get/enable/disable/delete-by-external-id).
+   * when operating on users by Gravitino-assigned id (for example, get/alter/delete-by-id).
+   *
+   * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
+   * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system, user-id, <id>}}
+   * so that concurrent operations on the same user id are serialized.
+   */
+  String USER_ID_SCHEMA_NAME = "user-id";
+
+  /**
+   * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
+   * when operating on users by external id (for example, get/delete-by-external-id).
    *
    * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
    * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system, user-external-id,
@@ -54,6 +64,27 @@ public interface Entity extends Serializable {
 
   /** The group schema name in the system catalog. */
   String GROUP_SCHEMA_NAME = "group";
+
+  /**
+   * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
+   * when operating on groups by Gravitino-assigned id (for example, get/alter/delete-by-id).
+   *
+   * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
+   * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system, group-id, <id>}}
+   * so that concurrent operations on the same group id are serialized.
+   */
+  String GROUP_ID_SCHEMA_NAME = "group-id";
+
+  /**
+   * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
+   * when operating on groups by external id (for example, get/delete-by-external-id).
+   *
+   * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
+   * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system,
+   * group-external-id, <externalId>}} so that concurrent operations on the same external id are
+   * serialized without requiring the Gravitino group name.
+   */
+  String GROUP_EXTERNAL_ID_SCHEMA_NAME = "group-external-id";
 
   /** The role schema name in the system catalog. */
   String ROLE_SCHEMA_NAME = "role";

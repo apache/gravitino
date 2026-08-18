@@ -94,4 +94,12 @@ public class TestCapability {
       Assertions.assertTrue(result.unsupportedMessage().contains("is illegal"));
     }
   }
+
+  @Test
+  void testDefaultNormalizeNameMatchesCaseSensitiveOnName() {
+    for (Capability.Scope scope : Capability.Scope.values()) {
+      // The default capability is case-sensitive, so normalizeName must be a no-op.
+      Assertions.assertEquals("MixedCase", Capability.DEFAULT.normalizeName(scope, "MixedCase"));
+    }
+  }
 }

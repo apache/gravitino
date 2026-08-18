@@ -38,17 +38,17 @@ Mixing Iceberg JARs from different versions on the client classpath is not compa
 - Supports DDL operations for Iceberg schemas and tables.
 - Doesn't support snapshot or table management operations.
 - Supports multi storage, including S3, GCS, ADLS, OSS and HDFS.
-- Supports Kerberos or simple authentication for Iceberg catalog with Hive backend.
+- Supports Kerberos or simple authentication for warehouse storage access on HDFS for Hive and JDBC catalog backends.
 - Supports table metadata cache.
 
 ### Catalog Properties
 
-| Property name          | Description                                                                                                                                                                                             | Default value                                                                  | Required                                  | Since Version |
-|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------------------------------|---------------|
-| `catalog-backend`      | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                                      | (none)                                                                         | Yes                                       | 0.2.0         |
-| `uri`                  | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001/iceberg`. | (none)                                                                         | Yes                                       | 0.2.0         |
-| `warehouse`            | Warehouse location of catalog. Use a physical S3 or HDFS location for `hive` or `jdbc` catalog backend, use catalog name for REST catalog backend.                                                      | (none)                                                                         | Yes for `hive` and `jdbc` catalog backend | 0.2.0         |
-| `catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                    | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                        | 0.5.2         |
+| Property name          | Description                                                                                                                                                                                             | Default value                                                                  | Required                                  |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------|-------------------------------------------|
+| `catalog-backend`      | Catalog backend of Gravitino Iceberg catalog. Supports `hive` or `jdbc` or `rest`.                                                                                                                      | (none)                                                                         | Yes                                       |
+| `uri`                  | The URI configuration of the Iceberg catalog. `thrift://127.0.0.1:9083` or `jdbc:postgresql://127.0.0.1:5432/db_name` or `jdbc:mysql://127.0.0.1:3306/metastore_db` or `http://127.0.0.1:9001/iceberg`. | (none)                                                                         | Yes                                       |
+| `warehouse`            | Warehouse location of catalog. Use a physical S3 or HDFS location for `hive` or `jdbc` catalog backend, use catalog name for REST catalog backend.                                                      | (none)                                                                         | Yes for `hive` and `jdbc` catalog backend |
+| `catalog-backend-name` | The catalog name passed to underlying Iceberg catalog backend. Catalog name in JDBC backend is used to isolate namespace and tables.                                                                    | The property value of `catalog-backend`, like `jdbc` for JDBC catalog backend. | No                                        |
 
 
 Any property not defined by Gravitino with `gravitino.bypass.` prefix will pass to Iceberg catalog properties and HDFS configuration. For example, if specify `gravitino.bypass.list-all-tables`, `list-all-tables` will pass to Iceberg catalog properties.
@@ -60,14 +60,14 @@ If you are using the Gravitino with Spark, you can pass the Spark Iceberg connec
 
 #### JDBC Backend
 
-If you are using JDBC backend, you must provide properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`.
+If you are using JDBC backend, you must provide properties like `jdbc-user`, `jdbc-password` and `jdbc-driver`. Use `jdbc-user` and `jdbc-password` for the JDBC metadata store connection. When the warehouse is on Kerberos-secured HDFS, set `authentication.type` to `kerberos` and configure the Kerberos properties in [Catalog Backend Security](#catalog-backend-security).
 
-| Property name     | Description                                                                                             | Default value | Required | Since Version |
-|-------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-user`       | JDBC user name                                                                                          | (none)        | Yes      | 0.2.0         |
-| `jdbc-password`   | JDBC password                                                                                           | (none)        | Yes      | 0.2.0         |
-| `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      | 0.3.0         |
-| `jdbc-initialize` | Whether to initialize meta tables when create JDBC catalog                                              | `true`        | No       | 0.2.0         |
+| Property name     | Description                                                                                             | Default value | Required |
+|-------------------|---------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-user`       | JDBC user name                                                                                          | (none)        | Yes      |
+| `jdbc-password`   | JDBC password                                                                                           | (none)        | Yes      |
+| `jdbc-driver`     | `com.mysql.jdbc.Driver` or `com.mysql.cj.jdbc.Driver` for MySQL, `org.postgresql.Driver` for PostgreSQL | (none)        | Yes      |
+| `jdbc-initialize` | Whether to initialize meta tables when create JDBC catalog                                              | `true`        | No       |
 
 If you have a JDBC Iceberg catalog prior, you must set `catalog-backend-name` to keep consistent with your Jdbc Iceberg catalog name to operate the prior namespace and tables.
 
@@ -82,11 +82,11 @@ For the REST catalog backend, `warehouse` identifies the catalog in the Iceberg 
 
 The following properties tune REST backend behavior:
 
-| Property name                         | Description                                                                                                | Default value | Required | Since Version |
-|---------------------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|---------------|
-| `data-access`                         | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       | 1.3.0         |
-| `rest-client-connection-timeout-ms`   | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       | 1.3.0         |
-| `rest-client-socket-timeout-ms`       | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       | 1.3.0         |
+| Property name                       | Description                                                                                                | Default value | Required |
+|-------------------------------------|------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `data-access`                       | Data access mode for REST catalog backend. Supported values are `vended-credentials` and `remote-signing`. | (none)        | No       |
+| `rest-client-connection-timeout-ms` | The HTTP connection timeout in milliseconds for requests to the REST catalog backend.                      | 10000         | No       |
+| `rest-client-socket-timeout-ms`     | The HTTP socket timeout in milliseconds for requests to the REST catalog backend.                          | 60000         | No       |
 
 - `vended-credentials`: request credential vending from the Iceberg REST server.
 - `remote-signing`: Gravitino doesn't support this mode yet.
@@ -127,14 +127,14 @@ on the URI scheme:
 
 Supports using static access-key-id and secret-access-key to access S3 data.
 
-| Configuration item     | Description                                                                                                                                                                                                         | Default value                           | Required | Since Version    |
-|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
-| `io-impl`              | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.aws.s3.S3FileIO` to explicitly use S3FileIO.                                                                                           | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
-| `s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                    | (none)                                  | No       | 0.6.0-incubating |
-| `s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)                                  | No       | 0.6.0-incubating |
-| `s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)                                  | No       | 0.6.0-incubating |
-| `s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)                                  | No       | 0.6.0-incubating |
-| `s3-path-style-access` | Whether to use path style access for S3.                                                                                                                                                                            | false                                   | No       | 0.9.0-incubating |
+| Configuration item     | Description                                                                                                                                                                                                         | Default value                           | Required |
+|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `io-impl`              | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.aws.s3.S3FileIO` to explicitly use S3FileIO.                                                                                           | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| `s3-access-key-id`     | The static access key ID used to access S3 data.                                                                                                                                                                    | (none)                                  | No       |
+| `s3-secret-access-key` | The static secret access key used to access S3 data.                                                                                                                                                                | (none)                                  | No       |
+| `s3-endpoint`          | An alternative endpoint of the S3 service, This could be used for S3FileIO with any s3-compatible object storage service that has a different endpoint, or access a private S3 endpoint in a virtual private cloud. | (none)                                  | No       |
+| `s3-region`            | The region of the S3 service, like `us-west-2`.                                                                                                                                                                     | (none)                                  | No       |
+| `s3-path-style-access` | Whether to use path style access for S3.                                                                                                                                                                            | false                                   | No       |
 
 
 For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you could config it directly by `gravitino.bypass.s3.sse.type`.
@@ -146,19 +146,19 @@ For other Iceberg s3 properties not managed by Gravitino like `s3.sse.type`, you
 :::
 
 :::note
-Since Gravitino 1.1.0, the Gravitino Iceberg AWS bundle jar has already included the Iceberg AWS bundle jar, no need to download and include it separately.
+The Gravitino Iceberg AWS bundle jar already includes the Iceberg AWS bundle jar, no need to download and include it separately.
 :::
 
 #### OSS
 
 Gravitino Iceberg REST service supports using static access-key-id and secret-access-key to access OSS data.
 
-| Configuration item      | Description                                                                                                                     | Default value                           | Required | Since Version    |
-|-------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
-| `io-impl`               | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.aliyun.oss.OSSFileIO` to explicitly use OSSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
-| `oss-access-key-id`     | The static access key ID used to access OSS data.                                                                               | (none)                                  | No       | 0.7.0-incubating |
-| `oss-secret-access-key` | The static secret access key used to access OSS data.                                                                           | (none)                                  | No       | 0.7.0-incubating |
-| `oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                                             | (none)                                  | No       | 0.7.0-incubating |
+| Configuration item      | Description                                                                                                                     | Default value                           | Required |
+|-------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `io-impl`               | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.aliyun.oss.OSSFileIO` to explicitly use OSSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| `oss-access-key-id`     | The static access key ID used to access OSS data.                                                                               | (none)                                  | No       |
+| `oss-secret-access-key` | The static secret access key used to access OSS data.                                                                           | (none)                                  | No       |
+| `oss-endpoint`          | The endpoint of Aliyun OSS service.                                                                                             | (none)                                  | No       |
 
 For other Iceberg OSS properties not managed by Gravitino like `client.security-token`, you could config it directly by `gravitino.bypass.client.security-token`.
 See [Catalog Properties Configuration](./gravitino-server-config.md#catalog-properties-configuration) for credential leakage risks when passing credentials or security tokens through `gravitino.bypass.` properties.
@@ -168,16 +168,16 @@ Please set the `warehouse` parameter to `oss://{bucket_name}/${prefix_name}`. Ad
 :::
 
 :::note
-Since Gravitino 1.1.0, the Gravitino Iceberg aliyun bundle jar has already included the Iceberg aliyun necessary dependency jars, no need to download and include them separately.
+The Gravitino Iceberg aliyun bundle jar already includes the Iceberg aliyun necessary dependency jars, no need to download and include them separately.
 :::
 
 #### GCS
 
 Supports using google credential file to access GCS data.
 
-| Configuration item | Description                                                                                                                  | Default value                           | Required | Since Version    |
-|--------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
-| `io-impl`          | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
+| Configuration item | Description                                                                                                                  | Default value                           | Required |
+|--------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `io-impl`          | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.gcp.gcs.GCSFileIO` to explicitly use GCSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
 
 For other Iceberg GCS properties not managed by Gravitino like `gcs.project-id`, you could config it directly by `gravitino.bypass.gcs.project-id`.
 
@@ -188,18 +188,18 @@ Please set `warehouse` to `gs://{bucket_name}/${prefix_name}`, and download [Gra
 :::
 
 :::note
-Since Gravitino 1.1.0, the Gravitino Iceberg GCP bundle jar has already included the Iceberg GCP bundle jar, no need to download and include it separately.
+The Gravitino Iceberg GCP bundle jar already includes the Iceberg GCP bundle jar, no need to download and include it separately.
 :::
 
 #### ADLS
 
 Supports using Azure account name and secret key to access ADLS data.
 
-| Configuration item           | Description                                                                                                                         | Default value                           | Required | Since Version    |
-|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
-| `io-impl`                    | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.azure.adlsv2.ADLSFileIO` to explicitly use ADLSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
-| `azure-storage-account-name` | The static storage account name used to access ADLS data.                                                                           | (none)                                  | No       | 0.8.0-incubating |
-| `azure-storage-account-key`  | The static storage account key used to access ADLS data.                                                                            | (none)                                  | No       | 0.8.0-incubating |
+| Configuration item           | Description                                                                                                                         | Default value                           | Required |
+|------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `io-impl`                    | The IO implementation for `FileIO` in Iceberg. Set it to `org.apache.iceberg.azure.adlsv2.ADLSFileIO` to explicitly use ADLSFileIO. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
+| `azure-storage-account-name` | The static storage account name used to access ADLS data.                                                                           | (none)                                  | No       |
+| `azure-storage-account-key`  | The static storage account key used to access ADLS data.                                                                            | (none)                                  | No       |
 
 For other Iceberg ADLS properties not managed by Gravitino like `adls.read.block-size-bytes`, you could config it directly by `gravitino.iceberg-rest.adls.read.block-size-bytes`.
 
@@ -208,16 +208,16 @@ Please set `warehouse` to `abfs[s]://{container-name}@{storage-account-name}.dfs
 :::
 
 :::note
-Since Gravitino 1.1.0, the Gravitino Iceberg Azure bundle jar has already included the Iceberg Azure bundle jar, no need to download and include it separately.
+The Gravitino Iceberg Azure bundle jar already includes the Iceberg Azure bundle jar, no need to download and include it separately.
 :::
 
 #### Other Storage
 
 For other storages that are not managed by Gravitino directly, you can manage them through custom catalog properties.
 
-| Configuration item | Description                                                                                                               | Default value                           | Required | Since Version    |
-|--------------------|---------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|------------------|
-| `io-impl`          | The IO implementation for `FileIO` in Iceberg. Use the fully qualified class name to override the default implementation. | `org.apache.iceberg.io.ResolvingFileIO` | No       | 0.6.0-incubating |
+| Configuration item | Description                                                                                                               | Default value                           | Required |
+|--------------------|---------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|----------|
+| `io-impl`          | The IO implementation for `FileIO` in Iceberg. Use the fully qualified class name to override the default implementation. | `org.apache.iceberg.io.ResolvingFileIO` | No       |
 
 To pass custom properties such as `security-token` to your custom `FileIO`, you can directly configure it by `gravitino.bypass.security-token`. `security-token` will be included in the properties when the initialize method of `FileIO` is invoked.
 See [Catalog Properties Configuration](./gravitino-server-config.md#catalog-properties-configuration) for credential leakage risks when passing credentials or security tokens through `gravitino.bypass.` properties.
@@ -228,36 +228,36 @@ Please set the `warehouse` parameter to `{storage_prefix}://{bucket_name}/${pref
 
 #### Catalog Backend Security
 
-Users can use the following properties to configure the security of the catalog backend if needed. For example, if you are using a Kerberos Hive catalog backend, you must set `authentication.type` to `Kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`.
+Users can use the following properties to configure warehouse storage security when needed. For example, if you are using a Hive or JDBC catalog backend with a Kerberos-secured HDFS warehouse, set `authentication.type` to `kerberos` and provide `authentication.kerberos.principal` and `authentication.kerberos.keytab-uri`. For JDBC backend, JDBC username/password authentication for the metadata store is configured separately via `jdbc-user` and `jdbc-password`.
 
-| Property name                                      | Description                                                                                                                                                                                                                                      | Default value | Required                                                                                                                                                             | Since Version    |
-|----------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `authentication.type`                              | The type of authentication for Iceberg catalog backend. This configuration only applicable for for Hive backend, and only supports `Kerberos`, `simple` currently. As for JDBC backend, only username/password authentication was supported now. | `simple`      | No                                                                                                                                                                   | 0.6.0-incubating |
-| `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog                                                                                                                                                                                          | `false`       | No                                                                                                                                                                   | 0.6.0-incubating |
-| `hive.metastore.sasl.enabled`                      | Whether to enable SASL authentication protocol when connect to Kerberos Hive metastore. This is a raw Hive configuration                                                                                                                         | `false`       | No, This value should be true in most case(Some will use SSL protocol, but it rather rare) if the value of `gravitino.iceberg-rest.authentication.type` is Kerberos. | 0.6.0-incubating |
-| `authentication.kerberos.principal`                | The principal of the Kerberos authentication                                                                                                                                                                                                     | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
-| `authentication.kerberos.keytab-uri`               | The URI of The keytab for the Kerberos authentication.                                                                                                                                                                                           | (none)        | required if the value of `authentication.type` is Kerberos.                                                                                                          | 0.6.0-incubating |
-| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for Iceberg catalog.                                                                                                                                                                                   | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
-| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout of retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                                                                                                                                                       | 60            | No                                                                                                                                                                   | 0.6.0-incubating |
+| Property name                                      | Description                                                                                                             | Default value | Required                                                                                                                     |
+|----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------|---------------|------------------------------------------------------------------------------------------------------------------------------|
+| `authentication.type`                              | The authentication type for HDFS warehouse access. Supports `kerberos` and `simple` for Hive and JDBC catalog backends. | `simple`      | No                                                                                                                           |
+| `authentication.impersonation-enable`              | Whether to enable impersonation for the Iceberg catalog.                                                                | `false`       | No                                                                                                                           |
+| `hive.metastore.sasl.enabled`                      | Whether to enable SASL when connecting to a Kerberos Hive Metastore. This is a raw Hive configuration.                  | `false`       | No. Set to true in most cases when `authentication.type` is `kerberos` (some deployments use SSL instead, but that is rare). |
+| `authentication.kerberos.principal`                | The principal for Kerberos authentication.                                                                              | (none)        | Yes, if `authentication.type` is `kerberos`.                                                                                 |
+| `authentication.kerberos.keytab-uri`               | The URI of the keytab for Kerberos authentication.                                                                      | (none)        | Yes, if `authentication.type` is `kerberos`.                                                                                 |
+| `authentication.kerberos.check-interval-sec`       | The check interval of Kerberos credential for the Iceberg catalog.                                                      | 60            | No                                                                                                                           |
+| `authentication.kerberos.keytab-fetch-timeout-sec` | The fetch timeout for retrieving Kerberos keytab from `authentication.kerberos.keytab-uri`.                             | 60            | No                                                                                                                           |
 
 #### Table Metadata Cache
 
 Gravitino features a pluggable cache system for updating or retrieving table metadata in the cache. It validates the location of table metadata against the catalog backend to ensure the correctness of cached data.
 
-| Configuration item                    | Description                                                                                                                                                                           | Default value                                                       | Required | Since Version |
-|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------|---------------|
-| `table-metadata-cache-impl`           | The implementation of the table metadata cache. Set to empty string("") if `catalog-backend` is `rest` catalog, or `custom` catalog without the `SupportsMetadataLocation` interface. | `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` | No       | 1.1.0         |
-| `table-metadata-cache-capacity`       | The capacity of the table metadata cache.                                                                                                                                             | 1000                                                                | No       | 1.1.0         |
-| `table-metadata-cache-expire-minutes` | The expiration time (in minutes) of the table metadata cache.                                                                                                                         | 60                                                                  | No       | 1.1.0         |
+| Configuration item                    | Description                                                                                                                                                                           | Default value                                                       | Required |
+|---------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------|
+| `table-metadata-cache-impl`           | The implementation of the table metadata cache. Set to empty string("") if `catalog-backend` is `rest` catalog, or `custom` catalog without the `SupportsMetadataLocation` interface. | `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` | No       |
+| `table-metadata-cache-capacity`       | The capacity of the table metadata cache.                                                                                                                                             | 1000                                                                | No       |
+| `table-metadata-cache-expire-minutes` | The expiration time (in minutes) of the table metadata cache.                                                                                                                         | 60                                                                  | No       |
 
 Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.LocalTableMetadataCache` to store the cached data in the memory. You could also implement your custom table metadata cache by implementing the `org.apache.gravitino.iceberg.common.cache.TableMetadataCache` interface.
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
 :::
 
 ## Schema
@@ -273,7 +273,7 @@ You could put properties except `comment`.
 
 ### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ### Hierarchical schema
 
@@ -415,29 +415,42 @@ If you doesn't specify distribution expressions, the table distribution will be 
 
 ### Table Column Types
 
-| Gravitino Type    | Apache Iceberg Type         |
-|-------------------|-----------------------------|
-| `Struct`          | `Struct`                    |
-| `Map`             | `Map`                       |
-| `List`            | `Array`                     |
-| `Boolean`         | `Boolean`                   |
-| `Integer`         | `Integer`                   |
-| `Long`            | `Long`                      |
-| `Float`           | `Float`                     |
-| `Double`          | `Double`                    |
-| `String`          | `String`                    |
-| `Date`            | `Date`                      |
-| `Time(6)`         | `Time`                      |
-| `Timestamp(6)`    | `TimestampType withZone`    |
-| `Timestamp_tz(6)` | `TimestampType withoutZone` |
-| `Decimal`         | `Decimal`                   |
-| `Fixed`           | `Fixed`                     |
-| `Binary`          | `Binary`                    |
-| `UUID`            | `UUID`                      |
+| Gravitino Type    | Apache Iceberg Type             |
+|-------------------|---------------------------------|
+| `Struct`          | `Struct`                        |
+| `Map`             | `Map`                           |
+| `List`            | `Array`                         |
+| `Boolean`         | `Boolean`                       |
+| `Integer`         | `Integer`                       |
+| `Long`            | `Long`                          |
+| `Float`           | `Float`                         |
+| `Double`          | `Double`                        |
+| `String`          | `String`                        |
+| `Date`            | `Date`                          |
+| `Time(6)`         | `Time`                          |
+| `Timestamp(6)`    | `TimestampType withoutZone`     |
+| `Timestamp_tz(6)` | `TimestampType withZone`        |
+| `Timestamp(9)`    | `TimestampNanoType withoutZone` |
+| `Timestamp_tz(9)` | `TimestampNanoType withZone`    |
+| `Decimal`         | `Decimal`                       |
+| `Fixed`           | `Fixed`                         |
+| `Binary`          | `Binary`                        |
+| `UUID`            | `UUID`                          |
+| `Variant`         | `Variant`                       |
+| `Null`            | `Unknown`                       |
+| `Geometry`        | `Geometry`                      |
+| `Geography`       | `Geography`                     |
+
+:::note
+Gravitino `Null` maps to Apache Iceberg's V3 `unknown` type — a null-only placeholder for a column
+whose type is not yet known. It requires table `format-version` 3, must be an optional (nullable)
+column, and can be promoted to a concrete type via schema evolution. This is the recommended way to
+represent an Iceberg `unknown` column in Gravitino.
+:::
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type since 0.6.0-incubating.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.
 :::
 
 ### Table Properties
@@ -450,19 +463,19 @@ Pass [Iceberg table properties](https://iceberg.apache.org/docs/1.5.2/configurat
 **Immutable**: Fields that cannot be modified once set.
 :::
 
-| Configuration item        | Description                                                                           | Default value | Required | Reserved | Immutable | Since Version |
-|---------------------------|---------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
-| `location`                | Iceberg location for table storage.                                                   | (none)        | No       | No       | Yes       | 0.2.0         |
-| `provider`                | The storage provider for table storage.                                               | (none)        | No       | No       | Yes       | 0.2.0         |
-| `format`                  | The format of table storage.                                                          | (none)        | No       | No       | Yes       | 0.2.0         |
-| `format-version`          | The format version of table storage.                                                  | (none)        | No       | No       | Yes       | 0.2.0         |
-| `comment`                 | The table comment; use the `comment` field in table meta instead.                     | (none)        | No       | Yes      | No        | 0.2.0         |
-| `creator`                 | The table creator.                                                                    | (none)        | No       | Yes      | No        | 0.2.0         |
-| `current-snapshot-id`     | The snapshot represents the current state of the table.                               | (none)        | No       | Yes      | No        | 0.2.0         |
-| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                   | (none)        | No       | Yes      | No        | 0.2.0         |
-| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                      | (none)        | No       | Yes      | No        | 0.2.0         |
-| `identifier-fields`       | The identifier fields for defining the table.                                         | (none)        | No       | Yes      | No        | 0.2.0         |
-| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.         | (none)        | No       | Yes      | No        | 0.2.0         |
+| Configuration item        | Description                                                                                                                                                                                                                                                                         | Default value | Required | Reserved | Immutable |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
+| `location`                | Iceberg location for table storage.                                                                                                                                                                                                                                                 | (none)        | No       | No       | Yes       |
+| `provider`                | The storage provider for table storage.                                                                                                                                                                                                                                             | (none)        | No       | No       | Yes       |
+| `format`                  | The format of table storage.                                                                                                                                                                                                                                                        | (none)        | No       | No       | Yes       |
+| `format-version`          | The Iceberg table format version. Gravitino supports creating tables at versions `1`–`4` (the range the bundled Iceberg version can write) and defaults to `2` when unset. Version `3` is required for V3 types such as `variant`; version `4` is not yet a finalized Iceberg spec. | `2`           | No       | No       | Yes       |
+| `comment`                 | The table comment; use the `comment` field in table meta instead.                                                                                                                                                                                                                   | (none)        | No       | Yes      | No        |
+| `creator`                 | The table creator.                                                                                                                                                                                                                                                                  | (none)        | No       | Yes      | No        |
+| `current-snapshot-id`     | The snapshot represents the current state of the table.                                                                                                                                                                                                                             | (none)        | No       | Yes      | No        |
+| `cherry-pick-snapshot-id` | Selecting a specific snapshot in a merge operation.                                                                                                                                                                                                                                 | (none)        | No       | Yes      | No        |
+| `sort-order`              | Iceberg table sort order; use `SortOrder` in table meta instead.                                                                                                                                                                                                                    | (none)        | No       | Yes      | No        |
+| `identifier-fields`       | The identifier fields for defining the table.                                                                                                                                                                                                                                       | (none)        | No       | Yes      | No        |
+| `write.distribution-mode` | Defines distribution of write data; use `distribution` in table meta instead.                                                                                                                                                                                                       | (none)        | No       | Yes      | No        |
 
 ### Table Indexes
 

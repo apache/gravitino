@@ -28,6 +28,12 @@ public interface EntityChangeLogListener {
   /**
    * Handles a batch of entity changes.
    *
+   * <p>A batch is handed to the listener only once and is never sent again, so the listener has to
+   * clean up after itself when something goes wrong. The simplest way is to clear the whole cache
+   * this listener keeps, because that also removes whatever entry it failed to remove. Do not count
+   * on the poller retrying. If this method throws, the poller only logs the error at {@code ERROR}
+   * and moves on, and this listener's cache can stay wrong from then on.
+   *
    * @param changes the entity changes fetched in one poller cycle
    */
   void onEntityChange(List<EntityChangeRecord> changes);

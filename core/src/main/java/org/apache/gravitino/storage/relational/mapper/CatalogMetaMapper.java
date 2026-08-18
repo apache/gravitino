@@ -47,6 +47,12 @@ public interface CatalogMetaMapper {
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByMetalakeId")
   List<CatalogPO> listCatalogPOsByMetalakeId(@Param("metalakeId") Long metalakeId);
 
+  /** Selects and locks all active catalogs in a metalake for the current transaction. */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "listCatalogPOsByMetalakeIdForUpdate")
+  List<CatalogPO> listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId);
+
   @SelectProvider(type = CatalogMetaSQLProviderFactory.class, method = "listCatalogPOsByCatalogIds")
   List<CatalogPO> listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds);
 
@@ -91,10 +97,15 @@ public interface CatalogMetaMapper {
       method = "softDeleteCatalogMetasByCatalogId")
   Integer softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId);
 
+  /**
+   * Soft-deletes catalogs whose identifiers and OCC versions still match.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(
       type = CatalogMetaSQLProviderFactory.class,
-      method = "softDeleteCatalogMetasByMetalakeId")
-  Integer softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
+      method = "softDeleteCatalogMetasWithVersion")
+  Integer softDeleteCatalogMetasWithVersion(@Param("catalogMetas") List<CatalogPO> catalogPOs);
 
   @DeleteProvider(
       type = CatalogMetaSQLProviderFactory.class,

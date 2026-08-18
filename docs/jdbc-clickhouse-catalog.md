@@ -48,15 +48,15 @@ Pass any JDBC pool property that Gravitino does not define by adding the `gravit
 
 When using the JDBC catalog you must provide `jdbc-url`, `jdbc-driver`, `jdbc-user`, and `jdbc-password`. Common catalog properties are listed [here](./gravitino-server-config.md#catalog-properties-configuration); ClickHouse adds no extra catalog-scoped keys.
 
-| Configuration item      | Description                                                                 | Default value | Required | Since Version |
-|-------------------------|-----------------------------------------------------------------------------|---------------|----------|---------------|
-| `jdbc-url`              | JDBC URL, for example `jdbc:clickhouse://localhost:8123`                    | (none)        | Yes      | 1.2.0         |
-| `jdbc-driver`           | JDBC driver class, for example `com.clickhouse.jdbc.ClickHouseDriver`       | (none)        | Yes      | 1.2.0         |
-| `jdbc-user`             | JDBC user name                                                              | (none)        | Yes      | 1.2.0         |
-| `jdbc-password`         | JDBC password                                                               | (none)        | Yes      | 1.2.0         |
-| `jdbc.pool.min-size`    | Minimum pool size                                                           | `2`           | No       | 1.2.0         |
-| `jdbc.pool.max-size`    | Maximum pool size                                                           | `10`          | No       | 1.2.0         |
-| `jdbc.pool.max-wait-ms` | Max wait time for a connection                                              | `30000`       | No       | 1.2.0         |
+| Configuration item      | Description                                                           | Default value | Required |
+|-------------------------|-----------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL, for example `jdbc:clickhouse://localhost:8123`              | (none)        | Yes      |
+| `jdbc-driver`           | JDBC driver class, for example `com.clickhouse.jdbc.ClickHouseDriver` | (none)        | Yes      |
+| `jdbc-user`             | JDBC user name                                                        | (none)        | Yes      |
+| `jdbc-password`         | JDBC password                                                         | (none)        | Yes      |
+| `jdbc.pool.min-size`    | Minimum pool size                                                     | `2`           | No       |
+| `jdbc.pool.max-size`    | Maximum pool size                                                     | `10`          | No       |
+| `jdbc.pool.max-wait-ms` | Max wait time for a connection                                        | `30000`       | No       |
 
 ### Create a ClickHouse Catalog
 
@@ -107,7 +107,7 @@ Catalog catalog =
 </TabItem>
 </Tabs>
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for other catalog operations.
+See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for other catalog operations.
 
 ## Schema
 
@@ -122,10 +122,10 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 
 ### Schema Properties
 
-| Property Name  | Description                                                                        | Default Value | Required | Immutable | Since version |
-|----------------|------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
-| `on-cluster`   | Use `ON CLUSTER` when creating the database                                        | `false`       | No       | No        | 1.2.0         |
-| `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings) | (none)        | No       | No        | 1.2.0         |
+| Property Name  | Description                                                                        | Default Value | Required | Immutable |
+|----------------|------------------------------------------------------------------------------------|---------------|----------|-----------|
+| `on-cluster`   | Use `ON CLUSTER` when creating the database                                        | `false`       | No       | No        |
+| `cluster-name` | Cluster name used with `ON CLUSTER` (must align with table-level cluster settings) | (none)        | No       | No        |
 
 :::warning
 **Cluster properties only reflect Gravitino-managed schemas.** Gravitino embeds the cluster name inside the schema's `COMMENT` field at creation time (because `SHOW CREATE DATABASE` does not include `ON CLUSTER` for standard Atomic databases). Schemas created outside Gravitino will not have this metadata, so `on-cluster` and `cluster-name` will be absent when loaded, and `DROP SCHEMA` will not propagate `ON CLUSTER` to other cluster nodes.
@@ -161,7 +161,7 @@ Schema schema = catalog.asTableCatalog()
 </TabItem>
 </Tabs>
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more schema operations.
+See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more schema operations.
 
 ## Table
 
@@ -172,7 +172,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | Mapping             | Gravitino table maps to a ClickHouse table                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Engines             | **MergeTree family** (`MergeTree` default, `ReplacingMergeTree`, `SummingMergeTree`, `AggregatingMergeTree`, `CollapsingMergeTree`, `VersionedCollapsingMergeTree`, `GraphiteMergeTree`): fully supported, data persists across restarts. **Log family** (`TinyLog`, `StripeLog`, `Log`): supported, data and table definition persist across restarts. **`Null`**: supported, table persists, data is always discarded by design. **`Set`**: supported, table definition persists. **`Memory`**: ⚠️ table definition persists but data is lost on ClickHouse restart (volatile). **Distributed**: cluster mode with remote database/table and sharding key. **Not directly creatable via Gravitino** (`Join`, `Buffer`, `View`, `KeeperMap`, `File`): require parameterized ENGINE clauses or external dependencies not supported by the CREATE TABLE API. |
 | Ordering/Partition  | MergeTree-family requires exactly one `ORDER BY` column; only single-column identity `PARTITION BY` is supported on MergeTree engines. Other engines reject `ORDER BY`/`PARTITION BY`.                                                                                                                                                                                                                                                                                    |
-| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX` and `DATA_SKIPPING_BLOOM_FILTER` (fixed granularities).                                                                                                                                                                                                                                                                                                                                                         |
+| Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, and `DATA_SKIPPING_SET` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                                                   |
 | Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
@@ -199,7 +199,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | `BOOLEAN`           | `Bool`                                 |
 | `UUID`              | `UUID`                                 |
 
-Other ClickHouse types are exposed as [External Type](./manage-relational-metadata-using-gravitino.md#external-type).
+Other ClickHouse types are exposed as [External Type](./tables-and-views.md#external-type).
 
 ### Table Properties
 
@@ -223,15 +223,15 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 **Memory engine data volatility**: Tables created with `engine=Memory` store data in RAM only. After a ClickHouse server restart the table definition persists (Gravitino's `loadTable` succeeds), but all data is permanently lost. Gravitino metadata and ClickHouse remain consistent at the schema level, but users are responsible for repopulating data after restarts. Consider using `TinyLog`, `StripeLog`, or a MergeTree-family engine if data durability is required.
 :::
 
-| Property Name              | Description                                                                                              | Default Value | Required | Reserved | Immutable | Since version |
-|----------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|---------------|
-| `engine`                   | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No       | No       | Yes       | 1.2.0         |
-| `cluster-name`             | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | No        | 1.2.0         |
-| `on-cluster`               | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No       | No       | No        | 1.2.0         |
-| `cluster-remote-database`  | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*   | No       | No        | 1.2.0         |
-| `cluster-remote-table`     | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*   | No       | No        | 1.2.0         |
-| `cluster-sharding-key`     | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*   | No       | No        | 1.2.0         |
-| `settings.<name>`          | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No       | No       | No        | 1.2.0         |
+| Property Name             | Description                                                                                              | Default Value | Required | Reserved | Immutable |
+|---------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
+| `engine`                  | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No       | No       | Yes       |
+| `cluster-name`            | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | No        |
+| `on-cluster`              | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No       | No       | No        |
+| `cluster-remote-database` | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*   | No       | No        |
+| `cluster-remote-table`    | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*   | No       | No        |
+| `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*   | No       | No        |
+| `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No       | No       | No        |
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
@@ -240,8 +240,11 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 
 - `PRIMARY_KEY`
 - Data-skipping indexes:
-  - `DATA_SKIPPING_MINMAX` (`GRANULARITY` fixed to 1)
-  - `DATA_SKIPPING_BLOOM_FILTER` (`GRANULARITY` fixed to 3)
+  - `DATA_SKIPPING_MINMAX` (default `GRANULARITY 1`)
+  - `DATA_SKIPPING_BLOOM_FILTER` (default `GRANULARITY 1`)
+  - `DATA_SKIPPING_SET` (default `GRANULARITY 1`, plus configurable `set(N)` max values)
+
+  Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
 ### Partitioning, Sorting, and Distribution
 
@@ -347,7 +350,7 @@ Supported:
 - Rename column.
 - Update column type/comment/default/position/nullability.
 - Delete columns (with `IF EXISTS` support).
-- Add data-skipping indexes; drop data-skipping indexes. Adding/dropping primary key is not supported.
+- Add data-skipping indexes with custom `GRANULARITY` and `set(N)` via `Index.properties()`; drop data-skipping indexes. Adding/dropping primary key is not supported.
 - Update table comment.
 
 Unsupported:

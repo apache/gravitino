@@ -36,10 +36,13 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -57,6 +60,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.function.Executable;
 
 class TestGroupMetaService extends TestJDBCBackend {
 
@@ -1061,6 +1065,193 @@ class TestGroupMetaService extends TestJDBCBackend {
   private GroupUpdatedAt getGroupUpdatedAt(String groupName) {
     return SessionUtils.doWithCommitAndFetchResult(
         GroupMetaMapper.class, mapper -> mapper.getGroupUpdatedAt(metalakeName, groupName));
+  }
+
+  @TestTemplate
+  void testGroupExtId() throws IOException {
+    GroupMetaService svc = groupMetaService();
+    svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
+    GroupEntity found = svc.getGroupByExternalId(groupExtIdent("ext-1"));
+    Assertions.assertEquals("g1", found.name());
+    Assertions.assertEquals("ext-1", found.externalId());
+    assertThrowsExt(
+        NoSuchEntityException.class,
+        () -> svc.getGroupByExternalId(groupExtIdent("missing-ext-id")));
+    assertThrowsExt(
+        IllegalArgumentException.class, () -> svc.getGroupByExternalId(groupExtIdent("")));
+  }
+
+  @TestTemplate
+  void testExtDup() throws IOException {
+    GroupMetaService svc = groupMetaService();
+    svc.insertGroup(groupWithExtId("g1", "ext-1"), false);
+    assertThrowsExt(
+        EntityAlreadyExistsException.class,
+        () -> svc.insertGroup(groupWithExtId("g2", "ext-1"), false));
+  }
+
+  @TestTemplate
+  void testGroupExtDel() throws IOException {
+    GroupMetaService svc = groupMetaService();
+    svc.insertGroup(groupWithExtId("g1", "ext-del-by"), false);
+    GroupEntity group = svc.getGroupByExternalId(groupExtIdent("ext-del-by"));
+    Assertions.assertEquals("g1", group.name());
+    Assertions.assertTrue(svc.deleteGroup(group.nameIdentifier()));
+    assertThrowsExt(
+        NoSuchEntityException.class, () -> svc.getGroupByExternalId(groupExtIdent("ext-del-by")));
+    assertThrowsExt(NoSuchEntityException.class, () -> svc.deleteGroup(group.nameIdentifier()));
+  }
+
+  @TestTemplate
+  void testGroupPagination() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    GroupMetaService svc = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "page_group_role",
+            auditInfo,
+            catalogName);
+    roleMetaService.insertRole(role1, false);
+
+    GroupEntity g1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g1",
+            auditInfo);
+    GroupEntity g2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g2",
+            auditInfo,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    GroupEntity g3 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g3",
+            auditInfo);
+    GroupEntity g4 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g4",
+            auditInfo);
+    svc.insertGroup(g1, false);
+    svc.insertGroup(g2, false);
+    svc.insertGroup(g3, false);
+    svc.insertGroup(g4, false);
+
+    List<GroupEntity> ordered =
+        Lists.newArrayList(g1, g2, g3, g4).stream()
+            .sorted(Comparator.comparing(GroupEntity::id))
+            .collect(Collectors.toList());
+
+    Assertions.assertEquals(4, svc.countGroupsByMetalake(metalakeName));
+
+    // offset=1, limit=2 exercises JDBC OFFSET and stable ORDER BY group_id ASC.
+    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(4, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+    Assertions.assertEquals(ordered.get(1).name(), page.items().get(0).name());
+    Assertions.assertEquals(ordered.get(2).name(), page.items().get(1).name());
+    Assertions.assertEquals(ordered.get(1).id(), page.items().get(0).id());
+    Assertions.assertEquals(ordered.get(2).id(), page.items().get(1).id());
+
+    GroupEntity withRole =
+        ordered.stream().filter(g -> "page_g2".equals(g.name())).findFirst().orElseThrow();
+    int roleGroupOffset = ordered.indexOf(withRole);
+    PagedResult<GroupEntity> rolePage =
+        svc.listGroupsByMetalakePaginated(metalakeName, roleGroupOffset, 1);
+    Assertions.assertEquals(1, rolePage.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet("page_group_role"), Sets.newHashSet(rolePage.items().get(0).roleNames()));
+
+    PagedResult<GroupEntity> pageAgain = svc.listGroupsByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
+    Assertions.assertTrue(svc.listGroupsByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
+    Assertions.assertTrue(
+        svc.listGroupsByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
+  }
+
+  @TestTemplate
+  void testGroupPaginationWithSpecialRoleNames() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    GroupMetaService svc = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    String quotedRole = "role\"quoted";
+    String backslashRole = "back\\slash";
+    RoleEntity roleQuoted =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            quotedRole,
+            auditInfo,
+            catalogName);
+    RoleEntity roleBackslash =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            backslashRole,
+            auditInfo,
+            catalogName);
+    roleMetaService.insertRole(roleQuoted, false);
+    roleMetaService.insertRole(roleBackslash, false);
+
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "special_role_group",
+            auditInfo,
+            Lists.newArrayList(quotedRole, backslashRole),
+            Lists.newArrayList(roleQuoted.id(), roleBackslash.id()));
+    svc.insertGroup(group, false);
+
+    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet(quotedRole, backslashRole),
+        Sets.newHashSet(page.items().get(0).roleNames()));
+  }
+
+  private NameIdentifier groupExtIdent(String externalId) {
+    return AuthorizationUtils.ofGroupExternalId(metalakeName, externalId);
+  }
+
+  private GroupMetaService groupMetaService() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    return GroupMetaService.getInstance();
+  }
+
+  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
+    Assertions.assertThrows(type, executable);
+  }
+
+  private GroupEntity groupWithExtId(String name, String externalId) {
+    return GroupEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withNamespace(AuthorizationUtils.ofGroupNamespace(metalakeName))
+        .withExternalId(externalId)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
   }
 
   private GroupEntity createGroupEntity(

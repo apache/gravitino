@@ -186,8 +186,8 @@ public class Configs {
           .createWithDefault(60 * 60 * 1000L);
 
   public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
-  public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 24 * 60 * 60L;
-  public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 60 * 60L;
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 30 * 24 * 60 * 60L;
+  public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 24 * 60 * 60L;
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.pollIntervalSecs")
@@ -207,7 +207,9 @@ public class Configs {
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.cleanupIntervalSecs")
-          .doc("The interval in seconds for pruning expired entity change logs")
+          .doc(
+              "The interval in seconds for independently cleaning expired entity change logs on a"
+                  + " dedicated thread")
           .version(ConfigConstants.VERSION_1_3_0)
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
@@ -217,6 +219,18 @@ public class Configs {
       new ConfigBuilder("gravitino.catalog.classloader.isolated")
           .doc("Whether to load the catalog in an isolated classloader")
           .version(ConfigConstants.VERSION_0_1_0)
+          .booleanConf()
+          .createWithDefault(true);
+
+  public static final ConfigEntry<Boolean> CATALOG_CLASSLOADER_SHARING_ENABLED =
+      new ConfigBuilder("gravitino.catalog.classloader.sharing.enabled")
+          .doc(
+              "Whether to share ClassLoaders across catalogs with identical isolation-relevant "
+                  + "properties. When true (default), catalogs with the same isolation key reuse "
+                  + "a single ClassLoader, significantly reducing Metaspace memory usage. When "
+                  + "false, each catalog gets its own dedicated ClassLoader as in previous "
+                  + "releases.")
+          .version(ConfigConstants.VERSION_2_0_0)
           .booleanConf()
           .createWithDefault(true);
 

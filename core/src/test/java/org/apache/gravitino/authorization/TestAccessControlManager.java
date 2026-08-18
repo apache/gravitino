@@ -68,6 +68,7 @@ import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
+import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
@@ -467,10 +468,12 @@ public class TestAccessControlManager {
     User added = accessControlManager.addUser(METALAKE, user, extId, true);
     Assertions.assertEquals(extId, added.externalId());
     Assertions.assertTrue(added.enabled());
+    long userId = added.id();
 
     createCatalogRole("ext_role");
     accessControlManager.grantRolesToUser(METALAKE, Lists.newArrayList("ext_role"), user);
-    User disabled = accessControlManager.disableUser(METALAKE, extId);
+    User disabled =
+        accessControlManager.alterUserById(METALAKE, userId, UserChange.updateEnabled(false));
     Assertions.assertFalse(disabled.enabled());
     assertSortedRoles(disabled, "ext_role");
 
@@ -479,7 +482,8 @@ public class TestAccessControlManager {
     assertSortedRoles(accessControlManager.getUser(METALAKE, user), "ext_role", "ext_role2");
     Assertions.assertFalse(accessControlManager.getUserByExternalId(METALAKE, extId).enabled());
 
-    User enabled = accessControlManager.enableUser(METALAKE, extId);
+    User enabled =
+        accessControlManager.alterUserById(METALAKE, userId, UserChange.updateEnabled(true));
     Assertions.assertTrue(enabled.enabled());
     assertSortedRoles(enabled, "ext_role", "ext_role2");
 
@@ -494,15 +498,17 @@ public class TestAccessControlManager {
   public void testMissingExt() {
     assertInvalidExt(() -> accessControlManager.getUserByExternalId(METALAKE, null));
     assertInvalidExt(() -> accessControlManager.getUserByExternalId(METALAKE, ""));
+    assertInvalidExt(() -> accessControlManager.getGroupByExternalId(METALAKE, null));
+    assertInvalidExt(() -> accessControlManager.getGroupByExternalId(METALAKE, ""));
     assertMissingExt(
         NoSuchUserException.class,
         () -> accessControlManager.getUserByExternalId(METALAKE, "missing-ext-id"));
     assertMissingExt(
+        NoSuchGroupException.class,
+        () -> accessControlManager.getGroupByExternalId(METALAKE, "missing-ext-id"));
+    Assertions.assertThrows(
         NoSuchUserException.class,
-        () -> accessControlManager.disableUser(METALAKE, "missing-ext-id"));
-    assertMissingExt(
-        NoSuchUserException.class,
-        () -> accessControlManager.enableUser(METALAKE, "missing-ext-id"));
+        () -> accessControlManager.alterUserById(METALAKE, -1L, UserChange.updateEnabled(false)));
   }
 
   @Test
@@ -512,6 +518,12 @@ public class TestAccessControlManager {
         UserAlreadyExistsException.class,
         () -> accessControlManager.addUser(METALAKE, "u2", "dup-ext", true));
     accessControlManager.removeUser(METALAKE, "u1");
+
+    accessControlManager.addGroup(METALAKE, "g1", "dup-ext");
+    assertThrowsExt(
+        GroupAlreadyExistsException.class,
+        () -> accessControlManager.addGroup(METALAKE, "g2", "dup-ext"));
+    accessControlManager.removeGroup(METALAKE, "g1");
   }
 
   @Test
@@ -527,13 +539,145 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testGroupExtDel() {
+    String extId = "ext-remove-group";
+    accessControlManager.addGroup(METALAKE, "remove_group", extId);
+    Assertions.assertTrue(accessControlManager.removeGroupByExternalId(METALAKE, extId));
+    assertMissingExt(
+        NoSuchGroupException.class,
+        () -> accessControlManager.getGroupByExternalId(METALAKE, extId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class, () -> accessControlManager.getGroup(METALAKE, "remove_group"));
+    Assertions.assertFalse(
+        accessControlManager.removeGroupByExternalId(METALAKE, "missing-ext-id"));
+  }
+
+  @Test
+  public void testUserById() {
+    User added = accessControlManager.addUser(METALAKE, "id_user", "ext-id-user", true);
+    long userId = added.id();
+    Assertions.assertNotNull(userId);
+
+    User loaded = accessControlManager.getUserById(METALAKE, userId);
+    Assertions.assertEquals(userId, loaded.id());
+    Assertions.assertEquals("id_user", loaded.name());
+    Assertions.assertEquals("ext-id-user", loaded.externalId());
+    Assertions.assertTrue(loaded.enabled());
+
+    User disabled =
+        accessControlManager.alterUserById(METALAKE, userId, UserChange.updateEnabled(false));
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertEquals(userId, disabled.id());
+    Assertions.assertEquals("ext-id-user", disabled.externalId());
+    Assertions.assertEquals(added.auditInfo().creator(), disabled.auditInfo().creator());
+    Assertions.assertEquals(added.auditInfo().createTime(), disabled.auditInfo().createTime());
+    Assertions.assertNotNull(disabled.auditInfo().lastModifier());
+    Assertions.assertNotNull(disabled.auditInfo().lastModifiedTime());
+    Assertions.assertTrue(
+        !disabled.auditInfo().lastModifiedTime().isBefore(added.auditInfo().createTime()));
+
+    User enabledAndExt =
+        accessControlManager.alterUserById(
+            METALAKE,
+            userId,
+            UserChange.updateEnabled(true),
+            UserChange.updateExternalId("ext-id-user-2"));
+    Assertions.assertTrue(enabledAndExt.enabled());
+    Assertions.assertEquals(userId, enabledAndExt.id());
+    Assertions.assertEquals("ext-id-user-2", enabledAndExt.externalId());
+    User byNewExt = accessControlManager.getUserByExternalId(METALAKE, "ext-id-user-2");
+    Assertions.assertEquals("id_user", byNewExt.name());
+    Assertions.assertEquals(userId, byNewExt.id());
+
+    Assertions.assertTrue(accessControlManager.removeUserById(METALAKE, userId));
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.getUserById(METALAKE, userId));
+    Assertions.assertFalse(accessControlManager.removeUserById(METALAKE, userId));
+    Assertions.assertThrows(
+        NoSuchUserException.class,
+        () -> accessControlManager.alterUserById(METALAKE, userId, UserChange.updateEnabled(true)));
+  }
+
+  @Test
   public void testExtCache() {
     String extId = "ext-cache-user";
-    accessControlManager.addUser(METALAKE, "cache_user", extId, true);
+    User added = accessControlManager.addUser(METALAKE, "cache_user", extId, true);
     accessControlManager.getUser(METALAKE, "cache_user");
-    accessControlManager.disableUser(METALAKE, extId);
+    accessControlManager.alterUserById(METALAKE, added.id(), UserChange.updateEnabled(false));
     Assertions.assertFalse(accessControlManager.getUser(METALAKE, "cache_user").enabled());
     accessControlManager.removeUser(METALAKE, "cache_user");
+  }
+
+  @Test
+  public void testGroupExtId() {
+    String group = "ext_group";
+    String extId = "ext-group-1";
+    Group added = accessControlManager.addGroup(METALAKE, group, extId);
+    Assertions.assertEquals(extId, added.externalId());
+    Assertions.assertEquals(
+        group, accessControlManager.getGroupByExternalId(METALAKE, extId).name());
+    accessControlManager.removeGroup(METALAKE, group);
+  }
+
+  @Test
+  public void testUserPagination() {
+    long beforeCount = accessControlManager.countUsers(METALAKE);
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.addUser(METALAKE, "page_user_" + i);
+    }
+
+    Assertions.assertEquals(beforeCount + 5, accessControlManager.countUsers(METALAKE));
+
+    PagedResult<User> page = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 5, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    // Repeated call with the same offset/limit must be stable.
+    PagedResult<User> pageAgain = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
+    PagedResult<User> lastPage =
+        accessControlManager.listUsers(METALAKE, (int) beforeCount + 4, 10);
+    Assertions.assertEquals(beforeCount + 5, lastPage.totalCount());
+    Assertions.assertEquals(1, lastPage.items().size());
+
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.removeUser(METALAKE, "page_user_" + i);
+    }
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.countUsers("no_such_metalake"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.listUsers("no_such_metalake", 0, 10));
+  }
+
+  @Test
+  public void testGroupPagination() {
+    long beforeCount = accessControlManager.countGroups(METALAKE);
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.addGroup(METALAKE, "page_group_" + i);
+    }
+    Assertions.assertEquals(beforeCount + 3, accessControlManager.countGroups(METALAKE));
+
+    PagedResult<Group> page = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 3, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    PagedResult<Group> pageAgain = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.removeGroup(METALAKE, "page_group_" + i);
+    }
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.countGroups("no_such_metalake"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.listGroups("no_such_metalake", 0, 10));
   }
 
   private void createCatalogRole(String role) {
@@ -572,5 +716,40 @@ public class TestAccessControlManager {
         });
 
     Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
+  }
+
+  @Test
+  public void testGroupById() {
+    Group added = accessControlManager.addGroup(METALAKE, "id_group", "ext-id-group");
+    long groupId = added.id();
+    Assertions.assertNotNull(groupId);
+
+    Group loaded = accessControlManager.getGroupById(METALAKE, groupId);
+    Assertions.assertEquals(groupId, loaded.id());
+    Assertions.assertEquals("id_group", loaded.name());
+    Assertions.assertEquals("ext-id-group", loaded.externalId());
+
+    Group updated =
+        accessControlManager.alterGroupById(
+            METALAKE, groupId, GroupChange.updateExternalId("ext-id-group-2"));
+    Assertions.assertEquals(groupId, updated.id());
+    Assertions.assertEquals("ext-id-group-2", updated.externalId());
+    Assertions.assertEquals(
+        "id_group", accessControlManager.getGroupByExternalId(METALAKE, "ext-id-group-2").name());
+
+    Assertions.assertThrows(
+        NoSuchGroupException.class,
+        () ->
+            accessControlManager.alterGroupById(METALAKE, -1L, GroupChange.updateExternalId("x")));
+
+    Assertions.assertTrue(accessControlManager.removeGroupById(METALAKE, groupId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class, () -> accessControlManager.getGroupById(METALAKE, groupId));
+    Assertions.assertFalse(accessControlManager.removeGroupById(METALAKE, groupId));
+    Assertions.assertThrows(
+        NoSuchGroupException.class,
+        () ->
+            accessControlManager.alterGroupById(
+                METALAKE, groupId, GroupChange.updateExternalId("x")));
   }
 }

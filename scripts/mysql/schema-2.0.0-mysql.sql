@@ -90,7 +90,7 @@ CREATE TABLE IF NOT EXISTS `table_column_version_info` (
     `column_name` VARCHAR(128) NOT NULL COMMENT 'column name',
     `column_position` INT UNSIGNED NOT NULL COMMENT 'column position, starting from 0',
     `column_type` TEXT NOT NULL COMMENT 'column type',
-    `column_comment` VARCHAR(256) DEFAULT '' COMMENT 'column comment',
+    `column_comment` VARCHAR(4096) DEFAULT '' COMMENT 'column comment',
     `column_nullable` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'column nullable, 0 is not nullable, 1 is nullable',
     `column_auto_increment` TINYINT(1) NOT NULL DEFAULT 0 COMMENT 'column auto increment, 0 is not auto increment, 1 is auto increment',
     `column_default_value` TEXT DEFAULT NULL COMMENT 'column default value',
@@ -286,6 +286,7 @@ CREATE TABLE IF NOT EXISTS `tag_meta` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `tag_comment` VARCHAR(256) DEFAULT '' COMMENT 'tag comment',
     `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'tag properties',
+    `allowed_values` MEDIUMTEXT DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag last version',
@@ -299,14 +300,16 @@ CREATE TABLE IF NOT EXISTS `tag_relation_meta` (
     `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
     `metadata_object_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metadata object id',
     `metadata_object_type` VARCHAR(64) NOT NULL COMMENT 'metadata object type',
+    `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value',
     `audit_info` MEDIUMTEXT NOT NULL COMMENT 'tag relation audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'tag relation last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'tag relation deleted at',
     PRIMARY KEY (`id`),
-    UNIQUE KEY `uk_ti_mi_mo_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
+    UNIQUE KEY `uk_ti_mi_mo_tv_del` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`),
     KEY `idx_tid` (`tag_id`),
-    KEY `idx_mid` (`metadata_object_id`)
+    KEY `idx_mid` (`metadata_object_id`),
+    KEY `idx_tid_value` (`tag_id`, `tag_value`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'tag metadata object relation';
 
 CREATE TABLE IF NOT EXISTS `owner_meta` (
@@ -598,7 +601,7 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
   `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
   `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
-  `entity_full_name` VARCHAR(512) NOT NULL COMMENT 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.',
+  `entity_full_name` VARCHAR(512) NOT NULL COMMENT 'Encoded full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.',
   `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
   `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
   PRIMARY KEY (`id`),

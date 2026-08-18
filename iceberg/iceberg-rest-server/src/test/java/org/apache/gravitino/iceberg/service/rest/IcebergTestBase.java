@@ -70,6 +70,15 @@ public class IcebergTestBase extends JerseyTest {
     return getViewClientBuilder(ns, Optional.empty());
   }
 
+  public Invocation.Builder getRegisterViewClientBuilder(Namespace ns) {
+    String path =
+        IcebergRestTestUtil.NAMESPACE_PATH
+            + "/"
+            + RESTUtil.encodeNamespace(ns, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8)
+            + "/register-view";
+    return getIcebergClientBuilder(path, Optional.empty());
+  }
+
   public Invocation.Builder getViewClientBuilder(Namespace ns, Optional<String> name) {
     String path =
         Joiner.on("/")

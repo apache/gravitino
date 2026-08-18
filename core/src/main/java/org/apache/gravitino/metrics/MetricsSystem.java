@@ -146,7 +146,7 @@ public class MetricsSystem implements Closeable {
           try {
             reporter.close();
           } catch (IOException exception) {
-            LOG.warn("Close metrics reporter failed,", exception);
+            LOG.warn("Failed to close metrics reporter", exception);
           }
         });
   }

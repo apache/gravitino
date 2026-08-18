@@ -97,17 +97,13 @@ def _create_lifespan_manager(gravitino_context: GravitinoContext):
 
 
 def _create_gravitino_mcp(setting: Setting) -> FastMCP:
-    if setting.tags is not None and len(setting.tags) > 0:
-        mcp = FastMCP(
-            "Gravitino MCP Server",
-            lifespan=_create_lifespan_manager(GravitinoContext(setting)),
-            include_tags=setting.tags,
-        )
-    else:
-        mcp = FastMCP(
-            "Gravitino MCP Server",
-            lifespan=_create_lifespan_manager(GravitinoContext(setting)),
-        )
+    mcp = FastMCP(
+        "Gravitino MCP Server",
+        lifespan=_create_lifespan_manager(GravitinoContext(setting)),
+    )
+    if setting.tags:
+        # Allowlist mode: disable everything, then re-enable the wanted tags.
+        mcp.enable(tags=setting.tags, only=True)
 
     mcp.add_middleware(AuditMiddleware(startup_authorization(setting)))
     mcp.add_middleware(

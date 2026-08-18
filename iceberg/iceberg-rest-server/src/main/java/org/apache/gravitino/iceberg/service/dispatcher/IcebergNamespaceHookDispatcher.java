@@ -28,6 +28,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.catalog.ViewDispatcher;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
@@ -38,11 +39,13 @@ import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.requests.UpdateNamespacePropertiesRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.apache.iceberg.rest.responses.UpdateNamespacePropertiesResponse;
 
 /**
@@ -206,6 +209,64 @@ public class IcebergNamespaceHookDispatcher implements IcebergNamespaceOperation
         GravitinoEnv.getInstance().internalOwnerDispatcher());
 
     return response;
+  }
+
+  @Override
+  public LoadViewResponse registerView(
+      IcebergRequestContext context, Namespace namespace, RegisterViewRequest registerViewRequest) {
+    LoadViewResponse response = dispatcher.registerView(context, namespace, registerViewRequest);
+
+    if (hasViewEntityInStore(context, namespace, registerViewRequest.name())) {
+      // Gravitino already tracks this view: preserve view_id and existing role/owner/tag/policy
+      // bindings after the backend registerView completes.
+      return response;
+    }
+
+    // Import is intentionally NOT wrapped in try-catch: if it fails the view exists in Iceberg
+    // but not in Gravitino, and silently swallowing that would mislead callers into thinking the
+    // entity is registered. Surface the failure so the caller can react.
+    importView(context.catalogName(), namespace, registerViewRequest.name());
+
+    IcebergOwnershipUtils.setViewOwner(
+        metalake,
+        context.catalogName(),
+        namespace,
+        registerViewRequest.name(),
+        context.userName(),
+        GravitinoEnv.getInstance().internalOwnerDispatcher());
+
+    return response;
+  }
+
+  private void importView(String catalogName, Namespace namespace, String viewName) {
+    ViewDispatcher viewDispatcher = GravitinoEnv.getInstance().internalViewDispatcher();
+    if (viewDispatcher != null) {
+      viewDispatcher.loadView(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              catalogName,
+              TableIdentifier.of(namespace, viewName),
+              HierarchicalSchemaUtil.schemaSeparator()));
+    }
+  }
+
+  private boolean hasViewEntityInStore(
+      IcebergRequestContext context, Namespace namespace, String viewName) {
+    EntityStore entityStore = GravitinoEnv.getInstance().entityStore();
+    if (entityStore == null) {
+      return false;
+    }
+    try {
+      return entityStore.exists(
+          IcebergIdentifierUtils.toGravitinoTableIdentifier(
+              metalake,
+              context.catalogName(),
+              TableIdentifier.of(namespace, viewName),
+              HierarchicalSchemaUtil.schemaSeparator()),
+          Entity.EntityType.VIEW);
+    } catch (IOException ioe) {
+      throw new RuntimeException("io exception when checking view entity existence", ioe);
+    }
   }
 
   private boolean hasTableEntityInStore(

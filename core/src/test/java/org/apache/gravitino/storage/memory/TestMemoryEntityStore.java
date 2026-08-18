@@ -42,6 +42,7 @@ import org.apache.gravitino.Metalake;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsExternalIdOperations;
+import org.apache.gravitino.SupportsIdOperations;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Privileges;
@@ -66,7 +67,9 @@ import org.mockito.Mockito;
 
 public class TestMemoryEntityStore {
 
-  public static class InMemoryEntityStore implements EntityStore, SupportsExternalIdOperations {
+  public static class InMemoryEntityStore
+      implements EntityStore, SupportsExternalIdOperations, SupportsIdOperations {
+
     private final Map<NameIdentifier, Entity> entityMap;
     private final Lock lock;
 
@@ -154,28 +157,43 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public SupportsIdOperations idOperations() {
+      return this;
+    }
+
+    @Override
     public <E extends Entity & HasIdentifier> E getByExternalId(
         NameIdentifier ident, EntityType entityType, Class<E> type)
         throws NoSuchEntityException, IOException {
-      if (entityType != EntityType.USER) {
+      if (entityType != EntityType.USER && entityType != EntityType.GROUP) {
         throw new UnsupportedOperationException(
             "Get by external id is not supported for entity type: " + entityType);
       }
 
-      AuthorizationUtils.checkUserExternalId(ident);
-      String externalId = ident.name();
-      Namespace userNamespace = AuthorizationUtils.ofUserNamespace(ident.namespace().level(0));
+      String externalId;
+      Namespace entityNamespace;
+      if (entityType == EntityType.USER) {
+        AuthorizationUtils.checkUserExternalId(ident);
+        externalId = ident.name();
+        entityNamespace = AuthorizationUtils.ofUserNamespace(ident.namespace().level(0));
+      } else {
+        AuthorizationUtils.checkGroupExternalId(ident);
+        externalId = ident.name();
+        entityNamespace = AuthorizationUtils.ofGroupNamespace(ident.namespace().level(0));
+      }
 
       for (Map.Entry<NameIdentifier, Entity> entry : entityMap.entrySet()) {
         Entity entity = entry.getValue();
         if (!entity.type().equals(entityType)
-            || !entry.getKey().namespace().equals(userNamespace)) {
+            || !entry.getKey().namespace().equals(entityNamespace)) {
           continue;
         }
 
         String entityExternalId = null;
         if (entity instanceof UserEntity userEntity) {
           entityExternalId = userEntity.externalId();
+        } else if (entity instanceof GroupEntity groupEntity) {
+          entityExternalId = groupEntity.externalId();
         }
 
         if (externalId.equals(entityExternalId)) {
@@ -194,17 +212,92 @@ public class TestMemoryEntityStore {
     public <E extends Entity & HasIdentifier> E updateByExternalId(
         NameIdentifier ident, EntityType entityType, Class<E> type, Function<E, E> updater)
         throws NoSuchEntityException, IOException {
-      E user = getByExternalId(ident, entityType, type);
-      E updated = updater.apply(user);
-      return update(user.nameIdentifier(), type, entityType, entity -> updated);
+      E entity = getByExternalId(ident, entityType, type);
+      E updated = updater.apply(entity);
+      return update(entity.nameIdentifier(), type, entityType, e -> updated);
     }
 
     @Override
     public boolean deleteByExternalId(NameIdentifier ident, EntityType entityType)
         throws IOException {
       try {
-        UserEntity user = getByExternalId(ident, entityType, UserEntity.class);
-        return delete(user.nameIdentifier(), entityType);
+        if (entityType == EntityType.USER) {
+          UserEntity user = getByExternalId(ident, entityType, UserEntity.class);
+          return delete(user.nameIdentifier(), entityType);
+        } else if (entityType == EntityType.GROUP) {
+          GroupEntity group = getByExternalId(ident, entityType, GroupEntity.class);
+          return delete(group.nameIdentifier(), entityType);
+        }
+        throw new UnsupportedOperationException(
+            "Delete by external id is not supported for entity type: " + entityType);
+      } catch (NoSuchEntityException e) {
+        return false;
+      }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E extends Entity & HasIdentifier> E getById(
+        NameIdentifier ident, EntityType entityType, Class<E> type)
+        throws NoSuchEntityException, IOException {
+      if (entityType != EntityType.USER && entityType != EntityType.GROUP) {
+        throw new UnsupportedOperationException(
+            "Get by id is not supported for entity type: " + entityType);
+      }
+
+      long entityId;
+      Namespace entityNamespace;
+      if (entityType == EntityType.USER) {
+        AuthorizationUtils.checkUserId(ident);
+        entityId = Long.parseLong(ident.name());
+        entityNamespace = AuthorizationUtils.ofUserNamespace(ident.namespace().level(0));
+      } else {
+        AuthorizationUtils.checkGroupId(ident);
+        entityId = Long.parseLong(ident.name());
+        entityNamespace = AuthorizationUtils.ofGroupNamespace(ident.namespace().level(0));
+      }
+
+      for (Map.Entry<NameIdentifier, Entity> entry : entityMap.entrySet()) {
+        Entity entity = entry.getValue();
+        if (!entity.type().equals(entityType)
+            || !entry.getKey().namespace().equals(entityNamespace)) {
+          continue;
+        }
+
+        if (entity instanceof HasIdentifier hasIdentifier
+            && java.util.Objects.equals(hasIdentifier.id(), entityId)) {
+          return (E) entity;
+        }
+      }
+
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          entityType.name().toLowerCase(),
+          String.valueOf(entityId));
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <E extends Entity & HasIdentifier> E updateById(
+        NameIdentifier ident, EntityType entityType, Class<E> type, Function<E, E> updater)
+        throws NoSuchEntityException, IOException {
+      E entity = getById(ident, entityType, type);
+      E updated = updater.apply(entity);
+      return update(entity.nameIdentifier(), type, entityType, e -> updated);
+    }
+
+    @Override
+    public boolean deleteById(NameIdentifier ident, EntityType entityType) throws IOException {
+      try {
+        if (entityType == EntityType.USER) {
+          UserEntity user = getById(ident, entityType, UserEntity.class);
+          return delete(user.nameIdentifier(), entityType);
+        } else if (entityType == EntityType.GROUP) {
+          GroupEntity group = getById(ident, entityType, GroupEntity.class);
+          return delete(group.nameIdentifier(), entityType);
+        }
+        throw new UnsupportedOperationException(
+            "Delete by id is not supported for entity type: " + entityType);
       } catch (NoSuchEntityException e) {
         return false;
       }

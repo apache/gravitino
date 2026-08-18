@@ -170,6 +170,9 @@ public class JsonUtils {
               Types.TimestampType.withoutTimeZone(),
               Types.StringType.get(),
               Types.UUIDType.get(),
+              Types.VariantType.get(),
+              Types.GeometryType.crs84(),
+              Types.GeographyType.crs84(),
               Types.BinaryType.get(),
               Types.IntervalYearType.get(),
               Types.IntervalDayType.get()),
@@ -179,6 +182,10 @@ public class JsonUtils {
   private static final Pattern VARCHAR = Pattern.compile("varchar\\(\\s*(\\d+)\\s*\\)");
   private static final Pattern DECIMAL =
       Pattern.compile("decimal\\(\\s*(\\d+)\\s*,\\s*(\\d+)\\s*\\)");
+  private static final Pattern GEOMETRY =
+      Pattern.compile("geometry\\(\\s*(.+?)\\s*\\)", Pattern.CASE_INSENSITIVE);
+  private static final Pattern GEOGRAPHY =
+      Pattern.compile("geography\\(\\s*(.+?)\\s*,\\s*(.+?)\\s*\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern TIME = Pattern.compile("time\\((\\d+)\\)");
   private static final Pattern TIMESTAMP_TZ = Pattern.compile("timestamp_tz\\((\\d+)\\)");
   private static final Pattern TIMESTAMP = Pattern.compile("timestamp\\((\\d+)\\)");
@@ -680,6 +687,9 @@ public class JsonUtils {
       case INTERVAL_DAY:
       case INTERVAL_YEAR:
       case UUID:
+      case VARIANT:
+      case GEOMETRY:
+      case GEOGRAPHY:
       case FIXED:
       case BINARY:
       case NULL:
@@ -867,6 +877,17 @@ public class JsonUtils {
     if (decimal.matches()) {
       return Types.DecimalType.of(
           Integer.parseInt(decimal.group(1)), Integer.parseInt(decimal.group(2)));
+    }
+
+    // Match against the original string, not the lowercased one, so the CRS keeps its case.
+    Matcher geometry = GEOMETRY.matcher(orignalTypeString);
+    if (geometry.matches()) {
+      return Types.GeometryType.of(geometry.group(1));
+    }
+
+    Matcher geography = GEOGRAPHY.matcher(orignalTypeString);
+    if (geography.matches()) {
+      return Types.GeographyType.of(geography.group(1), geography.group(2));
     }
 
     Matcher time = TIME.matcher(lowerTypeString);

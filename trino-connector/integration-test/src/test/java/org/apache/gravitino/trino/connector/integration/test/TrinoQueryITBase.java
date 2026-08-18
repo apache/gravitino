@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.commons.io.FileUtils;
 import org.apache.gravitino.Catalog;
@@ -64,6 +65,7 @@ public class TrinoQueryITBase {
   protected static GravitinoAdminClient gravitinoClient;
   protected static TrinoITContainers trinoITContainers;
   protected static TrinoQueryRunner trinoQueryRunner;
+  protected static Map<String, String> serviceUrls = new HashMap<>();
 
   protected static final String metalakeName = "test";
   protected static GravitinoMetalake metalake;
@@ -76,12 +78,19 @@ public class TrinoQueryITBase {
 
   protected String trinoConnectorDir;
 
+  protected String testContainers;
+
   public TrinoQueryITBase() {}
 
-  public TrinoQueryITBase(Integer trinoWorkerNum, Integer trinoVersion, String trinoConnectorDir) {
+  public TrinoQueryITBase(
+      Integer trinoWorkerNum,
+      Integer trinoVersion,
+      String trinoConnectorDir,
+      String testContainers) {
     this.trinoWorkerNum = trinoWorkerNum;
     this.trinoVersion = trinoVersion;
     this.trinoConnectorDir = trinoConnectorDir;
+    this.testContainers = testContainers;
   }
 
   private void setEnv() throws Exception {
@@ -112,13 +121,16 @@ public class TrinoQueryITBase {
           isTrinoConnectorTest,
           trinoWorkerNum,
           trinoVersion,
-          trinoConnectorDir);
+          trinoConnectorDir,
+          testContainers);
 
-      trinoUri = trinoITContainers.getTrinoUri();
-      hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
-      hdfsUri = trinoITContainers.getHdfsUri();
-      mysqlUri = trinoITContainers.getMysqlUri();
-      postgresqlUri = trinoITContainers.getPostgresqlUri();
+      serviceUrls.clear();
+      serviceUrls.putAll(trinoITContainers.getServiceUrls());
+      trinoUri = serviceUrls.getOrDefault("trino_uri", trinoUri);
+      hiveMetastoreUri = serviceUrls.getOrDefault("hive_uri", hiveMetastoreUri);
+      hdfsUri = serviceUrls.getOrDefault("hdfs_uri", hdfsUri);
+      mysqlUri = serviceUrls.getOrDefault("mysql_uri", mysqlUri);
+      postgresqlUri = serviceUrls.getOrDefault("postgresql_uri", postgresqlUri);
 
     } else if (autoStartGravitino) {
       baseIT.startIntegrationTest();

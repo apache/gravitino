@@ -143,6 +143,35 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws NoSuchEntityException, IOException;
 
   /**
+   * Retrieves an entity by Gravitino-assigned id.
+   *
+   * @param <E> The type of the entity returned.
+   * @param ident The id name identifier.
+   * @param entityType The type of the entity.
+   * @return The entity associated with the id name identifier.
+   * @throws NoSuchEntityException If the entity does not exist.
+   * @throws IOException If an I/O exception occurs during retrieval.
+   */
+  <E extends Entity & HasIdentifier> E getById(NameIdentifier ident, Entity.EntityType entityType)
+      throws NoSuchEntityException, IOException;
+
+  /**
+   * Updates an entity by Gravitino-assigned id.
+   *
+   * @param <E> the type of the entity returned
+   * @param ident the id name identifier
+   * @param entityType the type of the entity
+   * @param updater a {@link Function} that takes the current entity instance and returns the
+   *     updated instance
+   * @return the updated entity
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the update operation fails
+   */
+  <E extends Entity & HasIdentifier> E updateById(
+      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
+      throws NoSuchEntityException, IOException;
+
+  /**
    * Batch retrieves the entities associated with the identifiers and the entity type.
    *
    * @param <E> The type of the entity returned.
