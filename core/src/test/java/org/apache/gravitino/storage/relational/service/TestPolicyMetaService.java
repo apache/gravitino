@@ -924,6 +924,57 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(18, countAllPolicyRel(policyEntity1.id()));
   }
 
+  @TestTemplate
+  public void testDeletePolicyVersionsByRetentionCountRespectGlobalLimit() throws IOException {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME + "_global_limit");
+
+    PolicyEntity policy1 =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(metalake.name()),
+            "policy_limit_1",
+            AUDIT_INFO);
+    PolicyEntity policy2 =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(metalake.name()),
+            "policy_limit_2",
+            AUDIT_INFO);
+
+    backend.insert(policy1, false);
+    backend.insert(policy2, false);
+
+    PolicyEntity policy1V2 =
+        PolicyEntity.builder()
+            .withId(policy1.id())
+            .withNamespace(policy1.namespace())
+            .withName(policy1.name())
+            .withPolicyType(policy1.policyType())
+            .withComment(policy1.comment())
+            .withEnabled(!policy1.enabled())
+            .withContent(policy1.content())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    PolicyEntity policy2V2 =
+        PolicyEntity.builder()
+            .withId(policy2.id())
+            .withNamespace(policy2.namespace())
+            .withName(policy2.name())
+            .withPolicyType(policy2.policyType())
+            .withComment(policy2.comment())
+            .withEnabled(!policy2.enabled())
+            .withContent(policy2.content())
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    backend.update(policy1.nameIdentifier(), Entity.EntityType.POLICY, e -> policy1V2);
+    backend.update(policy2.nameIdentifier(), Entity.EntityType.POLICY, e -> policy2V2);
+
+    int deletedCount = PolicyMetaService.getInstance().deletePolicyVersionsByRetentionCount(1L, 1);
+
+    assertEquals(1, deletedCount);
+  }
+
   private static class EntitiesToTest {
     final CatalogEntity catalog;
     final SchemaEntity schema;
