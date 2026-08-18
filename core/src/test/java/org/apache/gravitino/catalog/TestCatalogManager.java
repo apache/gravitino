@@ -395,6 +395,41 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testCreateCatalogReturnsNoSuchMetalakeWhenParentDisappears() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    NoSuchEntityException missingMetalake =
+        new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.METALAKE.name().toLowerCase(),
+            metalake);
+    Mockito.doThrow(missingMetalake).when(store).put(any(CatalogEntity.class), eq(false));
+
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    NameIdentifier ident = NameIdentifier.of(metalake, "concurrent_parent_drop");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+
+    try {
+      NoSuchMetalakeException exception =
+          Assertions.assertThrows(
+              NoSuchMetalakeException.class,
+              () ->
+                  manager.createCatalog(
+                      ident, Catalog.Type.RELATIONAL, provider, "comment", props));
+      Assertions.assertSame(missingMetalake, exception.getCause());
+      Mockito.verify(store, Mockito.never()).delete(ident, EntityType.CATALOG, true);
+    } finally {
+      manager.close();
+      store.close();
+    }
+  }
+
+  @Test
   public void testCreateCatalogValidatesBackendConnection() {
     Map<String, String> okProps =
         Maps.newHashMap(

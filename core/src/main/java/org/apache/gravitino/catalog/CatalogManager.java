@@ -625,9 +625,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           checkMetalake(metalakeIdent, store);
-          boolean needClean = true;
+          boolean needClean = false;
           try {
-            store.put(e, false /* overwrite */);
+            try {
+              store.put(e, false /* overwrite */);
+            } catch (NoSuchEntityException e1) {
+              // The relational store locks and rechecks the parent metalake while inserting the
+              // catalog. A concurrent drop or rename can therefore make the metalake disappear
+              // after checkMetalake() succeeds but before this insert starts.
+              LOG.warn("Metalake {} does not exist", metalakeIdent, e1);
+              throw new NoSuchMetalakeException(e1, "Metalake %s does not exist", metalakeIdent);
+            }
+            needClean = true;
             CatalogWrapper wrapper =
                 catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 

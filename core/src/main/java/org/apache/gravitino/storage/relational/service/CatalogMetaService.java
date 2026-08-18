@@ -401,6 +401,35 @@ public class CatalogMetaService {
     return true;
   }
 
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteCatalogMetasByLegacyTimeline")
+  public int deleteCatalogMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        CatalogMetaMapper.class,
+        mapper -> {
+          return mapper.deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit);
+        });
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "batchGetCatalogByIdentifier")
+  public List<CatalogEntity> batchGetCatalogByIdentifier(List<NameIdentifier> identifiers) {
+    NameIdentifier firstIdent = identifiers.get(0);
+    String metalakeName = firstIdent.namespace().level(0);
+    List<String> catalogNames =
+        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
+
+    return SessionUtils.doWithCommitAndFetchResult(
+        CatalogMetaMapper.class,
+        mapper -> {
+          List<CatalogPO> catalogPOs =
+              mapper.batchSelectCatalogByIdentifier(metalakeName, catalogNames);
+          return POConverters.fromCatalogPOs(catalogPOs, firstIdent.namespace());
+        });
+  }
+
   /**
    * Soft-deletes the catalog only if its version is still the one the caller read. A drop that
    * loses the race to another writer must not delete a catalog it never saw.
@@ -491,34 +520,5 @@ public class CatalogMetaService {
       throw ExceptionUtils.concurrentChildModification(
           Entity.EntityType.SCHEMA, Entity.EntityType.CATALOG, catalogIdentifier);
     }
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "deleteCatalogMetasByLegacyTimeline")
-  public int deleteCatalogMetasByLegacyTimeline(Long legacyTimeline, int limit) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        CatalogMetaMapper.class,
-        mapper -> {
-          return mapper.deleteCatalogMetasByLegacyTimeline(legacyTimeline, limit);
-        });
-  }
-
-  @Monitored(
-      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
-      baseMetricName = "batchGetCatalogByIdentifier")
-  public List<CatalogEntity> batchGetCatalogByIdentifier(List<NameIdentifier> identifiers) {
-    NameIdentifier firstIdent = identifiers.get(0);
-    String metalakeName = firstIdent.namespace().level(0);
-    List<String> catalogNames =
-        identifiers.stream().map(NameIdentifier::name).collect(Collectors.toList());
-
-    return SessionUtils.doWithCommitAndFetchResult(
-        CatalogMetaMapper.class,
-        mapper -> {
-          List<CatalogPO> catalogPOs =
-              mapper.batchSelectCatalogByIdentifier(metalakeName, catalogNames);
-          return POConverters.fromCatalogPOs(catalogPOs, firstIdent.namespace());
-        });
   }
 }
