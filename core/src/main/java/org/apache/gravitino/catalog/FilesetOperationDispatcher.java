@@ -18,12 +18,10 @@
  */
 package org.apache.gravitino.catalog;
 
-import static org.apache.gravitino.Entity.EntityType.FILESET;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.EntityStore;
@@ -41,7 +39,6 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
-import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
@@ -277,26 +274,17 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-          // Secret URNs live on FilesetEntity in the store (catalog loadFileset may omit them).
-          Map<String, String> filesetProperties = new HashMap<>();
-          FilesetEntity filesetEntity = getEntity(ident, FILESET, FilesetEntity.class);
-          if (filesetEntity != null
-              && filesetEntity.properties() != null
-              && !filesetEntity.properties().isEmpty()) {
-            filesetProperties = new HashMap<>(filesetEntity.properties());
-          } else {
-            try {
-              Fileset fileset =
-                  doWithCatalog(
-                      catalogIdent,
-                      c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
-                      NoSuchFilesetException.class);
-              if (fileset.properties() != null) {
-                filesetProperties = new HashMap<>(fileset.properties());
-              }
-            } catch (NoSuchFilesetException e) {
-              return false;
-            }
+          // Capture properties (including write-through secret URNs) before drop.
+          Map<String, String> filesetProperties;
+          try {
+            Fileset fileset =
+                doWithCatalog(
+                    catalogIdent,
+                    c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+                    NoSuchFilesetException.class);
+            filesetProperties = fileset.properties();
+          } catch (NoSuchFilesetException e) {
+            return false;
           }
 
           boolean dropped =
