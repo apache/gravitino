@@ -140,20 +140,19 @@ class GenericTag(Tag, Tag.AssociatedObjects):
         Returns:
             list[MetadataObject]: The list of objects that are associated with this tag.
         """
-        params = {}
-        if value is not None:
-            Precondition.check_argument(
-                value.strip() != "" and len(value) <= 256,
-                "value must not be empty or longer than 256 characters",
-            )
-            params["value"] = value
-
         url = self.API_LIST_OBJECTS_ENDPOINT.format(
             self._metalake,
             encode_string(self.name()),
         )
 
-        response = self.get_response(url, TAG_ERROR_HANDLER, params)
+        if value is None:
+            response = self.get_response(url, TAG_ERROR_HANDLER)
+        else:
+            Precondition.check_argument(
+                value.strip() != "" and len(value) <= 256,
+                "value must not be empty or longer than 256 characters",
+            )
+            response = self.get_response(url, TAG_ERROR_HANDLER, {"value": value})
         objects_resp = MetadataObjectListResponse.from_json(
             response.body, infer_missing=True
         )
@@ -162,7 +161,10 @@ class GenericTag(Tag, Tag.AssociatedObjects):
         return objects_resp.metadata_objects()
 
     def get_response(
-        self, url: str, error_handler: ErrorHandler, params: dict[str, str]
+        self,
+        url: str,
+        error_handler: ErrorHandler,
+        params: Optional[dict[str, str]] = None,
     ) -> Response:
         """
         Get the response from the server, for testing convenience.
@@ -177,6 +179,6 @@ class GenericTag(Tag, Tag.AssociatedObjects):
         """
         return self._client.get(
             url,
-            params=params,
+            params=params or {},
             error_handler=error_handler,
         )

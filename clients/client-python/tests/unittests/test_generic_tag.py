@@ -166,6 +166,25 @@ class TestGenericTag(unittest.TestCase):
             )
             generic_tag.associated_objects().objects()
 
+    def test_generic_tag_associated_objects_supports_legacy_get_response_hook(self):
+        response_body = {
+            "code": 0,
+            "metadataObjects": [
+                {
+                    "fullName": "catalog1.schema1.table1",
+                    "type": "table",
+                },
+            ],
+        }
+        generic_tag = TestGenericTagEntityWithLegacyGetResponse(
+            self.METALAKE, self.TAG_DTO, self._rest_client, response_body
+        )
+
+        objects = generic_tag.associated_objects().objects()
+
+        self.assertEqual(1, len(objects))
+        self.assertEqual("catalog1.schema1.table1", objects[0].full_name())
+
     def test_generic_tag_associated_objects_with_value_filter(self):
         response_body = {
             "code": 0,
@@ -271,3 +290,8 @@ class TestGenericTagEntity(GenericTag):
         mock_response.info.return_value = {"Content-Type": "application/json"}
 
         return Response(mock_response)
+
+
+class TestGenericTagEntityWithLegacyGetResponse(TestGenericTagEntity):
+    def get_response(self, url, _=None) -> Response[MagicMock]:
+        return super().get_response(url, _)
