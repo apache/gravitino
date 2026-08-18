@@ -34,5 +34,7 @@ ALTER TABLE `tag_relation_meta` DROP INDEX `uk_ti_mi_del`;
 
 ALTER TABLE `tag_relation_meta` ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
 
+ALTER TABLE `idp_group_meta` ADD COLUMN `group_comment` VARCHAR(256) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
+
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);

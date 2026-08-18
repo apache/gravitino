@@ -26,6 +26,7 @@ import org.apache.gravitino.idp.dto.IdpGroupDTO;
 public class IdpGroup {
 
   private final String name;
+  private final String comment;
   private final List<String> usernames;
 
   /**
@@ -35,13 +36,30 @@ public class IdpGroup {
    * @param usernames The usernames in the group.
    */
   public IdpGroup(String name, List<String> usernames) {
+    this(name, usernames, "");
+  }
+
+  /**
+   * Creates a built-in IdP group.
+   *
+   * @param name The group name.
+   * @param usernames The usernames in the group.
+   * @param comment The group comment, or empty if none.
+   */
+  public IdpGroup(String name, List<String> usernames, String comment) {
     this.name = name;
     this.usernames = usernames;
+    this.comment = comment == null ? "" : comment;
   }
 
   /** Returns the group name. */
   public String name() {
     return name;
+  }
+
+  /** Returns the group comment, or an empty string if none. */
+  public String comment() {
+    return comment;
   }
 
   /** Returns the usernames in the group. */
@@ -55,7 +73,7 @@ public class IdpGroup {
    * @return the group DTO
    */
   public IdpGroupDTO toDTO() {
-    return IdpGroupDTO.builder().withName(name).withUsers(usernames).build();
+    return IdpGroupDTO.builder().withName(name).withComment(comment).withUsers(usernames).build();
   }
 
   @Override
@@ -67,16 +85,18 @@ public class IdpGroup {
       return false;
     }
     IdpGroup that = (IdpGroup) other;
-    return Objects.equals(name, that.name) && Objects.equals(usernames, that.usernames);
+    return Objects.equals(name, that.name)
+        && Objects.equals(comment, that.comment)
+        && Objects.equals(usernames, that.usernames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, usernames);
+    return Objects.hash(name, comment, usernames);
   }
 
   @Override
   public String toString() {
-    return "IdpGroup{name='" + name + "', usernames=" + usernames + '}';
+    return "IdpGroup{name='" + name + "', comment='" + comment + "', usernames=" + usernames + '}';
   }
 }

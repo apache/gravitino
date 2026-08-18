@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.idp.web.rest;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -140,14 +142,16 @@ class TestIdpOperations extends JerseyTest {
   @Test
   void testAddAndGetGroup() throws Exception {
     AddGroupRequest req = new AddGroupRequest("group1");
-    doReturn(buildGroup("group1")).when(MANAGER).addGroup("group1");
+    doReturn(buildGroup("group1")).when(MANAGER).addGroup(eq("group1"), nullable(String.class));
     when(MANAGER.getGroup("group1")).thenReturn(buildGroup("group1"));
 
     assertStatus(Response.Status.OK, post("/idp/groups", req));
     Assertions.assertEquals(
         "group1", get("/idp/groups/group1").readEntity(IdpGroupResponse.class).getGroup().name());
 
-    doThrow(new AlreadyExistsException("mock error")).when(MANAGER).addGroup("group1");
+    doThrow(new AlreadyExistsException("mock error"))
+        .when(MANAGER)
+        .addGroup(eq("group1"), nullable(String.class));
     assertStatus(Response.Status.CONFLICT, post("/idp/groups", req));
   }
 
