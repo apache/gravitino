@@ -293,5 +293,7 @@ class TestGenericTagEntity(GenericTag):
 
 
 class TestGenericTagEntityWithLegacyGetResponse(TestGenericTagEntity):
-    def get_response(self, url, _=None) -> Response[MagicMock]:
+    def get_response(  # pylint: disable=arguments-differ
+        self, url, _=None
+    ) -> Response[MagicMock]:
         return super().get_response(url, _)
