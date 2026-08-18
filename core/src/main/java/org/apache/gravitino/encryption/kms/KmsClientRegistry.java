@@ -26,15 +26,15 @@ import java.util.Map;
 import java.util.ServiceLoader;
 import org.apache.gravitino.Config;
 
-/** Creates, resolves, and owns server-private KMS clients by configured source. */
+/** Creates, resolves, and owns server-private KMS clients by configured provider. */
 public final class KmsClientRegistry implements AutoCloseable {
 
-  private final Map<String, ConfiguredClient> clients;
+  private final Map<String, KmsClient> clients;
   private volatile boolean closed;
 
   /**
    * Loads configuration and available {@link KmsClientFactory} implementations, then creates one
-   * client for each configured source.
+   * client for each configured provider.
    *
    * @param config Gravitino server configuration
    * @throws IllegalArgumentException if configuration or factory discovery is invalid
@@ -45,7 +45,7 @@ public final class KmsClientRegistry implements AutoCloseable {
 
   KmsClientRegistry(Config config, Iterable<KmsClientFactory> factories) {
     KmsConfig kmsConfig = new KmsConfig(config);
-    if (kmsConfig.sources().isEmpty()) {
+    if (kmsConfig.providers().isEmpty()) {
       this.clients = Collections.emptyMap();
       return;
     }
@@ -55,23 +55,24 @@ public final class KmsClientRegistry implements AutoCloseable {
     }
 
     Map<String, KmsClientFactory> factoriesByApi = indexFactories(factories);
-    this.clients = createClients(kmsConfig.sources(), factoriesByApi);
+    this.clients = createClients(kmsConfig.providers(), factoriesByApi);
   }
 
   /**
    * Resolves the client configured for a key reference.
    *
    * <p>The registry owns the returned client. Callers must not close it or use it after the
-   * registry is closed.
+   * registry is closed. Lookup is by {@link KmsReference#provider()} only; the provider's API was
+   * bound at startup from {@code gravitino.kms.provider.<name>.api}.
    *
-   * @param reference key whose source and API select the client
+   * @param reference key whose provider name selects the client
    * @return client configured for the reference
-   * @throws IllegalArgumentException if the source is unknown or configured for another API
+   * @throws IllegalArgumentException if the provider is unknown
    * @throws IllegalStateException if the registry is closed
    */
   public KmsClient getClient(KmsReference reference) {
     checkOpen();
-    return resolveClient(reference).client;
+    return resolveClient(reference);
   }
 
   /** Closes all configured clients. This operation is idempotent. */
@@ -112,27 +113,27 @@ public final class KmsClientRegistry implements AutoCloseable {
     return ServiceLoader.load(KmsClientFactory.class, classLoader);
   }
 
-  private static Map<String, ConfiguredClient> createClients(
-      Map<String, KmsConfig.SourceConfig> sourceConfigs,
+  private static Map<String, KmsClient> createClients(
+      Map<String, KmsConfig.ProviderConfig> providerConfigs,
       Map<String, KmsClientFactory> factoriesByApi) {
-    Map<String, ConfiguredClient> clients = new LinkedHashMap<>();
+    Map<String, KmsClient> clients = new LinkedHashMap<>();
     try {
-      sourceConfigs.forEach(
-          (source, sourceConfig) -> {
-            KmsClientFactory factory = factoriesByApi.get(sourceConfig.api());
+      providerConfigs.forEach(
+          (provider, providerConfig) -> {
+            KmsClientFactory factory = factoriesByApi.get(providerConfig.api());
             if (factory == null) {
               throw new IllegalArgumentException(
                   String.format(
-                      "No KMS client factory supports API '%s' for source '%s'",
-                      sourceConfig.api(), source));
+                      "No KMS client factory supports API '%s' for provider '%s'",
+                      providerConfig.api(), provider));
             }
-            KmsClient client = factory.create(source, sourceConfig.properties());
+            KmsClient client = factory.create(provider, providerConfig.properties());
             if (client == null) {
               throw new IllegalStateException(
                   String.format(
-                      "KMS client factory for API '%s' returned null", sourceConfig.api()));
+                      "KMS client factory for API '%s' returned null", providerConfig.api()));
             }
-            clients.put(source, new ConfiguredClient(sourceConfig.api(), client));
+            clients.put(provider, client);
           });
       return Collections.unmodifiableMap(clients);
     } catch (RuntimeException | Error e) {
@@ -144,11 +145,11 @@ public final class KmsClientRegistry implements AutoCloseable {
     }
   }
 
-  private static RuntimeException closeClients(List<ConfiguredClient> clients) {
+  private static RuntimeException closeClients(List<KmsClient> clients) {
     RuntimeException failure = null;
     for (int index = clients.size() - 1; index >= 0; index--) {
       try {
-        clients.get(index).client.close();
+        clients.get(index).close();
       } catch (RuntimeException e) {
         if (failure == null) {
           failure = e;
@@ -160,38 +161,22 @@ public final class KmsClientRegistry implements AutoCloseable {
     return failure;
   }
 
-  private ConfiguredClient resolveClient(KmsReference reference) {
+  private KmsClient resolveClient(KmsReference reference) {
     if (reference == null) {
       throw new IllegalArgumentException("KMS reference cannot be null");
     }
 
-    ConfiguredClient configuredClient = clients.get(reference.source());
-    if (configuredClient == null) {
+    KmsClient client = clients.get(reference.provider());
+    if (client == null) {
       throw new IllegalArgumentException(
-          String.format("No KMS client is configured for source '%s'", reference.source()));
+          String.format("No KMS client is configured for provider '%s'", reference.provider()));
     }
-    if (!configuredClient.api.equals(reference.api())) {
-      throw new IllegalArgumentException(
-          String.format(
-              "KMS source '%s' uses API '%s', not '%s'",
-              reference.source(), configuredClient.api, reference.api()));
-    }
-    return configuredClient;
+    return client;
   }
 
   private void checkOpen() {
     if (closed) {
       throw new IllegalStateException("KMS client registry is closed");
-    }
-  }
-
-  private static final class ConfiguredClient {
-    private final String api;
-    private final KmsClient client;
-
-    private ConfiguredClient(String api, KmsClient client) {
-      this.api = api;
-      this.client = client;
     }
   }
 }

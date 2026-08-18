@@ -44,16 +44,16 @@ public class TestKmsClientRegistry {
   void testEmptyRegistryDoesNotEnumerateFactories() {
     Iterable<KmsClientFactory> factories =
         () -> {
-          throw new AssertionError("Factories must not be enumerated without configured sources");
+          throw new AssertionError("Factories must not be enumerated without configured providers");
         };
     KmsClientRegistry registry = new KmsClientRegistry(config(), factories);
-    KmsReference reference = new KmsReference(AWS_API, "primary", "alias/orders");
+    KmsReference reference = new KmsReference("primary", "alias/orders");
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> registry.getClient(reference));
     Assertions.assertEquals(
-        "No KMS client is configured for source 'primary'", exception.getMessage());
+        "No KMS client is configured for provider 'primary'", exception.getMessage());
   }
 
   @Test
@@ -63,16 +63,16 @@ public class TestKmsClientRegistry {
     KmsClientRegistry registry =
         new KmsClientRegistry(
             config(
-                "gravitino.kms.sources", "primary,analytics",
-                "gravitino.kms.source.primary.api", AWS_API,
-                "gravitino.kms.source.primary.endpoint.region", "us-west-2",
-                "gravitino.kms.source.analytics.api", "google-cloud-kms",
-                "gravitino.kms.source.analytics.endpoint.project", "data-project"),
+                "gravitino.kms.providers", "primary,analytics",
+                "gravitino.kms.provider.primary.api", AWS_API,
+                "gravitino.kms.provider.primary.endpoint.region", "us-west-2",
+                "gravitino.kms.provider.analytics.api", "google-cloud-kms",
+                "gravitino.kms.provider.analytics.endpoint.project", "data-project"),
             List.of(awsFactory, gcpFactory));
 
-    KmsReference awsReference = new KmsReference(AWS_API, "primary", "alias/orders");
+    KmsReference awsReference = new KmsReference("primary", "alias/orders");
     KmsReference gcpReference =
-        new KmsReference(GCP_API, "analytics", "projects/p/locations/l/keyRings/r/cryptoKeys/k");
+        new KmsReference("analytics", "projects/p/locations/l/keyRings/r/cryptoKeys/k");
 
     KmsClient awsClient = registry.getClient(awsReference);
     KmsClient gcpClient = registry.getClient(gcpReference);
@@ -81,43 +81,40 @@ public class TestKmsClientRegistry {
     Assertions.assertSame(gcpClient, registry.getClient(gcpReference));
     Assertions.assertEquals(Map.of("endpoint.region", "us-west-2"), awsFactory.properties);
     Assertions.assertEquals(Map.of("endpoint.project", "data-project"), gcpFactory.properties);
-    Assertions.assertEquals("primary", awsFactory.createdSource);
-    Assertions.assertEquals("analytics", gcpFactory.createdSource);
+    Assertions.assertEquals("primary", awsFactory.createdProvider);
+    Assertions.assertEquals("analytics", gcpFactory.createdProvider);
     Assertions.assertEquals(1, awsFactory.createCount.get());
     Assertions.assertEquals(1, gcpFactory.createCount.get());
   }
 
   @Test
-  void testRejectsUnknownSourceAndApiMismatch() {
+  void testRejectsUnknownProvider() {
     KmsClientRegistry registry =
         new KmsClientRegistry(
             config(
-                "gravitino.kms.sources", "primary",
-                "gravitino.kms.source.primary.api", "aws-kms"),
+                "gravitino.kms.providers", "primary",
+                "gravitino.kms.provider.primary.api", "aws-kms"),
             List.of(new RecordingFactory(AWS_API)));
 
     Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> registry.getClient(new KmsReference(AWS_API, "other", "key")));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> registry.getClient(new KmsReference(GCP_API, "primary", "key")));
+        IllegalArgumentException.class, () -> registry.getClient(new KmsReference("other", "key")));
+    Assertions.assertDoesNotThrow(() -> registry.getClient(new KmsReference("primary", "key")));
     Assertions.assertThrows(IllegalArgumentException.class, () -> registry.getClient(null));
   }
 
   @Test
-  void testCreatesMultipleSourcesForSameApi() {
+  void testCreatesMultipleProvidersForSameApi() {
     RecordingFactory factory = new RecordingFactory(AZURE_API);
     KmsClientRegistry registry =
         new KmsClientRegistry(
             config(
-                "gravitino.kms.sources", "azure-eu,azure-us",
-                "gravitino.kms.source.azure-eu.api", "azure-key-vault",
-                "gravitino.kms.source.azure-us.api", "azure-key-vault"),
+                "gravitino.kms.providers", "azure-eu,azure-us",
+                "gravitino.kms.provider.azure-eu.api", "azure-key-vault",
+                "gravitino.kms.provider.azure-us.api", "azure-key-vault"),
             List.of(factory));
 
-    KmsReference euReference = new KmsReference(AZURE_API, "azure-eu", "primary");
-    KmsReference usReference = new KmsReference(AZURE_API, "azure-us", "primary");
+    KmsReference euReference = new KmsReference("azure-eu", "primary");
+    KmsReference usReference = new KmsReference("azure-us", "primary");
 
     KmsClient euClient = registry.getClient(euReference);
     KmsClient usClient = registry.getClient(usReference);
@@ -132,9 +129,13 @@ public class TestKmsClientRegistry {
     String customApi = "custom-kms";
     KmsClientRegistry registry =
         new KmsClientRegistry(
-            config("gravitino.kms.sources", "custom", "gravitino.kms.source.custom.api", customApi),
+            config(
+                "gravitino.kms.providers",
+                "custom",
+                "gravitino.kms.provider.custom.api",
+                customApi),
             List.of(new RecordingFactory(customApi)));
-    KmsReference reference = new KmsReference(customApi, "custom", "key");
+    KmsReference reference = new KmsReference("custom", "key");
 
     Assertions.assertNotNull(registry.getClient(reference));
   }
@@ -144,12 +145,12 @@ public class TestKmsClientRegistry {
     KmsClientRegistry registry =
         new KmsClientRegistry(
             config(
-                "gravitino.kms.sources",
+                "gravitino.kms.providers",
                 "primary",
-                "gravitino.kms.source.primary.api",
+                "gravitino.kms.provider.primary.api",
                 new String(AWS_API)),
             List.of(new RecordingFactory(new String(AWS_API))));
-    KmsReference reference = new KmsReference(new String(AWS_API), "primary", "key");
+    KmsReference reference = new KmsReference("primary", "key");
 
     Assertions.assertNotNull(registry.getClient(reference));
   }
@@ -158,8 +159,8 @@ public class TestKmsClientRegistry {
   void testRejectsMissingDuplicateAndInvalidFactories() {
     Config awsConfig =
         config(
-            "gravitino.kms.sources", "primary",
-            "gravitino.kms.source.primary.api", "aws-kms");
+            "gravitino.kms.providers", "primary",
+            "gravitino.kms.provider.primary.api", "aws-kms");
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> new KmsClientRegistry(awsConfig, List.of()));
@@ -191,8 +192,8 @@ public class TestKmsClientRegistry {
   void testRejectsConfiguredApiWithoutFactory() {
     Config customConfig =
         config(
-            "gravitino.kms.sources", "primary",
-            "gravitino.kms.source.primary.api", "custom-kms");
+            "gravitino.kms.providers", "primary",
+            "gravitino.kms.provider.primary.api", "custom-kms");
 
     IllegalArgumentException exception =
         Assertions.assertThrows(
@@ -217,9 +218,9 @@ public class TestKmsClientRegistry {
       try (KmsClientRegistry registry =
           new KmsClientRegistry(
               config(
-                  "gravitino.kms.sources", "primary",
-                  "gravitino.kms.source.primary.api", "aws-kms"))) {
-        KmsReference reference = new KmsReference(AWS_API, "primary", "key");
+                  "gravitino.kms.providers", "primary",
+                  "gravitino.kms.provider.primary.api", "aws-kms"))) {
+        KmsReference reference = new KmsReference("primary", "key");
         Assertions.assertNotNull(registry.getClient(reference));
       }
     } finally {
@@ -233,9 +234,9 @@ public class TestKmsClientRegistry {
         new CloseTrackingFactory(AWS_API, "aws", new ArrayList<>(), null);
     Config awsConfig =
         config(
-            "gravitino.kms.sources", "primary,analytics",
-            "gravitino.kms.source.primary.api", "aws-kms",
-            "gravitino.kms.source.analytics.api", "google-cloud-kms");
+            "gravitino.kms.providers", "primary,analytics",
+            "gravitino.kms.provider.primary.api", "aws-kms",
+            "gravitino.kms.provider.analytics.api", "google-cloud-kms");
 
     KmsClientFactory nullClientFactory = factory(GCP_API, (source, properties) -> null);
 
@@ -253,11 +254,11 @@ public class TestKmsClientRegistry {
     KmsClientRegistry registry =
         new KmsClientRegistry(
             config(
-                "gravitino.kms.sources", "primary,analytics",
-                "gravitino.kms.source.primary.api", "aws-kms",
-                "gravitino.kms.source.analytics.api", "google-cloud-kms"),
+                "gravitino.kms.providers", "primary,analytics",
+                "gravitino.kms.provider.primary.api", "aws-kms",
+                "gravitino.kms.provider.analytics.api", "google-cloud-kms"),
             List.of(awsFactory, gcpFactory));
-    KmsReference awsReference = new KmsReference(AWS_API, "primary", "key");
+    KmsReference awsReference = new KmsReference("primary", "key");
 
     registry.close();
     registry.close();
@@ -284,9 +285,9 @@ public class TestKmsClientRegistry {
         () ->
             new KmsClientRegistry(
                 config(
-                    "gravitino.kms.sources", "primary,analytics",
-                    "gravitino.kms.source.primary.api", "aws-kms",
-                    "gravitino.kms.source.analytics.api", "google-cloud-kms"),
+                    "gravitino.kms.providers", "primary,analytics",
+                    "gravitino.kms.provider.primary.api", "aws-kms",
+                    "gravitino.kms.provider.analytics.api", "google-cloud-kms"),
                 List.of(awsFactory, failingFactory)));
 
     Assertions.assertEquals(1, awsFactory.closeCount.get());
@@ -313,9 +314,9 @@ public class TestKmsClientRegistry {
             () ->
                 new KmsClientRegistry(
                     config(
-                        "gravitino.kms.sources", "primary,analytics",
-                        "gravitino.kms.source.primary.api", "aws-kms",
-                        "gravitino.kms.source.analytics.api", "google-cloud-kms"),
+                        "gravitino.kms.providers", "primary,analytics",
+                        "gravitino.kms.provider.primary.api", "aws-kms",
+                        "gravitino.kms.provider.analytics.api", "google-cloud-kms"),
                     List.of(awsFactory, failingFactory)));
 
     Assertions.assertSame(creationFailure, exception);
@@ -333,9 +334,9 @@ public class TestKmsClientRegistry {
     KmsClientRegistry registry =
         new KmsClientRegistry(
             config(
-                "gravitino.kms.sources", "primary,analytics",
-                "gravitino.kms.source.primary.api", "aws-kms",
-                "gravitino.kms.source.analytics.api", "google-cloud-kms"),
+                "gravitino.kms.providers", "primary,analytics",
+                "gravitino.kms.provider.primary.api", "aws-kms",
+                "gravitino.kms.provider.analytics.api", "google-cloud-kms"),
             List.of(awsFactory, gcpFactory));
 
     RuntimeException exception = Assertions.assertThrows(RuntimeException.class, registry::close);
@@ -359,19 +360,19 @@ public class TestKmsClientRegistry {
       }
 
       @Override
-      public KmsClient create(String source, Map<String, String> properties) {
-        return creator.create(source, properties);
+      public KmsClient create(String provider, Map<String, String> properties) {
+        return creator.create(provider, properties);
       }
     };
   }
 
   private interface ClientCreator {
-    KmsClient create(String source, Map<String, String> properties);
+    KmsClient create(String provider, Map<String, String> properties);
   }
 
   private static final class RecordingFactory implements KmsClientFactory {
     private final String api;
-    private String createdSource;
+    private String createdProvider;
     private Map<String, String> properties;
     private final AtomicInteger createCount = new AtomicInteger();
 
@@ -385,9 +386,9 @@ public class TestKmsClientRegistry {
     }
 
     @Override
-    public KmsClient create(String source, Map<String, String> properties) {
+    public KmsClient create(String provider, Map<String, String> properties) {
       createCount.incrementAndGet();
-      this.createdSource = source;
+      this.createdProvider = provider;
       this.properties = properties;
       return reference -> Optional.of(new Properties(reference));
     }
@@ -414,7 +415,7 @@ public class TestKmsClientRegistry {
     }
 
     @Override
-    public KmsClient create(String source, Map<String, String> properties) {
+    public KmsClient create(String provider, Map<String, String> properties) {
       return new KmsClient() {
         @Override
         public Optional<KmsKeyProperties> getKeyProperties(KmsReference reference) {
@@ -482,7 +483,7 @@ public class TestKmsClientRegistry {
 
     /** {@inheritDoc} */
     @Override
-    public KmsClient create(String source, Map<String, String> properties) {
+    public KmsClient create(String provider, Map<String, String> properties) {
       return reference -> Optional.of(new Properties(reference));
     }
   }

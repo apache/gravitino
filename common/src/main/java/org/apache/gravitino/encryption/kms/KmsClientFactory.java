@@ -29,14 +29,14 @@ public interface KmsClientFactory {
    * Returns the exact KMS API identifier implemented by this factory.
    *
    * <p>Identifiers use lowercase kebab-case with no surrounding whitespace ({@link
-   * KmsApiIdentifiers}) and are matched exactly against {@link KmsReference#api()}.
+   * KmsApiIdentifiers}) and are matched exactly against {@code gravitino.kms.provider.<name>.api}.
    *
    * @return the KMS API identifier
    */
   String api();
 
   /**
-   * Creates a client bound to a configured KMS source.
+   * Creates a client bound to a configured KMS provider.
    *
    * <p>Provider credentials are private implementation details of the returned client. They must
    * not be exposed as Gravitino credentials or key properties. The caller owns the returned client
@@ -44,10 +44,10 @@ public interface KmsClientFactory {
    * contacting the configured KMS; network and authentication failures are reported by client
    * operations.
    *
-   * @param source logical name of the configured KMS instance
+   * @param provider logical name of the configured KMS instance
    * @param properties provider-specific configuration
    * @return the configured client
-   * @throws IllegalArgumentException if the source or configuration is invalid
+   * @throws IllegalArgumentException if the provider or configuration is invalid
    */
-  KmsClient create(String source, Map<String, String> properties);
+  KmsClient create(String provider, Map<String, String> properties);
 }
