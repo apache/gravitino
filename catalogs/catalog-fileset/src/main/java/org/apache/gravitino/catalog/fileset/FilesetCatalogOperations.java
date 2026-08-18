@@ -835,114 +835,117 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       Map<String, Path> schemaPaths = getAndCheckSchemaPaths(ident.name(), properties);
 
       boolean dropped = super.dropSchema(ident, cascade);
-      // If the schema entity is failed to be deleted, we should not delete secrets / storage
-      // locations and return false immediately.
+      if (disableFSOps) {
+        // No FS cleanup; still remove fileset write-through secrets when cascade deleted them.
+        // Schema secrets are cleaned by SchemaOperationDispatcher.
+        if (dropped && cascade) {
+          deleteFilesetSecrets(filesets);
+        }
+        return dropped;
+      }
+
+      // If the schema entity is failed to be deleted, we should not delete the storage location
+      // and return false immediately.
       if (!dropped) {
         return false;
       }
 
-      if (!disableFSOps) {
-        // Delete all the managed filesets no matter whether the storage location is under the
-        // schema path or not.
-        // The reason why we delete the managed fileset's storage location one by one is because we
-        // may mis-delete the storage location of the external fileset if it happens to be under
-        // the schema path.
-        // FS cleanup still needs write-through secret plaintext via mergeUpLevelConfigurations,
-        // so run it before deleting secrets below.
-        ClassLoader cl = Thread.currentThread().getContextClassLoader();
-        filesets.parallelStream()
-            .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
-            .forEach(
-                f -> {
-                  ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
-                  try {
-                    // parallelStream uses forkjoin thread pool, which has a different classloader
-                    // than the catalog thread. We need to set the context classloader to the
-                    // catalog's classloader to avoid classloading issues.
-                    Thread.currentThread().setContextClassLoader(cl);
-                    f.storageLocations()
-                        .forEach(
-                            (locationName, location) -> {
-                              try {
-                                Path filesetPath = new Path(location);
-                                Map<String, String> fsConf =
-                                    mergeUpLevelConfigurations(ident, f.properties(), filesetPath);
-                                FileSystem fs = getFileSystemWithCache(filesetPath, fsConf);
-                                if (fs.exists(filesetPath)) {
-                                  if (!fs.delete(filesetPath, true)) {
-                                    LOG.warn(
-                                        "Failed to delete fileset {} location: {} with location name: {}",
-                                        f.name(),
-                                        filesetPath,
-                                        locationName);
-                                  }
-                                }
-                              } catch (IOException ioe) {
-                                LOG.warn(
-                                    "Failed to delete fileset {} location: {} with location name: {}",
-                                    f.name(),
-                                    location,
-                                    locationName,
-                                    ioe);
-                              }
-                            });
-                  } finally {
-                    Thread.currentThread().setContextClassLoader(oldCl);
-                  }
-                });
-
-        // Delete the schema path if it exists and is empty.
-        if (!schemaPaths.isEmpty()) {
-          AtomicReference<RuntimeException> exception = new AtomicReference<>();
-          schemaPaths.forEach(
-              (locationName, schemaPath) -> {
+      // Delete all the managed filesets no matter whether the storage location is under the
+      // schema path or not.
+      // The reason why we delete the managed fileset's storage location one by one is because we
+      // may mis-delete the storage location of the external fileset if it happens to be under
+      // the schema path.
+      ClassLoader cl = Thread.currentThread().getContextClassLoader();
+      filesets.parallelStream()
+          .filter(f -> f.filesetType() == Fileset.Type.MANAGED)
+          .forEach(
+              f -> {
+                ClassLoader oldCl = Thread.currentThread().getContextClassLoader();
                 try {
-                  Map<String, String> fsConf =
-                      mergeUpLevelConfigurations(ident, schemaEntity.properties(), schemaPath);
-                  FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
-                  if (fs.exists(schemaPath)) {
-                    FileStatus[] statuses = fs.listStatus(schemaPath);
-                    if (statuses.length == 0) {
-                      if (fs.delete(schemaPath, true)) {
-                        LOG.info(
-                            "Deleted schema {} location {} with location name {}",
-                            ident,
-                            schemaPath,
-                            locationName);
-                      } else {
-                        LOG.warn(
-                            "Failed to delete schema {} because it has files/folders under location {} with location name {}",
-                            ident,
-                            schemaPath,
-                            locationName);
-                      }
-                    }
-                  }
-                } catch (IOException ioe) {
-                  LOG.warn(
-                      "Failed to delete schema {} location {} with location name {}",
-                      ident,
-                      schemaPath,
-                      locationName,
-                      ioe);
-                  exception.set(
-                      new RuntimeException("Failed to delete schema " + ident + " location", ioe));
+                  // parallelStream uses forkjoin thread pool, which has a different classloader
+                  // than the catalog thread. We need to set the context classloader to the
+                  // catalog's classloader to avoid classloading issues.
+                  Thread.currentThread().setContextClassLoader(cl);
+                  f.storageLocations()
+                      .forEach(
+                          (locationName, location) -> {
+                            try {
+                              Path filesetPath = new Path(location);
+                              Map<String, String> fsConf =
+                                  mergeUpLevelConfigurations(ident, f.properties(), filesetPath);
+                              FileSystem fs = getFileSystemWithCache(filesetPath, fsConf);
+                              if (fs.exists(filesetPath)) {
+                                if (!fs.delete(filesetPath, true)) {
+                                  LOG.warn(
+                                      "Failed to delete fileset {} location: {} with location name: {}",
+                                      f.name(),
+                                      filesetPath,
+                                      locationName);
+                                }
+                              }
+                            } catch (IOException ioe) {
+                              LOG.warn(
+                                  "Failed to delete fileset {} location: {} with location name: {}",
+                                  f.name(),
+                                  location,
+                                  locationName,
+                                  ioe);
+                            }
+                          });
+                } finally {
+                  Thread.currentThread().setContextClassLoader(oldCl);
                 }
               });
-          if (exception.get() != null) {
-            throw exception.get();
-          }
+
+      // Delete the schema path if it exists and is empty.
+      if (!schemaPaths.isEmpty()) {
+        AtomicReference<RuntimeException> exception = new AtomicReference<>();
+        schemaPaths.forEach(
+            (locationName, schemaPath) -> {
+              try {
+                Map<String, String> fsConf =
+                    mergeUpLevelConfigurations(ident, schemaEntity.properties(), schemaPath);
+                FileSystem fs = getFileSystemWithCache(schemaPath, fsConf);
+                if (fs.exists(schemaPath)) {
+                  FileStatus[] statuses = fs.listStatus(schemaPath);
+                  if (statuses.length == 0) {
+                    if (fs.delete(schemaPath, true)) {
+                      LOG.info(
+                          "Deleted schema {} location {} with location name {}",
+                          ident,
+                          schemaPath,
+                          locationName);
+                    } else {
+                      LOG.warn(
+                          "Failed to delete schema {} because it has files/folders under location {} with location name {}",
+                          ident,
+                          schemaPath,
+                          locationName);
+                    }
+                  }
+                }
+              } catch (IOException ioe) {
+                LOG.warn(
+                    "Failed to delete schema {} location {} with location name {}",
+                    ident,
+                    schemaPath,
+                    locationName,
+                    ioe);
+                exception.set(
+                    new RuntimeException("Failed to delete schema " + ident + " location", ioe));
+              }
+            });
+        if (exception.get() != null) {
+          throw exception.get();
         }
       }
 
-      // Cascade store.delete removes fileset entities without going through
-      // FilesetOperationDispatcher.dropFileset, so clean fileset write-through secrets here using
-      // properties captured before the store delete. Must run after FS cleanup above, which still
-      // resolves URNs to plaintext. Schema secrets are cleaned by SchemaOperationDispatcher.
+      // Cascade store.delete removes fileset entities without
+      // FilesetOperationDispatcher.dropFileset;
+      // clean fileset secrets after FS ops (still need plaintext for mergeUpLevelConfigurations).
+      // Schema secrets are cleaned by SchemaOperationDispatcher.
       if (cascade) {
-        for (FilesetEntity fileset : filesets) {
-          secretManager.deleteSecretsFromProperties(fileset.properties());
-        }
+        deleteFilesetSecrets(filesets);
       }
 
       LOG.info("Deleted schema {}", ident);
@@ -1005,6 +1008,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     MetricsSystem metricsSystem = GravitinoEnv.getInstance().metricsSystem();
     if (metricsSystem != null) {
       metricsSystem.unregister(catalogMetricsSource);
+    }
+  }
+
+  /**
+   * Deletes write-through secrets for fileset entities whose metadata was cascade-removed from the
+   * store. Schema secrets are cleaned by SchemaOperationDispatcher.
+   */
+  private void deleteFilesetSecrets(List<FilesetEntity> filesets) {
+    for (FilesetEntity fileset : filesets) {
+      secretManager.deleteSecretsFromProperties(fileset.properties());
     }
   }
 
