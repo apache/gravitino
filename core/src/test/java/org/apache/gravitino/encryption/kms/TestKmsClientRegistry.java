@@ -152,7 +152,7 @@ public class TestKmsClientRegistry {
                 "gravitino.kms.providers",
                 "primary",
                 "gravitino.kms.provider.primary.className",
-                ServiceLoadedFactory.class.getName()))) {
+                ClassLoadedFactory.class.getName()))) {
       KmsReference reference = new KmsReference("primary", "key");
       Assertions.assertNotNull(registry.getClient(reference));
     }
@@ -324,17 +324,7 @@ public class TestKmsClientRegistry {
   }
 
   private static KmsClientFactory factory(ClientCreator creator) {
-    return new KmsClientFactory() {
-      @Override
-      public String api() {
-        return "test-kms";
-      }
-
-      @Override
-      public KmsClient create(String provider, Map<String, String> properties) {
-        return creator.create(provider, properties);
-      }
-    };
+    return creator::create;
   }
 
   private interface ClientCreator {
@@ -345,11 +335,6 @@ public class TestKmsClientRegistry {
     private String createdProvider;
     private Map<String, String> properties;
     private final AtomicInteger createCount = new AtomicInteger();
-
-    @Override
-    public String api() {
-      return "test-kms";
-    }
 
     @Override
     public KmsClient create(String provider, Map<String, String> properties) {
@@ -371,11 +356,6 @@ public class TestKmsClientRegistry {
       this.name = name;
       this.closeOrder = closeOrder;
       this.closeFailure = closeFailure;
-    }
-
-    @Override
-    public String api() {
-      return "test-kms";
     }
 
     @Override
@@ -434,16 +414,10 @@ public class TestKmsClientRegistry {
   }
 
   /** Factory loaded by {@link Class#forName(String)} in the public-constructor test. */
-  public static final class ServiceLoadedFactory implements KmsClientFactory {
+  public static final class ClassLoadedFactory implements KmsClientFactory {
 
     /** Creates a test factory. */
-    public ServiceLoadedFactory() {}
-
-    /** {@inheritDoc} */
-    @Override
-    public String api() {
-      return "aws-kms";
-    }
+    public ClassLoadedFactory() {}
 
     /** {@inheritDoc} */
     @Override

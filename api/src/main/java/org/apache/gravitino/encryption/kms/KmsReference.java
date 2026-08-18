@@ -27,10 +27,9 @@ import org.apache.gravitino.annotation.DeveloperApi;
 /**
  * Identifies a key owned by a named KMS provider.
  *
- * <p>Contains no credentials, key material, or protocol identifier. The provider name is the
- * configured instance handle ({@code gravitino.kms.providers}). The server loads that name's
- * factory from {@code gravitino.kms.provider.<name>.className} and resolves a client from {@code
- * KmsClientRegistry}.
+ * <p>Contains no credentials or key material. The provider name is the configured instance handle
+ * ({@code gravitino.kms.providers}). The server loads that name's factory from {@code
+ * gravitino.kms.provider.<name>.className} and resolves a client from {@code KmsClientRegistry}.
  */
 @DeveloperApi
 public final class KmsReference {
@@ -39,8 +38,7 @@ public final class KmsReference {
   private final String keyId;
 
   /**
-   * Creates a structurally valid key reference without contacting the provider or looking up its
-   * API.
+   * Creates a structurally valid key reference without contacting the provider.
    *
    * @param provider configured KMS provider name
    * @param keyId provider-native key identifier

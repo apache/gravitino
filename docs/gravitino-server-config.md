@@ -491,9 +491,8 @@ server, are documented with those services. See
 ### Key Management
 
 The server talks to KMS instances you name in `gravitino.conf`. Each name is one configured
-instance. Each instance names the `KmsClientFactory` class the server should construct, the same
-way event listeners set `class`. Two names may share one class, which is how you run more than one
-AWS or Azure vault.
+instance. Each instance names the `KmsClientFactory` class the server constructs. Two names may
+share one class, which is how you run more than one AWS or Azure vault.
 
 The list is empty by default, and then the server has no KMS clients. Naming a provider without a
 `className`, or with a class the server cannot construct as a `KmsClientFactory`, fails startup.

@@ -21,20 +21,14 @@ package org.apache.gravitino.encryption.kms;
 import java.util.Map;
 import org.apache.gravitino.annotation.DeveloperApi;
 
-/** Creates server-side KMS clients for one KMS API. */
+/**
+ * Creates a server-side KMS client for one configured provider.
+ *
+ * <p>The server loads an implementation from {@code gravitino.kms.provider.<name>.className}. The
+ * class must have a public no-arg constructor.
+ */
 @DeveloperApi
 public interface KmsClientFactory {
-
-  /**
-   * Returns the exact KMS API identifier implemented by this factory.
-   *
-   * <p>Identifiers use lowercase kebab-case with no surrounding whitespace ({@link
-   * KmsApiIdentifiers}). The server loads this factory from {@code
-   * gravitino.kms.provider.<name>.className}, not by matching this identifier.
-   *
-   * @return the KMS API identifier
-   */
-  String api();
 
   /**
    * Creates a client bound to a configured KMS provider.
