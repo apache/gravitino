@@ -49,6 +49,7 @@ dependencies {
   implementation(libs.commons.io)
   implementation(libs.commons.lang3)
   implementation(libs.guava)
+  implementation(libs.jackson.databind)
   implementation(libs.hadoop3.auth) {
     exclude("*")
   }

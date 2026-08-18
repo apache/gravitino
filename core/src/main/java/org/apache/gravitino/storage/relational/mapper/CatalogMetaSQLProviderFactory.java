@@ -61,6 +61,11 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);
   }
 
+  /** Returns SQL that lists and locks all active catalogs in a metalake. */
+  public static String listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listCatalogPOsByMetalakeIdForUpdate(metalakeId);
+  }
+
   public static String listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds) {
     return getProvider().listCatalogPOsByCatalogIds(catalogIds);
   }
@@ -113,8 +118,10 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().softDeleteCatalogMetasByCatalogId(catalogId);
   }
 
-  public static String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteCatalogMetasByMetalakeId(metalakeId);
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public static String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return getProvider().softDeleteCatalogMetasWithVersion(catalogPOs);
   }
 
   public static String deleteCatalogMetasByLegacyTimeline(

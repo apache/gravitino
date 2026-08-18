@@ -30,7 +30,6 @@ import com.googlecode.concurrenttrees.radix.ConcurrentRadixTree;
 import com.googlecode.concurrenttrees.radix.RadixTree;
 import com.googlecode.concurrenttrees.radix.node.concrete.DefaultCharArrayNodeFactory;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
@@ -43,7 +42,6 @@ import org.apache.gravitino.Configs;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,10 +55,10 @@ import org.slf4j.LoggerFactory;
  * schemas and tables under it).
  *
  * <p>Relation query results are NOT cached by this implementation; relation and list operations
- * always fall back to the {@code EntityStore}. Entity types whose materialized form embeds
- * relation-derived data ({@code USER}, {@code GROUP}, {@code ROLE}) are excluded from caching
- * entirely by {@link BaseEntityCache#put}, because without relation tracking their entries could
- * not be invalidated when the referenced entities change.
+ * always fall back to the {@code EntityStore}. Only the self-contained metadata objects listed in
+ * {@link BaseEntityCache#isCacheable} are cached; every other type (user/group/role, model/model
+ * version, function, job template, and any type not in that allowlist) is read straight from the
+ * {@code EntityStore}.
  */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_CORE_THREADS = 1;
@@ -228,13 +226,9 @@ public class CaffeineEntityCache extends BaseEntityCache {
   /** {@inheritDoc} */
   @Override
   public <E extends Entity & HasIdentifier> void invalidateOnKeyChange(E entity) {
-    // Invalidate the cache if inserting the entity may affect related cache keys.
-    // For example, inserting a model version changes the latest version of the model,
-    // so the corresponding model cache entry should be invalidated.
-    if (Objects.requireNonNull(entity.type()) == Entity.EntityType.MODEL_VERSION) {
-      NameIdentifier modelIdent = ((ModelVersionEntity) entity).modelIdentifier();
-      invalidate(modelIdent, Entity.EntityType.MODEL);
-    }
+    // Every cacheable entity is self-contained (see BaseEntityCache#isCacheable), so inserting one
+    // never requires invalidating a different key. Kept for the SPI contract; implementations that
+    // cache derived entries can override this.
   }
 
   /** {@inheritDoc} */

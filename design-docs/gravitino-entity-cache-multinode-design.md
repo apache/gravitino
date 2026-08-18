@@ -130,7 +130,7 @@ Dropping relations leaves the entity keys. But not every entity key is truly one
 
 So caching user, group, and role buys almost nothing (authorization does not depend on it) and costs a lot (the reverse-lookup problem comes back). tag and policy are safe to cache, but they are low-volume governance objects, not the read-heavy metadata the cache exists for.
 
-**Conclusion: cache the self-contained metadata objects** — metalake, catalog, schema, table, topic, view, fileset, plus tag, policy, and the job entity. A stale read of any of these is at worst cosmetic (an old comment, property, or job status), never a wrong pointer, so a per-node cache can serve them and refresh them across nodes through the change log. The first seven already emit change-log rows; tag, policy, and job do not emit one yet, so this work adds an emit point for them (a small writer-side change). Model, model version, and function are different because each holds a load-bearing pointer, so a per-node cache (caffeine) does not cache them — they read straight from the DB; a shared cache (redis) caches them since it has no staleness window. The [Consistency](#consistency) section works this out per alter and lists the handling per type. Every entity a per-node cache serves is then either self-contained and one-to-one or has its pointer resolved fresh, so cross-node invalidation stays precise with no reverse lookups.
+**Conclusion: cache the self-contained metadata objects** — metalake, catalog, schema, table, topic, view, fileset, plus tag, policy, and the job entity. A stale read of any of these is at worst cosmetic (an old comment, property, or job status), never a wrong pointer, so a per-node cache can serve them and refresh them across nodes through the change log. All invalidating mutations of these cacheable types emit change-log rows from the common entity-store boundary. Model, model version, and function are different because each holds a load-bearing pointer, so a per-node cache (caffeine) does not cache them — they read straight from the DB; a shared cache (redis) caches them since it has no staleness window. The [Consistency](#consistency) section works this out per alter and lists the handling per type. Every entity a per-node cache serves is then either self-contained and one-to-one or has its pointer resolved fresh, so cross-node invalidation stays precise with no reverse lookups.
 
 The cache now holds only self-contained metadata objects. The next question is how to tell the other nodes to drop a key when it changes.
 
@@ -221,21 +221,25 @@ With only self-contained metadata objects cached, "entity X changed" names exact
 - `CatalogChangeLogListener` → clears `CatalogManager`'s catalog cache;
 - `JcasbinChangeListener` → clears jcasbin's **id-mapping cache** (`metadataIdCache`).
 
-Each row is `{metalake, entity_type, full_name, operate_type (ALTER | DROP), created_at}`. The structural MetaServices (metalake, catalog, schema, table, topic, view, fileset) already write a row on ALTER/DROP. We add the entity store cache as a **third consumer** of the same poller.
+Each row is `{metalake, entity_type, full_name, operate_type (ALTER | DROP), created_at}`. `full_name` retains the legacy dot-joined form for ordinary identifiers and uses a versioned, length-prefixed encoding when a name segment contains a dot, so consumers can reconstruct every `NameIdentifier` without ambiguity. The entity-store mutation boundary writes rows for all cacheable entity types, and the entity store cache is a **third consumer** of the same poller.
 
 ### Writer side
 
-Most cached objects **already write** an ALTER/DROP row to `entity_change_log` today, so the writer side is almost unchanged — no new columns and no new operate type. The one addition is a change-log row for **tag and policy**, which are cached but do not emit one yet:
+The writer policy is centralized in `JDBCBackend`, after dispatch to the type-specific MetaService. This avoids fragmented coverage in which some services emitted only on rename or drop while ordinary alters, overwrite/import paths, enable/disable operations, and repair updates were missed. No new column or operate type is required:
 
-| Change                                                | Cached? | Writes a change-log row               |
-| ----------------------------------------------------- | ------- | ------------------------------------- |
-| structural ALTER/DROP (table, schema, catalog, …)     | yes     | yes — already emitted                 |
-| tag / policy / job ALTER/DROP                         | yes     | **add a new emit point** (none today) |
-| user / group / role ALTER/DROP                        | no      | not needed (not cached)               |
-| model / model version / function ALTER/DROP           | no      | not needed (not cached)               |
-| relation change (grant, set owner, attach tag/policy) | no      | not needed (not cached)               |
+| Entity-store mutation                                 | Cached? | Change-log action                                        |
+| ----------------------------------------------------- | ------- | -------------------------------------------------------- |
+| create (`insert` with `overwritten = false`)          | yes     | none; there is no negative caching and `list` skips cache |
+| overwrite/import (`insert` with `overwritten = true`) | yes     | `ALTER` for the entity key                               |
+| update, including enable/disable and repair           | yes     | `ALTER` for the identifier passed to `update`            |
+| rename                                                | yes     | `ALTER` for the old identifier only                      |
+| successful drop                                       | yes     | `DROP` for the dropped identifier                        |
+| cascade drop                                          | yes     | one `DROP` for the root; prefix invalidation clears descendants |
+| failed mutation or rollback                           | yes     | none                                                     |
+| mutation of a non-cacheable type                      | no      | no cache-specific row                                    |
+| relation change (grant, set owner, attach tag/policy) | no      | none; relations are not cached                           |
 
-The existing structural rows are written in the same transaction as the entity write; the new tag/policy rows must be written the same way, in the same transaction as the tag/policy write.
+The entity mutation and its cache change-log row are enclosed by the same outer transaction. A MetaService failure, a change-log failure, or a caller rollback therefore leaves neither side committed. The cacheability allowlist is also the writer policy, so adding a new cacheable type cannot silently omit its standard overwrite, update, and drop events.
 
 ### Reader side
 
@@ -251,7 +255,7 @@ Dropping a container (for example a schema) must also drop its cached children. 
 
 ### A third consumer of the existing feed
 
-The entity store cache becomes a third consumer of the poller, next to the catalog cache and the jcasbin id-mapping cache. All three read the same structural ALTER/DROP rows that already exist — the entity store cache clears its entity key, the catalog cache clears its catalog, jcasbin clears its id mapping. There is no new row type, so the existing consumers do not change.
+The entity store cache becomes a third consumer of the poller, next to the catalog cache and the jcasbin id-mapping cache. All three read the same ALTER/DROP rows — the entity store cache clears its entity key, the catalog cache clears its catalog, jcasbin clears its id mapping. There is no new row type, so the existing consumers do not change.
 
 ### Consistency
 
@@ -315,8 +319,8 @@ We do **not** need a per-entity version check on the cache: for a point read, ch
 | schema               | own data (connector for external catalogs); safe                                                  | cache + change-log invalidation                                        | cache            |
 | table, view, topic   | real metadata comes from the connector; cache holds only id/audit; safe                           | cache + change-log invalidation                                        | cache            |
 | fileset              | own data; storage location is immutable                                                           | cache + change-log invalidation                                        | cache            |
-| tag, policy          | self-contained; a stale read is only cosmetic (old comment/property)                              | cache + change-log invalidation (add the emit point — see writer side) | cache            |
-| job                  | self-contained operational entity; a stale read is only an old job status                         | cache + change-log invalidation (add the emit point — see writer side) | cache            |
+| tag, policy          | self-contained; a stale read is only cosmetic (old comment/property)                              | cache + change-log invalidation                                        | cache            |
+| job                  | self-contained operational entity; a stale read is only an old job status                         | cache + change-log invalidation                                        | cache            |
 | model, model version | carries a load-bearing pointer (a version's URI, the latest version) that would be wrong if stale | **not cached — read from the DB** (revisit if it gets hot)             | cache            |
 | function             | the cached value *is* the code that runs, so a stale copy would run the wrong code                | **not cached — read from the DB** (revisit if it gets hot)             | cache            |
 | user, group, role    | derived fields (`roleNames`, `securableObjects`) need a reverse lookup                            | not cached                                                             | not cached       |
@@ -409,7 +413,7 @@ Both are chosen through the same SPI, so a user picks by environment with a sing
 
 | Phase | Deliverable                                                                                                                                                                                                                                                         | Why                                                           |
 | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| 1     | cache self-contained metadata objects (incl. tag/policy/job); drop relation, user/group/role, model, and function caching; add the entity store `EntityChangeLogListener` and a change-log emit point for tag/policy/job (other structural rows already exist) — `caffeine` | multi-node works, no schema change, new emits (tag/policy/job) |
+| 1     | cache self-contained metadata objects (incl. tag/policy/job); drop relation, user/group/role, model, and function caching; add the entity store `EntityChangeLogListener`; centralize cache mutation events for every cacheable type — `caffeine` | multi-node works, no schema change, complete mutation coverage |
 | 2     | `redis` `SHARED` implementation behind the same SPI                                                                                                                                                                                                                 | strong consistency, reuse user's Redis                        |
 | 3     | (later, if metrics show hot relation reads) add precise relation caching back, per relation type                                                                                                                                                                    | heavy tag/policy workloads                                    |
 
@@ -418,7 +422,8 @@ Both are chosen through the same SPI, so a user picks by environment with a sing
 | Area                    | Check                                                                                                                                                                                                                        |
 | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Multi-node — caffeine   | node A runs ALTER/DROP on table / schema / catalog; node B serves the fresh entity within one poll interval                                                                                                                  |
-| Tag / policy cross-node | after the new emit point is added, an ALTER/DROP of a tag or policy on node A is reflected on node B within one poll interval                                                                                                |
+| Mutation-event coverage | create emits nothing; overwrite/update/rename/successful drop emit exactly one row for every cacheable type; rename keeps only the old key; entity and row roll back together                                                 |
+| Tag / policy cross-node | an ALTER/DROP of a tag or policy on node A is reflected on node B within one poll interval                                                                                                                                    |
 | Hierarchical drop       | dropping a schema drops the schema's cached child tables on the other node(s), and leaves a sibling schema alone (forward prefix scan)                                                                                       |
 | Shared feed             | the entity store cache, the catalog cache, and the jcasbin id-mapping cache all act on the same structural rows; adding the entity store consumer does not change the others                                                 |
 | Not cached (caffeine)   | get user / group / role / model / model version / function return correct data straight from the DB; authorization is unaffected                                                                                             |

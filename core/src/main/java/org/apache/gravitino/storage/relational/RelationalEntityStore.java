@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -50,6 +49,7 @@ import org.apache.gravitino.SupportsIdOperations;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.cache.CacheFactory;
 import org.apache.gravitino.cache.CachedEntityIdResolver;
+import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
@@ -80,6 +80,10 @@ public class RelationalEntityStore
   private EntityChangeLogCleaner entityChangeLogCleaner;
   private EntityCache cache;
 
+  // Non-null only for a LOCAL_PER_NODE cache, which needs cross-node invalidation. SHARED and NONE
+  // caches have no per-node copy to invalidate, so no listener is registered.
+  @Nullable private EntityCacheChangeLogListener entityCacheChangeLogListener;
+
   @VisibleForTesting
   public EntityCache getCache() {
     return cache;
@@ -103,20 +107,33 @@ public class RelationalEntityStore
     // Polling and cleanup use separate single-threaded schedulers. Polling only dispatches changes
     // to local listeners, while cleanup independently removes records beyond the retention period.
     this.entityChangeLogPoller =
-        new EntityChangeLogPoller(
-            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
-            config.get(Configs.ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES),
-            EntityChangeLogPoller.ListenerFailureAction.valueOf(
-                config
-                    .get(Configs.ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION)
-                    .toUpperCase(Locale.ROOT)));
+        new EntityChangeLogPoller(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS));
     this.entityChangeLogCleaner =
         new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)),
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)));
+
+    registerCacheChangeLogListener();
+
     this.entityChangeLogPoller.start();
     this.entityChangeLogCleaner.start();
+  }
+
+  /**
+   * The coherence gate: a {@link Coherence#LOCAL_PER_NODE} cache keeps its own copy per node, so
+   * changes made on other nodes must be replayed here through the change log. {@link
+   * Coherence#SHARED} and {@link Coherence#NONE} caches have nothing per-node to invalidate, so no
+   * listener is registered.
+   */
+  @VisibleForTesting
+  void registerCacheChangeLogListener() {
+    if (cache.coherence() != Coherence.LOCAL_PER_NODE) {
+      return;
+    }
+
+    this.entityCacheChangeLogListener = new EntityCacheChangeLogListener(cache);
+    this.entityChangeLogPoller.registerListener(entityCacheChangeLogListener);
   }
 
   private RelationalBackend createRelationalEntityBackend(Config config) {
