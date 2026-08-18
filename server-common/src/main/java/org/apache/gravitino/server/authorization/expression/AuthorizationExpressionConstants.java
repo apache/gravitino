@@ -42,6 +42,7 @@ public class AuthorizationExpressionConstants {
 
   public static final String PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
       """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA &&
                   (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
                   ANY_CREATE_TABLE || ANY_CREATE_VIEW)
