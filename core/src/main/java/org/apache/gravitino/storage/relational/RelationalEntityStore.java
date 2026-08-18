@@ -186,7 +186,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
-    cache.invalidate(ident, entityType);
+    writeThroughCache(ident, entityType, updatedEntity);
     return updatedEntity;
   }
 
@@ -226,34 +226,6 @@ public class RelationalEntityStore
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> E updateByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
-      throws NoSuchEntityException, IOException {
-    E updatedEntity = backend.updateByExternalId(ident, entityType, updater);
-    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
-    return updatedEntity;
-  }
-
-  @Override
-  public boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
-      throws IOException {
-    NameIdentifier nameIdent = null;
-    try {
-      HasIdentifier entity = backend.getByExternalId(ident, entityType);
-      nameIdent = entity.nameIdentifier();
-      return backend.delete(nameIdent, entityType, false);
-    } catch (NoSuchEntityException e) {
-      LOGGER.warn(
-          "The entity to be deleted by external id does not exist in the store: {}", ident, e);
-      return false;
-    } finally {
-      if (nameIdent != null) {
-        cache.invalidate(nameIdent, entityType);
-      }
-    }
-  }
-
-  @Override
   public <E extends Entity & HasIdentifier> E getById(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException {
@@ -265,7 +237,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
       throws NoSuchEntityException, IOException {
     E updatedEntity = backend.updateById(ident, entityType, updater);
-    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+    writeThroughCache(updatedEntity.nameIdentifier(), entityType, updatedEntity);
     return updatedEntity;
   }
 
@@ -520,6 +492,25 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  /**
+   * Replaces the cached entity with {@code updatedEntity} so name-based {@link #get} sees the new
+   * fields immediately. If {@code previousIdent} is a different name (rename), the old cache key is
+   * dropped first.
+   *
+   * @param previousIdent lookup key used for the update, or the updated entity's current name
+   * @param entityType entity type of the cache entry
+   * @param updatedEntity entity written to the backend
+   * @param <E> entity type
+   */
+  private <E extends Entity & HasIdentifier> void writeThroughCache(
+      NameIdentifier previousIdent, Entity.EntityType entityType, E updatedEntity) {
+    NameIdentifier newIdent = updatedEntity.nameIdentifier();
+    if (previousIdent != null && !previousIdent.equals(newIdent)) {
+      cache.invalidate(previousIdent, entityType);
+    }
+    cache.put(updatedEntity);
   }
 
   private void invalidateRelationTargetCache(

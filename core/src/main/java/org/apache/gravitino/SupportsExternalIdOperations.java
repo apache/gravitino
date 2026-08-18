@@ -19,13 +19,9 @@
 package org.apache.gravitino;
 
 import java.io.IOException;
-import java.util.function.Function;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 
-/**
- * Optional extension for entity stores that support lookup and mutation by external id within a
- * namespace.
- */
+/** Optional extension for entity stores that support lookup by external id within a namespace. */
 public interface SupportsExternalIdOperations {
 
   /**
@@ -42,30 +38,4 @@ public interface SupportsExternalIdOperations {
   <E extends Entity & HasIdentifier> E getByExternalId(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException;
-
-  /**
-   * Update an entity by external id.
-   *
-   * @param ident the external id name identifier
-   * @param entityType the general type of the entity
-   * @param type the detailed type of the entity
-   * @param updater the updater function to update the entity
-   * @param <E> the class of entity
-   * @return the updated entity
-   * @throws NoSuchEntityException if the entity does not exist
-   * @throws IOException if the update operation fails
-   */
-  <E extends Entity & HasIdentifier> E updateByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
-      throws NoSuchEntityException, IOException;
-
-  /**
-   * Delete an entity by external id.
-   *
-   * @param ident the external id name identifier
-   * @param entityType the general type of the entity
-   * @return true if the entity exists and is deleted successfully, false otherwise
-   * @throws IOException if the delete operation fails
-   */
-  boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType) throws IOException;
 }

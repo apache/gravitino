@@ -84,12 +84,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
-  public boolean removeUserByExternalId(String metalake, String externalId)
-      throws NoSuchMetalakeException {
-    return dispatcher.removeUserByExternalId(metalake, externalId);
-  }
-
-  @Override
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     return dispatcher.getUser(metalake, user);
@@ -154,12 +148,6 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     return dispatcher.removeGroup(metalake, group);
-  }
-
-  @Override
-  public boolean removeGroupByExternalId(String metalake, String externalId)
-      throws NoSuchMetalakeException {
-    return dispatcher.removeGroupByExternalId(metalake, externalId);
   }
 
   @Override

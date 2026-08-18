@@ -598,19 +598,6 @@ public class TestUserEvent {
   }
 
   @Test
-  void testRemoveUserByExternalIdEvent() {
-    dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(RemoveUserByExternalIdPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_USER_BY_EXTERNAL_ID, preEvent.operationType());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(RemoveUserByExternalIdEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_USER_BY_EXTERNAL_ID, event.operationType());
-  }
-
-  @Test
   void testGetUserByExternalIdFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -712,7 +699,6 @@ public class TestUserEvent {
 
     when(dispatcher.removeUser(METALAKE, userName)).thenReturn(true);
     when(dispatcher.removeUser(METALAKE, inExistUserName)).thenReturn(false);
-    when(dispatcher.removeUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(true);
 
     when(dispatcher.listUsers(METALAKE)).thenReturn(new User[] {user, otherUser});
     when(dispatcher.listUsers(eq(METALAKE), eq(0), eq(10)))

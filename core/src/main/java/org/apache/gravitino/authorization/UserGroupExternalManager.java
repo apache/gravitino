@@ -82,22 +82,6 @@ class UserGroupExternalManager extends UserGroupManager {
     }
   }
 
-  boolean removeUserByExternalId(String metalake, String externalId) {
-    try {
-      return store
-          .externalIdOperations()
-          .deleteByExternalId(
-              AuthorizationUtils.ofUserExternalId(metalake, externalId), Entity.EntityType.USER);
-    } catch (IOException ioe) {
-      LOG.error(
-          "Removing user with external id {} in the metalake {} failed due to storage issues",
-          externalId,
-          metalake,
-          ioe);
-      throw new RuntimeException(ioe);
-    }
-  }
-
   User getUserByExternalId(String metalake, String externalId) throws NoSuchUserException {
     try {
       return store
@@ -142,22 +126,6 @@ class UserGroupExternalManager extends UserGroupManager {
     } catch (IOException ioe) {
       LOG.error(
           "Adding group {} failed in the metalake {} due to storage issues", group, metalake, ioe);
-      throw new RuntimeException(ioe);
-    }
-  }
-
-  boolean removeGroupByExternalId(String metalake, String externalId) {
-    try {
-      return store
-          .externalIdOperations()
-          .deleteByExternalId(
-              AuthorizationUtils.ofGroupExternalId(metalake, externalId), Entity.EntityType.GROUP);
-    } catch (IOException ioe) {
-      LOG.error(
-          "Removing group with external id {} in the metalake {} failed due to storage issues",
-          externalId,
-          metalake,
-          ioe);
       throw new RuntimeException(ioe);
     }
   }

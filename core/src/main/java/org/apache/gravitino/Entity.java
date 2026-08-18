@@ -53,7 +53,7 @@ public interface Entity extends Serializable {
 
   /**
    * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
-   * when operating on users by external id (for example, get/delete-by-external-id).
+   * when operating on users by external id (for example, get-by-external-id).
    *
    * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
    * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system, user-external-id,
@@ -77,7 +77,7 @@ public interface Entity extends Serializable {
 
   /**
    * A virtual schema name used only for {@link org.apache.gravitino.lock.TreeLockUtils} lock paths
-   * when operating on groups by external id (for example, get/delete-by-external-id).
+   * when operating on groups by external id (for example, get-by-external-id).
    *
    * <p>This is not a real metadata schema and does not store entities. It forms part of a synthetic
    * {@link org.apache.gravitino.NameIdentifier} such as {@code {metalake, system,

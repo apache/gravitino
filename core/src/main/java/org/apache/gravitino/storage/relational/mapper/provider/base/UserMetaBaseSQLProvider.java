@@ -87,26 +87,6 @@ public class UserMetaBaseSQLProvider {
         + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
   }
 
-  public String updateUserMetaByExternalId(
-      @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO) {
-    return "UPDATE "
-        + USER_TABLE_NAME
-        + " SET user_name = #{newUserMeta.userName},"
-        + " metalake_id = #{newUserMeta.metalakeId},"
-        + " audit_info = #{newUserMeta.auditInfo},"
-        + " external_id = #{newUserMeta.externalId},"
-        + " enabled = #{newUserMeta.enabled},"
-        + " current_version = #{newUserMeta.currentVersion},"
-        + " last_version = #{newUserMeta.lastVersion},"
-        + " deleted_at = #{newUserMeta.deletedAt}"
-        + " WHERE external_id = #{oldUserMeta.externalId}"
-        + " AND metalake_id = #{oldUserMeta.metalakeId}"
-        + " AND audit_info = #{oldUserMeta.auditInfo}"
-        + " AND current_version = #{oldUserMeta.currentVersion}"
-        + " AND last_version = #{oldUserMeta.lastVersion}"
-        + " AND deleted_at = 0";
-  }
-
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
