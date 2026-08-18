@@ -465,6 +465,8 @@ public class JobManager implements JobOperationDispatcher {
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
+            // A newly submitted job is queued, not finished yet.
+            .withFinishedAt(0L)
             .build();
 
     try {
@@ -515,6 +517,8 @@ public class JobManager implements JobOperationDispatcher {
                     .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                     .withLastModifiedTime(Instant.now())
                     .build())
+            // CANCELLING is not a terminal state, so the job is not finished yet.
+            .withFinishedAt(jobEntity.finishedAt())
             .build();
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofJob(metalake, jobId),
@@ -588,6 +592,11 @@ public class JobManager implements JobOperationDispatcher {
             }
 
             if (newStatus != job.status()) {
+              boolean isFinished =
+                  newStatus == JobHandle.Status.SUCCEEDED
+                      || newStatus == JobHandle.Status.FAILED
+                      || newStatus == JobHandle.Status.CANCELLED;
+
               JobEntity newJobEntity =
                   JobEntity.builder()
                       .withId(job.id())
@@ -602,6 +611,7 @@ public class JobManager implements JobOperationDispatcher {
                               .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                               .withLastModifiedTime(Instant.now())
                               .build())
+                      .withFinishedAt(isFinished ? Instant.now().toEpochMilli() : job.finishedAt())
                       .build();
 
               // Update the job entity with new status.

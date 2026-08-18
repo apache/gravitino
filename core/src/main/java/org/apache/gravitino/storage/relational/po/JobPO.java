@@ -99,23 +99,17 @@ public class JobPO {
   }
 
   public static JobPO initializeJobPO(JobEntity jobEntity, JobPOBuilder builder) {
-    // We should not keep the terminated job entities in the database forever, so we set the
-    // current time as the finished timestamp if the job is in a terminal state,
-    // So the entity GC cleaner will clean it up later.
-    long finished = DEFAULT_DELETED_AT;
-    if (jobEntity.status() == JobHandle.Status.CANCELLED
-        || jobEntity.status() == JobHandle.Status.FAILED
-        || jobEntity.status() == JobHandle.Status.SUCCEEDED) {
-      finished = System.currentTimeMillis();
-    }
-
+    // finishedAt is a required field on JobEntity - the caller (e.g. JobManager, when the job
+    // transitions to a terminal state) is guaranteed to have already set it, using the storage
+    // layer's "not finished" sentinel (<= 0) otherwise. The entity GC cleaner relies on this
+    // timestamp being set to clean up terminated jobs later.
     try {
       return builder
           .withJobRunId(jobEntity.id())
           .withJobTemplateName(jobEntity.jobTemplateName())
           .withJobExecutionId(jobEntity.jobExecutionId())
           .withJobRunStatus(jobEntity.status().name())
-          .withJobFinishedAt(finished)
+          .withJobFinishedAt(jobEntity.finishedAt())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(jobEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)

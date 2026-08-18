@@ -288,6 +288,7 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle1.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle1.jobTemplateName());
+    Assertions.assertNull(jobHandle1.finishedAt());
 
     JobHandle jobHandle2 =
         metalake.runJob(
@@ -295,6 +296,7 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value3", "arg2", "success", "env_var", "value4"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle2.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle2.jobTemplateName());
+    Assertions.assertNull(jobHandle2.finishedAt());
 
     List<JobHandle> jobs = metalake.listJobs(template.name());
     Assertions.assertEquals(2, jobs.size());
@@ -324,6 +326,8 @@ public class JobIT extends BaseIT {
         updatedJobs.stream().map(JobHandle::jobStatus).collect(Collectors.toSet());
     Assertions.assertEquals(1, jobStatuses.size());
     Assertions.assertTrue(jobStatuses.contains(JobHandle.Status.SUCCEEDED));
+    // Finished jobs should carry a non-null finishedAt.
+    updatedJobs.forEach(job -> Assertions.assertNotNull(job.finishedAt()));
   }
 
   @Test
@@ -338,6 +342,7 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle.jobTemplateName());
+    Assertions.assertNull(jobHandle.finishedAt());
 
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
@@ -350,6 +355,7 @@ public class JobIT extends BaseIT {
     JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
     Assertions.assertEquals(jobHandle.jobId(), retrievedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, retrievedJob.jobStatus());
+    Assertions.assertNotNull(retrievedJob.finishedAt());
 
     // Test run a failed job
     JobHandle failedJobHandle =
@@ -357,6 +363,7 @@ public class JobIT extends BaseIT {
             template.name(),
             ImmutableMap.of("arg1", "value1", "arg2", "fail", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, failedJobHandle.jobStatus());
+    Assertions.assertNull(failedJobHandle.finishedAt());
 
     Awaitility.await()
         .atMost(3, TimeUnit.MINUTES)
@@ -369,6 +376,7 @@ public class JobIT extends BaseIT {
     JobHandle retrievedFailedJob = metalake.getJob(failedJobHandle.jobId());
     Assertions.assertEquals(failedJobHandle.jobId(), retrievedFailedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.FAILED, retrievedFailedJob.jobStatus());
+    Assertions.assertNotNull(retrievedFailedJob.finishedAt());
 
     // Test get a non-existent job
     Assertions.assertThrows(NoSuchJobException.class, () -> metalake.getJob("non_existent_job_id"));
@@ -386,6 +394,7 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle.jobTemplateName());
+    Assertions.assertNull(jobHandle.finishedAt());
 
     // Cancel the job
     metalake.cancelJob(jobHandle.jobId());
@@ -401,6 +410,7 @@ public class JobIT extends BaseIT {
     JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
     Assertions.assertEquals(jobHandle.jobId(), retrievedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.CANCELLED, retrievedJob.jobStatus());
+    Assertions.assertNotNull(retrievedJob.finishedAt());
 
     // Test cancel a non-existent job
     Assertions.assertThrows(

@@ -130,6 +130,7 @@ public class TestJobMetaService extends TestJDBCBackend {
             .withNamespace(job.namespace())
             .withAuditInfo(job.auditInfo())
             .withJobTemplateName(job.jobTemplateName())
+            .withFinishedAt(System.currentTimeMillis())
             .build();
     Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(jobOverwrite, true));
     JobEntity updatedJob =
@@ -179,6 +180,7 @@ public class TestJobMetaService extends TestJDBCBackend {
             .withNamespace(job.namespace())
             .withAuditInfo(job.auditInfo())
             .withJobTemplateName(job.jobTemplateName())
+            .withFinishedAt(timestamp)
             .build();
     Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(updatedJob, true));
 

@@ -611,6 +611,7 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
             .withStatus(JobHandle.Status.STARTED)
             .withJobTemplateName("template1")
             .withAuditInfo(AUDIT_INFO)
+            .withFinishedAt(0L)
             .build();
     JobEntity job2 =
         JobEntity.builder()
@@ -620,6 +621,7 @@ public class TestJDBCBackendBatchGet extends TestJDBCBackend {
             .withStatus(JobHandle.Status.QUEUED)
             .withJobTemplateName("template2")
             .withAuditInfo(AUDIT_INFO)
+            .withFinishedAt(0L)
             .build();
 
     backend.insert(job1, false);

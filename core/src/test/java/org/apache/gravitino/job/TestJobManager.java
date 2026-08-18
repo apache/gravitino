@@ -83,6 +83,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -632,7 +633,15 @@ public class TestJobManager {
 
     when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
     Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
-    verify(entityStore, times(1)).put(any(JobEntity.class), anyBoolean());
+
+    ArgumentCaptor<JobEntity> captor = ArgumentCaptor.forClass(JobEntity.class);
+    verify(entityStore, times(1)).put(captor.capture(), anyBoolean());
+
+    // Once a job transitions to a terminal status, finishedAt must be set.
+    JobEntity updatedJob = captor.getValue();
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, updatedJob.status());
+    Assertions.assertNotNull(updatedJob.finishedAt());
+    Assertions.assertTrue(updatedJob.finishedAt() > 0);
   }
 
   @Test

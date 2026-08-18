@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.time.Instant;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
@@ -58,9 +59,12 @@ public class JobDTO {
   @JsonProperty("audit")
   private final AuditDTO audit;
 
+  @JsonProperty("finishedAt")
+  private final Instant finishedAt;
+
   /** Default constructor for Jackson deserialization. */
   private JobDTO() {
-    this(null, null, null, null);
+    this(null, null, null, null, null);
   }
 
   /**
@@ -70,12 +74,20 @@ public class JobDTO {
    * @param jobTemplateName The name of the job template used for this job.
    * @param status The current status of the job.
    * @param audit The audit information associated with the job.
+   * @param finishedAt The time when the job finished execution, or null if the job has not finished
+   *     execution yet.
    */
-  public JobDTO(String jobId, String jobTemplateName, JobHandle.Status status, AuditDTO audit) {
+  public JobDTO(
+      String jobId,
+      String jobTemplateName,
+      JobHandle.Status status,
+      AuditDTO audit,
+      Instant finishedAt) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.status = status;
     this.audit = audit;
+    this.finishedAt = finishedAt;
   }
 
   /**
