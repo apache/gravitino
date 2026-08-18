@@ -185,11 +185,11 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         ident,
         LockType.WRITE,
         () -> {
-          // Same pattern as CatalogManager.createCatalog: writeSecrets inside the locked try;
-          // only roll back when the underlying create did not succeed (needClean stays true).
+          // Persist the fileset first, then write secrets so already-exists / create failure
+          // does not leave provider-side secrets. Roll back only when writeSecrets ran and
+          // the create path still failed (needClean stays true).
           boolean needClean = true;
           try {
-            secretManager.writeSecrets(secretMaterials);
             Fileset createdFileset =
                 doWithCatalog(
                     catalogIdent,
@@ -200,6 +200,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                                     ident, comment, type, storageLocations, updatedProperties)),
                     NoSuchSchemaException.class,
                     FilesetAlreadyExistsException.class);
+            secretManager.writeSecrets(secretMaterials);
             needClean = false;
             return EntityCombinedFileset.of(createdFileset)
                 .withHiddenProperties(

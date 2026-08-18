@@ -1351,29 +1351,21 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testCreateWithSecrets() throws Exception {
-    try (SecretManager secrets = memorySecretManager()) {
-      CatalogManager manager =
-          new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets);
-      NameIdentifier ident = NameIdentifier.of("metalake", "secret_catalog_ok");
-      Map<String, String> props =
-          ImmutableMap.of(
-              "provider",
-              "test",
-              PROPERTY_KEY1,
-              "value1",
-              PROPERTY_KEY2,
-              "value2",
-              PROPERTY_KEY5_PREFIX + "1",
-              "value3");
-      Map<String, SecretBinding> bindings =
-          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t"));
-
+  void testSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_ok");
       Catalog catalog =
           manager.createCatalog(
-              ident, Catalog.Type.RELATIONAL, provider, "comment", props, bindings, Map.of());
+              ident,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "comment",
+              catalogProps(),
+              Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
+              Map.of());
       Assertions.assertFalse(catalog.properties().containsKey(PROPERTY_KEY4));
-
       String urn =
           entityStore
               .get(ident, EntityType.CATALOG, CatalogEntity.class)
@@ -1381,43 +1373,22 @@ public class TestCatalogManager {
               .get(PROPERTY_KEY4);
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
-
       Assertions.assertTrue(manager.dropCatalog(ident, true));
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
-      manager.close();
     }
   }
 
   @Test
-  void testCreateSecretRollback() throws Exception {
+  void testSecretRollback() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
-      AtomicLong nextId = new AtomicLong(4242L);
-      IdGenerator ids = nextId::getAndIncrement;
+      IdGenerator ids = new AtomicLong(4242L)::getAndIncrement;
       CatalogManager manager = Mockito.spy(new CatalogManager(config, entityStore, ids, secrets));
-      NameIdentifier ident = NameIdentifier.of("metalake", "secret_catalog_fail");
-      Map<String, String> props =
-          ImmutableMap.of(
-              "provider",
-              "test",
-              PROPERTY_KEY1,
-              "value1",
-              PROPERTY_KEY2,
-              "value2",
-              PROPERTY_KEY5_PREFIX + "1",
-              "value3");
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_fail");
       Mockito.doThrow(new RuntimeException("init failed"))
           .when(manager)
           .createCatalogWrapper(any(CatalogEntity.class), any());
-
-      SecretUrn urn =
-          SecretUrn.buildWriteThrough(
-              "memory",
-              Map.of(
-                  SecretConstants.ATTR_ENTITY_TYPE, "catalog",
-                  SecretConstants.ATTR_ENTITY_ID, "4242",
-                  SecretConstants.ATTR_PROPERTY_KEY, PROPERTY_KEY4));
-
+      SecretUrn urn = writeThroughUrn("catalog", 4242L, PROPERTY_KEY4);
       Assertions.assertThrows(
           RuntimeException.class,
           () ->
@@ -1426,7 +1397,7 @@ public class TestCatalogManager {
                   Catalog.Type.RELATIONAL,
                   provider,
                   "comment",
-                  props,
+                  catalogProps(),
                   Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
                   Map.of()));
       Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
@@ -1436,20 +1407,13 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testCreateSecretSkippedNoMetalake() throws Exception {
-    try (SecretManager secrets = memorySecretManager()) {
-      AtomicLong nextId = new AtomicLong(4343L);
-      IdGenerator ids = nextId::getAndIncrement;
-      CatalogManager manager = new CatalogManager(config, entityStore, ids, secrets);
+  void testSecretNoMetalake() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(
+                config, entityStore, new AtomicLong(4343L)::getAndIncrement, secrets)) {
       NameIdentifier ident = NameIdentifier.of("missing_metalake", "secret_catalog");
-      SecretUrn urn =
-          SecretUrn.buildWriteThrough(
-              "memory",
-              Map.of(
-                  SecretConstants.ATTR_ENTITY_TYPE, "catalog",
-                  SecretConstants.ATTR_ENTITY_ID, "4343",
-                  SecretConstants.ATTR_PROPERTY_KEY, PROPERTY_KEY4));
-
+      SecretUrn urn = writeThroughUrn("catalog", 4343L, PROPERTY_KEY4);
       Assertions.assertThrows(
           NoSuchMetalakeException.class,
           () ->
@@ -1458,20 +1422,32 @@ public class TestCatalogManager {
                   Catalog.Type.RELATIONAL,
                   provider,
                   "comment",
-                  ImmutableMap.of(
-                      "provider",
-                      "test",
-                      PROPERTY_KEY1,
-                      "value1",
-                      PROPERTY_KEY2,
-                      "value2",
-                      PROPERTY_KEY5_PREFIX + "1",
-                      "value3"),
+                  catalogProps(),
                   Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
                   Map.of()));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
-      manager.close();
     }
+  }
+
+  private static Map<String, String> catalogProps() {
+    return ImmutableMap.of(
+        "provider",
+        "test",
+        PROPERTY_KEY1,
+        "value1",
+        PROPERTY_KEY2,
+        "value2",
+        PROPERTY_KEY5_PREFIX + "1",
+        "value3");
+  }
+
+  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
+    return SecretUrn.buildWriteThrough(
+        "memory",
+        Map.of(
+            SecretConstants.ATTR_ENTITY_TYPE, entityType,
+            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+            SecretConstants.ATTR_PROPERTY_KEY, key));
   }
 
   private static SecretManager memorySecretManager() {

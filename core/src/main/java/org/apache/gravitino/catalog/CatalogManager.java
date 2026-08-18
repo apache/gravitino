@@ -650,9 +650,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           checkMetalake(metalakeIdent, store);
           boolean needClean = true;
           try {
-            secretManager.writeSecrets(secretMaterials);
-
             store.put(e, false /* overwrite */);
+            secretManager.writeSecrets(secretMaterials);
             CatalogWrapper wrapper =
                 catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 
@@ -660,10 +659,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             return wrapper.catalog;
 
           } catch (EntityAlreadyExistsException e1) {
-            // Catalog already exists: do not delete it, but roll back secrets written for this
-            // attempt (needClean is false so finally will not roll back).
+            // store.put failed first, so secrets were not written for this attempt.
             needClean = false;
-            secretManager.rollbackSecrets(secretMaterials);
             LOG.warn("Catalog {} already exists", ident, e1);
             throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
 
@@ -680,8 +677,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } finally {
             if (needClean) {
-              // Create failed after writeSecrets (or writeSecrets itself failed — rollback is
-              // best-effort / idempotent with writeSecrets' own partial cleanup).
+              // Create failed after store.put / writeSecrets (or writeSecrets itself failed —
+              // rollback is best-effort / idempotent with writeSecrets' own partial cleanup).
               secretManager.rollbackSecrets(secretMaterials);
               // since we put the catalog entity into the store but failed to create the catalog
               // instance,

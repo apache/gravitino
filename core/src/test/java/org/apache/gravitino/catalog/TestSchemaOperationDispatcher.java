@@ -423,15 +423,14 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateWithSecrets() throws Exception {
+  public void testSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       SchemaOperationDispatcher d =
           new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secrets);
-      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_1");
-      Map<String, String> props = ImmutableMap.of("k1", "v1");
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret");
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
-
-      Schema schema = d.createSchema(ident, "comment", props, bindings, Map.of());
+      Schema schema =
+          d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of());
       Assertions.assertFalse(schema.properties().containsKey("k2"));
 
       Schema stored =
@@ -440,7 +439,6 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
               .doWithSchemaOps(ops -> ops.loadSchema(ident));
       Assertions.assertTrue(
           SecretPropertyUtils.isSecretProperty("k2", stored.properties().get("k2")));
-
       SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
@@ -452,7 +450,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
-          () -> d.createSchema(ident, "comment", props, bindings, Map.of()));
+          () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of()));
       Assertions.assertTrue(d.dropSchema(ident, false));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }
