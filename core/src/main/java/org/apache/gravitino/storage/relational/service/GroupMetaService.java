@@ -48,6 +48,8 @@ import org.apache.gravitino.storage.relational.po.ExtendedGroupPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.GroupRoleRelPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.cache.OperateType;
+import org.apache.gravitino.storage.relational.utils.EntityChangeLogs;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -230,7 +232,13 @@ public class GroupMetaService {
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
-                        groupId, Entity.EntityType.GROUP.name())));
+                        groupId, Entity.EntityType.GROUP.name())),
+        () ->
+            EntityChangeLogs.insert(
+                identifier.namespace().level(0),
+                Entity.EntityType.GROUP,
+                identifier,
+                OperateType.DROP));
     return true;
   }
 
@@ -301,7 +309,13 @@ public class GroupMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   GroupMetaMapper.class,
-                  mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())));
+                  mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())),
+          () ->
+              EntityChangeLogs.insert(
+                  identifier.namespace().level(0),
+                  Entity.EntityType.GROUP,
+                  identifier,
+                  OperateType.ALTER));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
@@ -450,7 +464,13 @@ public class GroupMetaService {
           () ->
               SessionUtils.doWithoutCommit(
                   GroupMetaMapper.class,
-                  mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())));
+                  mapper -> mapper.touchGroupUpdatedAt(oldGroupPO.getGroupId())),
+          () ->
+              EntityChangeLogs.insert(
+                  metalake,
+                  Entity.EntityType.GROUP,
+                  newEntity.nameIdentifier(),
+                  OperateType.ALTER));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.GROUP, newEntity.nameIdentifier().toString());
@@ -463,11 +483,13 @@ public class GroupMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteGroupById")
   public boolean deleteGroupById(String metalake, long groupId) {
+    GroupPO groupPO;
     try {
-      getGroupPOByMetalakeNameAndId(metalake, groupId);
+      groupPO = getGroupPOByMetalakeNameAndId(metalake, groupId);
     } catch (NoSuchEntityException e) {
       return false;
     }
+    NameIdentifier ident = AuthorizationUtils.ofGroup(metalake, groupPO.getGroupName());
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -482,7 +504,8 @@ public class GroupMetaService {
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
-                        groupId, Entity.EntityType.GROUP.name())));
+                        groupId, Entity.EntityType.GROUP.name())),
+        () -> EntityChangeLogs.insert(metalake, Entity.EntityType.GROUP, ident, OperateType.DROP));
     return true;
   }
 

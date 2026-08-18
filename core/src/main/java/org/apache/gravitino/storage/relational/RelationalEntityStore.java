@@ -240,7 +240,7 @@ public class RelationalEntityStore
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
       throws NoSuchEntityException, IOException {
     E updatedEntity = backend.updateById(ident, entityType, updater);
-    cache.put(updatedEntity);
+    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
     return updatedEntity;
   }
 

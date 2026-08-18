@@ -119,6 +119,25 @@ public class TestJcasbinChangePoller {
   }
 
   @Test
+  void testSkipsUserAndGroupChangeLogWithoutInvalidation() {
+    RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
+    RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
+
+    JcasbinChangeListener poller = new JcasbinChangeListener(metadataIdCache, ownerRelCache, 1);
+    poller.onEntityChange(
+        List.of(
+            new EntityChangeRecord(
+                1L, "ml1", "USER", "ml1.system.user.alice", OperateType.ALTER, 0L),
+            new EntityChangeRecord(
+                2L, "ml1", "GROUP", "ml1.system.group.eng", OperateType.ALTER, 0L),
+            change(3L, MetadataObject.Type.CATALOG, "ml1.cat1")));
+
+    Assertions.assertEquals(
+        List.of(key("ml1", "CATALOG", "cat1", "")), metadataIdCache.invalidatedPrefixes);
+    Assertions.assertEquals(List.of(), metadataIdCache.invalidatedKeys);
+  }
+
+  @Test
   void testVirtualNamespaceTypesAreSkippedWithoutFailingTheBatch() {
     RecordingCache<String, Long> metadataIdCache = new RecordingCache<>();
     RecordingCache<Long, Optional<OwnerInfo>> ownerRelCache = new RecordingCache<>();
