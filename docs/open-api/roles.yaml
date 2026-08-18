@@ -199,6 +199,7 @@ components:
             - CREATE_SCHEMA
             - USE_SCHEMA
             - CREATE_TABLE
+            - PROBE_TABLE_LIKE
             - MODIFY_TABLE
             - SELECT_TABLE
             - CREATE_FILESET

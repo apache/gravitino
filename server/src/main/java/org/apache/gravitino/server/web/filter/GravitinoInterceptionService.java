@@ -232,7 +232,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                     parameters,
                     args,
                     secondaryExpression,
-                    secondaryExpressionCondition);
+                    secondaryExpressionCondition,
+                    expressionAnnotation.allowCheckExistence());
             boolean authorizeResult = executor.execute(authorizationRequestContext);
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();
