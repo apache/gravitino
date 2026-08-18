@@ -48,8 +48,6 @@ import org.apache.gravitino.storage.relational.po.ExtendedUserPO;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.UserRoleRelPO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
-import org.apache.gravitino.storage.relational.utils.EntityChangeLogs;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -191,13 +189,7 @@ public class UserMetaService {
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
-                        userId, Entity.EntityType.USER.name())),
-        () ->
-            EntityChangeLogs.insert(
-                identifier.namespace().level(0),
-                Entity.EntityType.USER,
-                identifier,
-                OperateType.DROP));
+                        userId, Entity.EntityType.USER.name())));
     return true;
   }
 
@@ -264,13 +256,8 @@ public class UserMetaService {
           },
           () ->
               SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class, mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())),
-          () ->
-              EntityChangeLogs.insert(
-                  identifier.namespace().level(0),
-                  Entity.EntityType.USER,
-                  identifier,
-                  OperateType.ALTER));
+                  UserMetaMapper.class,
+                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
@@ -412,10 +399,8 @@ public class UserMetaService {
                           POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
           () ->
               SessionUtils.doWithoutCommit(
-                  UserMetaMapper.class, mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())),
-          () ->
-              EntityChangeLogs.insert(
-                  metalake, Entity.EntityType.USER, newEntity.nameIdentifier(), OperateType.ALTER));
+                  UserMetaMapper.class,
+                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
@@ -428,13 +413,11 @@ public class UserMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteUserById")
   public boolean deleteUserById(String metalake, long userId) {
-    UserPO userPO;
     try {
-      userPO = getUserPOByMetalakeNameAndId(metalake, userId);
+      getUserPOByMetalakeNameAndId(metalake, userId);
     } catch (NoSuchEntityException e) {
       return false;
     }
-    NameIdentifier ident = AuthorizationUtils.ofUser(metalake, userPO.getUserName());
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -448,8 +431,7 @@ public class UserMetaService {
                 OwnerMetaMapper.class,
                 mapper ->
                     mapper.softDeleteOwnerRelByOwnerIdAndType(
-                        userId, Entity.EntityType.USER.name())),
-        () -> EntityChangeLogs.insert(metalake, Entity.EntityType.USER, ident, OperateType.DROP));
+                        userId, Entity.EntityType.USER.name())));
     return true;
   }
 

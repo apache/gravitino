@@ -65,6 +65,7 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
   private List<String> roleNames;
   private List<Long> roleIds;
   private Namespace namespace;
+  private long updatedAt;
 
   private UserEntity() {}
 
@@ -175,6 +176,16 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     return roleIds;
   }
 
+  /**
+   * Returns the {@code user_meta.updated_at} sentinel used to version-validate name-keyed entity
+   * cache entries. Not part of the public {@link User} API.
+   *
+   * @return milliseconds since epoch, or {@code 0} when the row has never been touched
+   */
+  public long updatedAt() {
+    return updatedAt;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -281,6 +292,17 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withRoleIds(List<Long> roleIds) {
       userEntity.roleIds = roleIds;
+      return this;
+    }
+
+    /**
+     * Sets the {@code user_meta.updated_at} cache version sentinel.
+     *
+     * @param updatedAt milliseconds since epoch
+     * @return The builder instance.
+     */
+    public Builder withUpdatedAt(long updatedAt) {
+      userEntity.updatedAt = updatedAt;
       return this;
     }
 

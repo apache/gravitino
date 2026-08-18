@@ -170,8 +170,7 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    boolean existsInCache = cache.contains(ident, entityType);
-    return existsInCache || backend.exists(ident, entityType);
+    return getFreshFromCache(ident, entityType).isPresent() || backend.exists(ident, entityType);
   }
 
   @Override
@@ -186,6 +185,11 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
+    if (UserGroupEntityVersions.isVersionValidatedType(entityType)) {
+      cache.invalidate(ident, entityType);
+      cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+      return updatedEntity;
+    }
     if (!ident.equals(updatedEntity.nameIdentifier())) {
       cache.invalidate(ident, entityType);
     }
@@ -200,7 +204,7 @@ public class RelationalEntityStore
     return cache.withCacheLock(
         EntityCacheKey.of(ident, entityType),
         () -> {
-          Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
+          Optional<E> entityFromCache = getFreshFromCache(ident, entityType);
           if (entityFromCache.isPresent()) {
             return entityFromCache.get();
           }
@@ -209,6 +213,29 @@ public class RelationalEntityStore
           cache.put(entity);
           return entity;
         });
+  }
+
+  /**
+   * Returns a cached entity if it is present and, for USER/GROUP, still matches {@code
+   * *_meta.updated_at}. Stale USER/GROUP entries are invalidated.
+   *
+   * @param ident the name identifier
+   * @param entityType the entity type
+   * @param <E> the entity class
+   * @return the cached entity, or empty if missing or stale
+   */
+  private <E extends Entity & HasIdentifier> Optional<E> getFreshFromCache(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    Optional<E> cached = cache.getIfPresent(ident, entityType);
+    if (cached.isEmpty()) {
+      return Optional.empty();
+    }
+    if (!UserGroupEntityVersions.isVersionValidatedType(entityType)
+        || UserGroupEntityVersions.isFresh(ident, entityType, cached.get())) {
+      return cached;
+    }
+    cache.invalidate(ident, entityType);
+    return Optional.empty();
   }
 
   @Override
@@ -269,7 +296,7 @@ public class RelationalEntityStore
         idents.stream()
             .filter(
                 ident -> {
-                  Optional<E> entity = cache.getIfPresent(ident, entityType);
+                  Optional<E> entity = getFreshFromCache(ident, entityType);
                   entity.ifPresent(allEntities::add);
                   return entity.isEmpty();
                 })

@@ -56,9 +56,9 @@ import org.slf4j.LoggerFactory;
  *
  * <p>Relation query results are NOT cached by this implementation; relation and list operations
  * always fall back to the {@code EntityStore}. Only the self-contained metadata objects listed in
- * {@link BaseEntityCache#isCacheable} are cached; every other type (user/group/role, model/model
- * version, function, job template, and any type not in that allowlist) is read straight from the
- * {@code EntityStore}.
+ * {@link BaseEntityCache#isCacheable} are cached; every other type (role, model/model version,
+ * function, job template, and any type not in that allowlist) is read straight from the {@code
+ * EntityStore}. User and group entries are version-validated on {@code get}.
  */
 public class CaffeineEntityCache extends BaseEntityCache {
   private static final int CACHE_CLEANUP_CORE_THREADS = 1;

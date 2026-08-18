@@ -46,7 +46,7 @@ public class UserMetaBaseSQLProvider {
         + " metalake_id as metalakeId,"
         + " external_id as externalId, enabled as enabled,"
         + " audit_info as auditInfo, current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " last_version as lastVersion, deleted_at as deletedAt, updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
@@ -59,7 +59,7 @@ public class UserMetaBaseSQLProvider {
         + " ut.metalake_id as metalakeId,"
         + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
-        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt, ut.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "
@@ -76,7 +76,7 @@ public class UserMetaBaseSQLProvider {
         + " ut.metalake_id as metalakeId,"
         + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
-        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt, ut.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "
@@ -174,7 +174,7 @@ public class UserMetaBaseSQLProvider {
         + " us.metalake_id as metalakeId,"
         + " us.external_id as externalId, us.enabled as enabled,"
         + " us.audit_info as auditInfo, us.current_version as currentVersion,"
-        + " us.last_version as lastVersion, us.deleted_at as deletedAt"
+        + " us.last_version as lastVersion, us.deleted_at as deletedAt, us.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " us JOIN "
@@ -190,7 +190,7 @@ public class UserMetaBaseSQLProvider {
         + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
-        + " ut.deleted_at as deletedAt"
+        + " ut.deleted_at as deletedAt, ut.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "

@@ -20,7 +20,6 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.SQLException;
@@ -31,22 +30,18 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
-import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.JobEntity;
 import org.apache.gravitino.meta.JobTemplateEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
-import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
-import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
@@ -673,129 +668,6 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         METALAKE_NAME,
         Entity.EntityType.JOB,
         job.nameIdentifier().toString(),
-        OperateType.DROP);
-  }
-
-  @TestTemplate
-  void testUserAndGroupChangeLogOnAlterAndDrop() throws IOException {
-    createAndInsertMakeLake(METALAKE_NAME);
-    createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
-
-    UserEntity user =
-        createUserEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
-            "changelog_user",
-            AUDIT_INFO);
-    UserMetaService.getInstance().insertUser(user, false);
-
-    long maxIdBeforeUserAlter = maxEntityChangeId();
-    UserMetaService.getInstance()
-        .updateUserById(
-            METALAKE_NAME,
-            user.id(),
-            existing -> {
-              UserEntity current = (UserEntity) existing;
-              return UserEntity.builder()
-                  .withId(current.id())
-                  .withName(current.name())
-                  .withNamespace(current.namespace())
-                  .withExternalId(current.externalId())
-                  .withEnabled(false)
-                  .withRoleNames(current.roleNames())
-                  .withRoleIds(current.roleIds())
-                  .withAuditInfo(current.auditInfo())
-                  .build();
-            });
-    assertEntityChange(
-        maxIdBeforeUserAlter,
-        METALAKE_NAME,
-        Entity.EntityType.USER,
-        AuthorizationUtils.ofUser(METALAKE_NAME, user.name()).toString(),
-        OperateType.ALTER);
-
-    RoleEntity role =
-        createRoleEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
-            "changelog_role",
-            AUDIT_INFO,
-            CATALOG_NAME);
-    RoleMetaService.getInstance().insertRole(role, false);
-    long maxIdBeforeUserGrant = maxEntityChangeId();
-    UserMetaService.getInstance()
-        .updateUser(
-            user.nameIdentifier(),
-            existing -> {
-              UserEntity current = (UserEntity) existing;
-              return UserEntity.builder()
-                  .withId(current.id())
-                  .withName(current.name())
-                  .withNamespace(current.namespace())
-                  .withExternalId(current.externalId())
-                  .withEnabled(current.enabled())
-                  .withRoleNames(Lists.newArrayList(role.name()))
-                  .withRoleIds(Lists.newArrayList(role.id()))
-                  .withAuditInfo(current.auditInfo())
-                  .build();
-            });
-    assertEntityChange(
-        maxIdBeforeUserGrant,
-        METALAKE_NAME,
-        Entity.EntityType.USER,
-        AuthorizationUtils.ofUser(METALAKE_NAME, user.name()).toString(),
-        OperateType.ALTER);
-
-    long maxIdBeforeUserDrop = maxEntityChangeId();
-    Assertions.assertTrue(UserMetaService.getInstance().deleteUserById(METALAKE_NAME, user.id()));
-    assertEntityChange(
-        maxIdBeforeUserDrop,
-        METALAKE_NAME,
-        Entity.EntityType.USER,
-        AuthorizationUtils.ofUser(METALAKE_NAME, user.name()).toString(),
-        OperateType.DROP);
-
-    GroupEntity group =
-        createGroupEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            AuthorizationUtils.ofGroupNamespace(METALAKE_NAME),
-            "changelog_group",
-            AUDIT_INFO,
-            Lists.newArrayList(),
-            Lists.newArrayList());
-    GroupMetaService.getInstance().insertGroup(group, false);
-
-    long maxIdBeforeGroupAlter = maxEntityChangeId();
-    GroupMetaService.getInstance()
-        .updateGroupById(
-            METALAKE_NAME,
-            group.id(),
-            existing -> {
-              GroupEntity current = (GroupEntity) existing;
-              return GroupEntity.builder()
-                  .withId(current.id())
-                  .withName(current.name())
-                  .withNamespace(current.namespace())
-                  .withExternalId("ext-new")
-                  .withRoleNames(current.roleNames())
-                  .withRoleIds(current.roleIds())
-                  .withAuditInfo(current.auditInfo())
-                  .build();
-            });
-    assertEntityChange(
-        maxIdBeforeGroupAlter,
-        METALAKE_NAME,
-        Entity.EntityType.GROUP,
-        AuthorizationUtils.ofGroup(METALAKE_NAME, group.name()).toString(),
-        OperateType.ALTER);
-
-    long maxIdBeforeGroupDrop = maxEntityChangeId();
-    Assertions.assertTrue(GroupMetaService.getInstance().deleteGroup(group.nameIdentifier()));
-    assertEntityChange(
-        maxIdBeforeGroupDrop,
-        METALAKE_NAME,
-        Entity.EntityType.GROUP,
-        AuthorizationUtils.ofGroup(METALAKE_NAME, group.name()).toString(),
         OperateType.DROP);
   }
 }

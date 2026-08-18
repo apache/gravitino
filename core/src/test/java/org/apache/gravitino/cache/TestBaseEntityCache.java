@@ -52,7 +52,9 @@ public class TestBaseEntityCache {
           Entity.EntityType.FILESET,
           Entity.EntityType.TAG,
           Entity.EntityType.POLICY,
-          Entity.EntityType.JOB);
+          Entity.EntityType.JOB,
+          Entity.EntityType.USER,
+          Entity.EntityType.GROUP);
 
   private RecordingCache cache;
 
@@ -79,12 +81,18 @@ public class TestBaseEntityCache {
 
   @Test
   void testPutSkipsNonCacheableTypesForSubclasses() {
-    cache.put(TestUtil.getTestUserEntity());
-    cache.put(TestUtil.getTestGroupEntity());
     cache.put(TestUtil.getTestRoleEntity());
 
     Assertions.assertTrue(
         cache.cached.isEmpty(), "Subclasses must never see non-cacheable entities in doPut");
+  }
+
+  @Test
+  void testPutCachesUserAndGroup() {
+    cache.put(TestUtil.getTestUserEntity());
+    cache.put(TestUtil.getTestGroupEntity());
+
+    Assertions.assertEquals(2, cache.cached.size());
   }
 
   @Test
@@ -99,7 +107,7 @@ public class TestBaseEntityCache {
 
   @Test
   void testPutInvalidatesRelatedKeysEvenForNonCacheableTypes() {
-    cache.put(TestUtil.getTestUserEntity());
+    cache.put(TestUtil.getTestRoleEntity());
 
     Assertions.assertEquals(
         1,
