@@ -89,10 +89,16 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
         + " audit_info = #{catalogMeta.auditInfo},"
         // Move the version forward instead of writing the initial version again. Resetting it
         // would let a slow alter or drop that still holds an older version pass its own version
-        // check later on. A bare column name here means the value the row has now, and PostgreSQL
-        // computes every assignment from that same row.
-        + " current_version = current_version + 1,"
-        + " last_version = current_version + 1,"
+        // check later on. The column has to be written as <table>.<column> here: on this side of
+        // ON CONFLICT a bare name could mean either the stored row or the rejected one, and
+        // PostgreSQL refuses it as ambiguous. The table-qualified name is the stored row, and
+        // PostgreSQL computes every assignment from it.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 
