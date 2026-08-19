@@ -24,6 +24,7 @@ import org.apache.gravitino.spark.connector.jdbc.GravitinoJdbcCatalogSpark35;
 import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark35;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import scala.util.Properties$;
 
 public class TestCatalogNameAdaptor {
   @Test
@@ -44,5 +45,14 @@ public class TestCatalogNameAdaptor {
 
     String jdbcCatalogName = CatalogNameAdaptor.getCatalogName("jdbc");
     Assertions.assertEquals(GravitinoJdbcCatalogSpark35.class.getName(), jdbcCatalogName);
+
+    String dorisCatalogName = CatalogNameAdaptor.getCatalogName("jdbc-doris");
+    if (Properties$.MODULE$.versionNumberString().startsWith("2.12")) {
+      Assertions.assertEquals(
+          "org.apache.gravitino.spark.connector.jdbc.doris.GravitinoDorisCatalogSpark35",
+          dorisCatalogName);
+    } else {
+      Assertions.assertNull(dorisCatalogName);
+    }
   }
 }

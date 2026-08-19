@@ -251,6 +251,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   protected void initCatalogEnv() throws Exception {}
 
+  /**
+   * Allows a version-specific integration test to add Spark configuration before session startup.
+   */
+  protected void configureSparkConf(SparkConf sparkConf) {}
+
   private void initIcebergRestServiceEnv() {
     super.ignoreIcebergAuxRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
@@ -315,6 +320,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
     getExtraSparkConfigs().forEach(sparkConf::set);
+    configureSparkConf(sparkConf);
     sparkSession =
         SparkSession.builder()
             .master("local[1]")

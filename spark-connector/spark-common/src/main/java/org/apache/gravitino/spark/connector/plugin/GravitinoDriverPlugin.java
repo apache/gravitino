@@ -74,6 +74,8 @@ import scala.Option;
 public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
+  private static final String DORIS_SPARK_CATALOG_CLASS =
+      "org.apache.doris.spark.catalog.DorisTableCatalog";
 
   @VisibleForTesting
   static final String PAIMON_SPARK_EXTENSIONS =
@@ -94,6 +96,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
           Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+  private boolean enableDorisSupport = false;
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -114,6 +117,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
     this.enablePaimonSupport =
         conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    this.enableDorisSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_DORIS_SUPPORT, false);
     if (enablePaimonSupport) {
       gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
     }
@@ -141,8 +146,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(
-      SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
+  @VisibleForTesting
+  void registerGravitinoCatalogs(SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
     gravitinoCatalogs
         .entrySet()
         .forEach(
@@ -158,12 +163,50 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                   && !enablePaimonSupport) {
                 return;
               }
+              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT)) && !enableDorisSupport) {
+                // Keep the existing generic JDBC behavior when the specialized adapter is not
+                // explicitly enabled. The provider-specific mapping is reserved for the opt-in
+                // Doris path below.
+                try {
+                  registerCatalog(sparkConf, catalogName, "jdbc");
+                } catch (Exception e) {
+                  LOG.warn("Register catalog {} failed.", catalogName, e);
+                }
+                return;
+              }
+              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT))
+                  && enableDorisSupport
+                  && StringUtils.isBlank(CatalogNameAdaptor.getCatalogName(provider))) {
+                throw new IllegalArgumentException(
+                    "Apache Doris Spark support requires Spark 3.5.3 or newer in the Spark 3.5 "
+                        + "line with Scala 2.12");
+              }
+              if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT)) && enableDorisSupport) {
+                validateDorisDependency(Thread.currentThread().getContextClassLoader());
+              }
               try {
                 registerCatalog(sparkConf, catalogName, provider);
               } catch (Exception e) {
                 LOG.warn("Register catalog {} failed.", catalogName, e);
               }
             });
+  }
+
+  @VisibleForTesting
+  void setDorisSupportEnabled(boolean enabled) {
+    this.enableDorisSupport = enabled;
+  }
+
+  @VisibleForTesting
+  static void validateDorisDependency(ClassLoader classLoader) {
+    ClassLoader effectiveClassLoader =
+        classLoader == null ? GravitinoDriverPlugin.class.getClassLoader() : classLoader;
+    try {
+      Class.forName(DORIS_SPARK_CATALOG_CLASS, false, effectiveClassLoader);
+    } catch (ClassNotFoundException | LinkageError e) {
+      throw new IllegalArgumentException(
+          "Apache Doris Spark Connector 26.0.0 must be available on the driver and executors", e);
+    }
   }
 
   private void registerCatalog(SparkConf sparkConf, String catalogName, String provider) {

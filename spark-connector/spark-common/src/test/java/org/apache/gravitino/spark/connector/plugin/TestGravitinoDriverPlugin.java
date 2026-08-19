@@ -20,16 +20,21 @@
 package org.apache.gravitino.spark.connector.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin.DynamicBearerTokenProvider;
+import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf;
@@ -140,6 +145,54 @@ public class TestGravitinoDriverPlugin {
                     "http://127.0.0.1:1", "metalake", sparkConf, "user", ImmutableMap.of()));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_VALUE));
     Assertions.assertTrue(e.getMessage().contains(GravitinoSparkConfig.GRAVITINO_TOKEN_FILE));
+  }
+
+  @Test
+  void testDorisCatalogRegistrationIsOptIn() {
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.provider()).thenReturn("jdbc-doris");
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin();
+    SparkConf sparkConf = new SparkConf(false);
+
+    plugin.registerGravitinoCatalogs(sparkConf, ImmutableMap.of("doris", catalog));
+    assertTrue(sparkConf.contains("spark.sql.catalog.doris"));
+    assertEquals(
+        CatalogNameAdaptor.getCatalogName("jdbc"), sparkConf.get("spark.sql.catalog.doris"));
+
+    plugin.setDorisSupportEnabled(true);
+    String dorisCatalogClassName = CatalogNameAdaptor.getCatalogName("jdbc-doris");
+    if (dorisCatalogClassName != null) {
+      SparkConf dorisSparkConf = new SparkConf(false);
+      plugin.registerGravitinoCatalogs(dorisSparkConf, ImmutableMap.of("doris", catalog));
+      assertTrue(dorisSparkConf.contains("spark.sql.catalog.doris"));
+      assertEquals(dorisCatalogClassName, dorisSparkConf.get("spark.sql.catalog.doris"));
+    } else {
+      Assertions.assertThrows(
+          IllegalArgumentException.class,
+          () ->
+              plugin.registerGravitinoCatalogs(
+                  new SparkConf(false), ImmutableMap.of("doris", catalog)));
+    }
+  }
+
+  @Test
+  void testDorisDependencyPreflight() {
+    Assertions.assertDoesNotThrow(
+        () -> GravitinoDriverPlugin.validateDorisDependency(getClass().getClassLoader()));
+
+    ClassLoader missingDependencyLoader =
+        new ClassLoader(getClass().getClassLoader()) {
+          @Override
+          protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
+            if ("org.apache.doris.spark.catalog.DorisTableCatalog".equals(name)) {
+              throw new ClassNotFoundException(name);
+            }
+            return super.loadClass(name, resolve);
+          }
+        };
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoDriverPlugin.validateDorisDependency(missingDependencyLoader));
   }
 
   private static SparkConf tokenAuthConf() {
