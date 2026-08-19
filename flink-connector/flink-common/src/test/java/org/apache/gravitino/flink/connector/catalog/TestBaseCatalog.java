@@ -33,14 +33,18 @@ import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
 import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
@@ -401,5 +405,59 @@ public class TestBaseCatalog {
     protected Catalog catalog() {
       return gravitinoCatalog;
     }
+  }
+
+  @Test
+  public void testGetTableThrowsCatalogExceptionWhenForbidden() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    org.apache.gravitino.TableCatalog tableCatalog =
+        Mockito.mock(org.apache.gravitino.TableCatalog.class);
+    org.apache.gravitino.SchemaCatalog schemaCatalog =
+        Mockito.mock(org.apache.gravitino.SchemaCatalog.class);
+
+    ObjectPath tablePath = new ObjectPath("db", "tbl");
+    NameIdentifier ident = NameIdentifier.of("db", "tbl");
+
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(gravitinoCatalog.asSchemas()).thenReturn(schemaCatalog);
+    Mockito.when(tableCatalog.loadTable(ident))
+        .thenThrow(new ForbiddenException("Access denied"));
+    // table name is NOT a schema -> real auth failure
+    Mockito.when(schemaCatalog.schemaExists("tbl")).thenReturn(false);
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    Assertions.assertThrows(
+        CatalogException.class,
+        () -> catalog.getTable(tablePath),
+        "Should throw CatalogException for real auth failure");
+  }
+
+  @Test
+  public void testGetTableThrowsTableNotExistWhenSpeculativeSchemaProbe() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    org.apache.gravitino.TableCatalog tableCatalog =
+        Mockito.mock(org.apache.gravitino.TableCatalog.class);
+    org.apache.gravitino.SchemaCatalog schemaCatalog =
+        Mockito.mock(org.apache.gravitino.SchemaCatalog.class);
+
+    ObjectPath tablePath = new ObjectPath("default", "db");
+    NameIdentifier ident = NameIdentifier.of("default", "db");
+
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(gravitinoCatalog.asSchemas()).thenReturn(schemaCatalog);
+    Mockito.when(tableCatalog.loadTable(ident))
+        .thenThrow(new ForbiddenException("Access denied"));
+    // table name IS a schema -> speculative probe
+    Mockito.when(schemaCatalog.schemaExists("db")).thenReturn(true);
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    Assertions.assertThrows(
+        TableNotExistException.class,
+        () -> catalog.getTable(tablePath),
+        "Should throw TableNotExistException for speculative schema probe");
   }
 }
