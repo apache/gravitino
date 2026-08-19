@@ -497,6 +497,8 @@ components:
             - "FILESET"
             - "TOPIC"
             - "MODEL"
+            - "VIEW"
+            - "FUNCTION"
             - "COLUMN"
 
     PolicyCreateRequestBase:
