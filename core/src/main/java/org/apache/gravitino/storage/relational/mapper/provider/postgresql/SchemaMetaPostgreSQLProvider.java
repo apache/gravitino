@@ -125,14 +125,6 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + "</script>";
   }
 
-  @Override
-  public String softDeleteSchemaMetasByCatalogId(Long catalogId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
-  }
-
   /** {@inheritDoc} */
   @Override
   public String softDeleteSchemaMetasWithVersion(List<SchemaPO> schemaPOs) {

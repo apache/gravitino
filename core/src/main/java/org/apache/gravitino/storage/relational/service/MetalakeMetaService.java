@@ -407,11 +407,11 @@ public class MetalakeMetaService {
 
   private RuntimeException metalakeWriteFailure(
       NameIdentifier identifier, Long metalakeId, String observedName) {
-    // Use a locking read to see the latest committed row. Under MySQL REPEATABLE READ, a plain
-    // SELECT can return an old snapshot that still contains a row another writer already deleted
-    // or renamed. We would then report a version conflict instead of a missing metalake. The CAS
-    // UPDATE above already waits for the same row lock, so the other writer has finished before
-    // this read runs.
+    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
+    // The locking read additionally waits for a writer that is still in flight, so a delete or
+    // rename that has not committed yet is reported as a missing metalake instead of as a stale
+    // version conflict. The lock is taken on the error path of a transaction that is about to roll
+    // back.
     MetalakePO currentMetalakePO =
         SessionUtils.getWithoutCommit(
             MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId));

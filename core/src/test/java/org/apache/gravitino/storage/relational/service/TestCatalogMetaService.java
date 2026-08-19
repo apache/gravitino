@@ -29,12 +29,22 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -50,7 +60,11 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -86,6 +100,84 @@ public class TestCatalogMetaService extends TestJDBCBackend {
             auditInfo);
     backend.insert(catalog, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(catalogCopy, false));
+  }
+
+  @TestTemplate
+  public void testInsertCatalogLocksMetalakeWithoutChangingVersion() throws IOException {
+    MetalakePO beforeInsert =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_fence",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    MetalakePO afterInsert =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+    assertEquals(beforeInsert.getCurrentVersion(), afterInsert.getCurrentVersion());
+    assertEquals(beforeInsert.getLastVersion(), afterInsert.getLastVersion());
+
+    CatalogEntity duplicate =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            catalog.name(),
+            auditInfo);
+    assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(duplicate, false));
+
+    MetalakePO afterFailure =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+    assertEquals(afterInsert.getCurrentVersion(), afterFailure.getCurrentVersion());
+    assertEquals(afterInsert.getLastVersion(), afterFailure.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testConcurrentSameNameCatalogCreateReportsAlreadyExists() throws Exception {
+    CatalogEntity first =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "concurrent_catalog",
+            auditInfo);
+    CatalogEntity second =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            first.name(),
+            auditInfo);
+
+    List<Throwable> results = insertCatalogsConcurrently(first, second);
+    assertEquals(1, results.stream().filter(Objects::isNull).count());
+    Throwable failure = results.stream().filter(Objects::nonNull).findFirst().orElseThrow();
+    Assertions.assertTrue(
+        failure instanceof EntityAlreadyExistsException,
+        () -> "Expected EntityAlreadyExistsException, but got " + failure);
+  }
+
+  @TestTemplate
+  public void testConcurrentDifferentCatalogCreatesBothSucceed() throws Exception {
+    CatalogEntity first =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "concurrent_catalog_1",
+            auditInfo);
+    CatalogEntity second =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "concurrent_catalog_2",
+            auditInfo);
+
+    List<Throwable> results = insertCatalogsConcurrently(first, second);
+    Assertions.assertTrue(
+        results.stream().allMatch(Objects::isNull),
+        () -> "Concurrent catalog creates failed: " + results);
   }
 
   @TestTemplate
@@ -147,6 +239,184 @@ public class TestCatalogMetaService extends TestJDBCBackend {
 
     CatalogEntity updatedCatalog = backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     Assertions.assertNotNull(updatedCatalog.getComment());
+  }
+
+  @TestTemplate
+  public void testAlterAndDeleteUseCurrentVersion() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_occ",
+            auditInfo);
+    backend.insert(catalog, false);
+    CatalogPO oldPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    CatalogEntity updatedCatalog =
+        CatalogEntity.builder()
+            .withId(catalog.id())
+            .withName(catalog.name())
+            .withNamespace(catalog.namespace())
+            .withAuditInfo(auditInfo)
+            .withComment("updated")
+            .withProperties(catalog.getProperties())
+            .withType(catalog.getType())
+            .withProvider(catalog.getProvider())
+            .build();
+    CatalogPO newPO =
+        POConverters.updateCatalogPOWithVersion(oldPO, updatedCatalog, oldPO.getMetalakeId());
+
+    int updated =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class, mapper -> mapper.updateCatalogMeta(newPO, oldPO));
+    int staleUpdate =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class, mapper -> mapper.updateCatalogMeta(newPO, oldPO));
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(catalog.id(), oldPO.getCurrentVersion()));
+    assertEquals(1, updated);
+    assertEquals(0, staleUpdate);
+    assertEquals(0, staleDelete);
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    int deleted =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(catalog.id(), newPO.getCurrentVersion()));
+    assertEquals(1, deleted);
+  }
+
+  @TestTemplate
+  public void testOverwriteInsertAdvancesCurrentVersion() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_overwrite_occ",
+            auditInfo);
+    backend.insert(catalog, false);
+    CatalogPO initialPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+
+    backend.insert(catalog, true);
+
+    CatalogPO overwrittenPO =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
+    assertEquals(
+        overwrittenPO.getCurrentVersion().longValue(), overwrittenPO.getLastVersion().longValue());
+
+    // A writer that observed the catalog before the overwrite must not pass its compare-and-set.
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            CatalogMetaMapper.class,
+            mapper ->
+                mapper.softDeleteCatalogMetasByCatalogId(
+                    catalog.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
+  public void testAlterReportsOptimisticLockConflict() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_alter_conflict",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            CatalogMetaService.getInstance()
+                .updateCatalog(
+                    catalog.nameIdentifier(),
+                    entity -> {
+                      CatalogEntity current = (CatalogEntity) entity;
+                      CatalogPO currentPO =
+                          SessionUtils.getWithoutCommit(
+                              CatalogMetaMapper.class,
+                              mapper -> mapper.selectCatalogMetaById(current.id()));
+                      CatalogEntity competingUpdate =
+                          copyCatalogWithComment(current, "competing update");
+                      CatalogPO competingPO =
+                          POConverters.updateCatalogPOWithVersion(
+                              currentPO, competingUpdate, currentPO.getMetalakeId());
+                      SessionUtils.doWithCommitAndFetchResult(
+                          CatalogMetaMapper.class,
+                          mapper -> mapper.updateCatalogMeta(competingPO, currentPO));
+                      return copyCatalogWithComment(current, "requested update");
+                    }));
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenCatalogIsDeletedConcurrently() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_alter_deleted",
+            auditInfo);
+    backend.insert(catalog, false);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            CatalogMetaService.getInstance()
+                .updateCatalog(
+                    catalog.nameIdentifier(),
+                    entity -> {
+                      CatalogEntity current = (CatalogEntity) entity;
+                      CatalogPO currentPO =
+                          SessionUtils.getWithoutCommit(
+                              CatalogMetaMapper.class,
+                              mapper -> mapper.selectCatalogMetaById(current.id()));
+                      SessionUtils.doWithCommitAndFetchResult(
+                          CatalogMetaMapper.class,
+                          mapper ->
+                              mapper.softDeleteCatalogMetasByCatalogId(
+                                  current.id(), currentPO.getCurrentVersion()));
+                      return copyCatalogWithComment(current, "requested update");
+                    }));
+  }
+
+  @TestTemplate
+  public void testNonCascadeDeleteRollsBackCatalogFence() throws IOException {
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofCatalog(metalakeName),
+            "catalog_non_empty",
+            auditInfo);
+    backend.insert(catalog, false);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalog.name()),
+            "schema",
+            auditInfo);
+    backend.insert(schema, false);
+    CatalogPO beforeDelete =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+
+    assertThrows(
+        NonEmptyEntityException.class,
+        () -> CatalogMetaService.getInstance().deleteCatalog(catalog.nameIdentifier(), false));
+
+    CatalogPO afterDelete =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class, mapper -> mapper.selectCatalogMetaById(catalog.id()));
+    assertEquals(beforeDelete.getCurrentVersion(), afterDelete.getCurrentVersion());
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
   }
 
   @TestTemplate
@@ -301,6 +571,59 @@ public class TestCatalogMetaService extends TestJDBCBackend {
     assertEquals(0, countActiveTagRelForMetadataObject(model.id(), "MODEL"));
     assertEquals(0, countActiveTagRelForMetadataObject(view.id(), "VIEW"));
     assertEquals(0, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
+  }
+
+  private List<Throwable> insertCatalogsConcurrently(CatalogEntity first, CatalogEntity second)
+      throws Exception {
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CountDownLatch ready = new CountDownLatch(2);
+    CountDownLatch start = new CountDownLatch(1);
+    try {
+      Future<Throwable> firstResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  CatalogMetaService.getInstance().insertCatalog(first, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Future<Throwable> secondResult =
+          executor.submit(
+              () -> {
+                ready.countDown();
+                start.await();
+                try {
+                  CatalogMetaService.getInstance().insertCatalog(second, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(ready.await(30, TimeUnit.SECONDS));
+      start.countDown();
+      return Arrays.asList(
+          firstResult.get(30, TimeUnit.SECONDS), secondResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      start.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  private CatalogEntity copyCatalogWithComment(CatalogEntity catalog, String comment) {
+    return CatalogEntity.builder()
+        .withId(catalog.id())
+        .withName(catalog.name())
+        .withNamespace(catalog.namespace())
+        .withType(catalog.getType())
+        .withProvider(catalog.getProvider())
+        .withComment(comment)
+        .withProperties(catalog.getProperties())
+        .withAuditInfo(auditInfo)
+        .build();
   }
 
   private void associateTag(TagEntity tag, NameIdentifier ident, Entity.EntityType type)
