@@ -32,11 +32,7 @@ public final class IdpCredentialValidator {
   /** Matches {@code idp_user_meta.user_name} and {@code idp_group_meta.group_name} column size. */
   private static final int MAX_NAME_LENGTH = 128;
 
-  /**
-   * Matches {@code idp_group_meta.group_comment} (utf8mb4 VARCHAR(1024)). Same character limit as
-   * Microsoft Entra ID / Azure AD and Okta group description (Keycloak DESCRIPTION is
-   * VARCHAR(255)).
-   */
+  /** Matches {@code idp_group_meta.group_comment} column size (utf8mb4 VARCHAR(1024)). */
   private static final int MAX_COMMENT_LENGTH = 1024;
 
   private IdpCredentialValidator() {}
