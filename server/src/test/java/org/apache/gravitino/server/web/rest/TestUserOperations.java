@@ -44,10 +44,8 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.dto.authorization.BasicUserDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.UserAddRequest;
-import org.apache.gravitino.dto.responses.BasicUserResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
@@ -244,34 +242,6 @@ public class TestUserOperations extends BaseOperationsTest {
     UserResponse userResponse = resp.readEntity(UserResponse.class);
     Assertions.assertEquals("ext-1", userResponse.getUser().externalId());
     Assertions.assertFalse(userResponse.getUser().enabled());
-  }
-
-  @Test
-  public void testGetBasicUser() throws IOException {
-
-    User user = buildUser("user1");
-
-    when(manager.getBasicUser(any(), any())).thenReturn(user);
-
-    BaseMetalake metalake = mock(BaseMetalake.class);
-    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
-    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
-    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
-    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
-
-    Response resp =
-        target("/metalakes/metalake1/users/user1/basic")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-
-    BasicUserResponse userResponse = resp.readEntity(BasicUserResponse.class);
-    Assertions.assertEquals(0, userResponse.getCode());
-    BasicUserDTO userDTO = userResponse.getUser();
-    Assertions.assertEquals("user1", userDTO.name());
-    Assertions.assertEquals(1L, userDTO.id());
   }
 
   @Test

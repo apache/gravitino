@@ -143,41 +143,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/groups/{group}/basic:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/group"
-
-    get:
-      tags:
-        - access control
-      summary: Get basic group
-      operationId: getBasicGroup
-      description: Returns the specified group metadata without role bindings
-      responses:
-        "200":
-          description: Returns the basic group object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "#/components/responses/BasicGroupResponse"
-              examples:
-                BasicGroupResponse:
-                  $ref: "#/components/examples/BasicGroupResponse"
-        "404":
-          description: Not Found - The specified group does not exist in the specified metalake
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchGroupException:
-                  $ref: "#/components/examples/NoSuchGroupException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
 components:
   parameters:
     details:
@@ -206,24 +171,6 @@ components:
           items:
             type: string
           description: The roles of the group
-        audit:
-          $ref: "./openapi.yaml#/components/schemas/Audit"
-
-    BasicGroup:
-      type: object
-      required:
-        - name
-      properties:
-        id:
-          type: integer
-          format: int64
-          description: The Gravitino-assigned id of the group
-        name:
-          type: string
-          description: The name of the group
-        externalId:
-          type: string
-          description: The external identifier of the group
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
 
@@ -267,18 +214,6 @@ components:
           items:
             $ref: "#/components/schemas/Group"
 
-    BasicGroupResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        group:
-          $ref: "#/components/schemas/BasicGroup"
-
   examples:
     GroupAddRequest:
       value: {
@@ -302,19 +237,6 @@ components:
             "creator": "gravitino",
             "createTime": "2023-12-08T06:41:25.595Z"
           },
-        }
-      }
-
-    BasicGroupResponse:
-      value: {
-        "code": 0,
-        "group": {
-          "id": 1,
-          "name": "group1",
-          "audit": {
-            "creator": "gravitino",
-            "createTime": "2023-12-08T06:41:25.595Z"
-          }
         }
       }
 

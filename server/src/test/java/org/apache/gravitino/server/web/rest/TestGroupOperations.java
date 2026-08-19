@@ -46,10 +46,8 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.connector.PropertiesMetadata;
-import org.apache.gravitino.dto.authorization.BasicGroupDTO;
 import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
-import org.apache.gravitino.dto.responses.BasicGroupResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.GroupListResponse;
@@ -245,33 +243,6 @@ public class TestGroupOperations extends BaseOperationsTest {
     Assertions.assertEquals(Status.OK.getStatusCode(), resp.getStatus());
     GroupResponse groupResponse = resp.readEntity(GroupResponse.class);
     Assertions.assertEquals("ext-group-1", groupResponse.getGroup().externalId());
-  }
-
-  @Test
-  public void testGetBasicGroup() throws IOException {
-    Group group = buildGroup("group1");
-
-    when(manager.getBasicGroup(any(), any())).thenReturn(group);
-
-    BaseMetalake metalake = mock(BaseMetalake.class);
-    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
-    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
-    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
-    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
-
-    Response resp =
-        target("/metalakes/metalake1/groups/group1/basic")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .get();
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
-
-    BasicGroupResponse groupResponse = resp.readEntity(BasicGroupResponse.class);
-    Assertions.assertEquals(0, groupResponse.getCode());
-    BasicGroupDTO groupDTO = groupResponse.getGroup();
-    Assertions.assertEquals("group1", groupDTO.name());
-    Assertions.assertEquals(1L, groupDTO.id());
   }
 
   @Test

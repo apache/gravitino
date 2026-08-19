@@ -42,7 +42,6 @@ import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.requests.UserAddRequest;
-import org.apache.gravitino.dto.responses.BasicUserResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
@@ -99,30 +98,6 @@ public class UserOperations {
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(accessControlManager.getUser(metalake, user))));
-          });
-    } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(OperationType.GET, user, metalake, e);
-    }
-  }
-
-  @GET
-  @Path("{user}/basic")
-  @Produces("application/vnd.gravitino.v1+json")
-  @Timed(name = "get-basic-user." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
-  @ResponseMetered(name = "get-basic-user", absolute = true)
-  @AuthorizationExpression(expression = LOAD_USER_PRIVILEGE)
-  public Response getBasicUser(
-      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
-          String metalake,
-      @PathParam("user") @AuthorizationMetadata(type = Entity.EntityType.USER) String user) {
-    try {
-      return Utils.doAs(
-          httpRequest,
-          () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
-            return Utils.ok(
-                new BasicUserResponse(
-                    DTOConverters.toBasicDTO(accessControlManager.getBasicUser(metalake, user))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(OperationType.GET, user, metalake, e);

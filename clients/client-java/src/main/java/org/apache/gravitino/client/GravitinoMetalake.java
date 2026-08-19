@@ -39,8 +39,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SupportsCatalogs;
-import org.apache.gravitino.authorization.BasicGroup;
-import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
@@ -75,8 +73,6 @@ import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdatesRequest;
 import org.apache.gravitino.dto.requests.UserAddRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
-import org.apache.gravitino.dto.responses.BasicGroupResponse;
-import org.apache.gravitino.dto.responses.BasicUserResponse;
 import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
@@ -905,31 +901,6 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   /**
-   * Gets a user without loading role bindings (metadata row only).
-   *
-   * @param user The name of the User.
-   * @return The getting BasicUser instance.
-   * @throws NoSuchUserException If the User with the given name does not exist.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If getting the User encounters storage issues.
-   */
-  public BasicUser getBasicUser(String user) throws NoSuchUserException, NoSuchMetalakeException {
-    BasicUserResponse resp =
-        restClient.get(
-            String.format(
-                    API_METALAKES_USERS_PATH,
-                    RESTUtils.encodeString(this.name()),
-                    RESTUtils.encodeString(user))
-                + "/basic",
-            BasicUserResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.userErrorHandler());
-    resp.validate();
-
-    return resp.getUser();
-  }
-
-  /**
    * Lists the users.
    *
    * @return The User list.
@@ -1067,32 +1038,6 @@ public class GravitinoMetalake extends MetalakeDTO
                 RESTUtils.encodeString(this.name()),
                 RESTUtils.encodeString(group)),
             GroupResponse.class,
-            Collections.emptyMap(),
-            ErrorHandlers.groupErrorHandler());
-    resp.validate();
-
-    return resp.getGroup();
-  }
-
-  /**
-   * Gets a group without loading role bindings (metadata row only).
-   *
-   * @param group The name of the Group.
-   * @return The getting BasicGroup instance.
-   * @throws NoSuchGroupException If the Group with the given name does not exist.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If getting the Group encounters storage issues.
-   */
-  public BasicGroup getBasicGroup(String group)
-      throws NoSuchGroupException, NoSuchMetalakeException {
-    BasicGroupResponse resp =
-        restClient.get(
-            String.format(
-                    API_METALAKES_GROUPS_PATH,
-                    RESTUtils.encodeString(this.name()),
-                    RESTUtils.encodeString(group))
-                + "/basic",
-            BasicGroupResponse.class,
             Collections.emptyMap(),
             ErrorHandlers.groupErrorHandler());
     resp.validate();

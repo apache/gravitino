@@ -143,41 +143,6 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-  /metalakes/{metalake}/users/{user}/basic:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/user"
-
-    get:
-      tags:
-        - access control
-      summary: Get basic user
-      operationId: getBasicUser
-      description: Returns the specified user metadata without role bindings
-      responses:
-        "200":
-          description: Returns the basic user object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "#/components/responses/BasicUserResponse"
-              examples:
-                BasicUserResponse:
-                  $ref: "#/components/examples/BasicUserResponse"
-        "404":
-          description: Not Found - The specified user does not exist in the specified metalake
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-                NoSuchUserException:
-                  $ref: "#/components/examples/NoSuchUserException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
 components:
   parameters:
     details:
@@ -210,28 +175,6 @@ components:
           items:
             type: string
           description: The roles of the user
-        audit:
-          $ref: "./openapi.yaml#/components/schemas/Audit"
-
-    BasicUser:
-      type: object
-      required:
-        - name
-      properties:
-        id:
-          type: integer
-          format: int64
-          description: The Gravitino-assigned id of the user
-        name:
-          type: string
-          description: The name of the user
-        externalId:
-          type: string
-          description: The external identifier of the user
-        enabled:
-          type: boolean
-          description: Whether the user is enabled
-          default: true
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
 
@@ -279,18 +222,6 @@ components:
           items:
             $ref: "#/components/schemas/User"
 
-    BasicUserResponse:
-      type: object
-      properties:
-        code:
-          type: integer
-          format: int32
-          description: Status code of the response
-          enum:
-            - 0
-        user:
-          $ref: "#/components/schemas/BasicUser"
-
   examples:
     UserAddRequest:
       value: {
@@ -315,20 +246,6 @@ components:
             "creator": "gravitino",
             "createTime": "2023-12-08T06:41:25.595Z"
           },
-        }
-      }
-
-    BasicUserResponse:
-      value: {
-        "code": 0,
-        "user": {
-          "id": 1,
-          "name": "user1",
-          "enabled": true,
-          "audit": {
-            "creator": "gravitino",
-            "createTime": "2023-12-08T06:41:25.595Z"
-          }
         }
       }
 
