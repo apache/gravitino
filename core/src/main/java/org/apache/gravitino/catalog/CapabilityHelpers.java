@@ -52,11 +52,16 @@ public class CapabilityHelpers {
 
   public static Capability getCapability(NameIdentifier ident, CatalogManager catalogManager) {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
-    CatalogManager.CatalogWrapper c = catalogManager.loadCatalogAndWrap(catalogIdent);
+    // Acquire the lease outside the try so a missing catalog keeps propagating its
+    // NoSuchCatalogException (a 404) instead of being wrapped into a plain RuntimeException (a
+    // 500); only the capability lookup itself is wrapped.
+    CatalogLease lease = catalogManager.acquireCatalogLease(catalogIdent);
     try {
-      return c.capabilities();
+      return lease.wrapper().capabilities();
     } catch (Exception e) {
       throw new RuntimeException("Failed to get capabilities for catalog: " + catalogIdent, e);
+    } finally {
+      lease.close();
     }
   }
 

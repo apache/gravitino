@@ -23,6 +23,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.partitions.IdentityPartition;
@@ -30,6 +31,7 @@ import org.apache.gravitino.rel.partitions.Partition;
 import org.apache.gravitino.rel.partitions.Partitions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 public class TestCapabilityHelpers {
 
@@ -141,5 +143,39 @@ public class TestCapabilityHelpers {
             quotedIdent, Capability.Scope.TABLE, QUOTE_AWARE_CAPABILITY);
 
     Assertions.assertEquals("My Table", result.name());
+  }
+
+  @Test
+  void testGetCapabilityPropagatesNoSuchCatalogException() {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Mockito.when(catalogManager.acquireCatalogLease(Mockito.any()))
+        .thenThrow(new NoSuchCatalogException("Catalog %s does not exist", tableIdent));
+
+    // A missing catalog must stay a NoSuchCatalogException (mapped to 404 by the REST layer)
+    // instead of being wrapped into a plain RuntimeException (a 500).
+    Assertions.assertThrows(
+        NoSuchCatalogException.class,
+        () -> CapabilityHelpers.getCapability(tableIdent, catalogManager));
+  }
+
+  @Test
+  void testGetCapabilityWrapsCapabilityFailureAndReleasesLease() throws Exception {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(Namespace.of("metalake", "catalog", "schema"), "table");
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(catalogManager.acquireCatalogLease(Mockito.any()))
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
+    Mockito.when(wrapper.capabilities()).thenThrow(new IllegalStateException("boom"));
+
+    RuntimeException e =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> CapabilityHelpers.getCapability(tableIdent, catalogManager));
+
+    Assertions.assertInstanceOf(IllegalStateException.class, e.getCause());
+    Mockito.verify(wrapper).release();
   }
 }

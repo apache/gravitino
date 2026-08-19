@@ -35,6 +35,7 @@ import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -85,6 +86,8 @@ public class TestTableHookDispatcher {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(wrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    Mockito.when(catalogManager.acquireCatalogLease(any()))
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
 
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
     TableDispatcher dispatcher = Mockito.mock(TableDispatcher.class);
@@ -151,6 +154,8 @@ public class TestTableHookDispatcher {
     CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
     Mockito.when(wrapper.capabilities()).thenReturn(Capability.DEFAULT);
     Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(wrapper);
+    Mockito.when(catalogManager.acquireCatalogLease(any()))
+        .thenAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper));
     TableHookDispatcher hook =
         new TableHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
 

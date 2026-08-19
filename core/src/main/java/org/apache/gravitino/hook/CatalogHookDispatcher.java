@@ -31,7 +31,6 @@ import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogDispatcher;
-import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
@@ -94,9 +93,16 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
       // Apply the metalake securable object privileges to authorization plugin
       FutureGrantManager futureGrantManager = GravitinoEnv.getInstance().futureGrantManager();
-      if (futureGrantManager != null && catalog instanceof BaseCatalog) {
-        futureGrantManager.grantNewlyCreatedCatalog(
-            ident.namespace().level(0), (BaseCatalog) catalog);
+      if (futureGrantManager != null) {
+        GravitinoEnv.getInstance()
+            .catalogManager()
+            .doWithCatalog(
+                ident,
+                leasedCatalog -> {
+                  futureGrantManager.grantNewlyCreatedCatalog(
+                      ident.namespace().level(0), leasedCatalog);
+                  return null;
+                });
       }
     } catch (Exception postHookException) {
       LOG.warn(
@@ -143,13 +149,9 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       return false;
     }
 
-    Catalog catalog = dispatcher.loadCatalog(ident);
-
-    if (catalog != null) {
-      List<String> locations =
-          AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
-      AuthorizationUtils.removeCatalogPrivileges(catalog, locations);
-    }
+    List<String> locations =
+        AuthorizationUtils.getMetadataObjectLocation(ident, Entity.EntityType.CATALOG);
+    AuthorizationUtils.removeCatalogPrivileges(ident, locations);
 
     // We should call the authorization plugin before dropping the catalog, because the dropping
     // catalog will close the authorization plugin.

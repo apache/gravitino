@@ -565,7 +565,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
 
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
@@ -604,7 +605,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // now-empty namespaces, so the catalog no longer knows the table (dropTable returns false),
     // while Gravitino still holds the orphaned schema entities.
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.dropTable(tableIdent));
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
@@ -646,7 +648,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     // now-empty namespaces, so the catalog no longer knows the table (purgeTable returns false),
     // while Gravitino still holds the orphaned schema entities.
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     Assertions.assertTrue(testCatalogOperations.purgeTable(tableIdent));
     Assertions.assertTrue(testCatalogOperations.dropSchema(schemaIdent, false));
@@ -667,7 +670,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     NameIdentifier tableIdent = NameIdentifier.of(tableNs, "topic81");
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
     testCatalogOperations.createSchema(
         NameIdentifier.of(tableNs.levels()), "", Collections.emptyMap());
@@ -736,7 +740,8 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
 
     // Test if the column from table is not matched with the column from table entity
     TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+        (TestCatalog)
+            catalogManager.loadCatalogAndWrap(NameIdentifier.of(metalake, catalog)).catalog();
     TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
 
     // 1. Update the existing column
