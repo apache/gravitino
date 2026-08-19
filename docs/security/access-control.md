@@ -270,6 +270,42 @@ object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on 
 | Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
 | Job          |                         | Owner                                  | Owner           |                                           |
 
+Bulk user access-control APIs use the same privileges as the matching single-user operations. These
+bulk operations are authorized once before processing the request. Bulk user requests report
+item-level failures in `errors`.
+
+| API                                                | Required privilege                        |
+|----------------------------------------------------|-------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`    | `OWNER` of the metalake or `MANAGE_USERS` |
+| `POST /api/bulk/metalakes/{metalake}/users/remove` | `OWNER` of the metalake or `MANAGE_USERS` |
+
+For example, add users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "users": [
+    {"name": "analyst"},
+    {"name": "developer", "externalId": "developer@example.com", "enabled": true}
+  ]
+}'
+```
+
+Remove users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analyst", "developer"]
+}'
+```
+
 Granting or revoking a privilege on an object takes `MANAGE_GRANTS` on that object or an ancestor.
 Granting or revoking a role, and overriding a role's privileges, takes `MANAGE_GRANTS` on the
 metalake. Setting an owner takes ownership.
