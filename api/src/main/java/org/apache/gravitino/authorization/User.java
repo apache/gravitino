@@ -28,7 +28,8 @@ import org.apache.gravitino.annotation.Evolving;
 public interface User extends Auditable {
 
   /**
-   * The name of the user.
+   * The name of the user. It's the identifier of User. It must be unique. Usually the name comes
+   * from an external user management system like LDAP, IAM and so on.
    *
    * @return The name of the user.
    */
@@ -37,12 +38,21 @@ public interface User extends Auditable {
   /**
    * The unique id assigned by Gravitino.
    *
+   * <p>This id is server-assigned and immutable. Upstream systems may also supply an optional
+   * {@link #externalId()}.
+   *
    * @return The unique id of the user.
    */
   Long id();
 
   /**
-   * The stable identifier assigned by an upstream identity system, or null if not set.
+   * The stable identifier assigned by an upstream identity system (for example, SCIM, LDAP, or
+   * IAM), or null if not set.
+   *
+   * <p>Gravitino {@link User#name() user names} may differ from upstream ids or be unknown at sync
+   * time. External id lets integrators look up and correlate users without relying on the Gravitino
+   * user name. Mutable attributes such as {@link #enabled()} and {@code externalId} are updated via
+   * {@code alterUserById}.
    *
    * @return The upstream external identifier, or null if not set.
    */
