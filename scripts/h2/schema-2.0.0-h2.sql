@@ -269,6 +269,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
 CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'idp group name',
+    `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp group deleted at',

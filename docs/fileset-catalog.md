@@ -8,15 +8,15 @@ license: "This software is licensed under the Apache License version 2."
 
 ## Introduction
 
-Fileset catalog is a fileset catalog that using Hadoop Compatible File System (HCFS) to manage
-the storage location of the fileset. It supports the local filesystem and HDFS.
-Gravitino supports [S3](fileset-catalog-with-s3.md), [GCS](fileset-catalog-with-gcs.md),
-[OSS](fileset-catalog-with-oss.md) and [Azure Blob Storage](fileset-catalog-with-adls.md) through Fileset catalog.
-Gravitino also supports [Tencent Cloud COS](fileset-catalog-with-cos.md).
+The fileset catalog manages the storage location of a fileset through a Hadoop Compatible File
+System (HCFS). It supports the local filesystem and HDFS out of the box, and Amazon S3, Google Cloud
+Storage, Azure Data Lake Storage, Alibaba Cloud OSS and Tencent Cloud COS once the matching bundle
+jar is on the classpath.
 
-The rest of this document will use HDFS or local file as an example to illustrate how to use the Fileset catalog.
-For S3, GCS, OSS, Azure Blob Storage and COS, the configuration is similar to HDFS,
-refer to the corresponding document for more details.
+This page is the shared reference: the properties every backend accepts, how they are inherited from
+catalog to schema to fileset, and how to plug in a custom filesystem. It uses HDFS and the local
+filesystem in its examples. For a runnable end-to-end example on a cloud backend, follow the page for
+that backend listed under [Fileset Catalog with Cloud Storage](#fileset-catalog-with-cloud-storage).
 
 Note that Gravitino uses Hadoop 3 dependencies to build Fileset catalog. Theoretically, it should be
 compatible with both Hadoop 2.x and 3.x, since Gravitino doesn't leverage any new features in
@@ -26,7 +26,7 @@ Hadoop 3. If there's any compatibility issue, create an [issue](https://github.c
 
 ### Catalog Properties
 
-Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration),
+Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties),
 the Fileset catalog has the following properties:
 
 | Property Name                        | Description                                                                                                                                                                                                                                                                                                                      | Default Value   | Required |
@@ -75,15 +75,23 @@ The Gravitino Fileset extends the following properties in the `xxx-site.xml`:
 
 ### Fileset Catalog with Cloud Storage
 
-In the current implementation, the fileset uses the HDFS protocol to access its location. If users use S3, GCS, OSS,
-Azure Blob Storage or Tencent Cloud COS, they can also configure the `config.resources` to specify custom configuration
-files.
+For Java and Hadoop-based access, Fileset uses the Hadoop Compatible File System (HCFS) interface.
+Each cloud backend provides its own Hadoop `FileSystem` implementation, such as S3A for Amazon S3.
+Put the matching bundle jar on the classpath and set the credential properties for that backend.
+Python clients use fsspec-based implementations and do not require these jars. Each backend has its
+own page with a runnable end-to-end example.
 
-- For S3, refer to [Fileset-catalog-with-s3](./fileset-catalog-with-s3.md) for more details.
-- For GCS, refer to [Fileset-catalog-with-gcs](./fileset-catalog-with-gcs.md) for more details.
-- For OSS, refer to [Fileset-catalog-with-oss](./fileset-catalog-with-oss.md) for more details.
-- For Azure Blob Storage, refer to [Fileset-catalog-with-adls](./fileset-catalog-with-adls.md) for more details.
-- For Tencent Cloud COS, refer to [Fileset-catalog-with-cos](./fileset-catalog-with-cos.md) for more details.
+| Storage backend                                           | Bundle jar                 | Location scheme | Backend properties                                                         |
+|-----------------------------------------------------------|----------------------------|-----------------|----------------------------------------------------------------------------|
+| [Amazon S3](./fileset-catalog-with-s3.md)                 | `gravitino-aws-bundle`     | `s3a://`        | `s3-endpoint`, `s3-access-key-id`, `s3-secret-access-key`                  |
+| [Google Cloud Storage](./fileset-catalog-with-gcs.md)     | `gravitino-gcp-bundle`     | `gs://`         | `gcs-service-account-file`                                                 |
+| [Azure Data Lake Storage](./fileset-catalog-with-adls.md) | `gravitino-azure-bundle`   | `abfss://`      | `azure-storage-account-name`, `azure-storage-account-key`                  |
+| [Alibaba Cloud OSS](./fileset-catalog-with-oss.md)        | `gravitino-aliyun-bundle`  | `oss://`        | `oss-endpoint`, `oss-access-key-id`, `oss-secret-access-key`               |
+| [Tencent Cloud COS](./fileset-catalog-with-cos.md)        | `gravitino-tencent-bundle` | `cosn://`       | `cos-region`, `cos-access-key-id`, `cos-secret-access-key`, `cos-endpoint` |
+
+A catalog may hold locations in more than one backend at the same time, as long as every bundle jar
+involved is on the classpath. Cloud backends also accept `config.resources` to pass custom
+configuration files to the underlying filesystem client.
 
 ### Implement a Custom HCFS File System Fileset
 
@@ -134,7 +142,7 @@ value, and the priority mechanism is the same as authentication.
 
 ### Catalog Operations
 
-Refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Catalog operations](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 ## Schema
 
@@ -160,7 +168,7 @@ properties:
 
 ### Schema Operations
 
-Refer to [Schema operation](./manage-fileset-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Schema operations](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 :::note
 During schema creation or deletion, Gravitino automatically creates or removes the corresponding filesystem directories
@@ -168,7 +176,7 @@ for the schema locations.
 This behavior is skipped in either of these cases:
 
 1. When the catalog property `disable-filesystem-ops` is set to `true`
-2. When the location contains [placeholders](./manage-fileset-metadata-using-gravitino.md#placeholder)
+2. When the location contains [placeholders](./filesets.md#storage-locations)
 :::
 
 ## Fileset

@@ -53,6 +53,11 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that lists and locks all active catalogs in a metalake. */
+  public String listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return listCatalogPOsByMetalakeId(metalakeId) + " FOR UPDATE";
+  }
+
   public String listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds) {
     return "<script>"
         + "SELECT catalog_id as catalogId, catalog_name as catalogName,"
@@ -227,12 +232,19 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
-  public String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "UPDATE "
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String deleteCatalogMetasByLegacyTimeline(
