@@ -459,6 +459,7 @@ COMMENT ON COLUMN idp_user_meta.deleted_at IS 'idp user deleted at';
 CREATE TABLE IF NOT EXISTS idp_group_meta (
     group_id BIGINT NOT NULL,
     group_name VARCHAR(128) NOT NULL,
+    group_comment VARCHAR(1024) DEFAULT '',
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -469,6 +470,7 @@ COMMENT ON TABLE idp_group_meta IS 'local IdP group metadata';
 
 COMMENT ON COLUMN idp_group_meta.group_id IS 'idp group id';
 COMMENT ON COLUMN idp_group_meta.group_name IS 'idp group name';
+COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
 COMMENT ON COLUMN idp_group_meta.current_version IS 'idp group current version';
 COMMENT ON COLUMN idp_group_meta.last_version IS 'idp group last version';
 COMMENT ON COLUMN idp_group_meta.deleted_at IS 'idp group deleted at';
