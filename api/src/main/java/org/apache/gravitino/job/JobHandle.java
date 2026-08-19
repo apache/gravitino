@@ -19,6 +19,7 @@
 package org.apache.gravitino.job;
 
 import java.time.Instant;
+import javax.annotation.Nullable;
 
 /**
  * JobHandle is an interface that is returned by the job submission, which provides methods to get
@@ -77,7 +78,9 @@ public interface JobHandle {
    *
    * @return the finished time of the job, or null if the job has not finished execution yet
    */
+  @Nullable
   default Instant finishedAt() {
-    throw new UnsupportedOperationException("finishedAt is not implemented");
+    throw new UnsupportedOperationException(
+        "finishedAt() is not implemented by " + getClass().getName() + "; override this method");
   }
 }

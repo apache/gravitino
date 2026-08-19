@@ -517,7 +517,8 @@ components:
         finishedAt:
           type: string
           format: date-time
-          description: The time when the job finished execution, or absent if the job has not finished execution yet
+          nullable: true
+          description: The time when the job finished execution, or null if the job has not finished execution yet
 
 
     TemplateUpdate:

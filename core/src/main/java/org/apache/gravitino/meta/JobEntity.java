@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -117,6 +118,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
    * @return the {@link Instant} the job finished execution, or {@code null} if the job has not
    *     finished execution yet
    */
+  @Nullable
   public Instant finishedAtAsInstant() {
     return (finishedAt == null || finishedAt <= 0) ? null : Instant.ofEpochMilli(finishedAt);
   }

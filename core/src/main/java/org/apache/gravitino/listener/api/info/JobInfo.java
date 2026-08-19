@@ -20,6 +20,7 @@
 package org.apache.gravitino.listener.api.info;
 
 import java.time.Instant;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.job.JobHandle;
@@ -110,6 +111,7 @@ public final class JobInfo {
    *
    * @return the finished time of the job, or null if the job has not finished execution yet
    */
+  @Nullable
   public Instant finishedAt() {
     return finishedAt;
   }
