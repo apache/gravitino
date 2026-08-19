@@ -330,13 +330,12 @@ public class JobIT extends BaseIT {
         updatedJobs.stream().map(JobHandle::jobStatus).collect(Collectors.toSet());
     Assertions.assertEquals(1, jobStatuses.size());
     Assertions.assertTrue(jobStatuses.contains(JobHandle.Status.SUCCEEDED));
-    // Finished jobs should carry a non-null queuedAt/startedAt/finishedAt. SUCCEEDED proves
-    // the job actually ran, so startedAt is guaranteed even if no poll observed it as STARTED
-    // (JobManager falls back to queuedAt in that case).
+    // Finished jobs should carry a non-null queuedAt/finishedAt. startedAt is not asserted here:
+    // a fast job can transition QUEUED -> SUCCEEDED between two polls without ever being
+    // observed as STARTED, in which case startedAt legitimately stays null.
     updatedJobs.forEach(
         job -> {
           Assertions.assertNotNull(job.queuedAt());
-          Assertions.assertNotNull(job.startedAt());
           Assertions.assertNotNull(job.finishedAt());
         });
   }
@@ -369,7 +368,8 @@ public class JobIT extends BaseIT {
     Assertions.assertEquals(jobHandle.jobId(), retrievedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, retrievedJob.jobStatus());
     Assertions.assertNotNull(retrievedJob.queuedAt());
-    Assertions.assertNotNull(retrievedJob.startedAt());
+    // startedAt is not asserted here: the job may transition QUEUED -> SUCCEEDED between two
+    // polls without ever being observed as STARTED, in which case it legitimately stays null.
     Assertions.assertNotNull(retrievedJob.finishedAt());
 
     // Test run a failed job
@@ -394,7 +394,8 @@ public class JobIT extends BaseIT {
     Assertions.assertEquals(failedJobHandle.jobId(), retrievedFailedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.FAILED, retrievedFailedJob.jobStatus());
     Assertions.assertNotNull(retrievedFailedJob.queuedAt());
-    Assertions.assertNotNull(retrievedFailedJob.startedAt());
+    // startedAt is not asserted here: FAILED does not prove the job ever started (it can be
+    // reached directly from QUEUED, e.g. if the executor fails to launch the job at all).
     Assertions.assertNotNull(retrievedFailedJob.finishedAt());
 
     // Test get a non-existent job

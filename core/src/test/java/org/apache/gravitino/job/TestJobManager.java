@@ -703,10 +703,13 @@ public class TestJobManager {
   }
 
   @Test
-  public void testPullJobStatusStartedAtFallbackOnDirectTerminalTransition() throws IOException {
-    // A job that transitions QUEUED -> SUCCEEDED/FAILED directly (skipping any poll that
-    // observes it as STARTED) still proves it ran, so startedAt must fall back to the job's
-    // queued time rather than staying unset.
+  public void testPullJobStatusStartedAtNotBackfilledOnDirectTerminalTransition()
+      throws IOException {
+    // A job that transitions QUEUED -> SUCCEEDED directly (skipping any poll that observes it
+    // as STARTED) does not prove exactly when it started - e.g. LocalJobExecutor can also reach
+    // FAILED directly from QUEUED without ever recording STARTED. Backfilling startedAt from the
+    // queued time would understate queue latency and overstate execution duration, so startedAt
+    // stays unset (0) unless a STARTED transition was actually observed.
     Instant queuedAt = Instant.now();
     JobEntity queuedJob =
         JobEntity.builder()
@@ -742,7 +745,7 @@ public class TestJobManager {
     verify(entityStore, times(1)).put(captor.capture(), anyBoolean());
     JobEntity succeededJob = captor.getValue();
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, succeededJob.status());
-    Assertions.assertEquals(queuedAt.toEpochMilli(), succeededJob.startedAt());
+    Assertions.assertEquals(0L, succeededJob.startedAt());
     Assertions.assertNotNull(succeededJob.finishedAt());
     Assertions.assertTrue(succeededJob.finishedAt() > 0);
   }
