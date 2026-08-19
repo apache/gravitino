@@ -313,6 +313,106 @@ class TestUserMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void getBasicUserByIdentifier() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), metalakeName, auditInfo);
+    backend.insert(metalake, false);
+    CatalogEntity catalog =
+        createCatalog(
+            RandomIdGenerator.INSTANCE.nextId(), Namespace.of(metalakeName), "catalog", auditInfo);
+    backend.insert(catalog, false);
+
+    UserMetaService userMetaService = UserMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    // get not exist user
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            userMetaService.getBasicUserByIdentifier(
+                AuthorizationUtils.ofUser(metalakeName, "user1")));
+
+    // get not exist metalake
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            userMetaService.getBasicUserByIdentifier(
+                AuthorizationUtils.ofUser("no_such_metalake", "user1")));
+
+    // get user without roles
+    UserEntity user1 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user1",
+            auditInfo);
+    userMetaService.insertUser(user1, false);
+    Assertions.assertEquals(
+        user1, userMetaService.getBasicUserByIdentifier(user1.nameIdentifier()));
+
+    // basic get skips role loading
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            auditInfo,
+            "catalog");
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            auditInfo,
+            "catalog");
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+    UserEntity user2 =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "user2",
+            auditInfo,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    userMetaService.insertUser(user2, false);
+
+    UserEntity basicUser = userMetaService.getBasicUserByIdentifier(user2.nameIdentifier());
+    UserEntity fullUser = userMetaService.getUserByIdentifier(user2.nameIdentifier());
+    Assertions.assertEquals(user2.name(), basicUser.name());
+    Assertions.assertEquals(user2.id(), basicUser.id());
+    Assertions.assertTrue(
+        basicUser.roleNames() == null || basicUser.roleNames().isEmpty(),
+        "basic user load should not include roles");
+    Assertions.assertEquals(
+        Sets.newHashSet(user2.roleNames()), Sets.newHashSet(fullUser.roleNames()));
+
+    // same username in another metalake should resolve by metalake name
+    String anotherMetalakeName = "another-metalake-for-basic-user";
+    createAndInsertMakeLake(anotherMetalakeName);
+    createAndInsertCatalog(anotherMetalakeName, "another-catalog");
+    UserEntity anotherUser =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(anotherMetalakeName),
+            "user1",
+            auditInfo);
+    userMetaService.insertUser(anotherUser, false);
+    Assertions.assertEquals(
+        anotherUser.id(),
+        userMetaService.getBasicUserByIdentifier(anotherUser.nameIdentifier()).id());
+
+    // deleted user should not be found
+    Assertions.assertTrue(userMetaService.deleteUser(user1.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> userMetaService.getBasicUserByIdentifier(user1.nameIdentifier()));
+  }
+
+  @TestTemplate
   void testListUsers() throws IOException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

@@ -240,9 +240,14 @@ public class TestAccessControlManager {
   @Test
   public void testGetBasicUser() {
     accessControlManager.addUser(METALAKE, "testBasicGet");
+    createCatalogRole("basic_role");
+    accessControlManager.grantRolesToUser(
+        METALAKE, Lists.newArrayList("basic_role"), "testBasicGet");
+    assertSortedRoles(accessControlManager.getUser(METALAKE, "testBasicGet"), "basic_role");
 
     User user = accessControlManager.getBasicUser(METALAKE, "testBasicGet");
     Assertions.assertEquals("testBasicGet", user.name());
+    Assertions.assertTrue(user.roles() == null || user.roles().isEmpty());
 
     Assertions.assertThrows(
         NoSuchUserException.class, () -> accessControlManager.getBasicUser(METALAKE, "not-exist"));
@@ -250,6 +255,9 @@ public class TestAccessControlManager {
         NoSuchMetalakeException.class,
         () -> accessControlManager.getBasicUser("no_such_metalake", "testBasicGet"));
 
+    accessControlManager.revokeRolesFromUser(
+        METALAKE, Lists.newArrayList("basic_role"), "testBasicGet");
+    accessControlManager.deleteRole(METALAKE, "basic_role");
     accessControlManager.removeUser(METALAKE, "testBasicGet");
   }
 
@@ -316,9 +324,15 @@ public class TestAccessControlManager {
   @Test
   public void testGetBasicGroup() {
     accessControlManager.addGroup(METALAKE, "testBasicGet");
+    createCatalogRole("basic_group_role");
+    accessControlManager.grantRolesToGroup(
+        METALAKE, Lists.newArrayList("basic_group_role"), "testBasicGet");
+    assertSortedGroupRoles(
+        accessControlManager.getGroup(METALAKE, "testBasicGet"), "basic_group_role");
 
     Group group = accessControlManager.getBasicGroup(METALAKE, "testBasicGet");
     Assertions.assertEquals("testBasicGet", group.name());
+    Assertions.assertTrue(group.roles() == null || group.roles().isEmpty());
 
     Assertions.assertThrows(
         NoSuchGroupException.class,
@@ -327,6 +341,9 @@ public class TestAccessControlManager {
         NoSuchMetalakeException.class,
         () -> accessControlManager.getBasicGroup("no_such_metalake", "testBasicGet"));
 
+    accessControlManager.revokeRolesFromGroup(
+        METALAKE, Lists.newArrayList("basic_group_role"), "testBasicGet");
+    accessControlManager.deleteRole(METALAKE, "basic_group_role");
     accessControlManager.removeGroup(METALAKE, "testBasicGet");
   }
 
@@ -729,6 +746,12 @@ public class TestAccessControlManager {
 
   private void assertSortedRoles(User user, String... expectedRoles) {
     List<String> roles = Lists.newArrayList(user.roles());
+    Collections.sort(roles);
+    Assertions.assertEquals(Lists.newArrayList(expectedRoles), roles);
+  }
+
+  private void assertSortedGroupRoles(Group group, String... expectedRoles) {
+    List<String> roles = Lists.newArrayList(group.roles());
     Collections.sort(roles);
     Assertions.assertEquals(Lists.newArrayList(expectedRoles), roles);
   }

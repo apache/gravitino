@@ -205,6 +205,98 @@ class TestGroupMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void getBasicGroupByIdentifier() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    GroupMetaService groupMetaService = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+
+    // get not exist group
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            groupMetaService.getBasicGroupByIdentifier(
+                AuthorizationUtils.ofGroup(metalakeName, "group1")));
+
+    // get not exist metalake
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            groupMetaService.getBasicGroupByIdentifier(
+                AuthorizationUtils.ofGroup("no_such_metalake", "group1")));
+
+    // get group without roles
+    GroupEntity group1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "group1",
+            AUDIT_INFO);
+    groupMetaService.insertGroup(group1, false);
+    Assertions.assertEquals(
+        group1, groupMetaService.getBasicGroupByIdentifier(group1.nameIdentifier()));
+
+    // basic get skips role loading
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            catalogName);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            catalogName);
+    roleMetaService.insertRole(role1, false);
+    roleMetaService.insertRole(role2, false);
+    GroupEntity group2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "group2",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name(), role2.name()),
+            Lists.newArrayList(role1.id(), role2.id()));
+    groupMetaService.insertGroup(group2, false);
+
+    GroupEntity basicGroup = groupMetaService.getBasicGroupByIdentifier(group2.nameIdentifier());
+    GroupEntity fullGroup = groupMetaService.getGroupByIdentifier(group2.nameIdentifier());
+    Assertions.assertEquals(group2.name(), basicGroup.name());
+    Assertions.assertEquals(group2.id(), basicGroup.id());
+    Assertions.assertTrue(
+        basicGroup.roleNames() == null || basicGroup.roleNames().isEmpty(),
+        "basic group load should not include roles");
+    Assertions.assertEquals(
+        Sets.newHashSet(group2.roleNames()), Sets.newHashSet(fullGroup.roleNames()));
+
+    // same group name in another metalake should resolve by metalake name
+    String anotherMetalakeName = "another-metalake-for-basic-group";
+    createAndInsertMakeLake(anotherMetalakeName);
+    createAndInsertCatalog(anotherMetalakeName, "another-catalog");
+    GroupEntity anotherGroup =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(anotherMetalakeName),
+            "group1",
+            AUDIT_INFO);
+    groupMetaService.insertGroup(anotherGroup, false);
+    Assertions.assertEquals(
+        anotherGroup.id(),
+        groupMetaService.getBasicGroupByIdentifier(anotherGroup.nameIdentifier()).id());
+
+    // deleted group should not be found
+    Assertions.assertTrue(groupMetaService.deleteGroup(group1.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> groupMetaService.getBasicGroupByIdentifier(group1.nameIdentifier()));
+  }
+
+  @TestTemplate
   void testListGroups() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

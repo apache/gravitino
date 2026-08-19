@@ -243,6 +243,34 @@ public class TestAuthMappers {
   }
 
   @Test
+  void testUserMetaSelectUserMetaByMetalakeNameAndName() {
+    insertMetalake(1L, "metalake1");
+    insertMetalake(2L, "metalake2");
+    insertUser(21L, "user21", 1L);
+    insertUser(22L, "user21", 2L);
+
+    UserPO found = userMetaMapper.selectUserMetaByMetalakeNameAndName("metalake1", "user21");
+    Assertions.assertNotNull(found);
+    Assertions.assertEquals(21L, found.getUserId());
+    Assertions.assertEquals("user21", found.getUserName());
+    Assertions.assertEquals(1L, found.getMetalakeId());
+
+    UserPO sameNameOtherMetalake =
+        userMetaMapper.selectUserMetaByMetalakeNameAndName("metalake2", "user21");
+    Assertions.assertNotNull(sameNameOtherMetalake);
+    Assertions.assertEquals(22L, sameNameOtherMetalake.getUserId());
+
+    Assertions.assertNull(
+        userMetaMapper.selectUserMetaByMetalakeNameAndName("no_such_metalake", "user21"));
+    Assertions.assertNull(
+        userMetaMapper.selectUserMetaByMetalakeNameAndName("metalake1", "missing-user"));
+
+    userMetaMapper.softDeleteUserMetaByUserId(21L);
+    Assertions.assertNull(
+        userMetaMapper.selectUserMetaByMetalakeNameAndName("metalake1", "user21"));
+  }
+
+  @Test
   void testGroupMetaTouchUpdatedAt() {
     insertMetalake(1L, "metalake1");
     insertGroup(30L, "group30", 1L);
@@ -285,6 +313,34 @@ public class TestAuthMappers {
     Assertions.assertNotNull(info);
     Assertions.assertEquals(32L, info.getGroupId());
     Assertions.assertEquals(expected, info.getUpdatedAt());
+  }
+
+  @Test
+  void testGroupMetaSelectGroupMetaByMetalakeNameAndName() {
+    insertMetalake(1L, "metalake1");
+    insertMetalake(2L, "metalake2");
+    insertGroup(32L, "group32", 1L);
+    insertGroup(33L, "group32", 2L);
+
+    GroupPO found = groupMetaMapper.selectGroupMetaByMetalakeNameAndName("metalake1", "group32");
+    Assertions.assertNotNull(found);
+    Assertions.assertEquals(32L, found.getGroupId());
+    Assertions.assertEquals("group32", found.getGroupName());
+    Assertions.assertEquals(1L, found.getMetalakeId());
+
+    GroupPO sameNameOtherMetalake =
+        groupMetaMapper.selectGroupMetaByMetalakeNameAndName("metalake2", "group32");
+    Assertions.assertNotNull(sameNameOtherMetalake);
+    Assertions.assertEquals(33L, sameNameOtherMetalake.getGroupId());
+
+    Assertions.assertNull(
+        groupMetaMapper.selectGroupMetaByMetalakeNameAndName("no_such_metalake", "group32"));
+    Assertions.assertNull(
+        groupMetaMapper.selectGroupMetaByMetalakeNameAndName("metalake1", "missing-group"));
+
+    groupMetaMapper.softDeleteGroupMetaByGroupId(32L);
+    Assertions.assertNull(
+        groupMetaMapper.selectGroupMetaByMetalakeNameAndName("metalake1", "group32"));
   }
 
   @Test
