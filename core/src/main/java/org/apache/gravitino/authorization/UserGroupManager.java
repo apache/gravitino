@@ -119,10 +119,7 @@ class UserGroupManager {
     try {
       UserEntity userEntity =
           store.get(
-              AuthorizationUtils.ofUser(metalake, user),
-              Entity.EntityType.USER,
-              UserEntity.class,
-              false /* allFields */);
+              AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
       return DTOConverters.toBasicDTO(userEntity);
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
@@ -216,8 +213,7 @@ class UserGroupManager {
           store.get(
               AuthorizationUtils.ofGroup(metalake, group),
               Entity.EntityType.GROUP,
-              GroupEntity.class,
-              false /* allFields */);
+              GroupEntity.class);
       return DTOConverters.toBasicDTO(groupEntity);
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);

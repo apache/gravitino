@@ -177,13 +177,6 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> E get(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> e)
       throws NoSuchEntityException, IOException {
-    return get(ident, entityType, e, true /* allFields */);
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E get(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> e, boolean allFields)
-      throws NoSuchEntityException, IOException {
     return cache.withCacheLock(
         EntityCacheKey.of(ident, entityType),
         () -> {
@@ -192,10 +185,8 @@ public class RelationalEntityStore
             return entityFromCache.get();
           }
 
-          E entity = backend.get(ident, entityType, allFields);
-          if (allFields) {
-            cache.put(entity);
-          }
+          E entity = backend.get(ident, entityType);
+          cache.put(entity);
           return entity;
         });
   }
