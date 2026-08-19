@@ -486,6 +486,45 @@ server, are documented with those services. See
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
 
+### Key Management
+
+The server talks to KMS instances you name in `gravitino.conf`. Each name is one configured
+instance. To add one, implement `KmsClientFactory` with a public no-arg constructor, put the jar on
+the server classpath, and set `gravitino.kms.provider.<name>.className` to that class.
+`create(provider, properties)` builds the `KmsClient` for that name. Gravitino does not ship AWS or
+Azure factories. Two names may share one class, which is how you run more than one vault of the
+same kind.
+
+The list is empty by default, and then the server has no KMS clients. Naming a provider without a
+`className`, or with a class the server cannot construct as a `KmsClientFactory`, fails startup.
+Client construction validates local configuration only; the first call to the provider is a later
+key inspection, not startup.
+
+| Configuration Item                         | Description                                                                                                                                                          | Default Value |
+|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.kms.providers`                  | Comma-separated KMS instance names, with no spaces after commas. Each name must match `[A-Za-z0-9][A-Za-z0-9_-]*` and cannot contain `.`. Duplicates fail startup. | (empty)       |
+| `gravitino.kms.provider.<name>.className`  | Required factory class name for that instance. The class must have a no-arg constructor and implement `KmsClientFactory`.                                          | (none)        |
+| `gravitino.kms.provider.<name>.<key>`      | Any other property under that name is passed to that factory. Nested dots in `<key>` are allowed, as in `endpoint.region`.                                           | (none)        |
+
+Every name in `providers` needs a matching `.className`. A `gravitino.kms.provider.<name>.*` key
+for a name that is not in the list, or any other `gravitino.kms.*` key, fails startup.
+
+Callers name the instance and the key. They do not send `className`. The server already constructed
+the factory for `aws-prod` at startup.
+
+```text
+# conf/gravitino.conf
+gravitino.kms.providers = aws-prod,aws-dr,azure-eu
+
+gravitino.kms.provider.aws-prod.className = com.example.kms.AwsCustomKmsClientFactory
+gravitino.kms.provider.aws-dr.className = com.example.kms.AwsCustomKmsClientFactory
+gravitino.kms.provider.azure-eu.className = com.example.kms.AzureCustomKmsClientFactory
+```
+
+That configuration builds three clients: two instances of one custom AWS factory and one custom
+Azure factory. Further `gravitino.kms.provider.<name>.*` keys are factory properties, not a closed
+schema; each factory documents the keys it accepts.
+
 ## Catalog Properties
 
 Catalog properties configure one catalog rather than the server. They come from two places: a
