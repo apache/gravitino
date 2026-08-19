@@ -16,9 +16,10 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# No fixed ports or named networks — Testcontainers auto-generates a unique
-# project name and random host-port mappings, allowing multiple Doris clusters
-# (e.g. 1.2.x and 3.0.x) to coexist in the same JVM lifecycle.
+# Testcontainers auto-generates a unique project name and random host-port
+# mappings, allowing multiple Doris clusters to coexist in the same JVM lifecycle.
+# macOS Docker Desktop runs may add docker-compose-mac-network.yaml to use the
+# fixed network routed by mac-docker-connector.
 
 services:
 

@@ -76,6 +76,7 @@ paimon = '1.2.0'
 spark33 = "3.3.4"
 spark34 = "3.4.3"
 spark35 = "3.5.3"
+doris-spark-connector = "26.0.0"
 kyuubi4spark = "1.11.0"
 kyuubi4authz = "1.10.2"
 trino = '435'
@@ -284,6 +285,7 @@ paimon-hive-catalog = { group = "org.apache.paimon", name = "paimon-hive-catalog
 paimon-s3 = { group = "org.apache.paimon", name = "paimon-s3", version.ref = "paimon" }
 paimon-oss = { group = "org.apache.paimon", name = "paimon-oss", version.ref = "paimon" }
 paimon-spark = { group = "org.apache.paimon", name = "paimon-spark", version.ref = "paimon" }
+doris-spark-connector = { group = "org.apache.doris", name = "spark-doris-connector-spark-3.5", version.ref = "doris-spark-connector" }
 
 trino-spi= { group = "io.trino", name = "trino-spi", version.ref = "trino" }
 trino-testing= { group = "io.trino", name = "trino-testing", version.ref = "trino" }

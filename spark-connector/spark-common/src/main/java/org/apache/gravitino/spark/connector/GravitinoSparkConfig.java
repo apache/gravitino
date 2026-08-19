@@ -30,6 +30,10 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + "enableIcebergSupport";
   public static final String GRAVITINO_ENABLE_PAIMON_SUPPORT =
       GRAVITINO_PREFIX + "enablePaimonSupport";
+  /** Enables the opt-in Apache Doris Spark adapter. */
+  public static final String GRAVITINO_ENABLE_DORIS_SUPPORT =
+      GRAVITINO_PREFIX + "enableDorisSupport";
+
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
   /**

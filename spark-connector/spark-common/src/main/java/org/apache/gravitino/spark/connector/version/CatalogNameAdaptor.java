@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import org.apache.spark.package$;
 import org.apache.spark.util.VersionUtils$;
+import scala.util.Properties$;
 
 public class CatalogNameAdaptor {
   private static final Map<String, String> catalogNames;
@@ -82,12 +83,19 @@ public class CatalogNameAdaptor {
           "3.5",
           "org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlCatalogSpark35");
 
+  private static final Map<String, String> dorisCatalogNames =
+      ImmutableMap.of(
+          "3.5", "org.apache.gravitino.spark.connector.jdbc.doris.GravitinoDorisCatalogSpark35");
+
   private static String sparkVersion() {
     return package$.MODULE$.SPARK_VERSION();
   }
 
   private static String getCatalogName(String provider, int majorVersion, int minorVersion) {
     String versionKey = String.format("%d.%d", majorVersion, minorVersion);
+    if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT))) {
+      return isScala212() ? dorisCatalogNames.get(versionKey) : null;
+    }
     if (provider.startsWith("jdbc")) {
       if (provider.startsWith("jdbc-postgresql")) {
         return pgCatalogNames.get(versionKey);
@@ -102,5 +110,9 @@ public class CatalogNameAdaptor {
     int majorVersion = VersionUtils$.MODULE$.majorVersion(sparkVersion());
     int minorVersion = VersionUtils$.MODULE$.minorVersion(sparkVersion());
     return getCatalogName(provider, majorVersion, minorVersion);
+  }
+
+  private static boolean isScala212() {
+    return Properties$.MODULE$.versionNumberString().startsWith("2.12");
   }
 }

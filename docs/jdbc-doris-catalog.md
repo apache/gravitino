@@ -47,9 +47,18 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                          | (none)        | Yes      |
 | `jdbc-user`             | The JDBC user name.                                                                               | (none)        | Yes      |
 | `jdbc-password`         | The JDBC password.                                                                                | (none)        | Yes      |
+| `doris-fenodes`         | Comma-separated Doris FE endpoints in `host:port` format, used by the specialized Spark reader. | (none)        | No       |
+| `doris-query-port`      | Doris MySQL-protocol query port, used by the specialized Spark reader.                            | (none)        | No       |
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                    | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                   | `10`          | No       |
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default. | `30000`       | No       |
+
+:::note
+`doris-fenodes` and `doris-query-port` are optional for server-side metadata and DDL operations.
+They are required when the opt-in Spark Doris batch-read adapter is enabled. Endpoints must use
+the comma-separated `host:port` form; URI schemes, paths, query strings, and IPv6 literals are
+rejected.
+:::
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
