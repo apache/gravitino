@@ -101,8 +101,7 @@ public interface AccessControlDispatcher {
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If getting the User encounters storage issues.
    */
-  public User getUser(String metalake, String user)
-      throws NoSuchUserException, NoSuchMetalakeException;
+  User getUser(String metalake, String user) throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
    * Gets a user without loading role bindings (metadata row only).
