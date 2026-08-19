@@ -46,8 +46,8 @@
 # stopped. The audit block is the opposite: EntityCombined*#auditInfo() merges
 # the entity's audit over the catalog's with overwrite=true, so
 # audit.lastModifiedTime is served from the entity cache alone. Externally
-# backed alter cases therefore assert on it, and treat name/comment/properties
-# as an end-to-end check only.
+# backed cases use it whenever the operation preserves a reliable audit block,
+# and treat name/comment/properties as an end-to-end check only.
 #
 # Two properties of that field drive how the cases are written. It is null until
 # the first alter (creation sets only creator and createTime), so each such
@@ -58,10 +58,10 @@
 # Covered cache entity types and mutations:
 #   METALAKE  alter, rename, disable/enable, drop
 #   CATALOG   alter, rename, disable/enable, drop
-#   SCHEMA    alter, rapid alters, drop, cascade drop, multi-level hierarchy
-#   TABLE     alter, rename, drop
-#   TOPIC     alter, drop
-#   VIEW      alter, rename, drop
+#   SCHEMA    alter, rapid alters, drop/recreate, cascade drop, multi-level hierarchy
+#   TABLE     alter (rename/drop/recreate are external-backend E2E only; see their notes)
+#   TOPIC     alter (drop is external-backend E2E only)
+#   VIEW      alter, drop/recreate (rename is external-backend E2E only)
 #   FILESET   alter, rename, drop
 #   TAG       alter, rename, drop
 #   POLICY    alter, rename, disable/enable, drop
@@ -83,10 +83,6 @@ INSTANCE_B="${INSTANCE_B:-http://localhost:8190}"
 INSTANCE_B_HOME="${INSTANCE_B_HOME:-distribution/package-b}"
 ADMIN_USER="${ADMIN_USER:-admin}"
 KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BOOTSTRAP_SERVERS:-localhost:9092}"
-# Only the stale-read control still sleeps for a fixed interval; every other
-# case polls until it converges. Keep this at roughly one poll interval so the
-# control observes the pre-invalidation state.
-POLL_WAIT_SECS="${POLL_WAIT_SECS:-1.5}"
 # Upper bound for convergence. Generous on purpose: a correct node converges in
 # about one poll interval and never reaches this, while a broken one has to burn
 # the whole budget before failing. Raising it costs nothing on a healthy run.
@@ -424,15 +420,6 @@ mutate_b() {
   expect_http "$desc" 200
 }
 
-# Fixed sleep, used only by the stale-read control. Consistency cases converge
-# through await_* instead, so this is deliberately not a general-purpose helper:
-# a fixed sleep in a positive assertion is just a slower way to be flaky.
-wait_for_invalidation() {
-  local target="${1:-instance B}"
-  printf '  ...waiting %ss for %s change-log polling\n' "$POLL_WAIT_SECS" "$target"
-  sleep "$POLL_WAIT_SECS"
-}
-
 wait_ready() {
   local url="$1"
   local attempt
@@ -701,11 +688,12 @@ mutate_a "create Kafka catalog" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" 
 # by the entity store (EntityCombined*#auditInfo() lets the entity's audit
 # overwrite the catalog's), so it is the only field here that can prove B
 # stopped serving a cached entity. Alters bump audit.lastModifiedTime and a
-# same-name recreate produces a new audit.createTime, so each externally backed
-# case pairs its catalog-side assertion with an audit-side one.
+# same-name recreate produces a new audit.createTime. Cache consistency cases
+# therefore pair their catalog-side assertion with an audit-side one; operations
+# without a reliable audit signal are labeled as external-backend E2E checks.
 # ---------------------------------------------------------------------------
 
-section "SCHEMA cache: alter and drop"
+section "SCHEMA cache: alter and drop/recreate"
 mutate_a "create Iceberg schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
   "{\"name\":\"${SCHEMA_NAME}\",\"comment\":\"schema-old\",\"properties\":{}}"
 # Creating an entity sets only creator and createTime, so audit.lastModifiedTime
@@ -733,6 +721,9 @@ consistency_case "SCHEMA keeps the latest of several alters inside one poll wind
 prewarm_value "B caches the schema before A performs rapid alters" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '.schema.properties["cache-key"]' schema-new
+STALE_SCHEMA_RAPID_MODIFIED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.audit.lastModifiedTime')
 mutate_a "set schema rapid value 1 on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '{"updates":[{"@type":"setProperty","property":"rapid-key","value":"schema-v1"}]}'
 mutate_a "set schema rapid value 2 on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
@@ -741,8 +732,11 @@ mutate_a "set schema rapid value 3 on A" PUT "/api/metalakes/${MAIN_METALAKE}/ca
   '{"updates":[{"@type":"setProperty","property":"rapid-key","value":"schema-v3"}]}'
 await_value "B sees the latest schema value" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" '.schema.properties["rapid-key"]' schema-v3
+await_changed "B drops the schema entity cached before the rapid batch" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.audit.lastModifiedTime' "$STALE_SCHEMA_RAPID_MODIFIED"
 
-section "TABLE cache: alter, rename, and drop"
+section "TABLE cache: alter"
 mutate_a "create Iceberg table on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables" \
   "{\"name\":\"${TABLE_NAME}\",\"comment\":\"table-old\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
 # Prime audit.lastModifiedTime; see the note in the SCHEMA section.
@@ -764,7 +758,7 @@ await_changed "B drops the cached table entity (audit moved on)" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
   '.table.audit.lastModifiedTime' "$STALE_TABLE_MODIFIED"
 
-consistency_case "TABLE rename invalidates the old name on B"
+section "TABLE external backend E2E: rename visibility"
 prewarm_value "B caches the pre-rename table" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
   '.table.comment' table-new
@@ -775,19 +769,19 @@ await_http "B invalidates the old table name" "$INSTANCE_B" \
 await_value "B loads the renamed table" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RENAMED_TABLE}" '.table.name' "$RENAMED_TABLE"
 
-consistency_case "TABLE drop invalidates B"
+section "TABLE external backend E2E: drop visibility"
 prewarm_value "B caches the renamed table before A drops it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RENAMED_TABLE}" \
   '.table.name' "$RENAMED_TABLE"
 mutate_a "drop table on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RENAMED_TABLE}?purge=true"
-await_http "B invalidates dropped table" "$INSTANCE_B" \
+await_http "B observes the table removed from Iceberg" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RENAMED_TABLE}" 404
 
-section "TABLE edge case: drop and recreate the same name in one poll window"
+section "TABLE external backend E2E: same-name recreation setup"
 mutate_a "create first recreate-probe table generation on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables" \
   "{\"name\":\"${RECREATE_TABLE}\",\"comment\":\"table-generation-1\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
 
-consistency_case "TABLE drop plus same-name recreate evicts the old generation"
+section "TABLE external backend E2E: drop plus same-name recreate"
 prewarm_value "B caches the first table generation" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" \
   '.table.comment' table-generation-1
@@ -804,7 +798,7 @@ await_value "B loads the second table generation" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" '.table.comment' table-generation-2
 mutate_a "remove recreate-probe table" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}?purge=true"
 
-section "VIEW cache: alter, rename, and drop"
+section "VIEW cache: alter and drop/recreate"
 mutate_a "create Iceberg view on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views" \
   "{\"name\":\"${VIEW_NAME}\",\"comment\":\"view-old\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 1 AS id\"}],\"properties\":{}}"
 # Prime audit.lastModifiedTime; see the note in the SCHEMA section.
@@ -826,7 +820,7 @@ await_changed "B drops the cached view entity (audit moved on)" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
   '.view.audit.lastModifiedTime' "$STALE_VIEW_MODIFIED"
 
-consistency_case "VIEW rename invalidates the old name on B"
+section "VIEW external backend E2E: rename visibility"
 prewarm_value "B caches the pre-rename view" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
   '.view.properties["cache-key"]' view-new
@@ -837,21 +831,45 @@ await_http "B invalidates the old view name" "$INSTANCE_B" \
 await_value "B loads the renamed view" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" '.view.name' "$RENAMED_VIEW"
 
-consistency_case "VIEW drop invalidates B"
+consistency_case "VIEW drop plus same-name recreate evicts the old entity"
 prewarm_value "B caches the renamed view before A drops it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
   '.view.name' "$RENAMED_VIEW"
+STALE_VIEW_CREATED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
+  '.view.audit.createTime')
 mutate_a "drop view on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}"
 await_http "B invalidates dropped view" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" 404
+mutate_a "recreate the dropped view name on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views" \
+  "{\"name\":\"${RENAMED_VIEW}\",\"comment\":\"view-generation-2\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 2 AS id\"}],\"properties\":{}}"
+await_value "B loads the replacement view" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
+  '.view.comment' view-generation-2
+await_changed "B does not reuse the dropped view entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
+  '.view.audit.createTime' "$STALE_VIEW_CREATED"
+mutate_a "remove the replacement view" DELETE \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}"
 
-consistency_case "SCHEMA drop invalidates B"
+consistency_case "SCHEMA drop plus same-name recreate evicts the old entity"
 prewarm_value "B caches the schema immediately before A drops it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '.schema.properties["rapid-key"]' schema-v3
+STALE_SCHEMA_CREATED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.audit.createTime')
 mutate_a "drop the warmed schema on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}"
 await_http "B invalidates dropped schema" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" 404
+mutate_a "recreate the dropped schema name on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
+  "{\"name\":\"${SCHEMA_NAME}\",\"comment\":\"schema-generation-2\",\"properties\":{}}"
+await_value "B loads the replacement schema" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.comment' schema-generation-2
+await_changed "B does not reuse the dropped schema entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.audit.createTime' "$STALE_SCHEMA_CREATED"
 
 section "SCHEMA cascade: invalidate descendant entity caches"
 mutate_a "create cascade schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas" \
@@ -885,6 +903,17 @@ mutate_a "create hierarchical grandchild schema on A" POST "/api/metalakes/${MAI
   "{\"name\":\"${HIER_GRANDCHILD}\",\"comment\":\"grandchild\",\"properties\":{}}"
 mutate_a "create hierarchical sibling schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
   "{\"name\":\"${HIER_SIBLING}\",\"comment\":\"sibling\",\"properties\":{}}"
+# Prime audit.lastModifiedTime for every externally backed schema. Their
+# catalog-side properties are useful E2E signals, but only the audit proves
+# that B discarded its cached Gravitino entity.
+mutate_a "prime hierarchical parent audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
+  '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
+mutate_a "prime hierarchical child audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
+  '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
+mutate_a "prime hierarchical grandchild audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
+  '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
+mutate_a "prime hierarchical sibling audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
+  '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
 mutate_a "create grandchild table on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}/tables" \
   "{\"name\":\"${HIER_TABLE}\",\"comment\":\"hierarchical table\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"properties\":{}}"
 mutate_a "create sibling view on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}/views" \
@@ -894,37 +923,61 @@ consistency_case "SCHEMA alter invalidates a cached top-level parent"
 prewarm_value "B caches the top-level parent before A alters it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
   '.schema.name' "$HIER_PARENT"
+STALE_HIER_PARENT_MODIFIED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
+  '.schema.audit.lastModifiedTime')
 mutate_a "alter hierarchical parent on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"parent-new"}]}'
 await_value "B sees altered parent schema" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" '.schema.properties["level-key"]' parent-new
+await_changed "B reloads the altered parent entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
+  '.schema.audit.lastModifiedTime' "$STALE_HIER_PARENT_MODIFIED"
 
 consistency_case "SCHEMA alter invalidates a cached middle-level child"
 prewarm_value "B caches the middle-level child before A alters it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
   '.schema.name' "$HIER_CHILD"
+STALE_HIER_CHILD_MODIFIED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
+  '.schema.audit.lastModifiedTime')
 mutate_a "alter hierarchical child on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"child-new"}]}'
 await_value "B sees altered child schema" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" '.schema.properties["level-key"]' child-new
+await_changed "B reloads the altered child entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
+  '.schema.audit.lastModifiedTime' "$STALE_HIER_CHILD_MODIFIED"
 
 consistency_case "SCHEMA alter invalidates a cached grandchild"
 prewarm_value "B caches the grandchild before A alters it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
   '.schema.name' "$HIER_GRANDCHILD"
+STALE_HIER_GRANDCHILD_MODIFIED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
+  '.schema.audit.lastModifiedTime')
 mutate_a "alter hierarchical grandchild on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"grandchild-new"}]}'
 await_value "B sees altered grandchild schema" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" '.schema.properties["level-key"]' grandchild-new
+await_changed "B reloads the altered grandchild entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
+  '.schema.audit.lastModifiedTime' "$STALE_HIER_GRANDCHILD_MODIFIED"
 
 consistency_case "SCHEMA alter invalidates a cached sibling branch"
 prewarm_value "B caches the sibling branch before A alters it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
   '.schema.name' "$HIER_SIBLING"
+STALE_HIER_SIBLING_MODIFIED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
+  '.schema.audit.lastModifiedTime')
 mutate_a "alter hierarchical sibling on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
   '{"updates":[{"@type":"setProperty","property":"level-key","value":"sibling-new"}]}'
 await_value "B sees altered sibling schema" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" '.schema.properties["level-key"]' sibling-new
+await_changed "B reloads the altered sibling entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
+  '.schema.audit.lastModifiedTime' "$STALE_HIER_SIBLING_MODIFIED"
 
 consistency_case "CATALOG force drop recursively invalidates the full schema tree"
 prewarm_value "B caches the hierarchical catalog before A force-drops it" "$INSTANCE_B" \
@@ -948,25 +1001,38 @@ prewarm_value "B caches the grandchild table before the recursive drop" "$INSTAN
 prewarm_value "B caches the sibling view before the recursive drop" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}/views/${HIER_VIEW}" \
   '.view.name' "$HIER_VIEW"
+STALE_HIER_PARENT_CREATED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
+  '.schema.audit.createTime')
+STALE_HIER_CHILD_CREATED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
+  '.schema.audit.createTime')
+STALE_HIER_GRANDCHILD_CREATED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
+  '.schema.audit.createTime')
+STALE_HIER_SIBLING_CREATED=$(read_field "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
+  '.schema.audit.createTime')
 mutate_a "force-drop hierarchical catalog on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}?force=true"
 await_http "B invalidates force-dropped hierarchical catalog" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}" 404
-await_http "B invalidates force-dropped parent schema" "$INSTANCE_B" \
+await_http "B observes the parent removed from Iceberg" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" 404
-await_http "B invalidates force-dropped child schema" "$INSTANCE_B" \
+await_http "B observes the child removed from Iceberg" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" 404
-await_http "B invalidates force-dropped grandchild schema" "$INSTANCE_B" \
+await_http "B observes the grandchild removed from Iceberg" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" 404
-await_http "B invalidates force-dropped sibling schema" "$INSTANCE_B" \
+await_http "B observes the sibling removed from Iceberg" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" 404
-await_http "B invalidates force-dropped grandchild table" "$INSTANCE_B" \
+await_http "B observes the grandchild table removed from Iceberg" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}/tables/${HIER_TABLE}" 404
-await_http "B invalidates force-dropped sibling view" "$INSTANCE_B" \
+await_http "B observes the sibling view removed from Iceberg" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}/views/${HIER_VIEW}" 404
 
-# Recreate an empty catalog with the same name so requests can pass the parent
-# lookup. This proves the nested entity caches themselves were evicted instead
-# of merely being hidden by the missing catalog.
+# Recreate the catalog first to show that the old external tree is absent, then
+# recreate the same schema names and compare their entity audit timestamps.
+# The latter is the cache assertion: external 404s alone cannot prove that the
+# Gravitino schema entities were evicted.
 HIER_RECREATE_BODY=$(jq -nc \
   --arg name "$ICEBERG_CATALOG" \
   --arg backend_name "multi_instance_recreated_${SUFFIX}" \
@@ -981,7 +1047,27 @@ api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALO
 expect_http "B does not leak the old grandchild through the replacement catalog" 404
 api "$INSTANCE_B" GET "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}"
 expect_http "B does not leak the old sibling through the replacement catalog" 404
-mutate_a "remove the empty replacement catalog" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}?force=true"
+mutate_a "recreate hierarchical parent schema" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
+  "{\"name\":\"${HIER_PARENT}\",\"comment\":\"parent-generation-2\",\"properties\":{}}"
+mutate_a "recreate hierarchical child schema" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
+  "{\"name\":\"${HIER_CHILD}\",\"comment\":\"child-generation-2\",\"properties\":{}}"
+mutate_a "recreate hierarchical grandchild schema" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
+  "{\"name\":\"${HIER_GRANDCHILD}\",\"comment\":\"grandchild-generation-2\",\"properties\":{}}"
+mutate_a "recreate hierarchical sibling schema" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
+  "{\"name\":\"${HIER_SIBLING}\",\"comment\":\"sibling-generation-2\",\"properties\":{}}"
+await_changed "B does not reuse the dropped parent schema entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_PARENT}" \
+  '.schema.audit.createTime' "$STALE_HIER_PARENT_CREATED"
+await_changed "B does not reuse the dropped child schema entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_CHILD}" \
+  '.schema.audit.createTime' "$STALE_HIER_CHILD_CREATED"
+await_changed "B does not reuse the dropped grandchild schema entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_GRANDCHILD}" \
+  '.schema.audit.createTime' "$STALE_HIER_GRANDCHILD_CREATED"
+await_changed "B does not reuse the dropped sibling schema entity" "$INSTANCE_B" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${HIER_SIBLING}" \
+  '.schema.audit.createTime' "$STALE_HIER_SIBLING_CREATED"
+mutate_a "remove the replacement hierarchical catalog" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}?force=true"
 
 section "FILESET cache: alter, rename, and drop"
 mutate_a "create fileset schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas" \
@@ -1031,7 +1117,7 @@ mutate_a "recreate the same fileset name on A" POST "/api/metalakes/${MAIN_METAL
 await_value "B loads the second fileset generation" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${RECREATE_FILESET}" '.fileset.comment' fileset-generation-2
 
-section "TOPIC cache: alter and drop"
+section "TOPIC cache: alter"
 mutate_a "create Kafka topic on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics" \
   "{\"name\":\"${TOPIC_NAME}\",\"comment\":\"topic-priming\",\"properties\":{\"partition-count\":\"1\",\"replication-factor\":\"1\"}}"
 # Prime audit.lastModifiedTime; see the note in the SCHEMA section. Kafka
@@ -1055,12 +1141,12 @@ await_changed "B drops the cached topic entity (audit moved on)" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
   '.topic.audit.lastModifiedTime' "$STALE_TOPIC_MODIFIED"
 
-consistency_case "TOPIC drop invalidates B"
+section "TOPIC external backend E2E: drop visibility"
 prewarm_value "B caches the altered topic before A drops it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
   '.topic.comment' topic-new
 mutate_a "drop topic on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}"
-await_http "B invalidates dropped topic" "$INSTANCE_B" \
+await_http "B observes the topic removed from Kafka" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" 404
 
 section "TAG cache: alter, rename, and drop"
