@@ -46,7 +46,7 @@ public class UserMetaBaseSQLProvider {
         + " metalake_id as metalakeId,"
         + " external_id as externalId, enabled as enabled,"
         + " audit_info as auditInfo, current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " last_version as lastVersion, deleted_at as deletedAt, updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
@@ -59,7 +59,7 @@ public class UserMetaBaseSQLProvider {
         + " ut.metalake_id as metalakeId,"
         + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
-        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt, ut.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "
@@ -76,7 +76,7 @@ public class UserMetaBaseSQLProvider {
         + " ut.metalake_id as metalakeId,"
         + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
-        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt, ut.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "
@@ -85,26 +85,6 @@ public class UserMetaBaseSQLProvider {
         + " WHERE mt.metalake_name = #{metalakeName}"
         + " AND ut.user_id = #{userId}"
         + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
-  }
-
-  public String updateUserMetaByExternalId(
-      @Param("newUserMeta") UserPO newUserPO, @Param("oldUserMeta") UserPO oldUserPO) {
-    return "UPDATE "
-        + USER_TABLE_NAME
-        + " SET user_name = #{newUserMeta.userName},"
-        + " metalake_id = #{newUserMeta.metalakeId},"
-        + " audit_info = #{newUserMeta.auditInfo},"
-        + " external_id = #{newUserMeta.externalId},"
-        + " enabled = #{newUserMeta.enabled},"
-        + " current_version = #{newUserMeta.currentVersion},"
-        + " last_version = #{newUserMeta.lastVersion},"
-        + " deleted_at = #{newUserMeta.deletedAt}"
-        + " WHERE external_id = #{oldUserMeta.externalId}"
-        + " AND metalake_id = #{oldUserMeta.metalakeId}"
-        + " AND audit_info = #{oldUserMeta.auditInfo}"
-        + " AND current_version = #{oldUserMeta.currentVersion}"
-        + " AND last_version = #{oldUserMeta.lastVersion}"
-        + " AND deleted_at = 0";
   }
 
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
@@ -194,7 +174,7 @@ public class UserMetaBaseSQLProvider {
         + " us.metalake_id as metalakeId,"
         + " us.external_id as externalId, us.enabled as enabled,"
         + " us.audit_info as auditInfo, us.current_version as currentVersion,"
-        + " us.last_version as lastVersion, us.deleted_at as deletedAt"
+        + " us.last_version as lastVersion, us.deleted_at as deletedAt, us.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " us JOIN "
@@ -210,7 +190,7 @@ public class UserMetaBaseSQLProvider {
         + " ut.external_id as externalId, ut.enabled as enabled,"
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
-        + " ut.deleted_at as deletedAt"
+        + " ut.deleted_at as deletedAt, ut.updated_at as updatedAt"
         + " FROM "
         + USER_TABLE_NAME
         + " ut JOIN "

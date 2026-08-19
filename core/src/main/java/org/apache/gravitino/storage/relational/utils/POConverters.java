@@ -1019,6 +1019,7 @@ public class POConverters {
               .withNamespace(namespace)
               .withExternalId(userPO.getExternalId())
               .withEnabled(userPO.getEnabled())
+              .withUpdatedAt(userPO.getUpdatedAt() == null ? 0L : userPO.getUpdatedAt())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(userPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {
@@ -1106,6 +1107,7 @@ public class POConverters {
               .withName(groupPO.getGroupName())
               .withNamespace(namespace)
               .withExternalId(groupPO.getExternalId())
+              .withUpdatedAt(groupPO.getUpdatedAt() == null ? 0L : groupPO.getUpdatedAt())
               .withAuditInfo(
                   JsonUtils.anyFieldMapper().readValue(groupPO.getAuditInfo(), AuditInfo.class));
       if (!roleNames.isEmpty()) {

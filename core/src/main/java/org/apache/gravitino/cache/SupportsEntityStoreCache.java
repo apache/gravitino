@@ -68,11 +68,12 @@ public interface SupportsEntityStoreCache {
    * invalidation path covers, so it must remain non-cacheable until its invalidation behavior has
    * been validated. Implementations extending {@link BaseEntityCache} get this check for free.
    *
-   * <p>Only self-contained entities are approved. User/group/role are deliberately excluded because
-   * they contain relation-derived data whose source can change through another entity. Model/model
-   * version and function are also excluded because they carry load-bearing pointers that must not
-   * be served stale. Other unapproved and newly introduced entity types go straight to the store
-   * until their invalidation behavior has been validated.
+   * <p>Self-contained catalog entities are approved. User and group are also approved: name-keyed
+   * {@code get} version-validates them against {@code *_meta.updated_at} before serving a cached
+   * copy. Role remains excluded because it contains relation-derived data that {@code store.get}
+   * does not version-check. Model/model version and function are excluded because they carry
+   * load-bearing pointers that must not be served stale. Other unapproved and newly introduced
+   * entity types go straight to the store until their invalidation behavior has been validated.
    *
    * <p>Implementations must also invoke {@link #invalidateOnKeyChange(Entity)} for every entity,
    * including non-cacheable ones, since a non-cacheable entity may still invalidate a cacheable

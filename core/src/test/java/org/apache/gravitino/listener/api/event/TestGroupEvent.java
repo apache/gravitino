@@ -657,19 +657,6 @@ public class TestGroupEvent {
   }
 
   @Test
-  void testRemoveGroupByExternalIdEvent() {
-    dispatcher.removeGroupByExternalId(METALAKE, GROUP_EXT_ID);
-
-    PreEvent preEvent = dummyEventListener.popPreEvent();
-    Assertions.assertEquals(RemoveGroupByExternalIdPreEvent.class, preEvent.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_GROUP_BY_EXTERNAL_ID, preEvent.operationType());
-
-    Event event = dummyEventListener.popPostEvent();
-    Assertions.assertEquals(RemoveGroupByExternalIdEvent.class, event.getClass());
-    Assertions.assertEquals(OperationType.REMOVE_GROUP_BY_EXTERNAL_ID, event.operationType());
-  }
-
-  @Test
   void testGetGroupByExternalIdFailureEvent() {
     Assertions.assertThrowsExactly(
         GravitinoRuntimeException.class,
@@ -773,7 +760,6 @@ public class TestGroupEvent {
 
     when(dispatcher.removeGroup(METALAKE, groupName)).thenReturn(true);
     when(dispatcher.removeGroup(METALAKE, inExistGroupName)).thenReturn(false);
-    when(dispatcher.removeGroupByExternalId(METALAKE, GROUP_EXT_ID)).thenReturn(true);
     when(dispatcher.removeGroupById(METALAKE, GROUP_ID)).thenReturn(true);
 
     when(dispatcher.listGroups(METALAKE)).thenReturn(new Group[] {group, otherGroup});

@@ -45,11 +45,12 @@ public abstract class BaseEntityCache implements EntityCache {
    * SupportsEntityStoreCache#put(Entity)} for the contract. New entity types are excluded by
    * default until their invalidation behavior has been validated.
    *
-   * <p>Only self-contained entities are cacheable: a stale copy of one is at worst cosmetically old
-   * (an old comment, property, or job status), never a wrong pointer, and each can be invalidated
-   * with a single one-to-one key drop. Every other type is read straight from the store.
-   * User/group/role embed relation-derived data that a per-node cache cannot invalidate;
-   * model/model version and function carry a load-bearing pointer that would be silently wrong if
+   * <p>Only self-contained entities, plus user/group, are cacheable. A stale copy of a catalog
+   * entity is at worst cosmetically old and is dropped by change-log invalidation. User and group
+   * embed relation-derived data ({@code enabled}, roles); name-keyed {@code
+   * RelationalEntityStore.get} version-validates those entries against {@code user_meta.updated_at}
+   * / {@code group_meta.updated_at} before serving a cached copy. Role remains excluded.
+   * Model/model version and function carry a load-bearing pointer that would be silently wrong if
    * served stale.
    */
   private static final Set<Entity.EntityType> CACHEABLE_TYPES =
@@ -63,7 +64,9 @@ public abstract class BaseEntityCache implements EntityCache {
           Entity.EntityType.FILESET,
           Entity.EntityType.TAG,
           Entity.EntityType.POLICY,
-          Entity.EntityType.JOB);
+          Entity.EntityType.JOB,
+          Entity.EntityType.USER,
+          Entity.EntityType.GROUP);
 
   protected final Config cacheConfig;
 

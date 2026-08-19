@@ -127,22 +127,6 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       NameIdentifier ident, Entity.EntityType entityType) throws NoSuchEntityException, IOException;
 
   /**
-   * Updates an entity by external id.
-   *
-   * @param <E> the type of the entity returned
-   * @param ident the external id name identifier
-   * @param entityType the type of the entity
-   * @param updater a {@link Function} that takes the current entity instance and returns the
-   *     updated instance
-   * @return the updated entity
-   * @throws NoSuchEntityException if the entity does not exist
-   * @throws IOException if the update operation fails
-   */
-  <E extends Entity & HasIdentifier> E updateByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws NoSuchEntityException, IOException;
-
-  /**
    * Retrieves an entity by Gravitino-assigned id.
    *
    * @param <E> The type of the entity returned.

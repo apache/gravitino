@@ -32,6 +32,7 @@ import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
@@ -248,10 +249,18 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
       String metalake = change.getMetalakeName();
       String entityType = change.getEntityType();
       String fullName = change.getFullName();
+      if (entityType == null) {
+        continue;
+      }
+      String typeName = entityType.toUpperCase(Locale.ROOT);
+      if (Entity.EntityType.USER.name().equals(typeName)
+          || Entity.EntityType.GROUP.name().equals(typeName)) {
+        continue;
+      }
 
       MetadataObject.Type mdType;
       try {
-        mdType = MetadataObject.Type.valueOf(entityType.toUpperCase(Locale.ROOT));
+        mdType = MetadataObject.Type.valueOf(typeName);
       } catch (IllegalArgumentException e) {
         LOG.warn("Unknown entity type in change log: {}", entityType);
         continue;

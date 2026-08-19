@@ -1409,41 +1409,6 @@ class TestUserMetaService extends TestJDBCBackend {
         NoSuchEntityException.class, () -> svc.getUserByExternalId(userExtIdent("missing-ext-id")));
     assertThrowsExt(
         IllegalArgumentException.class, () -> svc.getUserByExternalId(userExtIdent("")));
-    assertThrowsExt(
-        NoSuchEntityException.class,
-        () -> svc.updateUserByExternalId(userExtIdent("missing-ext-id"), enabledUpdater(false)));
-  }
-
-  @TestTemplate
-  void testExtEnable() throws IOException {
-    UserMetaService svc = userMetaService();
-    svc.insertUser(userWithExtId("u1", "ext-1"), false);
-    Assertions.assertFalse(
-        svc.updateUserByExternalId(userExtIdent("ext-1"), enabledUpdater(false)).enabled());
-    Assertions.assertTrue(
-        svc.updateUserByExternalId(userExtIdent("ext-1"), enabledUpdater(true)).enabled());
-
-    svc.insertUser(userWithExtId("u2", "ext-db"), false);
-    long updatedAtBefore = queryUpdatedAtByExtId("ext-db");
-    svc.updateUserByExternalId(userExtIdent("ext-db"), enabledUpdater(false));
-    Assertions.assertFalse(queryEnabledByExtId("ext-db"));
-    long updatedAtAfterDisable = queryUpdatedAtByExtId("ext-db");
-    Assertions.assertTrue(updatedAtAfterDisable >= updatedAtBefore);
-
-    svc.updateUserByExternalId(userExtIdent("ext-db"), enabledUpdater(true));
-    Assertions.assertTrue(queryEnabledByExtId("ext-db"));
-    Assertions.assertTrue(queryUpdatedAtByExtId("ext-db") >= updatedAtAfterDisable);
-  }
-
-  @TestTemplate
-  void testExtEnableDel() throws IOException {
-    UserMetaService svc = userMetaService();
-    UserEntity user = userWithExtId("u1", "ext-del");
-    svc.insertUser(user, false);
-    Assertions.assertTrue(svc.deleteUser(user.nameIdentifier()));
-    assertThrowsExt(
-        NoSuchEntityException.class,
-        () -> svc.updateUserByExternalId(userExtIdent("ext-del"), enabledUpdater(false)));
   }
 
   @TestTemplate
@@ -1493,54 +1458,6 @@ class TestUserMetaService extends TestJDBCBackend {
 
   private NameIdentifier userExtIdent(String externalId) {
     return AuthorizationUtils.ofUserExternalId(metalakeName, externalId);
-  }
-
-  private Function<UserEntity, UserEntity> enabledUpdater(boolean enabled) {
-    return user ->
-        UserEntity.builder()
-            .withId(user.id())
-            .withName(user.name())
-            .withNamespace(user.namespace())
-            .withExternalId(user.externalId())
-            .withEnabled(enabled)
-            .withRoleNames(user.roleNames())
-            .withRoleIds(user.roleIds())
-            .withAuditInfo(user.auditInfo())
-            .build();
-  }
-
-  private boolean queryEnabledByExtId(String externalId) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs =
-            statement.executeQuery(
-                String.format(
-                    "SELECT enabled FROM user_meta WHERE external_id = '%s' AND deleted_at = 0",
-                    externalId))) {
-      Assertions.assertTrue(rs.next());
-      return rs.getBoolean(1);
-    } catch (SQLException e) {
-      throw new RuntimeException("Query user enabled failed", e);
-    }
-  }
-
-  private long queryUpdatedAtByExtId(String externalId) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet rs =
-            statement.executeQuery(
-                String.format(
-                    "SELECT updated_at FROM user_meta WHERE external_id = '%s' AND deleted_at = 0",
-                    externalId))) {
-      Assertions.assertTrue(rs.next());
-      return rs.getLong(1);
-    } catch (SQLException e) {
-      throw new RuntimeException("Query user updated_at failed", e);
-    }
   }
 
   private Integer countUsers(Long metalakeId) {

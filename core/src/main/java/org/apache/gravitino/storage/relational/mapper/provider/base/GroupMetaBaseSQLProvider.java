@@ -41,7 +41,7 @@ public class GroupMetaBaseSQLProvider {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName, gt.metalake_id as metalakeId,"
         + " gt.external_id as externalId,"
         + " gt.audit_info as auditInfo, gt.current_version as currentVersion, gt.last_version as lastVersion,"
-        + " gt.deleted_at as deletedAt FROM "
+        + " gt.deleted_at as deletedAt, gt.updated_at as updatedAt FROM "
         + GROUP_TABLE_NAME
         + " gt JOIN "
         + MetalakeMetaMapper.TABLE_NAME
@@ -131,7 +131,7 @@ public class GroupMetaBaseSQLProvider {
         + " metalake_id as metalakeId,"
         + " external_id as externalId,"
         + " audit_info as auditInfo, current_version as currentVersion,"
-        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " last_version as lastVersion, deleted_at as deletedAt, updated_at as updatedAt"
         + " FROM "
         + GROUP_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND group_name = #{groupName}"
@@ -144,7 +144,7 @@ public class GroupMetaBaseSQLProvider {
         + " gt.metalake_id as metalakeId,"
         + " gt.external_id as externalId,"
         + " gt.audit_info as auditInfo, gt.current_version as currentVersion,"
-        + " gt.last_version as lastVersion, gt.deleted_at as deletedAt"
+        + " gt.last_version as lastVersion, gt.deleted_at as deletedAt, gt.updated_at as updatedAt"
         + " FROM "
         + GROUP_TABLE_NAME
         + " gt JOIN "
@@ -161,7 +161,7 @@ public class GroupMetaBaseSQLProvider {
         + " gt.metalake_id as metalakeId,"
         + " gt.external_id as externalId,"
         + " gt.audit_info as auditInfo, gt.current_version as currentVersion,"
-        + " gt.last_version as lastVersion, gt.deleted_at as deletedAt"
+        + " gt.last_version as lastVersion, gt.deleted_at as deletedAt, gt.updated_at as updatedAt"
         + " FROM "
         + GROUP_TABLE_NAME
         + " gt JOIN "
@@ -291,7 +291,7 @@ public class GroupMetaBaseSQLProvider {
         + " gr.metalake_id as metalakeId,"
         + " gr.external_id as externalId,"
         + " gr.audit_info as auditInfo, gr.current_version as currentVersion,"
-        + " gr.last_version as lastVersion, gr.deleted_at as deletedAt"
+        + " gr.last_version as lastVersion, gr.deleted_at as deletedAt, gr.updated_at as updatedAt"
         + " FROM "
         + GROUP_TABLE_NAME
         + " gr JOIN "

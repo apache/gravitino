@@ -209,34 +209,6 @@ public class TestMemoryEntityStore {
 
     @Override
     @SuppressWarnings("unchecked")
-    public <E extends Entity & HasIdentifier> E updateByExternalId(
-        NameIdentifier ident, EntityType entityType, Class<E> type, Function<E, E> updater)
-        throws NoSuchEntityException, IOException {
-      E entity = getByExternalId(ident, entityType, type);
-      E updated = updater.apply(entity);
-      return update(entity.nameIdentifier(), type, entityType, e -> updated);
-    }
-
-    @Override
-    public boolean deleteByExternalId(NameIdentifier ident, EntityType entityType)
-        throws IOException {
-      try {
-        if (entityType == EntityType.USER) {
-          UserEntity user = getByExternalId(ident, entityType, UserEntity.class);
-          return delete(user.nameIdentifier(), entityType);
-        } else if (entityType == EntityType.GROUP) {
-          GroupEntity group = getByExternalId(ident, entityType, GroupEntity.class);
-          return delete(group.nameIdentifier(), entityType);
-        }
-        throw new UnsupportedOperationException(
-            "Delete by external id is not supported for entity type: " + entityType);
-      } catch (NoSuchEntityException e) {
-        return false;
-      }
-    }
-
-    @Override
-    @SuppressWarnings("unchecked")
     public <E extends Entity & HasIdentifier> E getById(
         NameIdentifier ident, EntityType entityType, Class<E> type)
         throws NoSuchEntityException, IOException {

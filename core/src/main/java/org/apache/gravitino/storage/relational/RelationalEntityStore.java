@@ -54,7 +54,14 @@ import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.GroupEntity;
+import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
+import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -170,8 +177,7 @@ public class RelationalEntityStore
 
   @Override
   public boolean exists(NameIdentifier ident, Entity.EntityType entityType) throws IOException {
-    boolean existsInCache = cache.contains(ident, entityType);
-    return existsInCache || backend.exists(ident, entityType);
+    return getIfPresent(ident, entityType).isPresent() || backend.exists(ident, entityType);
   }
 
   @Override
@@ -186,7 +192,18 @@ public class RelationalEntityStore
       NameIdentifier ident, Class<E> type, Entity.EntityType entityType, Function<E, E> updater)
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
-    cache.invalidate(ident, entityType);
+    if (entityType == Entity.EntityType.USER || entityType == Entity.EntityType.GROUP) {
+      // Do not put: peers reload via updated_at on the next name-keyed get.
+      cache.invalidate(ident, entityType);
+      if (!ident.equals(updatedEntity.nameIdentifier())) {
+        cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+      }
+      return updatedEntity;
+    }
+    if (!ident.equals(updatedEntity.nameIdentifier())) {
+      cache.invalidate(ident, entityType);
+    }
+    cache.put(updatedEntity);
     return updatedEntity;
   }
 
@@ -197,7 +214,7 @@ public class RelationalEntityStore
     return cache.withCacheLock(
         EntityCacheKey.of(ident, entityType),
         () -> {
-          Optional<E> entityFromCache = cache.getIfPresent(ident, entityType);
+          Optional<E> entityFromCache = getIfPresent(ident, entityType);
           if (entityFromCache.isPresent()) {
             return entityFromCache.get();
           }
@@ -223,34 +240,6 @@ public class RelationalEntityStore
       NameIdentifier ident, Entity.EntityType entityType, Class<E> type)
       throws NoSuchEntityException, IOException {
     return backend.getByExternalId(ident, entityType);
-  }
-
-  @Override
-  public <E extends Entity & HasIdentifier> E updateByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Class<E> type, Function<E, E> updater)
-      throws NoSuchEntityException, IOException {
-    E updatedEntity = backend.updateByExternalId(ident, entityType, updater);
-    cache.invalidate(updatedEntity.nameIdentifier(), entityType);
-    return updatedEntity;
-  }
-
-  @Override
-  public boolean deleteByExternalId(NameIdentifier ident, Entity.EntityType entityType)
-      throws IOException {
-    NameIdentifier nameIdent = null;
-    try {
-      HasIdentifier entity = backend.getByExternalId(ident, entityType);
-      nameIdent = entity.nameIdentifier();
-      return backend.delete(nameIdent, entityType, false);
-    } catch (NoSuchEntityException e) {
-      LOGGER.warn(
-          "The entity to be deleted by external id does not exist in the store: {}", ident, e);
-      return false;
-    } finally {
-      if (nameIdent != null) {
-        cache.invalidate(nameIdent, entityType);
-      }
-    }
   }
 
   @Override
@@ -294,7 +283,7 @@ public class RelationalEntityStore
         idents.stream()
             .filter(
                 ident -> {
-                  Optional<E> entity = cache.getIfPresent(ident, entityType);
+                  Optional<E> entity = getIfPresent(ident, entityType);
                   entity.ifPresent(allEntities::add);
                   return entity.isEmpty();
                 })
@@ -520,6 +509,55 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  /**
+   * Same cache-hit rule as jcasbin {@code loadUserRoles} / {@code loadGroupRoles}: reuse a
+   * USER/GROUP snapshot only when its id and {@code *_meta.updated_at} still match.
+   */
+  private <E extends Entity & HasIdentifier> Optional<E> getIfPresent(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    Optional<E> cachedOpt = cache.getIfPresent(ident, entityType);
+    if (cachedOpt.isEmpty()) {
+      return Optional.empty();
+    }
+    String metalake = ident.namespace().level(0);
+    String name = ident.name();
+    if (entityType == Entity.EntityType.USER) {
+      if (!(cachedOpt.get() instanceof UserEntity)) {
+        cache.invalidate(ident, entityType);
+        return Optional.empty();
+      }
+      UserEntity cached = (UserEntity) cachedOpt.get();
+      UserUpdatedAt userInfo =
+          SessionUtils.getWithoutCommit(
+              UserMetaMapper.class, mapper -> mapper.getUserUpdatedAt(metalake, name));
+      if (userInfo != null
+          && cached.id() == userInfo.getUserId()
+          && cached.updatedAt() >= userInfo.getUpdatedAt()) {
+        return cachedOpt;
+      }
+      cache.invalidate(ident, entityType);
+      return Optional.empty();
+    }
+    if (entityType == Entity.EntityType.GROUP) {
+      if (!(cachedOpt.get() instanceof GroupEntity)) {
+        cache.invalidate(ident, entityType);
+        return Optional.empty();
+      }
+      GroupEntity cached = (GroupEntity) cachedOpt.get();
+      GroupUpdatedAt groupInfo =
+          SessionUtils.getWithoutCommit(
+              GroupMetaMapper.class, mapper -> mapper.getGroupUpdatedAt(metalake, name));
+      if (groupInfo != null
+          && cached.id() == groupInfo.getGroupId()
+          && cached.updatedAt() >= groupInfo.getUpdatedAt()) {
+        return cachedOpt;
+      }
+      cache.invalidate(ident, entityType);
+      return Optional.empty();
+    }
+    return cachedOpt;
   }
 
   private void invalidateRelationTargetCache(

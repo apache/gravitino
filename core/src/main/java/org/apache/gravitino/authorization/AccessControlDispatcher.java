@@ -79,19 +79,6 @@ public interface AccessControlDispatcher {
   boolean removeUser(String metalake, String user) throws NoSuchMetalakeException;
 
   /**
-   * Removes a User by external identifier.
-   *
-   * @param metalake The Metalake of the User.
-   * @param externalId The external identifier of the User.
-   * @return True if the User was successfully removed, false only when there's no such user,
-   *     otherwise it will throw an exception.
-   * @throws IllegalArgumentException If externalId is null or blank.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If removing the User encounters storage issues.
-   */
-  boolean removeUserByExternalId(String metalake, String externalId) throws NoSuchMetalakeException;
-
-  /**
    * Gets a User.
    *
    * @param metalake The Metalake of the User.
@@ -239,20 +226,6 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
   boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException;
-
-  /**
-   * Removes a Group by external identifier.
-   *
-   * @param metalake The Metalake of the Group.
-   * @param externalId The external identifier of the Group.
-   * @return True if the Group was successfully removed, false only when there's no such group,
-   *     otherwise it will throw an exception.
-   * @throws IllegalArgumentException If externalId is null or blank.
-   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
-   * @throws RuntimeException If removing the Group encounters storage issues.
-   */
-  boolean removeGroupByExternalId(String metalake, String externalId)
-      throws NoSuchMetalakeException;
 
   /**
    * Gets a Group.

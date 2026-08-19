@@ -301,19 +301,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
-  public <E extends Entity & HasIdentifier> E updateByExternalId(
-      NameIdentifier ident, Entity.EntityType entityType, Function<E, E> updater)
-      throws NoSuchEntityException, IOException {
-    switch (entityType) {
-      case USER:
-        return (E) UserMetaService.getInstance().updateUserByExternalId(ident, updater);
-      default:
-        throw new UnsupportedEntityTypeException(
-            "Unsupported entity type: %s for update enabled by external id operation", entityType);
-    }
-  }
-
-  @Override
   public <E extends Entity & HasIdentifier> E getById(
       NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {
