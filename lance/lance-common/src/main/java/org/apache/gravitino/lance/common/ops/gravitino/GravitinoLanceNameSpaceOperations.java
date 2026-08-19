@@ -223,22 +223,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
     if (nsId.levels() == 2) {
-<<<<<<< HEAD
-      String schemaName = nsId.levelAtListPos(1);
-      if (!catalog.asSchemas().schemaExists(schemaName)) {
-        throw new NamespaceNotFoundException(
-            "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
-      }
-=======
       validateSchemaExists(catalog, nsId.levelAtListPos(1));
     }
   }
 
   private void validateSchemaExists(Catalog catalog, String schemaName) {
-    if (!namespaceWrapper.schemaExists(catalog, schemaName)) {
+    if (!catalog.asSchemas().schemaExists(schemaName)) {
       throw new NamespaceNotFoundException(
           "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
->>>>>>> 101e3475a ([#12468] fix(lance): validate the identifier in ListNamespaces at schema level (#12469))
     }
   }
 
