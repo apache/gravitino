@@ -321,6 +321,24 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
   }
 
   @Override
+  public <E extends Entity & HasIdentifier> E get(
+      NameIdentifier ident, Entity.EntityType entityType, boolean allFields)
+      throws NoSuchEntityException, IOException {
+    if (allFields) {
+      return get(ident, entityType);
+    }
+
+    switch (entityType) {
+      case USER:
+        return (E) UserMetaService.getInstance().getBasicUserByIdentifier(ident);
+      case GROUP:
+        return (E) GroupMetaService.getInstance().getBasicGroupByIdentifier(ident);
+      default:
+        return get(ident, entityType);
+    }
+  }
+
+  @Override
   public <E extends Entity & HasIdentifier> E getByExternalId(
       NameIdentifier ident, Entity.EntityType entityType)
       throws NoSuchEntityException, IOException {

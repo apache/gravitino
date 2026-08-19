@@ -168,6 +168,30 @@ public interface EntityStore extends Closeable {
       throws NoSuchEntityException, IOException;
 
   /**
+   * Get the entity from the underlying storage.
+   *
+   * <p>Some fields may have a relatively high acquisition cost. When {@code allFields} is false,
+   * implementations may skip fetching these high-cost fields to improve performance.
+   *
+   * @param ident the unique identifier of the entity
+   * @param entityType the general type of the entity
+   * @param e the entity class instance
+   * @param allFields if true, fetch all fields; otherwise skip high-cost fields when supported
+   * @param <E> the class of entity
+   * @return the entity retrieved from the underlying storage
+   * @throws NoSuchEntityException if the entity does not exist
+   * @throws IOException if the retrieve operation fails
+   */
+  default <E extends Entity & HasIdentifier> E get(
+      NameIdentifier ident, EntityType entityType, Class<E> e, boolean allFields)
+      throws NoSuchEntityException, IOException {
+    if (allFields) {
+      return get(ident, entityType, e);
+    }
+    throw new UnsupportedOperationException("Don't support to skip fields on get");
+  }
+
+  /**
    * Batch get the entity from the underlying storage.
    *
    * @param idents the unique identifier of the entity

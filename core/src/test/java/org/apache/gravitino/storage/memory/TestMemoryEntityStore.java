@@ -152,6 +152,13 @@ public class TestMemoryEntityStore {
     }
 
     @Override
+    public <E extends Entity & HasIdentifier> E get(
+        NameIdentifier ident, EntityType entityType, Class<E> cl, boolean allFields)
+        throws NoSuchEntityException, IOException {
+      return get(ident, entityType, cl);
+    }
+
+    @Override
     public SupportsExternalIdOperations externalIdOperations() {
       return this;
     }

@@ -114,6 +114,24 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       throws IOException;
 
   /**
+   * Retrieves the entity associated with the identifier and the entity type.
+   *
+   * @param <E> The type of the entity returned.
+   * @param ident The identifier of the entity.
+   * @param entityType The type of the entity.
+   * @param allFields If true, fetch all fields; otherwise skip high-cost fields when supported.
+   * @return The entity associated with the identifier and the entity type.
+   * @throws IOException If an I/O exception occurs during retrieval.
+   */
+  default <E extends Entity & HasIdentifier> E get(
+      NameIdentifier ident, Entity.EntityType entityType, boolean allFields) throws IOException {
+    if (allFields) {
+      return get(ident, entityType);
+    }
+    throw new UnsupportedOperationException("Don't support to skip fields on get");
+  }
+
+  /**
    * Retrieves the entity associated with the external id name identifier.
    *
    * @param <E> The type of the entity returned.

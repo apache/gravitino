@@ -118,12 +118,18 @@ class UserGroupManager {
   BasicUser getBasicUser(String metalake, String user) throws NoSuchUserException {
     try {
       UserEntity userEntity =
-          UserMetaService.getInstance()
-              .getBasicUserByIdentifier(AuthorizationUtils.ofUser(metalake, user));
+          store.get(
+              AuthorizationUtils.ofUser(metalake, user),
+              Entity.EntityType.USER,
+              UserEntity.class,
+              false /* allFields */);
       return DTOConverters.toBasicDTO(userEntity);
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
       throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Getting user {} failed due to storage issues", user, ioe);
+      throw new RuntimeException(ioe);
     }
   }
 
@@ -207,12 +213,18 @@ class UserGroupManager {
   BasicGroup getBasicGroup(String metalake, String group) throws NoSuchGroupException {
     try {
       GroupEntity groupEntity =
-          GroupMetaService.getInstance()
-              .getBasicGroupByIdentifier(AuthorizationUtils.ofGroup(metalake, group));
+          store.get(
+              AuthorizationUtils.ofGroup(metalake, group),
+              Entity.EntityType.GROUP,
+              GroupEntity.class,
+              false /* allFields */);
       return DTOConverters.toBasicDTO(groupEntity);
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
       throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);
+    } catch (IOException ioe) {
+      LOG.error("Getting group {} failed due to storage issues", group, ioe);
+      throw new RuntimeException(ioe);
     }
   }
 
