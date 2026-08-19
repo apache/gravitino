@@ -42,6 +42,7 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.JobRunRequest;
@@ -641,7 +642,8 @@ public class TestJobOperations extends JerseyTest {
     String templateName = "shell_template_1";
     JobEntity job1 = newJobEntity(templateName, JobHandle.Status.QUEUED);
     JobEntity job2 = newJobEntity(templateName, JobHandle.Status.STARTED);
-    JobEntity job3 = newJobEntity("spark_template_1", JobHandle.Status.SUCCEEDED);
+    JobEntity job3 =
+        newJobEntity("spark_template_1", JobHandle.Status.SUCCEEDED, Instant.now().toEpochMilli());
 
     when(jobOperationDispatcher.listJobs(metalake, Optional.empty()))
         .thenReturn(Lists.newArrayList(job1, job2, job3));
@@ -662,6 +664,13 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse.getJobs().get(0));
     Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse.getJobs().get(1));
     Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(2));
+
+    // Not-yet-finished jobs round-trip finishedAt as null over the wire.
+    Assertions.assertNull(jobListResponse.getJobs().get(0).finishedAt());
+    Assertions.assertNull(jobListResponse.getJobs().get(1).finishedAt());
+    // A finished job round-trips its finishedAt as an Instant over the wire.
+    Assertions.assertEquals(
+        Instant.ofEpochMilli(job3.finishedAt()), jobListResponse.getJobs().get(2).finishedAt());
 
     // Test list jobs by template name
     when(jobOperationDispatcher.listJobs(metalake, Optional.of(templateName)))
@@ -793,7 +802,8 @@ public class TestJobOperations extends JerseyTest {
 
   @Test
   public void testCancelJob() {
-    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.STARTED);
+    JobEntity job =
+        newJobEntity("shell_template_1", JobHandle.Status.CANCELLED, Instant.now().toEpochMilli());
 
     when(jobOperationDispatcher.cancelJob(metalake, job.name())).thenReturn(job);
 
@@ -810,6 +820,8 @@ public class TestJobOperations extends JerseyTest {
     JobResponse jobResp = resp.readEntity(JobResponse.class);
     Assertions.assertEquals(0, jobResp.getCode());
     Assertions.assertEquals(JobOperations.toDTO(job), jobResp.getJob());
+    // A finished (cancelled) job round-trips its finishedAt as an Instant over the wire.
+    Assertions.assertEquals(Instant.ofEpochMilli(job.finishedAt()), jobResp.getJob().finishedAt());
 
     // Test throw NoSuchJobException
     doThrow(new NoSuchJobException("mock error"))
@@ -828,6 +840,21 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResp.getCode());
     Assertions.assertEquals(NoSuchJobException.class.getSimpleName(), errorResp.getType());
+  }
+
+  @Test
+  public void testToDTOFinishedAt() {
+    // Sentinel value (<= 0) used by the storage layer means "not finished".
+    JobEntity sentinelJob = newJobEntity("shell_template_1", JobHandle.Status.STARTED, 0L);
+    JobDTO sentinelJobDTO = JobOperations.toDTO(sentinelJob);
+    Assertions.assertNull(sentinelJobDTO.finishedAt());
+
+    // Finished, finishedAt is converted from epoch millis to an Instant.
+    long epochMilli = Instant.now().toEpochMilli();
+    JobEntity finishedJob =
+        newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED, epochMilli);
+    JobDTO finishedJobDTO = JobOperations.toDTO(finishedJob);
+    Assertions.assertEquals(Instant.ofEpochMilli(epochMilli), finishedJobDTO.finishedAt());
   }
 
   private String jobTemplatePath() {
@@ -876,6 +903,10 @@ public class TestJobOperations extends JerseyTest {
   }
 
   private JobEntity newJobEntity(String templateName, JobHandle.Status status) {
+    return newJobEntity(templateName, status, 0L);
+  }
+
+  private JobEntity newJobEntity(String templateName, JobHandle.Status status, Long finishedAt) {
     Random rand = new Random();
     return JobEntity.builder()
         .withId(rand.nextLong())
@@ -885,6 +916,7 @@ public class TestJobOperations extends JerseyTest {
         .withStatus(status)
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .withFinishedAt(finishedAt)
         .build();
   }
 }

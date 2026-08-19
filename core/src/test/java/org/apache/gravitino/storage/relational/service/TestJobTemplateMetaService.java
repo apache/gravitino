@@ -277,6 +277,11 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
   }
 
   static JobEntity newJobEntity(String templateName, JobHandle.Status status, String metalake) {
+    boolean isFinished =
+        status == JobHandle.Status.SUCCEEDED
+            || status == JobHandle.Status.FAILED
+            || status == JobHandle.Status.CANCELLED;
+
     return JobEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())
         .withJobExecutionId(RandomIdGenerator.INSTANCE.nextId() + "")
@@ -284,6 +289,7 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         .withJobTemplateName(templateName)
         .withStatus(status)
         .withAuditInfo(AUDIT_INFO)
+        .withFinishedAt(isFinished ? System.currentTimeMillis() : 0L)
         .build();
   }
 }

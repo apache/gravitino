@@ -273,12 +273,14 @@ class TestSupportsJobs(IntegrationTestEnv):
         )
         self.assertEqual(job_handle1.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle1.job_template_name(), template.name)
+        self.assertIsNone(job_handle1.finished_at())
 
         job_handle2 = self._metalake.run_job(
             template.name, {"arg1": "value3", "arg2": "success", "env_var": "value4"}
         )
         self.assertEqual(job_handle2.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle2.job_template_name(), template.name)
+        self.assertIsNone(job_handle2.finished_at())
 
         # List jobs
         jobs = self._metalake.list_jobs(template.name)
@@ -305,6 +307,9 @@ class TestSupportsJobs(IntegrationTestEnv):
         job_statuses = {job.job_status() for job in updated_jobs}
         self.assertEqual(len(job_statuses), 1)
         self.assertIn(JobHandle.Status.SUCCEEDED, job_statuses)
+        # Finished jobs should carry a non-None finished_at.
+        for job in updated_jobs:
+            self.assertIsNotNone(job.finished_at())
 
     def test_run_and_get_job(self):
         template = self.builder.with_name("test_run_get").build()
@@ -316,6 +321,7 @@ class TestSupportsJobs(IntegrationTestEnv):
         )
         self.assertEqual(job_handle.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle.job_template_name(), template.name)
+        self.assertIsNone(job_handle.finished_at())
 
         # Wait for job to complete
         self._wait_until(
@@ -326,12 +332,14 @@ class TestSupportsJobs(IntegrationTestEnv):
         retrieved_job = self._metalake.get_job(job_handle.job_id())
         self.assertEqual(job_handle.job_id(), retrieved_job.job_id())
         self.assertEqual(JobHandle.Status.SUCCEEDED, retrieved_job.job_status())
+        self.assertIsNotNone(retrieved_job.finished_at())
 
         # Test failed job
         failed_job_handle = self._metalake.run_job(
             template.name, {"arg1": "value1", "arg2": "fail", "env_var": "value2"}
         )
         self.assertEqual(failed_job_handle.job_status(), JobHandle.Status.QUEUED)
+        self.assertIsNone(failed_job_handle.finished_at())
 
         self._wait_until(
             lambda: self._metalake.get_job(failed_job_handle.job_id()).job_status()
@@ -341,6 +349,7 @@ class TestSupportsJobs(IntegrationTestEnv):
         retrieved_failed_job = self._metalake.get_job(failed_job_handle.job_id())
         self.assertEqual(failed_job_handle.job_id(), retrieved_failed_job.job_id())
         self.assertEqual(JobHandle.Status.FAILED, retrieved_failed_job.job_status())
+        self.assertIsNotNone(retrieved_failed_job.finished_at())
 
         # Test non-existent job
         with self.assertRaises(NoSuchJobException):
@@ -356,6 +365,7 @@ class TestSupportsJobs(IntegrationTestEnv):
         )
         self.assertEqual(job_handle.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle.job_template_name(), template.name)
+        self.assertIsNone(job_handle.finished_at())
 
         sleep(1)
 
@@ -371,6 +381,7 @@ class TestSupportsJobs(IntegrationTestEnv):
         retrieved_job = self._metalake.get_job(job_handle.job_id())
         self.assertEqual(job_handle.job_id(), retrieved_job.job_id())
         self.assertEqual(JobHandle.Status.CANCELLED, retrieved_job.job_status())
+        self.assertIsNotNone(retrieved_job.finished_at())
 
         # Test cancel non-existent job
         with self.assertRaises(NoSuchJobException):

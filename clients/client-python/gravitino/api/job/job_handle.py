@@ -16,7 +16,9 @@
 # under the License.
 
 from abc import ABC, abstractmethod
+from datetime import datetime
 from enum import Enum
+from typing import Optional
 
 
 class JobHandle(ABC):
@@ -52,3 +54,9 @@ class JobHandle(ABC):
     @abstractmethod
     def job_status(self) -> Status:
         pass
+
+    def finished_at(self) -> Optional[datetime]:
+        """Returns the time the job finished execution, or ``None`` if the job has not finished
+        execution yet.
+        """
+        raise NotImplementedError("finished_at is not implemented")

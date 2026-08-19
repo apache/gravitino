@@ -476,7 +476,8 @@ public class JobOperations {
         jobEntity.name(),
         jobEntity.jobTemplateName(),
         jobEntity.status(),
-        DTOConverters.toDTO(jobEntity.auditInfo()));
+        DTOConverters.toDTO(jobEntity.auditInfo()),
+        jobEntity.finishedAtAsInstant());
   }
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {

@@ -514,6 +514,11 @@ components:
             - "canceled"
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: The time when the job finished execution, or null if the job has not finished execution yet
 
 
     TemplateUpdate:
@@ -920,7 +925,8 @@ components:
               "audit": {
                 "createTime": "2025-08-12T02:14:28.205023Z",
                 "creator": "anonymous"
-              }
+              },
+              "finishedAt": "2025-08-12T02:15:03.512847Z"
             },
             {
               "jobId": "job-67890",
@@ -929,7 +935,8 @@ components:
               "audit": {
                 "createTime": "2025-08-12T02:14:28.205023Z",
                 "creator": "anonymous"
-              }
+              },
+              "finishedAt": "2025-08-12T02:15:47.891023Z"
             }
           ]
         }
@@ -944,7 +951,8 @@ components:
           "audit": {
             "createTime": "2025-08-12T02:14:28.205023Z",
             "creator": "anonymous"
-          }
+          },
+          "finishedAt": "2025-08-12T02:15:03.512847Z"
         }
       }
 
