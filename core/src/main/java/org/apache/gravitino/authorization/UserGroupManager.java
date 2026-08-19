@@ -118,16 +118,11 @@ class UserGroupManager {
       throws NoSuchUserException, NoSuchMetalakeException {
     MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
-      return store.get(
-          AuthorizationUtils.ofUser(metalake, user),
-          Entity.EntityType.BASIC_USER,
-          UserEntity.class);
+      return UserMetaService.getInstance()
+          .getBasicUserByIdentifier(AuthorizationUtils.ofUser(metalake, user));
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
       throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
-    } catch (IOException ioe) {
-      LOG.error("Getting user {} failed due to storage issues", user, ioe);
-      throw new RuntimeException(ioe);
     }
   }
 
@@ -212,16 +207,11 @@ class UserGroupManager {
       throws NoSuchGroupException, NoSuchMetalakeException {
     MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
-      return store.get(
-          AuthorizationUtils.ofGroup(metalake, group),
-          Entity.EntityType.BASIC_GROUP,
-          GroupEntity.class);
+      return GroupMetaService.getInstance()
+          .getBasicGroupByIdentifier(AuthorizationUtils.ofGroup(metalake, group));
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
       throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);
-    } catch (IOException ioe) {
-      LOG.error("Getting group {} failed due to storage issues", group, ioe);
-      throw new RuntimeException(ioe);
     }
   }
 

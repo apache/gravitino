@@ -340,12 +340,8 @@ public class TestCaffeineEntityCacheInvalidation {
     cache.put(user);
     cache.put(group);
 
-    Assertions.assertTrue(
-        cache.getIfPresent(user.nameIdentifier(), Entity.EntityType.BASIC_USER).isEmpty());
-    Assertions.assertTrue(
-        cache.getIfPresent(group.nameIdentifier(), Entity.EntityType.BASIC_GROUP).isEmpty());
-    Assertions.assertFalse(BaseEntityCache.isCacheable(Entity.EntityType.BASIC_USER));
-    Assertions.assertFalse(BaseEntityCache.isCacheable(Entity.EntityType.BASIC_GROUP));
+    Assertions.assertFalse(BaseEntityCache.isCacheable(Entity.EntityType.USER));
+    Assertions.assertFalse(BaseEntityCache.isCacheable(Entity.EntityType.GROUP));
   }
 
   @Test

@@ -114,13 +114,7 @@ public interface Entity extends Serializable {
     FILESET,
     TOPIC,
     USER,
-    /** Load-mode only: fetches user metadata without role bindings; not a persisted entity type. */
-    BASIC_USER,
     GROUP,
-    /**
-     * Load-mode only: fetches group metadata without role bindings; not a persisted entity type.
-     */
-    BASIC_GROUP,
     ROLE,
     TAG,
     MODEL,
