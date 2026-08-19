@@ -29,7 +29,6 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
-import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -115,12 +114,12 @@ class UserGroupManager {
     }
   }
 
-  BasicUser getBasicUser(String metalake, String user) throws NoSuchUserException {
+  User getBasicUser(String metalake, String user) throws NoSuchUserException {
     try {
-      UserEntity userEntity =
-          store.get(
-              AuthorizationUtils.ofUser(metalake, user), Entity.EntityType.USER, UserEntity.class);
-      return DTOConverters.toBasicDTO(userEntity);
+      return store.get(
+          AuthorizationUtils.ofUser(metalake, user),
+          Entity.EntityType.BASIC_USER,
+          UserEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
       throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
@@ -207,14 +206,12 @@ class UserGroupManager {
     }
   }
 
-  BasicGroup getBasicGroup(String metalake, String group) throws NoSuchGroupException {
+  Group getBasicGroup(String metalake, String group) throws NoSuchGroupException {
     try {
-      GroupEntity groupEntity =
-          store.get(
-              AuthorizationUtils.ofGroup(metalake, group),
-              Entity.EntityType.GROUP,
-              GroupEntity.class);
-      return DTOConverters.toBasicDTO(groupEntity);
+      return store.get(
+          AuthorizationUtils.ofGroup(metalake, group),
+          Entity.EntityType.BASIC_GROUP,
+          GroupEntity.class);
     } catch (NoSuchEntityException e) {
       LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
       throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);

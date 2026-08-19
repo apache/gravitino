@@ -107,7 +107,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public BasicUser getBasicUser(String metalake, String user)
+  public User getBasicUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofUser(metalake, user),
@@ -228,7 +228,7 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
-  public BasicGroup getBasicGroup(String metalake, String group)
+  public Group getBasicGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         AuthorizationUtils.ofGroup(metalake, group),

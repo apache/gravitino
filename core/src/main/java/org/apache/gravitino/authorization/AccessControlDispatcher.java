@@ -109,12 +109,12 @@ public interface AccessControlDispatcher {
    *
    * @param metalake The Metalake of the User.
    * @param user The name of the User.
-   * @return The getting BasicUser instance.
+   * @return The getting User instance without role bindings.
    * @throws NoSuchUserException If the User with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If getting the User encounters storage issues.
    */
-  BasicUser getBasicUser(String metalake, String user)
+  User getBasicUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException;
 
   /**
@@ -286,12 +286,12 @@ public interface AccessControlDispatcher {
    *
    * @param metalake The Metalake of the Group.
    * @param group The name of the Group.
-   * @return The getting BasicGroup instance.
+   * @return The getting Group instance without role bindings.
    * @throws NoSuchGroupException If the Group with the given name does not exist.
    * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
    * @throws RuntimeException If getting the Group encounters storage issues.
    */
-  BasicGroup getBasicGroup(String metalake, String group)
+  Group getBasicGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException;
 
   /**

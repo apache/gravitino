@@ -20,28 +20,28 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.BasicGroupInfo;
+import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered after successfully retrieving a basic group from a metalake. */
 @DeveloperApi
 public class GetBasicGroupEvent extends GroupEvent {
-  private final BasicGroupInfo loadedGroupInfo;
+  private final GroupInfo loadedGroupInfo;
 
   /**
    * Constructs a new {@link GetBasicGroupEvent} instance.
    *
    * @param initiator the user who initiated the request to get the basic group.
    * @param metalake the name of the metalake from which the group is retrieved.
-   * @param loadedGroupInfo the basic group information of the retrieved group.
+   * @param loadedGroupInfo the group information of the retrieved group.
    */
-  public GetBasicGroupEvent(String initiator, String metalake, BasicGroupInfo loadedGroupInfo) {
+  public GetBasicGroupEvent(String initiator, String metalake, GroupInfo loadedGroupInfo) {
     super(initiator, NameIdentifierUtil.ofGroup(metalake, loadedGroupInfo.name()));
     this.loadedGroupInfo = loadedGroupInfo;
   }
 
-  /** Returns the basic group information of the group successfully retrieved from the metalake. */
-  public BasicGroupInfo loadedGroupInfo() {
+  /** Returns the group information of the group successfully retrieved from the metalake. */
+  public GroupInfo loadedGroupInfo() {
     return loadedGroupInfo;
   }
 

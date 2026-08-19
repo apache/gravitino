@@ -160,6 +160,10 @@ public class CaffeineEntityCache extends BaseEntityCache {
       NameIdentifier ident, Entity.EntityType type) {
     checkArguments(ident, type);
 
+    if (type == Entity.EntityType.BASIC_USER || type == Entity.EntityType.BASIC_GROUP) {
+      return Optional.empty();
+    }
+
     Entity entityFromCache = cacheData.getIfPresent(EntityCacheKey.of(ident, type));
 
     return Optional.ofNullable(entityFromCache).map(BaseEntityCache::convertEntity);

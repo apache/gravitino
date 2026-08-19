@@ -24,8 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
-import org.apache.gravitino.authorization.BasicGroup;
-import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.GroupChange;
 import org.apache.gravitino.authorization.PagedResult;
@@ -154,8 +152,6 @@ import org.apache.gravitino.listener.api.event.RevokePrivilegesPreEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesFailureEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesPreEvent;
-import org.apache.gravitino.listener.api.info.BasicGroupInfo;
-import org.apache.gravitino.listener.api.info.BasicUserInfo;
 import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.listener.api.info.RoleInfo;
 import org.apache.gravitino.listener.api.info.UserInfo;
@@ -275,15 +271,14 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
-  public BasicUser getBasicUser(String metalake, String user)
+  public User getBasicUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new GetBasicUserPreEvent(initiator, metalake, user));
     try {
-      BasicUser userObject = dispatcher.getBasicUser(metalake, user);
-      eventBus.dispatchEvent(
-          new GetBasicUserEvent(initiator, metalake, new BasicUserInfo(userObject)));
+      User userObject = dispatcher.getBasicUser(metalake, user);
+      eventBus.dispatchEvent(new GetBasicUserEvent(initiator, metalake, new UserInfo(userObject)));
 
       return userObject;
     } catch (Exception e) {
@@ -532,15 +527,15 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
-  public BasicGroup getBasicGroup(String metalake, String group)
+  public Group getBasicGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
     eventBus.dispatchEvent(new GetBasicGroupPreEvent(initiator, metalake, group));
     try {
-      BasicGroup groupObject = dispatcher.getBasicGroup(metalake, group);
+      Group groupObject = dispatcher.getBasicGroup(metalake, group);
       eventBus.dispatchEvent(
-          new GetBasicGroupEvent(initiator, metalake, new BasicGroupInfo(groupObject)));
+          new GetBasicGroupEvent(initiator, metalake, new GroupInfo(groupObject)));
 
       return groupObject;
     } catch (Exception e) {

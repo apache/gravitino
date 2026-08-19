@@ -59,6 +59,11 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().selectGroupMetaByMetalakeIdAndName(metalakeId, name);
   }
 
+  public static String selectGroupMetaByMetalakeNameAndName(
+      @Param("metalakeName") String metalakeName, @Param("groupName") String groupName) {
+    return getProvider().selectGroupMetaByMetalakeNameAndName(metalakeName, groupName);
+  }
+
   public static String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return getProvider().listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);

@@ -78,6 +78,21 @@ public class GroupMetaService {
     return GroupPO;
   }
 
+  private GroupPO getGroupPOByMetalakeNameAndName(String metalakeName, String groupName) {
+    GroupPO groupPO =
+        SessionUtils.getWithoutCommit(
+            GroupMetaMapper.class,
+            mapper -> mapper.selectGroupMetaByMetalakeNameAndName(metalakeName, groupName));
+
+    if (groupPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.GROUP.name().toLowerCase(),
+          groupName);
+    }
+    return groupPO;
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getGroupIdByMetalakeIdAndName")
@@ -116,9 +131,8 @@ public class GroupMetaService {
   public GroupEntity getBasicGroupByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkGroup(identifier);
 
-    NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
-    long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
-    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+    GroupPO groupPO =
+        getGroupPOByMetalakeNameAndName(identifier.namespace().level(0), identifier.name());
 
     return POConverters.fromGroupPO(groupPO, Collections.emptyList(), identifier.namespace());
   }

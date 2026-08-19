@@ -294,8 +294,12 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) TopicMetaService.getInstance().getTopicByIdentifier(ident);
       case USER:
         return (E) UserMetaService.getInstance().getUserByIdentifier(ident);
+      case BASIC_USER:
+        return (E) UserMetaService.getInstance().getBasicUserByIdentifier(ident);
       case GROUP:
         return (E) GroupMetaService.getInstance().getGroupByIdentifier(ident);
+      case BASIC_GROUP:
+        return (E) GroupMetaService.getInstance().getBasicGroupByIdentifier(ident);
       case ROLE:
         return (E) RoleMetaService.getInstance().getRoleByIdentifier(ident);
       case TAG:
@@ -591,6 +595,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
+      case BASIC_USER:
+      case BASIC_GROUP:
+        return 0;
         // TODO: Implement hard delete logic for these entity types.
 
       default:
@@ -617,6 +624,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case TOPIC:
       case USER:
       case GROUP:
+      case BASIC_USER:
+      case BASIC_GROUP:
       case AUDIT:
       case ROLE:
       case TAG:

@@ -33,7 +33,6 @@ import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.BasicGroup;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.GroupChange;
 import org.apache.gravitino.authorization.PagedResult;
@@ -44,7 +43,6 @@ import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
-import org.apache.gravitino.listener.api.info.BasicGroupInfo;
 import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -192,7 +190,7 @@ public class TestGroupEvent {
     Assertions.assertEquals(OperationType.GET_BASIC_GROUP, event.operationType());
 
     GetBasicGroupEvent getBasicGroupEvent = (GetBasicGroupEvent) event;
-    validateBasicGroup(getBasicGroupEvent.loadedGroupInfo(), group);
+    validateGroup(getBasicGroupEvent.loadedGroupInfo(), group);
   }
 
   @Test
@@ -854,11 +852,5 @@ public class TestGroupEvent {
     Assertions.assertEquals(group.name(), groupInfo.name());
     Assertions.assertEquals(Optional.ofNullable(group.externalId()), groupInfo.externalId());
     Assertions.assertEquals(group.roles(), groupInfo.roles());
-  }
-
-  private void validateBasicGroup(BasicGroupInfo groupInfo, BasicGroup group) {
-    Assertions.assertEquals(group.id(), groupInfo.id());
-    Assertions.assertEquals(group.name(), groupInfo.name());
-    Assertions.assertEquals(Optional.ofNullable(group.externalId()), groupInfo.externalId());
   }
 }

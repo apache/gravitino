@@ -77,6 +77,21 @@ public class UserMetaService {
     return userPO;
   }
 
+  private UserPO getUserPOByMetalakeNameAndName(String metalakeName, String userName) {
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserMetaByMetalakeNameAndName(metalakeName, userName));
+
+    if (userPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          userName);
+    }
+    return userPO;
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getUserIdByMetalakeIdAndName")
@@ -115,9 +130,8 @@ public class UserMetaService {
   public UserEntity getBasicUserByIdentifier(NameIdentifier identifier) {
     AuthorizationUtils.checkUser(identifier);
 
-    Long metalakeId =
-        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
-    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
+    UserPO userPO =
+        getUserPOByMetalakeNameAndName(identifier.namespace().level(0), identifier.name());
 
     return POConverters.fromUserPO(userPO, Collections.emptyList(), identifier.namespace());
   }

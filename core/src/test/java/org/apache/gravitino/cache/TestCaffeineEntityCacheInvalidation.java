@@ -333,6 +333,22 @@ public class TestCaffeineEntityCacheInvalidation {
   }
 
   @Test
+  void testBasicUserAndGroupLoadModesNeverReadCache() {
+    UserEntity user = TestUtil.getTestUserEntity();
+    GroupEntity group = TestUtil.getTestGroupEntity();
+
+    cache.put(user);
+    cache.put(group);
+
+    Assertions.assertTrue(
+        cache.getIfPresent(user.nameIdentifier(), Entity.EntityType.BASIC_USER).isEmpty());
+    Assertions.assertTrue(
+        cache.getIfPresent(group.nameIdentifier(), Entity.EntityType.BASIC_GROUP).isEmpty());
+    Assertions.assertFalse(BaseEntityCache.isCacheable(Entity.EntityType.BASIC_USER));
+    Assertions.assertFalse(BaseEntityCache.isCacheable(Entity.EntityType.BASIC_GROUP));
+  }
+
+  @Test
   void testClearResetsSizeAndIndex() {
     CatalogEntity catalog =
         TestUtil.getTestCatalogEntity(1L, "catalog1", Namespace.of("metalake"), "hive", "cmt");

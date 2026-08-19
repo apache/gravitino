@@ -53,6 +53,23 @@ public class UserMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  public String selectUserMetaByMetalakeNameAndName(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.external_id as externalId, ut.enabled as enabled,"
+        + " ut.audit_info as auditInfo, ut.current_version as currentVersion,"
+        + " ut.last_version as lastVersion, ut.deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.user_name = #{userName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
   public String selectUserMetaByMetalakeNameAndExternalId(
       @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"

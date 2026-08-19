@@ -29,8 +29,6 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.Schema;
-import org.apache.gravitino.authorization.BasicGroup;
-import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
@@ -44,8 +42,6 @@ import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.CatalogDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.SchemaDTO;
-import org.apache.gravitino.dto.authorization.BasicGroupDTO;
-import org.apache.gravitino.dto.authorization.BasicUserDTO;
 import org.apache.gravitino.dto.authorization.GroupDTO;
 import org.apache.gravitino.dto.authorization.OwnerDTO;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
@@ -508,26 +504,6 @@ public class DTOConverters {
   }
 
   /**
-   * Converts a user implementation to a BasicUserDTO without role bindings.
-   *
-   * @param user The user implementation.
-   * @return The basic user DTO.
-   */
-  public static BasicUserDTO toBasicDTO(BasicUser user) {
-    if (user instanceof BasicUserDTO) {
-      return (BasicUserDTO) user;
-    }
-
-    return BasicUserDTO.builder()
-        .withId(user.id())
-        .withName(user.name())
-        .withExternalId(user.externalId())
-        .withEnabled(user.enabled())
-        .withAudit(toDTO(user.auditInfo()))
-        .build();
-  }
-
-  /**
    * Converts a group implementation to a GroupDTO.
    *
    * @param group The group implementation.
@@ -543,25 +519,6 @@ public class DTOConverters {
         .withName(group.name())
         .withExternalId(group.externalId())
         .withRoles(group.roles())
-        .withAudit(toDTO(group.auditInfo()))
-        .build();
-  }
-
-  /**
-   * Converts a group implementation to a BasicGroupDTO without role bindings.
-   *
-   * @param group The group implementation.
-   * @return The basic group DTO.
-   */
-  public static BasicGroupDTO toBasicDTO(BasicGroup group) {
-    if (group instanceof BasicGroupDTO) {
-      return (BasicGroupDTO) group;
-    }
-
-    return BasicGroupDTO.builder()
-        .withId(group.id())
-        .withName(group.name())
-        .withExternalId(group.externalId())
         .withAudit(toDTO(group.auditInfo()))
         .build();
   }

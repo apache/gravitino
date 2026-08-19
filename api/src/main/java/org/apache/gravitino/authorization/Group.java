@@ -19,11 +19,37 @@
 package org.apache.gravitino.authorization;
 
 import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
 /** The interface of a Group. The Group is the entity which contains users. */
 @Evolving
-public interface Group extends BasicGroup {
+public interface Group extends Auditable {
+
+  /**
+   * The name of the group.
+   *
+   * @return The name of the group.
+   */
+  String name();
+
+  /**
+   * The unique id assigned by Gravitino.
+   *
+   * @return The unique id of the group.
+   */
+  Long id();
+
+  /**
+   * The stable identifier assigned by an upstream identity system, or null if not set.
+   *
+   * @return The upstream external identifier, or null if not set.
+   */
+  @Nullable
+  default String externalId() {
+    return null;
+  }
 
   /**
    * The roles of the group.

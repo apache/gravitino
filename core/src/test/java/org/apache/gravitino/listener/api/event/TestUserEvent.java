@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.authorization.UserChange;
@@ -41,7 +40,6 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
-import org.apache.gravitino.listener.api.info.BasicUserInfo;
 import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -195,7 +193,7 @@ public class TestUserEvent {
 
     GetBasicUserEvent getBasicUserEvent = (GetBasicUserEvent) event;
     Assertions.assertEquals(identifier, getBasicUserEvent.identifier());
-    validateBasicUserInfo(getBasicUserEvent.loadedUserInfo(), user);
+    validateUserInfo(getBasicUserEvent.loadedUserInfo(), user);
   }
 
   @Test
@@ -816,12 +814,5 @@ public class TestUserEvent {
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
     Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
-  }
-
-  private void validateBasicUserInfo(BasicUserInfo userInfo, BasicUser expectedUser) {
-    Assertions.assertEquals(expectedUser.id(), userInfo.id());
-    Assertions.assertEquals(expectedUser.name(), userInfo.name());
-    Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
-    Assertions.assertEquals(expectedUser.enabled(), userInfo.enabled());
   }
 }

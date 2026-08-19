@@ -54,6 +54,12 @@ public interface UserMetaMapper {
   UserPO selectUserMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("userName") String name);
 
+  @SelectProvider(
+      type = UserMetaSQLProviderFactory.class,
+      method = "selectUserMetaByMetalakeNameAndName")
+  UserPO selectUserMetaByMetalakeNameAndName(
+      @Param("metalakeName") String metalakeName, @Param("userName") String userName);
+
   @InsertProvider(type = UserMetaSQLProviderFactory.class, method = "insertUserMeta")
   void insertUserMeta(@Param("userMeta") UserPO userPO);
 

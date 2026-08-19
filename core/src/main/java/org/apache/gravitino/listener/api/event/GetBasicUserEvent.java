@@ -20,28 +20,28 @@
 package org.apache.gravitino.listener.api.event;
 
 import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.listener.api.info.BasicUserInfo;
+import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 
 /** Represents an event triggered after successfully retrieving a basic user from a metalake. */
 @DeveloperApi
 public class GetBasicUserEvent extends UserEvent {
-  private final BasicUserInfo loadedUserInfo;
+  private final UserInfo loadedUserInfo;
 
   /**
    * Constructs a new {@link GetBasicUserEvent} instance.
    *
    * @param initiator the user who initiated the request to get the basic user.
    * @param metalake the name of the metalake from which the user is retrieved.
-   * @param loadedUserInfo the basic user information of the retrieved user.
+   * @param loadedUserInfo the user information of the retrieved user.
    */
-  public GetBasicUserEvent(String initiator, String metalake, BasicUserInfo loadedUserInfo) {
+  public GetBasicUserEvent(String initiator, String metalake, UserInfo loadedUserInfo) {
     super(initiator, NameIdentifierUtil.ofUser(metalake, loadedUserInfo.name()));
     this.loadedUserInfo = loadedUserInfo;
   }
 
-  /** Returns the basic user information of the user successfully retrieved from the metalake. */
-  public BasicUserInfo loadedUserInfo() {
+  /** Returns the user information of the user successfully retrieved from the metalake. */
+  public UserInfo loadedUserInfo() {
     return loadedUserInfo;
   }
 
