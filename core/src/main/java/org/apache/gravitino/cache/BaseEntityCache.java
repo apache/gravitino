@@ -47,11 +47,11 @@ public abstract class BaseEntityCache implements EntityCache {
    *
    * <p>Only self-contained entities, plus user/group, are cacheable. A stale copy of a catalog
    * entity is at worst cosmetically old and is dropped by change-log invalidation. User and group
-   * embed relation-derived data ({@code enabled}, roles); {@code RelationalEntityStore.get}
-   * version-validates those entries against {@code user_meta.updated_at} / {@code
-   * group_meta.updated_at} on every name-keyed read, matching the JCasbin authorizer. Role remains
-   * excluded. Model/model version and function carry a load-bearing pointer that would be silently
-   * wrong if served stale.
+   * embed relation-derived data ({@code enabled}, roles); name-keyed {@code
+   * RelationalEntityStore.get} version-validates those entries against {@code user_meta.updated_at}
+   * / {@code group_meta.updated_at} before serving a cached copy. Role remains excluded.
+   * Model/model version and function carry a load-bearing pointer that would be silently wrong if
+   * served stale.
    */
   private static final Set<Entity.EntityType> CACHEABLE_TYPES =
       Sets.immutableEnumSet(

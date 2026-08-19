@@ -271,17 +271,6 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the {@code group_meta.updated_at} cache version sentinel.
-     *
-     * @param updatedAt milliseconds since epoch
-     * @return The builder instance.
-     */
-    public Builder withUpdatedAt(long updatedAt) {
-      groupEntity.updatedAt = updatedAt;
-      return this;
-    }
-
-    /**
      * Sets the namespace of the group entity.
      *
      * @param namespace The namespace of the group entity.
@@ -289,6 +278,17 @@ public class GroupEntity implements Group, Entity, Auditable, HasIdentifier {
      */
     public Builder withNamespace(Namespace namespace) {
       groupEntity.namespace = namespace;
+      return this;
+    }
+
+    /**
+     * Sets the {@code group_meta.updated_at} cache version sentinel.
+     *
+     * @param updatedAt milliseconds since epoch
+     * @return The builder instance.
+     */
+    public Builder withUpdatedAt(long updatedAt) {
+      groupEntity.updatedAt = updatedAt;
       return this;
     }
 

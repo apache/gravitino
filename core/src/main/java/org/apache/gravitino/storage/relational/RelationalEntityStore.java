@@ -55,6 +55,7 @@ import org.apache.gravitino.cache.EntityCacheKey;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
+import org.apache.gravitino.storage.relational.utils.UserGroupEntityVersions;
 import org.apache.gravitino.utils.Executable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -186,8 +187,11 @@ public class RelationalEntityStore
       throws IOException, NoSuchEntityException, EntityAlreadyExistsException {
     E updatedEntity = backend.update(ident, entityType, updater);
     if (UserGroupEntityVersions.isVersionValidatedType(entityType)) {
+      // Do not put: peers reload via updated_at on the next name-keyed get.
       cache.invalidate(ident, entityType);
-      cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+      if (!ident.equals(updatedEntity.nameIdentifier())) {
+        cache.invalidate(updatedEntity.nameIdentifier(), entityType);
+      }
       return updatedEntity;
     }
     if (!ident.equals(updatedEntity.nameIdentifier())) {
@@ -213,29 +217,6 @@ public class RelationalEntityStore
           cache.put(entity);
           return entity;
         });
-  }
-
-  /**
-   * Returns a cached entity if it is present and, for USER/GROUP, still matches {@code
-   * *_meta.updated_at}. Stale USER/GROUP entries are invalidated.
-   *
-   * @param ident the name identifier
-   * @param entityType the entity type
-   * @param <E> the entity class
-   * @return the cached entity, or empty if missing or stale
-   */
-  private <E extends Entity & HasIdentifier> Optional<E> getFreshFromCache(
-      NameIdentifier ident, Entity.EntityType entityType) {
-    Optional<E> cached = cache.getIfPresent(ident, entityType);
-    if (cached.isEmpty()) {
-      return Optional.empty();
-    }
-    if (!UserGroupEntityVersions.isVersionValidatedType(entityType)
-        || UserGroupEntityVersions.isFresh(ident, entityType, cached.get())) {
-      return cached;
-    }
-    cache.invalidate(ident, entityType);
-    return Optional.empty();
   }
 
   @Override
@@ -522,6 +503,29 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void batchPut(List<E> entities, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.batchPut(entities, overwritten);
+  }
+
+  /**
+   * Returns a cached entity if it is present and, for USER/GROUP, still matches {@code
+   * *_meta.updated_at}. Stale USER/GROUP entries are invalidated.
+   *
+   * @param ident the name identifier
+   * @param entityType the entity type
+   * @param <E> the entity class
+   * @return the cached entity, or empty if missing or stale
+   */
+  private <E extends Entity & HasIdentifier> Optional<E> getFreshFromCache(
+      NameIdentifier ident, Entity.EntityType entityType) {
+    Optional<E> cached = cache.getIfPresent(ident, entityType);
+    if (cached.isEmpty()) {
+      return Optional.empty();
+    }
+    if (!UserGroupEntityVersions.isVersionValidatedType(entityType)
+        || UserGroupEntityVersions.isFresh(ident, entityType, cached.get())) {
+      return cached;
+    }
+    cache.invalidate(ident, entityType);
+    return Optional.empty();
   }
 
   private void invalidateRelationTargetCache(

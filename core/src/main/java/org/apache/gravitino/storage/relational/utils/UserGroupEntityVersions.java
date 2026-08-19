@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.storage.relational;
+package org.apache.gravitino.storage.relational.utils;
 
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -26,17 +26,15 @@ import org.apache.gravitino.storage.relational.mapper.GroupMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.po.auth.GroupUpdatedAt;
 import org.apache.gravitino.storage.relational.po.auth.UserUpdatedAt;
-import org.apache.gravitino.storage.relational.utils.SessionUtils;
 
 /**
- * JCasbin-style version checks for name-keyed USER/GROUP {@link
- * org.apache.gravitino.cache.EntityCache} entries.
+ * Version checks for name-keyed USER/GROUP entity-cache entries.
  *
- * <p>{@code touchUserUpdatedAt} / {@code touchGroupUpdatedAt} already advance {@code
- * *_meta.updated_at} on every mutating write. A cache hit is served only when the cached id and
- * sentinel still match the database; otherwise the caller reloads.
+ * <p>{@code touchUserUpdatedAt} / {@code touchGroupUpdatedAt} advance {@code *_meta.updated_at} on
+ * every mutating write. A cache hit is served only when the cached id and sentinel still match the
+ * database; otherwise the caller reloads.
  */
-final class UserGroupEntityVersions {
+public final class UserGroupEntityVersions {
 
   private UserGroupEntityVersions() {}
 
@@ -46,7 +44,7 @@ final class UserGroupEntityVersions {
    * @param type entity type
    * @return {@code true} for USER and GROUP
    */
-  static boolean isVersionValidatedType(Entity.EntityType type) {
+  public static boolean isVersionValidatedType(Entity.EntityType type) {
     return type == Entity.EntityType.USER || type == Entity.EntityType.GROUP;
   }
 
@@ -61,7 +59,7 @@ final class UserGroupEntityVersions {
    * @param cached the cache entry
    * @return {@code true} if the cached snapshot may be returned
    */
-  static boolean isFresh(NameIdentifier ident, Entity.EntityType type, Entity cached) {
+  public static boolean isFresh(NameIdentifier ident, Entity.EntityType type, Entity cached) {
     String metalake = ident.namespace().level(0);
     String name = ident.name();
     if (type == Entity.EntityType.USER) {

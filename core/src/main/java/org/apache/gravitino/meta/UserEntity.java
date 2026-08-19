@@ -296,17 +296,6 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
     }
 
     /**
-     * Sets the {@code user_meta.updated_at} cache version sentinel.
-     *
-     * @param updatedAt milliseconds since epoch
-     * @return The builder instance.
-     */
-    public Builder withUpdatedAt(long updatedAt) {
-      userEntity.updatedAt = updatedAt;
-      return this;
-    }
-
-    /**
      * Sets the namespace of the user entity.
      *
      * @param namespace The namespace of the user entity.
@@ -314,6 +303,17 @@ public class UserEntity implements User, Entity, Auditable, HasIdentifier {
      */
     public Builder withNamespace(Namespace namespace) {
       userEntity.namespace = namespace;
+      return this;
+    }
+
+    /**
+     * Sets the {@code user_meta.updated_at} cache version sentinel.
+     *
+     * @param updatedAt milliseconds since epoch
+     * @return The builder instance.
+     */
+    public Builder withUpdatedAt(long updatedAt) {
+      userEntity.updatedAt = updatedAt;
       return this;
     }
 
