@@ -28,8 +28,8 @@ import javax.annotation.Nullable;
  * providers that share an implementation.
  *
  * <p>Which kind a provider needs is the same on every Spark version, so that mapping lives here.
- * Which class implements a kind differs per version and lives in each version module's {@code
- * SparkCatalogs}.
+ * Which class implements a kind differs per version, so each version module binds that in its own
+ * {@code GravitinoSparkPlugin}.
  */
 public enum SparkCatalogKind {
   /** Hive catalogs, provider {@code hive}. */

@@ -24,7 +24,8 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Tests that a version module leaving out a binding fails at build time rather than at use time.
+ * Tests that a version module's binding mistakes fail at build time rather than at use time: a
+ * missing binding, a duplicate one, or a blank one.
  */
 public class TestSparkBindings {
 
@@ -64,6 +65,59 @@ public class TestSparkBindings {
     Assertions.assertFalse(
         bindings.catalogClassNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON));
     Assertions.assertEquals(5, bindings.catalogClassNames().size());
+  }
+
+  /**
+   * Binding the same thing twice is a copy-paste error a version module can make, and the survivor
+   * would be whichever line came last. Rejecting it matters most for the authorization extension,
+   * where silently keeping the wrong one means sessions run unauthorized.
+   */
+  @Test
+  void testBindingTheSameKindTwiceIsRejected() {
+    SparkBindings.Builder builder =
+        SparkBindings.builder().catalog(SparkCatalogKind.HIVE, "org.example.HiveCatalog");
+
+    IllegalStateException e =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () -> builder.catalog(SparkCatalogKind.HIVE, "org.example.OtherHiveCatalog"));
+
+    Assertions.assertTrue(e.getMessage().contains(SparkCatalogKind.HIVE.name()), e.getMessage());
+    // The rejected binding must not have replaced the first one.
+    SparkBindings bindings =
+        builder
+            .authorizationExtension("org.example.AuthorizationExtensions")
+            .catalog(SparkCatalogKind.LAKEHOUSE_ICEBERG, "org.example.IcebergCatalog")
+            .catalog(SparkCatalogKind.GLUE, "org.example.GlueCatalog")
+            .catalog(SparkCatalogKind.JDBC, "org.example.JdbcCatalog")
+            .catalog(SparkCatalogKind.JDBC_POSTGRESQL, "org.example.PostgreSqlCatalog")
+            .build();
+    Assertions.assertEquals(
+        "org.example.HiveCatalog", bindings.catalogClassNames().get(SparkCatalogKind.HIVE));
+  }
+
+  @Test
+  void testBindingTheAuthorizationExtensionTwiceIsRejected() {
+    SparkBindings.Builder builder =
+        SparkBindings.builder().authorizationExtension("org.example.AuthorizationExtensions");
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> builder.authorizationExtension("org.example.OtherExtensions"));
+
+    // The rejected binding must not have replaced the first one.
+    Assertions.assertEquals(
+        "org.example.AuthorizationExtensions",
+        everyRequiredCatalog(builder).build().authorizationExtension());
+  }
+
+  @Test
+  void testABlankBindingIsRejected() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> SparkBindings.builder().catalog(SparkCatalogKind.HIVE, " "));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> SparkBindings.builder().authorizationExtension(""));
   }
 
   private static SparkBindings.Builder everyRequiredCatalog(SparkBindings.Builder builder) {

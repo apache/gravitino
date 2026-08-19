@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.spark.connector.plugin;
 
+import com.google.common.annotations.VisibleForTesting;
 import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.glue.GravitinoGlueCatalogSpark35;
@@ -43,9 +44,11 @@ public class GravitinoSparkPlugin implements SparkPlugin {
   /**
    * The Paimon catalog is the one binding that cannot be a class reference: Paimon publishes no
    * {@code paimon-spark-3.5_2.13} artifact, so the Scala 2.13 build compiles the Paimon package out
-   * and the class is absent from that jar. Resolved by presence below.
+   * and the class is absent from that jar. Resolved by presence below, and checked against the real
+   * class by a test in that package, which the same build exclusion drops on 2.13.
    */
-  private static final String PAIMON_CATALOG =
+  @VisibleForTesting
+  public static final String PAIMON_CATALOG =
       "org.apache.gravitino.spark.connector.paimon.GravitinoPaimonCatalogSpark35";
 
   @Override

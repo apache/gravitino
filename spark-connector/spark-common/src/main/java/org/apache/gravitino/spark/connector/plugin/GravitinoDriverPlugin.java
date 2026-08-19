@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -116,16 +115,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
-    this.enableIcebergSupport =
-        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
-    this.enablePaimonSupport =
-        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
-    if (enablePaimonSupport) {
-      registerPaimonExtensionsIfSupported();
-    }
-    if (enableIcebergSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
-    }
+    registerOptInExtensions(conf);
 
     this.catalogManager =
         GravitinoCatalogManager.create(
@@ -145,8 +135,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(
-      SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
+  @VisibleForTesting
+  void registerGravitinoCatalogs(SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
     gravitinoCatalogs
         .entrySet()
         .forEach(
@@ -154,12 +144,15 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
-              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
-                  && !enableIcebergSupport) {
+              // Resolve the kind once, so the two opt-in gates below stay in step with the
+              // provider-to-kind mapping instead of repeating provider literals. An unknown
+              // provider falls through to registerCatalog, which warns and skips.
+              SparkCatalogKind kind =
+                  StringUtils.isBlank(provider) ? null : SparkCatalogKind.fromProvider(provider);
+              if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
                 return;
               }
-              if (PAIMON_PROVIDER.equals(provider.toLowerCase(Locale.ROOT))
-                  && !enablePaimonSupport) {
+              if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
                 return;
               }
               try {
@@ -170,7 +163,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
             });
   }
 
-  private void registerCatalog(SparkConf sparkConf, String catalogName, String provider) {
+  @VisibleForTesting
+  void registerCatalog(SparkConf sparkConf, String catalogName, @Nullable String provider) {
     if (StringUtils.isBlank(provider)) {
       LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
       return;
@@ -192,12 +186,35 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
   /**
    * Resolves the Spark catalog class a Gravitino catalog provider needs, from the bindings this
-   * build supplied. Returns null when the build has no catalog for the provider.
+   * build supplied. Returns null when the build has no catalog for the provider. The provider must
+   * not be blank; callers check that first, since this dereferences it.
    */
   @Nullable
-  private String catalogClassName(String provider) {
+  @VisibleForTesting
+  String catalogClassName(String provider) {
     SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
     return kind == null ? null : bindings.catalogClassNames().get(kind);
+  }
+
+  /**
+   * Reads the two opt-in flags and queues the session extensions they ask for. Extracted from
+   * {@link #init(SparkContext, PluginContext)} so a test can exercise the flags without a live
+   * SparkContext, and takes the conf rather than two booleans so the config keys are covered too.
+   *
+   * @param conf the Spark conf to read the opt-in flags from
+   */
+  @VisibleForTesting
+  void registerOptInExtensions(SparkConf conf) {
+    this.enableIcebergSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
+    this.enablePaimonSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    if (enablePaimonSupport) {
+      registerPaimonExtensionsIfSupported();
+    }
+    if (enableIcebergSupport) {
+      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
+    }
   }
 
   /**

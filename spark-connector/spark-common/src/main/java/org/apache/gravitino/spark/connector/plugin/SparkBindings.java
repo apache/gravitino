@@ -25,7 +25,11 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
+import org.apache.spark.sql.SparkSessionExtensions;
+import org.apache.spark.sql.connector.catalog.TableCatalog;
+import scala.Function1;
 
 /**
  * The classes a connector build supplies to {@link GravitinoDriverPlugin}: which class implements
@@ -97,20 +101,25 @@ public final class SparkBindings {
      * @param catalogClass the class implementing it
      * @return this builder
      */
-    public Builder catalog(SparkCatalogKind kind, Class<?> catalogClass) {
+    public Builder catalog(SparkCatalogKind kind, Class<? extends TableCatalog> catalogClass) {
       return catalog(kind, catalogClass.getName());
     }
 
     /**
      * Binds a catalog kind to the class implementing it, by name. Prefer {@link
-     * #catalog(SparkCatalogKind, Class)}, which the compiler checks; this overload is for a catalog
-     * whose class a build may compile out, such as Paimon on Scala 2.13.
+     * #catalog(SparkCatalogKind, Class)}, whose argument the compiler checks is a catalog at all;
+     * this overload is for a catalog whose class a build may compile out, such as Paimon on Scala
+     * 2.13.
      *
      * @param kind the kind of catalog
      * @param catalogClassName the name of the class implementing it
      * @return this builder
      */
     public Builder catalog(SparkCatalogKind kind, String catalogClassName) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(catalogClassName), "Blank catalog class name for %s", kind);
+      Preconditions.checkState(
+          !catalogClassNames.containsKey(kind), "Catalog kind %s was bound twice", kind);
       catalogClassNames.put(kind, catalogClassName);
       return this;
     }
@@ -121,18 +130,24 @@ public final class SparkBindings {
      * @param extensionClass the session extension class
      * @return this builder
      */
-    public Builder authorizationExtension(Class<?> extensionClass) {
+    public Builder authorizationExtension(
+        Class<? extends Function1<SparkSessionExtensions, Void>> extensionClass) {
       return authorizationExtension(extensionClass.getName());
     }
 
     /**
      * Binds the session extension that performs authorization checks, by name. Prefer {@link
-     * #authorizationExtension(Class)}, which the compiler checks.
+     * #authorizationExtension(Class)}, whose argument the compiler checks is a session extension at
+     * all.
      *
      * @param extensionClassName the name of the session extension class
      * @return this builder
      */
     public Builder authorizationExtension(String extensionClassName) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(extensionClassName), "Blank authorization session extension");
+      Preconditions.checkState(
+          authorizationExtension == null, "The authorization session extension was bound twice");
       this.authorizationExtension = extensionClassName;
       return this;
     }
