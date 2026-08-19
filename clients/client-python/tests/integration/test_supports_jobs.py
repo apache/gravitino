@@ -273,6 +273,8 @@ class TestSupportsJobs(IntegrationTestEnv):
         )
         self.assertEqual(job_handle1.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle1.job_template_name(), template.name)
+        self.assertIsNotNone(job_handle1.queued_at())
+        self.assertIsNone(job_handle1.started_at())
         self.assertIsNone(job_handle1.finished_at())
 
         job_handle2 = self._metalake.run_job(
@@ -280,6 +282,8 @@ class TestSupportsJobs(IntegrationTestEnv):
         )
         self.assertEqual(job_handle2.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle2.job_template_name(), template.name)
+        self.assertIsNotNone(job_handle2.queued_at())
+        self.assertIsNone(job_handle2.started_at())
         self.assertIsNone(job_handle2.finished_at())
 
         # List jobs
@@ -307,8 +311,12 @@ class TestSupportsJobs(IntegrationTestEnv):
         job_statuses = {job.job_status() for job in updated_jobs}
         self.assertEqual(len(job_statuses), 1)
         self.assertIn(JobHandle.Status.SUCCEEDED, job_statuses)
-        # Finished jobs should carry a non-None finished_at.
+        # Finished jobs should carry a non-None queued_at/started_at/finished_at. SUCCEEDED
+        # proves the job actually ran, so started_at is guaranteed even if no poll observed
+        # it as STARTED (JobManager falls back to queued_at in that case).
         for job in updated_jobs:
+            self.assertIsNotNone(job.queued_at())
+            self.assertIsNotNone(job.started_at())
             self.assertIsNotNone(job.finished_at())
 
     def test_run_and_get_job(self):
@@ -321,6 +329,8 @@ class TestSupportsJobs(IntegrationTestEnv):
         )
         self.assertEqual(job_handle.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle.job_template_name(), template.name)
+        self.assertIsNotNone(job_handle.queued_at())
+        self.assertIsNone(job_handle.started_at())
         self.assertIsNone(job_handle.finished_at())
 
         # Wait for job to complete
@@ -332,6 +342,8 @@ class TestSupportsJobs(IntegrationTestEnv):
         retrieved_job = self._metalake.get_job(job_handle.job_id())
         self.assertEqual(job_handle.job_id(), retrieved_job.job_id())
         self.assertEqual(JobHandle.Status.SUCCEEDED, retrieved_job.job_status())
+        self.assertIsNotNone(retrieved_job.queued_at())
+        self.assertIsNotNone(retrieved_job.started_at())
         self.assertIsNotNone(retrieved_job.finished_at())
 
         # Test failed job
@@ -339,6 +351,8 @@ class TestSupportsJobs(IntegrationTestEnv):
             template.name, {"arg1": "value1", "arg2": "fail", "env_var": "value2"}
         )
         self.assertEqual(failed_job_handle.job_status(), JobHandle.Status.QUEUED)
+        self.assertIsNotNone(failed_job_handle.queued_at())
+        self.assertIsNone(failed_job_handle.started_at())
         self.assertIsNone(failed_job_handle.finished_at())
 
         self._wait_until(
@@ -349,6 +363,8 @@ class TestSupportsJobs(IntegrationTestEnv):
         retrieved_failed_job = self._metalake.get_job(failed_job_handle.job_id())
         self.assertEqual(failed_job_handle.job_id(), retrieved_failed_job.job_id())
         self.assertEqual(JobHandle.Status.FAILED, retrieved_failed_job.job_status())
+        self.assertIsNotNone(retrieved_failed_job.queued_at())
+        self.assertIsNotNone(retrieved_failed_job.started_at())
         self.assertIsNotNone(retrieved_failed_job.finished_at())
 
         # Test non-existent job
@@ -365,6 +381,8 @@ class TestSupportsJobs(IntegrationTestEnv):
         )
         self.assertEqual(job_handle.job_status(), JobHandle.Status.QUEUED)
         self.assertEqual(job_handle.job_template_name(), template.name)
+        self.assertIsNotNone(job_handle.queued_at())
+        self.assertIsNone(job_handle.started_at())
         self.assertIsNone(job_handle.finished_at())
 
         sleep(1)
@@ -381,6 +399,9 @@ class TestSupportsJobs(IntegrationTestEnv):
         retrieved_job = self._metalake.get_job(job_handle.job_id())
         self.assertEqual(job_handle.job_id(), retrieved_job.job_id())
         self.assertEqual(JobHandle.Status.CANCELLED, retrieved_job.job_status())
+        self.assertIsNotNone(retrieved_job.queued_at())
+        # started_at is not asserted here: the job may be cancelled before it is ever
+        # observed as STARTED, in which case started_at legitimately stays None.
         self.assertIsNotNone(retrieved_job.finished_at())
 
         # Test cancel non-existent job

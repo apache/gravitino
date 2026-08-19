@@ -47,6 +47,16 @@ public class GenericJobHandle implements JobHandle {
   }
 
   @Override
+  public Instant queuedAt() {
+    return jobDTO.queuedAt();
+  }
+
+  @Override
+  public Instant startedAt() {
+    return jobDTO.startedAt();
+  }
+
+  @Override
   public Instant finishedAt() {
     return jobDTO.finishedAt();
   }

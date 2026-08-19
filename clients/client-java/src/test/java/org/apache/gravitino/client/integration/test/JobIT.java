@@ -288,6 +288,8 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle1.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle1.jobTemplateName());
+    Assertions.assertNotNull(jobHandle1.queuedAt());
+    Assertions.assertNull(jobHandle1.startedAt());
     Assertions.assertNull(jobHandle1.finishedAt());
 
     JobHandle jobHandle2 =
@@ -296,6 +298,8 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value3", "arg2", "success", "env_var", "value4"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle2.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle2.jobTemplateName());
+    Assertions.assertNotNull(jobHandle2.queuedAt());
+    Assertions.assertNull(jobHandle2.startedAt());
     Assertions.assertNull(jobHandle2.finishedAt());
 
     List<JobHandle> jobs = metalake.listJobs(template.name());
@@ -326,8 +330,15 @@ public class JobIT extends BaseIT {
         updatedJobs.stream().map(JobHandle::jobStatus).collect(Collectors.toSet());
     Assertions.assertEquals(1, jobStatuses.size());
     Assertions.assertTrue(jobStatuses.contains(JobHandle.Status.SUCCEEDED));
-    // Finished jobs should carry a non-null finishedAt.
-    updatedJobs.forEach(job -> Assertions.assertNotNull(job.finishedAt()));
+    // Finished jobs should carry a non-null queuedAt/startedAt/finishedAt. SUCCEEDED proves
+    // the job actually ran, so startedAt is guaranteed even if no poll observed it as STARTED
+    // (JobManager falls back to queuedAt in that case).
+    updatedJobs.forEach(
+        job -> {
+          Assertions.assertNotNull(job.queuedAt());
+          Assertions.assertNotNull(job.startedAt());
+          Assertions.assertNotNull(job.finishedAt());
+        });
   }
 
   @Test
@@ -342,6 +353,8 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle.jobTemplateName());
+    Assertions.assertNotNull(jobHandle.queuedAt());
+    Assertions.assertNull(jobHandle.startedAt());
     Assertions.assertNull(jobHandle.finishedAt());
 
     Awaitility.await()
@@ -355,6 +368,8 @@ public class JobIT extends BaseIT {
     JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
     Assertions.assertEquals(jobHandle.jobId(), retrievedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, retrievedJob.jobStatus());
+    Assertions.assertNotNull(retrievedJob.queuedAt());
+    Assertions.assertNotNull(retrievedJob.startedAt());
     Assertions.assertNotNull(retrievedJob.finishedAt());
 
     // Test run a failed job
@@ -363,6 +378,8 @@ public class JobIT extends BaseIT {
             template.name(),
             ImmutableMap.of("arg1", "value1", "arg2", "fail", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, failedJobHandle.jobStatus());
+    Assertions.assertNotNull(failedJobHandle.queuedAt());
+    Assertions.assertNull(failedJobHandle.startedAt());
     Assertions.assertNull(failedJobHandle.finishedAt());
 
     Awaitility.await()
@@ -376,6 +393,8 @@ public class JobIT extends BaseIT {
     JobHandle retrievedFailedJob = metalake.getJob(failedJobHandle.jobId());
     Assertions.assertEquals(failedJobHandle.jobId(), retrievedFailedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.FAILED, retrievedFailedJob.jobStatus());
+    Assertions.assertNotNull(retrievedFailedJob.queuedAt());
+    Assertions.assertNotNull(retrievedFailedJob.startedAt());
     Assertions.assertNotNull(retrievedFailedJob.finishedAt());
 
     // Test get a non-existent job
@@ -394,6 +413,8 @@ public class JobIT extends BaseIT {
             ImmutableMap.of("arg1", "value1", "arg2", "success", "env_var", "value2"));
     Assertions.assertEquals(JobHandle.Status.QUEUED, jobHandle.jobStatus());
     Assertions.assertEquals(template.name(), jobHandle.jobTemplateName());
+    Assertions.assertNotNull(jobHandle.queuedAt());
+    Assertions.assertNull(jobHandle.startedAt());
     Assertions.assertNull(jobHandle.finishedAt());
 
     // Cancel the job
@@ -410,6 +431,9 @@ public class JobIT extends BaseIT {
     JobHandle retrievedJob = metalake.getJob(jobHandle.jobId());
     Assertions.assertEquals(jobHandle.jobId(), retrievedJob.jobId());
     Assertions.assertEquals(JobHandle.Status.CANCELLED, retrievedJob.jobStatus());
+    Assertions.assertNotNull(retrievedJob.queuedAt());
+    // startedAt is not asserted here: the job may be cancelled before it is ever observed as
+    // STARTED, in which case startedAt legitimately stays null.
     Assertions.assertNotNull(retrievedJob.finishedAt());
 
     // Test cancel a non-existent job

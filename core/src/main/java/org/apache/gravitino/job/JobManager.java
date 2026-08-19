@@ -465,7 +465,8 @@ public class JobManager implements JobOperationDispatcher {
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
-            // A newly submitted job is queued, not finished yet.
+            // A newly submitted job is queued, not started or finished yet.
+            .withStartedAt(0L)
             .withFinishedAt(0L)
             .build();
 
@@ -517,7 +518,9 @@ public class JobManager implements JobOperationDispatcher {
                     .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                     .withLastModifiedTime(Instant.now())
                     .build())
-            // CANCELLING is not a terminal state, so the job is not finished yet.
+            // CANCELLING is not a terminal state; carry forward whatever startedAt/finishedAt
+            // the job already had.
+            .withStartedAt(jobEntity.startedAt())
             .withFinishedAt(jobEntity.finishedAt())
             .build();
     return TreeLockUtils.doWithTreeLock(
@@ -592,10 +595,29 @@ public class JobManager implements JobOperationDispatcher {
             }
 
             if (newStatus != job.status()) {
+              boolean isStarted = newStatus == JobHandle.Status.STARTED;
               boolean isFinished =
                   newStatus == JobHandle.Status.SUCCEEDED
                       || newStatus == JobHandle.Status.FAILED
                       || newStatus == JobHandle.Status.CANCELLED;
+
+              // SUCCEEDED/FAILED prove the job actually ran, even when no poll ever observed
+              // it as STARTED (e.g. it transitioned QUEUED -> terminal between two polls). In
+              // that case, fall back to the job's queued time as the best-known lower bound for
+              // startedAt - leaving it unset would incorrectly imply the job never started.
+              // CANCELLED is deliberately excluded: a cancelled job may have been killed while
+              // still QUEUED and never started at all, so leaving startedAt unset stays
+              // accurate there.
+              boolean provenToHaveStarted =
+                  newStatus == JobHandle.Status.SUCCEEDED || newStatus == JobHandle.Status.FAILED;
+              long startedAt;
+              if (isStarted) {
+                startedAt = Instant.now().toEpochMilli();
+              } else if (provenToHaveStarted && job.startedAt() <= 0) {
+                startedAt = job.auditInfo().createTime().toEpochMilli();
+              } else {
+                startedAt = job.startedAt();
+              }
 
               JobEntity newJobEntity =
                   JobEntity.builder()
@@ -611,6 +633,7 @@ public class JobManager implements JobOperationDispatcher {
                               .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                               .withLastModifiedTime(Instant.now())
                               .build())
+                      .withStartedAt(startedAt)
                       .withFinishedAt(isFinished ? Instant.now().toEpochMilli() : job.finishedAt())
                       .build();
 
