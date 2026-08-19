@@ -491,8 +491,11 @@ server, are documented with those services. See
 ### Key Management
 
 The server talks to KMS instances you name in `gravitino.conf`. Each name is one configured
-instance. Each instance names the `KmsClientFactory` class the server constructs. Two names may
-share one class, which is how you run more than one AWS or Azure vault.
+instance. To add one, implement `KmsClientFactory` with a public no-arg constructor, put the jar on
+the server classpath, and set `gravitino.kms.provider.<name>.className` to that class.
+`create(provider, properties)` builds the `KmsClient` for that name. Gravitino does not ship AWS or
+Azure factories. Two names may share one class, which is how you run more than one vault of the
+same kind.
 
 The list is empty by default, and then the server has no KMS clients. Naming a provider without a
 `className`, or with a class the server cannot construct as a `KmsClientFactory`, fails startup.
@@ -515,14 +518,14 @@ the factory for `aws-prod` at startup.
 # conf/gravitino.conf
 gravitino.kms.providers = aws-prod,aws-dr,azure-eu
 
-gravitino.kms.provider.aws-prod.className = org.apache.gravitino.encryption.kms.aws.AwsKmsClientFactory
-gravitino.kms.provider.aws-dr.className = org.apache.gravitino.encryption.kms.aws.AwsKmsClientFactory
-gravitino.kms.provider.azure-eu.className = org.apache.gravitino.encryption.kms.azure.AzureKmsClientFactory
+gravitino.kms.provider.aws-prod.className = com.example.kms.AwsCustomKmsClientFactory
+gravitino.kms.provider.aws-dr.className = com.example.kms.AwsCustomKmsClientFactory
+gravitino.kms.provider.azure-eu.className = com.example.kms.AzureCustomKmsClientFactory
 ```
 
-That configuration builds three clients: two instances of the AWS factory and one Azure factory.
-Further `gravitino.kms.provider.<name>.*` keys are factory properties, not a closed schema; each
-factory documents the keys it accepts.
+That configuration builds three clients: two instances of one custom AWS factory and one custom
+Azure factory. Further `gravitino.kms.provider.<name>.*` keys are factory properties, not a closed
+schema; each factory documents the keys it accepts.
 
 ## Catalog Properties
 
