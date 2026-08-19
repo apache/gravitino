@@ -90,7 +90,7 @@ or several values. Adding a value is incremental, so adding `risk` to an assignm
 When you create a tag, you can choose one of three value constraints:
 
 | Constraint | Meaning |
-|------------|---------|
+| --- | --- |
 | Any value | The tag accepts any non-blank string, and can also be assigned without a value |
 | No value | The tag can only be assigned without a value |
 | Allowed values | The tag accepts only values from the configured list |

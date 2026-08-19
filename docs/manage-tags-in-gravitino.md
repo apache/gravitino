@@ -363,6 +363,24 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
   "http://localhost:8090/api/metalakes/test/objects/table/catalog1.schema1.customers/tags?details=true"
 ```
 
+The response includes each tag's definition and assignment details:
+
+```json
+{
+  "code": 0,
+  "tags": [
+    {
+      "name": "data_domain",
+      "comment": "Business data domain",
+      "properties": {},
+      "allowedValues": ["finance", "risk", "ml"],
+      "assignmentValues": ["finance", "risk"],
+      "inherited": false
+    }
+  ]
+}
+```
+
 </TabItem>
 <TabItem value="java" label="Java">
 
@@ -370,7 +388,8 @@ curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
 Table customers = ...
 String[] tagNames = customers.supportsTags().listTags();
 Tag[] tags = customers.supportsTags().listTagsInfo();
-String[] values = tags[0].assignment().get().values();
+String[] values =
+    tags[0].assignment().map(assignment -> assignment.values()).orElse(new String[0]);
 ```
 
 </TabItem>
