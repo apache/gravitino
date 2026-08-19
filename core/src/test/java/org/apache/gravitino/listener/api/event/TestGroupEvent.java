@@ -33,6 +33,7 @@ import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.BasicGroup;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.GroupChange;
 import org.apache.gravitino.authorization.PagedResult;
@@ -43,6 +44,7 @@ import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.EventListenerPlugin;
+import org.apache.gravitino.listener.api.info.BasicGroupInfo;
 import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -163,6 +165,46 @@ public class TestGroupEvent {
     Assertions.assertEquals(
         NameIdentifierUtil.ofGroup(METALAKE, groupName), getGroupPreEvent.identifier());
     Assertions.assertEquals(groupName, getGroupPreEvent.groupName());
+  }
+
+  @Test
+  void testGetBasicGroupPreEventWithExistingGroup() {
+    dispatcher.getBasicGroup(METALAKE, groupName);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetBasicGroupPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.GET_BASIC_GROUP, preEvent.operationType());
+
+    GetBasicGroupPreEvent getBasicGroupPreEvent = (GetBasicGroupPreEvent) preEvent;
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, groupName), getBasicGroupPreEvent.identifier());
+    Assertions.assertEquals(groupName, getBasicGroupPreEvent.groupName());
+  }
+
+  @Test
+  void testGetBasicGroupEventWithExistingGroup() {
+    dispatcher.getBasicGroup(METALAKE, groupName);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetBasicGroupEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_BASIC_GROUP, event.operationType());
+
+    GetBasicGroupEvent getBasicGroupEvent = (GetBasicGroupEvent) event;
+    validateBasicGroup(getBasicGroupEvent.loadedGroupInfo(), group);
+  }
+
+  @Test
+  void testGetBasicGroupFailureEvent() {
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getBasicGroup(METALAKE, groupName));
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetBasicGroupFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_BASIC_GROUP, event.operationType());
   }
 
   @Test
@@ -783,6 +825,7 @@ public class TestGroupEvent {
     when(dispatcher.listGroupNames(METALAKE)).thenReturn(new String[] {groupName, otherGroupName});
 
     when(dispatcher.getGroup(METALAKE, groupName)).thenReturn(group);
+    when(dispatcher.getBasicGroup(METALAKE, groupName)).thenReturn(group);
     when(dispatcher.getGroupByExternalId(METALAKE, GROUP_EXT_ID)).thenReturn(externalIdGroup);
     when(dispatcher.getGroupById(METALAKE, GROUP_ID)).thenReturn(group);
     when(dispatcher.alterGroupById(eq(METALAKE), eq(GROUP_ID), any(GroupChange[].class)))
@@ -811,5 +854,11 @@ public class TestGroupEvent {
     Assertions.assertEquals(group.name(), groupInfo.name());
     Assertions.assertEquals(Optional.ofNullable(group.externalId()), groupInfo.externalId());
     Assertions.assertEquals(group.roles(), groupInfo.roles());
+  }
+
+  private void validateBasicGroup(BasicGroupInfo groupInfo, BasicGroup group) {
+    Assertions.assertEquals(group.id(), groupInfo.id());
+    Assertions.assertEquals(group.name(), groupInfo.name());
+    Assertions.assertEquals(Optional.ofNullable(group.externalId()), groupInfo.externalId());
   }
 }

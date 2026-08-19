@@ -42,6 +42,7 @@ import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
+import org.apache.gravitino.dto.responses.BasicGroupResponse;
 import org.apache.gravitino.dto.responses.GroupListResponse;
 import org.apache.gravitino.dto.responses.GroupResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
@@ -98,6 +99,30 @@ public class GroupOperations {
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(accessControlManager.getGroup(metalake, group))));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleGroupException(OperationType.GET, group, metalake, e);
+    }
+  }
+
+  @GET
+  @Path("{group}/basic")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "get-basic-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "get-basic-group", absolute = true)
+  @AuthorizationExpression(expression = LOAD_GROUP_PRIVILEGE)
+  public Response getBasicGroup(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("group") @AuthorizationMetadata(type = Entity.EntityType.GROUP) String group) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            MetalakeManager.checkMetalakeInUse(metalake);
+            return Utils.ok(
+                new BasicGroupResponse(
+                    DTOConverters.toBasicDTO(accessControlManager.getBasicGroup(metalake, group))));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.GET, group, metalake, e);

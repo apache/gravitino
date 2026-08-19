@@ -111,6 +111,19 @@ public class UserMetaService {
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getBasicUserByIdentifier")
+  public UserEntity getBasicUserByIdentifier(NameIdentifier identifier) {
+    AuthorizationUtils.checkUser(identifier);
+
+    Long metalakeId =
+        MetalakeMetaService.getInstance().getMetalakeIdByName(identifier.namespace().level(0));
+    UserPO userPO = getUserPOByMetalakeIdAndName(metalakeId, identifier.name());
+
+    return POConverters.fromUserPO(userPO, Collections.emptyList(), identifier.namespace());
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "listUsersByRoleIdent")
   public List<UserEntity> listUsersByRoleIdent(NameIdentifier roleIdent) {
     RoleEntity roleEntity = RoleMetaService.getInstance().getRoleByIdentifier(roleIdent);

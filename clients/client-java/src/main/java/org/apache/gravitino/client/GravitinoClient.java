@@ -29,6 +29,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.SupportsCatalogs;
+import org.apache.gravitino.authorization.BasicGroup;
+import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privilege;
@@ -221,6 +223,19 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   /**
+   * Gets a user without loading role bindings (metadata row only).
+   *
+   * @param user The name of the User.
+   * @return The getting BasicUser instance.
+   * @throws NoSuchUserException If the User with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the User encounters storage issues.
+   */
+  public BasicUser getBasicUser(String user) throws NoSuchUserException, NoSuchMetalakeException {
+    return getMetalake().getBasicUser(user);
+  }
+
+  /**
    * Lists the users.
    *
    * @return The User list.
@@ -293,6 +308,20 @@ public class GravitinoClient extends GravitinoClientBase
    */
   public Group getGroup(String group) throws NoSuchGroupException, NoSuchMetalakeException {
     return getMetalake().getGroup(group);
+  }
+
+  /**
+   * Gets a group without loading role bindings (metadata row only).
+   *
+   * @param group The name of the Group.
+   * @return The getting BasicGroup instance.
+   * @throws NoSuchGroupException If the Group with the given name does not exist.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If getting the Group encounters storage issues.
+   */
+  public BasicGroup getBasicGroup(String group)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    return getMetalake().getBasicGroup(group);
   }
 
   /**

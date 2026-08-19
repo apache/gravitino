@@ -31,6 +31,7 @@ import java.util.List;
 import java.util.Optional;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.authorization.UserChange;
@@ -40,6 +41,7 @@ import org.apache.gravitino.exceptions.NoSuchUserException;
 import org.apache.gravitino.listener.AccessControlEventDispatcher;
 import org.apache.gravitino.listener.DummyEventListener;
 import org.apache.gravitino.listener.EventBus;
+import org.apache.gravitino.listener.api.info.BasicUserInfo;
 import org.apache.gravitino.listener.api.info.UserInfo;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
@@ -166,6 +168,46 @@ public class TestUserEvent {
     Assertions.assertEquals(identifier, getUserPreEvent.identifier());
     String requestedUserName = getUserPreEvent.userName();
     Assertions.assertEquals(userName, requestedUserName);
+  }
+
+  @Test
+  void testGetBasicUserPreEventWithExistingUser() {
+    dispatcher.getBasicUser(METALAKE, userName);
+
+    PreEvent preEvent = dummyEventListener.popPreEvent();
+    Assertions.assertEquals(GetBasicUserPreEvent.class, preEvent.getClass());
+    Assertions.assertEquals(OperationStatus.UNPROCESSED, preEvent.operationStatus());
+    Assertions.assertEquals(OperationType.GET_BASIC_USER, preEvent.operationType());
+
+    GetBasicUserPreEvent getBasicUserPreEvent = (GetBasicUserPreEvent) preEvent;
+    Assertions.assertEquals(identifier, getBasicUserPreEvent.identifier());
+    Assertions.assertEquals(userName, getBasicUserPreEvent.userName());
+  }
+
+  @Test
+  void testGetBasicUserEventWithExistingUser() {
+    dispatcher.getBasicUser(METALAKE, userName);
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetBasicUserEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_BASIC_USER, event.operationType());
+
+    GetBasicUserEvent getBasicUserEvent = (GetBasicUserEvent) event;
+    Assertions.assertEquals(identifier, getBasicUserEvent.identifier());
+    validateBasicUserInfo(getBasicUserEvent.loadedUserInfo(), user);
+  }
+
+  @Test
+  void testGetBasicUserFailureEvent() {
+    Assertions.assertThrowsExactly(
+        GravitinoRuntimeException.class,
+        () -> failureDispatcher.getBasicUser(METALAKE, inExistUserName));
+
+    Event event = dummyEventListener.popPostEvent();
+    Assertions.assertEquals(GetBasicUserFailureEvent.class, event.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, event.operationStatus());
+    Assertions.assertEquals(OperationType.GET_BASIC_USER, event.operationType());
   }
 
   @Test
@@ -721,12 +763,15 @@ public class TestUserEvent {
     when(dispatcher.listUserNames(METALAKE)).thenReturn(new String[] {userName, otherUserName});
 
     when(dispatcher.getUser(METALAKE, userName)).thenReturn(user);
+    when(dispatcher.getBasicUser(METALAKE, userName)).thenReturn(user);
     when(dispatcher.getUserByExternalId(METALAKE, USER_EXT_ID)).thenReturn(externalIdUser);
     when(dispatcher.getUserById(METALAKE, USER_ID)).thenReturn(user);
     when(dispatcher.removeUserById(METALAKE, USER_ID)).thenReturn(true);
     when(dispatcher.alterUserById(eq(METALAKE), eq(USER_ID), any(UserChange[].class)))
         .thenReturn(user);
     when(dispatcher.getUser(METALAKE, inExistUserName))
+        .thenThrow(new NoSuchUserException("user not found"));
+    when(dispatcher.getBasicUser(METALAKE, inExistUserName))
         .thenThrow(new NoSuchUserException("user not found"));
     when(dispatcher.getUser(INEXIST_METALAKE, userName))
         .thenThrow(new NoSuchMetalakeException("user not found"));
@@ -771,5 +816,12 @@ public class TestUserEvent {
     Assertions.assertEquals(userInfo.name(), expectedUser.name());
     Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
     Assertions.assertEquals(userInfo.roles(), expectedUser.roles());
+  }
+
+  private void validateBasicUserInfo(BasicUserInfo userInfo, BasicUser expectedUser) {
+    Assertions.assertEquals(expectedUser.id(), userInfo.id());
+    Assertions.assertEquals(expectedUser.name(), userInfo.name());
+    Assertions.assertEquals(Optional.ofNullable(expectedUser.externalId()), userInfo.externalId());
+    Assertions.assertEquals(expectedUser.enabled(), userInfo.enabled());
   }
 }

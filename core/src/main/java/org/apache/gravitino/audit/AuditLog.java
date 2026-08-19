@@ -382,6 +382,8 @@ public interface AuditLog {
 
     GET_USER,
 
+    GET_BASIC_USER,
+
     GET_USER_BY_EXTERNAL_ID,
 
     GET_USER_BY_ID,
@@ -409,6 +411,8 @@ public interface AuditLog {
     REMOVE_GROUP_BY_EXTERNAL_ID,
 
     GET_GROUP,
+
+    GET_BASIC_GROUP,
 
     GET_GROUP_BY_EXTERNAL_ID,
 

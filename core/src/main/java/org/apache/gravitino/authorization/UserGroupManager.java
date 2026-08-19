@@ -29,6 +29,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -114,6 +115,18 @@ class UserGroupManager {
     }
   }
 
+  BasicUser getBasicUser(String metalake, String user) throws NoSuchUserException {
+    try {
+      UserEntity userEntity =
+          UserMetaService.getInstance()
+              .getBasicUserByIdentifier(AuthorizationUtils.ofUser(metalake, user));
+      return DTOConverters.toBasicDTO(userEntity);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("User {} does not exist in the metalake {}", user, metalake, e);
+      throw new NoSuchUserException(AuthorizationUtils.USER_DOES_NOT_EXIST_MSG, user, metalake);
+    }
+  }
+
   String[] listUserNames(String metalake) {
 
     return Arrays.stream(listUsersInternal(metalake, false /* allFields */))
@@ -188,6 +201,18 @@ class UserGroupManager {
     } catch (IOException ioe) {
       LOG.error("Getting group {} failed due to storage issues", group, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  BasicGroup getBasicGroup(String metalake, String group) throws NoSuchGroupException {
+    try {
+      GroupEntity groupEntity =
+          GroupMetaService.getInstance()
+              .getBasicGroupByIdentifier(AuthorizationUtils.ofGroup(metalake, group));
+      return DTOConverters.toBasicDTO(groupEntity);
+    } catch (NoSuchEntityException e) {
+      LOG.warn("Group {} does not exist in the metalake {}", group, metalake, e);
+      throw new NoSuchGroupException(AuthorizationUtils.GROUP_DOES_NOT_EXIST_MSG, group, metalake);
     }
   }
 

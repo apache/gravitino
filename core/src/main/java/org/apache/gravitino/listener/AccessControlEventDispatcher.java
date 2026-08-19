@@ -24,6 +24,8 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.BasicGroup;
+import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.GroupChange;
 import org.apache.gravitino.authorization.PagedResult;
@@ -65,6 +67,12 @@ import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
 import org.apache.gravitino.listener.api.event.DeleteRoleEvent;
 import org.apache.gravitino.listener.api.event.DeleteRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.DeleteRolePreEvent;
+import org.apache.gravitino.listener.api.event.GetBasicGroupEvent;
+import org.apache.gravitino.listener.api.event.GetBasicGroupFailureEvent;
+import org.apache.gravitino.listener.api.event.GetBasicGroupPreEvent;
+import org.apache.gravitino.listener.api.event.GetBasicUserEvent;
+import org.apache.gravitino.listener.api.event.GetBasicUserFailureEvent;
+import org.apache.gravitino.listener.api.event.GetBasicUserPreEvent;
 import org.apache.gravitino.listener.api.event.GetGroupByExternalIdEvent;
 import org.apache.gravitino.listener.api.event.GetGroupByExternalIdFailureEvent;
 import org.apache.gravitino.listener.api.event.GetGroupByExternalIdPreEvent;
@@ -146,6 +154,8 @@ import org.apache.gravitino.listener.api.event.RevokePrivilegesPreEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesFailureEvent;
 import org.apache.gravitino.listener.api.event.RevokeUserRolesPreEvent;
+import org.apache.gravitino.listener.api.info.BasicGroupInfo;
+import org.apache.gravitino.listener.api.info.BasicUserInfo;
 import org.apache.gravitino.listener.api.info.GroupInfo;
 import org.apache.gravitino.listener.api.info.RoleInfo;
 import org.apache.gravitino.listener.api.info.UserInfo;
@@ -259,6 +269,25 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return userObject;
     } catch (Exception e) {
       eventBus.dispatchEvent(new GetUserFailureEvent(initiator, metalake, e, user));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public BasicUser getBasicUser(String metalake, String user)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetBasicUserPreEvent(initiator, metalake, user));
+    try {
+      BasicUser userObject = dispatcher.getBasicUser(metalake, user);
+      eventBus.dispatchEvent(
+          new GetBasicUserEvent(initiator, metalake, new BasicUserInfo(userObject)));
+
+      return userObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new GetBasicUserFailureEvent(initiator, metalake, e, user));
       throw e;
     }
   }
@@ -497,6 +526,25 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return groupObject;
     } catch (Exception e) {
       eventBus.dispatchEvent(new GetGroupFailureEvent(initiator, metalake, e, group));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public BasicGroup getBasicGroup(String metalake, String group)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+
+    eventBus.dispatchEvent(new GetBasicGroupPreEvent(initiator, metalake, group));
+    try {
+      BasicGroup groupObject = dispatcher.getBasicGroup(metalake, group);
+      eventBus.dispatchEvent(
+          new GetBasicGroupEvent(initiator, metalake, new BasicGroupInfo(groupObject)));
+
+      return groupObject;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(new GetBasicGroupFailureEvent(initiator, metalake, e, group));
       throw e;
     }
   }

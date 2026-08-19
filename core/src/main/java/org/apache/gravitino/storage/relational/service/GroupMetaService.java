@@ -112,6 +112,19 @@ public class GroupMetaService {
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "getBasicGroupByIdentifier")
+  public GroupEntity getBasicGroupByIdentifier(NameIdentifier identifier) {
+    AuthorizationUtils.checkGroup(identifier);
+
+    NameIdentifier metalakeIdent = NameIdentifier.of(NameIdentifierUtil.getMetalake(identifier));
+    long metalakeId = EntityIdService.getEntityId(metalakeIdent, Entity.EntityType.METALAKE);
+    GroupPO groupPO = getGroupPOByMetalakeIdAndName(metalakeId, identifier.name());
+
+    return POConverters.fromGroupPO(groupPO, Collections.emptyList(), identifier.namespace());
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "batchGetGroupByIdentifier")
   public List<GroupEntity> batchGetGroupByIdentifier(List<NameIdentifier> identifiers) {
     if (identifiers == null || identifiers.isEmpty()) {

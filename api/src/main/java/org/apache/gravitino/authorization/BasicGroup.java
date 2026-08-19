@@ -18,17 +18,37 @@
  */
 package org.apache.gravitino.authorization;
 
-import java.util.List;
+import javax.annotation.Nullable;
+import org.apache.gravitino.Auditable;
 import org.apache.gravitino.annotation.Evolving;
 
-/** The interface of a user. The user is the entity which executes every operation. */
+/**
+ * A lightweight view of a group backed only by {@code group_meta} row data, without role bindings.
+ */
 @Evolving
-public interface User extends BasicUser {
+public interface BasicGroup extends Auditable {
 
   /**
-   * The roles of the user. A user can have multiple roles. Every role binds several privileges.
+   * The name of the group.
    *
-   * @return The roles of the user.
+   * @return The name of the group.
    */
-  List<String> roles();
+  String name();
+
+  /**
+   * The unique id assigned by Gravitino.
+   *
+   * @return The unique id of the group.
+   */
+  Long id();
+
+  /**
+   * The stable identifier assigned by an upstream identity system, or null if not set.
+   *
+   * @return The upstream external identifier, or null if not set.
+   */
+  @Nullable
+  default String externalId() {
+    return null;
+  }
 }

@@ -26,6 +26,8 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.BasicGroup;
+import org.apache.gravitino.authorization.BasicUser;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.GroupChange;
@@ -93,6 +95,12 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     return dispatcher.getUser(metalake, user);
+  }
+
+  @Override
+  public BasicUser getBasicUser(String metalake, String user)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    return dispatcher.getBasicUser(metalake, user);
   }
 
   @Override
@@ -166,6 +174,12 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return dispatcher.getGroup(metalake, group);
+  }
+
+  @Override
+  public BasicGroup getBasicGroup(String metalake, String group)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    return dispatcher.getBasicGroup(metalake, group);
   }
 
   @Override
