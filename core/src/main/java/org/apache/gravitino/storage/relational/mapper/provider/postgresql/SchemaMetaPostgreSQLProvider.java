@@ -57,8 +57,17 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " schema_comment = #{schemaMeta.schemaComment},"
         + " properties = #{schemaMeta.properties},"
         + " audit_info = #{schemaMeta.auditInfo},"
-        + " current_version = #{schemaMeta.currentVersion},"
-        + " last_version = #{schemaMeta.lastVersion},"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. The column has to be written as <table>.<column> here: on this side of
+        // ON CONFLICT a bare name could mean either the stored row or the rejected one, and
+        // PostgreSQL refuses it as ambiguous.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{schemaMeta.deletedAt}";
   }
 
@@ -82,8 +91,17 @@ public class SchemaMetaPostgreSQLProvider extends SchemaMetaBaseSQLProvider {
         + " schema_comment = EXCLUDED.schema_comment,"
         + " properties = EXCLUDED.properties,"
         + " audit_info = EXCLUDED.audit_info,"
-        + " current_version = EXCLUDED.current_version,"
-        + " last_version = EXCLUDED.last_version,"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. The column has to be written as <table>.<column> here: on this side of
+        // ON CONFLICT a bare name could mean either the stored row or the rejected one, and
+        // PostgreSQL refuses it as ambiguous.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = EXCLUDED.deleted_at"
         + "</script>";
   }

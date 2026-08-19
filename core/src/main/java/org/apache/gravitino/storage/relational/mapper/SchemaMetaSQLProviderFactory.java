@@ -52,7 +52,9 @@ public class SchemaMetaSQLProviderFactory {
   static class SchemaMetaH2Provider extends SchemaMetaBaseSQLProvider {
     @Override
     public String selectSchemaMetaByIdForShare(Long schemaId) {
-      // H2 has no shared row-lock syntax, so use an exclusive lock in tests.
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Writes of
+      // tables, views, filesets and the like under one schema therefore serialize on H2, and a slow
+      // write can make a concurrent one hit H2's lock timeout instead of a clean conflict.
       return selectSchemaMetaByIdForUpdate(schemaId);
     }
   }

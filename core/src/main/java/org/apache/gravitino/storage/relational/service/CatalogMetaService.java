@@ -505,9 +505,7 @@ public class CatalogMetaService {
    * must already hold the catalog row, so no schema can appear or disappear in between.
    */
   private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {
-    List<SchemaPO> schemaPOs =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
+    List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
     if (schemaPOs.isEmpty()) {
       return;
     }
@@ -520,5 +518,15 @@ public class CatalogMetaService {
       throw ExceptionUtils.concurrentChildModification(
           Entity.EntityType.SCHEMA, Entity.EntityType.CATALOG, catalogIdentifier);
     }
+  }
+
+  /**
+   * Reads the schemas that the cascade is about to delete. The caller already holds the catalog
+   * row, so this snapshot cannot grow or shrink behind it. Kept separate so a test can pause the
+   * cascade exactly here, between taking the lock and reading the children.
+   */
+  List<SchemaPO> listSchemaPOsForCascade(Long catalogId) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
   }
 }

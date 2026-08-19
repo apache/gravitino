@@ -72,6 +72,7 @@ import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestSchemaMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_catalog_test";
@@ -979,6 +980,75 @@ public class TestSchemaMetaService extends TestJDBCBackend {
         ancestorAPOBefore.getCurrentVersion(), ancestorAPOAfter.getCurrentVersion());
     Assertions.assertEquals(
         ancestorABPOBefore.getCurrentVersion(), ancestorABPOAfter.getCurrentVersion());
+  }
+
+  @TestTemplate
+  public void testConcurrentCatalogCascadeAndSchemaCreateLeavesNoOrphan() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    CatalogEntity catalog = createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            "schema_racing_catalog_drop",
+            AUDIT_INFO);
+
+    CountDownLatch catalogLocked = new CountDownLatch(1);
+    CountDownLatch allowSchemaSnapshot = new CountDownLatch(1);
+    CountDownLatch createStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    CatalogMetaService service = Mockito.spy(CatalogMetaService.getInstance());
+    try {
+      // Pause the cascade right after it has soft-deleted the catalog row, which is the moment it
+      // holds that row, and before it reads the schemas to delete.
+      Mockito.doAnswer(
+              invocation -> {
+                catalogLocked.countDown();
+                assertTrue(allowSchemaSnapshot.await(30, TimeUnit.SECONDS));
+                return invocation.callRealMethod();
+              })
+          .when(service)
+          .listSchemaPOsForCascade(catalog.id());
+
+      Future<Throwable> deleteResult =
+          executor.submit(
+              () -> {
+                try {
+                  service.deleteCatalog(catalog.nameIdentifier(), true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(catalogLocked.await(30, TimeUnit.SECONDS));
+
+      Future<Throwable> createResult =
+          executor.submit(
+              () -> {
+                createStarted.countDown();
+                try {
+                  SchemaMetaService.getInstance().insertSchema(schema, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(createStarted.await(30, TimeUnit.SECONDS));
+      // The create must not slip past the drop: it waits on the catalog row instead.
+      assertThrows(TimeoutException.class, () -> createResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowSchemaSnapshot.countDown();
+      Throwable createFailure = createResult.get(30, TimeUnit.SECONDS);
+      Throwable deleteFailure = deleteResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertInstanceOf(NoSuchEntityException.class, createFailure);
+      Assertions.assertNull(deleteFailure, () -> "Catalog cascade failed: " + deleteFailure);
+    } finally {
+      allowSchemaSnapshot.countDown();
+      executor.shutdownNow();
+    }
+
+    assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
   }
 
   private List<Throwable> insertSchemasConcurrently(SchemaEntity first, SchemaEntity second)

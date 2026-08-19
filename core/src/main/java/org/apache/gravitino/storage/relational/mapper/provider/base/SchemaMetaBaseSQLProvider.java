@@ -237,8 +237,12 @@ public class SchemaMetaBaseSQLProvider {
         + " schema_comment = #{schemaMeta.schemaComment},"
         + " properties = #{schemaMeta.properties},"
         + " audit_info = #{schemaMeta.auditInfo},"
-        + " current_version = #{schemaMeta.currentVersion},"
-        + " last_version = #{schemaMeta.lastVersion},"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. last_version is assigned first, so both columns are computed from the
+        // version the row had before this statement.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{schemaMeta.deletedAt}";
   }
 
@@ -275,8 +279,12 @@ public class SchemaMetaBaseSQLProvider {
         + " schema_comment = VALUES(schema_comment),"
         + " properties = VALUES(properties),"
         + " audit_info = VALUES(audit_info),"
-        + " current_version = VALUES(current_version),"
-        + " last_version = VALUES(last_version),"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. last_version is assigned first, so both columns are computed from the
+        // version the row had before this statement.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = VALUES(deleted_at)"
         + "</script>";
   }
