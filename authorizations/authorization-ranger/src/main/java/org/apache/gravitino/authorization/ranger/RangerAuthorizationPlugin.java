@@ -53,6 +53,7 @@ import org.apache.gravitino.authorization.ranger.reference.VXGroupList;
 import org.apache.gravitino.authorization.ranger.reference.VXUser;
 import org.apache.gravitino.authorization.ranger.reference.VXUserList;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.connector.authorization.BaseAuthorization;
 import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GroupEntity;
@@ -84,6 +85,7 @@ public abstract class RangerAuthorizationPlugin
 
   protected String metalake;
   protected final String rangerServiceName;
+  protected final String catalogId;
   protected RangerClientExtension rangerClient;
   protected RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
@@ -103,6 +105,8 @@ public abstract class RangerAuthorizationPlugin
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
 
     rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
+    catalogId = config.get(BaseAuthorization.CATALOG_ID);
+    Preconditions.checkArgument(catalogId != null, "Catalog ID is required");
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
 
     createRangerServiceIfNecessary(config, rangerServiceName);
@@ -525,7 +529,7 @@ public abstract class RangerAuthorizationPlugin
         if (metadataObject.type() == MetadataObject.Type.METALAKE) {
           ownerRoleName = RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE;
         } else {
-          ownerRoleName = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE;
+          ownerRoleName = RangerHelper.generateCatalogOwnerRoleName(catalogId);
         }
         rangerHelper.createRangerRoleIfNotExists(ownerRoleName, true);
         rangerHelper.createRangerRoleIfNotExists(RangerHelper.GRAVITINO_OWNER_ROLE, true);

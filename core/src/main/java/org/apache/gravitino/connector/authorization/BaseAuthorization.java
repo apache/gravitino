@@ -45,6 +45,9 @@ import org.apache.gravitino.utils.IsolatedClassLoader;
 public abstract class BaseAuthorization<T extends BaseAuthorization>
     implements AuthorizationProvider, Closeable {
 
+  /** The internal property used to pass the stable catalog entity ID to authorization plugins. */
+  public static final String CATALOG_ID = "authorization.catalog.id";
+
   /**
    * Creates a new instance of AuthorizationPlugin. <br>
    * The child class should implement this method to provide a specific AuthorizationPlugin instance

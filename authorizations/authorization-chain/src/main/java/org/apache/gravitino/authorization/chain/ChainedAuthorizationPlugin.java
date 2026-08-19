@@ -62,6 +62,8 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
               String authzProvider = chainedAuthzProperties.getPluginProvider(pluginName);
               Map<String, String> pluginConfig =
                   chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
+              pluginConfig.put(
+                  BaseAuthorization.CATALOG_ID, properties.get(BaseAuthorization.CATALOG_ID));
 
               ArrayList<String> libAndResourcesPaths = Lists.newArrayList();
               BaseAuthorization.buildAuthorizationPkgPath(

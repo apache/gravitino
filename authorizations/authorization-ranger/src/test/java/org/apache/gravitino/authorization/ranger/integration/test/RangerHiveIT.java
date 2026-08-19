@@ -1493,7 +1493,7 @@ public class RangerHiveIT {
                   null,
                   Lists.newArrayList(
                       RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE,
-                      RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE));
+                      RangerHelper.generateCatalogOwnerRoleName(RangerITEnv.CATALOG_ID)));
             });
   }
 

@@ -228,6 +228,16 @@ public class RangerHelper {
     return GRAVITINO_ROLE_PREFIX + roleName;
   }
 
+  /**
+   * Generate the Ranger owner role name for a catalog.
+   *
+   * @param catalogId The stable catalog entity ID
+   * @return The catalog-specific Ranger owner role name
+   */
+  public static String generateCatalogOwnerRoleName(String catalogId) {
+    return GRAVITINO_CATALOG_OWNER_ROLE + "_" + catalogId;
+  }
+
   protected GrantRevokeRoleRequest createGrantRevokeRoleRequest(
       String roleName, String userName, String groupName) {
     roleName = generateGravitinoRoleName(roleName);
@@ -260,18 +270,18 @@ public class RangerHelper {
     if (isOwnerRole) {
       Preconditions.checkArgument(
           roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
-              || roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+              || isCatalogOwnerRole(roleName)
               || roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
           String.format(
-              "The role name should be %s or %s or %s",
+              "The role name should be %s, start with %s_, or be %s",
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     } else {
       Preconditions.checkArgument(
           !roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
-              && !roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+              && !isCatalogOwnerRole(roleName)
               && !roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
           String.format(
-              "The role name should not be %s or %s or %s",
+              "The role name should not be %s, start with %s_, or be %s",
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     }
 
@@ -439,5 +449,15 @@ public class RangerHelper {
     if (!policyItem.getRoles().contains(gravitinoRoleName)) {
       policyItem.getRoles().add(gravitinoRoleName);
     }
+  }
+
+  private static boolean isCatalogOwnerRole(String roleName) {
+    return roleName.equalsIgnoreCase(GRAVITINO_CATALOG_OWNER_ROLE)
+        || roleName.regionMatches(
+            true,
+            0,
+            GRAVITINO_CATALOG_OWNER_ROLE + "_",
+            0,
+            GRAVITINO_CATALOG_OWNER_ROLE.length() + 1);
   }
 }

@@ -295,11 +295,14 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           try (BaseAuthorization<?> authorization =
               BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
 
+            Map<String, String> authorizationConfig = Maps.newHashMap(conf);
+            authorizationConfig.put(BaseAuthorization.CATALOG_ID, String.valueOf(entity().id()));
+
             authorizationPlugin =
                 classLoader.withClassLoader(
                     cl ->
                         authorization.newPlugin(
-                            entity.namespace().level(0), provider(), this.conf));
+                            entity.namespace().level(0), provider(), authorizationConfig));
 
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
