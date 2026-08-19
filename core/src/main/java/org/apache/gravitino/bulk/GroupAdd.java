@@ -3,8 +3,8 @@
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
  * regarding copyright ownership.  The ASF licenses this file
- * to you under the Apache License, Version 2.0 (the
- * "License"); you may not use this file except in compliance
+ * to you under the Apache License, Version 2.0
+ * (the "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
  *  http://www.apache.org/licenses/LICENSE-2.0
@@ -21,30 +21,27 @@ package org.apache.gravitino.bulk;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
-/** Represents one user to add in a bulk operation. */
-public final class UserAdd {
+/** Represents one group to add in a bulk operation. */
+public final class GroupAdd {
 
   private final String name;
   @Nullable private final String externalId;
-  @Nullable private final Boolean enabled;
 
   /**
-   * Creates a user add item.
+   * Creates a group add item.
    *
-   * @param name The user name.
+   * @param name The group name.
    * @param externalId The external identifier, or null if unset.
-   * @param enabled Whether the user is enabled, or null to use the default value.
    */
-  public UserAdd(String name, @Nullable String externalId, @Nullable Boolean enabled) {
+  public GroupAdd(String name, @Nullable String externalId) {
     this.name = name;
     this.externalId = externalId;
-    this.enabled = enabled;
   }
 
   /**
-   * Returns the user name.
+   * Returns the group name.
    *
-   * @return The user name.
+   * @return The group name.
    */
   public String name() {
     return name;
@@ -61,21 +58,11 @@ public final class UserAdd {
   }
 
   /**
-   * Returns whether the user has an external identifier.
+   * Returns whether the group has an external identifier.
    *
-   * @return True if the user has an external identifier, otherwise false.
+   * @return True if the group has a non-blank external identifier, otherwise false.
    */
   public boolean hasExternalId() {
     return StringUtils.isNotBlank(externalId);
-  }
-
-  /**
-   * Returns whether the user is enabled.
-   *
-   * @return Whether the user is enabled, or null to use the default value.
-   */
-  @Nullable
-  public Boolean enabled() {
-    return enabled;
   }
 }

@@ -29,6 +29,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -254,11 +255,65 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<Group>> results = Lists.newArrayListWithCapacity(groups.size());
+          for (int index = 0; index < groups.size(); index++) {
+            GroupAdd group = groups.get(index);
+            try {
+              Group addedGroup =
+                  group.hasExternalId()
+                      ? userGroupExternalManager.addGroup(
+                          metalake, group.name(), group.externalId())
+                      : userGroupManager.addGroup(metalake, group.name());
+              results.add(BulkItemResult.success(index, group.name(), addedGroup));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, group.name(), e));
+            }
+          }
+          return results;
+        });
+  }
+
+  @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
         LockType.WRITE,
         () -> userGroupManager.removeGroup(metalake, group));
+  }
+
+  @Override
+  public List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<String>> results = Lists.newArrayListWithCapacity(groups.size());
+          for (int index = 0; index < groups.size(); index++) {
+            String group = groups.get(index);
+            try {
+              ensureNotMetalakeOwnerGroup(metalakeOwner, metalake, group);
+              boolean removed = userGroupManager.removeGroup(metalake, group);
+              if (!removed) {
+                results.add(
+                    BulkItemResult.failure(
+                        index, group, new NoSuchGroupException("Group does not exist: %s", group)));
+                continue;
+              }
+              results.add(BulkItemResult.success(index, group));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, group, e));
+            }
+          }
+          return results;
+        });
   }
 
   @Override
@@ -472,6 +527,19 @@ public class AccessControlManager implements AccessControlDispatcher {
                 String.format(
                     "Cannot remove user %s from metalake %s because the user is the owner of the metalake.",
                     user, metalake));
+          }
+        });
+  }
+
+  private void ensureNotMetalakeOwnerGroup(
+      Optional<Owner> metalakeOwner, String metalake, String group) {
+    metalakeOwner.ifPresent(
+        owner -> {
+          if (owner.type() == Owner.Type.GROUP && owner.name().equals(group)) {
+            throw new IllegalArgumentException(
+                String.format(
+                    "Cannot remove group %s from metalake %s because the group is the owner of the metalake.",
+                    group, metalake));
           }
         });
   }

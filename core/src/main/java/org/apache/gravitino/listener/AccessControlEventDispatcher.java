@@ -35,6 +35,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.authorization.UserChange;
 import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -492,6 +493,27 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    groups.forEach(
+        group -> eventBus.dispatchEvent(new AddGroupPreEvent(initiator, metalake, group.name())));
+
+    try {
+      List<BulkItemResult<Group>> results = dispatcher.addGroups(metalake, groups);
+      results.forEach(result -> dispatchAddGroupResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      groups.forEach(
+          group ->
+              eventBus.dispatchEvent(
+                  new AddGroupFailureEvent(initiator, metalake, e, group.name())));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -503,6 +525,28 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    groups.forEach(
+        group -> eventBus.dispatchEvent(new RemoveGroupPreEvent(initiator, metalake, group)));
+
+    try {
+      List<BulkItemResult<String>> results =
+          dispatcher.removeGroups(metalake, groups, metalakeOwner);
+      results.forEach(result -> dispatchRemoveGroupResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      groups.forEach(
+          group ->
+              eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group)));
       throw e;
     }
   }
@@ -963,6 +1007,27 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
     } else {
       eventBus.dispatchEvent(
           new RemoveUserFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchAddGroupResultEvent(
+      String initiator, String metalake, BulkItemResult<Group> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(
+          new AddGroupEvent(initiator, metalake, new GroupInfo(result.value().get())));
+    } else {
+      eventBus.dispatchEvent(
+          new AddGroupFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchRemoveGroupResultEvent(
+      String initiator, String metalake, BulkItemResult<String> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(new RemoveGroupEvent(initiator, metalake, result.name(), true));
+    } else {
+      eventBus.dispatchEvent(
+          new RemoveGroupFailureEvent(initiator, metalake, result.error().get(), result.name()));
     }
   }
 }

@@ -39,6 +39,7 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.authorization.UserChange;
 import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -168,8 +169,21 @@ public class AccessControlHookDispatcher implements AccessControlDispatcher {
   }
 
   @Override
+  public List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException {
+    return dispatcher.addGroups(metalake, groups);
+  }
+
+  @Override
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     return dispatcher.removeGroup(metalake, group);
+  }
+
+  @Override
+  public List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    return dispatcher.removeGroups(metalake, groups, metalakeOwner);
   }
 
   @Override
