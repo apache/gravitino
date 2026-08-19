@@ -20,17 +20,24 @@
 package org.apache.gravitino.spark.connector.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
-import org.apache.gravitino.spark.connector.catalog.SparkCatalogs;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
+/**
+ * Tests what the plugin does with the bindings it is given. The bindings here are made up, so these
+ * assertions hold on every Spark version and do not restate what the version modules declare.
+ */
 public class TestGravitinoDriverPlugin {
+
+  private static final String AUTHZ_EXTENSION = "org.example.AuthorizationExtensions";
+  private static final String PAIMON_CATALOG = "org.example.PaimonCatalog";
 
   @Test
   void testIcebergExtensionName() {
@@ -40,47 +47,67 @@ public class TestGravitinoDriverPlugin {
   }
 
   @Test
-  void testAlwaysRegistersAuthorizationExtension() {
+  void testAlwaysRegistersTheBoundAuthorizationExtension() {
     SparkConf sparkConf = new SparkConf(false);
 
-    new GravitinoDriverPlugin().registerSqlExtensions(sparkConf);
+    new GravitinoDriverPlugin(withoutPaimon()).registerSqlExtensions(sparkConf);
 
-    assertEquals(
-        GravitinoAuthorizationSparkSessionExtensions.class.getName(),
-        sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+    assertEquals(AUTHZ_EXTENSION, sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
   }
 
   @Test
   void testDoesNotDuplicateAuthorizationExtension() {
     SparkConf sparkConf = new SparkConf(false);
-    String extension = GravitinoAuthorizationSparkSessionExtensions.class.getName();
-    sparkConf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), extension);
+    sparkConf.set(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(), AUTHZ_EXTENSION);
 
-    new GravitinoDriverPlugin().registerSqlExtensions(sparkConf);
+    new GravitinoDriverPlugin(withoutPaimon()).registerSqlExtensions(sparkConf);
 
-    assertEquals(extension, sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+    assertEquals(AUTHZ_EXTENSION, sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
   }
 
   /**
    * Paimon publishes no paimon-spark artifact for every Spark version and Scala version this
-   * connector supports, so the Paimon classes are absent from some builds. Registering the Paimon
-   * session extension there would fail SparkSession construction, so the plugin must skip it
-   * exactly when this build declares no Paimon catalog.
+   * connector supports, so some builds bind no Paimon catalog. Registering the Paimon session
+   * extension there would fail SparkSession construction, so the plugin must skip it whenever the
+   * binding is absent.
    */
   @Test
-  void testPaimonExtensionFollowsCatalogAvailability() {
-    SparkConf sparkConf = new SparkConf(false);
+  void testPaimonExtensionIsSkippedWithoutAPaimonBinding() {
+    assertFalse(registeredExtensions(withoutPaimon()).contains(paimonExtension()));
+  }
 
-    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin();
+  @Test
+  void testPaimonExtensionIsRegisteredWithAPaimonBinding() {
+    assertTrue(registeredExtensions(withPaimon()).contains(paimonExtension()));
+  }
+
+  private static String registeredExtensions(SparkBindings bindings) {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(bindings);
     plugin.registerPaimonExtensionsIfSupported();
     plugin.registerSqlExtensions(sparkConf);
+    return sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
+  }
 
-    String extensions = sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
-    boolean paimonSupported =
-        SparkCatalogs.classNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON);
-    Assertions.assertEquals(
-        paimonSupported,
-        extensions.contains(GravitinoDriverPlugin.PAIMON_SPARK_EXTENSIONS),
-        "Paimon extension registration must match Paimon catalog availability");
+  private static String paimonExtension() {
+    return GravitinoDriverPlugin.PAIMON_SPARK_EXTENSIONS;
+  }
+
+  private static SparkBindings withoutPaimon() {
+    return requiredCatalogs().build();
+  }
+
+  private static SparkBindings withPaimon() {
+    return requiredCatalogs().catalog(SparkCatalogKind.LAKEHOUSE_PAIMON, PAIMON_CATALOG).build();
+  }
+
+  private static SparkBindings.Builder requiredCatalogs() {
+    return SparkBindings.builder()
+        .authorizationExtension(AUTHZ_EXTENSION)
+        .catalog(SparkCatalogKind.HIVE, "org.example.HiveCatalog")
+        .catalog(SparkCatalogKind.LAKEHOUSE_ICEBERG, "org.example.IcebergCatalog")
+        .catalog(SparkCatalogKind.GLUE, "org.example.GlueCatalog")
+        .catalog(SparkCatalogKind.JDBC, "org.example.JdbcCatalog")
+        .catalog(SparkCatalogKind.JDBC_POSTGRESQL, "org.example.PostgreSqlCatalog");
   }
 }

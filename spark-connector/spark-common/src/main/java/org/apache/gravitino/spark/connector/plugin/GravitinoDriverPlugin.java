@@ -46,10 +46,8 @@ import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
-import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
-import org.apache.gravitino.spark.connector.catalog.SparkCatalogs;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.spark.SparkConf;
@@ -63,6 +61,9 @@ import org.slf4j.LoggerFactory;
 /**
  * GravitinoDriverPlugin creates GravitinoCatalogManager to fetch catalogs from Apache Gravitino and
  * register Gravitino catalogs to Apache Spark.
+ *
+ * <p>The classes it registers differ per Spark version, so it takes them as {@link SparkBindings}
+ * from the version module's {@code GravitinoSparkPlugin} rather than naming them itself.
  */
 public class GravitinoDriverPlugin implements DriverPlugin {
 
@@ -78,17 +79,27 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   static final String ICEBERG_SPARK_EXTENSIONS =
       "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
 
-  private GravitinoCatalogManager catalogManager;
+  private final SparkBindings bindings;
   private final List<String> gravitinoIcebergExtensions =
       Arrays.asList(
           GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
   private final List<String> gravitinoPaimonExtensions = Arrays.asList(PAIMON_SPARK_EXTENSIONS);
 
-  private final List<String> gravitinoDriverExtensions =
-      new ArrayList<>(
-          Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
+  private final List<String> gravitinoDriverExtensions;
+  private GravitinoCatalogManager catalogManager;
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+
+  /**
+   * Creates the plugin from the classes a connector build supplies.
+   *
+   * @param bindings the catalog and session extension classes of this build
+   */
+  public GravitinoDriverPlugin(SparkBindings bindings) {
+    this.bindings = bindings;
+    this.gravitinoDriverExtensions =
+        new ArrayList<>(Collections.singletonList(bindings.authorizationExtension()));
+  }
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -180,26 +191,25 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   }
 
   /**
-   * Resolves the Spark catalog class a Gravitino catalog provider needs, from the table the
-   * connector jar on the classpath declares. Returns null when this connector has no catalog for
-   * the provider, which is also how an unbuilt catalog reports itself.
+   * Resolves the Spark catalog class a Gravitino catalog provider needs, from the bindings this
+   * build supplied. Returns null when the build has no catalog for the provider.
    */
   @Nullable
-  private static String catalogClassName(String provider) {
+  private String catalogClassName(String provider) {
     SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
-    return kind == null ? null : SparkCatalogs.classNames().get(kind);
+    return kind == null ? null : bindings.catalogClassNames().get(kind);
   }
 
   /**
-   * Queues the Paimon session extensions, unless this connector jar has no Paimon catalog. Paimon
-   * publishes no paimon-spark artifact for every Spark version and Scala version this connector
-   * supports, so some builds omit the Paimon classes; registering the extension there would fail
-   * SparkSession construction with a ClassNotFoundException. Skip it the way an unsupported catalog
-   * provider is skipped, so a config carried over from another build degrades to a warning.
+   * Queues the Paimon session extensions, unless this build has no Paimon catalog. Paimon publishes
+   * no paimon-spark artifact for every Spark version and Scala version this connector supports, so
+   * some builds omit the Paimon classes; registering the extension there would fail SparkSession
+   * construction with a ClassNotFoundException. Skip it the way an unsupported catalog provider is
+   * skipped, so a config carried over from another build degrades to a warning.
    */
   @VisibleForTesting
   void registerPaimonExtensionsIfSupported() {
-    if (!SparkCatalogs.classNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON)) {
+    if (!bindings.catalogClassNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON)) {
       LOG.warn(
           "Skip registering Paimon session extensions because {} is not supported yet.",
           PAIMON_PROVIDER);

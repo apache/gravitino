@@ -45,9 +45,8 @@ val jakartaValidationVersion: String = "2.0.2"
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
 // The connector's shared sources are compiled here rather than consumed as a jar, so that every
-// supported Spark version builds them against its own API. `spark40` holds the one class Spark 4
-// needs its own copy of: the authorization parser, since Spark 4 added an abstract method to
-// ParserInterface.
+// supported Spark version builds them against its own API. Everything a Spark 4 build needs its own
+// copy of lives in this module's own src/main/java, so no flavor directory is composed in.
 val sparkCommonDir = project(":spark-connector").projectDir.resolve("spark-common")
 
 sourceSets {
@@ -56,7 +55,6 @@ sourceSets {
       setSrcDirs(
         listOf(
           "$sparkCommonDir/src/main/java",
-          "$sparkCommonDir/src/main/spark40",
           "src/main/java"
         )
       )
