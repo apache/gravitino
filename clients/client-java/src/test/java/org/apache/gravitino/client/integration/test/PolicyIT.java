@@ -35,6 +35,14 @@ import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
+import org.apache.gravitino.function.Function;
+import org.apache.gravitino.function.FunctionDefinition;
+import org.apache.gravitino.function.FunctionDefinitions;
+import org.apache.gravitino.function.FunctionImpl;
+import org.apache.gravitino.function.FunctionImpls;
+import org.apache.gravitino.function.FunctionParam;
+import org.apache.gravitino.function.FunctionParams;
+import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
@@ -45,7 +53,10 @@ import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.Column;
+import org.apache.gravitino.rel.Dialects;
+import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -65,6 +76,8 @@ public class PolicyIT extends BaseIT {
   private static Catalog relationalCatalog;
   private static Schema schema;
   private static Table table;
+  private static View view;
+  private static Function function;
 
   private static Catalog modelCatalog;
   private static Schema modelSchema;
@@ -116,6 +129,51 @@ public class PolicyIT extends BaseIT {
                 "comment",
                 Collections.emptyMap());
 
+    // Create view
+    String viewName = GravitinoITUtils.genRandomName("policy_it_view");
+    Assertions.assertFalse(
+        relationalCatalog.asViewCatalog().viewExists(NameIdentifier.of(schemaName, viewName)));
+    view =
+        relationalCatalog
+            .asViewCatalog()
+            .createView(
+                NameIdentifier.of(schemaName, viewName),
+                "comment",
+                new Column[] {
+                  Column.of("col1", Types.IntegerType.get()),
+                  Column.of("col2", Types.StringType.get())
+                },
+                new SQLRepresentation[] {
+                  SQLRepresentation.builder()
+                      .withDialect(Dialects.HIVE)
+                      .withSql("SELECT col1, col2 FROM " + table.name())
+                      .build()
+                },
+                null,
+                null,
+                Collections.emptyMap());
+
+    // Create function
+    String functionName = GravitinoITUtils.genRandomName("policy_it_function");
+    Assertions.assertFalse(
+        relationalCatalog
+            .asFunctionCatalog()
+            .functionExists(NameIdentifier.of(schemaName, functionName)));
+    FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
+    function =
+        relationalCatalog
+            .asFunctionCatalog()
+            .registerFunction(
+                NameIdentifier.of(schemaName, functionName),
+                "comment",
+                FunctionType.SCALAR,
+                true,
+                new FunctionDefinition[] {definition});
+
     // Create model catalog
     String modelCatalogName = GravitinoITUtils.genRandomName("policy_it_model_catalog");
     Assertions.assertFalse(metalake.catalogExists(modelCatalogName));
@@ -142,6 +200,10 @@ public class PolicyIT extends BaseIT {
 
   @AfterAll
   public void tearDown() {
+    relationalCatalog
+        .asFunctionCatalog()
+        .dropFunction(NameIdentifier.of(schema.name(), function.name()));
+    relationalCatalog.asViewCatalog().dropView(NameIdentifier.of(schema.name(), view.name()));
     relationalCatalog.asTableCatalog().dropTable(NameIdentifier.of(schema.name(), table.name()));
     relationalCatalog.asSchemas().dropSchema(schema.name(), true);
     metalake.dropCatalog(relationalCatalog.name(), true);
@@ -166,6 +228,12 @@ public class PolicyIT extends BaseIT {
 
   @AfterEach
   public void cleanUp() {
+    String[] functionPolicies = function.supportsPolicies().listPolicies();
+    function.supportsPolicies().associatePolicies(null, functionPolicies);
+
+    String[] viewPolicies = view.supportsPolicies().listPolicies();
+    view.supportsPolicies().associatePolicies(null, viewPolicies);
+
     String[] tablePolicies = table.supportsPolicies().listPolicies();
     table.supportsPolicies().associatePolicies(null, tablePolicies);
 
@@ -395,9 +463,13 @@ public class PolicyIT extends BaseIT {
   @Test
   public void testAssociatePoliciesToCatalog() {
     Policy policy1 =
-        createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_catalog_policy1"));
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_catalog_policy1"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
     Policy policy2 =
-        createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_catalog_policy2"));
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_catalog_policy2"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
 
     // Test associate policies to catalog
     String[] policies =
@@ -494,8 +566,14 @@ public class PolicyIT extends BaseIT {
 
   @Test
   public void testAssociatePoliciesToSchema() {
-    Policy policy1 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_schema_policy1"));
-    Policy policy2 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_schema_policy2"));
+    Policy policy1 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_schema_policy1"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
+    Policy policy2 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_schema_policy2"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
 
     // Associate policies to catalog
     relationalCatalog.supportsPolicies().associatePolicies(new String[] {policy1.name()}, null);
@@ -655,9 +733,18 @@ public class PolicyIT extends BaseIT {
 
   @Test
   public void testAssociateAndDeletePolicies() {
-    Policy policy1 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_policy1"));
-    Policy policy2 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_policy2"));
-    Policy policy3 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_policy3"));
+    Policy policy1 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_policy1"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
+    Policy policy2 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_policy2"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
+    Policy policy3 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_policy3"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
 
     String[] associatedPolicies =
         relationalCatalog
@@ -689,9 +776,18 @@ public class PolicyIT extends BaseIT {
 
   @Test
   public void testAssociatePoliciesToModel() {
-    Policy policy1 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_model_policy1"));
-    Policy policy2 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_model_policy2"));
-    Policy policy3 = createCustomPolicy(GravitinoITUtils.genRandomName("policy_it_model_policy3"));
+    Policy policy1 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_model_policy1"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
+    Policy policy2 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_model_policy2"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
+    Policy policy3 =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_model_policy3"),
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
 
     // Associate policies to catalog
     modelCatalog.supportsPolicies().associatePolicies(new String[] {policy1.name()}, null);
@@ -759,7 +855,488 @@ public class PolicyIT extends BaseIT {
         MetadataObject.Type.MODEL, policy3.associatedObjects().objects()[0].type());
   }
 
-  private Policy createCustomPolicy(String name) {
+  @Test
+  public void testAssociatePoliciesToView() {
+    PolicyContent content =
+        PolicyContents.custom(
+            ImmutableMap.of("rule1", "value1"), ImmutableSet.of(MetadataObject.Type.VIEW), null);
+    Policy policy1 =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_view_policy1"),
+            "custom",
+            null,
+            true,
+            content);
+    Policy policy2 =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_view_policy2"),
+            "custom",
+            null,
+            true,
+            content);
+    Policy policy3 =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_view_policy3"),
+            "custom",
+            null,
+            true,
+            content);
+
+    // Associate policies to catalog
+    relationalCatalog.supportsPolicies().associatePolicies(new String[] {policy1.name()}, null);
+
+    // Associate policies to schema
+    schema.supportsPolicies().associatePolicies(new String[] {policy2.name()}, null);
+
+    // Test associate policies to view
+    String[] policies =
+        view.supportsPolicies().associatePolicies(new String[] {policy3.name()}, null);
+
+    Assertions.assertEquals(1, policies.length);
+    Assertions.assertEquals(policy3.name(), policies[0]);
+
+    // Test list associated policies for view
+    String[] policies1 = view.supportsPolicies().listPolicies();
+    Assertions.assertEquals(3, policies1.length);
+    Set<String> policyNames = Sets.newHashSet(policies1);
+    Assertions.assertTrue(policyNames.contains(policy1.name()));
+    Assertions.assertTrue(policyNames.contains(policy2.name()));
+    Assertions.assertTrue(policyNames.contains(policy3.name()));
+
+    // Test list associated policies with details for view
+    Policy[] policies2 = view.supportsPolicies().listPolicyInfos();
+    Assertions.assertEquals(3, policies2.length);
+
+    Set<Policy> nonInheritedPolicies =
+        Arrays.stream(policies2)
+            .filter(policy -> !policy.inherited().get())
+            .collect(Collectors.toSet());
+    Set<Policy> inheritedPolicies =
+        Arrays.stream(policies2)
+            .filter(policy -> policy.inherited().get())
+            .collect(Collectors.toSet());
+
+    Assertions.assertEquals(1, nonInheritedPolicies.size());
+    Assertions.assertEquals(2, inheritedPolicies.size());
+    Assertions.assertTrue(nonInheritedPolicies.contains(policy3));
+    Assertions.assertTrue(inheritedPolicies.contains(policy1));
+    Assertions.assertTrue(inheritedPolicies.contains(policy2));
+
+    // Test get associated policy for view
+    Policy resultPolicy1 = view.supportsPolicies().getPolicy(policy1.name());
+    Assertions.assertEquals(policy1, resultPolicy1);
+    Assertions.assertTrue(resultPolicy1.inherited().get());
+
+    Policy resultPolicy2 = view.supportsPolicies().getPolicy(policy2.name());
+    Assertions.assertEquals(policy2, resultPolicy2);
+    Assertions.assertTrue(resultPolicy2.inherited().get());
+
+    Policy resultPolicy3 = view.supportsPolicies().getPolicy(policy3.name());
+    Assertions.assertEquals(policy3, resultPolicy3);
+    Assertions.assertFalse(resultPolicy3.inherited().get());
+
+    // Test get objects associated with policy
+    Assertions.assertEquals(1, policy1.associatedObjects().count());
+    Assertions.assertEquals(
+        relationalCatalog.name(), policy1.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG, policy1.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, policy2.associatedObjects().count());
+    Assertions.assertEquals(schema.name(), policy2.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.SCHEMA, policy2.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, policy3.associatedObjects().count());
+    Assertions.assertEquals(view.name(), policy3.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.VIEW, policy3.associatedObjects().objects()[0].type());
+  }
+
+  @Test
+  public void testAssociatePoliciesToFunction() {
+    PolicyContent content =
+        PolicyContents.custom(
+            ImmutableMap.of("rule1", "value1"),
+            ImmutableSet.of(MetadataObject.Type.FUNCTION),
+            null);
+    Policy policy1 =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_func_policy1"),
+            "custom",
+            null,
+            true,
+            content);
+    Policy policy2 =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_func_policy2"),
+            "custom",
+            null,
+            true,
+            content);
+    Policy policy3 =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_func_policy3"),
+            "custom",
+            null,
+            true,
+            content);
+
+    // Associate policies to catalog
+    relationalCatalog.supportsPolicies().associatePolicies(new String[] {policy1.name()}, null);
+
+    // Associate policies to schema
+    schema.supportsPolicies().associatePolicies(new String[] {policy2.name()}, null);
+
+    // Test associate policies to function
+    String[] policies =
+        function.supportsPolicies().associatePolicies(new String[] {policy3.name()}, null);
+
+    Assertions.assertEquals(1, policies.length);
+    Assertions.assertEquals(policy3.name(), policies[0]);
+
+    // Test list associated policies for function
+    String[] policies1 = function.supportsPolicies().listPolicies();
+    Assertions.assertEquals(3, policies1.length);
+    Set<String> policyNames = Sets.newHashSet(policies1);
+    Assertions.assertTrue(policyNames.contains(policy1.name()));
+    Assertions.assertTrue(policyNames.contains(policy2.name()));
+    Assertions.assertTrue(policyNames.contains(policy3.name()));
+
+    // Test list associated policies with details for function
+    Policy[] policies2 = function.supportsPolicies().listPolicyInfos();
+    Assertions.assertEquals(3, policies2.length);
+
+    Set<Policy> nonInheritedPolicies =
+        Arrays.stream(policies2)
+            .filter(policy -> !policy.inherited().get())
+            .collect(Collectors.toSet());
+    Set<Policy> inheritedPolicies =
+        Arrays.stream(policies2)
+            .filter(policy -> policy.inherited().get())
+            .collect(Collectors.toSet());
+
+    Assertions.assertEquals(1, nonInheritedPolicies.size());
+    Assertions.assertEquals(2, inheritedPolicies.size());
+    Assertions.assertTrue(nonInheritedPolicies.contains(policy3));
+    Assertions.assertTrue(inheritedPolicies.contains(policy1));
+    Assertions.assertTrue(inheritedPolicies.contains(policy2));
+
+    // Test get associated policy for function
+    Policy resultPolicy1 = function.supportsPolicies().getPolicy(policy1.name());
+    Assertions.assertEquals(policy1, resultPolicy1);
+    Assertions.assertTrue(resultPolicy1.inherited().get());
+
+    Policy resultPolicy2 = function.supportsPolicies().getPolicy(policy2.name());
+    Assertions.assertEquals(policy2, resultPolicy2);
+    Assertions.assertTrue(resultPolicy2.inherited().get());
+
+    Policy resultPolicy3 = function.supportsPolicies().getPolicy(policy3.name());
+    Assertions.assertEquals(policy3, resultPolicy3);
+    Assertions.assertFalse(resultPolicy3.inherited().get());
+
+    // Test get objects associated with policy
+    Assertions.assertEquals(1, policy1.associatedObjects().count());
+    Assertions.assertEquals(
+        relationalCatalog.name(), policy1.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.CATALOG, policy1.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, policy2.associatedObjects().count());
+    Assertions.assertEquals(schema.name(), policy2.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.SCHEMA, policy2.associatedObjects().objects()[0].type());
+
+    Assertions.assertEquals(1, policy3.associatedObjects().count());
+    Assertions.assertEquals(function.name(), policy3.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.FUNCTION, policy3.associatedObjects().objects()[0].type());
+  }
+
+  @Test
+  public void testCascadeDeleteView() {
+    // Create a policy that supports VIEW
+    Policy policy =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_cascade_view"),
+            ImmutableSet.of(MetadataObject.Type.VIEW));
+
+    // Create a view in the existing schema
+    String viewName = GravitinoITUtils.genRandomName("policy_it_cascade_view");
+    NameIdentifier viewIdent = NameIdentifier.of(schema.name(), viewName);
+    Assertions.assertFalse(relationalCatalog.asViewCatalog().viewExists(viewIdent));
+    View cascadeView =
+        relationalCatalog
+            .asViewCatalog()
+            .createView(
+                viewIdent,
+                "comment",
+                new Column[] {
+                  Column.of("col1", Types.IntegerType.get()),
+                  Column.of("col2", Types.StringType.get())
+                },
+                new SQLRepresentation[] {
+                  SQLRepresentation.builder()
+                      .withDialect(Dialects.HIVE)
+                      .withSql("SELECT col1, col2 FROM " + table.name())
+                      .build()
+                },
+                null,
+                null,
+                Collections.emptyMap());
+
+    // Associate the policy with the view
+    cascadeView.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+
+    // Verify the policy is associated with the view
+    Policy fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(1, fetchedPolicy.associatedObjects().count());
+    Assertions.assertEquals(
+        cascadeView.name(), fetchedPolicy.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.VIEW, fetchedPolicy.associatedObjects().objects()[0].type());
+
+    // Delete the view — this should cascade-delete policy relations
+    Assertions.assertTrue(relationalCatalog.asViewCatalog().dropView(viewIdent));
+
+    // Verify the policy's associated objects are cleaned up
+    fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(0, fetchedPolicy.associatedObjects().count());
+  }
+
+  @Test
+  public void testCascadeDeleteFunction() {
+    // Create a policy that supports FUNCTION
+    Policy policy =
+        createCustomPolicy(
+            GravitinoITUtils.genRandomName("policy_it_cascade_func"),
+            ImmutableSet.of(MetadataObject.Type.FUNCTION));
+
+    // Create a function in the existing schema
+    String funcName = GravitinoITUtils.genRandomName("policy_it_cascade_func");
+    NameIdentifier funcIdent = NameIdentifier.of(schema.name(), funcName);
+    Assertions.assertFalse(relationalCatalog.asFunctionCatalog().functionExists(funcIdent));
+    FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
+    Function cascadeFunc =
+        relationalCatalog
+            .asFunctionCatalog()
+            .registerFunction(
+                funcIdent,
+                "comment",
+                FunctionType.SCALAR,
+                true,
+                new FunctionDefinition[] {definition});
+
+    // Associate the policy with the function
+    cascadeFunc.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+
+    // Verify the policy is associated with the function
+    Policy fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(1, fetchedPolicy.associatedObjects().count());
+    Assertions.assertEquals(
+        cascadeFunc.name(), fetchedPolicy.associatedObjects().objects()[0].name());
+    Assertions.assertEquals(
+        MetadataObject.Type.FUNCTION, fetchedPolicy.associatedObjects().objects()[0].type());
+
+    // Delete the function — this should cascade-delete policy relations
+    Assertions.assertTrue(relationalCatalog.asFunctionCatalog().dropFunction(funcIdent));
+
+    // Verify the policy's associated objects are cleaned up
+    fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(0, fetchedPolicy.associatedObjects().count());
+  }
+
+  @Test
+  public void testCascadeDeleteSchemaWithViewAndFunction() {
+    // Create a policy that supports VIEW and FUNCTION
+    Policy policy =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_cascade_schema"),
+            "custom",
+            "test comment",
+            true,
+            PolicyContents.custom(
+                ImmutableMap.of("rule1", "value1"),
+                ImmutableSet.of(MetadataObject.Type.VIEW, MetadataObject.Type.FUNCTION),
+                null));
+
+    // Create a new schema
+    String cascadeSchemaName = GravitinoITUtils.genRandomName("policy_it_cascade_schema");
+    Assertions.assertFalse(relationalCatalog.asSchemas().schemaExists(cascadeSchemaName));
+    Schema cascadeSchema =
+        relationalCatalog
+            .asSchemas()
+            .createSchema(cascadeSchemaName, "comment", Collections.emptyMap());
+
+    // Create a view in the new schema
+    String cascadeViewName = GravitinoITUtils.genRandomName("policy_it_cascade_schema_view");
+    NameIdentifier cascadeViewIdent = NameIdentifier.of(cascadeSchemaName, cascadeViewName);
+    View cascadeView =
+        relationalCatalog
+            .asViewCatalog()
+            .createView(
+                cascadeViewIdent,
+                "comment",
+                new Column[] {
+                  Column.of("col1", Types.IntegerType.get()),
+                  Column.of("col2", Types.StringType.get())
+                },
+                new SQLRepresentation[] {
+                  SQLRepresentation.builder()
+                      .withDialect(Dialects.HIVE)
+                      .withSql("SELECT col1, col2 FROM " + table.name())
+                      .build()
+                },
+                null,
+                null,
+                Collections.emptyMap());
+
+    // Create a function in the new schema
+    String cascadeFuncName = GravitinoITUtils.genRandomName("policy_it_cascade_schema_func");
+    NameIdentifier cascadeFuncIdent = NameIdentifier.of(cascadeSchemaName, cascadeFuncName);
+    FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
+    Function cascadeFunc =
+        relationalCatalog
+            .asFunctionCatalog()
+            .registerFunction(
+                cascadeFuncIdent,
+                "comment",
+                FunctionType.SCALAR,
+                true,
+                new FunctionDefinition[] {definition});
+
+    // Associate the policy with the view and function
+    cascadeView.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+    cascadeFunc.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+
+    // Verify the policy is associated with both view and function
+    Policy fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(2, fetchedPolicy.associatedObjects().count());
+    Set<String> associatedNames =
+        Arrays.stream(fetchedPolicy.associatedObjects().objects())
+            .map(MetadataObject::name)
+            .collect(Collectors.toSet());
+    Assertions.assertTrue(associatedNames.contains(cascadeViewName));
+    Assertions.assertTrue(associatedNames.contains(cascadeFuncName));
+
+    // Drop the schema with cascade — this should cascade-delete policy relations
+    Assertions.assertTrue(relationalCatalog.asSchemas().dropSchema(cascadeSchemaName, true));
+
+    // Verify the policy's associated objects are cleaned up
+    fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(0, fetchedPolicy.associatedObjects().count());
+  }
+
+  @Test
+  public void testCascadeDeleteCatalogWithViewAndFunction() {
+    // Create a policy that supports VIEW and FUNCTION
+    Policy policy =
+        metalake.createPolicy(
+            GravitinoITUtils.genRandomName("policy_it_cascade_catalog"),
+            "custom",
+            "test comment",
+            true,
+            PolicyContents.custom(
+                ImmutableMap.of("rule1", "value1"),
+                ImmutableSet.of(MetadataObject.Type.VIEW, MetadataObject.Type.FUNCTION),
+                null));
+
+    // Create a new catalog for cascade test
+    String cascadeCatalogName = GravitinoITUtils.genRandomName("policy_it_cascade_catalog");
+    Assertions.assertFalse(metalake.catalogExists(cascadeCatalogName));
+    String hmsUri =
+        String.format(
+            "thrift://%s:%d",
+            containerSuite.getHiveContainer().getContainerIpAddress(),
+            HiveContainer.HIVE_METASTORE_PORT);
+    Catalog cascadeCatalog =
+        metalake.createCatalog(
+            cascadeCatalogName,
+            Catalog.Type.RELATIONAL,
+            "hive",
+            "comment",
+            ImmutableMap.of("metastore.uris", hmsUri));
+
+    // Create a schema in the cascade catalog
+    String cascadeSchemaName = GravitinoITUtils.genRandomName("policy_it_cascade_catalog_schema");
+    Assertions.assertFalse(cascadeCatalog.asSchemas().schemaExists(cascadeSchemaName));
+    Schema cascadeSchema =
+        cascadeCatalog
+            .asSchemas()
+            .createSchema(cascadeSchemaName, "comment", Collections.emptyMap());
+
+    // Create a view in the cascade catalog
+    String cascadeViewName = GravitinoITUtils.genRandomName("policy_it_cascade_catalog_view");
+    NameIdentifier cascadeViewIdent = NameIdentifier.of(cascadeSchemaName, cascadeViewName);
+    View cascadeView =
+        cascadeCatalog
+            .asViewCatalog()
+            .createView(
+                cascadeViewIdent,
+                "comment",
+                new Column[] {
+                  Column.of("col1", Types.IntegerType.get()),
+                  Column.of("col2", Types.StringType.get())
+                },
+                new SQLRepresentation[] {
+                  SQLRepresentation.builder()
+                      .withDialect(Dialects.HIVE)
+                      .withSql("SELECT 1")
+                      .build()
+                },
+                null,
+                null,
+                Collections.emptyMap());
+
+    // Create a function in the cascade catalog
+    String cascadeFuncName = GravitinoITUtils.genRandomName("policy_it_cascade_catalog_func");
+    NameIdentifier cascadeFuncIdent = NameIdentifier.of(cascadeSchemaName, cascadeFuncName);
+    FunctionParam param = FunctionParams.of("x", Types.IntegerType.get());
+    FunctionImpl impl = FunctionImpls.ofSql(FunctionImpl.RuntimeType.SPARK, "SELECT x + 1");
+    FunctionDefinition definition =
+        FunctionDefinitions.of(
+            new FunctionParam[] {param}, Types.IntegerType.get(), new FunctionImpl[] {impl});
+    Function cascadeFunc =
+        cascadeCatalog
+            .asFunctionCatalog()
+            .registerFunction(
+                cascadeFuncIdent,
+                "comment",
+                FunctionType.SCALAR,
+                true,
+                new FunctionDefinition[] {definition});
+
+    // Associate the policy with the view and function
+    cascadeView.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+    cascadeFunc.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+
+    // Verify the policy is associated with both view and function
+    Policy fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(2, fetchedPolicy.associatedObjects().count());
+    Set<String> associatedNames =
+        Arrays.stream(fetchedPolicy.associatedObjects().objects())
+            .map(MetadataObject::name)
+            .collect(Collectors.toSet());
+    Assertions.assertTrue(associatedNames.contains(cascadeViewName));
+    Assertions.assertTrue(associatedNames.contains(cascadeFuncName));
+
+    // Drop the catalog with cascade — this should cascade-delete policy relations
+    Assertions.assertTrue(metalake.dropCatalog(cascadeCatalogName, true));
+
+    // Verify the policy's associated objects are cleaned up
+    fetchedPolicy = metalake.getPolicy(policy.name());
+    Assertions.assertEquals(0, fetchedPolicy.associatedObjects().count());
+  }
+
+  private Policy createCustomPolicy(String name, Set<MetadataObject.Type> types) {
     return metalake.createPolicy(
         name,
         "custom",
@@ -767,7 +1344,7 @@ public class PolicyIT extends BaseIT {
         true,
         PolicyContents.custom(
             ImmutableMap.of("rule1", "value1"),
-            ImmutableSet.of(MetadataObject.Type.CATALOG),
+            types,
             null));
   }
 }
