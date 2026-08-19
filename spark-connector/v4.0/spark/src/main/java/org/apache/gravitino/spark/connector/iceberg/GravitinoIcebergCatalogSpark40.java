@@ -56,6 +56,9 @@ public class GravitinoIcebergCatalogSpark40 extends GravitinoIcebergCatalog
       throw new RuntimeException("Failed to load Iceberg Procedure " + identifier, e);
     }
 
+    // Spark 4 ships no NoSuchProcedureException: it wraps whatever loadProcedure throws in
+    // FAILED_TO_LOAD_ROUTINE unless the exception is already a SparkThrowable. Iceberg's own
+    // BaseCatalog throws a plain RuntimeException here for the same reason, so match it.
     throw new RuntimeException("Procedure does not exist: " + identifier);
   }
 }

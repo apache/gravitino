@@ -76,9 +76,15 @@ public final class SparkCatalogs {
 
   private static boolean isPresent(String className) {
     try {
+      // initialize=false still loads and links the class, so its Paimon supertypes are resolved
+      // here. A Spark 3.5 deployment that does not add the Paimon runtime -- the documented default
+      // -- reaches this with the catalog class present but its supertypes missing, which surfaces
+      // as
+      // NoClassDefFoundError rather than ClassNotFoundException. Both mean the same thing to the
+      // caller: this build cannot offer a Paimon catalog.
       Class.forName(className, false, SparkCatalogs.class.getClassLoader());
       return true;
-    } catch (ClassNotFoundException e) {
+    } catch (ClassNotFoundException | LinkageError e) {
       return false;
     }
   }

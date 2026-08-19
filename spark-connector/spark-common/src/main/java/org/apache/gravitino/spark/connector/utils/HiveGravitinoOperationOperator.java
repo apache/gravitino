@@ -43,9 +43,10 @@ public class HiveGravitinoOperationOperator {
 
   private static final Logger LOG = LoggerFactory.getLogger(HiveGravitinoOperationOperator.class);
 
-  private org.apache.gravitino.rel.Table gravitinoTable;
   private static final String PARTITION_NAME_DELIMITER = "/";
   private static final String PARTITION_VALUE_DELIMITER = "=";
+
+  private org.apache.gravitino.rel.Table gravitinoTable;
 
   public HiveGravitinoOperationOperator(org.apache.gravitino.rel.Table gravitinoTable) {
     this.gravitinoTable = gravitinoTable;
