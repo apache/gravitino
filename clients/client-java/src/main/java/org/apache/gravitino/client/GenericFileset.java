@@ -36,19 +36,26 @@ import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecretProperties;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic fileset. */
 class GenericFileset
-    implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials, SupportsPolicies {
+    implements Fileset,
+        SupportsTags,
+        SupportsRoles,
+        SupportsCredentials,
+        SupportsSecretProperties,
+        SupportsPolicies {
 
   private final FilesetDTO filesetDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectCredentialOperations objectCredentialOperations;
+  private final MetadataObjectSecretPropertiesOperations objectSecretPropertiesOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
@@ -62,6 +69,8 @@ class GenericFileset
         new MetadataObjectRoleOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectSecretPropertiesOperations =
+        new MetadataObjectSecretPropertiesOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(filesetNs.level(0), filesetObject, restClient);
   }
@@ -115,6 +124,16 @@ class GenericFileset
   @Override
   public SupportsCredentials supportsCredentials() {
     return this;
+  }
+
+  @Override
+  public SupportsSecretProperties supportsSecretProperties() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecretProperties() {
+    return objectSecretPropertiesOperations.getSecretProperties();
   }
 
   @Override

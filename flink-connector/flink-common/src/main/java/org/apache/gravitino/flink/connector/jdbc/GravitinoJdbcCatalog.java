@@ -37,6 +37,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.secret.CatalogSecretProperties;
 
 /**
  * The GravitinoJdbcCatalog class is an implementation of the BaseCatalog class that is used to
@@ -99,6 +100,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     }
     try {
       applyJdbcCredential(catalog(), mutableOptions);
+      CatalogSecretProperties.applySecretProperties(catalog(), mutableOptions);
     } catch (NoSuchCatalogException ignored) {
       // During CREATE CATALOG, open() is called before the catalog is stored in Gravitino.
       // In this case credentials are already present in the user-provided options.

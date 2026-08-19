@@ -56,6 +56,7 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SupportsSecretProperties;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
@@ -83,6 +84,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   private final MetadataObjectPolicyOperations objectPolicyOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   protected final MetadataObjectCredentialOperations objectCredentialOperations;
+  protected final MetadataObjectSecretPropertiesOperations objectSecretPropertiesOperations;
   private final FunctionCatalogOperations functionOperations;
 
   BaseSchemaCatalog(
@@ -114,6 +116,9 @@ abstract class BaseSchemaCatalog extends CatalogDTO
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(
             catalogNamespace.level(0), metadataObject, restClient);
+    this.objectSecretPropertiesOperations =
+        new MetadataObjectSecretPropertiesOperations(
+            catalogNamespace.level(0), metadataObject, restClient);
     this.functionOperations =
         new FunctionCatalogOperations(restClient, catalogNamespace, this.name());
   }
@@ -136,6 +141,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public SupportsRoles supportsRoles() throws UnsupportedOperationException {
     return this;
+  }
+
+  @Override
+  public SupportsSecretProperties supportsSecretProperties() throws UnsupportedOperationException {
+    return objectSecretPropertiesOperations;
   }
 
   /**
