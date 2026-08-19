@@ -118,7 +118,7 @@ public final class JobInfo {
    * @return the queued time of the job
    */
   public Instant queuedAt() {
-    return audit == null ? null : audit.createTime();
+    return audit.createTime();
   }
 
   /**
