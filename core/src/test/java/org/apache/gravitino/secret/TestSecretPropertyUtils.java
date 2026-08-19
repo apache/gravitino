@@ -35,7 +35,8 @@ public class TestSecretPropertyUtils {
       Map<String, String> properties = Map.of("jdbc-user", "root");
       Map<String, SecretBinding> bindings =
           Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
-      Map<String, String> entityProps = SecretPropertyUtils.copyEntityProperties(properties);
+      Map<String, String> entityProps =
+          SecretPropertyUtils.copyEntityProperties(properties, bindings, Map.of());
       List<SecretMaterial> writes =
           sm.assembleSecretMaterials(properties, entityProps, "catalog", 42L, bindings, Map.of());
       sm.writeSecrets(writes);
@@ -50,9 +51,17 @@ public class TestSecretPropertyUtils {
 
   @Test
   void testCopyEntityProperties() {
-    Assertions.assertTrue(SecretPropertyUtils.copyEntityProperties(null).isEmpty());
+    Assertions.assertNull(SecretPropertyUtils.copyEntityProperties(null, null, null));
+    Assertions.assertNull(SecretPropertyUtils.copyEntityProperties(null, Map.of(), Map.of()));
+
+    Map<String, SecretBinding> bindings =
+        Map.of("jdbc-password", new SecretBinding("memory", "s3cr3t"));
+    Map<String, String> forSecrets = SecretPropertyUtils.copyEntityProperties(null, bindings, null);
+    Assertions.assertNotNull(forSecrets);
+    Assertions.assertTrue(forSecrets.isEmpty());
+
     Map<String, String> original = Map.of("a", "b");
-    Map<String, String> copy = SecretPropertyUtils.copyEntityProperties(original);
+    Map<String, String> copy = SecretPropertyUtils.copyEntityProperties(original, null, null);
     Assertions.assertEquals(original, copy);
     copy.put("c", "d");
     Assertions.assertFalse(original.containsKey("c"));
@@ -67,6 +76,15 @@ public class TestSecretPropertyUtils {
       sm.writeSecrets(writes);
       Assertions.assertTrue(writes.isEmpty());
       Assertions.assertEquals("root", entityProps.get("jdbc-user"));
+    }
+  }
+
+  @Test
+  void testAssembleWithNullTargetWhenNoSecrets() {
+    try (SecretManager sm = memorySecretManager()) {
+      List<SecretMaterial> writes =
+          sm.assembleSecretMaterials(null, null, "schema", 1L, null, null);
+      Assertions.assertTrue(writes.isEmpty());
     }
   }
 

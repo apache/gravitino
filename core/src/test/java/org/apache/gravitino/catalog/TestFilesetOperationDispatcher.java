@@ -56,10 +56,10 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
 
   @BeforeAll
   public static void initialize() throws IOException {
-    schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     filesetOperationDispatcher =
         new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+    schemaOperationDispatcher =
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
   }
 
   public static FilesetOperationDispatcher getFilesetOperationDispatcher() {
@@ -326,7 +326,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateWithSecrets() throws Exception {
+  public void testSecrets() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       AtomicLong nextId = new AtomicLong(9000L);
       IdGenerator ids = nextId::getAndIncrement;
@@ -334,28 +334,30 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
           new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
       new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
           .createSchema(
-              NameIdentifier.of(metalake, catalog, "schema_secret_fileset"),
+              NameIdentifier.of(metalake, catalog, "schema_secret"),
               "comment",
               ImmutableMap.of("k1", "v1"));
-
       NameIdentifier ident =
-          NameIdentifier.of(metalake, catalog, "schema_secret_fileset", "fileset_secret_1");
+          NameIdentifier.of(metalake, catalog, "schema_secret", "fileset_secret");
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
       Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
-      Map<String, String> props = ImmutableMap.of("k1", "v1");
       long entityId = nextId.get();
       Fileset fileset =
           filesets.createMultipleLocationFileset(
-              ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
+              ident,
+              "comment",
+              Fileset.Type.MANAGED,
+              locations,
+              ImmutableMap.of("k1", "v1"),
+              bindings,
+              Map.of());
       Assertions.assertFalse(fileset.properties().containsKey("k2"));
-
       Fileset stored =
           catalogManager
               .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
               .doWithFilesetOps(ops -> ops.loadFileset(ident));
       Assertions.assertTrue(
           SecretPropertyUtils.isSecretProperty("k2", stored.properties().get("k2")));
-
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
               "memory",
@@ -368,7 +370,13 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
           FilesetAlreadyExistsException.class,
           () ->
               filesets.createMultipleLocationFileset(
-                  ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of()));
+                  ident,
+                  "comment",
+                  Fileset.Type.MANAGED,
+                  locations,
+                  ImmutableMap.of("k1", "v1"),
+                  bindings,
+                  Map.of()));
       Assertions.assertTrue(filesets.dropFileset(ident));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }

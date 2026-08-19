@@ -231,7 +231,7 @@ public interface Fileset extends Auditable {
    *     location and the value is the storage location path.
    */
   default Map<String, String> storageLocations() {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("Fileset does not support storageLocations.");
   }
 
   /**

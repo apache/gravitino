@@ -745,8 +745,19 @@ public class GravitinoEnv {
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
+    // Fileset dispatcher is created before schema dispatcher so schema can take it directly.
+    FilesetOperationDispatcher filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+    this.internalFilesetDispatcher = filesetNormalizeDispatcher;
+    FilesetEventDispatcher filesetEventDispatcher =
+        new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+    this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
+
     SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager, filesetNormalizeDispatcher);
     this.internalSchemaDispatcher = schemaOperationDispatcher;
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
@@ -781,15 +792,6 @@ public class GravitinoEnv {
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
     this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
-
-    FilesetOperationDispatcher filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
-    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
-    this.internalFilesetDispatcher = filesetNormalizeDispatcher;
-    FilesetEventDispatcher filesetEventDispatcher =
-        new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
-    this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);

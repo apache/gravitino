@@ -3249,15 +3249,9 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testMergeResolvesSecrets() throws Exception {
+  public void testMergeSecrets() throws Exception {
     long entityId = idGenerator.nextId();
-    SecretUrn urn =
-        SecretUrn.buildWriteThrough(
-            "memory",
-            Map.of(
-                SecretConstants.ATTR_ENTITY_TYPE, "schema",
-                SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
-                SecretConstants.ATTR_PROPERTY_KEY, "aws-sk"));
+    SecretUrn urn = writeThroughUrn("schema", entityId, "aws-sk");
     secretManager.writeSecrets(List.of(new SecretMaterial(urn, "super-secret")));
 
     String schemaName = "schema_secret_" + generateTestId();
@@ -3267,20 +3261,73 @@ public class TestFilesetCatalogOperations {
           Maps.newHashMap(Map.of(LOCATION, TEST_ROOT_PATH)),
           randomCatalogInfo("m1", "c1"),
           FILESET_PROPERTIES_METADATA);
-
       NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
-      Map<String, String> schemaProps =
-          Maps.newHashMap(
-              StringIdentifier.newPropertiesWithId(
-                  StringIdentifier.fromId(entityId),
-                  Map.of(LOCATION, schemaPath, "aws-sk", urn.toString())));
-      Schema schema = ops.createSchema(schemaIdent, "comment", schemaProps);
+      Schema schema =
+          ops.createSchema(
+              schemaIdent,
+              "comment",
+              Maps.newHashMap(
+                  StringIdentifier.newPropertiesWithId(
+                      StringIdentifier.fromId(entityId),
+                      Map.of(LOCATION, schemaPath, "aws-sk", urn.toString()))));
       Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
-
       Map<String, String> merged =
           ops.mergeUpLevelConfigurations(schemaIdent, schema.properties(), new Path(schemaPath));
       Assertions.assertEquals("super-secret", merged.get("aws-sk"));
       Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
     }
+  }
+
+  @Test
+  public void testDropCascadeSecrets() throws Exception {
+    long schemaId = idGenerator.nextId();
+    long filesetId = idGenerator.nextId();
+    SecretUrn schemaUrn = writeThroughUrn("schema", schemaId, "schema-sk");
+    SecretUrn filesetUrn = writeThroughUrn("fileset", filesetId, "fileset-sk");
+    secretManager.writeSecrets(
+        List.of(
+            new SecretMaterial(schemaUrn, "schema-secret"),
+            new SecretMaterial(filesetUrn, "fileset-secret")));
+
+    String schemaName = "schema_cascade_" + generateTestId();
+    String catalogPath = TEST_ROOT_PATH + "/catalog_cascade_" + generateTestId();
+    String schemaPath = catalogPath + "/" + schemaName;
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          Maps.newHashMap(Map.of(LOCATION, catalogPath)),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+      ops.createSchema(
+          schemaIdent,
+          "comment",
+          Maps.newHashMap(
+              StringIdentifier.newPropertiesWithId(
+                  StringIdentifier.fromId(schemaId),
+                  Map.of(LOCATION, schemaPath, "schema-sk", schemaUrn.toString()))));
+      ops.createFileset(
+          NameIdentifierUtil.ofFileset("m1", "c1", schemaName, "fs_cascade"),
+          "comment",
+          Fileset.Type.MANAGED,
+          null,
+          Maps.newHashMap(
+              StringIdentifier.newPropertiesWithId(
+                  StringIdentifier.fromId(filesetId),
+                  Map.of("fileset-sk", filesetUrn.toString()))));
+
+      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
+      Assertions.assertEquals("schema-secret", secretManager.readSecret(schemaUrn));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(filesetUrn));
+    }
+  }
+
+  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
+    return SecretUrn.buildWriteThrough(
+        "memory",
+        Map.of(
+            SecretConstants.ATTR_ENTITY_TYPE, entityType,
+            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+            SecretConstants.ATTR_PROPERTY_KEY, key));
   }
 }

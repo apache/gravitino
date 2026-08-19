@@ -154,7 +154,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    Map<String, String> entityProperties =
+        SecretPropertyUtils.copyEntityProperties(properties, secretBindings, secretReferences);
     List<SecretMaterial> secretMaterials =
         secretManager.assembleSecretMaterials(
             properties, entityProperties, "fileset", uid, secretBindings, secretReferences);
@@ -167,7 +168,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
-    secretManager.writeSecrets(secretMaterials);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
     // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
@@ -175,34 +175,42 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
-    try {
-      Fileset createdFileset =
-          TreeLockUtils.doWithTreeLock(
-              // Lock at fileset level (not schema level) to allow concurrent fileset creation.
-              // Trade-off: listFilesets() may temporarily miss in-progress creations until
-              // complete.
-              ident,
-              LockType.WRITE,
-              () ->
-                  doWithCatalog(
-                      catalogIdent,
-                      c ->
-                          c.doWithFilesetOps(
-                              f ->
-                                  f.createMultipleLocationFileset(
-                                      ident, comment, type, storageLocations, updatedProperties)),
-                      NoSuchSchemaException.class,
-                      FilesetAlreadyExistsException.class));
-      return EntityCombinedFileset.of(createdFileset)
-          .withHiddenProperties(
-              getHiddenPropertyNames(
-                  catalogIdent,
-                  HasPropertyMetadata::filesetPropertiesMetadata,
-                  createdFileset.properties()));
-    } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(secretMaterials);
-      throw e;
-    }
+    return TreeLockUtils.doWithTreeLock(
+        // Lock at fileset level (not schema level) to allow concurrent fileset creation.
+        // Trade-off: listFilesets() may temporarily miss in-progress creations until
+        // complete.
+        ident,
+        LockType.WRITE,
+        () -> {
+          // Persist the fileset first, then write secrets so already-exists / create failure
+          // does not leave provider-side secrets. Roll back only when writeSecrets ran and
+          // the create path still failed (needClean stays true).
+          boolean needClean = true;
+          try {
+            Fileset createdFileset =
+                doWithCatalog(
+                    catalogIdent,
+                    c ->
+                        c.doWithFilesetOps(
+                            f ->
+                                f.createMultipleLocationFileset(
+                                    ident, comment, type, storageLocations, updatedProperties)),
+                    NoSuchSchemaException.class,
+                    FilesetAlreadyExistsException.class);
+            secretManager.writeSecrets(secretMaterials);
+            needClean = false;
+            return EntityCombinedFileset.of(createdFileset)
+                .withHiddenProperties(
+                    getHiddenPropertyNames(
+                        catalogIdent,
+                        HasPropertyMetadata::filesetPropertiesMetadata,
+                        createdFileset.properties()));
+          } finally {
+            if (needClean) {
+              secretManager.rollbackSecrets(secretMaterials);
+            }
+          }
+        });
   }
 
   /**

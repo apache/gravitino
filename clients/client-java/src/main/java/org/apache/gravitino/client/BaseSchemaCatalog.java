@@ -42,6 +42,8 @@ import org.apache.gravitino.dto.requests.SchemaUpdatesRequest;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.SchemaResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -56,6 +58,8 @@ import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
@@ -168,7 +172,7 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   }
 
   /**
-   * Create a new schema with specified identifier, comment and metadata.
+   * Create a new schema with specified identifier, comment and properties.
    *
    * @param schemaName The name identifier of the schema.
    * @param comment The comment of the schema.
@@ -180,8 +184,40 @@ abstract class BaseSchemaCatalog extends CatalogDTO
   @Override
   public Schema createSchema(String schemaName, String comment, Map<String, String> properties)
       throws NoSuchCatalogException, SchemaAlreadyExistsException {
+    return createSchema(
+        schemaName, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
 
-    SchemaCreateRequest req = new SchemaCreateRequest(schemaName, comment, properties);
+  /**
+   * Create a new schema with specified identifier, comment, properties, and optional secret maps.
+   *
+   * @param schemaName The name identifier of the schema.
+   * @param comment The comment of the schema.
+   * @param properties The properties of the schema.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through.
+   * @param secretReferences Optional property key → secret locator ({@code provider} plus
+   *     provider-specific attributes).
+   * @return The created {@link Schema}.
+   * @throws NoSuchCatalogException if the catalog with specified namespace does not exist.
+   * @throws SchemaAlreadyExistsException if the schema with specified identifier already exists.
+   */
+  @Override
+  public Schema createSchema(
+      String schemaName,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchCatalogException, SchemaAlreadyExistsException {
+
+    SchemaCreateRequest req =
+        new SchemaCreateRequest(
+            schemaName,
+            comment,
+            properties,
+            SecretBindingDTO.fromSecretBindings(secretBindings),
+            SecretReferenceDTO.fromSecretReferences(secretReferences));
     req.validate();
 
     SchemaResponse resp =

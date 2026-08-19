@@ -169,8 +169,12 @@ public class TestCatalogOperations extends BaseOperationsTest {
   public void testListCatalogsInfo() {
     TestCatalog catalog1 = buildCatalog("metalake1", "catalog1");
     TestCatalog catalog2 = buildCatalog("metalake1", "catalog2");
+    NameIdentifier ident1 = NameIdentifier.of("metalake1", "catalog1");
+    NameIdentifier ident2 = NameIdentifier.of("metalake1", "catalog2");
 
-    when(manager.listCatalogsInfo(any())).thenReturn(new Catalog[] {catalog1, catalog2});
+    when(manager.listCatalogs(any())).thenReturn(new NameIdentifier[] {ident1, ident2});
+    when(manager.loadCatalog(ident1)).thenReturn(catalog1);
+    when(manager.loadCatalog(ident2)).thenReturn(catalog2);
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -202,7 +206,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Assertions.assertEquals(
         ImmutableMap.of("key", "value", PROPERTY_IN_USE, "true"), catalogDTO2.properties());
 
-    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogsInfo(any());
+    doThrow(new NoSuchMetalakeException("mock error")).when(manager).listCatalogs(any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
             .queryParam("details", "true")
@@ -229,7 +233,8 @@ public class TestCatalogOperations extends BaseOperationsTest {
             ImmutableMap.of("key", "value"));
     TestCatalog catalog = buildCatalog("metalake1", "catalog1");
 
-    when(manager.createCatalog(any(), any(), any(), any(), any())).thenReturn(catalog);
+    when(manager.createCatalog(any(), any(), any(), any(), any(), any(), any()))
+        .thenReturn(catalog);
 
     Response resp =
         target("/metalakes/metalake1/catalogs")
@@ -253,7 +258,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -270,7 +275,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw CatalogAlreadyExistsException
     doThrow(new CatalogAlreadyExistsException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp2 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -287,7 +292,7 @@ public class TestCatalogOperations extends BaseOperationsTest {
     // Test throw internal RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(manager)
-        .createCatalog(any(), any(), any(), any(), any());
+        .createCatalog(any(), any(), any(), any(), any(), any(), any());
     Response resp3 =
         target("/metalakes/metalake1/catalogs")
             .request(MediaType.APPLICATION_JSON_TYPE)

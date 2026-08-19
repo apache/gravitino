@@ -18,11 +18,14 @@
  */
 package org.apache.gravitino.hook;
 
+import java.io.IOException;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -31,13 +34,18 @@ import org.apache.gravitino.authorization.FutureGrantManager;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogDispatcher;
+import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
@@ -79,7 +87,23 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
-    Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    Catalog catalog =
+        dispatcher.createCatalog(
+            ident, type, provider, comment, properties, secretBindings, secretReferences);
 
     try {
       // Set the creator as the owner of the catalog.
@@ -153,7 +177,41 @@ public class CatalogHookDispatcher implements CatalogDispatcher {
 
     // We should call the authorization plugin before dropping the catalog, because the dropping
     // catalog will close the authorization plugin.
+    if (force) {
+      dropSchemasUnderCatalog(ident);
+    }
     return dispatcher.dropCatalog(ident, force);
+  }
+
+  /**
+   * Force-drop child schemas through {@link SchemaDispatcher} so schema (and fileset) write-through
+   * secrets are cleaned on the normal dropSchema path. CatalogManager only deletes the catalog
+   * entity and catalog-level secrets.
+   */
+  private void dropSchemasUnderCatalog(NameIdentifier catalogIdent) {
+    GravitinoEnv env = GravitinoEnv.getInstance();
+    SchemaDispatcher schemaDispatcher = env.internalSchemaDispatcher();
+    if (schemaDispatcher == null) {
+      return;
+    }
+    EntityStore store;
+    try {
+      store = env.entityStore();
+    } catch (IllegalArgumentException e) {
+      return;
+    }
+    Namespace schemaNs = Namespace.of(catalogIdent.namespace().level(0), catalogIdent.name());
+    List<SchemaEntity> schemas;
+    try {
+      schemas = store.list(schemaNs, SchemaEntity.class, Entity.EntityType.SCHEMA);
+    } catch (NoSuchEntityException e) {
+      return;
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to list schemas under catalog " + catalogIdent, e);
+    }
+    for (SchemaEntity schema : schemas) {
+      schemaDispatcher.dropSchema(schema.nameIdentifier(), true);
+    }
   }
 
   @Override

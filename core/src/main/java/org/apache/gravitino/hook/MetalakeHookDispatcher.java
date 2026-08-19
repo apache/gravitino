@@ -24,10 +24,12 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Metalake;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -103,7 +105,31 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   @Override
   public boolean dropMetalake(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, MetalakeInUseException {
+    if (force) {
+      dropCatalogsUnderMetalake(ident);
+    }
     return dispatcher.dropMetalake(ident, force);
+  }
+
+  /**
+   * Force-drop child catalogs through {@link CatalogDispatcher} so catalog/schema/fileset
+   * write-through secrets are cleaned on the normal dropCatalog path. MetalakeManager only deletes
+   * the metalake entity.
+   */
+  private void dropCatalogsUnderMetalake(NameIdentifier metalakeIdent) {
+    CatalogDispatcher catalogDispatcher = GravitinoEnv.getInstance().catalogDispatcher();
+    if (catalogDispatcher == null) {
+      return;
+    }
+    try {
+      NameIdentifier[] catalogs =
+          catalogDispatcher.listCatalogs(Namespace.of(metalakeIdent.name()));
+      for (NameIdentifier catalogIdent : catalogs) {
+        catalogDispatcher.dropCatalog(catalogIdent, true);
+      }
+    } catch (NoSuchMetalakeException e) {
+      // Metalake is already gone; dropMetalake will return false.
+    }
   }
 
   @Override
