@@ -21,6 +21,20 @@
 
 ---
 
+## Core Design
+
+The core model is that policies are associated with tag names, not directly with tag assignment
+values. A policy-to-tag relation may include a simple `selector` JSON object that decides whether
+the relation matches a metadata object's effective tag assignment values. The selector refines when
+a policy bound to a tag name applies; it does not make policy objects bind directly to individual
+tag values.
+
+For example, `retention_finance` is associated with the tag name `data_domain`. Its
+`selector` can be `{ "type": "TAG_VALUE", "value": "finance" }`, so the policy applies only
+when the object's effective `data_domain` tag assignment contains `finance`.
+
+---
+
 ## Background
 
 Gravitino currently has two independent governance concepts:
@@ -78,7 +92,7 @@ object has or inherits from parent metadata objects. Tags themselves are not nes
    enable, disable, delete, or associate policies directly on a metadata object.
 7. **TMS Integration**: TMS consumes the system iceberg compaction policy through object policy
    lookup, not through direct object policy relations.
-8. **Value Match Boundary**: The resolver boundary owns optional tag value matching, so policy
+8. **Selector Boundary**: The resolver boundary owns selector matching, so policy
    consumers do not need to understand tag assignment details.
 9. **Explicit Breaking Migration**: Existing direct object policy relations are migrated or retired
    explicitly; runtime behavior does not read direct object policy relations.
@@ -95,10 +109,10 @@ object has or inherits from parent metadata objects. Tags themselves are not nes
    tags, tag-to-tag relations, or tag-to-tag inheritance. Policy selection is based on flat tags
    assigned to metadata objects.
 4. **General Tag Expressions in Phase 1**: The first phase does not introduce a general
-   expression language. A policy-to-tag relation has an optional selector, and the only selector
-   type in phase 1 matches one tag value.
-5. **Full Explainability UI**: A dedicated UI is not required for the first milestone. APIs must
-   still return enough source information to trace object policy sources.
+   expression language. Policy selection only supports a simple `selector` on the
+   policy-to-tag relation.
+5. **Full Explainability UI**: A dedicated UI is not required for the first milestone. Policy-to-tag
+   relations remain inspectable through the tag and policy association APIs.
 6. **Tag Assignment Value Storage**: Assignment-level tag value storage, allowed values, search, and
    update semantics are covered by `design-docs/tag-assignment-values.md`. This design consumes the
    resulting effective tag assignments but does not redefine their storage semantics.
@@ -128,15 +142,12 @@ Consumer -> ObjectPolicyResolver -> object policies
 | Approach | Example | Trade-off | Decision |
 |----------|---------|-----------|----------|
 | Policy on tag definition only | `policyA -> data_domain`; applies when an object has effective tag `data_domain` with any value | Simple, but cannot distinguish `data_domain=finance` from `data_domain=risk` | Rejected |
-| Policy on tag with an optional selector | `policyA -> data_domain` with selector `TAG_VALUE(finance)` | Keeps the relation bound to the tag while allowing simple value-aware matching | **Chosen for phase 1** |
+| Policy on tag with selector | `policyA -> data_domain` with selector `{"type": "TAG_VALUE", "value": "finance"}` | Supports tag presence and simple valued-tag matching without an expression language | **Chosen for phase 1** |
 
-Phase 1 therefore makes an explicit behavior decision: a policy-to-tag relation is keyed only by a
-policy and a tag definition. The relation may carry one optional selector that controls whether the
-relation matches an effective tag assignment. If the selector is omitted, the relation matches by
-tag presence. The only phase-1 selector is `TAG_VALUE`, which matches when the object's effective
-tag assignment contains the selector value. The selector is an attribute of the relation, not part
-of the relation identity; one policy cannot be associated with the same tag multiple times through
-different selectors.
+Phase 1 therefore makes an explicit behavior decision: a policy-to-tag relation is keyed by a tag
+definition and carries one optional `selector`. If `selector` is omitted or null, the relation
+matches by tag presence. If `selector.type` is `TAG_VALUE`, the relation matches only when the
+object's effective tag assignment contains `selector.value`.
 
 ---
 
@@ -150,7 +161,7 @@ The target model has four concepts:
 |---------|-------------|
 | Policy | A metalake-scoped governance rule with typed content, enabled state, audit information, and version history. |
 | Tag | A flat metalake-scoped classification object associated with metadata objects. Tags do not have parent or child tags. |
-| Policy-tag relation | A relation that binds one policy to one tag in the same metalake and may carry an optional match selector. |
+| Policy-tag relation | A relation that binds one policy to one tag in the same metalake, optionally scoped by a simple selector. |
 | Object policy | A read-only policy result for a metadata object, derived from effective tags and matching policy-tag relations. |
 
 Object-side governance becomes:
@@ -174,10 +185,10 @@ flat tag names without dot separators.
    source for that tag and overrides inherited assignments with the same tag name.
 4. Effective tags include assignment values from the winning assignment, following
    `design-docs/tag-assignment-values.md`. A tag may therefore have zero, one, or multiple values.
-5. Policy-on-tag matches by effective tag definition and the relation's optional selector.
+5. Policy-on-tag matches by effective tag definition and selector.
 6. The effective tag set is the de-duplicated result of walking from the object to its ancestors.
-7. Policies bound to effective tags become object policy candidates only when their optional
-   selector matches the effective tag assignment.
+7. Policies bound to effective tags become object policy candidates only when their `selector`
+   matches the effective tag assignment.
 
 For example:
 
@@ -187,7 +198,7 @@ policy retention_finance
 
 tag data_domain
   policies:
-    - retention_finance with selector TAG_VALUE(finance)
+    - retention_finance with selector TAG_VALUE("finance")
 
 catalog iceberg
   direct tags: [data_domain = ["finance"]]
@@ -197,12 +208,11 @@ table iceberg.db.orders
   inherited tags: [data_domain = ["finance"]]
   effective tags: [data_domain = ["finance"]]
   object policies: [retention_finance]
-  policy source: tag data_domain, matched selector TAG_VALUE(finance), assigned on CATALOG iceberg
 ```
 
 If the table has a direct assignment `data_domain = ["risk", "ml"]`, the direct assignment wins.
-The `retention_finance` policy is not selected because selector `TAG_VALUE(finance)` does not match
-the effective values `["risk", "ml"]`. A policy-to-tag relation without a selector would match
+The `retention_finance` policy is not selected because `TAG_VALUE("finance")` does not match the
+effective values `["risk", "ml"]`. A policy-to-tag relation without a selector would match
 either assignment by tag presence.
 
 ### Policy Supported Object Types
@@ -279,8 +289,7 @@ Add a policy-to-tag relation table:
 policy_tag_relation_meta
   policy_id
   tag_id
-  selector_type
-  selector_value
+  selector (JSON)
   audit_info
   current_version
   last_version
@@ -289,27 +298,28 @@ policy_tag_relation_meta
 
 Constraints and indexes:
 
-1. Active rows are unique by `(policy_id, tag_id)`. A policy is bound to a tag at most once.
+1. Active rows are unique by `(policy_id, tag_id, canonical selector)`.
 2. Index `tag_id` for object policy lookup from tags.
 3. Index `policy_id` for impact analysis from policies.
 4. Policy and tag must belong to the same metalake.
-5. `selector_type` and `selector_value` are nullable. Both `NULL` means match the tag by presence.
-6. The only phase-1 selector type is `TAG_VALUE`. Its non-null `selector_value` must occur in the
-   effective tag assignment.
-7. `selector_type` and `selector_value` must either both be `NULL` or both be non-null. An empty
-   string is not a valid selector value.
-8. A selector is relation matching metadata and is not part of the relation identity. Updating a
-   selector updates the existing `(policy_id, tag_id)` relation instead of creating another row.
-9. The table follows the same soft-delete and version fields as existing relation tables.
+5. `selector` is the only selector-related storage column and stores a JSON object, such as
+   `{"type": "TAG_VALUE", "value": "finance"}`. The schema must not add separate
+   `selector_type` or `selector_value` columns. The JSON is canonicalized before storage and
+   comparison.
+6. The table follows the same soft-delete and version fields as existing relation tables.
 
-Selector rules:
+`selector` rules:
 
-1. An omitted or null selector matches the tag by presence only.
-2. `TAG_VALUE(value)` matches when the effective tag assignment contains `value`.
-3. The selector value must be non-blank.
+1. An omitted or null `selector` matches the tag by presence.
+2. `TAG_VALUE` matches when the effective tag assignment contains the same value as
+   `selector.value`.
+3. `TAG_VALUE` contains one non-blank `value` string.
 4. If the tag defines allowed values, the selector value must be one of the allowed values.
-5. The first version does not support multiple selector values, negative matching, or general
-   expressions.
+5. Selector JSON is canonicalized before storage and comparison.
+6. The first version supports only `TAG_VALUE`. It does not support value absence,
+   negative matching, principals, scopes, or general expressions. Future versions can add new
+   selector types in the same `selector` JSON field without changing the policy-to-tag relation
+   model.
 
 ### REST API Changes
 
@@ -319,7 +329,7 @@ Selector rules:
 
 | Query parameter | Type | Required | Description |
 |-----------------|------|----------|-------------|
-| `details` | boolean | no | If true, return policy association details including the optional selector. If false, return policy names. |
+| `details` | boolean | no | If true, return policy association details including selectors. If false, return policy names. |
 
 **Response:** `200 OK`
 
@@ -351,9 +361,11 @@ With `details=true`:
 ```
 
 **Behavior:** Lists policies directly associated with the tag. Without `details=true`, `names`
-returns policy names. With `details=true`, the response returns the optional selector on each
-`(policy, tag)` relation.
-Returns `404 Not Found` if the tag does not exist.
+returns distinct policy names, so a policy associated through multiple selectors appears once. With
+`details=true`, the response returns one association entry for each `(policy, selector)` relation.
+The caller must have `VIEW_TAG` on the requested tag. Returned policies are filtered by
+`VIEW_POLICY`; `APPLY_TAG` and `APPLY_POLICY` imply their corresponding view privileges. Returns
+`404 Not Found` if the tag does not exist.
 
 #### New: `POST /api/metalakes/{metalake}/tags/{tag}/policies`
 
@@ -361,22 +373,15 @@ Returns `404 Not Found` if the tag does not exist.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `policiesToAdd` | array of `PolicyTagAssociationRequest` | no | Policies and optional selectors to associate with the tag. |
-| `policiesToRemove` | array of string | no | Policy names to disassociate from the tag. |
+| `policiesToAdd` | array of `PolicyTagAssociationRequest` | no | Policies and selectors to associate with the tag. |
+| `policiesToRemove` | array of `PolicyTagAssociationRequest` | no | Policies and selectors to disassociate from the tag. |
 
 `PolicyTagAssociationRequest`:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | yes | Policy name. |
-| `selector` | `PolicyTagSelector` or null | no | Optional relation match selector. Missing or null means match by tag presence. |
-
-`PolicyTagSelector`:
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `type` | string | yes | Selector type. Phase 1 supports only `TAG_VALUE`. |
-| `value` | string | yes | Value used by the selector. For `TAG_VALUE`, the effective tag assignment must contain this value. |
+| `selector` | object or null | no | Tag selector. Missing or null matches by tag presence. |
 
 ```json
 {
@@ -390,7 +395,9 @@ Returns `404 Not Found` if the tag does not exist.
     }
   ],
   "policiesToRemove": [
-    "iceberg_compaction_legacy"
+    {
+      "name": "iceberg_compaction_legacy"
+    }
   ]
 }
 ```
@@ -406,11 +413,11 @@ Returns `404 Not Found` if the tag does not exist.
 **Behavior:** Atomically updates policy associations for one tag. The request supports adding and
 removing multiple policies so callers can change the complete relation set without issuing one
 request per policy or exposing an intermediate partial state. The tag and all added policies must
-exist in the same metalake. A selector must be valid for the tag. Adding a policy that is already
-associated with the tag and has the same selector is an idempotent no-op. Adding it with a different
-selector updates the selector on the existing relation. Removing a missing `(policy, tag)` relation
-is also an idempotent no-op. The same policy cannot appear in both arrays in one request; violations
-return `400 Bad Request`.
+exist in the same metalake. `selector` must be valid for the tag. Adding an already associated
+`(policy, selector)` pair is an idempotent no-op. Removing a missing pair is also an
+idempotent no-op. The same `(policy, selector)` pair cannot appear in both arrays in one
+request; violations return `400 Bad Request`. The same policy may be associated with the same tag
+through different selectors when the selectors are distinct.
 
 #### New: `GET /api/metalakes/{metalake}/policies/{policy}/tags`
 
@@ -418,7 +425,7 @@ return `400 Bad Request`.
 
 | Query parameter | Type | Required | Description |
 |-----------------|------|----------|-------------|
-| `details` | boolean | no | If true, return tag association details including the optional selector. If false, return tag names. |
+| `details` | boolean | no | If true, return tag association details including selectors. If false, return tag names. |
 
 **Response:** `200 OK`
 
@@ -446,10 +453,12 @@ With `details=true`:
 }
 ```
 
-**Behavior:** Lists tags that carry the policy. Without `details=true`, `names` returns tag names.
-With `details=true`, the response returns the optional selector on each `(policy, tag)` relation.
-This is used for impact analysis before altering, disabling, or deleting a policy. Returns
-`404 Not Found` if the policy does not exist.
+**Behavior:** Lists tags that carry the policy. Without `details=true`, `names` returns distinct tag
+names. With `details=true`, the response returns one association entry for each `(tag, selector)`
+relation. This is used for impact analysis before altering, disabling, or deleting a policy. Returns
+`404 Not Found` if the policy does not exist. The caller must have `VIEW_POLICY` on the requested
+policy. Returned tags are filtered by `VIEW_TAG`; `APPLY_POLICY` and `APPLY_TAG` imply their
+corresponding view privileges.
 
 #### Changed: `GET /api/metalakes/{metalake}/objects/{type}/{fullName}/policies`
 
@@ -457,7 +466,7 @@ This is used for impact analysis before altering, disabling, or deleting a polic
 
 | Query parameter | Type | Required | Description |
 |-----------------|------|----------|-------------|
-| `details` | boolean | no | If true, return policy content and source information according to the caller's policy and tag read authorization. If false, return policy names. |
+| `details` | boolean | no | If true, return full visible policy objects. If false, return visible policy names. |
 
 **Response with `details=false`:** `200 OK`
 
@@ -476,18 +485,7 @@ This is used for impact analysis before altering, disabling, or deleting a polic
       "name": "iceberg_compaction_standard",
       "policyType": "system_iceberg_compaction",
       "enabled": true,
-      "content": {},
-      "sources": [
-        {
-          "tagName": "maintenance_standard",
-          "tagValues": [],
-          "selector": null,
-          "matchedValue": null,
-          "inherited": true,
-          "objectType": "CATALOG",
-          "objectName": "iceberg"
-        }
-      ]
+      "content": {}
     }
   ]
 }
@@ -495,16 +493,13 @@ This is used for impact analysis before altering, disabling, or deleting a polic
 
 **Behavior:** Resolves object policies for one metadata object from its effective tags. Returns
 `404 Not Found` if the metadata object does not exist. This endpoint is read-only and does not
-modify policy objects or object-policy relationships.
+modify policy objects or object-policy relationships. The caller must be authorized to access the
+metadata object. Resolved policies for which the caller lacks `VIEW_POLICY` are filtered from both
+response shapes. `APPLY_POLICY` implies `VIEW_POLICY` for backward compatibility.
 
 A single policy can be associated with multiple effective tags on the same object. The resolver
 deduplicates by policy entity and current version, not by equivalent policy content. Different
-policy entities with equivalent content remain distinct policies. For each returned policy,
-`sources` contains every effective tag and selector through which that policy was reached. For a
-`TAG_VALUE` selector, `matchedValue` contains the effective assignment value that matched the
-selector. For presence-only relations, `selector` and `matchedValue` are null. Sources are ordered
-by `tagName`, selector type, selector value, `objectType`, then `objectName` to keep responses
-deterministic.
+policy entities with equivalent content remain distinct policies.
 
 #### Changed: Direct object policy APIs
 
@@ -564,48 +559,67 @@ Algorithm:
 2. Load effective tags for the object using current inheritance semantics, including assignment
    values from the winning direct or inherited tag assignment.
 3. Load policy-tag relations associated with those effective tags in batch.
-4. Evaluate each relation's optional selector against the effective tag assignment and drop
+4. Evaluate each relation's `selector` against the effective tag assignment and drop
    non-matching relations.
 5. Load matched policies and drop disabled policies.
-6. Deduplicate policies by policy entity and current version, preserving all contributing matched
-   sources.
-7. Return the object policies and their source tag information.
+6. Deduplicate policies by policy entity and current version.
+7. Return the object policies.
 
 ### Authorization, Response Visibility, and Audit
 
 Policy-on-tag makes tags part of the governance control plane. Assigning a high-impact tag can
 change security, maintenance, or retention behavior.
 
-This design does not introduce new `VIEW_TAG` or `VIEW_POLICY` privileges. It uses the existing tag
-and policy authorization model. In the rules below, "tag read authorization" means the caller is
-allowed to read tag details under the current authorization implementation, such as by ownership or
-`APPLY_TAG`. "Policy read authorization" means the caller is allowed to read policy details, such as
-by ownership or `APPLY_POLICY`.
+This design introduces explicit `VIEW_POLICY` and `VIEW_TAG` privileges so reading governance
+metadata is separate from applying it.
+
+| Privilege | Bindable scopes | Grants |
+|-----------|-----------------|--------|
+| `VIEW_POLICY` | Metalake and policy | List a visible policy, get its metadata and content, and inspect its visible tag associations. |
+| `VIEW_TAG` | Metalake and tag | List a visible tag, get its metadata and values, and inspect its visible policy or object associations. |
+
+The new privileges follow the existing allow and deny model. A grant on a metalake applies to all
+policies or tags in that metalake. A grant on one policy or tag applies only to that entity. Metalake
+owners and entity owners retain view access.
+
+For backward compatibility, an effective `APPLY_POLICY` grant implies `VIEW_POLICY`, and an
+effective `APPLY_TAG` grant implies `VIEW_TAG`. Existing roles with apply privileges therefore keep
+their current read access without a grant migration. A corresponding explicit deny of the view
+privilege blocks response visibility but does not change server-side policy enforcement.
 
 Recommended authorization rules:
 
-1. Creating and altering policies keeps existing policy privileges.
-2. Creating and altering tags keeps existing tag privileges.
-3. Associating a policy with a tag and optional selector requires both policy-side and tag-side
-   permission. A caller must be metalake owner, or must have authorization equivalent to
-   `APPLY_POLICY` on the policy and `APPLY_TAG` on the tag.
-4. Tag assignment permission alone is not enough to attach a policy to a tag. Policy permission
+1. Listing or getting policies requires `VIEW_POLICY`; listing or getting tags requires `VIEW_TAG`.
+   List APIs filter unauthorized entities, while a get API for one named entity rejects an
+   unauthorized request.
+2. Creating and altering policies keeps existing policy privileges. Creating and altering tags
+   keeps existing tag privileges.
+3. Associating a policy with a tag and selector requires both policy-side and tag-side permission.
+   A caller must be metalake owner, or must have `APPLY_POLICY` on every referenced policy and
+   `APPLY_TAG` on the tag.
+4. `VIEW_POLICY` and `VIEW_TAG` are read-only. Neither privilege authorizes policy-to-tag
+   association, tag-to-object assignment, policy mutation, or tag mutation.
+5. Tag assignment permission alone is not enough to attach a policy to a tag. Policy permission
    alone is not enough to bind the policy to arbitrary tags.
-5. Assigning a tag to a metadata object continues to require tag-application permission and access
-   to the metadata object.
-6. Object policy lookup requires access to the metadata object.
-7. Policy enforcement must be independent from response visibility. The trusted server-side
+6. Assigning a tag to a metadata object continues to require `APPLY_TAG` and access to the metadata
+   object.
+7. Object policy lookup requires access to the metadata object. Returned policies are filtered by
+   `VIEW_POLICY` after resolution.
+8. Policy enforcement must be independent from response visibility. The trusted server-side
    enforcement path must resolve all applicable policies even when the end user cannot read policy
-   or tag details.
+   details.
 
 Object policy response visibility is normative:
 
 | Caller authorization | `details=false` response | `details=true` response |
 |----------------------|--------------------------|-------------------------|
-| Object access only | Policy names in `names`; no content or sources | Redacted `policies` entries with `name`, `policyType`, `enabled`, and `enforced=true`; no `content`; no `sources` |
-| Object access + policy read authorization | Policy names in `names` | Full policy fields including `content`; no `sources` unless tag read authorization is also present |
-| Object access + tag read authorization | Policy names in `names` | Redacted policy fields with `sources`; no `content` unless policy read authorization is also present |
-| Object access + policy and tag read authorization | Policy names in `names` | Full policy fields including `content` and `sources` |
+| No object access | `403 Forbidden` | `403 Forbidden` |
+| Object access without `VIEW_POLICY` | `200 OK` with unauthorized policies filtered from `names` | `200 OK` with unauthorized policies filtered from `policies` |
+| Object access with `VIEW_POLICY` | Visible policy names in `names` | Full visible policy fields including `content` |
+
+Object policy responses do not expose matching tags or selectors, so tag read authorization does not
+affect their shape. The trusted enforcement path consumes the unfiltered resolver result; REST
+filtering never disables or bypasses an applicable policy.
 
 Audit events should cover policy lifecycle changes, policy-to-tag relation changes, and tag-to-object
 assignment changes.
@@ -615,23 +629,23 @@ assignment changes.
 Policy-to-tag association must be exposed through the event listener framework, matching the
 existing policy and tag lifecycle event pattern. The implementation should add pre-event,
 success-event, and failure-event types for associating policies with a tag. Event payloads should
-include the metalake, tag name, policy/selector associations to add or update, policy names to
-remove, actor, request context, and the final policy/selector associations on success.
+include the metalake, tag name, policy/selector pairs to add, policy/selector pairs to
+remove, actor, request context, and the final associated policy/selector pairs on success.
 
 Object policy lookup is a read-only derived operation and does not create policy-relation events. It
 may still be covered by normal REST access logs or audit logs if the project records read events.
 
 ### Policy Conflict Boundary
 
-`ObjectPolicyResolver` is responsible for selection, disabled-policy filtering, policy deduplication,
-and provenance. It does not make allow or deny decisions for row filters, column masks, or other
+`ObjectPolicyResolver` is responsible for selection, disabled-policy filtering, and policy
+deduplication. It does not make allow or deny decisions for row filters, column masks, or other
 engine-enforced policy types.
 
-For row filter and column mask policies, enforcement consumers must fail closed if multiple distinct
-effective policies of the same kind apply to the same evaluation target. The system should not merge
-them, union them, or choose one by priority in this design. Multiple sources that reach the same
-policy entity are not a conflict; they are represented as multiple `sources` entries on one returned
-policy.
+For row filter and column mask policies, enforcement consumers must fail closed if multiple
+distinct effective policies of the same kind apply to the same evaluation target. The system should
+not merge them, union them, or choose one by priority in this design. Multiple matching relations
+that reach the same policy entity are not a conflict; the resolver deduplicates them into one
+returned policy.
 
 When the first row-filter or column-mask consumer is implemented, the conflict check should be added
 as a shared helper instead of being copied into each engine integration.
@@ -653,16 +667,16 @@ Rules:
 1. If no system iceberg compaction policy appears in the object policy result, TMS does not generate
    a compaction strategy from policy-on-tag.
 2. If a system iceberg compaction policy appears in the object policy result, TMS uses its content.
-3. A system iceberg compaction policy relation can omit its selector for tag-presence behavior or
-   use `TAG_VALUE` when maintenance behavior should depend on an assignment value.
+3. A system iceberg compaction policy can omit `selector` for tag-presence behavior or use a
+   simple `TAG_VALUE` selector when maintenance behavior should depend on assignment values.
 4. TMS does not read direct object policy relations.
 
 ### User Process
 
 1. A governance administrator creates a policy, such as `retention_finance`.
 2. The administrator creates or reuses a tag, such as `data_domain`.
-3. The administrator associates the policy with the tag and an optional selector, such as
-   `TAG_VALUE(finance)`.
+3. The administrator associates the policy with the tag and a selector, such as
+   `TAG_VALUE("finance")`.
 4. A data owner assigns the tag and value to a catalog, schema, table, or column.
 5. Gravitino resolves object policies from the object's effective tags.
 6. TMS or another consumer reads object policies through a read-only lookup API.
@@ -689,10 +703,10 @@ Metadata Object
   -> parent metadata object hierarchy
   -> effective tags with assignment values
   -> policy-tag relations
-  -> optional selector evaluation
+  -> selector filtering
   -> policy metadata
   -> enabled policy filtering
-  -> policy deduplication with all sources preserved
+  -> policy deduplication
   -> object policy response
 ```
 
@@ -711,13 +725,12 @@ relations.
 2. Export a mapping from each direct policy relation to an administrator-approved tag. Existing tags
    may be reused, or new tags may be created only for migration.
 3. For valued tags, decide the assignment values that should be written to each target object and
-   the optional selectors that should be attached to each policy-to-tag relation.
+   the selector that should be attached to each policy-to-tag relation.
 4. Create missing tags and configure allowed values if the tag assignment value design is enabled.
-5. Associate policies with tags and optional selectors using the new tag-scoped policy association
-   API.
+5. Associate policies with tags and selectors using the new tag-scoped policy association API.
 6. Assign those tags, with values where needed, to the target metadata objects or their ancestors.
 7. Run an object policy verification command that compares expected objects with resolved object
-   policies and lists every policy source.
+   policies.
 8. Upgrade consumers such as TMS to read only object policies.
 9. Stop writing direct object policy relations, then retire the direct relation table and direct
    association APIs after the compatibility window.
@@ -744,21 +757,24 @@ objectTagMappings:
 
 ## Task Breakdown
 
-- [ ] Add `policy_tag_relation_meta` storage schema and entity store operations, including optional
-      selector storage.
-- [ ] Add core API and DTO contracts for policy-to-tag association, optional selectors,
-      and object policy source information.
+- [ ] Add `policy_tag_relation_meta` storage schema and entity store operations, including
+      `selector` JSON storage.
+- [ ] Add core API and DTO contracts for policy-to-tag association, selectors, and object
+      policy responses.
 - [ ] Deprecate `PolicyContent.supportedObjectTypes()`, stop using it during object policy
       resolution, and plan its removal according to the API evolution policy.
-- [ ] Implement `ObjectPolicyResolver` to resolve object policies from effective tags and optional
+- [ ] Implement `ObjectPolicyResolver` to resolve object policies from effective tags and value
       selectors.
-- [ ] Add REST endpoints for tag policy association and policy tag listing with optional selector
+- [ ] Add REST endpoints for tag policy association and policy tag listing with selector
       payloads.
 - [ ] Change object policy REST APIs to read-only derived lookup and remove direct object policy
       mutation behavior.
 - [ ] Add Java client and Python client support for policy-to-tag association and derived object
       policy lookup.
-- [ ] Define object policy response redaction using the existing tag and policy authorization model.
+- [ ] Add `VIEW_POLICY` and `VIEW_TAG` privileges for metalake and entity scopes, including
+      backward-compatible view implication from `APPLY_POLICY` and `APPLY_TAG`.
+- [ ] Apply view authorization to policy, tag, association, and object-policy APIs, including list
+      filtering and named-entity rejection behavior.
 - [ ] Add a shared fail-closed conflict helper for row filter or column mask enforcement consumers.
 - [ ] Integrate TMS with `ObjectPolicyResolver` instead of direct object policy relations.
 - [ ] Add migration tooling or documentation for moving direct object policy relations to
