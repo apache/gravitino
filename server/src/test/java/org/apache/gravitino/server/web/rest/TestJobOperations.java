@@ -32,6 +32,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
@@ -661,28 +663,30 @@ public class TestJobOperations extends JerseyTest {
     JobListResponse jobListResponse = resp.readEntity(JobListResponse.class);
     Assertions.assertEquals(0, jobListResponse.getCode());
 
+    // Default sort is queuedAt desc (newest first); job1/job2/job3 were created in that order,
+    // so queuedAt increases job1 < job2 < job3 and the response reverses it.
     Assertions.assertEquals(3, jobListResponse.getJobs().size());
-    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(0));
     Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse.getJobs().get(1));
-    Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(2));
+    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse.getJobs().get(2));
 
-    // Not-yet-finished jobs round-trip finishedAt as null over the wire.
-    Assertions.assertNull(jobListResponse.getJobs().get(0).finishedAt());
-    Assertions.assertNull(jobListResponse.getJobs().get(1).finishedAt());
     // A finished job round-trips its finishedAt as an Instant over the wire.
     Assertions.assertEquals(
-        Instant.ofEpochMilli(job3.finishedAt()), jobListResponse.getJobs().get(2).finishedAt());
+        Instant.ofEpochMilli(job3.finishedAt()), jobListResponse.getJobs().get(0).finishedAt());
+    // Not-yet-finished jobs round-trip finishedAt as null over the wire.
+    Assertions.assertNull(jobListResponse.getJobs().get(1).finishedAt());
+    Assertions.assertNull(jobListResponse.getJobs().get(2).finishedAt());
 
     // queuedAt is always present, regardless of status.
     Assertions.assertNotNull(jobListResponse.getJobs().get(0).queuedAt());
     Assertions.assertNotNull(jobListResponse.getJobs().get(1).queuedAt());
     Assertions.assertNotNull(jobListResponse.getJobs().get(2).queuedAt());
 
-    // A not-yet-started job round-trips startedAt as null over the wire.
-    Assertions.assertNull(jobListResponse.getJobs().get(0).startedAt());
     // A started job round-trips its startedAt as an Instant over the wire.
     Assertions.assertEquals(
         Instant.ofEpochMilli(job2.startedAt()), jobListResponse.getJobs().get(1).startedAt());
+    // A not-yet-started job round-trips startedAt as null over the wire.
+    Assertions.assertNull(jobListResponse.getJobs().get(2).startedAt());
 
     // Test list jobs by template name
     when(jobOperationDispatcher.listJobs(metalake, Optional.of(templateName)))
@@ -701,8 +705,9 @@ public class TestJobOperations extends JerseyTest {
     JobListResponse jobListResponse1 = resp1.readEntity(JobListResponse.class);
     Assertions.assertEquals(0, jobListResponse1.getCode());
     Assertions.assertEquals(2, jobListResponse1.getJobs().size());
-    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse1.getJobs().get(0));
-    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse1.getJobs().get(1));
+    // Default sort is queuedAt desc: job2 (queued after job1) comes first.
+    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse1.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse1.getJobs().get(1));
 
     // Test throw NoSuchMetalakeException
     doThrow(new NoSuchMetalakeException("mock error"))
@@ -770,6 +775,209 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp4 = resp5.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp4.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testListJobsWithTimeFiltersAndSort() {
+    String templateName = "shell_template_1";
+    // job1: queued only. job2: queued+started. job3: queued+started+finished, queued earliest.
+    JobEntity job1 = newJobEntityWithQueuedAt(templateName, JobHandle.Status.QUEUED, 3000L, 0L, 0L);
+    JobEntity job2 =
+        newJobEntityWithQueuedAt(templateName, JobHandle.Status.STARTED, 2000L, 2500L, 0L);
+    JobEntity job3 =
+        newJobEntityWithQueuedAt(templateName, JobHandle.Status.SUCCEEDED, 1000L, 1500L, 1800L);
+
+    when(jobOperationDispatcher.listJobs(metalake, Optional.empty()))
+        .thenReturn(Lists.newArrayList(job1, job2, job3));
+
+    // startedAfter excludes job1 (never started); default sort is queuedAt desc.
+    Response resp =
+        target(jobRunPath())
+            .queryParam("startedAfter", Instant.ofEpochMilli(1000L).toString())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobListResponse jobListResponse = resp.readEntity(JobListResponse.class);
+    Assertions.assertEquals(2, jobListResponse.getJobs().size());
+    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(1));
+
+    // sortBy=startedAt, sortOrder=asc: job3 (1500) < job2 (2500) < job1 (null, sorts last).
+    Response resp2 =
+        target(jobRunPath())
+            .queryParam("sortBy", "startedAt")
+            .queryParam("sortOrder", "asc")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp2.getStatus());
+    JobListResponse jobListResponse2 = resp2.readEntity(JobListResponse.class);
+    Assertions.assertEquals(3, jobListResponse2.getJobs().size());
+    Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse2.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse2.getJobs().get(1));
+    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse2.getJobs().get(2));
+
+    // Invalid sortBy is rejected with 400.
+    Response resp3 =
+        target(jobRunPath())
+            .queryParam("sortBy", "bogus")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp3.getStatus());
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp3.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp3.getType());
+
+    // Invalid sortOrder is rejected with 400.
+    Response resp4 =
+        target(jobRunPath())
+            .queryParam("sortOrder", "sideways")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp4.getStatus());
+    ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp4.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp4.getType());
+
+    // Non-ISO-8601 time value is rejected with 400.
+    Response resp5 =
+        target(jobRunPath())
+            .queryParam("queuedAfter", "not-a-timestamp")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp5.getStatus());
+    ErrorResponse errorResp5 = resp5.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp5.getCode());
+    Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp5.getType());
+  }
+
+  @Test
+  public void testListJobsCombinesTemplateFilterWithTimeFiltersAndSort() {
+    String templateName = "shell_template_1";
+    JobEntity job1 = newJobEntityWithQueuedAt(templateName, JobHandle.Status.QUEUED, 3000L, 0L, 0L);
+    JobEntity job2 =
+        newJobEntityWithQueuedAt(templateName, JobHandle.Status.STARTED, 2000L, 2500L, 0L);
+    JobEntity job3 =
+        newJobEntityWithQueuedAt(templateName, JobHandle.Status.SUCCEEDED, 1000L, 1500L, 1800L);
+
+    // The dispatcher already narrows to this template's jobs; jobs from other templates (e.g. a
+    // spark_template_1 job) are never in this list, so they can't leak in via the time filter.
+    when(jobOperationDispatcher.listJobs(metalake, Optional.of(templateName)))
+        .thenReturn(Lists.newArrayList(job1, job2, job3));
+
+    Response resp =
+        target(jobRunPath())
+            .queryParam("jobTemplateName", templateName)
+            .queryParam("startedAfter", Instant.ofEpochMilli(1000L).toString())
+            .queryParam("sortBy", "startedAt")
+            .queryParam("sortOrder", "asc")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobListResponse jobListResponse = resp.readEntity(JobListResponse.class);
+    // job1 is excluded (never started); job3 (startedAt=1500) sorts before job2 (startedAt=2500).
+    Assertions.assertEquals(2, jobListResponse.getJobs().size());
+    Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse.getJobs().get(1));
+  }
+
+  @Test
+  public void testFilterAndSortJobs() {
+    String templateName = "shell_template_1";
+    JobEntity job1 = newJobEntityWithQueuedAt(templateName, JobHandle.Status.QUEUED, 1000L, 0L, 0L);
+    JobEntity job2 =
+        newJobEntityWithQueuedAt(templateName, JobHandle.Status.STARTED, 2000L, 3000L, 0L);
+    JobEntity job3 =
+        newJobEntityWithQueuedAt(templateName, JobHandle.Status.SUCCEEDED, 3000L, 4000L, 5000L);
+    List<JobEntity> jobs = Lists.newArrayList(job1, job2, job3);
+    Comparator<JobEntity> queuedAtAsc = JobOperations.buildJobComparator("queuedAt", "asc");
+
+    // queuedAfter filters out job1.
+    List<JobEntity> filteredByQueuedAfter =
+        JobOperations.filterAndSortJobs(jobs, instant(1500L), null, null, queuedAtAsc);
+    Assertions.assertEquals(Lists.newArrayList(job2, job3), filteredByQueuedAfter);
+
+    // startedAfter excludes not-yet-started job1 and jobs started before the bound.
+    List<JobEntity> filteredByStartedAfter =
+        JobOperations.filterAndSortJobs(jobs, null, instant(3500L), null, queuedAtAsc);
+    Assertions.assertEquals(Lists.newArrayList(job3), filteredByStartedAfter);
+
+    // finishedAfter excludes not-yet-finished jobs.
+    List<JobEntity> filteredByFinishedAfter =
+        JobOperations.filterAndSortJobs(jobs, null, null, instant(1L), queuedAtAsc);
+    Assertions.assertEquals(Lists.newArrayList(job3), filteredByFinishedAfter);
+
+    // Filters are AND-combined.
+    List<JobEntity> filteredByAll =
+        JobOperations.filterAndSortJobs(
+            jobs, instant(1500L), instant(3500L), instant(1L), queuedAtAsc);
+    Assertions.assertEquals(Lists.newArrayList(job3), filteredByAll);
+
+    // Boundary is inclusive (>=).
+    List<JobEntity> filteredInclusive =
+        JobOperations.filterAndSortJobs(jobs, instant(2000L), null, null, queuedAtAsc);
+    Assertions.assertEquals(Lists.newArrayList(job2, job3), filteredInclusive);
+
+    // sortBy=queuedAt desc.
+    List<JobEntity> sortedByQueuedDesc =
+        JobOperations.filterAndSortJobs(
+            jobs, null, null, null, JobOperations.buildJobComparator("queuedAt", "desc"));
+    Assertions.assertEquals(Lists.newArrayList(job3, job2, job1), sortedByQueuedDesc);
+
+    // sortBy=startedAt asc, jobs without startedAt sort last regardless of direction.
+    List<JobEntity> sortedByStartedAsc =
+        JobOperations.filterAndSortJobs(
+            jobs, null, null, null, JobOperations.buildJobComparator("startedAt", "asc"));
+    Assertions.assertEquals(Lists.newArrayList(job2, job3, job1), sortedByStartedAsc);
+
+    List<JobEntity> sortedByStartedDesc =
+        JobOperations.filterAndSortJobs(
+            jobs, null, null, null, JobOperations.buildJobComparator("startedAt", "desc"));
+    Assertions.assertEquals(Lists.newArrayList(job3, job2, job1), sortedByStartedDesc);
+  }
+
+  @Test
+  public void testParseInstant() {
+    Assertions.assertNull(JobOperations.parseInstant("queuedAfter", null));
+
+    Instant expected = Instant.ofEpochMilli(1500L);
+    Assertions.assertEquals(
+        expected, JobOperations.parseInstant("queuedAfter", expected.toString()));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobOperations.parseInstant("queuedAfter", "not-a-timestamp"));
+  }
+
+  @Test
+  public void testBuildJobComparatorValidation() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> JobOperations.buildJobComparator("bogus", "asc"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> JobOperations.buildJobComparator("queuedAt", "bogus"));
+
+    // sortBy/sortOrder are matched exactly against the OpenAPI-documented casing, not
+    // case-insensitively.
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> JobOperations.buildJobComparator("queuedat", "asc"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> JobOperations.buildJobComparator("queuedAt", "ASC"));
+  }
+
+  private static Instant instant(long epochMilli) {
+    return Instant.ofEpochMilli(epochMilli);
   }
 
   @Test
@@ -963,6 +1171,29 @@ public class TestJobOperations extends JerseyTest {
         .withStatus(status)
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .withStartedAt(startedAt)
+        .withFinishedAt(finishedAt)
+        .build();
+  }
+
+  private JobEntity newJobEntityWithQueuedAt(
+      String templateName,
+      JobHandle.Status status,
+      long queuedAtEpochMilli,
+      Long startedAt,
+      Long finishedAt) {
+    Random rand = new Random();
+    return JobEntity.builder()
+        .withId(rand.nextLong())
+        .withJobExecutionId(rand.nextLong() + "")
+        .withNamespace(NamespaceUtil.ofJob(metalake))
+        .withJobTemplateName(templateName)
+        .withStatus(status)
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator("test")
+                .withCreateTime(Instant.ofEpochMilli(queuedAtEpochMilli))
+                .build())
         .withStartedAt(startedAt)
         .withFinishedAt(finishedAt)
         .build();

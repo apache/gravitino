@@ -23,10 +23,13 @@ import com.codahale.metrics.annotation.Timed;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.time.format.DateTimeParseException;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -285,13 +288,31 @@ public class JobOperations {
   public Response listJobs(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("jobTemplateName") String jobTemplateName) {
+      @QueryParam("jobTemplateName") String jobTemplateName,
+      @QueryParam("queuedAfter") String queuedAfter,
+      @QueryParam("startedAfter") String startedAfter,
+      @QueryParam("finishedAfter") String finishedAfter,
+      @QueryParam("sortBy") @DefaultValue("queuedAt") String sortBy,
+      @QueryParam("sortOrder") @DefaultValue("desc") String sortOrder) {
     LOG.info(
-        "Received request to list jobs in metalake {}{}",
+        "Received request to list jobs in metalake {}{}, queuedAfter: {}, startedAfter: {},"
+            + " finishedAfter: {}, sortBy: {}, sortOrder: {}",
         metalake,
-        jobTemplateName != null ? " for job template " + jobTemplateName : "");
+        jobTemplateName != null ? " for job template " + jobTemplateName : "",
+        queuedAfter,
+        startedAfter,
+        finishedAfter,
+        sortBy,
+        sortOrder);
 
     try {
+      // Parse/validate query params up front so a bad request fails fast, before paying for the
+      // dispatcher fetch and authorization filtering below.
+      Instant queuedAfterInstant = parseInstant("queuedAfter", queuedAfter);
+      Instant startedAfterInstant = parseInstant("startedAfter", startedAfter);
+      Instant finishedAfterInstant = parseInstant("finishedAfter", finishedAfter);
+      Comparator<JobEntity> comparator = buildJobComparator(sortBy, sortOrder);
+
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -305,9 +326,16 @@ public class JobOperations {
                             .listJobs(metalake, Optional.ofNullable(jobTemplateName))
                             .toArray(new JobEntity[0]),
                         jobEntity -> NameIdentifierUtil.ofJob(metalake, jobEntity.name())));
-            List<JobDTO> jobDTOs = toJobDTOs(jobEntities);
+            List<JobEntity> filteredAndSortedJobs =
+                filterAndSortJobs(
+                    jobEntities,
+                    queuedAfterInstant,
+                    startedAfterInstant,
+                    finishedAfterInstant,
+                    comparator);
+            List<JobDTO> jobDTOs = toJobDTOs(filteredAndSortedJobs);
 
-            LOG.info("Listed {} jobs in metalake {}", jobEntities.size(), metalake);
+            LOG.info("Listed {} jobs in metalake {}", jobDTOs.size(), metalake);
             return Utils.ok(new JobListResponse(jobDTOs));
           });
 
@@ -484,5 +512,104 @@ public class JobOperations {
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {
     return jobEntities.stream().map(JobOperations::toDTO).collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  static List<JobEntity> filterAndSortJobs(
+      List<JobEntity> jobEntities,
+      Instant queuedAfter,
+      Instant startedAfter,
+      Instant finishedAfter,
+      Comparator<JobEntity> comparator) {
+    return jobEntities.stream()
+        .filter(
+            jobEntity -> matchesTimeFilters(jobEntity, queuedAfter, startedAfter, finishedAfter))
+        .sorted(comparator)
+        .collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  static Instant parseInstant(String paramName, String value) {
+    if (value == null) {
+      return null;
+    }
+    try {
+      return Instant.parse(value);
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException(
+          "Invalid "
+              + paramName
+              + " value: "
+              + value
+              + ", must be an ISO-8601 instant, e.g. 2026-08-18T00:00:00Z",
+          e);
+    }
+  }
+
+  // queuedAfter/startedAfter/finishedAfter are inclusive lower bounds (>=), AND-combined. A job
+  // missing the relevant timestamp (e.g. not started yet) never matches a startedAfter/
+  // finishedAfter filter.
+  private static boolean matchesTimeFilters(
+      JobEntity jobEntity, Instant queuedAfter, Instant startedAfter, Instant finishedAfter) {
+    return matchesTimeFilter(jobEntity.auditInfo().createTime(), queuedAfter)
+        && matchesTimeFilter(jobEntity.startedAtAsInstant(), startedAfter)
+        && matchesTimeFilter(jobEntity.finishedAtAsInstant(), finishedAfter);
+  }
+
+  private static boolean matchesTimeFilter(Instant actual, Instant after) {
+    if (after == null) {
+      return true;
+    }
+    return actual != null && !actual.isBefore(after);
+  }
+
+  // sortBy/sortOrder are matched exactly against the OpenAPI-documented enum values (queuedAt,
+  // startedAt, finishedAt, asc, desc) rather than case-insensitively, so accepted input always
+  // matches what the spec advertises.
+  @VisibleForTesting
+  static Comparator<JobEntity> buildJobComparator(String sortBy, String sortOrder) {
+    Function<JobEntity, Instant> keyExtractor;
+    switch (sortBy) {
+      case "queuedAt":
+        keyExtractor = jobEntity -> jobEntity.auditInfo().createTime();
+        break;
+      case "startedAt":
+        keyExtractor = JobEntity::startedAtAsInstant;
+        break;
+      case "finishedAt":
+        keyExtractor = JobEntity::finishedAtAsInstant;
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid sortBy value: " + sortBy + ", must be one of queuedAt, startedAt, finishedAt");
+    }
+
+    boolean ascending;
+    switch (sortOrder) {
+      case "asc":
+        ascending = true;
+        break;
+      case "desc":
+        ascending = false;
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid sortOrder value: " + sortOrder + ", must be one of asc, desc");
+    }
+
+    // Jobs missing the sort key (e.g. not started/finished yet) always sort last, regardless of
+    // sortOrder - flipping their position based on direction would be confusing.
+    return (a, b) -> {
+      Instant ta = keyExtractor.apply(a);
+      Instant tb = keyExtractor.apply(b);
+      if (ta == null && tb == null) {
+        return 0;
+      } else if (ta == null) {
+        return 1;
+      } else if (tb == null) {
+        return -1;
+      }
+      return ascending ? ta.compareTo(tb) : tb.compareTo(ta);
+    };
   }
 }

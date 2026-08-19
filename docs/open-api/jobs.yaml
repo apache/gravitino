@@ -195,6 +195,11 @@ paths:
       operationId: listJobs
       parameters:
         - $ref: "#/components/parameters/jobTemplateName"
+        - $ref: "#/components/parameters/queuedAfter"
+        - $ref: "#/components/parameters/startedAfter"
+        - $ref: "#/components/parameters/finishedAfter"
+        - $ref: "#/components/parameters/sortBy"
+        - $ref: "#/components/parameters/sortOrder"
       responses:
         "200":
           description: Returns the list of job objects
@@ -352,6 +357,58 @@ components:
       required: true
       schema:
         type: string
+    queuedAfter:
+      name: queuedAfter
+      in: query
+      description: >-
+        Only return jobs queued at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z)
+      required: false
+      schema:
+        type: string
+        format: date-time
+    startedAfter:
+      name: startedAfter
+      in: query
+      description: >-
+        Only return jobs started at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z).
+        Jobs that have not started yet are excluded
+      required: false
+      schema:
+        type: string
+        format: date-time
+    finishedAfter:
+      name: finishedAfter
+      in: query
+      description: >-
+        Only return jobs finished at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z).
+        Jobs that have not finished yet are excluded
+      required: false
+      schema:
+        type: string
+        format: date-time
+    sortBy:
+      name: sortBy
+      in: query
+      description: The field to sort the returned jobs by
+      required: false
+      schema:
+        type: string
+        enum:
+          - queuedAt
+          - startedAt
+          - finishedAt
+        default: queuedAt
+    sortOrder:
+      name: sortOrder
+      in: query
+      description: The sort order for the returned jobs
+      required: false
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: desc
 
   schemas:
 
