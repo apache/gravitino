@@ -25,7 +25,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /** Represents an event triggered when retrieving a basic user from the metalake fails. */
 @DeveloperApi
 public class GetBasicUserFailureEvent extends UserFailureEvent {
-  private final String userName;
+  private final String username;
 
   /**
    * Constructs a new {@code GetBasicUserFailureEvent} instance.
@@ -33,17 +33,17 @@ public class GetBasicUserFailureEvent extends UserFailureEvent {
    * @param user the user who initiated the operation
    * @param metalake the name of the metalake from which the user was attempted to be retrieved
    * @param exception the exception encountered during the operation
-   * @param userName the name of the user that failed to be retrieved
+   * @param username the name of the user that failed to be retrieved
    */
   public GetBasicUserFailureEvent(
-      String user, String metalake, Exception exception, String userName) {
-    super(user, NameIdentifierUtil.ofUser(metalake, userName), exception);
-    this.userName = userName;
+      String user, String metalake, Exception exception, String username) {
+    super(user, NameIdentifierUtil.ofUser(metalake, username), exception);
+    this.username = username;
   }
 
   /** Returns the name of the user that failed to be retrieved. */
-  public String userName() {
-    return userName;
+  public String username() {
+    return username;
   }
 
   @Override

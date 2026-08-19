@@ -114,7 +114,9 @@ class UserGroupManager {
     }
   }
 
-  User getBasicUser(String metalake, String user) throws NoSuchUserException {
+  User getBasicUser(String metalake, String user)
+      throws NoSuchUserException, NoSuchMetalakeException {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
       return store.get(
           AuthorizationUtils.ofUser(metalake, user),
@@ -206,7 +208,9 @@ class UserGroupManager {
     }
   }
 
-  Group getBasicGroup(String metalake, String group) throws NoSuchGroupException {
+  Group getBasicGroup(String metalake, String group)
+      throws NoSuchGroupException, NoSuchMetalakeException {
+    MetalakeManager.checkMetalake(NameIdentifier.of(metalake), store);
     try {
       return store.get(
           AuthorizationUtils.ofGroup(metalake, group),

@@ -194,6 +194,12 @@ public class TestGroupEvent {
   }
 
   @Test
+  void testGetBasicGroupPreEventWithNonExistingMetalake() {
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> dispatcher.getBasicGroup(INEXIST_METALAKE, groupName));
+  }
+
+  @Test
   void testGetBasicGroupFailureEvent() {
     Assertions.assertThrows(
         GravitinoRuntimeException.class,
@@ -830,6 +836,8 @@ public class TestGroupEvent {
         .thenReturn(group);
     when(dispatcher.getGroup(METALAKE, inExistGroupName))
         .thenThrow(new NoSuchGroupException("group not found"));
+    when(dispatcher.getBasicGroup(INEXIST_METALAKE, groupName))
+        .thenThrow(new NoSuchMetalakeException("metalake not found"));
     when(dispatcher.getGroup(INEXIST_METALAKE, groupName))
         .thenThrow(new NoSuchMetalakeException("metalake not found"));
     when(dispatcher.grantRolesToGroup(METALAKE, grantedRoles, groupName)).thenReturn(group);

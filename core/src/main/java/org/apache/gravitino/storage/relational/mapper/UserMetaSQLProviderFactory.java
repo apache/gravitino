@@ -62,8 +62,8 @@ public class UserMetaSQLProviderFactory {
   }
 
   public static String selectUserMetaByMetalakeNameAndName(
-      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
-    return getProvider().selectUserMetaByMetalakeNameAndName(metalakeName, userName);
+      @Param("metalakeName") String metalakeName, @Param("username") String username) {
+    return getProvider().selectUserMetaByMetalakeNameAndName(metalakeName, username);
   }
 
   public static String insertUserMeta(@Param("userMeta") UserPO userPO) {

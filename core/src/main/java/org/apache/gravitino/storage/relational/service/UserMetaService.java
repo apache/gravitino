@@ -77,17 +77,17 @@ public class UserMetaService {
     return userPO;
   }
 
-  private UserPO getUserPOByMetalakeNameAndName(String metalakeName, String userName) {
+  private UserPO getUserPOByMetalakeNameAndName(String metalakeName, String username) {
     UserPO userPO =
         SessionUtils.getWithoutCommit(
             UserMetaMapper.class,
-            mapper -> mapper.selectUserMetaByMetalakeNameAndName(metalakeName, userName));
+            mapper -> mapper.selectUserMetaByMetalakeNameAndName(metalakeName, username));
 
     if (userPO == null) {
       throw new NoSuchEntityException(
           NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
           Entity.EntityType.USER.name().toLowerCase(),
-          userName);
+          username);
     }
     return userPO;
   }

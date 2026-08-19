@@ -179,7 +179,7 @@ public class TestUserEvent {
 
     GetBasicUserPreEvent getBasicUserPreEvent = (GetBasicUserPreEvent) preEvent;
     Assertions.assertEquals(identifier, getBasicUserPreEvent.identifier());
-    Assertions.assertEquals(userName, getBasicUserPreEvent.userName());
+    Assertions.assertEquals(userName, getBasicUserPreEvent.username());
   }
 
   @Test
@@ -194,6 +194,12 @@ public class TestUserEvent {
     GetBasicUserEvent getBasicUserEvent = (GetBasicUserEvent) event;
     Assertions.assertEquals(identifier, getBasicUserEvent.identifier());
     validateUserInfo(getBasicUserEvent.loadedUserInfo(), user);
+  }
+
+  @Test
+  void testGetBasicUserPreEventWithNonExistingMetalake() {
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> dispatcher.getBasicUser(INEXIST_METALAKE, userName));
   }
 
   @Test
@@ -771,6 +777,8 @@ public class TestUserEvent {
         .thenThrow(new NoSuchUserException("user not found"));
     when(dispatcher.getBasicUser(METALAKE, inExistUserName))
         .thenThrow(new NoSuchUserException("user not found"));
+    when(dispatcher.getBasicUser(INEXIST_METALAKE, userName))
+        .thenThrow(new NoSuchMetalakeException("metalake not found"));
     when(dispatcher.getUser(INEXIST_METALAKE, userName))
         .thenThrow(new NoSuchMetalakeException("user not found"));
     when(dispatcher.grantRolesToUser(METALAKE, grantedRoles, userName)).thenReturn(user);

@@ -238,6 +238,22 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testGetBasicUser() {
+    accessControlManager.addUser(METALAKE, "testBasicGet");
+
+    User user = accessControlManager.getBasicUser(METALAKE, "testBasicGet");
+    Assertions.assertEquals("testBasicGet", user.name());
+
+    Assertions.assertThrows(
+        NoSuchUserException.class, () -> accessControlManager.getBasicUser(METALAKE, "not-exist"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.getBasicUser("no_such_metalake", "testBasicGet"));
+
+    accessControlManager.removeUser(METALAKE, "testBasicGet");
+  }
+
+  @Test
   public void testRemoveUser() {
     accessControlManager.addUser(METALAKE, "testRemove");
 
@@ -295,6 +311,23 @@ public class TestAccessControlManager {
         Assertions.assertThrows(
             NoSuchGroupException.class, () -> accessControlManager.getGroup(METALAKE, "not-exist"));
     Assertions.assertTrue(exception.getMessage().contains("Group not-exist does not exist"));
+  }
+
+  @Test
+  public void testGetBasicGroup() {
+    accessControlManager.addGroup(METALAKE, "testBasicGet");
+
+    Group group = accessControlManager.getBasicGroup(METALAKE, "testBasicGet");
+    Assertions.assertEquals("testBasicGet", group.name());
+
+    Assertions.assertThrows(
+        NoSuchGroupException.class,
+        () -> accessControlManager.getBasicGroup(METALAKE, "not-exist"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.getBasicGroup("no_such_metalake", "testBasicGet"));
+
+    accessControlManager.removeGroup(METALAKE, "testBasicGet");
   }
 
   @Test

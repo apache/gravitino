@@ -25,23 +25,23 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 /** Represents an event triggered before retrieving a basic user from a specific metalake. */
 @DeveloperApi
 public class GetBasicUserPreEvent extends UserPreEvent {
-  private final String userName;
+  private final String username;
 
   /**
    * Constructs a new {@link GetBasicUserPreEvent} instance.
    *
    * @param initiator The name of the user who initiated the get-basic-user request.
    * @param metalake The name of the metalake where the user is being retrieved from.
-   * @param userName The username that is requested to be retrieved.
+   * @param username The username that is requested to be retrieved.
    */
-  public GetBasicUserPreEvent(String initiator, String metalake, String userName) {
-    super(initiator, NameIdentifierUtil.ofUser(metalake, userName));
-    this.userName = userName;
+  public GetBasicUserPreEvent(String initiator, String metalake, String username) {
+    super(initiator, NameIdentifierUtil.ofUser(metalake, username));
+    this.username = username;
   }
 
   /** Returns the username for the user being retrieved. */
-  public String userName() {
-    return userName;
+  public String username() {
+    return username;
   }
 
   @Override

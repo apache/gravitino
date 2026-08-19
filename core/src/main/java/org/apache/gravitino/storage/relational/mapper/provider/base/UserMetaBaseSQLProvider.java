@@ -54,7 +54,7 @@ public class UserMetaBaseSQLProvider {
   }
 
   public String selectUserMetaByMetalakeNameAndName(
-      @Param("metalakeName") String metalakeName, @Param("userName") String userName) {
+      @Param("metalakeName") String metalakeName, @Param("username") String username) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
         + " ut.external_id as externalId, ut.enabled as enabled,"
@@ -66,7 +66,7 @@ public class UserMetaBaseSQLProvider {
         + MetalakeMetaMapper.TABLE_NAME
         + " mt ON ut.metalake_id = mt.metalake_id"
         + " WHERE mt.metalake_name = #{metalakeName}"
-        + " AND ut.user_name = #{userName}"
+        + " AND ut.user_name = #{username}"
         + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
   }
 
