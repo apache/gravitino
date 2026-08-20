@@ -243,7 +243,7 @@ public class TestSupportsJobs extends TestBase {
     List<JobDTO> jobs =
         Lists.newArrayList(newJobDTO(jobId1, jobTemplateName), newJobDTO(jobId2, jobTemplateName));
 
-    JobListResponse resp = new JobListResponse(jobs);
+    JobListResponse resp = new JobListResponse(jobs, ImmutableMap.of());
 
     buildMockResource(Method.GET, jobRunsPath(), null, resp, HttpStatus.SC_OK);
 

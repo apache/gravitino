@@ -830,6 +830,14 @@ components:
           description: A list of job objects
           items:
             $ref: "#/components/schemas/Job"
+        statusCounts:
+          type: object
+          description: >-
+            The number of jobs in "jobs", keyed by lower-case status name. Every status is
+            present, even at zero.
+          additionalProperties:
+            type: integer
+            format: int64
 
     JobResponse:
       type: object
@@ -1009,7 +1017,15 @@ components:
               "startedAt": "2025-08-12T02:14:35.442190Z",
               "finishedAt": "2025-08-12T02:15:47.891023Z"
             }
-          ]
+          ],
+          "statusCounts": {
+            "queued": 0,
+            "started": 0,
+            "failed": 1,
+            "succeeded": 1,
+            "cancelling": 0,
+            "cancelled": 0
+          }
         }
 
     JobResponse:

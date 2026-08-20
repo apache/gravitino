@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.responses;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
 import java.util.List;
+import java.util.Map;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.dto.job.JobDTO;
@@ -33,19 +34,26 @@ public class JobListResponse extends BaseResponse {
   @JsonProperty("jobs")
   private final List<JobDTO> jobs;
 
+  @JsonProperty("statusCounts")
+  private final Map<String, Long> statusCounts;
+
   /**
-   * Creates a new JobListResponse with the specified list of jobs.
+   * Creates a new JobListResponse with the specified list of jobs and per-status counts.
    *
    * @param jobs The list of jobs to include in the response.
+   * @param statusCounts The number of jobs in {@code jobs}, keyed by lower-case status name (e.g.
+   *     "queued", "started"), with every {@link org.apache.gravitino.job.JobHandle.Status} value
+   *     present even when its count is zero.
    */
-  public JobListResponse(List<JobDTO> jobs) {
+  public JobListResponse(List<JobDTO> jobs, Map<String, Long> statusCounts) {
     super(0);
     this.jobs = jobs;
+    this.statusCounts = statusCounts;
   }
 
   /** Default constructor for Jackson deserialization. */
   private JobListResponse() {
-    this(null);
+    this(null, null);
   }
 
   @Override
@@ -54,5 +62,6 @@ public class JobListResponse extends BaseResponse {
 
     Preconditions.checkArgument(jobs != null, "\"jobs\" must not be null");
     jobs.forEach(JobDTO::validate);
+    Preconditions.checkArgument(statusCounts != null, "\"statusCounts\" must not be null");
   }
 }

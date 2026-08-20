@@ -33,6 +33,7 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -663,6 +664,17 @@ public class TestJobOperations extends JerseyTest {
     JobListResponse jobListResponse = resp.readEntity(JobListResponse.class);
     Assertions.assertEquals(0, jobListResponse.getCode());
 
+    // statusCounts reflects the returned jobs: one QUEUED, one STARTED, one SUCCEEDED, and every
+    // other status present at zero.
+    Map<String, Long> expectedStatusCounts = new HashMap<>();
+    expectedStatusCounts.put("queued", 1L);
+    expectedStatusCounts.put("started", 1L);
+    expectedStatusCounts.put("failed", 0L);
+    expectedStatusCounts.put("succeeded", 1L);
+    expectedStatusCounts.put("cancelling", 0L);
+    expectedStatusCounts.put("cancelled", 0L);
+    Assertions.assertEquals(expectedStatusCounts, jobListResponse.getStatusCounts());
+
     // Default sort is queuedAt desc (newest first); job1/job2/job3 were created in that order,
     // so queuedAt increases job1 < job2 < job3 and the response reverses it.
     Assertions.assertEquals(3, jobListResponse.getJobs().size());
@@ -803,6 +815,17 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(2, jobListResponse.getJobs().size());
     Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse.getJobs().get(0));
     Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(1));
+
+    // statusCounts is scoped to the filtered set: job1 (QUEUED) is excluded by startedAfter,
+    // so its status contributes zero here, even though the job itself exists.
+    Map<String, Long> expectedFilteredStatusCounts = new HashMap<>();
+    expectedFilteredStatusCounts.put("queued", 0L);
+    expectedFilteredStatusCounts.put("started", 1L);
+    expectedFilteredStatusCounts.put("failed", 0L);
+    expectedFilteredStatusCounts.put("succeeded", 1L);
+    expectedFilteredStatusCounts.put("cancelling", 0L);
+    expectedFilteredStatusCounts.put("cancelled", 0L);
+    Assertions.assertEquals(expectedFilteredStatusCounts, jobListResponse.getStatusCounts());
 
     // sortBy=startedAt, sortOrder=asc: job3 (1500) < job2 (2500) < job1 (null, sorts last).
     Response resp2 =
@@ -945,6 +968,36 @@ public class TestJobOperations extends JerseyTest {
         JobOperations.filterAndSortJobs(
             jobs, null, null, null, JobOperations.buildJobComparator("startedAt", "desc"));
     Assertions.assertEquals(Lists.newArrayList(job3, job2, job1), sortedByStartedDesc);
+  }
+
+  @Test
+  public void testCountJobsByStatus() {
+    String templateName = "shell_template_1";
+    JobEntity queuedJob1 = newJobEntity(templateName, JobHandle.Status.QUEUED);
+    JobEntity queuedJob2 = newJobEntity(templateName, JobHandle.Status.QUEUED);
+    JobEntity startedJob =
+        newJobEntity(templateName, JobHandle.Status.STARTED, Instant.now().toEpochMilli(), 0L);
+    JobEntity succeededJob =
+        newJobEntity(templateName, JobHandle.Status.SUCCEEDED, Instant.now().toEpochMilli());
+
+    Map<String, Long> counts =
+        JobOperations.countJobsByStatus(
+            Lists.newArrayList(queuedJob1, queuedJob2, startedJob, succeededJob));
+
+    // Every JobHandle.Status is present, even at zero.
+    Map<String, Long> expected = new HashMap<>();
+    expected.put("queued", 2L);
+    expected.put("started", 1L);
+    expected.put("failed", 0L);
+    expected.put("succeeded", 1L);
+    expected.put("cancelling", 0L);
+    expected.put("cancelled", 0L);
+    Assertions.assertEquals(expected, counts);
+
+    // An empty job list still reports every status at zero.
+    Map<String, Long> emptyCounts = JobOperations.countJobsByStatus(Lists.newArrayList());
+    Assertions.assertEquals(6, emptyCounts.size());
+    emptyCounts.values().forEach(count -> Assertions.assertEquals(0L, count));
   }
 
   @Test

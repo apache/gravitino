@@ -26,7 +26,9 @@ import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
@@ -62,6 +64,7 @@ import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -334,9 +337,10 @@ public class JobOperations {
                     finishedAfterInstant,
                     comparator);
             List<JobDTO> jobDTOs = toJobDTOs(filteredAndSortedJobs);
+            Map<String, Long> statusCounts = countJobsByStatus(filteredAndSortedJobs);
 
             LOG.info("Listed {} jobs in metalake {}", jobDTOs.size(), metalake);
-            return Utils.ok(new JobListResponse(jobDTOs));
+            return Utils.ok(new JobListResponse(jobDTOs, statusCounts));
           });
 
     } catch (Exception e) {
@@ -512,6 +516,20 @@ public class JobOperations {
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {
     return jobEntities.stream().map(JobOperations::toDTO).collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  static Map<String, Long> countJobsByStatus(List<JobEntity> jobEntities) {
+    // Every status is present, even at zero, so callers get a stable set of keys to render
+    // (e.g. a status histogram) without having to special-case missing entries.
+    Map<String, Long> statusCounts = new LinkedHashMap<>();
+    for (JobHandle.Status status : JobHandle.Status.values()) {
+      statusCounts.put(status.name().toLowerCase(Locale.ROOT), 0L);
+    }
+    for (JobEntity jobEntity : jobEntities) {
+      statusCounts.merge(jobEntity.status().name().toLowerCase(Locale.ROOT), 1L, Long::sum);
+    }
+    return statusCounts;
   }
 
   @VisibleForTesting
