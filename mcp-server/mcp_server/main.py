@@ -35,7 +35,12 @@ def do_main():
         token=args.token,
         tls_cert=args.tls_cert,
         tls_key=args.tls_key,
+        oauth_token_endpoint=args.oauth_token_endpoint,
+        oauth_client_id=args.oauth_client_id,
+        oauth_client_secret=args.oauth_client_secret,
+        oauth_scope=args.oauth_scope,
     )
+    setting.validate_oauth()
     _init_logging(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
@@ -121,7 +126,38 @@ def _parse_args():
         "incoming request carries no Authorization header "
         "(per-request identity takes priority). "
         "Can also be set via the GRAVITINO_TOKEN environment variable. "
-        "When omitted, requests are sent without authentication.",
+        "When omitted, requests are sent without authentication. "
+        "Takes precedence over OAuth client-credentials flags.",
+    )
+
+    parser.add_argument(
+        "--oauth-token-endpoint",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_TOKEN_ENDPOINT", ""),
+        help="OAuth2 token endpoint for client-credentials (service identity). "
+        "Requires --oauth-client-id and --oauth-client-secret. "
+        "Can also be set via GRAVITINO_OAUTH_TOKEN_ENDPOINT.",
+    )
+    parser.add_argument(
+        "--oauth-client-id",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_CLIENT_ID", ""),
+        help="OAuth2 client id for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_CLIENT_ID.",
+    )
+    parser.add_argument(
+        "--oauth-client-secret",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_CLIENT_SECRET", ""),
+        help="OAuth2 client secret for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_CLIENT_SECRET.",
+    )
+    parser.add_argument(
+        "--oauth-scope",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_SCOPE", ""),
+        help="Optional OAuth2 scope for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_SCOPE.",
     )
 
     parser.add_argument(
