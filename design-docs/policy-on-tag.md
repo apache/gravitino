@@ -322,6 +322,92 @@ Constraints and indexes:
    selector types in the same `selector` JSON field without changing the policy-to-tag relation
    model.
 
+### Selector Evolution Examples
+
+`TAG_VALUE` remains the basic selector for exact value matching. Future selector versions can make
+the current tag-presence behavior explicit through `ALL_VALUES` and use `EXPRESSION` for conditions
+that cannot be represented by one tag value.
+
+```json
+{
+  "type": "ALL_VALUES"
+}
+```
+
+`ALL_VALUES` matches whenever the effective tag assignment exists. It accepts a valueless
+assignment, one value, or multiple values; it does not require the assignment to contain every
+allowed value.
+
+The basic exact-value form remains:
+
+```json
+{
+  "type": "TAG_VALUE",
+  "value": "pii"
+}
+```
+
+A future expression selector can combine values from multiple effective tags:
+
+```json
+{
+  "type": "EXPRESSION",
+  "expression": {
+    "operator": "ALL_OF",
+    "conditions": [
+      {
+        "attribute": "effectiveTags.classification.values",
+        "operator": "CONTAINS",
+        "value": "pii"
+      },
+      {
+        "attribute": "effectiveTags.data_domain.values",
+        "operator": "CONTAINS",
+        "value": "finance"
+      }
+    ]
+  }
+}
+```
+
+This expression matches effective tag assignments `classification = ["pii"]` and
+`data_domain = ["finance"]`. It does not match if either tag is absent or its effective assignment
+does not contain the required value. These examples describe selector shapes only. Phase 1 supports
+only `TAG_VALUE`; the expression language and cross-tag lookup contract require a separate design.
+
+### ABAC Column Masking Example
+
+A future tag-based ABAC consumer can use a resolved object policy to mask a sensitive column. For
+example:
+
+```text
+policy mask_finance_pii
+  policyType: column_mask
+  associated tag: classification
+  selector: classification contains "pii" AND data_domain contains "finance"
+  mask behavior: FULL_REDACT
+
+column iceberg.sales.customers.email
+  effective tags:
+    classification = ["pii"]
+    data_domain = ["finance"]
+  value before enforcement: alice@example.com
+```
+
+The column's effective tags satisfy the policy selector, so object policy resolution includes
+`mask_finance_pii`. A column-mask enforcement consumer then applies the policy:
+
+```text
+ObjectPolicyResolver(iceberg.sales.customers.email)
+  -> mask_finance_pii
+  -> column-mask enforcement
+  -> value after enforcement: ****
+```
+
+The policy type name, mask behavior, and masked value are illustrative. This design covers policy
+selection but does not define the column-mask policy content contract or engine-specific
+enforcement behavior.
+
 ### REST API Changes
 
 #### New: `GET /api/metalakes/{metalake}/tags/{tag}/policies`
@@ -632,6 +718,26 @@ may still be covered by normal REST access logs or audit logs if the project rec
 `ObjectPolicyResolver` is responsible for selection, disabled-policy filtering, and policy
 deduplication. It does not make allow or deny decisions for row filters, column masks, or other
 engine-enforced policy types.
+
+The resolver must also detect mixed selector results for the same policy. This conflict exists when
+one metadata object has multiple effective tags associated with the same policy and evaluation of
+those policy-to-tag relation selectors produces at least one match and at least one non-match.
+
+For example:
+
+```text
+mask_policy -> classification with TAG_VALUE("pii")
+mask_policy -> data_domain with TAG_VALUE("finance")
+
+object effective tags:
+  classification = ["pii"]     -> match
+  data_domain = ["risk"]       -> not match
+```
+
+For this object, `mask_policy` is both selected and not selected through different effective tag
+relations, so the resolver detects a selector conflict. Relations for tags that are not in the
+object's effective tag set do not participate in this detection. This design identifies the
+conflict but does not define a precedence or merge rule for it.
 
 For row filter and column mask policies, enforcement consumers must fail closed if multiple
 distinct effective policies of the same kind apply to the same evaluation target. The system should
