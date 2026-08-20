@@ -834,7 +834,9 @@ components:
           type: object
           description: >-
             The number of jobs in "jobs", keyed by lower-case status name. Every status is
-            present, even at zero.
+            present, even at zero. Counted after queuedAfter/startedAfter/finishedAfter filtering,
+            so a time filter can make some statuses structurally zero - e.g. startedAfter always
+            yields queued: 0, since a queued job has no startedAt yet.
           additionalProperties:
             type: integer
             format: int64

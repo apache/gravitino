@@ -643,11 +643,14 @@ public class TestJobOperations extends JerseyTest {
   @Test
   public void testListJobs() {
     String templateName = "shell_template_1";
-    JobEntity job1 = newJobEntity(templateName, JobHandle.Status.QUEUED);
+    // Fixed, strictly-increasing queuedAt values rather than back-to-back Instant.now() calls -
+    // the latter can collide (millisecond clock resolution on some JDKs/OSes), which would make
+    // the desc-sort assertions below flaky.
+    JobEntity job1 = newJobEntityWithQueuedAt(templateName, JobHandle.Status.QUEUED, 1000L, 0L, 0L);
     JobEntity job2 =
-        newJobEntity(templateName, JobHandle.Status.STARTED, Instant.now().toEpochMilli(), 0L);
+        newJobEntityWithQueuedAt(templateName, JobHandle.Status.STARTED, 2000L, 2500L, 0L);
     JobEntity job3 =
-        newJobEntity("spark_template_1", JobHandle.Status.SUCCEEDED, Instant.now().toEpochMilli());
+        newJobEntityWithQueuedAt("spark_template_1", JobHandle.Status.SUCCEEDED, 3000L, 0L, 3500L);
 
     when(jobOperationDispatcher.listJobs(metalake, Optional.empty()))
         .thenReturn(Lists.newArrayList(job1, job2, job3));
@@ -675,8 +678,8 @@ public class TestJobOperations extends JerseyTest {
     expectedStatusCounts.put("cancelled", 0L);
     Assertions.assertEquals(expectedStatusCounts, jobListResponse.getStatusCounts());
 
-    // Default sort is queuedAt desc (newest first); job1/job2/job3 were created in that order,
-    // so queuedAt increases job1 < job2 < job3 and the response reverses it.
+    // Default sort is queuedAt desc (newest first); job1/job2/job3 have strictly increasing
+    // queuedAt (1000L < 2000L < 3000L), so the response reverses that order.
     Assertions.assertEquals(3, jobListResponse.getJobs().size());
     Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse.getJobs().get(0));
     Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse.getJobs().get(1));
@@ -881,6 +884,25 @@ public class TestJobOperations extends JerseyTest {
     ErrorResponse errorResp5 = resp5.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp5.getCode());
     Assertions.assertEquals(IllegalArgumentException.class.getSimpleName(), errorResp5.getType());
+
+    // Blank query params (e.g. "?sortBy=&sortOrder=&queuedAfter="), as templated/generated
+    // clients sometimes send, fall back to "not set" rather than 400ing: @DefaultValue only
+    // applies when a param is absent, not when it's present-but-empty.
+    Response resp6 =
+        target(jobRunPath())
+            .queryParam("sortBy", "")
+            .queryParam("sortOrder", "")
+            .queryParam("queuedAfter", "")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp6.getStatus());
+    JobListResponse jobListResponse6 = resp6.readEntity(JobListResponse.class);
+    Assertions.assertEquals(3, jobListResponse6.getJobs().size());
+    Assertions.assertEquals(JobOperations.toDTO(job1), jobListResponse6.getJobs().get(0));
+    Assertions.assertEquals(JobOperations.toDTO(job2), jobListResponse6.getJobs().get(1));
+    Assertions.assertEquals(JobOperations.toDTO(job3), jobListResponse6.getJobs().get(2));
   }
 
   @Test
@@ -1003,10 +1025,17 @@ public class TestJobOperations extends JerseyTest {
   @Test
   public void testParseInstant() {
     Assertions.assertNull(JobOperations.parseInstant("queuedAfter", null));
+    Assertions.assertNull(JobOperations.parseInstant("queuedAfter", ""));
 
     Instant expected = Instant.ofEpochMilli(1500L);
     Assertions.assertEquals(
         expected, JobOperations.parseInstant("queuedAfter", expected.toString()));
+
+    // RFC 3339 numeric offsets (as advertised by the OpenAPI `format: date-time`) are accepted,
+    // not just the strict ISO_INSTANT `Z` form.
+    Assertions.assertEquals(
+        Instant.parse("2026-08-17T16:00:00Z"),
+        JobOperations.parseInstant("queuedAfter", "2026-08-18T00:00:00+08:00"));
 
     Assertions.assertThrows(
         IllegalArgumentException.class,

@@ -21,8 +21,10 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.Comparator;
@@ -310,11 +312,16 @@ public class JobOperations {
 
     try {
       // Parse/validate query params up front so a bad request fails fast, before paying for the
-      // dispatcher fetch and authorization filtering below.
+      // dispatcher fetch and authorization filtering below. @DefaultValue only applies when a
+      // param is absent, not when a client sends it empty (e.g. "?sortBy=&sortOrder="), so blank
+      // values are treated as "not set" here too.
       Instant queuedAfterInstant = parseInstant("queuedAfter", queuedAfter);
       Instant startedAfterInstant = parseInstant("startedAfter", startedAfter);
       Instant finishedAfterInstant = parseInstant("finishedAfter", finishedAfter);
-      Comparator<JobEntity> comparator = buildJobComparator(sortBy, sortOrder);
+      Comparator<JobEntity> comparator =
+          buildJobComparator(
+              Strings.isNullOrEmpty(sortBy) ? "queuedAt" : sortBy,
+              Strings.isNullOrEmpty(sortOrder) ? "desc" : sortOrder);
 
       return Utils.doAs(
           httpRequest,
@@ -548,11 +555,15 @@ public class JobOperations {
 
   @VisibleForTesting
   static Instant parseInstant(String paramName, String value) {
-    if (value == null) {
+    if (Strings.isNullOrEmpty(value)) {
       return null;
     }
     try {
-      return Instant.parse(value);
+      // OffsetDateTime.parse (RFC 3339, matching the OpenAPI `format: date-time`) rather than
+      // Instant.parse (strict ISO_INSTANT, `Z`/zero-offset only): Instant.parse of a numeric
+      // offset like "+08:00" throws on JDK 8/11 and only started accepting it on JDK 12+
+      // (JDK-8166138), so the same request would 400 or succeed depending on the server's JDK.
+      return OffsetDateTime.parse(value).toInstant();
     } catch (DateTimeParseException e) {
       throw new IllegalArgumentException(
           "Invalid "
