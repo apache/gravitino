@@ -21,12 +21,19 @@ package org.apache.gravitino.server.web.rest;
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
 import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.servlet.http.HttpServletRequest;
@@ -59,6 +66,7 @@ import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobOperationDispatcher;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.meta.AuditInfo;
@@ -285,13 +293,36 @@ public class JobOperations {
   public Response listJobs(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
-      @QueryParam("jobTemplateName") String jobTemplateName) {
+      @QueryParam("jobTemplateName") String jobTemplateName,
+      @QueryParam("queuedAfter") String queuedAfter,
+      @QueryParam("startedAfter") String startedAfter,
+      @QueryParam("finishedAfter") String finishedAfter,
+      @QueryParam("sortBy") @DefaultValue("queuedAt") String sortBy,
+      @QueryParam("sortOrder") @DefaultValue("desc") String sortOrder) {
     LOG.info(
-        "Received request to list jobs in metalake {}{}",
+        "Received request to list jobs in metalake {}{}, queuedAfter: {}, startedAfter: {},"
+            + " finishedAfter: {}, sortBy: {}, sortOrder: {}",
         metalake,
-        jobTemplateName != null ? " for job template " + jobTemplateName : "");
+        jobTemplateName != null ? " for job template " + jobTemplateName : "",
+        queuedAfter,
+        startedAfter,
+        finishedAfter,
+        sortBy,
+        sortOrder);
 
     try {
+      // Parse/validate query params up front so a bad request fails fast, before paying for the
+      // dispatcher fetch and authorization filtering below. @DefaultValue only applies when a
+      // param is absent, not when a client sends it empty (e.g. "?sortBy=&sortOrder="), so blank
+      // values are treated as "not set" here too.
+      Instant queuedAfterInstant = parseInstant("queuedAfter", queuedAfter);
+      Instant startedAfterInstant = parseInstant("startedAfter", startedAfter);
+      Instant finishedAfterInstant = parseInstant("finishedAfter", finishedAfter);
+      Comparator<JobEntity> comparator =
+          buildJobComparator(
+              Strings.isNullOrEmpty(sortBy) ? "queuedAt" : sortBy,
+              Strings.isNullOrEmpty(sortOrder) ? "desc" : sortOrder);
+
       return Utils.doAs(
           httpRequest,
           () -> {
@@ -305,10 +336,18 @@ public class JobOperations {
                             .listJobs(metalake, Optional.ofNullable(jobTemplateName))
                             .toArray(new JobEntity[0]),
                         jobEntity -> NameIdentifierUtil.ofJob(metalake, jobEntity.name())));
-            List<JobDTO> jobDTOs = toJobDTOs(jobEntities);
+            List<JobEntity> filteredAndSortedJobs =
+                filterAndSortJobs(
+                    jobEntities,
+                    queuedAfterInstant,
+                    startedAfterInstant,
+                    finishedAfterInstant,
+                    comparator);
+            List<JobDTO> jobDTOs = toJobDTOs(filteredAndSortedJobs);
+            Map<String, Long> statusCounts = countJobsByStatus(filteredAndSortedJobs);
 
-            LOG.info("Listed {} jobs in metalake {}", jobEntities.size(), metalake);
-            return Utils.ok(new JobListResponse(jobDTOs));
+            LOG.info("Listed {} jobs in metalake {}", jobDTOs.size(), metalake);
+            return Utils.ok(new JobListResponse(jobDTOs, statusCounts));
           });
 
     } catch (Exception e) {
@@ -484,5 +523,122 @@ public class JobOperations {
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {
     return jobEntities.stream().map(JobOperations::toDTO).collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  static Map<String, Long> countJobsByStatus(List<JobEntity> jobEntities) {
+    // Every status is present, even at zero, so callers get a stable set of keys to render
+    // (e.g. a status histogram) without having to special-case missing entries.
+    Map<String, Long> statusCounts = new LinkedHashMap<>();
+    for (JobHandle.Status status : JobHandle.Status.values()) {
+      statusCounts.put(status.name().toLowerCase(Locale.ROOT), 0L);
+    }
+    for (JobEntity jobEntity : jobEntities) {
+      statusCounts.merge(jobEntity.status().name().toLowerCase(Locale.ROOT), 1L, Long::sum);
+    }
+    return statusCounts;
+  }
+
+  @VisibleForTesting
+  static List<JobEntity> filterAndSortJobs(
+      List<JobEntity> jobEntities,
+      Instant queuedAfter,
+      Instant startedAfter,
+      Instant finishedAfter,
+      Comparator<JobEntity> comparator) {
+    return jobEntities.stream()
+        .filter(
+            jobEntity -> matchesTimeFilters(jobEntity, queuedAfter, startedAfter, finishedAfter))
+        .sorted(comparator)
+        .collect(Collectors.toList());
+  }
+
+  @VisibleForTesting
+  static Instant parseInstant(String paramName, String value) {
+    if (Strings.isNullOrEmpty(value)) {
+      return null;
+    }
+    try {
+      // OffsetDateTime.parse (RFC 3339, matching the OpenAPI `format: date-time`) rather than
+      // Instant.parse (strict ISO_INSTANT, `Z`/zero-offset only): Instant.parse of a numeric
+      // offset like "+08:00" throws on JDK 8/11 and only started accepting it on JDK 12+
+      // (JDK-8166138), so the same request would 400 or succeed depending on the server's JDK.
+      return OffsetDateTime.parse(value).toInstant();
+    } catch (DateTimeParseException e) {
+      throw new IllegalArgumentException(
+          "Invalid "
+              + paramName
+              + " value: "
+              + value
+              + ", must be an ISO-8601 instant, e.g. 2026-08-18T00:00:00Z",
+          e);
+    }
+  }
+
+  // queuedAfter/startedAfter/finishedAfter are inclusive lower bounds (>=), AND-combined. A job
+  // missing the relevant timestamp (e.g. not started yet) never matches a startedAfter/
+  // finishedAfter filter.
+  private static boolean matchesTimeFilters(
+      JobEntity jobEntity, Instant queuedAfter, Instant startedAfter, Instant finishedAfter) {
+    return matchesTimeFilter(jobEntity.auditInfo().createTime(), queuedAfter)
+        && matchesTimeFilter(jobEntity.startedAtAsInstant(), startedAfter)
+        && matchesTimeFilter(jobEntity.finishedAtAsInstant(), finishedAfter);
+  }
+
+  private static boolean matchesTimeFilter(Instant actual, Instant after) {
+    if (after == null) {
+      return true;
+    }
+    return actual != null && !actual.isBefore(after);
+  }
+
+  // sortBy/sortOrder are matched exactly against the OpenAPI-documented enum values (queuedAt,
+  // startedAt, finishedAt, asc, desc) rather than case-insensitively, so accepted input always
+  // matches what the spec advertises.
+  @VisibleForTesting
+  static Comparator<JobEntity> buildJobComparator(String sortBy, String sortOrder) {
+    Function<JobEntity, Instant> keyExtractor;
+    switch (sortBy) {
+      case "queuedAt":
+        keyExtractor = jobEntity -> jobEntity.auditInfo().createTime();
+        break;
+      case "startedAt":
+        keyExtractor = JobEntity::startedAtAsInstant;
+        break;
+      case "finishedAt":
+        keyExtractor = JobEntity::finishedAtAsInstant;
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid sortBy value: " + sortBy + ", must be one of queuedAt, startedAt, finishedAt");
+    }
+
+    boolean ascending;
+    switch (sortOrder) {
+      case "asc":
+        ascending = true;
+        break;
+      case "desc":
+        ascending = false;
+        break;
+      default:
+        throw new IllegalArgumentException(
+            "Invalid sortOrder value: " + sortOrder + ", must be one of asc, desc");
+    }
+
+    // Jobs missing the sort key (e.g. not started/finished yet) always sort last, regardless of
+    // sortOrder - flipping their position based on direction would be confusing.
+    return (a, b) -> {
+      Instant ta = keyExtractor.apply(a);
+      Instant tb = keyExtractor.apply(b);
+      if (ta == null && tb == null) {
+        return 0;
+      } else if (ta == null) {
+        return 1;
+      } else if (tb == null) {
+        return -1;
+      }
+      return ascending ? ta.compareTo(tb) : tb.compareTo(ta);
+    };
   }
 }
