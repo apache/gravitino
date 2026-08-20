@@ -207,8 +207,28 @@ Index[] indexes = new Index[] {
 
 ### Table Properties
 
+<<<<<<< HEAD
 - Doris supports table properties, and you can set them in the table properties.
 - Only supports Doris table properties and doesn't support user-defined properties.
+=======
+Doris table properties can be set when creating a table.
+Only Doris built-in table properties are supported; user-defined properties are not supported.
+
+| Property Name                      | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
+| `replication_num`                  | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        |
+| `replication_allocation`           | The replication allocation policy for the table. It cannot be set together with `replication_num`.                                                                                          | (none)        | No       | No       | No        |
+| `compression`                      | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+. Cannot be changed after table creation.            | (none)        | No       | No       | Yes       |
+| `bloom_filter_columns`             | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        |
+| `storage_policy`                   | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        |
+| `light_schema_change`              | Whether light schema change is enabled for the table. Can be modified via ALTER TABLE SET.                                                                                                  | `true`        | No       | No       | No        |
+| `enable_unique_key_merge_on_write` | Whether merge-on-write is enabled for Unique Key tables. Must be set at CREATE TABLE time; cannot be changed after creation.                                                                | `true`        | No       | No       | Yes       |
+
+:::note
+**Immutable** properties can be set at CREATE TABLE time but cannot be changed via ALTER TABLE.
+**Reserved** properties (none currently) are read-only and cannot be set by users.
+:::
+>>>>>>> d38268a57 ([#11829] fix(doris): support replication allocation property (#11877))
 
 ### Table Indexes
 
