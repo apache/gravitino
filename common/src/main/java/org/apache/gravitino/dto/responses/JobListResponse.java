@@ -43,7 +43,8 @@ public class JobListResponse extends BaseResponse {
    * @param jobs The list of jobs to include in the response.
    * @param statusCounts The number of jobs in {@code jobs}, keyed by lower-case status name (e.g.
    *     "queued", "started"), with every {@link org.apache.gravitino.job.JobHandle.Status} value
-   *     present even when its count is zero.
+   *     present even when its count is zero. May be {@code null} when deserialized from an older
+   *     server that predates this field.
    */
   public JobListResponse(List<JobDTO> jobs, Map<String, Long> statusCounts) {
     super(0);
@@ -62,6 +63,7 @@ public class JobListResponse extends BaseResponse {
 
     Preconditions.checkArgument(jobs != null, "\"jobs\" must not be null");
     jobs.forEach(JobDTO::validate);
-    Preconditions.checkArgument(statusCounts != null, "\"statusCounts\" must not be null");
+    // statusCounts is intentionally not required: an older server that predates this field
+    // won't include it, and a new client must still be able to talk to it.
   }
 }
