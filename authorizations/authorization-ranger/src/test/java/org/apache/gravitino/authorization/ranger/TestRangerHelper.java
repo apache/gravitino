@@ -20,7 +20,9 @@ package org.apache.gravitino.authorization.ranger;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import java.util.Collections;
 import org.apache.ranger.RangerClient;
+import org.apache.ranger.plugin.model.RangerPolicy;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -63,5 +65,52 @@ public class TestRangerHelper {
         () ->
             rangerHelper.createRangerRoleIfNotExists(
                 RangerHelper.generateCatalogOwnerRoleName("1001"), true));
+  }
+
+  @Test
+  public void testMigrateLegacyOwnerRoleForTwoCatalogPolicies() {
+    RangerHelper rangerHelper =
+        new RangerHelper(
+            Mockito.mock(RangerClient.class),
+            "admin",
+            "service",
+            ImmutableSet.of(RangerPrivileges.RangerHadoopSQLPrivilege.SELECT),
+            ImmutableList.of());
+    RangerPolicy firstCatalogPolicy = createLegacyCatalogOwnerPolicy();
+    RangerPolicy secondCatalogPolicy = createLegacyCatalogOwnerPolicy();
+
+    String firstOwnerRole = RangerHelper.generateCatalogOwnerRoleName("1001");
+    String secondOwnerRole = RangerHelper.generateCatalogOwnerRoleName("1002");
+    rangerHelper.updatePolicyOwnerRole(
+        firstCatalogPolicy, firstOwnerRole, RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE);
+    rangerHelper.updatePolicyOwnerRole(
+        secondCatalogPolicy, secondOwnerRole, RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE);
+
+    Assertions.assertEquals(
+        Collections.singletonList(firstOwnerRole),
+        firstCatalogPolicy.getPolicyItems().get(0).getRoles());
+    Assertions.assertEquals(
+        Collections.singletonList(secondOwnerRole),
+        secondCatalogPolicy.getPolicyItems().get(0).getRoles());
+
+    // Reconciliation can be repeated safely.
+    rangerHelper.updatePolicyOwnerRole(
+        firstCatalogPolicy, firstOwnerRole, RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE);
+    Assertions.assertEquals(
+        Collections.singletonList(firstOwnerRole),
+        firstCatalogPolicy.getPolicyItems().get(0).getRoles());
+  }
+
+  private RangerPolicy createLegacyCatalogOwnerPolicy() {
+    RangerPolicy policy = new RangerPolicy();
+    RangerPolicy.RangerPolicyItem policyItem = new RangerPolicy.RangerPolicyItem();
+    policyItem
+        .getAccesses()
+        .add(
+            new RangerPolicy.RangerPolicyItemAccess(
+                RangerPrivileges.RangerHadoopSQLPrivilege.SELECT.getName()));
+    policyItem.getRoles().add(RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE);
+    policy.getPolicyItems().add(policyItem);
+    return policy;
   }
 }

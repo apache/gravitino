@@ -404,7 +404,8 @@ public class RangerHelper {
             });
   }
 
-  protected void updatePolicyOwnerRole(RangerPolicy policy, String ownerRoleName) {
+  protected void updatePolicyOwnerRole(
+      RangerPolicy policy, String ownerRoleName, String legacyOwnerRoleName) {
     // Find matching policy items based on the owner's privileges
     List<RangerPolicy.RangerPolicyItem> matchPolicyItems =
         policy.getPolicyItems().stream()
@@ -421,9 +422,10 @@ public class RangerHelper {
                           });
                 })
             .collect(Collectors.toList());
-    // Add or remove the owner role in the policy item
+    // Replace the legacy shared owner role with the entity-specific owner role.
     matchPolicyItems.forEach(
         policyItem -> {
+          policyItem.getRoles().removeIf(legacyOwnerRoleName::equalsIgnoreCase);
           addRoleToPolicyItemIfNoExists(policyItem, ownerRoleName);
         });
 

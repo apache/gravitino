@@ -530,33 +530,41 @@ public abstract class RangerAuthorizationPlugin
 
     List<AuthorizationSecurableObject> rangerSecurableObjects = translateOwner(metadataObject);
     String ownerRoleName;
+    String legacyOwnerRoleName;
     switch (metadataObject.type()) {
       case METALAKE:
       case CATALOG:
         // The metalake and catalog use role to manage the owner
         if (metadataObject.type() == MetadataObject.Type.METALAKE) {
           ownerRoleName = RangerHelper.generateMetalakeOwnerRoleName(metalakeId);
+          legacyOwnerRoleName = RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE;
         } else {
           ownerRoleName = RangerHelper.generateCatalogOwnerRoleName(catalogId);
+          legacyOwnerRoleName = RangerHelper.GRAVITINO_CATALOG_OWNER_ROLE;
         }
         rangerHelper.createRangerRoleIfNotExists(ownerRoleName, true);
         rangerHelper.createRangerRoleIfNotExists(RangerHelper.GRAVITINO_OWNER_ROLE, true);
-        try {
-          if (preOwnerUserName != null || preOwnerGroupName != null) {
-            GrantRevokeRoleRequest revokeRoleRequest =
-                rangerHelper.createGrantRevokeRoleRequest(
-                    ownerRoleName, preOwnerUserName, preOwnerGroupName);
+        if (preOwnerUserName != null || preOwnerGroupName != null) {
+          GrantRevokeRoleRequest revokeRoleRequest =
+              rangerHelper.createGrantRevokeRoleRequest(
+                  ownerRoleName, preOwnerUserName, preOwnerGroupName);
+          try {
             rangerClient.revokeRole(rangerServiceName, revokeRoleRequest);
+          } catch (RangerServiceException e) {
+            // Ignore exception, support idempotent operation
+            LOG.warn("Revoke owner role: {} failed!", ownerRoleName, e);
           }
-          if (newOwnerUserName != null || newOwnerGroupName != null) {
-            GrantRevokeRoleRequest grantRoleRequest =
-                rangerHelper.createGrantRevokeRoleRequest(
-                    ownerRoleName, newOwnerUserName, newOwnerGroupName);
+        }
+        if (newOwnerUserName != null || newOwnerGroupName != null) {
+          GrantRevokeRoleRequest grantRoleRequest =
+              rangerHelper.createGrantRevokeRoleRequest(
+                  ownerRoleName, newOwnerUserName, newOwnerGroupName);
+          try {
             rangerClient.grantRole(rangerServiceName, grantRoleRequest);
+          } catch (RangerServiceException e) {
+            // Ignore exception, support idempotent operation
+            LOG.warn("Grant owner role: {} failed!", ownerRoleName, e);
           }
-        } catch (RangerServiceException e) {
-          // Ignore exception, support idempotent operation
-          LOG.warn("Grant owner role: {} failed!", ownerRoleName, e);
         }
 
         rangerSecurableObjects.forEach(
@@ -567,7 +575,7 @@ public abstract class RangerAuthorizationPlugin
                   policy = addOwnerRoleToNewPolicy(rangerSecurableObject, ownerRoleName);
                   rangerClient.createPolicy(policy);
                 } else {
-                  rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName);
+                  rangerHelper.updatePolicyOwnerRole(policy, ownerRoleName, legacyOwnerRoleName);
                   rangerClient.updatePolicy(policy.getId(), policy);
                 }
               } catch (RangerServiceException e) {
