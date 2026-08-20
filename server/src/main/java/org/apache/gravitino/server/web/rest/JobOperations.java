@@ -477,6 +477,8 @@ public class JobOperations {
         jobEntity.jobTemplateName(),
         jobEntity.status(),
         DTOConverters.toDTO(jobEntity.auditInfo()),
+        jobEntity.auditInfo().createTime(),
+        jobEntity.startedAtAsInstant(),
         jobEntity.finishedAtAsInstant());
   }
 

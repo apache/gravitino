@@ -641,7 +641,8 @@ public class TestJobOperations extends JerseyTest {
   public void testListJobs() {
     String templateName = "shell_template_1";
     JobEntity job1 = newJobEntity(templateName, JobHandle.Status.QUEUED);
-    JobEntity job2 = newJobEntity(templateName, JobHandle.Status.STARTED);
+    JobEntity job2 =
+        newJobEntity(templateName, JobHandle.Status.STARTED, Instant.now().toEpochMilli(), 0L);
     JobEntity job3 =
         newJobEntity("spark_template_1", JobHandle.Status.SUCCEEDED, Instant.now().toEpochMilli());
 
@@ -671,6 +672,17 @@ public class TestJobOperations extends JerseyTest {
     // A finished job round-trips its finishedAt as an Instant over the wire.
     Assertions.assertEquals(
         Instant.ofEpochMilli(job3.finishedAt()), jobListResponse.getJobs().get(2).finishedAt());
+
+    // queuedAt is always present, regardless of status.
+    Assertions.assertNotNull(jobListResponse.getJobs().get(0).queuedAt());
+    Assertions.assertNotNull(jobListResponse.getJobs().get(1).queuedAt());
+    Assertions.assertNotNull(jobListResponse.getJobs().get(2).queuedAt());
+
+    // A not-yet-started job round-trips startedAt as null over the wire.
+    Assertions.assertNull(jobListResponse.getJobs().get(0).startedAt());
+    // A started job round-trips its startedAt as an Instant over the wire.
+    Assertions.assertEquals(
+        Instant.ofEpochMilli(job2.startedAt()), jobListResponse.getJobs().get(1).startedAt());
 
     // Test list jobs by template name
     when(jobOperationDispatcher.listJobs(metalake, Optional.of(templateName)))
@@ -802,8 +814,10 @@ public class TestJobOperations extends JerseyTest {
 
   @Test
   public void testCancelJob() {
+    long startedAt = Instant.now().toEpochMilli() - 1000;
+    long finishedAt = Instant.now().toEpochMilli();
     JobEntity job =
-        newJobEntity("shell_template_1", JobHandle.Status.CANCELLED, Instant.now().toEpochMilli());
+        newJobEntity("shell_template_1", JobHandle.Status.CANCELLED, startedAt, finishedAt);
 
     when(jobOperationDispatcher.cancelJob(metalake, job.name())).thenReturn(job);
 
@@ -820,6 +834,10 @@ public class TestJobOperations extends JerseyTest {
     JobResponse jobResp = resp.readEntity(JobResponse.class);
     Assertions.assertEquals(0, jobResp.getCode());
     Assertions.assertEquals(JobOperations.toDTO(job), jobResp.getJob());
+    // queuedAt is always present, regardless of status.
+    Assertions.assertNotNull(jobResp.getJob().queuedAt());
+    // A cancelled job that had started round-trips its startedAt as an Instant over the wire.
+    Assertions.assertEquals(Instant.ofEpochMilli(job.startedAt()), jobResp.getJob().startedAt());
     // A finished (cancelled) job round-trips its finishedAt as an Instant over the wire.
     Assertions.assertEquals(Instant.ofEpochMilli(job.finishedAt()), jobResp.getJob().finishedAt());
 
@@ -855,6 +873,30 @@ public class TestJobOperations extends JerseyTest {
         newJobEntity("shell_template_1", JobHandle.Status.SUCCEEDED, epochMilli);
     JobDTO finishedJobDTO = JobOperations.toDTO(finishedJob);
     Assertions.assertEquals(Instant.ofEpochMilli(epochMilli), finishedJobDTO.finishedAt());
+  }
+
+  @Test
+  public void testToDTOStartedAt() {
+    // Sentinel value (<= 0) used by the storage layer means "not started".
+    JobEntity sentinelJob = newJobEntity("shell_template_1", JobHandle.Status.QUEUED, 0L, 0L);
+    JobDTO sentinelJobDTO = JobOperations.toDTO(sentinelJob);
+    Assertions.assertNull(sentinelJobDTO.startedAt());
+
+    // Started, startedAt is converted from epoch millis to an Instant.
+    long epochMilli = Instant.now().toEpochMilli();
+    JobEntity startedJob =
+        newJobEntity("shell_template_1", JobHandle.Status.STARTED, epochMilli, 0L);
+    JobDTO startedJobDTO = JobOperations.toDTO(startedJob);
+    Assertions.assertEquals(Instant.ofEpochMilli(epochMilli), startedJobDTO.startedAt());
+  }
+
+  @Test
+  public void testToDTOQueuedAt() {
+    // queuedAt is always present - it's the job's creation time, not a sentinel-backed field.
+    JobEntity job = newJobEntity("shell_template_1", JobHandle.Status.QUEUED);
+    JobDTO jobDTO = JobOperations.toDTO(job);
+    Assertions.assertEquals(job.auditInfo().createTime(), jobDTO.queuedAt());
+    Assertions.assertNotNull(jobDTO.queuedAt());
   }
 
   private String jobTemplatePath() {
@@ -903,10 +945,15 @@ public class TestJobOperations extends JerseyTest {
   }
 
   private JobEntity newJobEntity(String templateName, JobHandle.Status status) {
-    return newJobEntity(templateName, status, 0L);
+    return newJobEntity(templateName, status, 0L, 0L);
   }
 
   private JobEntity newJobEntity(String templateName, JobHandle.Status status, Long finishedAt) {
+    return newJobEntity(templateName, status, 0L, finishedAt);
+  }
+
+  private JobEntity newJobEntity(
+      String templateName, JobHandle.Status status, Long startedAt, Long finishedAt) {
     Random rand = new Random();
     return JobEntity.builder()
         .withId(rand.nextLong())
@@ -916,6 +963,7 @@ public class TestJobOperations extends JerseyTest {
         .withStatus(status)
         .withAuditInfo(
             AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+        .withStartedAt(startedAt)
         .withFinishedAt(finishedAt)
         .build();
   }

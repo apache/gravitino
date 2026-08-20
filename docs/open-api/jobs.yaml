@@ -495,6 +495,7 @@ components:
         - jobTemplateName
         - status
         - audit
+        - queuedAt
       properties:
         jobId:
           type: string
@@ -514,6 +515,15 @@ components:
             - "canceled"
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
+        queuedAt:
+          type: string
+          format: date-time
+          description: The time when the job was queued for execution, same as the job's creation time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: The time when the job started execution, or null if the job has not started execution yet
         finishedAt:
           type: string
           format: date-time
@@ -926,6 +936,8 @@ components:
                 "createTime": "2025-08-12T02:14:28.205023Z",
                 "creator": "anonymous"
               },
+              "queuedAt": "2025-08-12T02:14:28.205023Z",
+              "startedAt": "2025-08-12T02:14:31.098231Z",
               "finishedAt": "2025-08-12T02:15:03.512847Z"
             },
             {
@@ -936,6 +948,8 @@ components:
                 "createTime": "2025-08-12T02:14:28.205023Z",
                 "creator": "anonymous"
               },
+              "queuedAt": "2025-08-12T02:14:28.205023Z",
+              "startedAt": "2025-08-12T02:14:35.442190Z",
               "finishedAt": "2025-08-12T02:15:47.891023Z"
             }
           ]
@@ -952,6 +966,8 @@ components:
             "createTime": "2025-08-12T02:14:28.205023Z",
             "creator": "anonymous"
           },
+          "queuedAt": "2025-08-12T02:14:28.205023Z",
+          "startedAt": "2025-08-12T02:14:31.098231Z",
           "finishedAt": "2025-08-12T02:15:03.512847Z"
         }
       }
