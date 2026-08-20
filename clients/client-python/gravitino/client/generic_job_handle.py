@@ -32,3 +32,6 @@ class GenericJobHandle(JobHandle):
 
     def job_status(self):
         return self._job_dto.status()
+
+    def finished_at(self):
+        return self._job_dto.finished_at()

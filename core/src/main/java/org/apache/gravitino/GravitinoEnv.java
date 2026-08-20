@@ -28,6 +28,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -185,6 +186,7 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerDispatcher ownerDispatcher;
   private OwnerDispatcher internalOwnerDispatcher;
+  private BulkManager bulkManager;
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
   private StatisticDispatcher statisticDispatcher;
@@ -527,6 +529,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the BulkManager associated with the Gravitino environment.
+   *
+   * @return The BulkManager instance.
+   */
+  public BulkManager bulkManager() {
+    return bulkManager;
+  }
+
+  /**
    * Get the tagDispatcher associated with the Gravitino environment.
    *
    * @return The tagDispatcher instance.
@@ -858,12 +869,14 @@ public class GravitinoEnv {
       OwnerDispatcher ownerManager = new OwnerManager(entityStore);
       this.internalOwnerDispatcher = ownerManager;
       this.ownerDispatcher = new OwnerEventManager(eventBus, ownerManager);
+      this.bulkManager = new BulkManager(config);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
       this.internalAccessControlDispatcher = null;
       this.ownerDispatcher = null;
       this.internalOwnerDispatcher = null;
+      this.bulkManager = null;
       this.futureGrantManager = null;
     }
 

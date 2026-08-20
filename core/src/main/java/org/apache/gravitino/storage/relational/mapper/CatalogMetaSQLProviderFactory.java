@@ -99,6 +99,11 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().selectCatalogMetaById(catalogId);
   }
 
+  /** Builds SQL that returns and locks an active catalog by ID. */
+  public static String selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId) {
+    return getProvider().selectCatalogMetaByIdForUpdate(catalogId);
+  }
+
   public static String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return getProvider().insertCatalogMeta(catalogPO);
   }
@@ -114,8 +119,9 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().updateCatalogMeta(newCatalogPO, oldCatalogPO);
   }
 
-  public static String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId);
+  public static String softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId, currentVersion);
   }
 
   /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */

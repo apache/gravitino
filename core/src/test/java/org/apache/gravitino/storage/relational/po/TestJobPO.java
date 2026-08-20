@@ -128,6 +128,7 @@ public class TestJobPO {
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withFinishedAt(0L)
             .build();
 
     JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(1L);
@@ -140,5 +141,32 @@ public class TestJobPO {
     Assertions.assertEquals(jobEntity.status(), resultEntity.status());
     Assertions.assertEquals(jobEntity.namespace(), resultEntity.namespace());
     Assertions.assertEquals(jobEntity.auditInfo().creator(), resultEntity.auditInfo().creator());
+    // A queued job has no finishedAt, so it should round-trip as the "not finished" sentinel.
+    Assertions.assertEquals(0L, resultEntity.finishedAt());
+  }
+
+  @Test
+  public void testJobPOFinishedAt() {
+    // initializeJobPO must trust the finishedAt already set on the entity by the caller (e.g.
+    // JobManager), rather than deriving it independently from the job's status.
+    long finishedAt = Instant.now().toEpochMilli();
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.SUCCEEDED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withFinishedAt(finishedAt)
+            .build();
+
+    JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(1L);
+    JobPO jobPO = JobPO.initializeJobPO(jobEntity, builder);
+    JobEntity resultEntity = JobPO.fromJobPO(jobPO, NamespaceUtil.ofJob("test"));
+
+    Assertions.assertEquals(finishedAt, jobPO.jobFinishedAt());
+    Assertions.assertEquals(finishedAt, resultEntity.finishedAt());
   }
 }

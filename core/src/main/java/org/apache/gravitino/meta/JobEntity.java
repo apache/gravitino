@@ -20,9 +20,11 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -49,7 +51,11 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
       Field.required(
           "audit_info", AuditInfo.class, "The audit details of the job template entity.");
   public static final Field FINISHED_AT =
-      Field.optional("job_finished_at", Long.class, "The time when the job finished execution.");
+      Field.required(
+          "job_finished_at",
+          Long.class,
+          "The time when the job finished execution, using the storage layer's "
+              + "\"not finished\" sentinel (<= 0) when the job has not finished execution yet.");
 
   private Long id;
   private String jobExecutionId;
@@ -104,6 +110,19 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     return finishedAt;
   }
 
+  /**
+   * Converts the raw {@code finishedAt} epoch-millis value to an {@link Instant}, treating {@code
+   * null} or a non-positive value (the "not finished" sentinel used by the storage layer) as {@code
+   * null}.
+   *
+   * @return the {@link Instant} the job finished execution, or {@code null} if the job has not
+   *     finished execution yet
+   */
+  @Nullable
+  public Instant finishedAtAsInstant() {
+    return (finishedAt == null || finishedAt <= 0) ? null : Instant.ofEpochMilli(finishedAt);
+  }
+
   @Override
   public AuditInfo auditInfo() {
     return auditInfo;
@@ -129,12 +148,14 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(status, that.status)
         && Objects.equals(jobTemplateName, that.jobTemplateName)
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(auditInfo, that.auditInfo);
+        && Objects.equals(auditInfo, that.auditInfo)
+        && Objects.equals(finishedAt, that.finishedAt);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, jobExecutionId, namespace, status, jobTemplateName, auditInfo);
+    return Objects.hash(
+        id, jobExecutionId, namespace, status, jobTemplateName, auditInfo, finishedAt);
   }
 
   public static Builder builder() {

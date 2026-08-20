@@ -21,27 +21,24 @@ package org.apache.gravitino.encryption.kms;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.apache.commons.lang3.StringUtils;
 
 /** In-memory KMS client for contract and consumer tests. */
 public final class FakeKmsClient implements KmsClient {
 
-  private final String api;
-  private final String source;
+  private final String provider;
   private final Map<String, KeyState> keys = new HashMap<>();
 
   /**
    * Creates an empty fake client.
    *
-   * @param api exact KMS API identifier accepted by the client; lowercase kebab-case with no
-   *     surrounding whitespace
-   * @param source configured source accepted by the client
+   * @param provider configured provider accepted by the client
    */
-  public FakeKmsClient(String api, String source) {
-    this.api = KmsApiIdentifiers.requireValid(api);
-    if (source == null || source.trim().isEmpty()) {
-      throw new IllegalArgumentException("KMS source cannot be blank");
+  public FakeKmsClient(String provider) {
+    if (StringUtils.isBlank(provider)) {
+      throw new IllegalArgumentException("KMS provider cannot be blank");
     }
-    this.source = source.trim();
+    this.provider = provider.trim();
   }
 
   /**
@@ -75,14 +72,11 @@ public final class FakeKmsClient implements KmsClient {
     if (reference == null) {
       throw new IllegalArgumentException("KMS reference cannot be null");
     }
-    if (!reference.api().equals(api)) {
-      throw new IllegalArgumentException(
-          String.format("Expected KMS API '%s' but received '%s'", api, reference.api()));
-    }
-    if (!source.equals(reference.source())) {
+    if (!provider.equals(reference.provider())) {
       throw new IllegalArgumentException(
           String.format(
-              "KMS source %s does not match configured source %s", reference.source(), source));
+              "KMS provider %s does not match configured provider %s",
+              reference.provider(), provider));
     }
   }
 

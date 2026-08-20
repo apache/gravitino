@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.client;
 
+import java.time.Instant;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.job.JobHandle;
 
@@ -43,5 +44,10 @@ public class GenericJobHandle implements JobHandle {
   @Override
   public Status jobStatus() {
     return jobDTO.status();
+  }
+
+  @Override
+  public Instant finishedAt() {
+    return jobDTO.finishedAt();
   }
 }

@@ -357,6 +357,10 @@ components:
           type: string
           maxLength: 128
           description: The name of the local user store group
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the local user store group
         users:
           type: array
           items:
@@ -407,6 +411,10 @@ components:
           minLength: 1
           maxLength: 128
           description: The group name to add.
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the group.
 
     GroupMembershipChangeRequest:
       type: object
@@ -485,7 +493,8 @@ components:
 
     AddGroupRequest:
       value: {
-        "group": "engineers"
+        "group": "engineers",
+        "comment": "Platform engineering"
       }
 
     GroupMembershipChangeRequest:
@@ -526,6 +535,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": []
         }
       }
@@ -535,6 +545,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": ["alice", "bob"]
         }
       }
@@ -544,6 +555,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": ["alice", "bob"]
         }
       }

@@ -103,11 +103,11 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 | Operation                | Method | Path                                        | Body                                                       |
 |--------------------------|--------|---------------------------------------------|------------------------------------------------------------|
 | Get a group              | GET    | `/api/idp/groups/{group}`                   | None                                                       |
-| Add a group              | POST   | `/api/idp/groups`                           | `{"group":"engineering"}`                                  |
+| Add a group              | POST   | `/api/idp/groups`                           | `{"group":"engineering","comment":"Platform engineering"}` |
 | Remove a group           | DELETE | `/api/idp/groups/{group}?force={true false}`| None                                                       |
 | Change group membership  | PUT    | `/api/idp/groups/{group}/users`             | `{"usersToAdd":["alice"],"usersToRemove":["carol"]}`       |
 
-The add-group body uses the field name `group` rather than `name`. Removing a group that still has members fails unless `force=true`. A membership change requires at least one of `usersToAdd` or `usersToRemove`, and accepts both in a single request.
+The add-group body uses the field name `group` rather than `name`. `comment` is optional (max 1024 characters, utf8mb4) and stored as the group description. Removing a group that still has members fails unless `force=true`. A membership change requires at least one of `usersToAdd` or `usersToRemove`, and accepts both in a single request.
 
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
