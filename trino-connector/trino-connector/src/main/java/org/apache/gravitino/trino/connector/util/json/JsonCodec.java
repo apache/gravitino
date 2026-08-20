@@ -30,6 +30,7 @@ import com.fasterxml.jackson.datatype.guava.GuavaModule;
 import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
+import com.google.common.annotations.VisibleForTesting;
 import io.airlift.json.RecordAutoDetectModule;
 import io.trino.spi.TrinoException;
 import io.trino.spi.block.Block;
@@ -130,7 +131,8 @@ public class JsonCodec {
    * order, then fall back to a generic constructor scan that fills unknown reference parameters
    * with default values as a last-resort compatibility mechanism.
    */
-  private static Object instantiateBlockEncodingManager(
+  @VisibleForTesting
+  static Object instantiateBlockEncodingManager(
       Class<?> blockEncodingManagerClass, ClassLoader classLoader) throws Exception {
     try {
       Object instance = blockEncodingManagerClass.getConstructor().newInstance();
@@ -162,23 +164,36 @@ public class JsonCodec {
 
     NoSuchMethodException lastError = null;
     for (Constructor<?> ctor : blockEncodingManagerClass.getDeclaredConstructors()) {
-      try {
-        ctor.setAccessible(true);
-        Class<?>[] paramTypes = ctor.getParameterTypes();
-        Object[] args = new Object[paramTypes.length];
-        for (int i = 0; i < paramTypes.length; i++) {
-          if (Set.class.isAssignableFrom(paramTypes[i])) {
-            args[i] = Collections.emptySet();
-          } else if (paramTypes[i].isPrimitive()) {
-            args[i] = defaultPrimitive(paramTypes[i]);
+      if (!ctor.trySetAccessible()) {
+        continue;
+      }
+
+      Class<?>[] paramTypes = ctor.getParameterTypes();
+      Object[] args = new Object[paramTypes.length];
+      boolean resolvable = true;
+      for (int i = 0; i < paramTypes.length && resolvable; i++) {
+        if (Set.class.isAssignableFrom(paramTypes[i])) {
+          args[i] = Collections.emptySet();
+        } else if (paramTypes[i].isPrimitive()) {
+          args[i] = defaultPrimitive(paramTypes[i]);
+        } else {
+          Object defaultInstance = tryDefaultInstance(paramTypes[i]);
+          if (defaultInstance == null) {
+            resolvable = false;
           } else {
-            args[i] = tryDefaultInstance(paramTypes[i]);
+            args[i] = defaultInstance;
           }
         }
+      }
+      if (!resolvable) {
+        continue;
+      }
+
+      try {
         Object instance = ctor.newInstance(args);
         LOG.debug("Instantiated BlockEncodingManager with fallback constructor {}", ctor);
         return instance;
-      } catch (ReflectiveOperationException e) {
+      } catch (ReflectiveOperationException | RuntimeException e) {
         lastError =
             new NoSuchMethodException(
                 "Failed invoking BlockEncodingManager constructor " + ctor + ": " + e.getMessage());
@@ -194,9 +209,11 @@ public class JsonCodec {
   private static Object tryDefaultInstance(Class<?> type) {
     try {
       Constructor<?> ctor = type.getDeclaredConstructor();
-      ctor.setAccessible(true);
+      if (!ctor.trySetAccessible()) {
+        return null;
+      }
       return ctor.newInstance();
-    } catch (ReflectiveOperationException e) {
+    } catch (ReflectiveOperationException | RuntimeException e) {
       return null;
     }
   }
