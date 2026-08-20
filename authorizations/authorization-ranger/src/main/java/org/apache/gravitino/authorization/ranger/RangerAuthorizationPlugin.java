@@ -85,7 +85,13 @@ public abstract class RangerAuthorizationPlugin
 
   protected String metalake;
   protected final String rangerServiceName;
+
+  /** The stable entity ID of the metalake containing this catalog. */
+  protected final String metalakeId;
+
+  /** The stable entity ID of this catalog. */
   protected final String catalogId;
+
   protected RangerClientExtension rangerClient;
   protected RangerHelper rangerHelper;
   @VisibleForTesting public final String rangerAdminName;
@@ -105,6 +111,8 @@ public abstract class RangerAuthorizationPlugin
     String password = config.get(RangerAuthorizationProperties.RANGER_PASSWORD);
 
     rangerServiceName = config.get(RangerAuthorizationProperties.RANGER_SERVICE_NAME);
+    metalakeId = config.get(BaseAuthorization.METALAKE_ID);
+    Preconditions.checkArgument(metalakeId != null, "Metalake ID is required");
     catalogId = config.get(BaseAuthorization.CATALOG_ID);
     Preconditions.checkArgument(catalogId != null, "Catalog ID is required");
     rangerClient = new RangerClientExtension(rangerUrl, authType, rangerAdminName, password);
@@ -527,7 +535,7 @@ public abstract class RangerAuthorizationPlugin
       case CATALOG:
         // The metalake and catalog use role to manage the owner
         if (metadataObject.type() == MetadataObject.Type.METALAKE) {
-          ownerRoleName = RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE;
+          ownerRoleName = RangerHelper.generateMetalakeOwnerRoleName(metalakeId);
         } else {
           ownerRoleName = RangerHelper.generateCatalogOwnerRoleName(catalogId);
         }

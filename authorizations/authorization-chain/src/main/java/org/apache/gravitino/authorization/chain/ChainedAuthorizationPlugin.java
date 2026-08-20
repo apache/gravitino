@@ -63,6 +63,8 @@ public class ChainedAuthorizationPlugin implements AuthorizationPlugin {
               Map<String, String> pluginConfig =
                   chainedAuthzProperties.fetchAuthPluginProperties(pluginName);
               pluginConfig.put(
+                  BaseAuthorization.METALAKE_ID, properties.get(BaseAuthorization.METALAKE_ID));
+              pluginConfig.put(
                   BaseAuthorization.CATALOG_ID, properties.get(BaseAuthorization.CATALOG_ID));
 
               ArrayList<String> libAndResourcesPaths = Lists.newArrayList();

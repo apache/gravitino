@@ -1473,7 +1473,8 @@ public class RangerHiveIT {
                   null,
                   null,
                   null,
-                  Lists.newArrayList(RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE));
+                  Lists.newArrayList(
+                      RangerHelper.generateMetalakeOwnerRoleName(RangerITEnv.METALAKE_ID)));
             });
 
     MetadataObject catalog =
@@ -1492,7 +1493,7 @@ public class RangerHiveIT {
                   null,
                   null,
                   Lists.newArrayList(
-                      RangerHelper.GRAVITINO_METALAKE_OWNER_ROLE,
+                      RangerHelper.generateMetalakeOwnerRoleName(RangerITEnv.METALAKE_ID),
                       RangerHelper.generateCatalogOwnerRoleName(RangerITEnv.CATALOG_ID)));
             });
   }

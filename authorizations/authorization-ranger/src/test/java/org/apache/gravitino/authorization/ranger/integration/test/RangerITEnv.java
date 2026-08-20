@@ -63,6 +63,7 @@ public class RangerITEnv {
   public static final String RANGER_HIVE_REPO_NAME = "hiveDev";
   private static final String RANGER_HIVE_TYPE = "hive";
   public static final String RANGER_HDFS_REPO_NAME = "hdfsDev";
+  public static final String METALAKE_ID = "1000";
   public static final String CATALOG_ID = "1001";
   private static final String RANGER_HDFS_TYPE = "hdfs";
   public static RangerClient rangerClient;
@@ -121,6 +122,8 @@ public class RangerITEnv {
                 RangerITEnv.RANGER_HIVE_REPO_NAME,
                 RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
                 "true",
+                BaseAuthorization.METALAKE_ID,
+                METALAKE_ID,
                 BaseAuthorization.CATALOG_ID,
                 CATALOG_ID));
 
@@ -146,6 +149,8 @@ public class RangerITEnv {
                     RangerITEnv.RANGER_HDFS_REPO_NAME,
                     RangerAuthorizationProperties.RANGER_SERVICE_CREATE_IF_ABSENT,
                     "true",
+                    BaseAuthorization.METALAKE_ID,
+                    METALAKE_ID,
                     BaseAuthorization.CATALOG_ID,
                     CATALOG_ID)));
     rangerAuthHDFSPlugin = spyRangerAuthorizationHDFSPlugin;

@@ -28,6 +28,15 @@ import org.mockito.Mockito;
 public class TestRangerHelper {
 
   @Test
+  public void testGenerateMetalakeOwnerRoleName() {
+    Assertions.assertEquals(
+        "GRAVITINO_METALAKE_OWNER_ROLE_1001", RangerHelper.generateMetalakeOwnerRoleName("1001"));
+    Assertions.assertNotEquals(
+        RangerHelper.generateMetalakeOwnerRoleName("1001"),
+        RangerHelper.generateMetalakeOwnerRoleName("1002"));
+  }
+
+  @Test
   public void testGenerateCatalogOwnerRoleName() {
     Assertions.assertEquals(
         "GRAVITINO_CATALOG_OWNER_ROLE_1001", RangerHelper.generateCatalogOwnerRoleName("1001"));
@@ -46,6 +55,10 @@ public class TestRangerHelper {
             ImmutableSet.of(),
             ImmutableList.of());
 
+    Assertions.assertDoesNotThrow(
+        () ->
+            rangerHelper.createRangerRoleIfNotExists(
+                RangerHelper.generateMetalakeOwnerRoleName("1001"), true));
     Assertions.assertDoesNotThrow(
         () ->
             rangerHelper.createRangerRoleIfNotExists(

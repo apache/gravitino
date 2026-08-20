@@ -68,7 +68,7 @@ Gravitino creates the following managed roles in Ranger and manages their member
 
 | Role                            | Purpose                                                                                          |
 |---------------------------------|---------------------------------------------------------------------------------------------------|
-| `GRAVITINO_METALAKE_OWNER_ROLE` | Holds the users and groups that own the metalake, carrying owner privileges in Ranger policies    |
+| `GRAVITINO_METALAKE_OWNER_ROLE_<metalake_id>` | Holds the user or group that owns the identified metalake, carrying owner privileges in Ranger policies |
 | `GRAVITINO_CATALOG_OWNER_ROLE_<catalog_id>` | Holds the user or group that owns the identified catalog, carrying owner privileges in Ranger policies |
 | `GRAVITINO_OWNER_ROLE`          | Labels the policy items covering schema and table owner privileges, and holds no members          |
 

@@ -229,6 +229,16 @@ public class RangerHelper {
   }
 
   /**
+   * Generate the Ranger owner role name for a metalake.
+   *
+   * @param metalakeId The stable metalake entity ID
+   * @return The metalake-specific Ranger owner role name
+   */
+  public static String generateMetalakeOwnerRoleName(String metalakeId) {
+    return GRAVITINO_METALAKE_OWNER_ROLE + "_" + metalakeId;
+  }
+
+  /**
    * Generate the Ranger owner role name for a catalog.
    *
    * @param catalogId The stable catalog entity ID
@@ -269,19 +279,19 @@ public class RangerHelper {
     roleName = generateGravitinoRoleName(roleName);
     if (isOwnerRole) {
       Preconditions.checkArgument(
-          roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
+          isMetalakeOwnerRole(roleName)
               || isCatalogOwnerRole(roleName)
               || roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
           String.format(
-              "The role name should be %s, start with %s_, or be %s",
+              "The role name should start with %s_ or %s_, or be %s",
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     } else {
       Preconditions.checkArgument(
-          !roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
+          !isMetalakeOwnerRole(roleName)
               && !isCatalogOwnerRole(roleName)
               && !roleName.equalsIgnoreCase(GRAVITINO_OWNER_ROLE),
           String.format(
-              "The role name should not be %s, start with %s_, or be %s",
+              "The role name should not start with %s_ or %s_, or be %s",
               GRAVITINO_METALAKE_OWNER_ROLE, GRAVITINO_CATALOG_OWNER_ROLE, GRAVITINO_OWNER_ROLE));
     }
 
@@ -449,6 +459,16 @@ public class RangerHelper {
     if (!policyItem.getRoles().contains(gravitinoRoleName)) {
       policyItem.getRoles().add(gravitinoRoleName);
     }
+  }
+
+  private static boolean isMetalakeOwnerRole(String roleName) {
+    return roleName.equalsIgnoreCase(GRAVITINO_METALAKE_OWNER_ROLE)
+        || roleName.regionMatches(
+            true,
+            0,
+            GRAVITINO_METALAKE_OWNER_ROLE + "_",
+            0,
+            GRAVITINO_METALAKE_OWNER_ROLE.length() + 1);
   }
 
   private static boolean isCatalogOwnerRole(String roleName) {
