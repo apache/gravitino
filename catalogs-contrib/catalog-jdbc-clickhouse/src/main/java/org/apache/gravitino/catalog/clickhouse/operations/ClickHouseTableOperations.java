@@ -92,9 +92,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
 
-  private static final Pattern ORDER_BY_PATTERN =
-      Pattern.compile(
-          "(?is)\\bORDER\\s+BY\\s*(.+?)(?=\\bPARTITION\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
@@ -782,25 +779,28 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       List<Index> indexes = getIndexes(connection, databaseName, tableName);
       jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
 
-      ShowCreateTableMetadata metadata = parseShowCreateTable(connection, tableName);
-      Transform[] partitioning = metadata.partitioning;
+      SystemTableMetadata systemTableMetadata =
+          getSystemTableMetadata(connection, databaseName, tableName);
+      ShowCreateTableMetadata showCreateMetadata = parseShowCreateTable(connection, tableName);
+      Transform[] partitioning = showCreateMetadata.partitioning;
       if (ArrayUtils.isEmpty(partitioning)) {
         partitioning = getTablePartitioning(connection, databaseName, tableName);
       }
       jdbcTableBuilder.withPartitioning(partitioning);
-      jdbcTableBuilder.withSortOrders(metadata.sortOrders);
+      jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
       jdbcTableBuilder.withDistribution(distribution);
 
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
-      // Merge SETTINGS parsed from SHOW CREATE TABLE into table properties.
-      // SHOW CREATE TABLE is the authoritative source for SETTINGS; it takes precedence
+      // Merge SETTINGS parsed from system.tables.engine_full into table properties.
+      // engine_full contains only table-level storage clauses, so projection SETTINGS cannot be
+      // mistaken for table SETTINGS. These values take precedence
       // over any settings.* keys that might exist in system.tables (though getTableProperties()
       // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
-      if (!metadata.settings.isEmpty()) {
+      if (!systemTableMetadata.settings().isEmpty()) {
         Map<String, String> merged = new HashMap<>(tableProperties);
-        merged.putAll(metadata.settings);
+        merged.putAll(systemTableMetadata.settings());
         tableProperties = Collections.unmodifiableMap(merged);
       }
       jdbcTableBuilder.withProperties(tableProperties);
@@ -828,6 +828,26 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
     return kinds;
+  }
+
+  @VisibleForTesting
+  SystemTableMetadata getSystemTableMetadata(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    String sql =
+        "SELECT sorting_key, engine_full FROM system.tables WHERE database = ? AND name = ?";
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          return new SystemTableMetadata(
+              parseOrderByClause(resultSet.getString("sorting_key")),
+              parseSettingsFromEngineFull(resultSet.getString("engine_full")));
+        }
+      }
+    }
+
+    throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
   }
 
   @Override
@@ -1376,176 +1396,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return ClickHouseTableSqlUtils.parsePartitioning(partitionKey);
   }
 
-  /**
-   * Strips PROJECTION definition blocks from a {@code SHOW CREATE TABLE} DDL string so that
-   * internal {@code ORDER BY} / {@code PARTITION BY} clauses inside projection bodies are not
-   * mistaken for the table-level sort key or partitioning expression.
-   *
-   * <p>A projection block has the form {@code PROJECTION name ( SELECT ... )} and sits inside the
-   * column-definition body of the DDL. This method removes every such block including the optional
-   * trailing comma, while preserving string literals and respecting nested parentheses.
-   *
-   * @param createSql raw {@code SHOW CREATE TABLE} output
-   * @return the DDL with all PROJECTION blocks removed, or the original string if none are found
-   */
-  @VisibleForTesting
-  String stripProjections(String createSql) {
-    if (StringUtils.isBlank(createSql)) {
-      return createSql;
-    }
-
-    StringBuilder result = new StringBuilder(createSql.length());
-    int i = 0;
-    int len = createSql.length();
-
-    while (i < len) {
-      char ch = createSql.charAt(i);
-
-      // ----- skip single-quoted string literals (preserve as-is) -----
-      if (ch == '\'') {
-        result.append(ch);
-        i++;
-        while (i < len) {
-          char c = createSql.charAt(i);
-          result.append(c);
-          if (c == '\'') {
-            // escaped single quote: ''
-            if (i + 1 < len && createSql.charAt(i + 1) == '\'') {
-              result.append('\'');
-              i += 2;
-              continue;
-            }
-            i++;
-            break;
-          }
-          i++;
-        }
-        continue;
-      }
-
-      // ----- skip backtick-quoted identifiers (preserve as-is) -----
-      // NOTE: does not handle ClickHouse double-backtick escaping (``col``name`).
-      // This is safe because SHOW CREATE TABLE output uses only simple ASCII
-      // identifiers where escaping is never necessary, and PROJECTION is always
-      // a keyword (never backtick-quoted).
-      if (ch == '`') {
-        result.append(ch);
-        i++;
-        while (i < len && createSql.charAt(i) != '`') {
-          result.append(createSql.charAt(i));
-          i++;
-        }
-        if (i < len) {
-          result.append(createSql.charAt(i)); // closing backtick
-          i++;
-        }
-        continue;
-      }
-
-      // ----- detect PROJECTION keyword -----
-      if (i + "PROJECTION".length() <= len) {
-        String candidate = createSql.substring(i, i + "PROJECTION".length());
-        if ("PROJECTION".equalsIgnoreCase(candidate)) {
-          // word boundary before
-          boolean boundaryBefore =
-              i == 0 || !Character.isJavaIdentifierPart(createSql.charAt(i - 1));
-          int afterKw = i + "PROJECTION".length();
-          // word boundary after (or end-of-string)
-          boolean boundaryAfter =
-              afterKw >= len || !Character.isJavaIdentifierPart(createSql.charAt(afterKw));
-          if (boundaryBefore && boundaryAfter) {
-            // Skip PROJECTION keyword and whitespace
-            i = afterKw;
-            while (i < len && Character.isWhitespace(createSql.charAt(i))) {
-              i++;
-            }
-            // Skip projection name (backtick-quoted or simple identifier)
-            if (i < len && createSql.charAt(i) == '`') {
-              i++;
-              while (i < len && createSql.charAt(i) != '`') {
-                i++;
-              }
-              if (i < len) i++; // closing backtick
-            } else {
-              while (i < len
-                  && (Character.isJavaIdentifierPart(createSql.charAt(i))
-                      || createSql.charAt(i) == '_')) {
-                i++;
-              }
-            }
-            // Skip whitespace to reach '('
-            while (i < len && Character.isWhitespace(createSql.charAt(i))) {
-              i++;
-            }
-            // Skip the projection body — bracket-counting aware
-            if (i < len && createSql.charAt(i) == '(') {
-              int depth = 1;
-              i++;
-              while (i < len && depth > 0) {
-                char bodyCh = createSql.charAt(i);
-                if (bodyCh == '\'') {
-                  // skip string literal inside projection body
-                  i++;
-                  while (i < len) {
-                    if (createSql.charAt(i) == '\'') {
-                      if (i + 1 < len && createSql.charAt(i + 1) == '\'') {
-                        i += 2;
-                        continue;
-                      }
-                      i++;
-                      break;
-                    }
-                    i++;
-                  }
-                } else {
-                  if (bodyCh == '(') depth++;
-                  else if (bodyCh == ')') depth--;
-                  i++;
-                }
-              }
-              // Skip trailing whitespace and optional comma
-              while (i < len && Character.isWhitespace(createSql.charAt(i))) {
-                i++;
-              }
-              if (i < len && createSql.charAt(i) == ',') {
-                i++;
-              }
-            }
-            continue;
-          }
-        }
-      }
-
-      result.append(ch);
-      i++;
-    }
-
-    return result.toString();
-  }
-
   private ShowCreateTableMetadata parseCreateStatement(String createSql) {
     ShowCreateTableMetadata metadata = new ShowCreateTableMetadata();
     if (StringUtils.isBlank(createSql)) {
       return metadata;
     }
 
-    // Strip PROJECTION blocks first so their internal ORDER BY / PARTITION BY
-    // clauses are not mistaken for the table-level sort key or partitioning.
-    String cleanedSql = stripProjections(createSql);
-
-    Matcher orderMatcher = ORDER_BY_PATTERN.matcher(cleanedSql);
-    if (orderMatcher.find()) {
-      metadata.sortOrders = parseOrderByClause(orderMatcher.group(1));
-    }
-
-    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(cleanedSql);
+    Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(createSql);
     if (partitionMatcher.find()) {
       metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
-    }
-
-    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(cleanedSql);
-    if (settingsMatcher.find()) {
-      metadata.settings = parseSettingsClause(settingsMatcher.group(1));
     }
 
     return metadata;
@@ -1571,13 +1430,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @VisibleForTesting
-  SortOrder[] parseSortOrdersFromCreateSql(String createSql) {
-    return parseCreateStatement(createSql).sortOrders;
-  }
+  Map<String, String> parseSettingsFromEngineFull(String engineFull) {
+    if (StringUtils.isBlank(engineFull)) {
+      return Collections.emptyMap();
+    }
 
-  @VisibleForTesting
-  Map<String, String> parseSettingsFromCreateSql(String createSql) {
-    return parseCreateStatement(createSql).settings;
+    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(engineFull);
+    if (settingsMatcher.find()) {
+      return parseSettingsClause(settingsMatcher.group(1));
+    }
+    return Collections.emptyMap();
   }
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
@@ -1696,10 +1558,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return expression.toString();
   }
 
+  @VisibleForTesting
+  static final class SystemTableMetadata {
+    private final SortOrder[] sortOrders;
+    private final Map<String, String> settings;
+
+    private SystemTableMetadata(SortOrder[] sortOrders, Map<String, String> settings) {
+      this.sortOrders = sortOrders;
+      this.settings = settings;
+    }
+
+    SortOrder[] sortOrders() {
+      return sortOrders;
+    }
+
+    Map<String, String> settings() {
+      return settings;
+    }
+  }
+
   private static final class ShowCreateTableMetadata {
     private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
-    private SortOrder[] sortOrders = SortOrders.NONE;
-    private Map<String, String> settings = Collections.emptyMap();
   }
 
   @VisibleForTesting

@@ -1362,44 +1362,20 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
-  void testParseSortOrdersFromMultilineShowCreateSql() {
-    TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
-    String showCreateSql =
-        """
-        CREATE TABLE `t1`
-        (
-          `id` Int32,
-          `event_time` DateTime
-        )
-        ENGINE = MergeTree
-        ORDER BY
-          (`id`, toDate(`event_time`))
-        SETTINGS index_granularity = 8192
-        """;
-
-    SortOrder[] sortOrders = ops.parseSortOrders(showCreateSql);
-    Assertions.assertEquals(2, sortOrders.length);
-    Assertions.assertTrue(sortOrders[0].expression() instanceof NamedReference);
-    Assertions.assertEquals("id", ((NamedReference) sortOrders[0].expression()).fieldName()[0]);
-  }
-
-  @Test
-  void testParseSettingsFromCreateSql() {
+  void testParseSettingsFromEngineFull() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
 
     // Single setting
-    String sql1 =
-        "CREATE TABLE t1 (id Int32) ENGINE = MergeTree ORDER BY id SETTINGS index_granularity = 4096";
-    Map<String, String> settings1 = ops.parseSettings(sql1);
+    String engineFull1 = "MergeTree ORDER BY id SETTINGS index_granularity = 4096";
+    Map<String, String> settings1 = ops.parseSettings(engineFull1);
     Assertions.assertEquals(1, settings1.size());
     Assertions.assertEquals(
         "4096", settings1.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
 
     // Multiple settings
-    String sql2 =
-        "CREATE TABLE t2 (id Int32) ENGINE = MergeTree ORDER BY id"
-            + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
-    Map<String, String> settings2 = ops.parseSettings(sql2);
+    String engineFull2 =
+        "MergeTree ORDER BY id" + " SETTINGS index_granularity = 4096, min_bytes_for_wide_part = 0";
+    Map<String, String> settings2 = ops.parseSettings(engineFull2);
     Assertions.assertEquals(2, settings2.size());
     Assertions.assertEquals(
         "4096", settings2.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
@@ -1407,15 +1383,15 @@ public class TestClickHouseTableOperations extends TestClickHouse {
         "0", settings2.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
 
     // No SETTINGS clause
-    String sql3 = "CREATE TABLE t3 (id Int32) ENGINE = MergeTree ORDER BY id";
-    Map<String, String> settings3 = ops.parseSettings(sql3);
+    String engineFull3 = "MergeTree ORDER BY id";
+    Map<String, String> settings3 = ops.parseSettings(engineFull3);
     Assertions.assertTrue(settings3.isEmpty());
 
-    // SETTINGS with COMMENT after
-    String sql4 =
-        "CREATE TABLE t4 (id Int32) ENGINE = MergeTree ORDER BY id"
-            + " SETTINGS index_granularity = 8192 COMMENT 'test'";
-    Map<String, String> settings4 = ops.parseSettings(sql4);
+    // Engine arguments before SETTINGS
+    String engineFull4 =
+        "ReplicatedMergeTree('/path', '{replica}') ORDER BY id"
+            + " SETTINGS index_granularity = 8192";
+    Map<String, String> settings4 = ops.parseSettings(engineFull4);
     Assertions.assertEquals(1, settings4.size());
     Assertions.assertEquals(
         "8192", settings4.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
@@ -1435,12 +1411,8 @@ public class TestClickHouseTableOperations extends TestClickHouse {
           tableName, columns, comment, properties, partitioning, distribution, indexes, sortOrders);
     }
 
-    SortOrder[] parseSortOrders(String createSql) {
-      return parseSortOrdersFromCreateSql(createSql);
-    }
-
-    Map<String, String> parseSettings(String createSql) {
-      return parseSettingsFromCreateSql(createSql);
+    Map<String, String> parseSettings(String engineFull) {
+      return parseSettingsFromEngineFull(engineFull);
     }
   }
 
