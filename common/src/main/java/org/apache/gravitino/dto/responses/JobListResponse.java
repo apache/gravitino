@@ -38,6 +38,15 @@ public class JobListResponse extends BaseResponse {
   private final Map<String, Long> statusCounts;
 
   /**
+   * Creates a new JobListResponse with the specified list of jobs and no per-status counts.
+   *
+   * @param jobs The list of jobs to include in the response.
+   */
+  public JobListResponse(List<JobDTO> jobs) {
+    this(jobs, null);
+  }
+
+  /**
    * Creates a new JobListResponse with the specified list of jobs and per-status counts.
    *
    * @param jobs The list of jobs to include in the response.

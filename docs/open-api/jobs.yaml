@@ -569,7 +569,7 @@ components:
             - "failed"
             - "succeeded"
             - "cancelling"
-            - "canceled"
+            - "cancelled"
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
         queuedAt:
