@@ -115,6 +115,20 @@ public class OwnerMetaSQLProviderFactory {
         .batchSelectUserOwnerMetaByMetadataObjectIdAndType(metadataObjectIds, metadataObjectType);
   }
 
+  /**
+   * Builds SQL to select group owners for the specified metadata objects.
+   *
+   * @param metadataObjectIds IDs of the metadata objects
+   * @param metadataObjectType type of the metadata objects
+   * @return SQL for selecting group owners
+   */
+  public static String batchSelectGroupOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return getProvider()
+        .batchSelectGroupOwnerMetaByMetadataObjectIdAndType(metadataObjectIds, metadataObjectType);
+  }
+
   public static String selectOwnerByMetadataObjectIdAndType(
       @Param("metadataObjectId") long metadataObjectId,
       @Param("metadataObjectType") String metadataObjectType) {
