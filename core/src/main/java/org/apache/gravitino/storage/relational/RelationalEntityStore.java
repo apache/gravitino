@@ -565,6 +565,8 @@ public class RelationalEntityStore
         return Entity.EntityType.POLICY;
       case TAG_METADATA_OBJECT_REL:
         return Entity.EntityType.TAG;
+      case POLICY_TAG_REL:
+        return Entity.EntityType.POLICY;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

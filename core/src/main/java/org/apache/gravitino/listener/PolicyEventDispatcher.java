@@ -59,6 +59,7 @@ import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosForMetadata
 import org.apache.gravitino.listener.api.event.policy.ListPolicyInfosPreEvent;
 import org.apache.gravitino.listener.api.info.PolicyInfo;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.PolicyTagAssociationEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
@@ -286,6 +287,12 @@ public class PolicyEventDispatcher implements PolicyDispatcher {
               e));
       throw e;
     }
+  }
+
+  @Override
+  public PolicyTagAssociationEntity[] listTagAssociationsForPolicy(
+      String metalake, String policyName) {
+    return dispatcher.listTagAssociationsForPolicy(metalake, policyName);
   }
 
   @Override

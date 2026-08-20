@@ -204,8 +204,10 @@ public class TestSecurableObjects {
     Privilege useModel = Privileges.UseModel.allow();
     Privilege createTag = Privileges.CreateTag.allow();
     Privilege applyTag = Privileges.ApplyTag.allow();
+    Privilege viewTag = Privileges.ViewTag.allow();
     Privilege createPolicy = Privileges.CreatePolicy.allow();
     Privilege applyPolicy = Privileges.ApplyPolicy.allow();
+    Privilege viewPolicy = Privileges.ViewPolicy.allow();
     Privilege registerJobTemplate = Privileges.RegisterJobTemplate.allow();
     Privilege runJob = Privileges.RunJob.allow();
     Privilege useJobTemplate = Privileges.UseJobTemplate.allow();
@@ -214,6 +216,13 @@ public class TestSecurableObjects {
     Privilege registerFunction = Privileges.RegisterFunction.allow();
     Privilege executeFunction = Privileges.ExecuteFunction.allow();
     Privilege modifyFunction = Privileges.ModifyFunction.allow();
+
+    Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(viewTag.canBindTo(MetadataObject.Type.TAG));
+    Assertions.assertFalse(viewTag.canBindTo(MetadataObject.Type.POLICY));
+    Assertions.assertTrue(viewPolicy.canBindTo(MetadataObject.Type.METALAKE));
+    Assertions.assertTrue(viewPolicy.canBindTo(MetadataObject.Type.POLICY));
+    Assertions.assertFalse(viewPolicy.canBindTo(MetadataObject.Type.TAG));
 
     // Test create catalog
     Assertions.assertTrue(createCatalog.canBindTo(MetadataObject.Type.METALAKE));

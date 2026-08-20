@@ -162,12 +162,14 @@ tagged.
 | Privilege    | Grantable on              | What it allows                              |
 |--------------|---------------------------|---------------------------------------------|
 | `CREATE_TAG` | Metalake                  | Creating tags in the metalake               |
-| `APPLY_TAG`  | Metalake, or a single tag | Reading a tag and attaching or detaching it |
+| `APPLY_TAG`  | Metalake, or a single tag | Attaching or detaching the tag              |
+| `VIEW_TAG`   | Metalake, or a single tag | Reading tag metadata and associations       |
 
 Altering and deleting a tag are reserved for the metalake owner and the tag owner.
 Attaching a tag also requires access to the object being tagged, so a user who can apply a tag
 cannot use it to reach an object they could not otherwise see. Tag listings show only the tags that
-user is allowed to read.
+user is allowed to read. An `APPLY_TAG` grant also satisfies tag read checks unless `VIEW_TAG` is
+explicitly denied.
 
 ## Using the API
 

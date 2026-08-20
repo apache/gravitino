@@ -183,6 +183,7 @@ public class IcebergDataCompactionContent implements PolicyContent {
   }
 
   @Override
+  @Deprecated
   public Set<MetadataObject.Type> supportedObjectTypes() {
     return SUPPORTED_OBJECT_TYPES;
   }

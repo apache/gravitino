@@ -154,6 +154,7 @@ public class PolicyContents {
     }
 
     @Override
+    @Deprecated
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return supportedObjectTypes;
     }

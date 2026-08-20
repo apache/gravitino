@@ -205,6 +205,37 @@ paths:
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
 
+  /metalakes/{metalake}/policies/{policy}/tags:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/policy"
+    get:
+      tags:
+        - policy
+        - tag
+      summary: List tags associated with a policy
+      operationId: listTagsForPolicy
+      parameters:
+        - $ref: "#/components/parameters/details"
+      responses:
+        "200":
+          description: Returns tag names, or tag association details when details is true
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                oneOf:
+                  - $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+                  - $ref: "#/components/schemas/TagForPolicyAssociationListResponse"
+        "404":
+          description: Not Found - The specified metalake or policy does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies:
     parameters:
       - $ref: "./openapi.yaml#/components/parameters/metalake"
@@ -213,13 +244,14 @@ paths:
     get:
       tags:
         - policy
-      summary: List policies (names) for metadata object
+      summary: Resolve policies (names) for metadata object
       operationId: listPoliciesForMetadataObject
+      description: Resolves enabled policies from the metadata object's effective tags and matching policy-to-tag selectors. This operation is read-only.
       parameters:
         - $ref: "#/components/parameters/details"
       responses:
         "200":
-          description: Returns the list of policy objects associated with specified metadata object if {details} is true, otherwise returns the list of policy name
+          description: Returns the resolved policy objects if {details} is true, otherwise returns the resolved policy names
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -244,92 +276,6 @@ paths:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-    post:
-      tags:
-        - policy
-      summary: Associate policies with metadata object
-      description: Associate and disassociate policies with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN
-      operationId: associatePoliciesForObject
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/PoliciesAssociateRequest"
-            examples:
-              PolicyAssociate:
-                $ref: "#/components/examples/PolicyAssociate"
-      responses:
-        "200":
-          description: Returns the list of policy names associated with the specified metadata object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
-              examples:
-                NameListResponse:
-                  $ref: "#/components/examples/NameListResponse"
-        "404":
-          description: Not Found - The specified metalake does not exist
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-        "409":
-          description: Conflict - The target policy already associated with the specified metadata object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                PolicyAlreadyAssociatedException:
-                  $ref: "#/components/examples/PolicyAlreadyAssociatedException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-
-  /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/policies/{policy}:
-    parameters:
-      - $ref: "./openapi.yaml#/components/parameters/metalake"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectType"
-      - $ref: "./openapi.yaml#/components/parameters/metadataObjectFullName"
-      - $ref: "./openapi.yaml#/components/parameters/policy"
-    get:
-      tags:
-        - policy
-      summary: Get policy for metadata object
-      operationId: getPolicyForObject
-      parameters:
-        - $ref: "#/components/parameters/details"
-      responses:
-        "200":
-          description: Returns the policy object associated with specified metadata object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "#/components/schemas/PolicyResponse"
-              examples:
-                PolicyResponse:
-                  $ref: "#/components/examples/PolicyResponse"
-        "400":
-          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
-        "404":
-          description: Not Found - The specified metalake does not exist or the specified policy is not associated with the specified metadata object
-          content:
-            application/vnd.gravitino.v1+json:
-              schema:
-                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
-              examples:
-                NoSuchPolicyException:
-                  $ref: "#/components/examples/NoSuchPolicyException"
-                NoSuchMetalakeException:
-                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
-        "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
 
   /metalakes/{metalake}/policies/{policy}/objects:
     parameters:
@@ -377,6 +323,50 @@ components:
         default: false
 
   schemas:
+
+    PolicyTagSelector:
+      type: object
+      required:
+        - type
+        - value
+      properties:
+        type:
+          type: string
+          enum:
+            - TAG_VALUE
+        value:
+          type: string
+          minLength: 1
+          maxLength: 256
+
+    TagForPolicyAssociation:
+      type: object
+      required:
+        - tag
+      properties:
+        tag:
+          $ref: "./tags.yaml#/components/schemas/Tag"
+        selector:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/PolicyTagSelector"
+          nullable: true
+
+    TagForPolicyAssociationListResponse:
+      type: object
+      required:
+        - code
+        - associations
+      properties:
+        code:
+          type: integer
+          format: int32
+          enum:
+            - 0
+        associations:
+          type: array
+          items:
+            $ref: "#/components/schemas/TagForPolicyAssociation"
 
     PolicyContentBase:
       type: object

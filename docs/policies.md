@@ -152,20 +152,19 @@ The policy list holds every policy in the metalake and can be searched. A policy
 comment and rules edited, and its enabled flag switched from there. Policies created over REST,
 including built-in ones, appear in the list alongside the rest.
 
-Deleting a policy removes it from every object it was attached to, with no warning about how many
-objects that affects and no way to recover the attachments.
+Deleting a policy removes all of its tag associations, with no way to recover them.
 
 ### Attaching and Detaching
 
-Policies attach from the object rather than from the policy, so open the object and use the policy
-control there. Inherited policies carry no remove control. Detaching removes the direct attachment
-only, so an object still shows a policy it inherits from an ancestor.
+Policies associate with tags rather than directly with metadata objects. An object derives enabled
+policies from its effective tags, including inherited tags. A policy-to-tag association may include
+a `TAG_VALUE` selector so the policy applies only when the effective tag assignment contains the
+selected value. Create or remove these associations through the tag-scoped REST or Java APIs.
 
 ### Finding Where a Policy Is Used
 
-Selecting a policy name opens a view listing the objects the policy is attached to directly.
-Inherited reach is not included, so a policy attached to one catalog lists that catalog rather than
-the tables under it.
+Use the policy-scoped tag association API to list the tags associated with a policy. The result is a
+direct relation list; metadata objects affected through those tags are resolved dynamically.
 
 ## Permissions
 
@@ -175,11 +174,13 @@ governed.
 | Privilege       | Grantable on                 | What it allows                                 |
 |-----------------|------------------------------|------------------------------------------------|
 | `CREATE_POLICY` | Metalake                     | Creating policies in the metalake              |
-| `APPLY_POLICY`  | Metalake, or a single policy | Reading a policy and attaching or detaching it |
+| `APPLY_POLICY`  | Metalake, or a single policy | Associating or disassociating it with a tag     |
+| `VIEW_POLICY`   | Metalake, or a single policy | Reading policy metadata and associations        |
 
-Altering and deleting a policy are reserved for the metalake owner and the policy owner. Attaching a
-policy also requires access to the object being governed. Policy listings show only the policies
-that user is allowed to read.
+Altering and deleting a policy are reserved for the metalake owner and the policy owner. Changing a
+policy-to-tag association requires `APPLY_POLICY` for the policy and `APPLY_TAG` for the tag. Policy
+listings show only the policies that the user is allowed to read. An `APPLY_POLICY` grant also
+satisfies policy read checks unless `VIEW_POLICY` is explicitly denied.
 
 ## Using the API
 
