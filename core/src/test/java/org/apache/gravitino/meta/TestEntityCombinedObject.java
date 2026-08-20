@@ -113,6 +113,37 @@ public class TestEntityCombinedObject {
   }
 
   @Test
+  public void testTableAuditMergePreservesCatalogValues() {
+    // Simulate: catalog provides creator/createTime (from Iceberg metadata),
+    // entity store only has lastModifier/lastModifiedTime (no creator/createTime).
+    AuditInfo entityAudit =
+        AuditInfo.builder()
+            .withLastModifier("entityModifier")
+            .withLastModifiedTime(Instant.parse("2025-06-01T00:00:00Z"))
+            .build();
+
+    TableEntity tableEntity =
+        TableEntity.builder()
+            .withId(1L)
+            .withName("testTable")
+            .withNamespace(org.apache.gravitino.Namespace.of("metalake", "catalog", "schema"))
+            .withAuditInfo(entityAudit)
+            .build();
+
+    EntityCombinedTable combined =
+        EntityCombinedTable.of(originTable, tableEntity).withHiddenProperties(hiddenProperties);
+
+    // Entity store's lastModifier/lastModifiedTime should win
+    Assertions.assertEquals("entityModifier", combined.auditInfo().lastModifier());
+    Assertions.assertEquals(
+        Instant.parse("2025-06-01T00:00:00Z"), combined.auditInfo().lastModifiedTime());
+    // Catalog-level creator/createTime should be preserved (not overwritten with null)
+    Assertions.assertEquals("creator", combined.auditInfo().creator());
+    Assertions.assertEquals(
+        Instant.parse("2025-01-01T00:00:00Z"), combined.auditInfo().createTime());
+  }
+
+  @Test
   public void testFileset() {
     EntityCombinedFileset entityCombinedFileset =
         EntityCombinedFileset.of(originFileset).withHiddenProperties(hiddenProperties);
