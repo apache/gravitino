@@ -198,6 +198,10 @@ public class CatalogRegister {
     }
 
     if (StringUtils.isBlank(truststorePath)) {
+      // The driver falls back to the default JVM truststore, which the password and the type of a
+      // truststore that was never configured have nothing to apply to.
+      checkRequiresTruststorePath("trino.jdbc.ssl.truststore.password", truststorePassword);
+      checkRequiresTruststorePath("trino.jdbc.ssl.truststore.type", truststoreType);
       return;
     }
 
@@ -213,6 +217,14 @@ public class CatalogRegister {
           String.format(
               "The truststore file configured by 'trino.jdbc.ssl.truststore.path' does not exist: %s",
               truststorePath));
+    }
+  }
+
+  private static void checkRequiresTruststorePath(String key, String value) {
+    if (StringUtils.isNotEmpty(value)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format("Config '%s' requires 'trino.jdbc.ssl.truststore.path' to be set", key));
     }
   }
 
