@@ -46,6 +46,7 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -162,7 +163,8 @@ public class ModelVersionMetaService {
     NameIdentifier modelIdent = modelVersionEntity.modelIdentifier();
     NameIdentifierUtil.checkModel(modelIdent);
 
-    Long modelId = EntityIdService.getEntityId(modelIdent, Entity.EntityType.MODEL);
+    ModelPO modelPO = ModelMetaService.getInstance().getModelPOByIdentifier(modelIdent);
+    Long modelId = modelPO.getModelId();
 
     List<ModelVersionPO> modelVersionPOs =
         POConverters.initializeModelVersionPO(modelVersionEntity, modelId);
@@ -171,6 +173,10 @@ public class ModelVersionMetaService {
 
     try {
       SessionUtils.doMultipleWithCommit(
+          // Model versions carry the schema ID directly, so they must take the same parent fence
+          // as models. Otherwise a schema cascade can pass its model-version cleanup and a
+          // concurrent registration can insert a new active version below the deleted schema.
+          () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
@@ -183,10 +189,17 @@ public class ModelVersionMetaService {
                 ModelVersionAliasRelMapper.class,
                 mapper -> mapper.insertModelVersionAliasRels(aliasRelPOs));
           },
-          () ->
-              // If the model version is inserted successfully, update the model latest version.
-              SessionUtils.doWithoutCommit(
-                  ModelMetaMapper.class, mapper -> mapper.updateModelLatestVersion(modelId)));
+          () -> {
+            // If the model version is inserted successfully, update the model latest version. A
+            // zero result means the model disappeared after the read above, so the inserted version
+            // and aliases must roll back with this transaction.
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    ModelMetaMapper.class, mapper -> mapper.updateModelLatestVersion(modelId));
+            if (updated == 0) {
+              throw noSuchModelException(modelIdent);
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL_VERSION, modelVersionEntity.modelIdentifier().toString());
@@ -291,17 +304,17 @@ public class ModelVersionMetaService {
     NameIdentifier modelIdent = NameIdentifier.of(ident.namespace().levels());
 
     boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
-    ModelEntity modelEntity = ModelMetaService.getInstance().getModelByIdentifier(modelIdent);
+    ModelPO modelPO = ModelMetaService.getInstance().getModelPOByIdentifier(modelIdent);
+    Long modelId = modelPO.getModelId();
 
     List<ModelVersionPO> oldModelVersionPOs =
         SessionUtils.getWithoutCommit(
             ModelVersionMetaMapper.class,
             mapper -> {
               if (isVersionNumber) {
-                return mapper.selectModelVersionMeta(
-                    modelEntity.id(), Integer.valueOf(ident.name()));
+                return mapper.selectModelVersionMeta(modelId, Integer.valueOf(ident.name()));
               } else {
-                return mapper.selectModelVersionMetaByAlias(modelEntity.id(), ident.name());
+                return mapper.selectModelVersionMetaByAlias(modelId, ident.name());
               }
             });
 
@@ -318,10 +331,9 @@ public class ModelVersionMetaService {
             mapper -> {
               if (isVersionNumber) {
                 return mapper.selectModelVersionAliasRelsByModelIdAndVersion(
-                    modelEntity.id(), Integer.valueOf(ident.name()));
+                    modelId, Integer.valueOf(ident.name()));
               } else {
-                return mapper.selectModelVersionAliasRelsByModelIdAndAlias(
-                    modelEntity.id(), ident.name());
+                return mapper.selectModelVersionAliasRelsByModelIdAndAlias(modelId, ident.name());
               }
             });
 
@@ -339,8 +351,7 @@ public class ModelVersionMetaService {
     boolean isAliasChanged =
         isModelVersionAliasUpdated(oldModelVersionEntity, newModelVersionEntity);
     List<ModelVersionAliasRelPO> newAliasRelPOs =
-        POConverters.updateModelVersionAliasRelPO(
-            oldAliasRelPOs, newModelVersionEntity, modelEntity.id());
+        POConverters.updateModelVersionAliasRelPO(oldAliasRelPOs, newModelVersionEntity, modelId);
 
     boolean isModelVersionUriUpdated =
         isModelVersionUriUpdated(oldModelVersionEntity, newModelVersionEntity);
@@ -348,6 +359,9 @@ public class ModelVersionMetaService {
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
+          // URI and alias updates can reinsert active model-version rows, so they need the same
+          // schema fence as a new version registration.
+          () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
           () -> {
             if (isModelVersionUriUpdated) {
               // delete old model version POs first
@@ -357,16 +371,16 @@ public class ModelVersionMetaService {
                       mapper -> {
                         if (isVersionNumber) {
                           return mapper.softDeleteModelVersionMetaByModelIdAndVersion(
-                              modelEntity.id(), Integer.valueOf(ident.name()));
+                              modelId, Integer.valueOf(ident.name()));
                         } else {
                           return mapper.softDeleteModelVersionMetaByModelIdAndAlias(
-                              modelEntity.id(), ident.name());
+                              modelId, ident.name());
                         }
                       }));
 
               // insert model version POs with updated URIs
               List<ModelVersionPO> modelVersionPOs =
-                  POConverters.initializeModelVersionPO(newModelVersionEntity, modelEntity.id());
+                  POConverters.initializeModelVersionPO(newModelVersionEntity, modelId);
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
                   mapper -> mapper.insertModelVersionMetasWithVersionNumber(modelVersionPOs));
@@ -392,7 +406,7 @@ public class ModelVersionMetaService {
                           .forEach(
                               alias ->
                                   mapper.softDeleteModelVersionAliasRelsByModelIdAndAlias(
-                                      modelEntity.id(), alias)));
+                                      modelId, alias)));
 
               SessionUtils.doWithoutCommit(
                   ModelVersionAliasRelMapper.class,
@@ -430,5 +444,22 @@ public class ModelVersionMetaService {
     Map<String, String> oldUris = oldModelVersionEntity.uris();
     Map<String, String> newUris = newModelVersionEntity.uris();
     return !oldUris.equals(newUris);
+  }
+
+  private void lockSchemaForModelVersionWrite(
+      NameIdentifier modelIdentifier, ModelPO observedModelPO) {
+    SchemaMetaService.getInstance()
+        .lockSchemaForEntityWrite(
+            modelIdentifier,
+            observedModelPO.getSchemaId(),
+            observedModelPO.getCatalogId(),
+            observedModelPO.getMetalakeId());
+  }
+
+  private NoSuchEntityException noSuchModelException(NameIdentifier modelIdentifier) {
+    return new NoSuchEntityException(
+        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+        Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+        modelIdentifier.toString());
   }
 }
