@@ -35,6 +35,7 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
 import org.apache.gravitino.rel.SupportsPartitions;
@@ -219,6 +220,9 @@ public abstract class OperationDispatcher {
     R ret = null;
     try {
       ret = fn.apply(ident);
+    } catch (OptimisticLockException e) {
+      // A version conflict is actionable: the caller must retry against the latest entity.
+      throw e;
     } catch (NoSuchEntityException e) {
       // Case 2: The table is created by Gravitino, but has no corresponding entity in Gravitino.
       LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);

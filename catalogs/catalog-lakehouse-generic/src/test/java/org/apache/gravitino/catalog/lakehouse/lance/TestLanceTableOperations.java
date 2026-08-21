@@ -48,6 +48,7 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -174,10 +175,10 @@ public class TestLanceTableOperations {
   /**
    * Reproduces the concurrent repair-on-load race seen in {@code LanceSparkRESTServiceIT}. When two
    * loads repair the same table at once, the optimistic-locked {@code store.update} of the slower
-   * one matches zero rows and {@code TableMetaService} surfaces it as {@code IOException("Failed to
-   * update the entity")}. Before the CAS retry, {@code repairTableMetadata} rethrew it as a fatal
-   * {@code RuntimeException} (HTTP 500) instead of tolerating the concurrent update. This test
-   * asserts that the lost race is benign and load returns a usable table.
+   * one matches zero rows and the store surfaces an {@link OptimisticLockException}. Before the CAS
+   * retry, {@code repairTableMetadata} rethrew it as a fatal error (HTTP 500) instead of tolerating
+   * the concurrent update. This test asserts that the lost race is benign and load returns a usable
+   * table.
    */
   @Test
   public void testLoadTableSurvivesConcurrentRepairVersionRace() throws Exception {
@@ -219,10 +220,10 @@ public class TestLanceTableOperations {
     when(idGenerator.nextId()).thenReturn(10L, 11L);
 
     // First repair attempt loses the optimistic-lock CAS (a concurrent load already bumped the
-    // version): TableMetaService surfaces exactly this IOException. The retry re-reads the winner's
-    // already-repaired entity, against which the idempotent updater succeeds.
+    // version). The retry re-reads the winner's already-repaired entity, against which the
+    // idempotent updater succeeds.
     when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
-        .thenThrow(new IOException("Failed to update the entity: " + ident))
+        .thenThrow(new OptimisticLockException("mock conflict"))
         .thenAnswer(
             invocation -> {
               @SuppressWarnings("unchecked")
@@ -253,6 +254,58 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(2, loadedTable.columns().length);
     Assertions.assertEquals("id", loadedTable.columns()[0].name());
     Assertions.assertEquals("name", loadedTable.columns()[1].name());
+  }
+
+  @Test
+  public void testRepairStopsAfterBoundedOptimisticLockRetries() throws Exception {
+    NameIdentifier ident = prepareDeclaredTableForRepair("repair-conflict-exhausted");
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(new OptimisticLockException("mock conflict"));
+    // Remove the real sleep so this test checks the retry bound without becoming timing-sensitive.
+    Mockito.doNothing().when(lanceTableOps).backoffBeforeRetry(any());
+
+    OptimisticLockException failure =
+        Assertions.assertThrows(
+            OptimisticLockException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident)));
+    Assertions.assertInstanceOf(OptimisticLockException.class, failure.getCause());
+    verify(store, Mockito.times(5))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testRepairDoesNotRetryOrdinaryIoFailure() throws Exception {
+    NameIdentifier ident = prepareDeclaredTableForRepair("repair-io-failure");
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenThrow(new IOException("database unavailable"));
+
+    RuntimeException failure =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () ->
+                PrincipalUtils.doAs(
+                    new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident)));
+    Assertions.assertInstanceOf(IOException.class, failure.getCause());
+    verify(store, Mockito.times(1))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testRepairBackoffPreservesThreadInterrupt() {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    Thread.currentThread().interrupt();
+    try {
+      IOException failure =
+          Assertions.assertThrows(IOException.class, () -> lanceTableOps.backoffBeforeRetry(ident));
+
+      Assertions.assertInstanceOf(InterruptedException.class, failure.getCause());
+      Assertions.assertTrue(Thread.currentThread().isInterrupted());
+    } finally {
+      // JUnit reuses worker threads, so do not leak this test's interrupt flag into another test.
+      Thread.interrupted();
+    }
   }
 
   @Test
@@ -953,5 +1006,32 @@ public class TestLanceTableOperations {
         .withAuditInfo(
             AuditInfo.builder().withCreator("creator").withCreateTime(Instant.EPOCH).build())
         .build();
+  }
+
+  private NameIdentifier prepareDeclaredTableForRepair(String directoryName) throws Exception {
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve(directoryName).toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_DECLARED,
+                "true",
+                LANCE_STORAGE_OPTIONS_PREFIX + "endpoint",
+                "http://endpoint"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("id", new ArrowType.Int(32, true)))));
+    when(dataset.version()).thenReturn(8L);
+    Mockito.doReturn(dataset)
+        .when(lanceTableOps)
+        .openDataset(location, Map.of("endpoint", "http://endpoint"));
+    return ident;
   }
 }
