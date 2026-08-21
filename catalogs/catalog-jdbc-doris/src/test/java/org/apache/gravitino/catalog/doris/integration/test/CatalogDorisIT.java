@@ -18,6 +18,13 @@
  */
 package org.apache.gravitino.catalog.doris.integration.test;
 
+<<<<<<< HEAD
+=======
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.BLOOM_FILTER_COLUMNS;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.COMPRESSION;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
+>>>>>>> d38268a57 ([#11829] fix(doris): support replication allocation property (#11877))
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -378,6 +385,29 @@ public class CatalogDorisIT extends BaseIT {
         null,
         Transforms.EMPTY_TRANSFORM,
         renamedTable);
+  }
+
+  @Test
+  void testCreateTableWithReplicationAllocation() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("doris_replication_allocation"));
+    String replicationAllocation = "tag.location.default: 1";
+    Map<String, String> properties = ImmutableMap.of(REPLICATION_ALLOCATION, replicationAllocation);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    assertEquals(replicationAllocation, loadedTable.properties().get(REPLICATION_ALLOCATION));
+    assertFalse(loadedTable.properties().containsKey(REPLICATION_FACTOR));
   }
 
   @Test

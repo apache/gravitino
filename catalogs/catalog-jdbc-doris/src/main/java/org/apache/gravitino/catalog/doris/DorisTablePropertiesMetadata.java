@@ -28,6 +28,7 @@ import org.apache.gravitino.connector.PropertyEntry;
 public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
 
   public static final String REPLICATION_FACTOR = "replication_num";
+  public static final String REPLICATION_ALLOCATION = "replication_allocation";
   public static final int DEFAULT_REPLICATION_FACTOR = 1;
   public static final int DEFAULT_REPLICATION_FACTOR_IN_SERVER_SIDE = 3;
 
@@ -42,6 +43,49 @@ public class DorisTablePropertiesMetadata extends JdbcTablePropertiesMetadata {
                     + " the default value will be used",
                 false /* immutable */,
                 DEFAULT_REPLICATION_FACTOR, /* default value */
+<<<<<<< HEAD
+=======
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                REPLICATION_ALLOCATION,
+                "The replication allocation policy for the table.",
+                false /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                COMPRESSION,
+                "The compression type for the table (ZSTD, LZ4, LZ4F, ZLIB)."
+                    + " Deprecated as a table-level property in Doris 4.0+."
+                    + " Cannot be changed via ALTER TABLE.",
+                true /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                BLOOM_FILTER_COLUMNS,
+                "Comma-separated list of columns for which bloom filter indexes are created",
+                false /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                STORAGE_POLICY,
+                "The name of the storage policy for cold-hot separation",
+                false /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                LIGHT_SCHEMA_CHANGE,
+                "Whether light schema change is enabled for the table. "
+                    + "Can be modified via ALTER TABLE SET",
+                false /* immutable */,
+                null /* default value */,
+                false /* hidden */),
+            PropertyEntry.stringOptionalPropertyEntry(
+                ENABLE_UNIQUE_KEY_MERGE_ON_WRITE,
+                "Whether merge-on-write is enabled for Unique Key tables. "
+                    + "Must be set at CREATE TABLE time; Doris rejects ALTER TABLE SET",
+                true /* immutable */,
+                null /* default value */,
+>>>>>>> d38268a57 ([#11829] fix(doris): support replication allocation property (#11877))
                 false /* hidden */));
 
     PROPERTIES_METADATA = Maps.uniqueIndex(propertyEntries, PropertyEntry::getName);
