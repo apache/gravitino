@@ -270,9 +270,124 @@ object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on 
 | Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
 | Job          |                         | Owner                                  | Owner           |                                           |
 
+Bulk user access-control APIs use the same privileges as the matching single-user operations. These
+bulk operations are authorized once before processing the request. Bulk user requests report
+item-level failures in `errors`.
+
+| API                                                | Required privilege                        |
+|----------------------------------------------------|-------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`    | `OWNER` of the metalake or `MANAGE_USERS` |
+| `POST /api/bulk/metalakes/{metalake}/users/remove` | `OWNER` of the metalake or `MANAGE_USERS` |
+
+For example, add users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "users": [
+    {"name": "analyst"},
+    {"name": "developer", "externalId": "developer@example.com", "enabled": true}
+  ]
+}'
+```
+
+Remove users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analyst", "developer"]
+}'
+```
+
 Granting or revoking a privilege on an object takes `MANAGE_GRANTS` on that object or an ancestor.
 Granting or revoking a role, and overriding a role's privileges, takes `MANAGE_GRANTS` on the
 metalake. Setting an owner takes ownership.
+
+## Narrowing Access with Active Roles
+
+By default, a request is evaluated against every role the caller holds. The `X-Gravitino-Active-Roles`
+header narrows that set for the request that carries it, so a workload runs with only the roles it
+needs instead of every role its user has been granted.
+
+```text
+X-Gravitino-Active-Roles: analyst,reader
+```
+
+| Value               | Meaning                                             |
+|---------------------|-----------------------------------------------------|
+| `analyst`           | Activate one named role                             |
+| `analyst,reader`    | Activate several; access is the union of just these |
+| `ALL`               | Activate every role the caller holds                |
+| `NONE`              | Activate no role                                    |
+| *(absent or empty)* | Same as `ALL`                                       |
+
+Role names are matched exactly, and `ALL` and `NONE` are recognized only in upper case, so `all` is
+read as the name of a role. Surrounding whitespace is trimmed and repeated names collapse.
+
+### What Narrowing Changes
+
+Narrowing only ever subtracts. The server validates the declaration against the roles the caller
+actually holds, so the header can never widen access, and a caller that omits it is evaluated exactly
+as before.
+
+- **`DENY` stays global.** A deny carried by any role the caller holds still applies even when that
+  role is not active, so narrowing cannot be used to escape a denial.
+- **Ownership is untouched.** Access that comes from owning an object is granted to the owner
+  directly rather than through a role, so an owner keeps it even under `NONE`.
+- **Every decision in the request is narrowed**, not only direct checks. List results are filtered
+  against the active set, and so are the privileges behind credential vending: an Iceberg caller
+  whose active roles no longer carry `MODIFY_TABLE` is vended a read-only storage credential in place
+  of a writable one.
+
+### Errors
+
+| Condition                                                          | Response          |
+|--------------------------------------------------------------------|-------------------|
+| An empty entry, such as the trailing comma in `analyst,`             | `400 Bad Request` |
+| `ALL` or `NONE` combined with anything else, such as `ALL,analyst`   | `400 Bad Request` |
+| A well-formed value naming a role the caller does not hold           | `403 Forbidden`   |
+
+A role that does not exist and a role the caller was never granted both return `403`, so the response
+cannot be used to discover which role names exist. An unheld role is rejected rather than ignored,
+which surfaces a typo immediately instead of silently reducing access.
+
+### Sending the Header
+
+Apache Spark forwards any `header.*` catalog property to the Iceberg REST catalog:
+
+```properties
+spark.sql.catalog.{catalog}.header.X-Gravitino-Active-Roles = analyst
+```
+
+Trino 481 and later forwards headers configured on the catalog:
+
+```properties
+iceberg.rest-catalog.http-headers = X-Gravitino-Active-Roles: analyst
+```
+
+Both are catalog-level and static, so the same value applies to every user and session using that
+catalog. The Java client sets the header per client instance:
+
+```java
+GravitinoClient.builder(uri)
+    .withMetalake("metalake")
+    .withHeaders(ImmutableMap.of("X-Gravitino-Active-Roles", "analyst"))
+    .build();
+```
+
+### Scope
+
+Narrowing applies where Gravitino enforces authorization itself: the native REST API and the Iceberg
+REST catalog. Catalogs that push enforcement down to an external system evaluate against the mapped
+user and groups and never see the declaration, so the header has no effect there. See
+[Authorization Pushdown](authorization-pushdown.md).
 
 ## Server Configuration
 
@@ -587,5 +702,4 @@ client.setOwner(schema, "analyst", Owner.Type.USER);
 - [Authorization Pushdown](authorization-pushdown.md), for pushing enforcement down to the underlying
   data source or to an external system such as Apache Ranger
 - [How to Authenticate](how-to-authenticate.md), for establishing who the caller is
-- [How to Use the Built-in IdP](how-to-use-built-in-idp.md)
-- [Security](security.md)
+- [Local users and groups](local-users-and-groups.md)

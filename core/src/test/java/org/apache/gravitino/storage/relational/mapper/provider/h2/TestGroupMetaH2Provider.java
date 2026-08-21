@@ -103,7 +103,7 @@ class TestGroupMetaH2Provider {
     try (ResultSet rs = statement.executeQuery(sql)) {
       rs.next();
       assertEquals("[\"role1\",\"role2\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
-      assertEquals("[\"1\",\"2\"]", rs.getString(COLUMN_LABEL_ROLE_IDS));
+      assertEquals("[1,2]", rs.getString(COLUMN_LABEL_ROLE_IDS));
     }
   }
 
@@ -125,8 +125,9 @@ class TestGroupMetaH2Provider {
             .replace(QUERY_PARAM_METALAKE_ID, "3");
     try (ResultSet rs = statement.executeQuery(sql)) {
       rs.next();
-      assertEquals("[\"role3\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
-      assertEquals("[\"3\",\"4\",\"5\"]", rs.getString(COLUMN_LABEL_ROLE_IDS));
+      // JSON_ARRAYAGG keeps empty role names and omits SQL NULLs; numeric role ids are unquoted.
+      assertEquals("[\"role3\",\"\"]", rs.getString(COLUMN_LABEL_ROLE_NAMES));
+      assertEquals("[3,4,5]", rs.getString(COLUMN_LABEL_ROLE_IDS));
     }
   }
 

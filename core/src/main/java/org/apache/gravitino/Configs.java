@@ -20,7 +20,6 @@ package org.apache.gravitino;
 
 import com.google.common.collect.Lists;
 import java.io.File;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.StringUtils;
@@ -30,7 +29,6 @@ import org.apache.gravitino.config.ConfigBuilder;
 import org.apache.gravitino.config.ConfigConstants;
 import org.apache.gravitino.config.ConfigEntry;
 import org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory;
-import org.apache.gravitino.storage.relational.EntityChangeLogPoller;
 import org.apache.gravitino.utils.FileFetcher;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 
@@ -98,6 +96,8 @@ public class Configs {
   public static final int DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_CONNECTIONS = 100;
 
   public static final int DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE = 100;
+
+  public static final int DEFAULT_BULK_MAX_ITEMS = 100;
 
   public static final long DEFAULT_RELATIONAL_JDBC_BACKEND_MAX_WAIT_MILLISECONDS = 1000L;
 
@@ -188,8 +188,6 @@ public class Configs {
           .createWithDefault(60 * 60 * 1000L);
 
   public static final long DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS = 3L;
-  public static final int DEFAULT_ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES = 10;
-  public static final String DEFAULT_ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION = "EXIT";
   public static final long DEFAULT_ENTITY_CHANGE_LOG_RETENTION_SECS = 30 * 24 * 60 * 60L;
   public static final long DEFAULT_ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS = 24 * 60 * 60L;
 
@@ -200,31 +198,6 @@ public class Configs {
           .longConf()
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS);
-
-  public static final ConfigEntry<Integer> ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES =
-      new ConfigBuilder("gravitino.entityChangeLog.listenerMaxRetries")
-          .doc(
-              "The number of times the poller retries a change log batch for a failing listener"
-                  + " before applying gravitino.entityChangeLog.listenerFailureAction")
-          .version(ConfigConstants.VERSION_2_0_0)
-          .intConf()
-          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
-          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES);
-
-  public static final ConfigEntry<String> ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION =
-      new ConfigBuilder("gravitino.entityChangeLog.listenerFailureAction")
-          .doc(
-              "What the poller does when a listener exhausted its retries: EXIT stops this server"
-                  + " because its local caches are known to be stale, SKIP drops the batch for that"
-                  + " listener and keeps serving")
-          .version(ConfigConstants.VERSION_2_0_0)
-          .stringConf()
-          .checkValue(
-              value ->
-                  Arrays.stream(EntityChangeLogPoller.ListenerFailureAction.values())
-                      .anyMatch(action -> action.name().equalsIgnoreCase(value)),
-              "The value must be either EXIT or SKIP")
-          .createWithDefault(DEFAULT_ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION);
 
   public static final ConfigEntry<Long> ENTITY_CHANGE_LOG_RETENTION_SECS =
       new ConfigBuilder("gravitino.entityChangeLog.retentionSecs")
@@ -374,6 +347,14 @@ public class Configs {
           .version(ConfigConstants.VERSION_1_0_0)
           .intConf()
           .createWithDefault(DEFAULT_GRAVITINO_AUTHORIZATION_THREAD_POOL_SIZE);
+
+  public static final ConfigEntry<Integer> BULK_MAX_ITEMS =
+      new ConfigBuilder("gravitino.server.bulk.maxItems")
+          .doc("The maximum number of items allowed in a single bulk request")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(DEFAULT_BULK_MAX_ITEMS);
 
   public static final long DEFAULT_GRAVITINO_AUTHORIZATION_CACHE_EXPIRATION_SECS = 3600L;
 

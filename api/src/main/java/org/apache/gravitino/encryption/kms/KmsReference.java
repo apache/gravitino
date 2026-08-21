@@ -25,56 +25,40 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.DeveloperApi;
 
 /**
- * Identifies a key owned by a configured KMS source.
+ * Identifies a key owned by a named KMS provider.
  *
- * <p>Contains no credentials or key material.
- *
- * <p>KMS API identifiers use exact string matching. Callers must supply lowercase kebab-case values
- * with no leading or trailing whitespace (for example {@code aws-kms}). This type does not
- * normalize the identifier.
+ * <p>Contains no credentials or key material. The provider name is the configured instance handle
+ * ({@code gravitino.kms.providers}). The server loads that name's factory from {@code
+ * gravitino.kms.provider.<name>.className} and resolves a client from {@code KmsClientRegistry}.
  */
 @DeveloperApi
 public final class KmsReference {
 
-  private final String api;
-  private final String source;
+  private final String provider;
   private final String keyId;
 
   /**
    * Creates a structurally valid key reference without contacting the provider.
    *
-   * @param api explicitly selected KMS API identifier; must be lowercase kebab-case with no
-   *     surrounding whitespace
-   * @param source configured KMS client-instance name
+   * @param provider configured KMS provider name
    * @param keyId provider-native key identifier
-   * @throws IllegalArgumentException if any argument is null or blank, or if {@code api} is not a
-   *     valid KMS API identifier
+   * @throws IllegalArgumentException if either argument is null or blank
    */
-  public KmsReference(String api, String source, String keyId) {
-    this.api = KmsApiIdentifiers.requireValid(api);
-    Preconditions.checkArgument(StringUtils.isNotBlank(source), "KMS source cannot be blank");
+  public KmsReference(String provider, String keyId) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(provider), "KMS provider cannot be blank");
     Preconditions.checkArgument(StringUtils.isNotBlank(keyId), "KMS key ID cannot be blank");
 
-    this.source = source.trim();
+    this.provider = provider.trim();
     this.keyId = keyId;
   }
 
   /**
-   * Returns the explicitly selected KMS API identifier.
+   * Returns the configured KMS provider name.
    *
-   * @return the exact KMS API identifier
+   * @return the provider name
    */
-  public String api() {
-    return api;
-  }
-
-  /**
-   * Returns the configured KMS client-instance name.
-   *
-   * @return the source name
-   */
-  public String source() {
-    return source;
+  public String provider() {
+    return provider;
   }
 
   /**
@@ -95,16 +79,16 @@ public final class KmsReference {
       return false;
     }
     KmsReference that = (KmsReference) other;
-    return api.equals(that.api) && source.equals(that.source) && keyId.equals(that.keyId);
+    return provider.equals(that.provider) && keyId.equals(that.keyId);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(api, source, keyId);
+    return Objects.hash(provider, keyId);
   }
 
   @Override
   public String toString() {
-    return String.format("KmsReference{api='%s', source='%s', keyId='%s'}", api, source, keyId);
+    return String.format("KmsReference{provider='%s', keyId='%s'}", provider, keyId);
   }
 }

@@ -162,7 +162,7 @@ public class ClickHouseTypeConverter extends JdbcTypeConverter {
       case DATE:
         return Types.DateType.get();
       case DATE32:
-        // Date32 supports 1900-2299 vs Date's 1970-2149. Use ExternalType to preserve round-trip.
+        // Date32 has a wider range than Date; preserve its catalog type for round-trip.
         return Types.ExternalType.of(DATE32);
       case DATETIME:
         // Default is 0 precision

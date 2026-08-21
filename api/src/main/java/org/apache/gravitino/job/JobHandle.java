@@ -18,6 +18,9 @@
  */
 package org.apache.gravitino.job;
 
+import java.time.Instant;
+import javax.annotation.Nullable;
+
 /**
  * JobHandle is an interface that is returned by the job submission, which provides methods to get
  * the job name, job ID, job status, and to add listeners for jobs.
@@ -69,4 +72,36 @@ public interface JobHandle {
    * @return the status of the job
    */
   Status jobStatus();
+
+  /**
+   * Get the time when the job was queued for execution.
+   *
+   * @return the queued time of the job
+   */
+  default Instant queuedAt() {
+    throw new UnsupportedOperationException(
+        "queuedAt() is not implemented by " + getClass().getName() + "; override this method");
+  }
+
+  /**
+   * Get the time when the job started execution.
+   *
+   * @return the started time of the job, or null if the job has not started execution yet
+   */
+  @Nullable
+  default Instant startedAt() {
+    throw new UnsupportedOperationException(
+        "startedAt() is not implemented by " + getClass().getName() + "; override this method");
+  }
+
+  /**
+   * Get the time when the job finished execution.
+   *
+   * @return the finished time of the job, or null if the job has not finished execution yet
+   */
+  @Nullable
+  default Instant finishedAt() {
+    throw new UnsupportedOperationException(
+        "finishedAt() is not implemented by " + getClass().getName() + "; override this method");
+  }
 }

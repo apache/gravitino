@@ -53,6 +53,11 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that lists and locks all active catalogs in a metalake. */
+  public String listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return listCatalogPOsByMetalakeId(metalakeId) + " FOR UPDATE";
+  }
+
   public String listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds) {
     return "<script>"
         + "SELECT catalog_id as catalogId, catalog_name as catalogName,"
@@ -137,6 +142,11 @@ public class CatalogMetaBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
+  /** Builds SQL that returns and locks an active catalog by ID. */
+  public String selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId) {
+    return selectCatalogMetaById(catalogId) + " FOR UPDATE";
+  }
+
   public String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -185,11 +195,23 @@ public class CatalogMetaBaseSQLProvider {
         + " catalog_comment = #{catalogMeta.catalogComment},"
         + " properties = #{catalogMeta.properties},"
         + " audit_info = #{catalogMeta.auditInfo},"
-        + " current_version = #{catalogMeta.currentVersion},"
-        + " last_version = #{catalogMeta.lastVersion},"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. last_version is assigned first, so both columns are computed from the
+        // version the row had before this statement.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{catalogMeta.deletedAt}";
   }
 
+  /**
+   * Builds SQL that updates a catalog only if nobody changed it in the meantime.
+   *
+   * <p>The WHERE clause used to repeat every column. Comparing the version alone is enough now,
+   * because every update moves the version forward, and it also avoids a MySQL trap: MySQL reports
+   * zero affected rows when an UPDATE writes the values a row already has, which the old SQL could
+   * not tell apart from a real conflict.
+   */
   public String updateCatalogMeta(
       @Param("newCatalogMeta") CatalogPO newCatalogPO,
       @Param("oldCatalogMeta") CatalogPO oldCatalogPO) {
@@ -206,33 +228,33 @@ public class CatalogMetaBaseSQLProvider {
         + " last_version = #{newCatalogMeta.lastVersion},"
         + " deleted_at = #{newCatalogMeta.deletedAt}"
         + " WHERE catalog_id = #{oldCatalogMeta.catalogId}"
-        + " AND catalog_name = #{oldCatalogMeta.catalogName}"
-        + " AND metalake_id = #{oldCatalogMeta.metalakeId}"
-        + " AND type = #{oldCatalogMeta.type}"
-        + " AND provider = #{oldCatalogMeta.provider}"
-        + " AND (catalog_comment = #{oldCatalogMeta.catalogComment} "
-        + "   OR (catalog_comment IS NULL and #{oldCatalogMeta.catalogComment} IS NULL))"
-        + " AND properties = #{oldCatalogMeta.properties}"
-        + " AND audit_info = #{oldCatalogMeta.auditInfo}"
         + " AND current_version = #{oldCatalogMeta.currentVersion}"
-        + " AND last_version = #{oldCatalogMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
+  public String softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE catalog_id = #{catalogId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
-  public String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "UPDATE "
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String deleteCatalogMetasByLegacyTimeline(

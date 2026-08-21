@@ -48,6 +48,7 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -279,7 +280,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return authorizationPlugin;
   }
 
-  public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader) {
+  /**
+   * Initializes the authorization plugin for this catalog.
+   *
+   * @param classLoader the catalog isolated class loader
+   * @param metalakeId the stable entity ID of the metalake containing this catalog
+   */
+  public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader, long metalakeId) {
     if (authorizationPlugin == null) {
       synchronized (this) {
         if (authorizationPlugin == null) {
@@ -294,11 +301,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           try (BaseAuthorization<?> authorization =
               BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
 
+            Map<String, String> authorizationConfig = Maps.newHashMap(conf);
+            authorizationConfig.put(BaseAuthorization.METALAKE_ID, String.valueOf(metalakeId));
+            authorizationConfig.put(BaseAuthorization.CATALOG_ID, String.valueOf(entity().id()));
+
             authorizationPlugin =
                 classLoader.withClassLoader(
                     cl ->
                         authorization.newPlugin(
-                            entity.namespace().level(0), provider(), this.conf));
+                            entity.namespace().level(0), provider(), authorizationConfig));
 
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
@@ -458,7 +469,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
           tempProperties
               .entrySet()
-              .removeIf(entry -> catalogPropertiesMetadata().isHiddenProperty(entry.getKey()));
+              .removeIf(
+                  entry ->
+                      catalogPropertiesMetadata().isHiddenProperty(entry.getKey())
+                          || SecretPropertyUtils.isSecretProperty(
+                              entry.getKey(), entry.getValue()));
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());

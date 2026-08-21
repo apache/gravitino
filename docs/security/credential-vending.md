@@ -364,6 +364,10 @@ GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 
 The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed.
 
+### Read or Write Scope
+
+Over the IRC, a credential is vended for writing when the caller is entitled to modify the table, and for reading otherwise. Narrowing the caller's roles with the `X-Gravitino-Active-Roles` header narrows this as well, so a caller whose active roles no longer carry `MODIFY_TABLE` is vended a read-only credential. See [Narrowing Access with Active Roles](access-control.md#narrowing-access-with-active-roles).
+
 ## Custom Credentials
 
 Gravitino supports custom credentials. You can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar in the classpath of the IRC or the Fileset catalog.
@@ -383,7 +387,7 @@ The credential provider implementations ship in separate jars. Whichever compone
 
 Substitute `{cloud}` with `aws`, `gcp`, `aliyun`, or `azure`. Note the two jar families: the `-bundle` variants also carry Hadoop and cloud SDK packages, which the Fileset catalog and the IRC need. The Hive, Glue, and Paimon catalogs only vend credentials, so they take the plain `gravitino-{cloud}` jar.
 
-Since Gravitino 1.1.0, the Gravitino Iceberg cloud bundle jars already include the Iceberg cloud bundle jars, so there is no need to download and include those separately.
+The Gravitino Iceberg cloud bundle jars already include the Iceberg cloud bundle jars, so there is no need to download and include those separately.
 
 Vending JDBC user and password requires no additional jar.
 
@@ -395,7 +399,7 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Since 1.3.0, sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from `GET /api/metalakes/{metalake}/catalogs/{catalog}`. Clients written against earlier releases that read those properties directly lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from `GET /api/metalakes/{metalake}/catalogs/{catalog}`. Clients written against earlier releases that read those properties directly lose access to them.
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 

@@ -38,6 +38,18 @@ public class SchemaMetaBaseSQLProvider {
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that lists all active schemas in a metalake. */
+  public String listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return "SELECT schema_id as schemaId, schema_name as schemaName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_comment as schemaComment, properties, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
+  }
+
   public String listSchemaPOsByFullQualifiedName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
     return """
@@ -299,20 +311,18 @@ public class SchemaMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return "UPDATE "
+  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  public String softDeleteSchemaMetasWithVersion(@Param("schemaMetas") List<SchemaPO> schemaPOs) {
+    return "<script>"
+        + "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
-  public String softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return "UPDATE "
-        + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
+        + " WHERE deleted_at = 0 AND "
+        + "<foreach collection='schemaMetas' item='item' separator=' OR ' open='(' close=')'>"
+        + "(schema_id = #{item.schemaId} AND current_version = #{item.currentVersion})"
+        + "</foreach>"
+        + "</script>";
   }
 
   public String deleteSchemaMetasByLegacyTimeline(

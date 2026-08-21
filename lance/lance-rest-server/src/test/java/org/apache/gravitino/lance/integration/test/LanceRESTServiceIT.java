@@ -186,6 +186,30 @@ public class LanceRESTServiceIT extends BaseIT {
     listNamespacesResp = ns.listNamespaces(listNamespacesReq);
 
     Assertions.assertEquals(Sets.newHashSet(schema1.name()), listNamespacesResp.getNamespaces());
+
+    // a schema has no child namespaces, only tables, so the result is empty
+    listNamespacesReq.addIdItem(schema1.name());
+    listNamespacesResp = ns.listNamespaces(listNamespacesReq);
+
+    Assertions.assertTrue(listNamespacesResp.getNamespaces().isEmpty());
+
+    // listing under a non-existent schema should fail instead of returning an empty list
+    ListNamespacesRequest nonExistentSchemaReq = new ListNamespacesRequest();
+    nonExistentSchemaReq.addIdItem(catalog1.name());
+    nonExistentSchemaReq.addIdItem("non_existent_schema");
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> ns.listNamespaces(nonExistentSchemaReq));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
+
+    // a non-existent catalog should be reported at every depth
+    ListNamespacesRequest nonExistentCatalogReq = new ListNamespacesRequest();
+    nonExistentCatalogReq.addIdItem("non_existent_catalog");
+    nonExistentCatalogReq.addIdItem("non_existent_schema");
+    exception =
+        Assertions.assertThrows(
+            RuntimeException.class, () -> ns.listNamespaces(nonExistentCatalogReq));
+    assertLanceErrorCode(exception, ErrorCode.NAMESPACE_NOT_FOUND);
   }
 
   @Test

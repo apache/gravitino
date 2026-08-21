@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.idp.web.rest;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -40,6 +42,7 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.dto.IdpGroupDTO;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
 import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
@@ -140,14 +143,31 @@ class TestIdpOperations extends JerseyTest {
   @Test
   void testAddAndGetGroup() throws Exception {
     AddGroupRequest req = new AddGroupRequest("group1");
-    doReturn(buildGroup("group1")).when(MANAGER).addGroup("group1");
+    doReturn(buildGroup("group1")).when(MANAGER).addGroup(eq("group1"), nullable(String.class));
     when(MANAGER.getGroup("group1")).thenReturn(buildGroup("group1"));
 
-    assertStatus(Response.Status.OK, post("/idp/groups", req));
+    IdpGroupDTO created = post("/idp/groups", req).readEntity(IdpGroupResponse.class).getGroup();
+    Assertions.assertEquals("group1", created.name());
+    Assertions.assertEquals("", created.comment());
     Assertions.assertEquals(
-        "group1", get("/idp/groups/group1").readEntity(IdpGroupResponse.class).getGroup().name());
+        "", get("/idp/groups/group1").readEntity(IdpGroupResponse.class).getGroup().comment());
 
-    doThrow(new AlreadyExistsException("mock error")).when(MANAGER).addGroup("group1");
+    AddGroupRequest withComment = new AddGroupRequest("group2", "platform engineering");
+    doReturn(buildGroup("group2", "platform engineering"))
+        .when(MANAGER)
+        .addGroup(eq("group2"), eq("platform engineering"));
+    Assertions.assertEquals(
+        "platform engineering",
+        post("/idp/groups", withComment).readEntity(IdpGroupResponse.class).getGroup().comment());
+
+    assertError(
+        Response.Status.BAD_REQUEST,
+        post("/idp/groups", new AddGroupRequest("group3", "a".repeat(1025))),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+
+    doThrow(new AlreadyExistsException("mock error"))
+        .when(MANAGER)
+        .addGroup(eq("group1"), nullable(String.class));
     assertStatus(Response.Status.CONFLICT, post("/idp/groups", req));
   }
 
@@ -220,10 +240,18 @@ class TestIdpOperations extends JerseyTest {
   }
 
   private IdpGroup buildGroup(String group) {
-    return buildGroup(group, Collections.emptyList());
+    return buildGroup(group, Collections.emptyList(), "");
+  }
+
+  private IdpGroup buildGroup(String group, String comment) {
+    return buildGroup(group, Collections.emptyList(), comment);
   }
 
   private IdpGroup buildGroup(String group, List<String> users) {
-    return new IdpGroup(group, users);
+    return buildGroup(group, users, "");
+  }
+
+  private IdpGroup buildGroup(String group, List<String> users, String comment) {
+    return new IdpGroup(group, users, comment);
   }
 }
