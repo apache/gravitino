@@ -162,6 +162,11 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       String comment,
       Map<String, String> properties)
       throws Exception {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       GetDatabasesRequest.Builder req = GetDatabasesRequest.builder().maxResults(1);
       applyCatalogId(catalogId, req::catalogId);

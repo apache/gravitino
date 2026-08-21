@@ -173,19 +173,22 @@ public class ExceptionHandlers {
   public static Response handleTestConnectionException(Exception e) {
     ErrorResponse response;
     if (e instanceof IllegalArgumentException) {
-      response = ErrorResponse.illegalArguments(e.getMessage(), e);
+      response = ErrorResponse.illegalArguments(e.getMessage());
 
     } else if (e instanceof ConnectionFailedException) {
-      response = ErrorResponse.connectionFailed(e.getMessage(), e);
+      response = ErrorResponse.connectionFailed(e.getMessage());
+
+    } else if (e instanceof UnsupportedOperationException) {
+      response = ErrorResponse.unsupportedOperation(e.getMessage());
 
     } else if (e instanceof NotFoundException) {
-      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), e);
+      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage());
 
     } else if (e instanceof AlreadyExistsException) {
-      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
+      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage());
 
     } else if (e instanceof NotInUseException) {
-      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
+      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), null);
 
     } else {
       return Utils.internalError(e.getMessage(), e);

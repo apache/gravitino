@@ -153,7 +153,13 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
       String provider,
       String comment,
       Map<String, String> properties) {
-    // No-op for generic catalog.
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
+    throw new UnsupportedOperationException(
+        "Generic catalogs do not define a catalog-level connection probe");
   }
 
   @Override

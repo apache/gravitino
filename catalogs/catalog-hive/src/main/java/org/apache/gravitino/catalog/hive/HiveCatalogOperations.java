@@ -1027,6 +1027,11 @@ public class HiveCatalogOperations
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       clientPool.run(c -> c.getAllDatabases(catalogName));
     } catch (ConnectionFailedException e) {

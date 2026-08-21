@@ -191,6 +191,11 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       adminClient.listTopics().names().get();
     } catch (Exception e) {

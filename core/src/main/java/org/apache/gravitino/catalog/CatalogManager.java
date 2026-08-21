@@ -750,6 +750,28 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     }
   }
 
+  /**
+   * Test the connection of an existing catalog using its stored configuration.
+   *
+   * @param ident The identifier of the existing catalog.
+   */
+  @Override
+  public void testConnection(NameIdentifier ident) {
+    CatalogWrapper wrapper = loadCatalogAndWrap(ident);
+    wrapper.catalog().checkMetalakeAndCatalogInUse();
+    try {
+      wrapper.doWithCatalogOps(
+          c -> {
+            c.testConnection(ident);
+            return null;
+          });
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   @Override
   public void enableCatalog(NameIdentifier ident)
       throws NoSuchCatalogException, CatalogNotInUseException {

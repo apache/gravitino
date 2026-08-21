@@ -64,6 +64,7 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
@@ -340,6 +341,46 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testExistingCatalogConnection() {
+    doNothing().when(manager).testConnection(any(NameIdentifier.class));
+    Response response =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(0, response.readEntity(BaseResponse.class).getCode());
+
+    doThrow(new ConnectionFailedException("sanitized failure"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response failedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), failedResponse.getStatus());
+    ErrorResponse errorResponse = failedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, errorResponse.getCode());
+    Assertions.assertEquals("sanitized failure", errorResponse.getMessage());
+    Assertions.assertNull(errorResponse.getStack());
+
+    doThrow(new UnsupportedOperationException("unsupported"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response unsupportedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+    ErrorResponse unsupported = unsupportedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, unsupported.getCode());
+    Assertions.assertNull(unsupported.getStack());
   }
 
   @Test

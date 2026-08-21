@@ -247,6 +247,11 @@ public class JdbcCatalogOperations implements CatalogOperations, SupportsSchemas
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     databaseOperation.listDatabases();
   }
 

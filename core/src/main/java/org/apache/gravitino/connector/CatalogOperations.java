@@ -67,4 +67,15 @@ public interface CatalogOperations extends Closeable {
       String comment,
       Map<String, String> properties)
       throws Exception;
+
+  /**
+   * Test the connection of an existing catalog using its stored configuration.
+   *
+   * @param catalogIdent the identifier of the existing catalog.
+   * @throws Exception if the connection test fails.
+   */
+  default void testConnection(NameIdentifier catalogIdent) throws Exception {
+    throw new UnsupportedOperationException(
+        String.format("Catalog %s does not support connection testing", catalogIdent));
+  }
 }
