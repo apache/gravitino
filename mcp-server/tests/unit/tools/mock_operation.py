@@ -484,3 +484,33 @@ class MockViewOperation(ViewOperation):
         self, catalog_name: str, schema_name: str, view_name: str
     ) -> str:
         return f"mock_view: {catalog_name}, {schema_name}, {view_name}"
+
+    # pylint: disable=too-many-positional-arguments
+    async def create_view(
+        self,
+        catalog_name,
+        schema_name,
+        name,
+        comment,
+        columns,
+        representations,
+        properties,
+        default_catalog=None,
+        default_schema=None,
+    ) -> str:
+        return (
+            f"mock_view_created: {catalog_name}.{schema_name}.{name} "
+            f"with representations {representations}, "
+            f"default_catalog={default_catalog}"
+        )
+
+    async def alter_view(
+        self, catalog_name, schema_name, view_name, updates
+    ) -> str:
+        return (
+            f"mock_view_altered: {catalog_name}.{schema_name}.{view_name} "
+            f"with updates {updates}"
+        )
+
+    async def drop_view(self, catalog_name, schema_name, view_name) -> str:
+        return f"mock_view_dropped: {catalog_name}.{schema_name}.{view_name}"
