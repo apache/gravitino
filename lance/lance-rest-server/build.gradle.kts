@@ -102,9 +102,11 @@ dependencies {
 
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":server"))
+  testImplementation(project(":spark-connector:spark-common"))
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server-common", "testArtifacts"))
   testImplementation(libs.lance)
+  testImplementation(libs.lance.namespace.apache.client)
 
   lanceSparkBundleVersions.forEach { version ->
     add(
