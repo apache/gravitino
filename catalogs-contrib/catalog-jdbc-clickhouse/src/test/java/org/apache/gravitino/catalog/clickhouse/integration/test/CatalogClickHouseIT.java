@@ -272,6 +272,50 @@ public class CatalogClickHouseIT extends BaseIT {
     return properties;
   }
 
+  private static String normalizeEnumFormatting(String value) {
+    StringBuilder normalized = new StringBuilder(value.length());
+    boolean inSingleQuote = false;
+    boolean pendingWhitespace = false;
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      boolean escapedQuote =
+          current == '\''
+              && i > 0
+              && value.charAt(i - 1) == '\\'
+              && (i < 2 || value.charAt(i - 2) != '\\');
+      if (current == '\'' && !escapedQuote) {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+        inSingleQuote = !inSingleQuote;
+      } else if (!inSingleQuote && Character.isWhitespace(current)) {
+        pendingWhitespace = true;
+      } else if (!inSingleQuote && (current == '=' || current == ',')) {
+        pendingWhitespace = false;
+        normalized.append(current);
+      } else {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+      }
+    }
+    return normalized.toString().trim();
+  }
+
+  private static void appendWhitespaceUnlessSeparator(StringBuilder builder) {
+    if (builder.length() == 0) {
+      return;
+    }
+    char previous = builder.charAt(builder.length() - 1);
+    if (previous != '=' && previous != ',') {
+      builder.append(' ');
+    }
+  }
+
   @Test
   void testOperationClickhouseSchema() {
     SupportsSchemas schemas = catalog.asSchemas();
@@ -2837,8 +2881,8 @@ public class CatalogClickHouseIT extends BaseIT {
     // may normalize the enum definition format (e.g., spacing around '=' and ',').
     Assertions.assertTrue(loadedTable.columns()[4].dataType() instanceof Types.ExternalType);
     Assertions.assertTrue(loadedTable.columns()[5].dataType() instanceof Types.ExternalType);
-    // Date32 maps to DateType (lossy downgrade: writing yields Date, not Date32)
-    Assertions.assertEquals(Types.DateType.get(), loadedTable.columns()[6].dataType());
+    // Date32 remains ExternalType so its wider range and catalog type survive round-trip.
+    Assertions.assertEquals(Types.ExternalType.of("Date32"), loadedTable.columns()[6].dataType());
   }
 
   /**
@@ -2899,7 +2943,8 @@ public class CatalogClickHouseIT extends BaseIT {
         enum8Type instanceof Types.ExternalType,
         "Enum8 should map to ExternalType, but got: " + enum8Type.simpleString());
     Assertions.assertEquals(
-        "Enum8('active' = 1, 'inactive' = 2)", ((Types.ExternalType) enum8Type).catalogString());
+        normalizeEnumFormatting("Enum8('active' = 1, 'inactive' = 2)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()));
 
     // Enum16 type verification
     Type enum16Type = columns[2].dataType();
@@ -2907,8 +2952,8 @@ public class CatalogClickHouseIT extends BaseIT {
         enum16Type instanceof Types.ExternalType,
         "Enum16 should map to ExternalType, but got: " + enum16Type.simpleString());
     Assertions.assertEquals(
-        "Enum16('low' = 100, 'medium' = 200, 'high' = 300)",
-        ((Types.ExternalType) enum16Type).catalogString());
+        normalizeEnumFormatting("Enum16('low' = 100, 'medium' = 200, 'high' = 300)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()));
 
     // Round-trip: recreate table through Gravitino with the loaded schema
     String rtTableName = GravitinoITUtils.genRandomName("enum_rt");
@@ -2933,21 +2978,23 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertTrue(
         rtEnum16 instanceof Types.ExternalType, "Enum16 should survive round-trip as ExternalType");
     Assertions.assertEquals(
-        ((Types.ExternalType) enum8Type).catalogString(),
-        ((Types.ExternalType) rtEnum8).catalogString());
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum8).catalogString()));
     Assertions.assertEquals(
-        ((Types.ExternalType) enum16Type).catalogString(),
-        ((Types.ExternalType) rtEnum16).catalogString());
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum16).catalogString()));
 
     // Verify DDL on ClickHouse side contains full enum definitions
     String createSql =
         clickhouseService.executeQueryForResult(
             String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, rtTableName));
+    Assertions.assertNotNull(createSql, "SHOW CREATE TABLE should return a result");
+    String normalizedCreateSql = normalizeEnumFormatting(createSql);
     Assertions.assertTrue(
-        createSql.contains("Enum8('active' = 1, 'inactive' = 2)"),
+        normalizedCreateSql.contains("Enum8('active'=1,'inactive'=2)"),
         "SHOW CREATE TABLE should contain Enum8 definition: " + createSql);
     Assertions.assertTrue(
-        createSql.contains("Enum16('low' = 100, 'medium' = 200, 'high' = 300)"),
+        normalizedCreateSql.contains("Enum16('low'=100,'medium'=200,'high'=300)"),
         "SHOW CREATE TABLE should contain Enum16 definition: " + createSql);
   }
 }
