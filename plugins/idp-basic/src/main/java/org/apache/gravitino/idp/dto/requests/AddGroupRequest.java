@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.idp.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -39,9 +40,13 @@ public class AddGroupRequest implements RESTRequest {
   @JsonProperty("group")
   private final String group;
 
+  @JsonProperty("comment")
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private final String comment;
+
   /** Default constructor for AddGroupRequest. (Used for Jackson deserialization.) */
   public AddGroupRequest() {
-    this(null);
+    this(null, null);
   }
 
   /**
@@ -50,8 +55,19 @@ public class AddGroupRequest implements RESTRequest {
    * @param group The group name of the built-in IdP group.
    */
   public AddGroupRequest(String group) {
+    this(group, null);
+  }
+
+  /**
+   * Creates a new AddGroupRequest.
+   *
+   * @param group The group name of the built-in IdP group.
+   * @param comment The optional group comment.
+   */
+  public AddGroupRequest(String group, String comment) {
     super();
     this.group = group;
+    this.comment = comment;
   }
 
   /**
@@ -62,5 +78,6 @@ public class AddGroupRequest implements RESTRequest {
   @Override
   public void validate() throws IllegalArgumentException {
     IdpCredentialValidator.validateGroupName(group);
+    IdpCredentialValidator.validateGroupComment(comment);
   }
 }

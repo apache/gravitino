@@ -27,7 +27,7 @@ Gravitino saves some system information in schema and table comments, like
 - Gravitino catalog corresponds to the Doris instance.
 - Supports metadata management of Doris (1.2.x, 3.0.x, 4.0.x).
 - Supports table index (PRIMARY_KEY, UNIQUE_KEY, INVERTED, BITMAP (legacy), ANN/VECTOR).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 ### Catalog Properties
 
@@ -41,15 +41,15 @@ more details.
 
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Doris catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                                                                                                                                                                                                                                                                      | Default value | Required | Since Version    |
-|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0            |
-| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                                                                                                                                                                                                                                                                                                                                         | (none)        | Yes      | 0.5.0            |
-| `jdbc-user`             | The JDBC user name.                                                                                                                                                                                                                                                                                                                                                                                              | (none)        | Yes      | 0.5.0            |
-| `jdbc-password`         | The JDBC password.                                                                                                                                                                                                                                                                                                                                                                                               | (none)        | Yes      | 0.5.0            |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                                                                                                                                                                                                                                                                   | `2`           | No       | 0.5.0            |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                                                                                                                                                                                                                                                                  | `10`          | No       | 0.5.0            |
-| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default.                                                                                                                                                                                                                                                                                                                | `30000`       | No       | 1.1.0            |
+| Configuration item      | Description                                                                                       | Default value | Required |
+|-------------------------|---------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:mysql://localhost:9030`               | (none)        | Yes      |
+| `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                          | (none)        | Yes      |
+| `jdbc-user`             | The JDBC user name.                                                                               | (none)        | Yes      |
+| `jdbc-password`         | The JDBC password.                                                                                | (none)        | Yes      |
+| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                    | `2`           | No       |
+| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                   | `10`          | No       |
+| `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default. | `30000`       | No       |
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.
 Gravitino doesn't package the JDBC driver for Doris due to licensing issues.
@@ -81,10 +81,10 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
 :::
 
 ## Schema
@@ -102,7 +102,7 @@ Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden 
 ### Schema Operations
 
 Refer to
-[Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+[Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
@@ -110,7 +110,7 @@ Refer to
 
 - Gravitino's table concept corresponds to the Doris table.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 #### Table Column Types
 
@@ -139,7 +139,7 @@ Refer to
 | `ExternalType("hll")`      | `HLL`                |
 
 Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type since 0.5.0.
+The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./tables-and-views.md#unparsed-type)** that represents an unresolvable data type.
 
 :::note
 Doris `array`, `map`, and `struct` types are loaded as `ExternalType` with the full type string preserved (e.g. `array<int(11)>`). They are not resolved into Gravitino native composite types (`ListType`, `MapType`, `StructType`). The type identifier in `ExternalType` is always lowercase (e.g. `"json"`, not `"JSON"`), matching Doris JDBC metadata behavior.
@@ -209,14 +209,15 @@ Index[] indexes = new Index[] {
 Doris table properties can be set when creating a table.
 Only Doris built-in table properties are supported; user-defined properties are not supported.
 
-| Property Name                        | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable | Since Version    |
-|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|------------------|
-| `replication_num`                    | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        | 0.6.0-incubating |
-| `compression`                        | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+. Cannot be changed after table creation.            | (none)        | No       | No       | Yes       | 2.0.0            |
-| `bloom_filter_columns`               | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        | 2.0.0            |
-| `storage_policy`                     | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        | 2.0.0            |
-| `light_schema_change`                | Whether light schema change is enabled for the table. Can be modified via ALTER TABLE SET.                                                                                                  | `true`        | No       | No       | No        | 2.0.0            |
-| `enable_unique_key_merge_on_write`   | Whether merge-on-write is enabled for Unique Key tables. Must be set at CREATE TABLE time; cannot be changed after creation.                                                                | `true`        | No       | No       | Yes       | 2.0.0            |
+| Property Name                      | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
+| `replication_num`                  | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        |
+| `replication_allocation`           | The replication allocation policy for the table. It cannot be set together with `replication_num`.                                                                                          | (none)        | No       | No       | No        |
+| `compression`                      | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+. Cannot be changed after table creation.            | (none)        | No       | No       | Yes       |
+| `bloom_filter_columns`             | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        |
+| `storage_policy`                   | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        |
+| `light_schema_change`              | Whether light schema change is enabled for the table. Can be modified via ALTER TABLE SET.                                                                                                  | `true`        | No       | No       | No        |
+| `enable_unique_key_merge_on_write` | Whether merge-on-write is enabled for Unique Key tables. Must be set at CREATE TABLE time; cannot be changed after creation.                                                                | `true`        | No       | No       | Yes       |
 
 :::note
 **Immutable** properties can be set at CREATE TABLE time but cannot be changed via ALTER TABLE.

@@ -41,6 +41,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -192,6 +193,35 @@ public class TestMetadataIdConverter {
       Assertions.assertEquals(Optional.of(5L), modelConvertedId);
       Assertions.assertEquals(Optional.of(6L), filesetConvertedId);
       Assertions.assertEquals(Optional.of(7L), topicConvertedId);
+    } finally {
+      FieldUtils.writeDeclaredField(
+          GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);
+      FieldUtils.writeDeclaredField(
+          GravitinoEnv.getInstance(), "entityStore", originalEntityStore, true);
+    }
+  }
+
+  @Test
+  void testConvertReturnsEmptyWhenParentCatalogDoesNotExist() throws IllegalAccessException {
+    CatalogManager mockCatalogManager = mock(CatalogManager.class);
+    Object originalCatalogManager =
+        FieldUtils.readDeclaredField(GravitinoEnv.getInstance(), "catalogManager", true);
+    Object originalEntityStore =
+        FieldUtils.readDeclaredField(GravitinoEnv.getInstance(), "entityStore", true);
+
+    FieldUtils.writeDeclaredField(
+        GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
+    FieldUtils.writeDeclaredField(GravitinoEnv.getInstance(), "entityStore", mockStore, true);
+
+    MetadataObject fileset =
+        MetadataObjects.of(
+            ImmutableList.of("missing_catalog", "schema", "fileset"), MetadataObject.Type.FILESET);
+    when(mockCatalogManager.loadCatalogAndWrap(NameIdentifier.of("metalake", "missing_catalog")))
+        .thenThrow(
+            new NoSuchCatalogException("Catalog %s does not exist", "metalake.missing_catalog"));
+
+    try {
+      Assertions.assertEquals(Optional.empty(), MetadataIdConverter.getID(fileset, "metalake"));
     } finally {
       FieldUtils.writeDeclaredField(
           GravitinoEnv.getInstance(), "catalogManager", originalCatalogManager, true);

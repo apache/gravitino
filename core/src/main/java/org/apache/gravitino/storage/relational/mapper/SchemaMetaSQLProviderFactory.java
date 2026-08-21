@@ -72,6 +72,11 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().listSchemaPOsByCatalogId(catalogId);
   }
 
+  /** Returns SQL that lists all active schemas in a metalake. */
+  public static String listSchemaPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listSchemaPOsByMetalakeId(metalakeId);
+  }
+
   public static String selectSchemaIdByCatalogIdAndName(
       @Param("catalogId") Long catalogId, @Param("schemaName") String name) {
     return getProvider().selectSchemaIdByCatalogIdAndName(catalogId, name);
@@ -120,12 +125,10 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 
-  public static String softDeleteSchemaMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteSchemaMetasByMetalakeId(metalakeId);
-  }
-
-  public static String softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteSchemaMetasByCatalogId(catalogId);
+  /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
+  public static String softDeleteSchemaMetasWithVersion(
+      @Param("schemaMetas") List<SchemaPO> schemaPOs) {
+    return getProvider().softDeleteSchemaMetasWithVersion(schemaPOs);
   }
 
   public static String deleteSchemaMetasByLegacyTimeline(

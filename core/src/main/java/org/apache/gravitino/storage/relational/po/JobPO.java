@@ -45,6 +45,7 @@ public class JobPO {
   private Long metalakeId;
   private String jobExecutionId;
   private String jobRunStatus;
+  private Long jobStartedAt;
   private Long jobFinishedAt;
   private String auditInfo;
   private Long currentVersion;
@@ -62,6 +63,7 @@ public class JobPO {
       Long metalakeId,
       String jobExecutionId,
       String jobRunStatus,
+      Long jobStartedAt,
       Long jobFinishedAt,
       String auditInfo,
       Long currentVersion,
@@ -75,6 +77,7 @@ public class JobPO {
         StringUtils.isNotBlank(jobExecutionId), "jobExecutionId cannot be blank");
     Preconditions.checkArgument(
         StringUtils.isNotBlank(jobRunStatus), "jobRunStatus cannot be blank");
+    Preconditions.checkArgument(jobStartedAt != null, "jobStartedAt cannot be null");
     Preconditions.checkArgument(jobFinishedAt != null, "jobFinishedAt cannot be null");
     Preconditions.checkArgument(StringUtils.isNotBlank(auditInfo), "auditInfo cannot be blank");
     Preconditions.checkArgument(currentVersion != null, "currentVersion cannot be null");
@@ -86,6 +89,7 @@ public class JobPO {
     this.metalakeId = metalakeId;
     this.jobExecutionId = jobExecutionId;
     this.jobRunStatus = jobRunStatus;
+    this.jobStartedAt = jobStartedAt;
     this.jobFinishedAt = jobFinishedAt;
     this.auditInfo = auditInfo;
     this.currentVersion = currentVersion;
@@ -99,23 +103,19 @@ public class JobPO {
   }
 
   public static JobPO initializeJobPO(JobEntity jobEntity, JobPOBuilder builder) {
-    // We should not keep the terminated job entities in the database forever, so we set the
-    // current time as the finished timestamp if the job is in a terminal state,
-    // So the entity GC cleaner will clean it up later.
-    long finished = DEFAULT_DELETED_AT;
-    if (jobEntity.status() == JobHandle.Status.CANCELLED
-        || jobEntity.status() == JobHandle.Status.FAILED
-        || jobEntity.status() == JobHandle.Status.SUCCEEDED) {
-      finished = System.currentTimeMillis();
-    }
-
+    // startedAt/finishedAt are required fields on JobEntity - the caller (e.g. JobManager, when
+    // the job transitions to STARTED/a terminal state) is guaranteed to have already set them,
+    // using the storage layer's "not started"/"not finished" sentinel (<= 0) otherwise. The
+    // entity GC cleaner relies on the finishedAt timestamp being set to clean up terminated jobs
+    // later.
     try {
       return builder
           .withJobRunId(jobEntity.id())
           .withJobTemplateName(jobEntity.jobTemplateName())
           .withJobExecutionId(jobEntity.jobExecutionId())
           .withJobRunStatus(jobEntity.status().name())
-          .withJobFinishedAt(finished)
+          .withJobStartedAt(jobEntity.startedAt())
+          .withJobFinishedAt(jobEntity.finishedAt())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(jobEntity.auditInfo()))
           .withCurrentVersion(INIT_VERSION)
           .withLastVersion(INIT_VERSION)
@@ -135,6 +135,7 @@ public class JobPO {
           .withStatus(JobHandle.Status.valueOf(jobPO.jobRunStatus))
           .withJobTemplateName(jobPO.jobTemplateName)
           .withAuditInfo(JsonUtils.anyFieldMapper().readValue(jobPO.auditInfo, AuditInfo.class))
+          .withStartedAt(jobPO.jobStartedAt())
           .withFinishedAt(jobPO.jobFinishedAt())
           .build();
     } catch (JsonProcessingException e) {

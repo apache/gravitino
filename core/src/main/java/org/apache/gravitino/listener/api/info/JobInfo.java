@@ -19,6 +19,8 @@
 
 package org.apache.gravitino.listener.api.info;
 
+import java.time.Instant;
+import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
 import org.apache.gravitino.job.JobHandle;
@@ -38,11 +40,23 @@ public final class JobInfo {
 
   private final Audit audit;
 
-  private JobInfo(String jobId, String jobTemplateName, JobHandle.Status jobStatus, Audit audit) {
+  private final Instant startedAt;
+
+  private final Instant finishedAt;
+
+  private JobInfo(
+      String jobId,
+      String jobTemplateName,
+      JobHandle.Status jobStatus,
+      Audit audit,
+      Instant startedAt,
+      Instant finishedAt) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.jobStatus = jobStatus;
     this.audit = audit;
+    this.startedAt = startedAt;
+    this.finishedAt = finishedAt;
   }
 
   /**
@@ -53,7 +67,12 @@ public final class JobInfo {
    */
   public static JobInfo fromJobEntity(JobEntity jobEntity) {
     return new JobInfo(
-        jobEntity.name(), jobEntity.jobTemplateName(), jobEntity.status(), jobEntity.auditInfo());
+        jobEntity.name(),
+        jobEntity.jobTemplateName(),
+        jobEntity.status(),
+        jobEntity.auditInfo(),
+        jobEntity.startedAtAsInstant(),
+        jobEntity.finishedAtAsInstant());
   }
 
   /**
@@ -90,5 +109,35 @@ public final class JobInfo {
    */
   public Audit auditInfo() {
     return audit;
+  }
+
+  /**
+   * Returns the time when the job was queued for execution. This is the same as the job's creation
+   * time.
+   *
+   * @return the queued time of the job
+   */
+  public Instant queuedAt() {
+    return audit.createTime();
+  }
+
+  /**
+   * Returns the time when the job started execution.
+   *
+   * @return the started time of the job, or null if the job has not started execution yet
+   */
+  @Nullable
+  public Instant startedAt() {
+    return startedAt;
+  }
+
+  /**
+   * Returns the time when the job finished execution.
+   *
+   * @return the finished time of the job, or null if the job has not finished execution yet
+   */
+  @Nullable
+  public Instant finishedAt() {
+    return finishedAt;
   }
 }

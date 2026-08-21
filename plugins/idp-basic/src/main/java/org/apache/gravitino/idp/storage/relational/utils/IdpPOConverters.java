@@ -56,7 +56,8 @@ public final class IdpPOConverters {
    */
   public static IdpGroup fromIdpGroupWithUsersPO(IdpGroupWithUsersPO groupPO) {
     Preconditions.checkNotNull(groupPO, "groupPO must not be null");
-    return new IdpGroup(groupPO.getName(), parseJsonStringList(groupPO.getUsernames()));
+    return new IdpGroup(
+        groupPO.getName(), parseJsonStringList(groupPO.getUsernames()), groupPO.getComment());
   }
 
   @SuppressWarnings("unchecked")

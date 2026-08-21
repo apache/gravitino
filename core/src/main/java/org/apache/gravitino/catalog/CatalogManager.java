@@ -99,6 +99,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelCatalog;
@@ -106,6 +107,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -358,6 +360,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Nullable private final CatalogChangeLogListener catalogChangeLogListener;
 
   private final IdGenerator idGenerator;
+
+  // Held for create-time secret writes; consumed by the entity-secrets create follow-up.
+  @SuppressWarnings("UnusedVariable")
+  private final SecretManager secretManager;
+
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
@@ -373,11 +380,14 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param config The configuration for the manager.
    * @param store The entity store to use.
    * @param idGenerator The id generator to use.
+   * @param secretManager The secret manager used by catalog operations.
    */
-  public CatalogManager(Config config, EntityStore store, IdGenerator idGenerator) {
+  public CatalogManager(
+      Config config, EntityStore store, IdGenerator idGenerator, SecretManager secretManager) {
     this.config = config;
     this.store = store;
     this.idGenerator = idGenerator;
+    this.secretManager = secretManager;
     this.classLoaderSharingEnabled = config.get(Configs.CATALOG_CLASSLOADER_SHARING_ENABLED);
 
     long cacheEvictionIntervalInMs = config.get(Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS);
@@ -616,9 +626,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           checkMetalake(metalakeIdent, store);
-          boolean needClean = true;
+          boolean needClean = false;
           try {
-            store.put(e, false /* overwrite */);
+            try {
+              store.put(e, false /* overwrite */);
+            } catch (NoSuchEntityException e1) {
+              // The relational store locks and rechecks the parent metalake while inserting the
+              // catalog. A concurrent drop or rename can therefore make the metalake disappear
+              // after checkMetalake() succeeds but before this insert starts.
+              LOG.warn("Metalake {} does not exist", metalakeIdent, e1);
+              throw new NoSuchMetalakeException(e1, "Metalake %s does not exist", metalakeIdent);
+            }
+            needClean = true;
             CatalogWrapper wrapper =
                 catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 
@@ -975,6 +994,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } catch (NoSuchMetalakeException | NoSuchCatalogException ignored) {
             return false;
+          } catch (NoSuchEntityException ignored) {
+            // Another server deleted the catalog after it was loaded above, so a later store read
+            // such as listing its schemas no longer finds it. The drop stays idempotent, but the
+            // wrapper cached by loadCatalogAndWrap has to be discarded. store.delete itself never
+            // reaches here: it maps a missing entity to false on its own.
+            catalogCache.invalidate(ident);
+            return false;
           } catch (GravitinoRuntimeException e) {
             throw e;
           } catch (Exception e) {
@@ -1292,10 +1318,26 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
+    BaseMetalake metalakeEntity;
+    try {
+      metalakeEntity =
+          store.get(
+              NameIdentifier.of(entity.namespace().levels()),
+              EntityType.METALAKE,
+              BaseMetalake.class);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          String.format("Failed to load metalake for catalog %s", entity.nameIdentifier()), e);
+    }
+
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
-    catalog.withCatalogConf(entity.getProperties()).withCatalogEntity(entity);
-    catalog.initAuthorizationPluginInstance(classLoader);
+    // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
+    // Fileset FS merge assumes catalog conf is already plaintext at this boundary.
+    catalog
+        .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
+        .withCatalogEntity(entity);
+    catalog.initAuthorizationPluginInstance(classLoader, metalakeEntity.id());
     return catalog;
   }
 

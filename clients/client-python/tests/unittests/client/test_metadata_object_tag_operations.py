@@ -22,7 +22,10 @@ from gravitino.api.metadata_objects import MetadataObject, MetadataObjects
 from gravitino.api.tag import Tag
 from gravitino.client.generic_tag import GenericTag
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
-from gravitino.dto.requests.tag_associate_request import TagsAssociateRequest
+from gravitino.dto.requests.tag_associate_request import (
+    TagsAssociateRequest,
+    TagValuesAssociateRequest,
+)
 from gravitino.dto.responses.tag_response import (
     TagListResponse,
     TagNamesListResponse,
@@ -179,6 +182,106 @@ class TestMetadataObjectTagOperations(unittest.TestCase):
             mock_post.assert_called_once_with(
                 "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
                 json=param,
+                error_handler=TAG_ERROR_HANDLER,
+            )
+
+    def test_associate_tags_allows_empty_lists(self) -> None:
+        tag_operations = MetadataObjectTagOperations(
+            TestMetadataObjectTagOperations.METALAKE_NAME,
+            MetadataObjects.of(
+                ["catalog", "schema", "table"],
+                MetadataObject.Type.TABLE,
+            ),
+            TestMetadataObjectTagOperations.REST_CLIENT,
+        )
+        json_str = TagNamesListResponse(0, ["tagA"]).to_json()
+        mock_resp = mock_base.mock_http_response(json_str)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=mock_resp,
+        ) as mock_post:
+            tags = tag_operations.associate_tags([], [])
+
+            self.assertEqual(["tagA"], tags)
+            param = TagsAssociateRequest([], [])
+            mock_post.assert_called_once_with(
+                "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
+                json=param,
+                error_handler=TAG_ERROR_HANDLER,
+            )
+
+    def test_assign_tag_values(self) -> None:
+        tag_operations = MetadataObjectTagOperations(
+            TestMetadataObjectTagOperations.METALAKE_NAME,
+            MetadataObjects.of(
+                ["catalog", "schema", "table"],
+                MetadataObject.Type.TABLE,
+            ),
+            TestMetadataObjectTagOperations.REST_CLIENT,
+        )
+        json_str = TagNamesListResponse(0, ["data_domain"]).to_json()
+        mock_resp = mock_base.mock_http_response(json_str)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=mock_resp,
+        ) as mock_post:
+            tags = tag_operations.assign_tags(
+                [
+                    {"name": "data_domain", "value": "finance"},
+                    {"name": "data_domain", "value": "risk"},
+                    {"name": "pii", "value": None},
+                ],
+                [{"name": "deprecated", "value": None}],
+            )
+
+            self.assertEqual(["data_domain"], tags)
+            param = TagValuesAssociateRequest(
+                [
+                    {"name": "data_domain", "value": "finance"},
+                    {"name": "data_domain", "value": "risk"},
+                    {"name": "pii", "value": None},
+                ],
+                [{"name": "deprecated", "value": None}],
+            )
+
+            mock_post.assert_called_once_with(
+                "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
+                json=param,
+                headers=MetadataObjectTagOperations.TAG_VALUES_JSON_HEADER,
+                error_handler=TAG_ERROR_HANDLER,
+            )
+
+    def test_assign_tag_values_with_default_remove(self) -> None:
+        tag_operations = MetadataObjectTagOperations(
+            TestMetadataObjectTagOperations.METALAKE_NAME,
+            MetadataObjects.of(
+                ["catalog", "schema", "table"],
+                MetadataObject.Type.TABLE,
+            ),
+            TestMetadataObjectTagOperations.REST_CLIENT,
+        )
+        json_str = TagNamesListResponse(0, ["data_domain"]).to_json()
+        mock_resp = mock_base.mock_http_response(json_str)
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.post",
+            return_value=mock_resp,
+        ) as mock_post:
+            tags = tag_operations.assign_tags(
+                [{"name": "data_domain", "value": "finance"}]
+            )
+
+            self.assertEqual(["data_domain"], tags)
+            param = TagValuesAssociateRequest(
+                [{"name": "data_domain", "value": "finance"}], None
+            )
+
+            mock_post.assert_called_once_with(
+                "api/metalakes/demo_metalake/objects/table/catalog.schema.table/tags",
+                json=param,
+                headers=MetadataObjectTagOperations.TAG_VALUES_JSON_HEADER,
                 error_handler=TAG_ERROR_HANDLER,
             )
 

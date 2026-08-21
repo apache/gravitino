@@ -33,10 +33,15 @@ class TagDTO(Tag):
     _name: str = field(metadata=config(field_name="name"))
     _comment: str = field(metadata=config(field_name="comment"))
     _properties: dict[str, str] = field(metadata=config(field_name="properties"))
-
     _audit: AuditDTO = field(default=None, metadata=config(field_name="audit"))
     _inherited: Optional[bool] = field(
         default=None, metadata=config(field_name="inherited")
+    )
+    _allowed_values: Optional[list[str]] = field(
+        default=None, metadata=config(field_name="allowedValues")
+    )
+    _assignment_values: Optional[list[str]] = field(
+        default=None, metadata=config(field_name="assignmentValues")
     )
 
     def __eq__(self, other: object):
@@ -46,6 +51,7 @@ class TagDTO(Tag):
             self._name == other._name
             and self._comment == other._comment
             and self._properties == other._properties
+            and self._allowed_values == other._allowed_values
             and self._audit == other._audit
         )
 
@@ -55,6 +61,11 @@ class TagDTO(Tag):
                 self._name,
                 self._comment,
                 frozenset(self._properties.items()) if self._properties else None,
+                (
+                    tuple(self._allowed_values)
+                    if self._allowed_values is not None
+                    else None
+                ),
                 self._audit,
             )
         )
@@ -88,6 +99,22 @@ class TagDTO(Tag):
         """
         return self._properties
 
+    def allowed_values(self) -> Optional[list[str]]:
+        """Get the allowed values for this tag.
+
+        Returns:
+            Optional[list[str]]: The allowed values, or None if values are unrestricted.
+        """
+        return self._allowed_values
+
+    def assignment_values(self) -> Optional[list[str]]:
+        """Get assignment values when this tag is loaded from a metadata object.
+
+        Returns:
+            Optional[list[str]]: The assignment values, or None if not assignment-scoped.
+        """
+        return self._assignment_values
+
     def audit_info(self) -> AuditDTO:
         """
         Get the audit information of the tag.
@@ -119,6 +146,8 @@ class TagDTO(Tag):
             self._name = ""
             self._comment = ""
             self._properties: dict[str, str] = {}
+            self._allowed_values = None
+            self._assignment_values = None
             self._audit = None
             self._inherited = True
 
@@ -134,6 +163,16 @@ class TagDTO(Tag):
             self._properties = properties
             return self
 
+        def allowed_values(self, allowed_values: Optional[list[str]]) -> TagDTO.Builder:
+            self._allowed_values = allowed_values
+            return self
+
+        def assignment_values(
+            self, assignment_values: Optional[list[str]]
+        ) -> TagDTO.Builder:
+            self._assignment_values = assignment_values
+            return self
+
         def audit_info(self, audit: AuditDTO) -> TagDTO.Builder:
             self._audit = audit
             return self
@@ -144,9 +183,11 @@ class TagDTO(Tag):
 
         def build(self) -> TagDTO:
             return TagDTO(
-                self._name,
-                self._comment,
-                self._properties,
-                self._audit,
-                self._inherited,
+                _name=self._name,
+                _comment=self._comment,
+                _properties=self._properties,
+                _audit=self._audit,
+                _inherited=self._inherited,
+                _allowed_values=self._allowed_values,
+                _assignment_values=self._assignment_values,
             )

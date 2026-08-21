@@ -19,9 +19,6 @@
 
 package org.apache.gravitino.cache;
 
-import org.apache.gravitino.Entity;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.meta.ModelEntity;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.Level;
 import org.openjdk.jmh.annotations.Setup;
@@ -36,19 +33,15 @@ import org.openjdk.jmh.annotations.Setup;
  * <p>Before each invocation, the cache is pre-populated with a predefined list of entities to
  * ensure the {@code clear()} method operates on a non-empty cache.
  *
- * @param <E> the entity type being tested, must extend {@link Entity} and implement {@link
- *     HasIdentifier}
  * @see org.apache.gravitino.cache.EntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class ClearEntityCacheBenchmark<E extends Entity & HasIdentifier>
-    extends AbstractEntityBenchmark {
+public class ClearEntityCacheBenchmark extends AbstractEntityBenchmark {
 
   @Setup(Level.Invocation)
-  @SuppressWarnings("unchecked")
   public void prepareCacheForClear() {
     cache.clear();
-    entities.forEach(e -> cache.put((ModelEntity) e));
+    entities.forEach(e -> cache.put(e));
   }
 
   @Benchmark

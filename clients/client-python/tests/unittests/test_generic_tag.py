@@ -26,7 +26,11 @@ from gravitino.client.generic_tag import GenericTag
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.metadata_object_dto import MetadataObjectDTO
 from gravitino.dto.tag_dto import TagDTO
-from gravitino.exceptions.base import InternalError, NoSuchMetalakeException
+from gravitino.exceptions.base import (
+    IllegalArgumentException,
+    InternalError,
+    NoSuchMetalakeException,
+)
 from gravitino.utils import HTTPClient
 from gravitino.utils.http_client import Response
 
@@ -39,6 +43,8 @@ class TestGenericTag(unittest.TestCase):
         .name("tag1")
         .comment("comment1")
         .properties({"key1": "value1"})
+        .allowed_values(["finance", "risk"])
+        .assignment_values(["finance"])
         .inherited(True)
         .audit_info(AuditDTO(_creator="test", _create_time="2022-01-01T00:00:00Z"))
         .build()
@@ -54,6 +60,8 @@ class TestGenericTag(unittest.TestCase):
         self.assertEqual("tag1", generic_tag.name())
         self.assertEqual("comment1", generic_tag.comment())
         self.assertEqual({"key1": "value1"}, generic_tag.properties())
+        self.assertEqual(["finance", "risk"], generic_tag.allowed_values())
+        self.assertEqual(["finance"], generic_tag.assignment_values())
         self.assertEqual(True, generic_tag.inherited())
         self.assertEqual(
             AuditDTO(_creator="test", _create_time="2022-01-01T00:00:00Z"),
@@ -158,6 +166,56 @@ class TestGenericTag(unittest.TestCase):
             )
             generic_tag.associated_objects().objects()
 
+    def test_generic_tag_associated_objects_supports_legacy_get_response_hook(self):
+        response_body = {
+            "code": 0,
+            "metadataObjects": [
+                {
+                    "fullName": "catalog1.schema1.table1",
+                    "type": "table",
+                },
+            ],
+        }
+        generic_tag = TestGenericTagEntityWithLegacyGetResponse(
+            self.METALAKE, self.TAG_DTO, self._rest_client, response_body
+        )
+
+        objects = generic_tag.associated_objects().objects()
+
+        self.assertEqual(1, len(objects))
+        self.assertEqual("catalog1.schema1.table1", objects[0].full_name())
+
+    def test_generic_tag_associated_objects_with_value_filter(self):
+        response_body = {
+            "code": 0,
+            "metadataObjects": [
+                {
+                    "fullName": "catalog1.schema1.table1",
+                    "type": "table",
+                },
+            ],
+        }
+        generic_tag = TestGenericTagEntity(
+            self.METALAKE, self.TAG_DTO, self._rest_client, response_body
+        )
+
+        objects = generic_tag.associated_objects().objects(value="finance")
+
+        self.assertEqual(1, len(objects))
+        self.assertEqual("catalog1.schema1.table1", objects[0].full_name())
+        self.assertEqual({"value": "finance"}, generic_tag.params)
+
+    def test_generic_tag_associated_objects_with_invalid_value_filter(self):
+        generic_tag = TestGenericTagEntity(
+            self.METALAKE, self.TAG_DTO, self._rest_client, {"code": 0}
+        )
+
+        with self.assertRaises(IllegalArgumentException):
+            generic_tag.associated_objects().objects(value=" ")
+
+        with self.assertRaises(IllegalArgumentException):
+            generic_tag.associated_objects().objects(value="v" * 257)
+
     def test_hash_and_equal(self) -> None:
         tag_dto1 = (
             TagDTO.Builder()
@@ -215,8 +273,10 @@ class TestGenericTagEntity(GenericTag):
         )
         self.__dump_object = dump_object
         self.__throw_error = throw_error
+        self.params = None
 
-    def get_response(self, url, _=None) -> Response[MagicMock]:
+    def get_response(self, url, _=None, params=None) -> Response[MagicMock]:
+        self.params = params
         if self.__throw_error is not None:
             raise self.__throw_error(f"Raise {self.__throw_error.__name__} Error")
 
@@ -230,3 +290,10 @@ class TestGenericTagEntity(GenericTag):
         mock_response.info.return_value = {"Content-Type": "application/json"}
 
         return Response(mock_response)
+
+
+class TestGenericTagEntityWithLegacyGetResponse(TestGenericTagEntity):
+    def get_response(  # pylint: disable=arguments-differ
+        self, url, _=None
+    ) -> Response[MagicMock]:
+        return super().get_response(url, _)

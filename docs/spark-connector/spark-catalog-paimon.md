@@ -85,10 +85,10 @@ ALTER TABLE employee DROP PARTITION (`name`='Alice');
 
 Gravitino spark connector will transform below property names which are defined in catalog properties to Spark Paimon connector configuration.
 
-| Gravitino catalog property name | Spark Paimon connector configuration | Description                                                                                                                                                                                                         | Since Version     |
-|---------------------------------|--------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------|
-| `catalog-backend`               | `metastore`                          | Catalog backend type                                                                                                                                                                                                | 0.8.0-incubating  |
-| `uri`                           | `uri`                                | Catalog backend uri                                                                                                                                                                                                 | 0.8.0-incubating  |
-| `warehouse`                     | `warehouse`                          | Catalog backend warehouse                                                                                                                                                                                           | 0.8.0-incubating  |
+| Gravitino catalog property name | Spark Paimon connector configuration | Description               |
+|---------------------------------|--------------------------------------|---------------------------|
+| `catalog-backend`               | `metastore`                          | Catalog backend type      |
+| `uri`                           | `uri`                                | Catalog backend uri       |
+| `warehouse`                     | `warehouse`                          | Catalog backend warehouse |
 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark Paimon connector. For example, using `spark.bypass.client-pool-size` to pass the `client-pool-size` to the Spark Paimon connector.

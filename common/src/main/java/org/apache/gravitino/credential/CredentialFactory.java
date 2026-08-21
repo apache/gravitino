@@ -19,15 +19,41 @@
 
 package org.apache.gravitino.credential;
 
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Streams;
-import java.util.List;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.ServiceLoader;
-import java.util.stream.Collectors;
 
 /** Create a specific credential according to the credential information. */
 public class CredentialFactory {
+
+  /**
+   * Holder for the lazily-initialized, immutable mapping from credential type to its implementation
+   * class. {@link Credential} is a fixed, built-in SPI (all implementations ship in the {@code api}
+   * and {@code common} modules on the same class loader as this factory; custom credentials are
+   * added through {@link CredentialProvider}, not by registering new {@link Credential} services),
+   * so the {@link ServiceLoader} result is stable for the lifetime of the JVM and is safe to scan
+   * once and cache instead of on every {@link #create} call.
+   */
+  private static class CredentialClassesHolder {
+    private static final Map<String, Class<? extends Credential>> CREDENTIAL_CLASSES =
+        loadCredentialClasses();
+
+    private static Map<String, Class<? extends Credential>> loadCredentialClasses() {
+      Map<String, Class<? extends Credential>> classes = new HashMap<>();
+      for (Credential credential : ServiceLoader.load(Credential.class)) {
+        String type = credential.credentialType().toLowerCase(Locale.ROOT);
+        Class<? extends Credential> existing = classes.put(type, credential.getClass());
+        if (existing != null) {
+          throw new RuntimeException(
+              "Multiple credentials found for: " + credential.credentialType());
+        }
+      }
+      return Collections.unmodifiableMap(classes);
+    }
+  }
+
   /**
    * Creates a {@link Credential} instance based on the provided credential type, information, and
    * expiration time.
@@ -52,18 +78,11 @@ public class CredentialFactory {
   }
 
   private static Class<? extends Credential> lookupCredential(String credentialType) {
-    ServiceLoader<Credential> serviceLoader = ServiceLoader.load(Credential.class);
-    List<Class<? extends Credential>> credentials =
-        Streams.stream(serviceLoader.iterator())
-            .filter(credential -> credentialType.equalsIgnoreCase(credential.credentialType()))
-            .map(Credential::getClass)
-            .collect(Collectors.toList());
-    if (credentials.isEmpty()) {
+    Class<? extends Credential> credentialClz =
+        CredentialClassesHolder.CREDENTIAL_CLASSES.get(credentialType.toLowerCase(Locale.ROOT));
+    if (credentialClz == null) {
       throw new RuntimeException("No credential found for: " + credentialType);
-    } else if (credentials.size() > 1) {
-      throw new RuntimeException("Multiple credential found for: " + credentialType);
-    } else {
-      return Iterables.getOnlyElement(credentials);
     }
+    return credentialClz;
   }
 }
