@@ -53,8 +53,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   @SuppressWarnings("UnusedVariable")
-  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
-
   private CatalogConnectorManager catalogConnectorManager;
 
   private GravitinoAdminClient client;
@@ -102,23 +100,26 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogRegister catalogRegister = new CatalogRegister();
 
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
-          catalogConnectorManager =
+          CatalogConnectorManager manager =
               new CatalogConnectorManager(
                   catalogRegister, catalogConnectorFactory, this::getTrinoCatalogName);
-          catalogConnectorManager.config(config, client);
+          manager.config(config, client);
 
           if (isCoordinator(trinoConnectorContext)) {
             // Only the coordinator runs the load loop, so it is the only node holding the
             // registration state the system tables report. Pin their splits to it.
             GravitinoSystemConnector.Split.setCoordinatorAddress(
                 getCurrentNodeAddress(trinoConnectorContext));
-            catalogConnectorManager.start();
+            manager.start();
           }
 
-          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
+          // Publish only once the initialization has fully succeeded. Assigning the field first
+          // would make the next create() skip this block and hand back an entry catalog whose
+          // load loop never started: it looks healthy and registers nothing.
+          catalogConnectorManager = manager;
         } catch (Exception e) {
           String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
-          LOG.error(message);
+          LOG.error(message, e);
           throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
         }
       }
@@ -141,9 +142,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
+      // Built per entry catalog, like the stored procedures: both are scoped to this catalog's
+      // metalake even though the underlying manager is shared.
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
-      return createSystemConnector(gravitinoStoredProcedureFactory, gravitinoSystemTableFactory);
+      GravitinoSystemTableFactory systemTableFactory =
+          new GravitinoSystemTableFactory(catalogConnectorManager, metalake);
+      return createSystemConnector(gravitinoStoredProcedureFactory, systemTableFactory);
     }
   }
 

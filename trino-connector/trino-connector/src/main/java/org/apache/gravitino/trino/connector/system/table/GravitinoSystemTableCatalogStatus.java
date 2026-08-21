@@ -57,21 +57,30 @@ public class GravitinoSystemTableCatalogStatus extends GravitinoSystemTable {
               ColumnMetadata.builder().setName("failure_count").setType(BIGINT).build()));
 
   private final CatalogConnectorManager catalogConnectorManager;
+  private final String metalake;
 
   /**
    * Constructs a new GravitinoSystemTableCatalogStatus.
    *
    * @param catalogConnectorManager the manager for catalog connectors
+   * @param metalake the metalake to report on
    */
-  public GravitinoSystemTableCatalogStatus(CatalogConnectorManager catalogConnectorManager) {
+  public GravitinoSystemTableCatalogStatus(
+      CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
+    this.metalake = metalake;
   }
 
   @Override
   public Page loadPageData() {
     // Take a snapshot first, the load loop writes these states concurrently and the column
     // builders must all end up with the same number of positions.
-    List<CatalogRegistrationState> states = catalogConnectorManager.getCatalogRegistrationStates();
+    // The load loop is shared by every entry catalog in this Trino, so report only the metalake
+    // this connector is configured with.
+    List<CatalogRegistrationState> states =
+        catalogConnectorManager.getCatalogRegistrationStates().stream()
+            .filter(state -> state.getMetalake().equals(metalake))
+            .toList();
     int size = states.size();
 
     BlockBuilder metalakeColumnBuilder = VARCHAR.createBlockBuilder(null, size);

@@ -54,14 +54,18 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
               ColumnMetadata.builder().setName("properties").setType(VARCHAR).build()));
 
   private final CatalogConnectorManager catalogConnectorManager;
+  private final String metalake;
 
   /**
    * Constructs a new GravitinoSystemTableCatalog.
    *
    * @param catalogConnectorManager the manager for catalog connectors
+   * @param metalake the metalake to report on
    */
-  public GravitinoSystemTableCatalog(CatalogConnectorManager catalogConnectorManager) {
+  public GravitinoSystemTableCatalog(
+      CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
+    this.metalake = metalake;
   }
 
   @Override
@@ -69,8 +73,10 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
     List<GravitinoCatalog> gravitinoCatalogs = new ArrayList<>();
     // retrieve catalogs form the Gravitino server with the configuration metalakes,
     // the catalogConnectorManager does not manager catalogs in worker nodes
-    catalogConnectorManager
-        .getUsedMetalakes()
+    // Only the metalake this connector is configured with: the manager is shared by every entry
+    // catalog in this Trino.
+    catalogConnectorManager.getUsedMetalakes().stream()
+        .filter(metalake::equals)
         .forEach(
             (metalakeName) -> {
               GravitinoMetalake metalake = catalogConnectorManager.getMetalake(metalakeName);
