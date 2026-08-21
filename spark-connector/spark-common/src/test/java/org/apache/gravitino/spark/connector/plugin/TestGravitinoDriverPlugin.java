@@ -20,7 +20,11 @@
 package org.apache.gravitino.spark.connector.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.util.Collections;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
@@ -57,5 +61,18 @@ public class TestGravitinoDriverPlugin {
     new GravitinoDriverPlugin().registerSqlExtensions(sparkConf);
 
     assertEquals(extension, sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
+  }
+
+  @Test
+  void testSkipsCatalogAlreadyConfiguredInSpark() {
+    SparkConf sparkConf =
+        new SparkConf(false).set("spark.sql.catalog.existing", "example.UserCatalog");
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.provider()).thenReturn("hive");
+
+    new GravitinoDriverPlugin()
+        .registerGravitinoCatalogs(sparkConf, Collections.singletonMap("existing", catalog));
+
+    assertEquals("example.UserCatalog", sparkConf.get("spark.sql.catalog.existing"));
   }
 }
