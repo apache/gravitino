@@ -21,9 +21,12 @@ package org.apache.gravitino.trino.connector.catalog;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -31,12 +34,18 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.Optional;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -269,6 +278,185 @@ public class TestCatalogConnectorManager {
     assertEquals("http://irc-host:9001/iceberg", config.getDiscoveredIcebergRestUri("test"));
   }
 
+  @Test
+  public void testSuccessfulRegistrationIsRecorded() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, state.getStatus());
+    assertEquals("test", state.getMetalake());
+    assertEquals("memory", state.getCatalogName());
+    assertEquals("memory", state.getTrinoCatalogName());
+    assertEquals("memory", state.getProvider());
+    assertNull(state.getLastError());
+    assertEquals(0, state.getFailureCount());
+    assertTrue(state.getLastSuccessTimeMs() > 0);
+
+    assertTrue(manager.isTrinoStarted());
+    assertNull(manager.getLastLoadError());
+    assertEquals(0, manager.getConsecutiveLoadFailures());
+    assertTrue(manager.getMetalakeErrors().isEmpty());
+  }
+
+  @Test
+  public void testRegistrationFailureIsRecorded() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+    doThrow(
+            new TrinoException(
+                GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
+                "Access Denied: Cannot create catalog memory"))
+        .when(fixture.catalogRegister)
+        .registerCatalog(any(), any());
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.FAILED, state.getStatus());
+    assertTrue(state.getLastError().contains("Access Denied"));
+    assertEquals(1, state.getFailureCount());
+    assertEquals(0, state.getLastSuccessTimeMs());
+
+    // A second failing round must accumulate rather than reset the failure count.
+    manager.loadMetalakeSync();
+    state = singleState(manager);
+    assertEquals(2, state.getFailureCount());
+    assertEquals(0, state.getLastSuccessTimeMs());
+  }
+
+  @Test
+  public void testRegistrationFailureIsReportedByStoredProcedureMessage() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+    doThrow(
+            new TrinoException(
+                GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
+                "Access Denied: Cannot create catalog memory"))
+        .when(fixture.catalogRegister)
+        .registerCatalog(any(), any());
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    String description = manager.describeRegistrationFailure("memory");
+    assertTrue(description.contains("FAILED"));
+    assertTrue(description.contains("Access Denied"));
+  }
+
+  @Test
+  public void testNonRelationalCatalogIsRecorded() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("files", "hadoop", Catalog.Type.FILESET));
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.UNSUPPORTED, state.getStatus());
+    assertTrue(state.getLastError().contains("FILESET"));
+  }
+
+  @Test
+  public void testUnsupportedProviderIsRecorded() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("other", "unknown", Catalog.Type.RELATIONAL));
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.UNSUPPORTED, state.getStatus());
+    assertTrue(state.getLastError().contains("unknown"));
+    assertEquals("unknown", state.getProvider());
+  }
+
+  @Test
+  public void testSkippedCatalogIsRecorded() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+
+    CatalogConnectorManager manager =
+        fixture.createManager(ImmutableMap.of("gravitino.trino.skip-catalog-patterns", "mem.*"));
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.SKIPPED, state.getStatus());
+    assertTrue(state.getLastError().contains("skip-catalog-patterns"));
+  }
+
+  @Test
+  public void testStaleStateIsPruned() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog first = mockCatalog("a", "memory", Catalog.Type.RELATIONAL);
+    Catalog second = mockCatalog("b", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(first, second);
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+    assertEquals(2, manager.getCatalogRegistrationStates().size());
+
+    // The second catalog is dropped in the Gravitino server, its state must not linger.
+    fixture.withCatalogs(first);
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals("a", state.getCatalogName());
+  }
+
+  @Test
+  public void testListCatalogsFailureIsRecordedPerMetalake() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, singleState(manager).getStatus());
+
+    when(fixture.metalake.listCatalogs()).thenThrow(new RuntimeException("Connection refused"));
+    manager.loadMetalakeSync();
+
+    Map<String, String> metalakeErrors = manager.getMetalakeErrors();
+    assertEquals(1, metalakeErrors.size());
+    assertTrue(metalakeErrors.get("test").contains("Connection refused"));
+    // A transient listing failure must not turn a healthy catalog into a failed one.
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, singleState(manager).getStatus());
+  }
+
+  @Test
+  public void testUnreachableServerIsRecordedInLoadStatus() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    when(fixture.client.loadMetalake(any())).thenThrow(new RuntimeException("Connection refused"));
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    assertNotNull(manager.getLastLoadError());
+    assertTrue(manager.getLastLoadError().contains("Connection refused"));
+    assertEquals(1, manager.getConsecutiveLoadFailures());
+    assertEquals(0, manager.getLastSuccessfulLoadTimeMs());
+    assertTrue(manager.getLastLoadAttemptTimeMs() > 0);
+    assertTrue(manager.getCatalogRegistrationStates().isEmpty());
+  }
+
+  @Test
+  public void testTrinoNotStartedIsRecordedInLoadStatus() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    when(fixture.catalogRegister.isTrinoStarted()).thenReturn(false);
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    assertFalse(manager.isTrinoStarted());
+    assertNotNull(manager.getLastLoadError());
+    assertTrue(manager.getLastLoadError().contains("Waiting for the Trino server"));
+    assertTrue(manager.getCatalogRegistrationStates().isEmpty());
+  }
+
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)
       throws Exception {
     return createManager(createCatalogConnectorFactory(), configMap);
@@ -322,5 +510,67 @@ public class TestCatalogConnectorManager {
 
   private static ConnectorContext mockContext() {
     return mock(ConnectorContext.class);
+  }
+
+  private static CatalogRegistrationState singleState(CatalogConnectorManager manager) {
+    List<CatalogRegistrationState> states = manager.getCatalogRegistrationStates();
+    assertEquals(1, states.size());
+    return states.get(0);
+  }
+
+  private static Catalog mockCatalog(String name, String provider, Catalog.Type type) {
+    Catalog catalog = mock(Catalog.class);
+    when(catalog.name()).thenReturn(name);
+    when(catalog.provider()).thenReturn(provider);
+    when(catalog.type()).thenReturn(type);
+    when(catalog.properties()).thenReturn(ImmutableMap.of());
+    Audit audit = mock(Audit.class);
+    when(audit.createTime()).thenReturn(Instant.now());
+    when(audit.lastModifiedTime()).thenReturn(null);
+    when(catalog.auditInfo()).thenReturn(audit);
+    return catalog;
+  }
+
+  /** Wires up a manager whose load loop can be driven with {@code loadMetalakeSync()}. */
+  private static class LoadFixture {
+    private final CatalogRegister catalogRegister = mock(CatalogRegister.class);
+    private final GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    private final GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+    private final CatalogConnectorFactory catalogFactory = mock(CatalogConnectorFactory.class);
+
+    LoadFixture() throws Exception {
+      when(catalogRegister.isTrinoStarted()).thenReturn(true);
+      when(metalake.name()).thenReturn("test");
+      when(client.loadMetalake(any())).thenReturn(metalake);
+      when(catalogFactory.getSupportedCatalogProviders()).thenReturn(ImmutableSet.of("memory"));
+      CatalogConnectorContext.Builder builder = mock(CatalogConnectorContext.Builder.class);
+      when(catalogFactory.createCatalogConnectorContextBuilder(any())).thenReturn(builder);
+      when(builder.withMetalake(any())).thenReturn(builder);
+      when(builder.withContext(any())).thenReturn(builder);
+      when(builder.build()).thenReturn(mock(CatalogConnectorContext.class));
+    }
+
+    void withCatalogs(Catalog... catalogs) {
+      String[] names = new String[catalogs.length];
+      for (int i = 0; i < catalogs.length; i++) {
+        names[i] = catalogs[i].name();
+        when(metalake.loadCatalog(names[i])).thenReturn(catalogs[i]);
+      }
+      when(metalake.listCatalogs()).thenReturn(names);
+    }
+
+    CatalogConnectorManager createManager(Map<String, String> extraConfig) {
+      ImmutableMap<String, String> configMap =
+          ImmutableMap.<String, String>builder()
+              .put("gravitino.uri", "http://127.0.0.1:8090")
+              .put("gravitino.metalake", "test")
+              .put("gravitino.use-single-metalake", "true")
+              .putAll(extraConfig)
+              .build();
+      CatalogConnectorManager manager =
+          new CatalogConnectorManager(catalogRegister, catalogFactory, null);
+      manager.config(new GravitinoConfig(configMap), client);
+      return manager;
+    }
   }
 }

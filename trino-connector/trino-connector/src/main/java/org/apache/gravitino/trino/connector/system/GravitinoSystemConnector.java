@@ -129,7 +129,16 @@ public class GravitinoSystemConnector implements Connector {
 
       SchemaTableName tableName =
           ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).getName();
-      return createPageSource(GravitinoSystemTableFactory.loadPageData(tableName));
+      Page page = GravitinoSystemTableFactory.loadPageData(tableName);
+
+      // Project the page down to the requested columns. Trino only expects the columns it asked
+      // for, so handing it the whole row breaks any query that is not a SELECT *.
+      int[] channels = new int[columns.size()];
+      for (int i = 0; i < channels.length; i++) {
+        channels[i] =
+            ((GravitinoSystemConnectorMetadata.SystemColumnHandle) columns.get(i)).getIndex();
+      }
+      return createPageSource(page.getColumns(channels));
     }
 
     protected ConnectorPageSource createPageSource(Page page) {
@@ -183,14 +192,30 @@ public class GravitinoSystemConnector implements Connector {
       return tableName;
     }
 
+    // The system table data lives on the coordinator only: the catalog load loop runs there, and
+    // the registration state it records is never replicated to workers. Splits are built in
+    // SplitManager.getSplits(), which also runs on the coordinator, so this is always set by the
+    // time it is read. It stays null on worker JVMs, where the behaviour is unchanged.
+    private static volatile HostAddress coordinatorAddress;
+
+    /**
+     * Sets the coordinator address that system table splits are pinned to.
+     *
+     * @param address the host and port of the Trino coordinator
+     */
+    public static void setCoordinatorAddress(HostAddress address) {
+      coordinatorAddress = address;
+    }
+
     @Override
     public boolean isRemotelyAccessible() {
-      return true;
+      return coordinatorAddress == null;
     }
 
     @Override
     public List<HostAddress> getAddresses() {
-      return Collections.emptyList();
+      HostAddress address = coordinatorAddress;
+      return address == null ? Collections.emptyList() : List.of(address);
     }
   }
 
