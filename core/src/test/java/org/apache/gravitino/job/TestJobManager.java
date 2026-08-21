@@ -645,6 +645,157 @@ public class TestJobManager {
   }
 
   @Test
+  public void testPullJobStatusStartedAt() throws IOException {
+    JobEntity job =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_job")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
+    when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(job));
+
+    // QUEUED -> STARTED: startedAt must be set, finishedAt must remain unset.
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.STARTED);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    ArgumentCaptor<JobEntity> startedCaptor = ArgumentCaptor.forClass(JobEntity.class);
+    verify(entityStore, times(1)).put(startedCaptor.capture(), anyBoolean());
+    JobEntity startedJob = startedCaptor.getValue();
+    Assertions.assertEquals(JobHandle.Status.STARTED, startedJob.status());
+    Assertions.assertNotNull(startedJob.startedAt());
+    Assertions.assertTrue(startedJob.startedAt() > 0);
+    Assertions.assertEquals(0L, startedJob.finishedAt());
+
+    // STARTED -> SUCCEEDED: finishedAt must be set, and the previously-recorded startedAt must
+    // be carried forward unchanged, not overwritten.
+    Mockito.clearInvocations(entityStore);
+    when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(startedJob));
+    when(jobExecutor.getJobStatus(job.jobExecutionId())).thenReturn(JobHandle.Status.SUCCEEDED);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    ArgumentCaptor<JobEntity> finishedCaptor = ArgumentCaptor.forClass(JobEntity.class);
+    verify(entityStore, times(1)).put(finishedCaptor.capture(), anyBoolean());
+    JobEntity finishedJob = finishedCaptor.getValue();
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, finishedJob.status());
+    Assertions.assertEquals(startedJob.startedAt(), finishedJob.startedAt());
+    Assertions.assertNotNull(finishedJob.finishedAt());
+    Assertions.assertTrue(finishedJob.finishedAt() > 0);
+  }
+
+  @Test
+  public void testPullJobStatusStartedAtNotBackfilledOnDirectTerminalTransition()
+      throws IOException {
+    // A job that transitions QUEUED -> SUCCEEDED directly (skipping any poll that observes it
+    // as STARTED) does not prove exactly when it started - e.g. LocalJobExecutor can also reach
+    // FAILED directly from QUEUED without ever recording STARTED. Backfilling startedAt from the
+    // queued time would understate queue latency and overstate execution duration, so startedAt
+    // stays unset (0) unless a STARTED transition was actually observed.
+    Instant queuedAt = Instant.now();
+    JobEntity queuedJob =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_job")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withAuditInfo(AuditInfo.builder().withCreator("test").withCreateTime(queuedAt).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
+    when(jobManager.listJobs(metalake, Optional.empty())).thenReturn(ImmutableList.of(queuedJob));
+    when(jobExecutor.getJobStatus(queuedJob.jobExecutionId()))
+        .thenReturn(JobHandle.Status.SUCCEEDED);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    ArgumentCaptor<JobEntity> captor = ArgumentCaptor.forClass(JobEntity.class);
+    verify(entityStore, times(1)).put(captor.capture(), anyBoolean());
+    JobEntity succeededJob = captor.getValue();
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, succeededJob.status());
+    Assertions.assertEquals(0L, succeededJob.startedAt());
+    Assertions.assertNotNull(succeededJob.finishedAt());
+    Assertions.assertTrue(succeededJob.finishedAt() > 0);
+  }
+
+  @Test
+  public void testPullJobStatusStartedAtNotBackfilledOnDirectCancellation() throws IOException {
+    // CANCELLED does not prove the job ever started (it may have been cancelled while still
+    // QUEUED), so startedAt must NOT fall back to the queued time here - it stays unset.
+    JobEntity cancellingJob =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_job")
+            .withStatus(JobHandle.Status.CANCELLING)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
+    when(jobManager.listJobs(metalake, Optional.empty()))
+        .thenReturn(ImmutableList.of(cancellingJob));
+    when(jobExecutor.getJobStatus(cancellingJob.jobExecutionId()))
+        .thenReturn(JobHandle.Status.CANCELLED);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    ArgumentCaptor<JobEntity> captor = ArgumentCaptor.forClass(JobEntity.class);
+    verify(entityStore, times(1)).put(captor.capture(), anyBoolean());
+    JobEntity cancelledJob = captor.getValue();
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, cancelledJob.status());
+    Assertions.assertEquals(0L, cancelledJob.startedAt());
+    Assertions.assertNotNull(cancelledJob.finishedAt());
+    Assertions.assertTrue(cancelledJob.finishedAt() > 0);
+  }
+
+  @Test
   public void testCleanUpStagingDirs() throws IOException, InterruptedException {
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.STARTED);
     BaseMetalake mockMetalake =
@@ -944,6 +1095,7 @@ public class TestJobManager {
         .withJobExecutionId(rand.nextLong() + "")
         .withNamespace(NamespaceUtil.ofJob(metalake))
         .withJobTemplateName(templateName)
+        .withStartedAt(System.currentTimeMillis())
         .withFinishedAt(System.currentTimeMillis())
         .withStatus(status)
         .withAuditInfo(

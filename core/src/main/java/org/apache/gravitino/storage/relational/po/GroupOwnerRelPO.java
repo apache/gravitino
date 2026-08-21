@@ -16,48 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.client;
 
-import java.time.Instant;
-import org.apache.gravitino.dto.job.JobDTO;
-import org.apache.gravitino.job.JobHandle;
+package org.apache.gravitino.storage.relational.po;
 
-/** Represents a generic job handle. */
-public class GenericJobHandle implements JobHandle {
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
-  private final JobDTO jobDTO;
+/** The persistence object that combines a group owner with its owned metadata object ID. */
+@Data
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class GroupOwnerRelPO extends GroupPO {
 
-  GenericJobHandle(JobDTO jobDTO) {
-    this.jobDTO = jobDTO;
-  }
-
-  @Override
-  public String jobTemplateName() {
-    return jobDTO.jobTemplateName();
-  }
-
-  @Override
-  public String jobId() {
-    return jobDTO.jobId();
-  }
-
-  @Override
-  public Status jobStatus() {
-    return jobDTO.status();
-  }
-
-  @Override
-  public Instant queuedAt() {
-    return jobDTO.queuedAt();
-  }
-
-  @Override
-  public Instant startedAt() {
-    return jobDTO.startedAt();
-  }
-
-  @Override
-  public Instant finishedAt() {
-    return jobDTO.finishedAt();
-  }
+  private Long metadataObjectId;
 }

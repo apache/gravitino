@@ -74,6 +74,27 @@ public interface JobHandle {
   Status jobStatus();
 
   /**
+   * Get the time when the job was queued for execution.
+   *
+   * @return the queued time of the job
+   */
+  default Instant queuedAt() {
+    throw new UnsupportedOperationException(
+        "queuedAt() is not implemented by " + getClass().getName() + "; override this method");
+  }
+
+  /**
+   * Get the time when the job started execution.
+   *
+   * @return the started time of the job, or null if the job has not started execution yet
+   */
+  @Nullable
+  default Instant startedAt() {
+    throw new UnsupportedOperationException(
+        "startedAt() is not implemented by " + getClass().getName() + "; override this method");
+  }
+
+  /**
    * Get the time when the job finished execution.
    *
    * @return the finished time of the job, or null if the job has not finished execution yet

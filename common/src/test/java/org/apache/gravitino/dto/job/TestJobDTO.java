@@ -30,6 +30,8 @@ public class TestJobDTO {
 
   @Test
   public void testSerDeWithFinishedAt() throws JsonProcessingException {
+    Instant queuedAt = Instant.now();
+    Instant startedAt = Instant.now();
     Instant finishedAt = Instant.now();
     JobDTO jobDTO =
         new JobDTO(
@@ -37,26 +39,35 @@ public class TestJobDTO {
             "testTemplate",
             JobHandle.Status.SUCCEEDED,
             AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
+            queuedAt,
+            startedAt,
             finishedAt);
 
     Assertions.assertDoesNotThrow(jobDTO::validate);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
+    Assertions.assertTrue(serJson.contains("\"queuedAt\""));
+    Assertions.assertTrue(serJson.contains("\"startedAt\""));
     Assertions.assertTrue(serJson.contains("\"finishedAt\""));
 
     JobDTO deserJobDTO = JsonUtils.objectMapper().readValue(serJson, JobDTO.class);
     Assertions.assertEquals(jobDTO, deserJobDTO);
+    Assertions.assertEquals(queuedAt, deserJobDTO.queuedAt());
+    Assertions.assertEquals(startedAt, deserJobDTO.startedAt());
     Assertions.assertEquals(finishedAt, deserJobDTO.finishedAt());
   }
 
   @Test
   public void testSerDeWithNullFinishedAt() throws JsonProcessingException {
+    Instant queuedAt = Instant.now();
     JobDTO jobDTO =
         new JobDTO(
             "job-456",
             "testTemplate",
             JobHandle.Status.QUEUED,
             AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build(),
+            queuedAt,
+            null,
             null);
 
     Assertions.assertDoesNotThrow(jobDTO::validate);
@@ -64,12 +75,16 @@ public class TestJobDTO {
     String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
     JobDTO deserJobDTO = JsonUtils.objectMapper().readValue(serJson, JobDTO.class);
     Assertions.assertEquals(jobDTO, deserJobDTO);
+    Assertions.assertEquals(queuedAt, deserJobDTO.queuedAt());
+    Assertions.assertNull(deserJobDTO.startedAt());
     Assertions.assertNull(deserJobDTO.finishedAt());
   }
 
   @Test
   public void testSerializeToString() throws JsonProcessingException {
     Instant createTime = Instant.parse("2024-01-01T00:00:00Z");
+    Instant queuedAt = Instant.parse("2024-01-01T00:00:00Z");
+    Instant startedAt = Instant.parse("2024-01-01T00:30:00Z");
     Instant finishedAt = Instant.parse("2024-01-01T01:00:00Z");
     JobDTO jobDTO =
         new JobDTO(
@@ -77,6 +92,8 @@ public class TestJobDTO {
             "testTemplate",
             JobHandle.Status.FAILED,
             AuditDTO.builder().withCreator("test").withCreateTime(createTime).build(),
+            queuedAt,
+            startedAt,
             finishedAt);
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(jobDTO);
@@ -84,6 +101,8 @@ public class TestJobDTO {
     Assertions.assertTrue(serJson.contains("\"jobId\":\"job-789\""));
     Assertions.assertTrue(serJson.contains("\"jobTemplateName\":\"testTemplate\""));
     Assertions.assertTrue(serJson.contains("\"status\":\"failed\""));
+    Assertions.assertTrue(serJson.contains("\"queuedAt\":\"2024-01-01T00:00:00Z\""));
+    Assertions.assertTrue(serJson.contains("\"startedAt\":\"2024-01-01T00:30:00Z\""));
     Assertions.assertTrue(serJson.contains("\"finishedAt\":\"2024-01-01T01:00:00Z\""));
   }
 
@@ -95,6 +114,8 @@ public class TestJobDTO {
             + "\"jobTemplateName\":\"testTemplate\","
             + "\"status\":\"succeeded\","
             + "\"audit\":{\"creator\":\"test\",\"createTime\":\"2024-01-01T00:00:00Z\"},"
+            + "\"queuedAt\":\"2024-01-01T00:00:00Z\","
+            + "\"startedAt\":\"2024-01-01T00:30:00Z\","
             + "\"finishedAt\":\"2024-01-01T01:00:00Z\""
             + "}";
 
@@ -103,6 +124,8 @@ public class TestJobDTO {
     Assertions.assertEquals("job-999", jobDTO.jobId());
     Assertions.assertEquals("testTemplate", jobDTO.jobTemplateName());
     Assertions.assertEquals(JobHandle.Status.SUCCEEDED, jobDTO.status());
+    Assertions.assertEquals(Instant.parse("2024-01-01T00:00:00Z"), jobDTO.queuedAt());
+    Assertions.assertEquals(Instant.parse("2024-01-01T00:30:00Z"), jobDTO.startedAt());
     Assertions.assertEquals(Instant.parse("2024-01-01T01:00:00Z"), jobDTO.finishedAt());
   }
 
@@ -113,12 +136,15 @@ public class TestJobDTO {
             + "\"jobId\":\"job-1000\","
             + "\"jobTemplateName\":\"testTemplate\","
             + "\"status\":\"queued\","
-            + "\"audit\":{\"creator\":\"test\",\"createTime\":\"2024-01-01T00:00:00Z\"}"
+            + "\"audit\":{\"creator\":\"test\",\"createTime\":\"2024-01-01T00:00:00Z\"},"
+            + "\"queuedAt\":\"2024-01-01T00:00:00Z\""
             + "}";
 
     JobDTO jobDTO = JsonUtils.objectMapper().readValue(json, JobDTO.class);
 
     Assertions.assertEquals("job-1000", jobDTO.jobId());
+    Assertions.assertEquals(Instant.parse("2024-01-01T00:00:00Z"), jobDTO.queuedAt());
+    Assertions.assertNull(jobDTO.startedAt());
     Assertions.assertNull(jobDTO.finishedAt());
   }
 }

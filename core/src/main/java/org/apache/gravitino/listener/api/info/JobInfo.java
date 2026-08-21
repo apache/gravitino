@@ -40,6 +40,8 @@ public final class JobInfo {
 
   private final Audit audit;
 
+  private final Instant startedAt;
+
   private final Instant finishedAt;
 
   private JobInfo(
@@ -47,11 +49,13 @@ public final class JobInfo {
       String jobTemplateName,
       JobHandle.Status jobStatus,
       Audit audit,
+      Instant startedAt,
       Instant finishedAt) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.jobStatus = jobStatus;
     this.audit = audit;
+    this.startedAt = startedAt;
     this.finishedAt = finishedAt;
   }
 
@@ -67,6 +71,7 @@ public final class JobInfo {
         jobEntity.jobTemplateName(),
         jobEntity.status(),
         jobEntity.auditInfo(),
+        jobEntity.startedAtAsInstant(),
         jobEntity.finishedAtAsInstant());
   }
 
@@ -104,6 +109,26 @@ public final class JobInfo {
    */
   public Audit auditInfo() {
     return audit;
+  }
+
+  /**
+   * Returns the time when the job was queued for execution. This is the same as the job's creation
+   * time.
+   *
+   * @return the queued time of the job
+   */
+  public Instant queuedAt() {
+    return audit.createTime();
+  }
+
+  /**
+   * Returns the time when the job started execution.
+   *
+   * @return the started time of the job, or null if the job has not started execution yet
+   */
+  @Nullable
+  public Instant startedAt() {
+    return startedAt;
   }
 
   /**
