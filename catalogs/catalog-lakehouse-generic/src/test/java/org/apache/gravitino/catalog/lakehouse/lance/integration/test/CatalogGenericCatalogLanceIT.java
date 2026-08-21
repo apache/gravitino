@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_FORMAT;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_REGISTER;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_VERSION;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.collect.ImmutableMap;
@@ -411,6 +412,162 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
 
     Assertions.assertThrows(
         RuntimeException.class, () -> catalog.asTableCatalog().loadTable(newNameIdentifier));
+  }
+
+  @Test
+  public void testAddNullableColumnsBackfillNullInSingleLanceVersion() throws Exception {
+    String addColumnTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, addColumnTableName);
+    String tableLocation = String.format("%s/%s/%s", tempDirectory, schemaName, addColumnTableName);
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            tableIdentifier,
+            createColumns(),
+            TABLE_COMMENT,
+            properties,
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[0]);
+
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build()) {
+      SourcedTransaction transaction =
+          dataset
+              .newTransactionBuilder()
+              .operation(
+                  Append.builder()
+                      .fragments(
+                          createFragmentMetadata(
+                              tableLocation,
+                              List.of(
+                                  new LanceDataValue(1, 100L, "first"),
+                                  new LanceDataValue(2, 200L, "second")),
+                              dataset.getSchema()))
+                      .build())
+              .transactionProperties(Map.of())
+              .build();
+      try (Dataset ignored = transaction.commit()) {
+        // The committed dataset is closed after the historical rows have been written.
+      }
+    }
+
+    long versionBeforeAlter;
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build()) {
+      versionBeforeAlter = dataset.version();
+    }
+
+    Table alteredTable =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                tableIdentifier,
+                TableChange.addColumn(
+                    new String[] {"new_nullable_col"}, Types.StringType.get(), "nullable column"),
+                TableChange.addColumn(
+                    new String[] {"new_nullable_long"}, Types.LongType.get(), "nullable long"));
+
+    Assertions.assertEquals(5, alteredTable.columns().length);
+    Assertions.assertEquals("new_nullable_col", alteredTable.columns()[3].name());
+    Assertions.assertEquals("nullable column", alteredTable.columns()[3].comment());
+    Assertions.assertEquals("new_nullable_long", alteredTable.columns()[4].name());
+    Assertions.assertEquals("nullable long", alteredTable.columns()[4].comment());
+
+    int rowCount = 0;
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build();
+        LanceScanner scanner =
+            dataset.newScan(
+                new ScanOptions.Builder()
+                    .columns(List.of("new_nullable_col", "new_nullable_long"))
+                    .build());
+        ArrowReader reader = scanner.scanBatches()) {
+      Assertions.assertEquals(versionBeforeAlter + 1, dataset.version());
+      Assertions.assertEquals(
+          String.valueOf(dataset.version()), alteredTable.properties().get(LANCE_TABLE_VERSION));
+      Field addedStringField = dataset.getSchema().findField("new_nullable_col");
+      Assertions.assertNotNull(addedStringField);
+      Assertions.assertTrue(addedStringField.isNullable());
+      Assertions.assertEquals(new ArrowType.Utf8(), addedStringField.getType());
+      Field addedLongField = dataset.getSchema().findField("new_nullable_long");
+      Assertions.assertNotNull(addedLongField);
+      Assertions.assertTrue(addedLongField.isNullable());
+      Assertions.assertEquals(new ArrowType.Int(64, true), addedLongField.getType());
+
+      while (reader.loadNextBatch()) {
+        VectorSchemaRoot root = reader.getVectorSchemaRoot();
+        VarCharVector stringVector = (VarCharVector) root.getVector("new_nullable_col");
+        BigIntVector longVector = (BigIntVector) root.getVector("new_nullable_long");
+        for (int i = 0; i < root.getRowCount(); i++) {
+          Assertions.assertTrue(stringVector.isNull(i));
+          Assertions.assertTrue(longVector.isNull(i));
+          rowCount++;
+        }
+      }
+    }
+    Assertions.assertEquals(2, rowCount);
+  }
+
+  @Test
+  public void testAddColumnHydratesDeclaredTableWithoutPriorLoad() throws Exception {
+    String declaredTableName = GravitinoITUtils.genRandomName(TABLE_PREFIX);
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, declaredTableName);
+    String tableLocation = String.format("%s/%s/%s", tempDirectory, schemaName, declaredTableName);
+    org.apache.arrow.vector.types.pojo.Schema physicalSchema =
+        new org.apache.arrow.vector.types.pojo.Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("name", new ArrowType.Utf8())));
+
+    try (RootAllocator allocator = new RootAllocator();
+        Dataset ignored =
+            Dataset.write()
+                .allocator(allocator)
+                .schema(physicalSchema)
+                .uri(tableLocation)
+                .mode(WriteParams.WriteMode.CREATE)
+                .execute()) {
+      // The physical dataset exists before its declared-only Gravitino metadata is created.
+    }
+
+    Map<String, String> properties = createProperties();
+    properties.put(Table.PROPERTY_TABLE_FORMAT, LANCE_TABLE_FORMAT);
+    properties.put(Table.PROPERTY_LOCATION, tableLocation);
+    properties.put(Table.PROPERTY_EXTERNAL, "true");
+    properties.put(LANCE_TABLE_DECLARED, "true");
+    Table declaredTable =
+        catalog
+            .asTableCatalog()
+            .createTable(
+                tableIdentifier,
+                new Column[0],
+                TABLE_COMMENT,
+                properties,
+                Transforms.EMPTY_TRANSFORM,
+                Distributions.NONE,
+                new SortOrder[0]);
+    Assertions.assertEquals(0, declaredTable.columns().length);
+
+    Table alteredTable =
+        catalog
+            .asTableCatalog()
+            .alterTable(
+                tableIdentifier,
+                TableChange.addColumn(new String[] {"age"}, Types.LongType.get(), "age"));
+
+    Assertions.assertEquals(
+        List.of("id", "name", "age"),
+        Arrays.stream(alteredTable.columns()).map(Column::name).toList());
+    Assertions.assertFalse(alteredTable.properties().containsKey(LANCE_TABLE_DECLARED));
+    try (Dataset dataset = Dataset.open().uri(tableLocation).build()) {
+      Assertions.assertEquals(
+          List.of("id", "name", "age"),
+          dataset.getSchema().getFields().stream().map(Field::getName).toList());
+      Assertions.assertEquals(
+          String.valueOf(dataset.version()), alteredTable.properties().get(LANCE_TABLE_VERSION));
+    }
   }
 
   @Test

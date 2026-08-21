@@ -26,17 +26,21 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -301,15 +305,25 @@ public class LanceTableOperations extends ManagedTableOperations {
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchSchemaException, TableAlreadyExistsException {
+    List<Field> fieldsToAdd = prepareFieldsToAdd(changes);
+    // A declared or registered table can have an empty stored schema while its Lance dataset
+    // already contains columns. Hydrate the metadata before applying an incremental AddColumn.
+    Table loadedTable = fieldsToAdd.isEmpty() ? super.loadTable(ident) : loadTable(ident);
+    validateFieldsToAdd(loadedTable, fieldsToAdd);
+    long version = handleLanceTableChange(loadedTable, changes, fieldsToAdd);
 
-    Table loadedTable = super.loadTable(ident);
-    long version = handleLanceTableChange(loadedTable, changes);
     // After making changes to the Lance dataset, we need to update the table metadata in
     // Gravitino. If there's any failure during this process, the code will throw an exception
     // and the update won't be applied in Gravitino.
-    TableChange[] metadataChanges = Arrays.copyOf(changes, changes.length + 1);
-    metadataChanges[changes.length] =
-        TableChange.setProperty(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version));
+    TableChange[] metadataChanges =
+        ArrayUtils.add(
+            changes,
+            TableChange.setProperty(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(version)));
+    if (!fieldsToAdd.isEmpty()) {
+      metadataChanges =
+          ArrayUtils.add(
+              metadataChanges, TableChange.removeProperty(LanceConstants.LANCE_TABLE_DECLARED));
+    }
     return super.alterTable(ident, metadataChanges);
   }
 
@@ -754,10 +768,24 @@ public class LanceTableOperations extends ManagedTableOperations {
    * @return the new version id of the Lance dataset after applying the changes
    */
   long handleLanceTableChange(Table table, TableChange[] changes) {
+    List<Field> fieldsToAdd = prepareFieldsToAdd(changes);
+    validateFieldsToAdd(table, fieldsToAdd);
+    return handleLanceTableChange(table, changes, fieldsToAdd);
+  }
+
+  private long handleLanceTableChange(Table table, TableChange[] changes, List<Field> fieldsToAdd) {
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     Map<String, String> storageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(catalogProperties, table.properties());
     try (Dataset dataset = openDataset(location, storageOptions)) {
+      if (!fieldsToAdd.isEmpty()) {
+        // Adding all fields in one call creates one Lance schema version and backfills existing
+        // rows with null for the new nullable columns.
+        dataset.addColumns(fieldsToAdd);
+        dataset.checkoutLatest();
+        return dataset.getVersion().getId();
+      }
+
       for (TableChange change : changes) {
         if (change instanceof TableChange.DeleteColumn deleteColumn) {
           dataset.dropColumns(List.of(String.join(".", deleteColumn.fieldName())));
@@ -781,7 +809,7 @@ public class LanceTableOperations extends ManagedTableOperations {
                   .build();
           dataset.alterColumns(List.of(lanceColumnAlter));
         } else {
-          // Currently, only column drop/rename and index addition are supported.
+          // Currently, only column add/drop/rename and index addition are supported.
           // TODO: Support change column type once we have a clear knowledge about the means of
           // castTo in Lance.
           throw new UnsupportedOperationException(
@@ -809,6 +837,73 @@ public class LanceTableOperations extends ManagedTableOperations {
         .uri(location)
         .readOptions(new ReadOptions.Builder().setStorageOptions(storageOptions).build())
         .build();
+  }
+
+  private List<Field> prepareFieldsToAdd(TableChange[] changes) {
+    Preconditions.checkArgument(changes != null && changes.length > 0, "Changes cannot be empty");
+
+    int addColumnCount = 0;
+    Set<String> columnNames = new HashSet<>();
+    List<Field> fieldsToAdd = new ArrayList<>(changes.length);
+    for (TableChange change : changes) {
+      Preconditions.checkArgument(change != null, "Table change cannot be null");
+      if (change instanceof TableChange.AddColumn addColumn) {
+        addColumnCount++;
+
+        Preconditions.checkArgument(
+            addColumn.fieldName().length == 1,
+            "Lance only supports adding top-level columns: %s",
+            String.join(".", addColumn.fieldName()));
+        String columnName = addColumn.fieldName()[0];
+        Preconditions.checkArgument(
+            addColumn.isNullable(),
+            "Lance only supports adding nullable columns because existing rows are backfilled "
+                + "with null: %s",
+            columnName);
+        Preconditions.checkArgument(
+            TableChange.ColumnPosition.defaultPos().equals(addColumn.getPosition()),
+            "Lance only supports appending new columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            !addColumn.isAutoIncrement(),
+            "Lance does not support adding auto-increment columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            addColumn.getDefaultValue() == null
+                || addColumn.getDefaultValue().equals(DEFAULT_VALUE_NOT_SET),
+            "Lance does not support default values when adding columns: %s",
+            columnName);
+        Preconditions.checkArgument(
+            columnNames.add(columnName), "Column %s already exists", columnName);
+        fieldsToAdd.add(
+            LanceDataTypeConverter.CONVERTER.toArrowField(
+                columnName, addColumn.getDataType(), true));
+      } else if (change instanceof TableChange.DeleteColumn
+          || change instanceof TableChange.AddIndex
+          || change instanceof TableChange.RenameColumn) {
+        // Handled by the existing Lance alter-table flow.
+      } else {
+        throw new UnsupportedOperationException(
+            "Unsupported changes to lance table: " + change.getClass().getSimpleName());
+      }
+    }
+    Preconditions.checkArgument(
+        addColumnCount == 0 || addColumnCount == changes.length,
+        "Lance AddColumn cannot be combined with other table changes");
+    return fieldsToAdd;
+  }
+
+  private void validateFieldsToAdd(Table table, List<Field> fieldsToAdd) {
+    if (fieldsToAdd.isEmpty()) {
+      return;
+    }
+
+    Set<String> columnNames =
+        new HashSet<>(Arrays.stream(table.columns()).map(Column::name).toList());
+    for (Field field : fieldsToAdd) {
+      Preconditions.checkArgument(
+          columnNames.add(field.getName()), "Column %s already exists", field.getName());
+    }
   }
 
   private IndexParams getIndexParamsByIndexType(IndexType indexType) {
