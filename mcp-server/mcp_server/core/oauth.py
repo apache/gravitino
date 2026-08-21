@@ -44,6 +44,7 @@ _TokenTuple = Union[tuple[str, str], tuple[str, str, Union[int, str]]]
 class RefreshableBearerAuth(OAuth2ClientCredentials):
     """httpx-auth client-credentials with form POST and one 401 retry."""
 
+    requires_request_body = True
     requires_response_body = True
 
     def __init__(
@@ -125,6 +126,8 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         self, request: httpx.Request
     ) -> AsyncGenerator[httpx.Request, httpx.Response]:
         """Attach a Bearer without a blocking IdP POST on the event loop."""
+        if self.requires_request_body:
+            await request.aread()
         await self._apply_token_async(request)
         response = yield request
         if response.status_code != 401:

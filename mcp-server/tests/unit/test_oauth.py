@@ -263,6 +263,36 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertEqual(seen, ["Bearer t1", "Bearer t2"])
         self.assertEqual(calls["token"], 2)
 
+    def test_401_retry_replays_streaming_request_body(self):
+        seen_bodies = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST" and request.url.path == "/token":
+                return httpx.Response(
+                    200, json={"access_token": "t1", "expires_in": 3600}
+                )
+            seen_bodies.append(request.content)
+            if len(seen_bodies) == 1:
+                return httpx.Response(401)
+            return httpx.Response(200, json={"ok": True})
+
+        auth = self._auth(handler)
+
+        async def _run():
+            async def body():
+                yield b'{"name":"fileset"}'
+
+            async with httpx.AsyncClient(
+                auth=auth,
+                transport=auth._test_transport,
+                base_url="https://gravitino.example",
+            ) as client:
+                return await client.post("/api", content=body())
+
+        response = asyncio.run(_run())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(seen_bodies, [b'{"name":"fileset"}'] * 2)
+
     def test_async_auth_flow_posts_token_with_async_client(self):
         calls = {"token": 0}
 
