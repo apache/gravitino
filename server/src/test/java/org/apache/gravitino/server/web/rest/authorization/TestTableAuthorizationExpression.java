@@ -100,11 +100,11 @@ public class TestTableAuthorizationExpression {
   @Test
   public void testListTableFilter()
       throws IllegalAccessException, OgnlException, NoSuchFieldException {
-    Field probeTableLikeAuthorizationExpressionField =
+    Field listTableLikeAuthorizationExpressionField =
         AuthorizationExpressionConstants.class.getDeclaredField(
-            "PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION");
-    probeTableLikeAuthorizationExpressionField.setAccessible(true);
-    String expression = (String) probeTableLikeAuthorizationExpressionField.get(null);
+            "LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION");
+    listTableLikeAuthorizationExpressionField.setAccessible(true);
+    String expression = (String) listTableLikeAuthorizationExpressionField.get(null);
     MockAuthorizationExpressionEvaluator mockEvaluator =
         new MockAuthorizationExpressionEvaluator(expression);
     assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
@@ -129,9 +129,12 @@ public class TestTableAuthorizationExpression {
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::MODIFY_TABLE", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
-    assertTrue(
+    assertFalse(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_TABLE", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
+    assertFalse(
+        mockEvaluator.getResult(
+            ImmutableSet.of("SCHEMA::CREATE_VIEW", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
   }
 
   @Test
@@ -190,10 +193,10 @@ public class TestTableAuthorizationExpression {
     MockAuthorizationExpressionEvaluator mockEvaluator =
         new MockAuthorizationExpressionEvaluator(expression);
     assertFalse(mockEvaluator.getResult(ImmutableSet.of()));
-    assertTrue(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
-    assertTrue(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
-    assertTrue(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::OWNER")));
-    assertTrue(mockEvaluator.getResult(ImmutableSet.of("TABLE::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("METALAKE::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("CATALOG::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("SCHEMA::OWNER")));
+    assertFalse(mockEvaluator.getResult(ImmutableSet.of("TABLE::OWNER")));
     assertFalse(
         mockEvaluator.getResult(
             ImmutableSet.of(

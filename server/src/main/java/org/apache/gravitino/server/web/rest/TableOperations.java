@@ -99,7 +99,7 @@ public class TableOperations {
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+                    AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.TABLE,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
