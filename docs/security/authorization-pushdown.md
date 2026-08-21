@@ -64,13 +64,54 @@ authorization.ranger.service.name=hiveRepo
 
 ### Roles Gravitino Creates
 
-Gravitino creates three roles in Ranger and manages their membership itself, so treat them as owned by Gravitino rather than editing them in the Ranger UI.
+Gravitino creates the following managed roles in Ranger and manages their membership itself, so treat them as owned by Gravitino rather than editing them in the Ranger UI.
 
 | Role                            | Purpose                                                                                          |
 |---------------------------------|---------------------------------------------------------------------------------------------------|
-| `GRAVITINO_METALAKE_OWNER_ROLE` | Holds the users and groups that own the metalake, carrying owner privileges in Ranger policies    |
-| `GRAVITINO_CATALOG_OWNER_ROLE`  | Holds the users and groups that own the catalog, carrying owner privileges in Ranger policies     |
+| `GRAVITINO_METALAKE_OWNER_ROLE_<metalake_id>` | Holds the user or group that owns the identified metalake, carrying owner privileges in Ranger policies |
+| `GRAVITINO_CATALOG_OWNER_ROLE_<catalog_id>` | Holds the user or group that owns the identified catalog, carrying owner privileges in Ranger policies |
 | `GRAVITINO_OWNER_ROLE`          | Labels the policy items covering schema and table owner privileges, and holds no members          |
+
+### Migrate Owner Roles from 1.x to 2.0
+
+Gravitino 1.x used the shared Ranger roles `GRAVITINO_METALAKE_OWNER_ROLE` and
+`GRAVITINO_CATALOG_OWNER_ROLE`. If multiple catalogs wrote to the same Ranger service, membership
+in either shared role could give an owner access outside the object they owned. Gravitino 2.0 uses
+the ID-suffixed roles in the table above, but it does not migrate existing Ranger state
+automatically.
+
+After upgrading the Gravitino server, reconcile every existing metalake and Ranger-enabled catalog
+by setting its current owner again. Setting the same owner is safe and idempotent. It creates the
+ID-suffixed role, grants that role to the current owner, and replaces the legacy shared role in the
+matching Ranger policies. Get the current owner before sending the `PUT` request; do not infer it
+from membership in a legacy shared role because that role can contain owners of several catalogs.
+
+The following example reconciles the owner of catalog `sales` in metalake `prod`:
+
+```shell
+curl -s \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  "http://<gravitino-host>:8090/api/metalakes/prod/owners/CATALOG/sales"
+
+curl -X PUT \
+  -H "Content-Type: application/json" \
+  -d '{"name":"<current-owner-name>","type":"<USER-or-GROUP>"}' \
+  "http://<gravitino-host>:8090/api/metalakes/prod/owners/CATALOG/sales"
+```
+
+Repeat the same process for each catalog that has Ranger authorization enabled. Reconcile each
+metalake as well, using `METALAKE/<metalake-name>` in place of `CATALOG/<catalog-name>`. A metalake
+owner update is applied through every authorization-enabled catalog in that metalake.
+
+Keep the two legacy shared roles until all objects have been reconciled. Then use Ranger Admin to:
+
+1. Verify that no policy refers to the exact role names `GRAVITINO_METALAKE_OWNER_ROLE` or
+   `GRAVITINO_CATALOG_OWNER_ROLE`.
+2. Verify that every `GRAVITINO_METALAKE_OWNER_ROLE_<metalake_id>` and
+   `GRAVITINO_CATALOG_OWNER_ROLE_<catalog_id>` contains the expected owner, and test access for two
+   catalogs that share a Ranger service.
+3. Delete the two legacy shared roles. Do not delete the ID-suffixed roles or
+   `GRAVITINO_OWNER_ROLE`.
 
 ## Chaining Plugins
 
