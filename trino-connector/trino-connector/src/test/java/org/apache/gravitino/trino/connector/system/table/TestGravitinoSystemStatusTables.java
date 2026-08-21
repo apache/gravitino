@@ -64,7 +64,7 @@ public class TestGravitinoSystemStatusTables {
   public void testCatalogStatusTableRendersFailedCatalog() {
     CatalogRegistrationState state =
         CatalogRegistrationState.failed(
-            "test", "memory", "memory", null, "Access Denied: Cannot create catalog memory", null);
+            "test", "memory", "memory", null, "Access Denied: Cannot create catalog memory");
 
     Page page = loadCatalogStatusPage(List.of(state));
 

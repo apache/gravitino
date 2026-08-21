@@ -82,9 +82,11 @@ The result is like:
 
 Check catalog registration status:
 
-`gravitino.system.catalog` lists the catalogs the Gravitino server knows about. A catalog listed
-there is not necessarily usable in Trino: registering it is a separate step that can fail. When a
-catalog does not show up in `SHOW CATALOGS`, `gravitino.system.catalog_status` says why.
+`gravitino.system.catalog` lists the relational catalogs the Gravitino server knows about, minus any
+that match `gravitino.trino.skip-catalog-patterns`. A catalog listed there is not necessarily usable
+in Trino: registering it is a separate step that can fail. `gravitino.system.catalog_status` covers
+every catalog the connector considered, including the ones `catalog` filters out, and says why each
+one is or is not registered.
 
 ```sql
 select catalog_name, status, last_error from gravitino.system.catalog_status;
@@ -109,7 +111,7 @@ The result is like:
 | `status`             | One of `REGISTERED`, `FAILED`, `UNSUPPORTED` or `SKIPPED`. See the table below.                |
 | `last_error`         | The reason the catalog is not registered, `NULL` when it is.                                   |
 | `last_attempt_time`  | When the catalog was last processed, as an ISO-8601 UTC timestamp.                             |
-| `last_success_time`  | When the catalog was last registered successfully, `NULL` if it never was.                     |
+| `last_success_time`  | When the catalog was last registered successfully, `NULL` if it never was. Retained when a catalog later fails or becomes unsupported. |
 | `failure_count`      | The number of consecutive failed attempts, `0` when the last attempt succeeded.                |
 
 | Status        | Meaning                                                                                       |
@@ -129,15 +131,15 @@ select * from gravitino.system.load_status;
 
 | Column                 | Description                                                                             |
 |------------------------|-------------------------------------------------------------------------------------------|
-| `trino_started`        | Whether the connector can reach the Trino server over JDBC. No catalog is registered until it can. |
+| `trino_started`        | Whether the Trino server has been observed reachable over JDBC. No catalog is registered until it is. Latched: once true it stays true, so it is not a liveness probe. |
 | `last_attempt_time`    | When the loop last ran, as an ISO-8601 UTC timestamp.                                       |
 | `last_success_time`    | When the loop last completed successfully, `NULL` if it never did.                          |
 | `consecutive_failures` | The number of consecutive failed runs, `0` when the last run succeeded.                     |
-| `last_error`           | The reason the last run failed, `NULL` when it succeeded.                                   |
-| `metalake_errors`      | A JSON map of metalake name to its last error, `NULL` when every metalake loaded.           |
+| `last_error`           | The reason the last run did not complete, including waiting for Trino to start, `NULL` when it succeeded. |
+| `metalake_errors`      | A JSON map of metalake name to its last error, `NULL` when every metalake loaded. A metalake that fails here also fails the run as a whole. |
 
 Both tables are served by the coordinator and reflect the last refresh, which runs every
-`gravitino.metadata.refresh-interval-second` seconds (10 by default). A catalog created moments ago
+`gravitino.metadata.refresh-interval-seconds` seconds (10 by default). A catalog created moments ago
 may not have been processed yet.
 
 Example:
@@ -250,12 +252,12 @@ Registration happens in the background, so a catalog that fails to register simp
 | Symptom                                                            | Likely cause                                                                                                      |
 |--------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
 | A catalog is missing from `SHOW CATALOGS`                            | Query `gravitino.system.catalog_status` and read `status` and `last_error`, then follow the rows below              |
-| `status = FAILED`, `last_error` mentions `Access Denied`             | The `gravitino.trino.user` lacks a Trino system role permitted to run `CREATE CATALOG`                              |
+| `status = FAILED`, `last_error` mentions `Access Denied`             | The `trino.jdbc.user` lacks a Trino system role permitted to run `CREATE CATALOG`                              |
 | `status = FAILED`, `last_error` mentions a configuration property    | A `trino.bypass.` property is not accepted by the underlying Trino connector                                        |
 | `status = UNSUPPORTED`                                               | The catalog is not relational, or its provider is outside the supported list. `last_error` names the supported providers |
 | `status = SKIPPED`                                                   | The catalog matches `gravitino.trino.skip-catalog-patterns`                                                         |
 | The catalog has no row in `catalog_status` at all                    | The load loop never reached it. Check `gravitino.system.load_status`                                                |
-| `load_status.trino_started = false`                                  | The connector cannot reach Trino over JDBC. Check `discovery.uri`, `gravitino.trino.user` and `gravitino.trino.password` |
+| `load_status.trino_started = false`                                  | The connector cannot reach Trino over JDBC. `last_error` carries the connection error. Check `discovery.uri`, `trino.jdbc.user` and `trino.jdbc.password` |
 | `load_status.last_error` mentions connection refused                 | The Gravitino server is unreachable. Check `gravitino.uri`                                                          |
 | `load_status.metalake_errors` names a metalake                       | That metalake could not be listed, the other metalakes are unaffected                                               |
 | Querying `gravitino.system.catalog_status` itself fails              | The entry catalog did not initialise. The error is reported when the entry catalog is created, check the Trino server log at startup |

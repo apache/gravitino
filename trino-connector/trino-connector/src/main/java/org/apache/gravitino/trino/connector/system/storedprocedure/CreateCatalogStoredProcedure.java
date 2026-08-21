@@ -120,7 +120,7 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
             "Create catalog failed due to the loading process fails. "
-                + catalogConnectorManager.describeRegistrationFailure(trinoCatalogName));
+                + catalogConnectorManager.describeRegistrationFailure(metalake, trinoCatalogName));
       }
 
       LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);

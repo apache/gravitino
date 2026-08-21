@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -64,6 +65,7 @@ public class CatalogConnectorManager {
 
   private static final int NUMBER_EXECUTOR_THREAD = 1;
   private static final int LOAD_METALAKE_TIMEOUT = 60;
+  private static final int MAX_CAUSE_DEPTH = 32;
 
   private int metadataUpdateIntervalSecond = 10;
 
@@ -75,7 +77,8 @@ public class CatalogConnectorManager {
       new ConcurrentHashMap<>();
 
   // The registration state of every catalog seen by the load loop, keyed by the Trino catalog
-  // name. Written only by the load loop thread, read by query threads through the system tables.
+  // name. Written only by the load loop thread, read by query threads through the system tables
+  // and by stored procedure threads through describeRegistrationFailure().
   private final ConcurrentHashMap<String, CatalogRegistrationState> catalogStates =
       new ConcurrentHashMap<>();
 
@@ -198,12 +201,16 @@ public class CatalogConnectorManager {
     lastLoadAttemptTimeMs = System.currentTimeMillis();
     try {
       if (!catalogRegister.isTrinoStarted()) {
-        String message = "Waiting for the Trino server to start";
-        if (!Objects.equals(lastLoadError, message)) {
-          LOG.info("{}.", message);
-        }
-        lastLoadError = message;
+        // Report why the connection failed. "Waiting for Trino" alone reads the same for a
+        // coordinator that is seconds from ready and for credentials that will never work.
+        String cause = catalogRegister.getLastConnectionError();
+        String message =
+            cause == null
+                ? "Waiting for the Trino server to start"
+                : "Waiting for the Trino server to start, the last connection attempt failed: "
+                    + cause;
         trinoStarted = false;
+        recordLoadFailure(message, null);
         return;
       }
       trinoStarted = true;
@@ -234,10 +241,24 @@ public class CatalogConnectorManager {
         }
       }
 
-      lastSuccessfulLoadTimeMs = System.currentTimeMillis();
-      recordLoadSuccess();
-    } catch (Exception e) {
-      recordLoadFailure(toErrorMessage(e), e);
+      if (metalakeErrors.isEmpty()) {
+        lastSuccessfulLoadTimeMs = System.currentTimeMillis();
+        recordLoadSuccess();
+      } else {
+        // Some metalake failed. The loop reaching its last line is not a health signal, so do not
+        // advance the success time or clear the error, or load_status would report a healthy loop
+        // while no catalog is being registered at all.
+        recordLoadFailure(
+            String.format(
+                "%d of %d metalakes failed to load: %s",
+                metalakeErrors.size(), usedMetalakes.size(), new TreeMap<>(metalakeErrors)),
+            null);
+      }
+    } catch (Throwable t) {
+      // Catch Throwable, not Exception: scheduleWithFixedDelay silently cancels the task forever
+      // the first time the runnable throws, and loading a Trino connector plugin can raise
+      // NoClassDefFoundError. A dead loop must not look like a healthy one.
+      recordLoadFailure(toErrorMessage(t), t);
     }
   }
 
@@ -249,18 +270,21 @@ public class CatalogConnectorManager {
     consecutiveLoadFailures.set(0);
   }
 
-  private void recordLoadFailure(String message, Exception cause) {
+  private void recordLoadFailure(String message, Throwable cause) {
     boolean changed = !Objects.equals(lastLoadError, message);
     lastLoadError = message;
     consecutiveLoadFailures.incrementAndGet();
-    if (changed) {
+    if (!changed) {
+      LOG.debug("Failed to load catalogs from the Gravitino server: {}", message, cause);
+    } else if (trinoStarted) {
       LOG.error("Failed to load catalogs from the Gravitino server: {}", message, cause);
     } else {
-      LOG.debug("Failed to load catalogs from the Gravitino server: {}", message, cause);
+      // Trino not being up yet is the normal state during startup, not an error.
+      LOG.info("{}", message);
     }
   }
 
-  private void recordMetalakeError(String metalakeName, Exception cause) {
+  private void recordMetalakeError(String metalakeName, Throwable cause) {
     String message = toErrorMessage(cause);
     String previous = metalakeErrors.put(metalakeName, message);
     if (!Objects.equals(previous, message)) {
@@ -270,20 +294,33 @@ public class CatalogConnectorManager {
     }
   }
 
-  private static String toErrorMessage(Exception e) {
+  private static String toErrorMessage(Throwable e) {
     // Report the root cause: the actual reason a registration failed, such as "Access Denied:
     // Cannot create catalog", is wrapped in several layers of TrinoException by the time it gets
-    // here, and the outer messages say nothing a user can act on. Do not use
-    // GravitinoErrorCode.toSimpleErrorMessage(), it throws a NullPointerException when the
-    // exception carries no message.
+    // here, and the outer messages say nothing a user can act on. The outermost message is kept
+    // as a prefix because it names the subsystem that failed. Do not use
+    // GravitinoErrorCode.toSimpleErrorMessage(), it throws on an exception with no message.
     Throwable rootCause = e;
-    while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
-      rootCause = rootCause.getCause();
+    // Bound the walk: a cause chain can be cyclic, and this runs on the single load loop thread.
+    for (int depth = 0; depth < MAX_CAUSE_DEPTH; depth++) {
+      Throwable cause = rootCause.getCause();
+      if (cause == null || cause == rootCause) {
+        break;
+      }
+      rootCause = cause;
     }
-    String message = rootCause.getMessage();
-    if (StringUtils.isBlank(message)) {
-      message = e.getMessage();
+    String rootMessage = describeThrowable(rootCause);
+    if (rootCause == e) {
+      return rootMessage;
     }
+    String outerMessage = e.getMessage();
+    return StringUtils.isBlank(outerMessage) || outerMessage.contains(rootMessage)
+        ? rootMessage
+        : outerMessage + ": " + rootMessage;
+  }
+
+  private static String describeThrowable(Throwable e) {
+    String message = e.getMessage();
     return StringUtils.isBlank(message) ? e.getClass().getName() : message;
   }
 
@@ -355,12 +392,10 @@ public class CatalogConnectorManager {
       presentTrinoNames.add(trinoCatalogName);
       if (skipCatalog(trinoCatalogName)) {
         recordCatalogState(
-            CatalogRegistrationState.notLoaded(
+            CatalogRegistrationState.skipped(
                 metalakeName,
                 catalogName,
                 trinoCatalogName,
-                null,
-                CatalogRegistrationState.Status.SKIPPED,
                 "Matched gravitino.trino.skip-catalog-patterns"),
             null);
         continue;
@@ -384,19 +419,33 @@ public class CatalogConnectorManager {
         try {
           unloadCatalog(entry.getValue().getCatalog());
         } catch (Exception e) {
-          LOG.error("Failed to remove catalog {}.", entry.getKey(), e);
+          // The catalog is gone from Gravitino but is still registered in Trino. Record it, or
+          // the pruning below would drop the row and the table would report nothing at all about
+          // a catalog that still shows up in SHOW CATALOGS.
+          GravitinoCatalog catalog = entry.getValue().getCatalog();
+          recordCatalogState(
+              CatalogRegistrationState.failed(
+                  metalakeName,
+                  catalog.getName(),
+                  entry.getKey(),
+                  catalog.getProvider(),
+                  "The catalog was deleted in Gravitino but could not be unregistered from Trino: "
+                      + toErrorMessage(e)),
+              e);
         }
       }
     }
 
     // Drop the states of catalogs that no longer exist in the Gravitino server, including the
-    // states of catalogs that never had a connector.
+    // states of catalogs that never had a connector. A catalog whose connector could not be
+    // removed from Trino is kept, so that its failure stays visible for as long as it is real.
     catalogStates
         .values()
         .removeIf(
             state ->
                 state.getMetalake().equals(metalakeName)
-                    && !presentTrinoNames.contains(state.getTrinoCatalogName()));
+                    && !presentTrinoNames.contains(state.getTrinoCatalogName())
+                    && !catalogConnectors.containsKey(state.getTrinoCatalogName()));
 
     // Load new catalogs belows to the metalake.
     for (String catalogName : catalogNames) {
@@ -414,12 +463,11 @@ public class CatalogConnectorManager {
               CatalogRegistrationState.succeeded(gravitinoCatalog, trinoCatalogName), null);
         } else if (catalog.type() != Catalog.Type.RELATIONAL) {
           recordCatalogState(
-              CatalogRegistrationState.notLoaded(
+              CatalogRegistrationState.unsupported(
                   metalakeName,
                   catalogName,
                   trinoCatalogName,
                   gravitinoCatalog.getProvider(),
-                  CatalogRegistrationState.Status.UNSUPPORTED,
                   String.format(
                       "Only relational catalogs are supported, the catalog type is %s",
                       catalog.type())),
@@ -428,12 +476,11 @@ public class CatalogConnectorManager {
             .getSupportedCatalogProviders()
             .contains(gravitinoCatalog.getProvider())) {
           recordCatalogState(
-              CatalogRegistrationState.notLoaded(
+              CatalogRegistrationState.unsupported(
                   metalakeName,
                   catalogName,
                   trinoCatalogName,
                   gravitinoCatalog.getProvider(),
-                  CatalogRegistrationState.Status.UNSUPPORTED,
                   String.format(
                       "The catalog provider %s is not supported, the supported providers are %s",
                       gravitinoCatalog.getProvider(),
@@ -444,32 +491,26 @@ public class CatalogConnectorManager {
           recordCatalogState(
               CatalogRegistrationState.succeeded(gravitinoCatalog, trinoCatalogName), null);
         }
-      } catch (UnsupportedOperationException e) {
-        recordCatalogState(
-            CatalogRegistrationState.notLoaded(
-                metalakeName,
-                catalogName,
-                trinoCatalogName,
-                provider,
-                CatalogRegistrationState.Status.UNSUPPORTED,
-                toErrorMessage(e)),
-            null);
       } catch (Exception e) {
         recordCatalogState(
             CatalogRegistrationState.failed(
-                metalakeName,
-                catalogName,
-                trinoCatalogName,
-                provider,
-                toErrorMessage(e),
-                catalogStates.get(trinoCatalogName)),
+                metalakeName, catalogName, trinoCatalogName, provider, toErrorMessage(e)),
             e);
       }
     }
   }
 
-  private void recordCatalogState(CatalogRegistrationState state, Exception cause) {
-    CatalogRegistrationState previous = catalogStates.put(state.getTrinoCatalogName(), state);
+  private void recordCatalogState(CatalogRegistrationState newState, Throwable cause) {
+    // Merge under compute() so the history carried over cannot be lost to a concurrent record.
+    CatalogRegistrationState[] seen = new CatalogRegistrationState[1];
+    CatalogRegistrationState state =
+        catalogStates.compute(
+            newState.getTrinoCatalogName(),
+            (name, previous) -> {
+              seen[0] = previous;
+              return newState.withHistoryOf(previous);
+            });
+    CatalogRegistrationState previous = seen[0];
     boolean changed =
         previous == null
             || previous.getStatus() != state.getStatus()
@@ -678,16 +719,27 @@ public class CatalogConnectorManager {
   /**
    * Describes why a catalog is not registered in Trino, for use in error messages.
    *
+   * @param metalake the name of the metalake the catalog belongs to
    * @param trinoCatalogName the name the catalog would be registered under in Trino
    * @return a human readable explanation
    */
-  public String describeRegistrationFailure(String trinoCatalogName) {
+  public String describeRegistrationFailure(String metalake, String trinoCatalogName) {
     CatalogRegistrationState state = catalogStates.get(trinoCatalogName);
     if (state != null && state.getLastError() != null) {
       return String.format("%s: %s", state.getStatus(), state.getLastError());
     }
+    String metalakeError = metalakeErrors.get(metalake);
+    if (metalakeError != null) {
+      return String.format("Metalake %s could not be loaded: %s", metalake, metalakeError);
+    }
     if (lastLoadError != null) {
       return lastLoadError;
+    }
+    if (state != null) {
+      // The catalog is registered, so the caller is looking at a change that did not take effect.
+      return String.format(
+          "The catalog is %s and the last load attempt did not pick up the change.",
+          state.getStatus());
     }
     return "The catalog has not been loaded yet, please retry later.";
   }
