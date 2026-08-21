@@ -193,9 +193,12 @@ public class GravitinoSystemConnector implements Connector {
     }
 
     // The system table data lives on the coordinator only: the catalog load loop runs there, and
-    // the registration state it records is never replicated to workers. Splits are built in
-    // SplitManager.getSplits(), which also runs on the coordinator, so this is always set by the
-    // time it is read. It stays null on worker JVMs, where the behaviour is unchanged.
+    // the registration state it records is never replicated to workers. Set once by the
+    // coordinator's GravitinoConnectorFactory.create(), which necessarily runs before any query
+    // can reach the scheduler, and read by the scheduler through isRemotelyAccessible() and
+    // getAddresses() below. On a real worker JVM it is never set and the split keeps the previous
+    // remotely accessible behaviour; in a single JVM test runner the static is shared with the
+    // coordinator, which is harmless because only the coordinator's scheduler reads it.
     private static volatile HostAddress coordinatorAddress;
 
     /**

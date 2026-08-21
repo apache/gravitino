@@ -18,7 +18,10 @@
  */
 package org.apache.gravitino.trino.connector.system;
 
+import io.trino.spi.HostAddress;
 import io.trino.spi.Page;
+import io.trino.spi.connector.SchemaTableName;
+import java.util.List;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -63,5 +66,48 @@ public class TestGravitinoSystemConnector {
       Assertions.assertNull(pageSource.nextPage());
       Assertions.assertTrue(pageSource.isFinished());
     }
+  }
+
+  @Test
+  public void testSplitIsRemotelyAccessibleUntilTheCoordinatorIsKnown() {
+    HostAddress previous = null;
+    try {
+      GravitinoSystemConnector.Split.setCoordinatorAddress(null);
+      GravitinoSystemConnector.Split split = mockSplit();
+
+      // Without a known coordinator the split keeps the original, unpinned behaviour.
+      Assertions.assertTrue(split.isRemotelyAccessible());
+      Assertions.assertTrue(split.getAddresses().isEmpty());
+    } finally {
+      GravitinoSystemConnector.Split.setCoordinatorAddress(previous);
+    }
+  }
+
+  @Test
+  public void testSplitIsPinnedToTheCoordinator() {
+    try {
+      // The system tables are only populated on the coordinator, so a split must never be
+      // scheduled onto a worker.
+      HostAddress coordinator = HostAddress.fromParts("127.0.0.1", 8080);
+      GravitinoSystemConnector.Split.setCoordinatorAddress(coordinator);
+      GravitinoSystemConnector.Split split = mockSplit();
+
+      Assertions.assertFalse(split.isRemotelyAccessible());
+      Assertions.assertEquals(List.of(coordinator), split.getAddresses());
+    } finally {
+      GravitinoSystemConnector.Split.setCoordinatorAddress(null);
+    }
+  }
+
+  private static final SchemaTableName TABLE_NAME = new SchemaTableName("system", "catalog");
+
+  private static GravitinoSystemConnector.Split mockSplit() {
+    // Mocked rather than subclassed: ConnectorSplit's abstract members differ across the
+    // supported Trino SPI versions, and this test compiles against all of them.
+    return Mockito.mock(
+        GravitinoSystemConnector.Split.class,
+        Mockito.withSettings()
+            .useConstructor(TABLE_NAME)
+            .defaultAnswer(Mockito.CALLS_REAL_METHODS));
   }
 }

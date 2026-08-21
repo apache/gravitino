@@ -145,7 +145,7 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
             "Update catalog failed due to the reloading process fails. "
-                + catalogConnectorManager.describeRegistrationFailure(trinoCatalogName));
+                + catalogConnectorManager.describeRegistrationFailure(metalake, trinoCatalogName));
       }
       LOG.info("Alter catalog {} in metalake {} successfully.", catalogName, metalake);
 

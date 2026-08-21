@@ -102,7 +102,6 @@ public final class CatalogRegistrationState {
    * @param trinoCatalogName the name the catalog would be registered under in Trino
    * @param provider the catalog provider, null if it could not be determined
    * @param error the error that prevented the registration
-   * @param previous the previous state of the catalog, null if the catalog was never seen before
    * @return the registration state
    */
   public static CatalogRegistrationState failed(
@@ -110,8 +109,7 @@ public final class CatalogRegistrationState {
       String catalogName,
       String trinoCatalogName,
       @Nullable String provider,
-      String error,
-      @Nullable CatalogRegistrationState previous) {
+      String error) {
     return new CatalogRegistrationState(
         metalake,
         catalogName,
@@ -120,38 +118,92 @@ public final class CatalogRegistrationState {
         Status.FAILED,
         error,
         System.currentTimeMillis(),
-        previous == null ? 0 : previous.lastSuccessTimeMs,
-        previous == null ? 1 : previous.failureCount + 1);
+        0,
+        1);
   }
 
   /**
-   * Creates a state for a catalog that is intentionally not registered in Trino.
+   * Creates a state for a catalog that is deliberately not registered because it matches {@code
+   * gravitino.trino.skip-catalog-patterns}.
+   *
+   * @param metalake the name of the metalake the catalog belongs to
+   * @param catalogName the name of the catalog in Gravitino
+   * @param trinoCatalogName the name the catalog would be registered under in Trino
+   * @param reason a human readable explanation of why the catalog is skipped
+   * @return the registration state
+   */
+  public static CatalogRegistrationState skipped(
+      String metalake, String catalogName, String trinoCatalogName, String reason) {
+    return new CatalogRegistrationState(
+        metalake,
+        catalogName,
+        trinoCatalogName,
+        null,
+        Status.SKIPPED,
+        reason,
+        System.currentTimeMillis(),
+        0,
+        0);
+  }
+
+  /**
+   * Creates a state for a catalog the connector cannot register because of its type or provider.
    *
    * @param metalake the name of the metalake the catalog belongs to
    * @param catalogName the name of the catalog in Gravitino
    * @param trinoCatalogName the name the catalog would be registered under in Trino
    * @param provider the catalog provider, null if it could not be determined
-   * @param status the reason category, either {@link Status#SKIPPED} or {@link Status#UNSUPPORTED}
-   * @param reason a human readable explanation of why the catalog is not registered
+   * @param reason a human readable explanation of why the catalog is not supported
    * @return the registration state
    */
-  public static CatalogRegistrationState notLoaded(
+  public static CatalogRegistrationState unsupported(
       String metalake,
       String catalogName,
       String trinoCatalogName,
       @Nullable String provider,
-      Status status,
       String reason) {
     return new CatalogRegistrationState(
         metalake,
         catalogName,
         trinoCatalogName,
         provider,
-        status,
+        Status.UNSUPPORTED,
         reason,
         System.currentTimeMillis(),
         0,
         0);
+  }
+
+  /**
+   * Returns this state with the history carried over from the state it replaces. A catalog keeps
+   * the time it was last registered even after it starts failing, and consecutive failures are
+   * counted across attempts.
+   *
+   * @param previous the state being replaced, null if this catalog was never seen before
+   * @return this state if there is no history to carry over, a new state carrying it otherwise
+   */
+  CatalogRegistrationState withHistoryOf(@Nullable CatalogRegistrationState previous) {
+    if (previous == null) {
+      return this;
+    }
+    // A registered catalog stamps its own success time; every other status keeps the last one.
+    long successTime = status == Status.REGISTERED ? lastSuccessTimeMs : previous.lastSuccessTimeMs;
+    // Consecutive failures only accumulate while the catalog keeps failing. Any other status
+    // interrupts the run, and its own count is already zero.
+    long failures = status == Status.FAILED ? previous.failureCount + 1 : failureCount;
+    if (successTime == lastSuccessTimeMs && failures == failureCount) {
+      return this;
+    }
+    return new CatalogRegistrationState(
+        metalake,
+        catalogName,
+        trinoCatalogName,
+        provider,
+        status,
+        lastError,
+        lastAttemptTimeMs,
+        successTime,
+        failures);
   }
 
   /**

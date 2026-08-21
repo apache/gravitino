@@ -114,9 +114,11 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
                 getCurrentNodeAddress(trinoConnectorContext));
             catalogConnectorManager.start();
 
-            // Register the system tables against the coordinator's manager only. The table
-            // registry is static, so a worker registering its own manager, which never runs the
-            // load loop, would leave the system tables reporting an empty state.
+            // Register the system tables against the coordinator's manager only. The registry is
+            // static and shared by every connector in the JVM, so a worker constructing its own
+            // manager, which never runs the load loop, would take the registry over and leave the
+            // tables reporting an empty state. Assigned but never read: the constructor's effect
+            // on that static registry is the point, so do not drop this as an unused field.
             gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
           }
         } catch (Exception e) {
