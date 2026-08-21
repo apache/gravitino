@@ -34,6 +34,9 @@ cp /usr/lib/trino/plugin/mysql/*mysql-connector-j-*.jar /usr/lib/trino/plugin/ic
 sed -i "s/GRAVITINO_HOST_IP:GRAVITINO_HOST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_HOST_PORT}/g" /etc/trino/catalog/gravitino.properties
 # Update `gravitino.metalake = GRAVITINO_METALAKE_NAME` in the `conf/catalog/gravitino.properties`
 sed -i "s/GRAVITINO_METALAKE_NAME/${GRAVITINO_METALAKE_NAME}/g" /etc/trino/catalog/gravitino.properties
+# Update `gravitino.iceberg.rest-uri` in the `conf/catalog/gravitino.properties`. It uses its own
+# placeholders so that the substitution above cannot leave a half-replaced host behind.
+sed -i "s/GRAVITINO_ICEBERG_REST_HOST:GRAVITINO_ICEBERG_REST_PORT/${GRAVITINO_HOST_IP}:${GRAVITINO_ICEBERG_REST_PORT}/g" /etc/trino/catalog/gravitino.properties
 # Update `node.id=NODE_ID` in the `/conf/node.properties`
 sed -i "s/NODE_ID/${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}-${RANDOM}/g" /etc/trino/node.properties
 
