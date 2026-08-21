@@ -35,10 +35,19 @@ name: Required CI
 on:
   pull_request:
     branches: [main, branch-*]
+    # Minimal event set: a new PR, a new push to an open PR, or a reopened PR.
+    # Excluding labeled/unlabeled/edited avoids redundant runs (upstream has
+    # no opt-in label; every PR runs CI).
+    types: [opened, synchronize, reopened]
 
 concurrency:
   group: required-ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # A run, once started, completes. cancel-in-progress would cancel a
+  # Required CI run mid-flight when multiple pull_request events fire for
+  # the same PR (opened/synchronize/labeled), leaving a failed Required CI
+  # check and blocking the PR. Let each run finish so the aggregate reports a
+  # stable result.
+  cancel-in-progress: false
 
 jobs:
   build:
