@@ -415,7 +415,7 @@ public class GravitinoConfig {
   public boolean isTrinoJdbcSslEnabled() {
     String value = config.get(TRINO_JDBC_SSL_ENABLED.key);
     if (StringUtils.isNotBlank(value)) {
-      return Boolean.parseBoolean(value);
+      return Boolean.parseBoolean(value.trim());
     }
     return "https".equalsIgnoreCase(parseDiscoveryUri().getScheme());
   }

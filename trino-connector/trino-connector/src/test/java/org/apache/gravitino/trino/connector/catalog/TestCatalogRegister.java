@@ -115,6 +115,13 @@ public class TestCatalogRegister {
   }
 
   @Test
+  public void testSslEnabledIgnoresSurroundingWhitespace() {
+    GravitinoConfig config = config(Map.of("trino.jdbc.ssl.enabled", " true "));
+    assertTrue(config.isTrinoJdbcSslEnabled());
+    assertEquals("true", CatalogRegister.buildJdbcProperties(config).get("SSL"));
+  }
+
+  @Test
   public void testSslVerificationIsNormalized() {
     Properties properties =
         CatalogRegister.buildJdbcProperties(
@@ -220,6 +227,7 @@ public class TestCatalogRegister {
                             "trino.jdbc.ssl.truststore.path", "/not/exists/truststore.jks"))));
 
     assertEquals(GRAVITINO_MISSING_CONFIG.toErrorCode(), e.getErrorCode());
-    assertTrue(e.getMessage().contains("file not found"));
+    assertTrue(e.getMessage().contains("does not exist"));
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.truststore.path"));
   }
 }

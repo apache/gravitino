@@ -208,7 +208,7 @@ public class CatalogRegister {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
           String.format(
-              "Error config for 'trino.jdbc.ssl.truststore.path' %s, file not found",
+              "The truststore file configured by 'trino.jdbc.ssl.truststore.path' does not exist: %s",
               truststorePath));
     }
   }
