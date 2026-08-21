@@ -175,10 +175,14 @@ public class Privileges {
         return CreateTag.allow();
       case APPLY_TAG:
         return ApplyTag.allow();
+      case VIEW_TAG:
+        return ViewTag.allow();
 
         // Policy
       case APPLY_POLICY:
         return ApplyPolicy.allow();
+      case VIEW_POLICY:
+        return ViewPolicy.allow();
       case CREATE_POLICY:
         return CreatePolicy.allow();
 
@@ -297,10 +301,14 @@ public class Privileges {
         return CreateTag.deny();
       case APPLY_TAG:
         return ApplyTag.deny();
+      case VIEW_TAG:
+        return ViewTag.deny();
 
         // Policy
       case APPLY_POLICY:
         return ApplyPolicy.deny();
+      case VIEW_POLICY:
+        return ViewPolicy.deny();
       case CREATE_POLICY:
         return CreatePolicy.deny();
 
@@ -1141,6 +1149,36 @@ public class Privileges {
     }
   }
 
+  /** The privilege to view tag metadata and associations. */
+  public static final class ViewTag extends GenericPrivilege<ViewTag> {
+
+    private static final ViewTag ALLOW_INSTANCE = new ViewTag(Condition.ALLOW, Name.VIEW_TAG);
+    private static final ViewTag DENY_INSTANCE = new ViewTag(Condition.DENY, Name.VIEW_TAG);
+
+    private ViewTag(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewTag allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewTag deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.TAG;
+    }
+  }
+
   /** The privilege to create a tag */
   public static class CreatePolicy extends GenericPrivilege<CreatePolicy> {
     private static final CreatePolicy ALLOW_INSTANCE =
@@ -1235,6 +1273,38 @@ public class Privileges {
      * @return The instance with deny condition of the privilege.
      */
     public static ApplyPolicy deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return type == MetadataObject.Type.METALAKE || type == MetadataObject.Type.POLICY;
+    }
+  }
+
+  /** The privilege to view policy metadata, content, and associations. */
+  public static final class ViewPolicy extends GenericPrivilege<ViewPolicy> {
+
+    private static final ViewPolicy ALLOW_INSTANCE =
+        new ViewPolicy(Condition.ALLOW, Name.VIEW_POLICY);
+    private static final ViewPolicy DENY_INSTANCE =
+        new ViewPolicy(Condition.DENY, Name.VIEW_POLICY);
+
+    private ViewPolicy(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ViewPolicy allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ViewPolicy deny() {
       return DENY_INSTANCE;
     }
 
