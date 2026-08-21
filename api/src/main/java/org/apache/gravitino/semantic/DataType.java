@@ -20,7 +20,11 @@ package org.apache.gravitino.semantic;
 
 import org.apache.gravitino.annotation.Evolving;
 
-/** Logical data types for Semantic Model fields and metrics. */
+/**
+ * Logical data types for Semantic Model fields and metrics, derived from the Apache Ossie logical
+ * type vocabulary. These types are independent of physical relational column types and are not
+ * inferred from source schemas.
+ */
 @Evolving
 public enum DataType {
   /** A string value. */

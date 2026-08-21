@@ -119,10 +119,10 @@ public final class Expression {
     public Expression build() {
       Preconditions.checkArgument(
           dialects != null && dialects.length > 0, "dialects must not be null or empty");
+      SemanticModelDefinition.validateNoNullElements("dialects", dialects);
 
       Set<String> seenDialects = new HashSet<>();
       for (DialectExpression dialectExpression : dialects) {
-        Preconditions.checkArgument(dialectExpression != null, "dialects must not contain null");
         Preconditions.checkArgument(
             seenDialects.add(dialectExpression.dialect()),
             "dialects must not contain duplicate dialect: %s",

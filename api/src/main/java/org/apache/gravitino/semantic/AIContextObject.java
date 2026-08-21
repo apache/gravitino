@@ -224,8 +224,8 @@ public final class AIContextObject {
      *     JSON-compatible.
      */
     public AIContextObject build() {
-      validateStringArray("synonyms", synonyms);
-      validateStringArray("examples", examples);
+      SemanticModelDefinition.validateNoNullElements("synonyms", synonyms);
+      SemanticModelDefinition.validateNoNullElements("examples", examples);
       Preconditions.checkArgument(
           additionalProperties != null, "additionalProperties must not be null");
       return new AIContextObject(this);
@@ -235,15 +235,6 @@ public final class AIContextObject {
   @Nullable
   private static String[] copyOrNull(@Nullable String[] values) {
     return values == null ? null : Arrays.copyOf(values, values.length);
-  }
-
-  private static void validateStringArray(String name, @Nullable String[] values) {
-    if (values == null) {
-      return;
-    }
-    for (String value : values) {
-      Preconditions.checkArgument(value != null, "%s must not contain null", name);
-    }
   }
 
   private static Map<String, Object> immutableAdditionalProperties(Map<String, Object> properties) {

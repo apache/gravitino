@@ -257,8 +257,9 @@ public interface Catalog extends Auditable {
   }
 
   /**
-   * @return the {@link SemanticModelCatalog} for Semantic Model operations.
-   * @throws UnsupportedOperationException if the catalog does not expose Semantic Model operations.
+   * @return the {@link SemanticModelCatalog} if the catalog supports Semantic Model operations.
+   * @throws UnsupportedOperationException if the catalog does not support Semantic Model
+   *     operations.
    */
   default SemanticModelCatalog asSemanticModelCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support Semantic Model operations");

@@ -332,10 +332,10 @@ public final class Dataset {
       Preconditions.checkArgument(
           name != null && !name.isEmpty(), "name must not be null or empty");
       Preconditions.checkArgument(source != null, "source must not be null");
-      validateColumnNames("primaryKey", primaryKey);
+      SemanticModelDefinition.validateNonEmptyStringElements("primaryKey", primaryKey);
       validateUniqueKeys(uniqueKeys);
-      validateNoNullElements("fields", fields);
-      validateNoNullElements("customExtensions", customExtensions);
+      SemanticModelDefinition.validateNoNullElements("fields", fields);
+      SemanticModelDefinition.validateNoNullElements("customExtensions", customExtensions);
       return new Dataset(this);
     }
   }
@@ -368,29 +368,8 @@ public final class Dataset {
           uniqueKey != null && uniqueKey.length > 0,
           "uniqueKeys[%s] must not be null or empty",
           index);
-      validateColumnNames("uniqueKeys[" + index + "]", uniqueKey);
-    }
-  }
-
-  private static void validateColumnNames(String name, @Nullable String[] columns) {
-    if (columns == null) {
-      return;
-    }
-    for (int index = 0; index < columns.length; index++) {
-      Preconditions.checkArgument(
-          columns[index] != null && !columns[index].isEmpty(),
-          "%s[%s] must not be null or empty",
-          name,
-          index);
-    }
-  }
-
-  private static void validateNoNullElements(String name, @Nullable Object[] values) {
-    if (values == null) {
-      return;
-    }
-    for (int index = 0; index < values.length; index++) {
-      Preconditions.checkArgument(values[index] != null, "%s[%s] must not be null", name, index);
+      SemanticModelDefinition.validateNonEmptyStringElements(
+          "uniqueKeys[" + index + "]", uniqueKey);
     }
   }
 }

@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.exceptions.InvalidSemanticModelException;
+import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
@@ -75,7 +75,7 @@ public interface SemanticModelCatalog {
    * @return The created Semantic Model.
    * @throws NoSuchSchemaException If the schema does not exist.
    * @throws SemanticModelAlreadyExistsException If the Semantic Model already exists.
-   * @throws InvalidSemanticModelException If the Semantic Model definition is invalid.
+   * @throws IllegalSemanticModelException If the Semantic Model definition is invalid.
    */
   SemanticModel createSemanticModel(
       NameIdentifier ident,
@@ -83,7 +83,7 @@ public interface SemanticModelCatalog {
       SemanticModelDefinition definition,
       Map<String, String> properties)
       throws NoSuchSchemaException, SemanticModelAlreadyExistsException,
-          InvalidSemanticModelException;
+          IllegalSemanticModelException;
 
   /**
    * Applies changes atomically to a Semantic Model.
@@ -96,11 +96,11 @@ public interface SemanticModelCatalog {
    * @throws NoSuchSemanticModelException If the Semantic Model does not exist.
    * @throws SemanticModelAlreadyExistsException If a rename conflicts with an existing Semantic
    *     Model.
-   * @throws InvalidSemanticModelException If a change or the resulting Semantic Model is invalid.
+   * @throws IllegalSemanticModelException If a change or the resulting Semantic Model is invalid.
    */
   SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
-          InvalidSemanticModelException;
+          IllegalSemanticModelException;
 
   /**
    * Drops a Semantic Model.

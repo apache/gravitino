@@ -22,7 +22,7 @@ import com.google.errorprone.annotations.FormatMethod;
 import com.google.errorprone.annotations.FormatString;
 
 /** Exception thrown when a Semantic Model definition or change is invalid. */
-public class InvalidSemanticModelException extends IllegalArgumentException {
+public class IllegalSemanticModelException extends IllegalArgumentException {
 
   /**
    * Constructs an exception with a formatted detail message.
@@ -31,7 +31,7 @@ public class InvalidSemanticModelException extends IllegalArgumentException {
    * @param args The arguments referenced by the format specifiers in the detail message.
    */
   @FormatMethod
-  public InvalidSemanticModelException(@FormatString String message, Object... args) {
+  public IllegalSemanticModelException(@FormatString String message, Object... args) {
     super(String.format(message, args));
   }
 
@@ -43,7 +43,7 @@ public class InvalidSemanticModelException extends IllegalArgumentException {
    * @param args The arguments referenced by the format specifiers in the detail message.
    */
   @FormatMethod
-  public InvalidSemanticModelException(
+  public IllegalSemanticModelException(
       Throwable cause, @FormatString String message, Object... args) {
     super(String.format(message, args), cause);
   }
