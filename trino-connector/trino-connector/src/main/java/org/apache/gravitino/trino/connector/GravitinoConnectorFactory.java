@@ -108,19 +108,14 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.config(config, client);
 
           if (isCoordinator(trinoConnectorContext)) {
-            // Pin the system table splits here: the registration state the system tables report
-            // is only recorded on the coordinator by the load loop started below.
+            // Only the coordinator runs the load loop, so it is the only node holding the
+            // registration state the system tables report. Pin their splits to it.
             GravitinoSystemConnector.Split.setCoordinatorAddress(
                 getCurrentNodeAddress(trinoConnectorContext));
             catalogConnectorManager.start();
-
-            // Register the system tables against the coordinator's manager only. The registry is
-            // static and shared by every connector in the JVM, so a worker constructing its own
-            // manager, which never runs the load loop, would take the registry over and leave the
-            // tables reporting an empty state. Assigned but never read: the constructor's effect
-            // on that static registry is the point, so do not drop this as an unused field.
-            gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
           }
+
+          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
           String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
           LOG.error(message);
@@ -148,7 +143,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       }
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
-      return createSystemConnector(gravitinoStoredProcedureFactory);
+      return createSystemConnector(gravitinoStoredProcedureFactory, gravitinoSystemTableFactory);
     }
   }
 
@@ -157,8 +152,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   protected GravitinoSystemConnector createSystemConnector(
-      GravitinoStoredProcedureFactory storedProcedureFactory) {
-    return new GravitinoSystemConnector(storedProcedureFactory);
+      GravitinoStoredProcedureFactory storedProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
+    return new GravitinoSystemConnector(storedProcedureFactory, systemTableFactory);
   }
 
   protected String getTrinoCatalogName(String metalakeName, String catalogName) {

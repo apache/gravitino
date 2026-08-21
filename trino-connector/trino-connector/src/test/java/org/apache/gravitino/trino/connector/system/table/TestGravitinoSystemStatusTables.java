@@ -122,6 +122,35 @@ public class TestGravitinoSystemStatusTables {
     assertEquals("{\"test\":\"Connection refused\"}", varchar(page, 5));
   }
 
+  @Test
+  public void testEachFactoryOwnsItsTables() {
+    // The registry used to be static, so a second connector in the same JVM took it over and the
+    // system tables reported another manager's state. Each factory must now stand alone.
+    CatalogConnectorManager first = mock(CatalogConnectorManager.class);
+    when(first.getCatalogRegistrationStates())
+        .thenReturn(
+            List.of(
+                CatalogRegistrationState.succeeded(
+                    new GravitinoCatalog("prod", "memory", "memory", ImmutableMap.of(), 0L),
+                    "memory")));
+    CatalogConnectorManager second = mock(CatalogConnectorManager.class);
+    when(second.getCatalogRegistrationStates()).thenReturn(List.of());
+
+    GravitinoSystemTableFactory firstFactory = new GravitinoSystemTableFactory(first);
+    GravitinoSystemTableFactory secondFactory = new GravitinoSystemTableFactory(second);
+
+    assertEquals(
+        1,
+        firstFactory.loadPageData(GravitinoSystemTableCatalogStatus.TABLE_NAME).getPositionCount());
+    assertEquals(
+        0,
+        secondFactory
+            .loadPageData(GravitinoSystemTableCatalogStatus.TABLE_NAME)
+            .getPositionCount());
+    assertTrue(firstFactory.tableExists(GravitinoSystemTableLoadStatus.TABLE_NAME));
+    assertEquals(3, firstFactory.listTableNames().size());
+  }
+
   private static Page loadCatalogStatusPage(List<CatalogRegistrationState> states) {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
     when(manager.getCatalogRegistrationStates()).thenReturn(states);

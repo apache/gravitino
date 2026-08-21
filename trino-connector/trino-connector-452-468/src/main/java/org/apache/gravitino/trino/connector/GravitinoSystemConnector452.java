@@ -28,12 +28,14 @@ import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.SchemaTableName;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
+import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 
 public class GravitinoSystemConnector452 extends GravitinoSystemConnector {
 
   public GravitinoSystemConnector452(
-      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
-    super(gravitinoStoredProcedureFactory);
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
+    super(gravitinoStoredProcedureFactory, systemTableFactory);
   }
 
   @Override
@@ -43,10 +45,14 @@ public class GravitinoSystemConnector452 extends GravitinoSystemConnector {
 
   @Override
   protected ConnectorPageSourceProvider createPageSourceProvider() {
-    return new DatasourceProvider452();
+    return new DatasourceProvider452(getSystemTableFactory());
   }
 
   static class DatasourceProvider452 extends DatasourceProvider {
+
+    DatasourceProvider452(GravitinoSystemTableFactory systemTableFactory) {
+      super(systemTableFactory);
+    }
 
     @Override
     protected ConnectorPageSource createPageSource(Page page) {
