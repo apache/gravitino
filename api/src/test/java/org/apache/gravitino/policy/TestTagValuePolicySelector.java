@@ -22,22 +22,23 @@ import org.apache.gravitino.tag.TagAssignment;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestPolicyTagSelector {
+public class TestTagValuePolicySelector {
 
   @Test
   public void testTagValueSelector() {
-    PolicyTagSelector selector = PolicyTagSelector.tagValue("finance");
+    TagValuePolicySelector selector = TagValuePolicySelector.of("finance");
 
-    Assertions.assertEquals(PolicyTagSelector.Type.TAG_VALUE, selector.type());
+    Assertions.assertEquals("TAG_VALUE", selector.type());
     Assertions.assertEquals("finance", selector.value());
     Assertions.assertTrue(selector.matches(TagAssignment.ofValues("risk", "finance")));
     Assertions.assertFalse(selector.matches(TagAssignment.ofValues("engineering")));
     Assertions.assertFalse(selector.matches(TagAssignment.noValue()));
-    Assertions.assertEquals(selector, PolicyTagSelector.tagValue("finance"));
+    Assertions.assertEquals(selector, TagValuePolicySelector.of("finance"));
   }
 
   @Test
   public void testRejectBlankSelectorValue() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> PolicyTagSelector.tagValue(" "));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> TagValuePolicySelector.of(" "));
+    Assertions.assertThrows(IllegalArgumentException.class, () -> TagValuePolicySelector.of(null));
   }
 }

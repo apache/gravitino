@@ -18,26 +18,16 @@
  */
 package org.apache.gravitino.policy;
 
-import java.util.Optional;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.tag.Tag;
 
-/** A policy-to-tag association and its optional assignment selector. */
+/** A selector that restricts when a policy-to-tag association applies. */
 @Evolving
-public interface PolicyTagAssociation {
+public interface PolicySelector {
 
   /**
-   * @return The associated policy.
+   * Returns the selector type identifier.
+   *
+   * @return The selector type.
    */
-  Policy policy();
-
-  /**
-   * @return The associated tag.
-   */
-  Tag tag();
-
-  /**
-   * @return The selector, or empty when the association matches by tag presence.
-   */
-  Optional<PolicySelector> selector();
+  String type();
 }

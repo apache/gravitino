@@ -25,8 +25,8 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.PolicySelector;
 import org.apache.gravitino.policy.PolicyTagAssociation;
-import org.apache.gravitino.policy.PolicyTagSelector;
 
 /**
  * Interface for supporting global tag operations. This interface will provide tag listing, getting,
@@ -152,7 +152,7 @@ public interface TagOperations {
    * @throws UnsupportedOperationException If setting policy-to-tag associations is not supported.
    */
   default PolicyTagAssociation setPolicyForTag(
-      String tagName, String policyName, @Nullable PolicyTagSelector selector) {
+      String tagName, String policyName, @Nullable PolicySelector selector) {
     throw new UnsupportedOperationException("Setting a policy for a tag is not supported");
   }
 

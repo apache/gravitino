@@ -25,21 +25,16 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.tag.TagAssignment;
 
-/** A selector that restricts when a policy-to-tag association matches a tag assignment. */
+/** A policy selector that matches one exact tag assignment value. */
 @Evolving
-public final class PolicyTagSelector {
+public final class TagValuePolicySelector implements PolicySelector {
 
-  /** Supported policy-to-tag selector types. */
-  public enum Type {
-    /** Matches when the effective tag assignment contains one exact value. */
-    TAG_VALUE
-  }
+  /** The selector type for exact tag assignment value matching. */
+  public static final String TYPE = "TAG_VALUE";
 
-  private final Type type;
   private final String value;
 
-  private PolicyTagSelector(Type type, String value) {
-    this.type = type;
+  private TagValuePolicySelector(String value) {
     this.value = value;
   }
 
@@ -49,16 +44,14 @@ public final class PolicyTagSelector {
    * @param value The tag assignment value to match.
    * @return The selector.
    */
-  public static PolicyTagSelector tagValue(String value) {
+  public static TagValuePolicySelector of(String value) {
     Preconditions.checkArgument(StringUtils.isNotBlank(value), "Selector value cannot be blank");
-    return new PolicyTagSelector(Type.TAG_VALUE, value);
+    return new TagValuePolicySelector(value);
   }
 
-  /**
-   * @return The selector type.
-   */
-  public Type type() {
-    return type;
+  @Override
+  public String type() {
+    return TYPE;
   }
 
   /**
@@ -76,12 +69,7 @@ public final class PolicyTagSelector {
    */
   public boolean matches(TagAssignment assignment) {
     Preconditions.checkArgument(assignment != null, "Tag assignment cannot be null");
-    switch (type) {
-      case TAG_VALUE:
-        return Arrays.asList(assignment.values()).contains(value);
-      default:
-        throw new IllegalArgumentException("Unsupported selector type: " + type);
-    }
+    return Arrays.asList(assignment.values()).contains(value);
   }
 
   @Override
@@ -89,20 +77,20 @@ public final class PolicyTagSelector {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof PolicyTagSelector)) {
+    if (!(o instanceof TagValuePolicySelector)) {
       return false;
     }
-    PolicyTagSelector that = (PolicyTagSelector) o;
-    return type == that.type && Objects.equals(value, that.value);
+    TagValuePolicySelector that = (TagValuePolicySelector) o;
+    return Objects.equals(value, that.value);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(type, value);
+    return Objects.hash(value);
   }
 
   @Override
   public String toString() {
-    return "PolicyTagSelector{" + "type=" + type + ", value='" + value + '\'' + '}';
+    return "TagValuePolicySelector{value='" + value + "'}";
   }
 }
