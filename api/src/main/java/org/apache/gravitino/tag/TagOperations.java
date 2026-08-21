@@ -20,7 +20,6 @@
 package org.apache.gravitino.tag;
 
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
@@ -143,16 +142,28 @@ public interface TagOperations {
   }
 
   /**
-   * Adds or updates one policy association for a tag.
+   * Adds or updates one policy association for a tag without a selector.
    *
    * @param tagName The tag name.
    * @param policyName The policy name.
-   * @param selector The selector, or null for tag-presence matching.
+   * @return The resulting association.
+   * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
+   */
+  default PolicyTagAssociation addPolicyForTag(String tagName, String policyName) {
+    throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
+  }
+
+  /**
+   * Adds or updates one policy association for a tag with a selector.
+   *
+   * @param tagName The tag name.
+   * @param policyName The policy name.
+   * @param selector The policy selector.
    * @return The resulting association.
    * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
    */
   default PolicyTagAssociation addPolicyForTag(
-      String tagName, String policyName, @Nullable PolicySelector selector) {
+      String tagName, String policyName, PolicySelector selector) {
     throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
   }
 

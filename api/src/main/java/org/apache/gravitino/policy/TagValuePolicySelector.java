@@ -19,11 +19,9 @@
 package org.apache.gravitino.policy;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.tag.TagAssignment;
 
 /** A policy selector that matches one exact tag assignment value. */
 @Evolving
@@ -59,17 +57,6 @@ public final class TagValuePolicySelector implements PolicySelector {
    */
   public String value() {
     return value;
-  }
-
-  /**
-   * Tests whether this selector matches a tag assignment.
-   *
-   * @param assignment The effective tag assignment.
-   * @return True when the selector matches, false otherwise.
-   */
-  public boolean matches(TagAssignment assignment) {
-    Preconditions.checkArgument(assignment != null, "Tag assignment cannot be null");
-    return Arrays.asList(assignment.values()).contains(value);
   }
 
   @Override

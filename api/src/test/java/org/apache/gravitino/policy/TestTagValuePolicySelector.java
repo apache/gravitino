@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.policy;
 
-import org.apache.gravitino.tag.TagAssignment;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -30,9 +29,6 @@ public class TestTagValuePolicySelector {
 
     Assertions.assertEquals("TAG_VALUE", selector.type());
     Assertions.assertEquals("finance", selector.value());
-    Assertions.assertTrue(selector.matches(TagAssignment.ofValues("risk", "finance")));
-    Assertions.assertFalse(selector.matches(TagAssignment.ofValues("engineering")));
-    Assertions.assertFalse(selector.matches(TagAssignment.noValue()));
     Assertions.assertEquals(selector, TagValuePolicySelector.of("finance"));
   }
 
