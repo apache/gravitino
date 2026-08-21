@@ -231,7 +231,7 @@ public class CatalogOperations {
           });
     } catch (Exception e) {
       LOG.info("Failed to test connection for existing catalog: {}.{}", metalake, catalogName);
-      return ExceptionHandlers.handleTestConnectionException(e);
+      return ExceptionHandlers.handleExistingCatalogTestConnectionException(e);
     }
   }
 

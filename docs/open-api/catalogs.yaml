@@ -132,15 +132,9 @@ paths:
                     "code": 0
                   }
                 TestConnectionFailed:
-                  value:
-                    code: 1007
-                    type: ConnectionFailedException
-                    message: Failed to connect to the catalog backend
+                  $ref: "#/components/examples/ConnectionFailedException"
                 CatalogAlreadyExists:
-                  value:
-                    code: 1004
-                    type: CatalogAlreadyExistsException
-                    message: Catalog my_catalog already exists
+                  $ref: "#/components/examples/CatalogAlreadyExistsException"
                 MetalakeNotFound:
                   $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
         "400":
