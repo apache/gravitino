@@ -51,7 +51,8 @@ public class AuthorizationExpressionConstants {
       """
                   ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA &&
-                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  ANY_CREATE_TABLE || ANY_CREATE_VIEW)
                   """;
 
   //  Adding ANY_CREATE_TABLE here as Spark calls tableExists before creating a table.

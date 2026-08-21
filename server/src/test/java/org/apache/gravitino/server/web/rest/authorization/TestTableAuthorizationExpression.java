@@ -129,10 +129,10 @@ public class TestTableAuthorizationExpression {
     assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::MODIFY_TABLE", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
-    assertFalse(
+    assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_TABLE", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
-    assertFalse(
+    assertTrue(
         mockEvaluator.getResult(
             ImmutableSet.of("SCHEMA::CREATE_VIEW", "CATALOG::USE_CATALOG", "SCHEMA::USE_SCHEMA")));
   }
