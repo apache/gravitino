@@ -241,6 +241,8 @@ public class CatalogConnectorManager {
         }
       }
 
+      pruneMissingMetalakes(usedMetalakes);
+
       if (metalakeErrors.isEmpty()) {
         lastSuccessfulLoadTimeMs = System.currentTimeMillis();
         recordLoadSuccess();
@@ -260,6 +262,13 @@ public class CatalogConnectorManager {
       // NoClassDefFoundError. A dead loop must not look like a healthy one.
       recordLoadFailure(toErrorMessage(t), t);
     }
+  }
+
+  private void pruneMissingMetalakes(Set<String> usedMetalakes) {
+    // A metalake that was deleted, or that dropped out of the configuration, leaves its catalog
+    // rows behind. Without this they keep reporting REGISTERED for catalogs that no longer exist.
+    catalogStates.values().removeIf(state -> !usedMetalakes.contains(state.getMetalake()));
+    metalakeErrors.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
   }
 
   private void recordLoadSuccess() {

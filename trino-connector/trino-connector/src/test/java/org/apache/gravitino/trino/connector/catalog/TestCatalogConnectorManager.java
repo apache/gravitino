@@ -37,15 +37,16 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
-import java.time.Instant;
-import java.util.List;
-import java.util.Map;
-import org.apache.gravitino.Audit;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -624,6 +625,25 @@ public class TestCatalogConnectorManager {
     assertTrue(state.getLastError().contains("IllegalStateException"));
   }
 
+  @Test
+  public void testStateOfAVanishedMetalakeIsPruned() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+
+    // Multi metalake mode, so the used metalakes come from listMetalakes().
+    CatalogConnectorManager manager =
+        fixture.createManager(ImmutableMap.of("gravitino.use-single-metalake", "false"));
+    manager.loadMetalakeSync();
+    assertEquals(1, manager.getCatalogRegistrationStates().size());
+
+    // The metalake is deleted in Gravitino: its catalog rows must not linger as REGISTERED.
+    Mockito.doReturn(new GravitinoMetalake[0]).when(fixture.client).listMetalakes();
+    manager.loadMetalakeSync();
+
+    assertTrue(manager.getCatalogRegistrationStates().isEmpty());
+    assertTrue(manager.getMetalakeErrors().isEmpty());
+  }
+
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)
       throws Exception {
     return createManager(createCatalogConnectorFactory(), configMap);
@@ -709,6 +729,7 @@ public class TestCatalogConnectorManager {
       when(catalogRegister.isTrinoStarted()).thenReturn(true);
       when(metalake.name()).thenReturn("test");
       when(client.loadMetalake(any())).thenReturn(metalake);
+      Mockito.doReturn(new GravitinoMetalake[] {metalake}).when(client).listMetalakes();
       when(catalogFactory.getSupportedCatalogProviders()).thenReturn(ImmutableSet.of("memory"));
       CatalogConnectorContext.Builder builder = mock(CatalogConnectorContext.Builder.class);
       when(catalogFactory.createCatalogConnectorContextBuilder(any())).thenReturn(builder);
@@ -727,15 +748,15 @@ public class TestCatalogConnectorManager {
     }
 
     CatalogConnectorManager createManager(Map<String, String> extraConfig) {
-      ImmutableMap<String, String> configMap =
-          ImmutableMap.<String, String>builder()
-              .put("gravitino.uri", "http://127.0.0.1:8090")
-              .put("gravitino.metalake", "test")
-              .put("gravitino.use-single-metalake", "true")
-              .putAll(extraConfig)
-              .build();
+      Map<String, String> defaults = new HashMap<>();
+      defaults.put("gravitino.uri", "http://127.0.0.1:8090");
+      defaults.put("gravitino.metalake", "test");
+      defaults.put("gravitino.use-single-metalake", "true");
+      defaults.putAll(extraConfig);
+      ImmutableMap<String, String> configMap = ImmutableMap.copyOf(defaults);
       CatalogConnectorManager manager =
-          new CatalogConnectorManager(catalogRegister, catalogFactory, null);
+          new CatalogConnectorManager(
+              catalogRegister, catalogFactory, (metalakeName, catalog) -> catalog);
       manager.config(new GravitinoConfig(configMap), client);
       return manager;
     }

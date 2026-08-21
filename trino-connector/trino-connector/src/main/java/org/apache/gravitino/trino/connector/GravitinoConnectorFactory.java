@@ -63,6 +63,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   @SuppressWarnings("UnusedVariable")
   private CatalogConnectorManager catalogConnectorManager;
+
   private boolean catalogConnectorManagerStartTriggered = false;
 
   private GravitinoAdminClient client;
@@ -149,9 +150,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         if (!catalogConnectorManagerStartTriggered
             && !config.isDynamicConnector()
             && isCoordinator(trinoConnectorContext)) {
-          // Triggered before start() on purpose: everything that makes it fail is a
-          // configuration error, and retrying on the next create() would only open another
-          // connection.
+          // Mark the attempt before start() so concurrent connector creation cannot start the
+          // manager twice. The flag is reset below if initialization fails, allowing a corrected
+          // configuration to retry on the next create().
           catalogConnectorManagerStartTriggered = true;
           // Only the configuration is re-applied here: rebuilding the Gravitino client would leak
           // the one a dynamic connector may have already built.
@@ -159,6 +160,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.start();
         }
       } catch (Exception e) {
+        catalogConnectorManagerStartTriggered = false;
         String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
         LOG.error(message);
         throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
