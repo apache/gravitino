@@ -193,7 +193,25 @@ Whether the coordinator can populate this extra-credential depends on the Trino 
 
 The `gravitino.client.oauth2.*` properties above still configure the shared bootstrap/admin client used for catalog discovery — they are unrelated to the per-user forwarded token.
 
-For an Iceberg catalog with `catalog-backend=rest` (backed by an Iceberg REST Catalog), the connector does not set `iceberg.rest-catalog.security`/`iceberg.rest-catalog.session` on its own — that catalog's own `gravitino.client.*` config is unrelated to how its underlying Iceberg REST catalog authenticates. To also forward the end user's token to the REST catalog itself, set `trino.bypass.iceberg.rest-catalog.security=OAUTH2` and `trino.bypass.iceberg.rest-catalog.session=USER` explicitly on that catalog's properties, alongside its bootstrap `trino.bypass.iceberg.rest-catalog.oauth2.*` credentials; see the worked example below.
+For an Iceberg catalog reached through the Gravitino Iceberg REST server (IRC) — every
+`lakehouse-iceberg` catalog, unless `gravitino.iceberg.rest-enabled=false`; see [Iceberg
+catalog](./catalog-iceberg.md#how-trino-reaches-the-catalog) — the IRC's own authentication is
+configured once per Trino cluster with the `gravitino.iceberg.rest-catalog.` prefix, and
+`iceberg.rest-catalog.session=USER` is set automatically when `forwardUser=true`:
+
+```properties
+gravitino.iceberg.rest-uri=http://gravitino-host:9001/iceberg
+gravitino.iceberg.rest-catalog.security=OAUTH2
+gravitino.iceberg.rest-catalog.oauth2.credential=service-account-id:service-account-secret
+gravitino.iceberg.rest-catalog.oauth2.server-uri=http://your-idp/realms/gravitino/protocol/openid-connect/token
+gravitino.iceberg.rest-catalog.oauth2.scope=email
+```
+
+This is a completely separate credential from the one the connector uses against the main Gravitino
+server; it is not reused automatically.
+
+For an Iceberg catalog with `catalog-backend=rest` (pointing at an Iceberg REST Catalog of its own,
+which the connector does not re-route), the connector does not set `iceberg.rest-catalog.security`/`iceberg.rest-catalog.session` on its own — that catalog's own `gravitino.client.*` config is unrelated to how its underlying Iceberg REST catalog authenticates. To also forward the end user's token to the REST catalog itself, set `trino.bypass.iceberg.rest-catalog.security=OAUTH2` and `trino.bypass.iceberg.rest-catalog.session=USER` explicitly on that catalog's properties, alongside its bootstrap `trino.bypass.iceberg.rest-catalog.oauth2.*` credentials; see the worked example below.
 
 **Configuration properties:**
 

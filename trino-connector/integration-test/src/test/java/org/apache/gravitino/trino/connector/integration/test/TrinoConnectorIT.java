@@ -23,6 +23,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -33,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -76,6 +78,8 @@ public class TrinoConnectorIT extends BaseIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
+  private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
+
   public static String metalakeName =
       GravitinoITUtils.genRandomName("TrinoIT_metalake").toLowerCase();
   public static String catalogName =
@@ -89,6 +93,20 @@ public class TrinoConnectorIT extends BaseIT {
   public static String tab1Name = GravitinoITUtils.genRandomName("TrinoIT_table3").toLowerCase();
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
+
+  @BeforeAll
+  @Override
+  public void startIntegrationTest() throws Exception {
+    // The Trino connector loads every lakehouse-iceberg catalog through the Iceberg REST server,
+    // so the auxiliary service has to run and serve this test's metalake.
+    ignoreIcebergAuxRestService = false;
+    customConfigs.put(
+        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
+        IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
+    customConfigs.put(
+        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+    super.startIntegrationTest();
+  }
 
   @BeforeAll
   public void startDockerContainer() throws TException, InterruptedException {
@@ -113,6 +131,7 @@ public class TrinoConnectorIT extends BaseIT {
         trinoConfDir,
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
         getGravitinoServerPort(),
+        URI.create(getIcebergRestServiceUri()).getPort(),
         metalakeName);
     Assertions.assertTrue(
         containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, catalogName),

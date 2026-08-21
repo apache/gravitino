@@ -288,6 +288,7 @@ public class ContainerSuite implements Closeable {
       String trinoConfDir,
       String trinoConnectorLibDir,
       int gravitinoServerPort,
+      int icebergRestServerPort,
       String metalakeName) {
     ITUtils.cleanDisk();
     if (trinoContainer == null) {
@@ -303,6 +304,7 @@ public class ContainerSuite implements Closeable {
                           .put("HADOOP_USER_NAME", "anonymous")
                           .put("GRAVITINO_HOST_IP", "host.docker.internal")
                           .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
+                          .put("GRAVITINO_ICEBERG_REST_PORT", String.valueOf(icebergRestServerPort))
                           .put("GRAVITINO_METALAKE_NAME", metalakeName)
                           .build())
                   .withNetwork(getNetwork())

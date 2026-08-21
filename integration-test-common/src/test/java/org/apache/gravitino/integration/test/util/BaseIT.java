@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -672,6 +673,27 @@ public class BaseIT {
       }
     }
     return null;
+  }
+
+  /**
+   * Enables the Iceberg REST auxiliary service before the server starts. Callers that hold a {@link
+   * BaseIT} instance rather than extending it use this instead of the protected fields.
+   *
+   * @param icebergRestConfigs extra server configs, typically the dynamic config provider and the
+   *     metalake the Iceberg REST service should serve
+   */
+  public void enableIcebergAuxRestService(Map<String, String> icebergRestConfigs) {
+    this.ignoreIcebergAuxRestService = false;
+    this.customConfigs.putAll(icebergRestConfigs);
+  }
+
+  /**
+   * Returns the port the Iceberg REST auxiliary service listens on.
+   *
+   * @return the Iceberg REST service port
+   */
+  public int getIcebergRestServicePort() {
+    return URI.create(getIcebergRestServiceUri()).getPort();
   }
 
   protected String getIcebergRestServiceUri() {

@@ -34,6 +34,7 @@ dependencies {
   }
 
   testImplementation(project(":api"))
+  testImplementation(project(":catalogs:catalog-common"))
   testImplementation(project(":clients:client-java"))
   testImplementation(project(":common"))
   testImplementation(project(":core"))

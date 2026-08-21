@@ -300,6 +300,59 @@ public class TestGravitinoConfig {
     assertTrue(config.isTrinoJdbcSslEnabled());
   }
 
+  @Test
+  public void testIcebergRestConfigDefaults() {
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
+
+    assertTrue(config.isIcebergRestEnabled());
+    assertEquals("", config.getIcebergRestUri());
+    assertTrue(config.getIcebergRestCatalogConfig().isEmpty());
+  }
+
+  @Test
+  public void testIcebergRestConfig() {
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of(
+            "gravitino.metalake",
+            "user_001",
+            "gravitino.iceberg.rest-enabled",
+            "false",
+            "gravitino.iceberg.rest-uri",
+            "http://127.0.0.1:9001/iceberg",
+            "gravitino.iceberg.rest-catalog.security",
+            "OAUTH2",
+            "gravitino.iceberg.rest-catalog.oauth2.credential",
+            "client_id:client_secret");
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    assertFalse(config.isIcebergRestEnabled());
+    assertEquals("http://127.0.0.1:9001/iceberg", config.getIcebergRestUri());
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals(2, restCatalogConfig.size());
+    assertEquals("OAUTH2", restCatalogConfig.get("iceberg.rest-catalog.security"));
+    assertEquals(
+        "client_id:client_secret", restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+  }
+
+  @Test
+  public void testToCatalogConfigWithIcebergRestProperties() {
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of(
+            "gravitino.metalake",
+            "user_001",
+            "gravitino.iceberg.rest-uri",
+            "http://127.0.0.1:9001/iceberg",
+            "gravitino.iceberg.rest-catalog.security",
+            "OAUTH2");
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    String catalogConfig = config.toCatalogConfig();
+    assertTrue(
+        catalogConfig.contains("\"gravitino.iceberg.rest-uri\"='http://127.0.0.1:9001/iceberg'"));
+    assertTrue(catalogConfig.contains("\"gravitino.iceberg.rest-catalog.security\"='OAUTH2'"));
+  }
+
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {

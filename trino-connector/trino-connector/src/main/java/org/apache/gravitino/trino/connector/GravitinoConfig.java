@@ -76,6 +76,9 @@ public class GravitinoConfig {
   public static final String GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG =
       "__gravitino.dynamic.connector.catalog.config";
 
+  /** The Trino Iceberg REST catalog property prefix. */
+  private static final String TRINO_ICEBERG_REST_CATALOG_PREFIX = "iceberg.rest-catalog.";
+
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
   private final Map<String, String> config;
   private final List<Pattern> skipCatalogPatternList;
@@ -261,6 +264,32 @@ public class GravitinoConfig {
           GravitinoAuthProvider.SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS_KEY,
           "Seconds before an idle per-user session is evicted from the cache when session.forwardUser=true",
           "3600",
+          false);
+
+  private static final ConfigEntry GRAVITINO_ICEBERG_REST_ENABLED =
+      new ConfigEntry(
+          "gravitino.iceberg.rest-enabled",
+          "When true, lakehouse-iceberg catalogs are loaded through the Gravitino Iceberg REST "
+              + "server instead of being translated into a Trino JDBC or Hive metastore Iceberg "
+              + "catalog. Requires gravitino.iceberg.rest-uri.",
+          "true",
+          false);
+
+  private static final ConfigEntry GRAVITINO_ICEBERG_REST_URI =
+      new ConfigEntry(
+          "gravitino.iceberg.rest-uri",
+          "The endpoint of the Gravitino Iceberg REST server, for example "
+              + "http://localhost:9001/iceberg.",
+          "",
+          false);
+
+  private static final ConfigEntry GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX =
+      new ConfigEntry(
+          "gravitino.iceberg.rest-catalog.",
+          "Prefix for properties passed through to the internal Trino Iceberg REST catalog. Any "
+              + "property beginning with this prefix is rewritten to iceberg.rest-catalog. and "
+              + "passed through (e.g., gravitino.iceberg.rest-catalog.security=OAUTH2).",
+          "",
           false);
 
   /**
@@ -600,9 +629,13 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
-    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX
+    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX and
+    // GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX
     config.entrySet().stream()
-        .filter(entry -> entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key))
+        .filter(
+            entry ->
+                entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key)
+                    || entry.getKey().startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key))
         .forEach(
             entry ->
                 stringList.add(String.format("\"%s\"='%s'", entry.getKey(), entry.getValue())));
@@ -676,6 +709,45 @@ public class GravitinoConfig {
    */
   public long getSessionCacheExpireAfterAccessSeconds() {
     return parseLongConfigEntry(GRAVITINO_SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS);
+  }
+
+  /**
+   * Returns whether lakehouse-iceberg catalogs are routed through the Gravitino Iceberg REST
+   * server.
+   *
+   * @return true if the Iceberg REST routing is enabled
+   */
+  public boolean isIcebergRestEnabled() {
+    return Boolean.parseBoolean(
+        config.getOrDefault(
+            GRAVITINO_ICEBERG_REST_ENABLED.key, GRAVITINO_ICEBERG_REST_ENABLED.defaultValue));
+  }
+
+  /**
+   * Retrieves the endpoint of the Gravitino Iceberg REST server.
+   *
+   * @return the Iceberg REST server endpoint, or an empty string if not configured
+   */
+  public String getIcebergRestUri() {
+    return config.getOrDefault(
+        GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
+  }
+
+  /**
+   * Retrieves the properties passed through to the internal Trino Iceberg REST catalog, with the
+   * {@code gravitino.iceberg.rest-catalog.} prefix rewritten to {@code iceberg.rest-catalog.}.
+   *
+   * @return the Trino Iceberg REST catalog properties
+   */
+  public Map<String, String> getIcebergRestCatalogConfig() {
+    String prefix = GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key;
+    return config.entrySet().stream()
+        .filter(entry -> entry.getKey().startsWith(prefix))
+        .collect(
+            Collectors.toMap(
+                entry ->
+                    TRINO_ICEBERG_REST_CATALOG_PREFIX + entry.getKey().substring(prefix.length()),
+                Map.Entry::getValue));
   }
 
   private long parseLongConfigEntry(ConfigEntry entry) {

@@ -29,10 +29,21 @@ license: "This software is licensed under the Apache License version 2."
 | gravitino.client.                           | string  | (none)                | The configuration key prefix for the Gravitino client config.                                                                                                                                                                                                                                                                                    | No       |
 | gravitino.trino.skip-catalog-patterns       | string  | (none)                | The `gravitino.trino.skip-catalog-patterns` defines a comma-separated list of catalog name regex patterns that should be excluded from loading. For example, `test_.*, .*_tmp` excludes all catalogs starting with `test_` or ending with `_tmp`.                                                                                                | No       |
 | gravitino.use-single-metalake               | boolean | true                  | If `true`, only one metalake is used and catalogs are identified by `<catalog_name>`. If `false`, multi-metalake mode is enabled and catalogs are identified by `<metalake_name>.<catalog_name>`.                                                                                                                                                | No       |
+| gravitino.iceberg.rest-enabled              | boolean | true                  | If `true`, `lakehouse-iceberg` catalogs are loaded through the Gravitino Iceberg REST server (IRC) instead of being translated into Trino's `jdbc` or `hive_metastore` Iceberg catalog type. This is what makes credential vending work. Requires `gravitino.iceberg.rest-uri`. Set to `false` for a deployment that does not run the IRC.                                    | No       |
+| gravitino.iceberg.rest-uri                  | string  | (none)                | The endpoint of the Gravitino Iceberg REST server, for example `http://gravitino-host:9001/iceberg`. Required when `gravitino.iceberg.rest-enabled` is `true` and the metalake contains `lakehouse-iceberg` catalogs.                                                                                               | No       |
+| gravitino.iceberg.rest-catalog.             | string  | (none)                | The configuration key prefix for properties passed through to the internal Trino Iceberg REST catalog. The prefix is rewritten to `iceberg.rest-catalog.`, so `gravitino.iceberg.rest-catalog.security=OAUTH2` becomes `iceberg.rest-catalog.security=OAUTH2`.                                                      | No       |
 
 To configure the Gravitino client, use properties prefixed with `gravitino.client.`. These properties will directly passed to the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
+
+:::caution
+`gravitino.iceberg.rest-enabled` defaults to `true`. When upgrading an existing deployment whose
+metalake contains `lakehouse-iceberg` catalogs with `catalog-backend=jdbc` or `hive`, those catalogs
+fail to load unless you either set `gravitino.iceberg.rest-uri` to your Iceberg REST server endpoint,
+or set `gravitino.iceberg.rest-enabled=false` to keep the previous behavior. See
+[Iceberg catalog](./catalog-iceberg.md#how-trino-reaches-the-catalog).
+:::
 
 Multi-metalake mode (`gravitino.use-single-metalake=false`) is supported on Trino connector versions 435-445 and 469-478. On versions 446-468, a warning is logged and the connector initializes, but the mode is not fully supported and some operations may fail.
 
