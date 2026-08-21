@@ -100,7 +100,7 @@ public class TestLanceServiceIdentityFilter {
   }
 
   @Test
-  public void testRestoresOuterCallerAfterUnexpectedException() throws Exception {
+  public void testPreservesAuthenticatedCallerAfterUnexpectedException() throws Exception {
     LanceServiceIdentityFilter filter = new LanceServiceIdentityFilter("lance_rest_service_user");
     ServletRequest request = mock(ServletRequest.class);
     ServletResponse response = mock(ServletResponse.class);
@@ -119,6 +119,7 @@ public class TestLanceServiceIdentityFilter {
               Assertions.assertThrows(
                   ServletException.class, () -> filter.doFilter(request, response, chain));
           Assertions.assertSame(failure, thrown.getCause());
+          Assertions.assertEquals("Failed to execute the Lance REST request", thrown.getMessage());
           Assertions.assertSame(outerCaller, PrincipalUtils.getCurrentPrincipal());
           return null;
         });

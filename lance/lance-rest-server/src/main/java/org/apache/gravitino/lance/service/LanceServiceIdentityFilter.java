@@ -54,9 +54,9 @@ public class LanceServiceIdentityFilter implements Filter {
       throws IOException, ServletException {
     try {
       // AuthenticationFilter runs before this filter and keeps the rest of the filter chain inside
-      // the caller's Subject. Calling doAs again would add the service user to that Subject and
-      // make downstream code see the wrong user. Continue the existing chain directly so the
-      // caller's active roles and other principal details remain unchanged.
+      // the caller's Subject. Starting another doAs block here would make the service user the
+      // effective identity, so downstream code would no longer see the real caller. Continue the
+      // existing chain directly to preserve the caller's active roles and other principal details.
       if (!AuthConstants.ANONYMOUS_USER.equals(PrincipalUtils.getCurrentUserName())) {
         chain.doFilter(request, response);
         return;
@@ -74,7 +74,7 @@ public class LanceServiceIdentityFilter implements Filter {
     } catch (IOException | ServletException e) {
       throw e;
     } catch (Exception e) {
-      throw new ServletException("Failed to execute as the Lance REST service identity", e);
+      throw new ServletException("Failed to execute the Lance REST request", e);
     }
   }
 
