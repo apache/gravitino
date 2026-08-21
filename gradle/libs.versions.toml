@@ -205,6 +205,7 @@ log4j-layout-template-json = { group = "org.apache.logging.log4j", name = "log4j
 arrow-vector = { group = "org.apache.arrow", name = "arrow-vector", version.ref = "arrow" }
 lance = { group = "org.lance", name = "lance-core", version.ref = "lance" }
 lance-namespace-core = { group = "org.lance", name = "lance-namespace-core", version.ref = "lance-namespace" }
+lance-namespace-apache-client = { group = "org.lance", name = "lance-namespace-apache-client", version.ref = "lance-namespace" }
 delta-kernel = { group = "io.delta", name = "delta-kernel-api", version.ref = "delta-kernel" }
 delta-kernel-defaults = { group = "io.delta", name = "delta-kernel-defaults", version.ref = "delta-kernel" }
 jakarta-validation-api = { group = "jakarta.validation", name = "jakarta.validation-api", version.ref = "jakarta-validation" }

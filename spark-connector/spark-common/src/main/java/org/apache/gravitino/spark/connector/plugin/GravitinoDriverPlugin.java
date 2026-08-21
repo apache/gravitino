@@ -141,8 +141,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(
-      SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
+  @VisibleForTesting
+  void registerGravitinoCatalogs(SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
     gravitinoCatalogs
         .entrySet()
         .forEach(
@@ -156,6 +156,13 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               }
               if ("lakehouse-paimon".equals(provider.toLowerCase(Locale.ROOT))
                   && !enablePaimonSupport) {
+                return;
+              }
+              String sparkCatalogConfigName = "spark.sql.catalog." + catalogName;
+              if (sparkConf.contains(sparkCatalogConfigName)) {
+                LOG.info(
+                    "Skip registering catalog {} because it is already configured in Spark.",
+                    catalogName);
                 return;
               }
               try {
