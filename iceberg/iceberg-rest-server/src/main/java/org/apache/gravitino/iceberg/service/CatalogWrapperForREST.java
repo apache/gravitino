@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -451,6 +452,34 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
               "Scan planning returned no tasks for table: {}. Table may be empty or fully filtered.",
               tableIdentifier);
         }
+
+        // Iceberg plans manifests in parallel, so the order tasks come back in is not reproducible:
+        // planning one snapshot twice can return the same tasks in a different order, and so can
+        // two servers planning it at the same time. Order them totally, so that an identical scan
+        // of an identical snapshot produces an identical response.
+        //
+        // Data file location, offset and length do not order tasks totally on their own, because
+        // one path can be referenced by several manifest entries - the same file appended in two
+        // snapshots, for instance - and those entries carry different sequence numbers and delete
+        // files. A manifest entry is unique within a snapshot, identified by its manifest and its
+        // position in it, so comparing that as well makes the order total. Sequence numbers come
+        // first because they survive a rewrite into new manifests; when a reader leaves the
+        // manifest fields unset they are also the last discriminator, and tasks that tie on every
+        // key are interchangeable.
+        fileScanTasks.sort(
+            Comparator.comparing((FileScanTask task) -> task.file().location())
+                .thenComparingLong(FileScanTask::start)
+                .thenComparingLong(FileScanTask::length)
+                .thenComparing(
+                    task -> task.file().dataSequenceNumber(),
+                    Comparator.nullsFirst(Long::compareTo))
+                .thenComparing(
+                    task -> task.file().fileSequenceNumber(),
+                    Comparator.nullsFirst(Long::compareTo))
+                .thenComparing(
+                    task -> task.file().manifestLocation(),
+                    Comparator.nullsFirst(String::compareTo))
+                .thenComparing(task -> task.file().pos(), Comparator.nullsFirst(Long::compareTo)));
 
         try {
           response = buildCompletedPlanTableScanResponse(table, fileScanTasks);
