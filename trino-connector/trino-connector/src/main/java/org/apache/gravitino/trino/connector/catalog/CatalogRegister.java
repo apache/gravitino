@@ -55,9 +55,10 @@ public class CatalogRegister {
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
 
   private static final String SSL_VERIFICATION_FULL = "FULL";
+  private static final String SSL_VERIFICATION_CA = "CA";
   private static final String SSL_VERIFICATION_NONE = "NONE";
   private static final Set<String> SSL_VERIFICATION_MODES =
-      ImmutableSet.of(SSL_VERIFICATION_FULL, "CA", SSL_VERIFICATION_NONE);
+      ImmutableSet.of(SSL_VERIFICATION_FULL, SSL_VERIFICATION_CA, SSL_VERIFICATION_NONE);
 
   private Connection connection;
   private boolean isStarted = false;
@@ -134,7 +135,7 @@ public class CatalogRegister {
     String truststoreType = config.getTrinoJdbcSslTruststoreType();
     String roles = config.getTrinoJdbcRoles();
 
-    validateSslConfig(sslEnabled, verification, truststorePath);
+    validateSslConfig(sslEnabled, verification, truststorePath, truststorePassword, truststoreType);
 
     Properties properties = new Properties();
     properties.put("user", config.getTrinoUser());
@@ -171,7 +172,11 @@ public class CatalogRegister {
   }
 
   private static void validateSslConfig(
-      boolean sslEnabled, String verification, String truststorePath) {
+      boolean sslEnabled,
+      String verification,
+      String truststorePath,
+      String truststorePassword,
+      String truststoreType) {
     if (!SSL_VERIFICATION_MODES.contains(verification)) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
@@ -186,11 +191,9 @@ public class CatalogRegister {
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
             "Config 'trino.jdbc.ssl.verification' requires 'trino.jdbc.ssl.enabled' to be true");
       }
-      if (StringUtils.isNotBlank(truststorePath)) {
-        throw new TrinoException(
-            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Config 'trino.jdbc.ssl.truststore.path' requires 'trino.jdbc.ssl.enabled' to be true");
-      }
+      checkRequiresSslEnabled("trino.jdbc.ssl.truststore.path", truststorePath);
+      checkRequiresSslEnabled("trino.jdbc.ssl.truststore.password", truststorePassword);
+      checkRequiresSslEnabled("trino.jdbc.ssl.truststore.type", truststoreType);
       return;
     }
 
@@ -210,6 +213,14 @@ public class CatalogRegister {
           String.format(
               "The truststore file configured by 'trino.jdbc.ssl.truststore.path' does not exist: %s",
               truststorePath));
+    }
+  }
+
+  private static void checkRequiresSslEnabled(String key, String value) {
+    if (StringUtils.isNotEmpty(value)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format("Config '%s' requires 'trino.jdbc.ssl.enabled' to be true", key));
     }
   }
 

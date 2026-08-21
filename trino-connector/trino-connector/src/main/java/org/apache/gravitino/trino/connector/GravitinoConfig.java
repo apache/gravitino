@@ -60,6 +60,10 @@ public class GravitinoConfig {
   public static final String TRINO_CATALOG_STORE_DEFAULT_VALUE = "file";
   /** The Trino catalog management default value. */
   public static final String TRINO_CATALOG_MANAGEMENT_DEFAULT_VALUE = "static";
+  /** The default port used when the Trino `discovery.uri` omits it and the scheme is http. */
+  private static final int HTTP_DEFAULT_PORT = 80;
+  /** The default port used when the Trino `discovery.uri` omits it and the scheme is https. */
+  private static final int HTTPS_DEFAULT_PORT = 443;
 
   // The Trino configuration of etc/config.properties
   /** The Trino configuration. */
@@ -343,7 +347,13 @@ public class GravitinoConfig {
    */
   public String getTrinoJdbcURI() {
     URI trinoURI = parseDiscoveryUri();
-    return String.format("jdbc:trino://%s:%s", trinoURI.getHost(), trinoURI.getPort());
+    int port = trinoURI.getPort();
+    if (port < 0) {
+      // `discovery.uri` may omit the port, for example a TLS coordinator behind a load balancer
+      // on the standard HTTPS port. Fall back to the default port of the scheme.
+      port = isHttpsScheme(trinoURI) ? HTTPS_DEFAULT_PORT : HTTP_DEFAULT_PORT;
+    }
+    return String.format("jdbc:trino://%s:%s", trinoURI.getHost(), port);
   }
 
   private URI parseDiscoveryUri() {
@@ -360,6 +370,10 @@ public class GravitinoConfig {
           GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
           "The Trino configuration of `discovery.uri` = " + uriString + " is not correct");
     }
+  }
+
+  private static boolean isHttpsScheme(URI uri) {
+    return "https".equalsIgnoreCase(uri.getScheme());
   }
 
   /**
@@ -417,7 +431,7 @@ public class GravitinoConfig {
     if (StringUtils.isNotBlank(value)) {
       return Boolean.parseBoolean(value.trim());
     }
-    return "https".equalsIgnoreCase(parseDiscoveryUri().getScheme());
+    return isHttpsScheme(parseDiscoveryUri());
   }
 
   /**
@@ -456,10 +470,11 @@ public class GravitinoConfig {
    * @return the verification mode, one of FULL, CA or NONE
    */
   public String getTrinoJdbcSslVerification() {
-    return config
-        .getOrDefault(TRINO_JDBC_SSL_VERIFICATION.key, TRINO_JDBC_SSL_VERIFICATION.defaultValue)
-        .trim()
-        .toUpperCase(Locale.ROOT);
+    String value = config.get(TRINO_JDBC_SSL_VERIFICATION.key);
+    if (StringUtils.isBlank(value)) {
+      return TRINO_JDBC_SSL_VERIFICATION.defaultValue;
+    }
+    return value.trim().toUpperCase(Locale.ROOT);
   }
 
   /**

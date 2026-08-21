@@ -240,6 +240,34 @@ public class TestGravitinoConfig {
     assertTrue(catalogConfig.contains("\"gravitino.metalake\"='user_001'"));
   }
 
+  @Test
+  public void testTrinoJdbcUriUsesSchemeDefaultPort() {
+    GravitinoConfig httpsConfig =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "https://host"));
+    assertEquals("jdbc:trino://host:443", httpsConfig.getTrinoJdbcURI());
+
+    GravitinoConfig httpConfig =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "http://host"));
+    assertEquals("jdbc:trino://host:80", httpConfig.getTrinoJdbcURI());
+  }
+
+  @Test
+  public void testBlankSslVerificationFallsBackToDefault() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "discovery.uri",
+                "http://host:8080",
+                "trino.jdbc.ssl.verification",
+                "  "));
+
+    assertEquals("FULL", config.getTrinoJdbcSslVerification());
+  }
+
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {

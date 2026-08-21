@@ -15,10 +15,10 @@ license: "This software is licensed under the Apache License version 2."
 | trino.jdbc.user                             | string  | admin                 | The jdbc user name of current Trino.                                                                                                                                                                                                                                                                                | NO       |
 | trino.jdbc.password                         | string  | (none)                | The jdbc password of current Trino.                                                                                                                                                                                                                                                                                 | NO       |
 | trino.jdbc.ssl.enabled                      | boolean | (derived)             | Whether the internal JDBC connection to the Trino coordinator uses TLS. If not set, it is derived from the scheme of the Trino `discovery.uri`, so a coordinator whose `discovery.uri` is `https://...` needs no explicit setting.                                                                                    | No       |
-| trino.jdbc.ssl.truststore.path              | string  | (none)                | Path of the truststore holding the Trino coordinator certificate. If omitted, the default JVM truststore is used. Requires `trino.jdbc.ssl.enabled`.                                                                                                                                                                 | No       |
-| trino.jdbc.ssl.truststore.password          | string  | (none)                | Password of the truststore configured by `trino.jdbc.ssl.truststore.path`.                                                                                                                                                                                                                                          | No       |
-| trino.jdbc.ssl.truststore.type              | string  | (none)                | Type of the truststore, for example `JKS` or `PKCS12`. If omitted, the default JVM truststore type is used.                                                                                                                                                                                                          | No       |
-| trino.jdbc.ssl.verification                 | string  | FULL                  | Certificate verification mode of the internal JDBC connection: `FULL`, `CA` or `NONE`. `NONE` disables certificate verification entirely and should only be used for troubleshooting.                                                                                                                                | No       |
+| trino.jdbc.ssl.truststore.path              | string  | (none)                | Path of the truststore holding the Trino coordinator certificate. If omitted, the default JVM truststore is used. Requires `trino.jdbc.ssl.enabled`, otherwise the connector fails to start.                                                                                                                         | No       |
+| trino.jdbc.ssl.truststore.password          | string  | (none)                | Password of the truststore configured by `trino.jdbc.ssl.truststore.path`. Requires `trino.jdbc.ssl.enabled`, otherwise the connector fails to start.                                                                                                                                                                | No       |
+| trino.jdbc.ssl.truststore.type              | string  | (none)                | Type of the truststore, for example `JKS` or `PKCS12`. If omitted, the default JVM truststore type is used. Requires `trino.jdbc.ssl.enabled`, otherwise the connector fails to start.                                                                                                                                | No       |
+| trino.jdbc.ssl.verification                 | string  | FULL                  | Certificate verification mode of the internal JDBC connection: `FULL`, `CA` or `NONE`. Any value other than `FULL` requires `trino.jdbc.ssl.enabled`, otherwise the connector fails to start. `NONE` disables certificate verification entirely and should only be used for troubleshooting.                          | No       |
 | trino.jdbc.roles                            | string  | (none)                | Session roles applied to the internal JDBC connection, for example `system:sysadmin`. Required by deployments that only allow `CREATE CATALOG` with a privileged role.                                                                                                                                               | No       |
 | trino.jdbc.properties.                      | string  | (none)                | The configuration key prefix for raw Trino JDBC driver properties, see [Connecting to a TLS-enabled coordinator](#connecting-to-a-tls-enabled-coordinator).                                                                                                                                                          | No       |
 | gravitino.metadata.refresh-interval-seconds | integer | 10                    | The `gravitino.metadata.refresh-interval-seconds` defines the interval in seconds to refresh metadata from Gravitino server, the default value is 10 seconds.                                                                                                                                                       | No       |
@@ -56,7 +56,12 @@ trino.jdbc.roles=system:sysadmin
 ```
 
 `trino.jdbc.ssl.enabled` may be omitted when the Trino `discovery.uri` uses the `https` scheme, as
-it is derived from that scheme by default.
+it is derived from that scheme by default. When `discovery.uri` omits the port, the default port of
+its scheme is used, that is `443` for `https` and `80` for `http`.
+
+The `trino.jdbc.ssl.*` configurations are only meaningful on a TLS-enabled connection. Setting any
+of them while TLS is disabled fails the connector at startup rather than being silently ignored, so
+a misconfigured truststore never degrades into a plaintext connection.
 
 If the coordinator certificate is signed by a CA the JVM does not trust, import it into a
 truststore and point `trino.jdbc.ssl.truststore.path` at it:
@@ -90,6 +95,10 @@ trino.jdbc.properties.KerberosRemoteServiceName=trino
 trino.jdbc.properties.SSLKeyStorePath=/etc/trino/client.p12
 trino.jdbc.properties.SSLKeyStorePassword=YourSecureKeystorePassword
 ```
+
+Properties passed through this prefix are handed to the driver without validation, unlike the
+dedicated `trino.jdbc.*` configurations. An unknown name or an invalid value therefore surfaces as a
+driver error when the connection is established, not as a configuration error.
 
 See the [Trino JDBC driver documentation](https://trino.io/docs/current/client/jdbc.html) for the
 full list of supported property names.

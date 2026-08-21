@@ -198,6 +198,41 @@ public class TestCatalogRegister {
   }
 
   @Test
+  public void testTruststorePasswordWithoutSslEnabled() {
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                CatalogRegister.buildJdbcProperties(
+                    config(Map.of("trino.jdbc.ssl.truststore.password", "truststore-secret"))));
+
+    assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.truststore.password"));
+  }
+
+  @Test
+  public void testTruststoreTypeWithoutSslEnabled() {
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                CatalogRegister.buildJdbcProperties(
+                    config(Map.of("trino.jdbc.ssl.truststore.type", "PKCS12"))));
+
+    assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.truststore.type"));
+  }
+
+  @Test
+  public void testBlankSslVerificationFallsBackToDefault() {
+    Properties properties =
+        CatalogRegister.buildJdbcProperties(
+            config(Map.of("trino.jdbc.ssl.enabled", "true", "trino.jdbc.ssl.verification", "")));
+
+    assertEquals("FULL", properties.get("SSLVerification"));
+  }
+
+  @Test
   public void testTruststoreWithVerificationNone() throws IOException {
     TrinoException e =
         assertThrows(
