@@ -327,6 +327,19 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
   }
 
   @Test
+  public void testCatalogStatusSystemTableWithReorderedColumns() throws Exception {
+    // page.getColumns() honors the requested order; a projection that sorted or de-duplicated
+    // channels would return correct looking data in the wrong columns.
+    MaterializedResult result =
+        computeActual("select status, catalog_name, status from gravitino.system.catalog_status");
+    assertEquals(result.getRowCount(), 1);
+    MaterializedRow row = result.getMaterializedRows().get(0);
+    assertEquals(row.getField(0), "REGISTERED");
+    assertEquals(row.getField(1), "memory");
+    assertEquals(row.getField(2), "REGISTERED");
+  }
+
+  @Test
   public void testLoadStatusSystemTable() throws Exception {
     MaterializedResult result =
         computeActual(

@@ -45,6 +45,8 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
   public static final SchemaTableName TABLE_NAME =
       new SchemaTableName(SYSTEM_TABLE_SCHEMA_NAME, "catalog");
 
+  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
   private static final ConnectorTableMetadata TABLE_METADATA =
       new ConnectorTableMetadata(
           TABLE_NAME,
@@ -104,7 +106,7 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
       try {
         VARCHAR.writeString(
             propertyColumnBuilder,
-            new ObjectMapper().writeValueAsString(new TreeMap<>(catalog.getProperties())));
+            OBJECT_MAPPER.writeValueAsString(new TreeMap<>(catalog.getProperties())));
       } catch (JsonProcessingException e) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT, "Invalid property format", e); //
