@@ -148,6 +148,27 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
         .build();
   }
 
+  /**
+   * Returns the total number of connections currently created across all per-user pools. This
+   * provides an aggregated view of HMS connections for monitoring purposes.
+   */
+  public int totalCurrentSize() {
+    return clientPoolCache.asMap().values().stream().mapToInt(HiveClientPool::currentSize).sum();
+  }
+
+  /** Returns the total number of idle (available) connections across all per-user pools. */
+  public int totalIdleCount() {
+    return clientPoolCache.asMap().values().stream().mapToInt(HiveClientPool::idleCount).sum();
+  }
+
+  /**
+   * Returns the maximum configured pool size. Since all per-user pools share the same
+   * configuration, this returns the poolSize of any single pool.
+   */
+  public int totalPoolSize() {
+    return clientPoolCache.asMap().values().stream().mapToInt(HiveClientPool::poolSize).sum();
+  }
+
   public void close() {
     // Close all the HiveClientPool instances in the cache first and then shutdown the scheduler. As
     // Removal listener in Cache will be invoked by the scheduler asynchronously, we need to close
