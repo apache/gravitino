@@ -139,6 +139,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       ORDER BY COLUMN_NAME
       """;
 
+  private static final String SECONDARY_INDEX_QUERY =
+      "SELECT name, type, type_full, expr, granularity FROM system.data_skipping_indices "
+          + "WHERE database = ? AND table = ? ORDER BY name";
+  private static final String LEGACY_SECONDARY_INDEX_QUERY =
+      "SELECT name, type, expr, granularity FROM system.data_skipping_indices "
+          + "WHERE database = ? AND table = ? ORDER BY name";
+
   @Override
   public void create(
       String databaseName,
@@ -622,67 +629,15 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           sqlBuilder.append(" PRIMARY KEY (").append(fieldStr).append(")");
           break;
         case DATA_SKIPPING_MINMAX:
-          sqlBuilder
-              .append(" ")
-              .append(
-                  buildDataSkippingIndexDdl(
-                      index.name(),
-                      fieldStr,
-                      DATA_SKIPPING_MINMAX_VALUE,
-                      resolveGranularity(index.properties(), 1)));
-          break;
         case DATA_SKIPPING_BLOOM_FILTER:
-          sqlBuilder
-              .append(" ")
-              .append(
-                  buildDataSkippingIndexDdl(
-                      index.name(),
-                      fieldStr,
-                      DATA_SKIPPING_BLOOM_FILTER,
-                      resolveGranularity(index.properties(), 1)));
-          break;
         case DATA_SKIPPING_SET:
-          // SET index: set(N) max unique values default to 0 (unlimited), configurable via
-          // set_max_values property. GRANULARITY defaults to 1, configurable via granularity
-          // property, consistent with minmax and bloom_filter indexes.
+        case DATA_SKIPPING_NGRAMBFV1:
+        case DATA_SKIPPING_TOKENBFV1:
           sqlBuilder
               .append(" ")
               .append(
                   buildDataSkippingIndexDdl(
-                      index.name(),
-                      fieldStr,
-                      "set(" + resolveSetMaxValues(index.properties()) + ")",
-                      resolveGranularity(index.properties(), 1)));
-          break;
-        case DATA_SKIPPING_NGRAMBFV1:
-          {
-            String typeClause =
-                buildBloomFilterTypeClause(
-                    index.properties(), DATA_SKIPPING_NGRAMBFV1, index.name());
-            sqlBuilder
-                .append(" ")
-                .append(
-                    buildDataSkippingIndexDdl(
-                        index.name(),
-                        fieldStr,
-                        typeClause,
-                        resolveGranularity(index.properties(), 1)));
-          }
-          break;
-        case DATA_SKIPPING_TOKENBFV1:
-          {
-            String typeClause =
-                buildBloomFilterTypeClause(
-                    index.properties(), DATA_SKIPPING_TOKENBFV1, index.name());
-            sqlBuilder
-                .append(" ")
-                .append(
-                    buildDataSkippingIndexDdl(
-                        index.name(),
-                        fieldStr,
-                        typeClause,
-                        resolveGranularity(index.properties(), 1)));
-          }
+                      index.name(), fieldStr, index.type(), index.properties()));
           break;
         default:
           throw new IllegalArgumentException(
@@ -1136,46 +1091,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     Map<String, String> properties = addIndex.getProperties();
     switch (addIndex.getType()) {
       case DATA_SKIPPING_MINMAX:
-        return "ADD "
-            + buildDataSkippingIndexDdl(
-                addIndex.getName(),
-                fieldStr,
-                DATA_SKIPPING_MINMAX_VALUE,
-                resolveGranularity(properties, 1));
-
       case DATA_SKIPPING_BLOOM_FILTER:
-        return "ADD "
-            + buildDataSkippingIndexDdl(
-                addIndex.getName(),
-                fieldStr,
-                DATA_SKIPPING_BLOOM_FILTER,
-                resolveGranularity(properties, 1));
-
       case DATA_SKIPPING_SET:
+      case DATA_SKIPPING_NGRAMBFV1:
+      case DATA_SKIPPING_TOKENBFV1:
         return "ADD "
             + buildDataSkippingIndexDdl(
-                addIndex.getName(),
-                fieldStr,
-                "set(" + resolveSetMaxValues(properties) + ")",
-                resolveGranularity(properties, 1));
-
-      case DATA_SKIPPING_NGRAMBFV1:
-        {
-          String typeClause =
-              buildBloomFilterTypeClause(properties, DATA_SKIPPING_NGRAMBFV1, addIndex.getName());
-          return "ADD "
-              + buildDataSkippingIndexDdl(
-                  addIndex.getName(), fieldStr, typeClause, resolveGranularity(properties, 1));
-        }
-
-      case DATA_SKIPPING_TOKENBFV1:
-        {
-          String typeClause =
-              buildBloomFilterTypeClause(properties, DATA_SKIPPING_TOKENBFV1, addIndex.getName());
-          return "ADD "
-              + buildDataSkippingIndexDdl(
-                  addIndex.getName(), fieldStr, typeClause, resolveGranularity(properties, 1));
-        }
+                addIndex.getName(), fieldStr, addIndex.getType(), properties);
 
       case PRIMARY_KEY:
         throw new UnsupportedOperationException(
@@ -1638,20 +1560,45 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private List<Index> getSecondaryIndexes(
       Connection connection, String databaseName, String tableName) throws SQLException {
+    try {
+      return querySecondaryIndexes(
+          connection, databaseName, tableName, SECONDARY_INDEX_QUERY, true);
+    } catch (SQLException e) {
+      if (!isMissingTypeFullColumn(e)) {
+        throw e;
+      }
+      LOG.warn(
+          "ClickHouse server does not expose system.data_skipping_indices.type_full; "
+              + "falling back to the legacy secondary-index query for {}.{}",
+          databaseName,
+          tableName);
+      return querySecondaryIndexes(
+          connection, databaseName, tableName, LEGACY_SECONDARY_INDEX_QUERY, false);
+    }
+  }
+
+  private List<Index> querySecondaryIndexes(
+      Connection connection,
+      String databaseName,
+      String tableName,
+      String query,
+      boolean includesTypeFull)
+      throws SQLException {
     List<Index> secondaryIndexes = new ArrayList<>();
-    try (PreparedStatement preparedStatement =
-        connection.prepareStatement(
-            "SELECT name, type, expr, granularity FROM system.data_skipping_indices "
-                + "WHERE database = ? AND table = ? ORDER BY name")) {
+    try (PreparedStatement preparedStatement = connection.prepareStatement(query)) {
       preparedStatement.setString(1, databaseName);
       preparedStatement.setString(2, tableName);
       try (ResultSet resultSet = preparedStatement.executeQuery()) {
         while (resultSet.next()) {
           String name = resultSet.getString("name");
           String type = resultSet.getString("type");
+          String parameterSource = includesTypeFull ? resultSet.getString("type_full") : type;
+          String parameterSourceName = includesTypeFull ? "type_full" : "legacy type";
           String expression = resultSet.getString("expr");
           long granularity = resultSet.getLong("granularity");
+          Index.IndexType indexType = null;
           try {
+            indexType = getClickHouseIndexType(type);
             String[][] fields = parseIndexFields(expression);
             if (ArrayUtils.isEmpty(fields)) {
               continue;
@@ -1659,25 +1606,153 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             // Only include granularity in properties when it differs from the default,
             // so that indexes created without explicit granularity have empty properties
             // and match the original creation state (avoids false index-change diffs).
-            Map<String, String> properties =
-                granularity == DEFAULT_INDEX_GRANULARITY
-                    ? Map.of()
-                    : Map.of(GRANULARITY, String.valueOf(granularity));
-            secondaryIndexes.add(
-                Indexes.of(getClickHouseIndexType(type), name, fields, properties));
+            Map<String, String> properties = new HashMap<>();
+            if (granularity != DEFAULT_INDEX_GRANULARITY) {
+              properties.put(GRANULARITY, String.valueOf(granularity));
+            }
+            Map<String, String> bloomFilterProperties =
+                parseBloomFilterPropertiesForQuery(
+                    indexType, parameterSource, name, !includesTypeFull);
+            if (!includesTypeFull
+                && isParameterizedBloomFilterIndex(indexType)
+                && bloomFilterProperties.isEmpty()) {
+              LOG.warn(
+                  "Legacy ClickHouse metadata does not expose bloom-filter parameters for "
+                      + "{} index '{}' on {}.{}; loaded Index.properties() is incomplete",
+                  type,
+                  name,
+                  databaseName,
+                  tableName);
+            }
+            properties.putAll(bloomFilterProperties);
+            secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
           } catch (IllegalArgumentException e) {
+            if (isParameterizedBloomFilterIndex(indexType)) {
+              throw new IllegalArgumentException(
+                  "Failed to load data skipping index '%s' from %s.%s with %s '%s'"
+                      .formatted(
+                          name, databaseName, tableName, parameterSourceName, parameterSource),
+                  e);
+            }
             LOG.warn(
-                "Skip unsupported data skipping index {} for {}.{} with expression {}",
+                "Skip unsupported data skipping index {} for {}.{} with type {} "
+                    + "(parameter metadata={}) and expression {}",
                 name,
                 databaseName,
                 tableName,
-                expression);
+                type,
+                parameterSource,
+                expression,
+                e);
           }
         }
       }
     }
 
     return secondaryIndexes;
+  }
+
+  private static boolean isMissingTypeFullColumn(SQLException exception) {
+    for (SQLException current = exception; current != null; current = current.getNextException()) {
+      for (Throwable cause = current; cause != null; cause = cause.getCause()) {
+        String message = StringUtils.lowerCase(cause.getMessage());
+        if (message != null
+            && message.contains("type_full")
+            && (message.contains("unknown")
+                || message.contains("missing")
+                || message.contains("column"))) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Parses the positional parameters returned by ClickHouse in {@code type_full} for the two
+   * parameterized bloom-filter data skipping indexes.
+   *
+   * @param indexType the mapped Gravitino index type
+   * @param typeFull the complete ClickHouse index type expression
+   * @param indexName the index name for validation messages
+   * @return the index properties, or an empty map for non-parameterized index types
+   * @throws IllegalArgumentException if a supported index has malformed or invalid parameters
+   */
+  @VisibleForTesting
+  static Map<String, String> parseBloomFilterProperties(
+      Index.IndexType indexType, String typeFull, String indexName) {
+    if (!isParameterizedBloomFilterIndex(indexType)) {
+      return Collections.emptyMap();
+    }
+
+    String expectedType =
+        indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1
+            ? DATA_SKIPPING_NGRAMBFV1
+            : DATA_SKIPPING_TOKENBFV1;
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    int paramsEnd = normalizedTypeFull.lastIndexOf(')');
+    Preconditions.checkArgument(
+        paramsStart > 0 && paramsEnd == normalizedTypeFull.length() - 1,
+        "Invalid type_full '%s' for %s index '%s'",
+        typeFull,
+        expectedType,
+        indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(
+            expectedType, normalizedTypeFull.substring(0, paramsStart).trim()),
+        "type_full '%s' does not match %s index '%s'",
+        typeFull,
+        expectedType,
+        indexName);
+
+    String[] params = normalizedTypeFull.substring(paramsStart + 1, paramsEnd).split(",", -1);
+    int expectedParamCount = indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1 ? 4 : 3;
+    Preconditions.checkArgument(
+        params.length == expectedParamCount,
+        "Expected %s parameters for %s index '%s', but got %s in '%s'",
+        expectedParamCount,
+        expectedType,
+        indexName,
+        params.length,
+        typeFull);
+
+    Map<String, String> properties = new HashMap<>();
+    int paramIndex = 0;
+    if (indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1) {
+      properties.put(
+          NGRAM_SIZE,
+          requireIntWithMin(params[paramIndex++], NGRAM_SIZE, expectedType, indexName, 1));
+    }
+    properties.put(
+        BLOOM_FILTER_SIZE,
+        requireIntWithMin(params[paramIndex++], BLOOM_FILTER_SIZE, expectedType, indexName, 1));
+    properties.put(
+        HASH_FUNCTIONS,
+        requireIntWithMin(params[paramIndex++], HASH_FUNCTIONS, expectedType, indexName, 1));
+    properties.put(
+        RANDOM_SEED,
+        requireIntWithMin(params[paramIndex], RANDOM_SEED, expectedType, indexName, 0));
+    return Map.copyOf(properties);
+  }
+
+  private static Map<String, String> parseBloomFilterPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    if (!isParameterizedBloomFilterIndex(indexType)) {
+      return Collections.emptyMap();
+    }
+    if (allowBareLegacyType && !StringUtils.contains(parameterSource, "(")) {
+      return Collections.emptyMap();
+    }
+    return parseBloomFilterProperties(indexType, parameterSource, indexName);
+  }
+
+  private static boolean isParameterizedBloomFilterIndex(Index.IndexType indexType) {
+    return indexType == Index.IndexType.DATA_SKIPPING_NGRAMBFV1
+        || indexType == Index.IndexType.DATA_SKIPPING_TOKENBFV1;
   }
 
   /**
@@ -1812,6 +1887,38 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return String.format("(%s, %s, %s, %s)", ngramSize, size, hashFuncs, seed);
     }
     return String.format("(%s, %s, %s)", size, hashFuncs, seed);
+  }
+
+  private String buildDataSkippingIndexDdl(
+      String indexName,
+      String fieldStr,
+      Index.IndexType indexType,
+      Map<String, String> properties) {
+    return buildDataSkippingIndexDdl(
+        indexName,
+        fieldStr,
+        resolveDataSkippingIndexTypeClause(indexType, properties, indexName),
+        resolveGranularity(properties, 1));
+  }
+
+  private String resolveDataSkippingIndexTypeClause(
+      Index.IndexType indexType, Map<String, String> properties, String indexName) {
+    switch (indexType) {
+      case DATA_SKIPPING_MINMAX:
+        return DATA_SKIPPING_MINMAX_VALUE;
+      case DATA_SKIPPING_BLOOM_FILTER:
+        return DATA_SKIPPING_BLOOM_FILTER;
+      case DATA_SKIPPING_SET:
+        // SET index defaults to unlimited distinct values and supports an optional upper bound.
+        return "set(" + resolveSetMaxValues(properties) + ")";
+      case DATA_SKIPPING_NGRAMBFV1:
+        return buildBloomFilterTypeClause(properties, DATA_SKIPPING_NGRAMBFV1, indexName);
+      case DATA_SKIPPING_TOKENBFV1:
+        return buildBloomFilterTypeClause(properties, DATA_SKIPPING_TOKENBFV1, indexName);
+      default:
+        throw new IllegalArgumentException(
+            "Gravitino ClickHouse doesn't support index : " + indexType);
+    }
   }
 
   private String buildDataSkippingIndexDdl(

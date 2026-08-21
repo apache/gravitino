@@ -1786,6 +1786,36 @@ public class TestClickHouseTableOperations extends TestClickHouse {
   }
 
   @Test
+  public void testParseBloomFilterProperties() {
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        ClickHouseTableOperations.parseBloomFilterProperties(
+            IndexType.DATA_SKIPPING_NGRAMBFV1, "ngrambf_v1(3, 512, 3, 0)", "idx_ngram"));
+    Assertions.assertEquals(
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "1"),
+        ClickHouseTableOperations.parseBloomFilterProperties(
+            IndexType.DATA_SKIPPING_TOKENBFV1, " tokenbf_v1(256,2,1) ", "idx_token"));
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableOperations.parseBloomFilterProperties(
+                IndexType.DATA_SKIPPING_NGRAMBFV1, "ngrambf_v1(3,512,3)", "idx_bad"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ClickHouseTableOperations.parseBloomFilterProperties(
+                IndexType.DATA_SKIPPING_TOKENBFV1, "tokenbf_v1(256,2,-1)", "idx_bad"));
+  }
+
+  @Test
   public void testCreateTableWithNgrambfAndTokenbfIndexes() {
     TestableClickHouseTableOperations ops = new TestableClickHouseTableOperations();
     ops.initialize(
