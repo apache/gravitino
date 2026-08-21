@@ -45,14 +45,11 @@ class RESTClientFactory:
             authorization: Full Authorization header value forwarded verbatim
                 (e.g. "Bearer <token>" or "Basic <base64(user:dummy)>").
                 Empty string means anonymous.
-            auth: Optional httpx auth hook. Only passed through when set so
-                test doubles that omit the argument keep working.
+            auth: Optional httpx auth hook. ``None`` for static or anonymous.
 
         Returns:
             New instance of the configured rest client class
         """
-        if auth is None:
-            return cls._rest_client_class(metalake_name, uri, authorization)
         return cls._rest_client_class(
             metalake_name, uri, authorization, auth=auth
         )
