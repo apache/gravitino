@@ -61,14 +61,18 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
               ColumnMetadata.builder().setName("metalake_errors").setType(VARCHAR).build()));
 
   private final CatalogConnectorManager catalogConnectorManager;
+  private final String metalake;
 
   /**
    * Constructs a new GravitinoSystemTableLoadStatus.
    *
    * @param catalogConnectorManager the manager for catalog connectors
+   * @param metalake the metalake to report errors for
    */
-  public GravitinoSystemTableLoadStatus(CatalogConnectorManager catalogConnectorManager) {
+  public GravitinoSystemTableLoadStatus(
+      CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
+    this.metalake = metalake;
   }
 
   @Override
@@ -87,7 +91,11 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
         consecutiveFailuresColumnBuilder, catalogConnectorManager.getConsecutiveLoadFailures());
     writeNullableString(lastErrorColumnBuilder, catalogConnectorManager.getLastLoadError());
 
-    Map<String, String> metalakeErrors = catalogConnectorManager.getMetalakeErrors();
+    // The load loop itself is shared by every entry catalog, so the columns above are global.
+    // Only the per metalake errors are narrowed to the metalake this connector reports on.
+    Map<String, String> allErrors = catalogConnectorManager.getMetalakeErrors();
+    Map<String, String> metalakeErrors =
+        allErrors.containsKey(metalake) ? Map.of(metalake, allErrors.get(metalake)) : Map.of();
     if (metalakeErrors.isEmpty()) {
       metalakeErrorsColumnBuilder.appendNull();
     } else {

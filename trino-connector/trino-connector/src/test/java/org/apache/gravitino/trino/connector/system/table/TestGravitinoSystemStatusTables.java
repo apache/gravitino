@@ -92,7 +92,7 @@ public class TestGravitinoSystemStatusTables {
     when(manager.getLastLoadError()).thenReturn(null);
     when(manager.getMetalakeErrors()).thenReturn(Map.of());
 
-    Page page = new GravitinoSystemTableLoadStatus(manager).loadPageData();
+    Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
 
     assertEquals(1, page.getPositionCount());
     assertEquals(6, page.getChannelCount());
@@ -113,7 +113,7 @@ public class TestGravitinoSystemStatusTables {
     when(manager.getLastLoadError()).thenReturn("Connection refused");
     when(manager.getMetalakeErrors()).thenReturn(Map.of("test", "Connection refused"));
 
-    Page page = new GravitinoSystemTableLoadStatus(manager).loadPageData();
+    Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
 
     // last_success_time stays null while the server is unreachable.
     assertTrue(page.getBlock(2).isNull(0));
@@ -136,8 +136,8 @@ public class TestGravitinoSystemStatusTables {
     CatalogConnectorManager second = mock(CatalogConnectorManager.class);
     when(second.getCatalogRegistrationStates()).thenReturn(List.of());
 
-    GravitinoSystemTableFactory firstFactory = new GravitinoSystemTableFactory(first);
-    GravitinoSystemTableFactory secondFactory = new GravitinoSystemTableFactory(second);
+    GravitinoSystemTableFactory firstFactory = new GravitinoSystemTableFactory(first, "prod");
+    GravitinoSystemTableFactory secondFactory = new GravitinoSystemTableFactory(second, "prod");
 
     assertEquals(
         1,
@@ -154,7 +154,7 @@ public class TestGravitinoSystemStatusTables {
   private static Page loadCatalogStatusPage(List<CatalogRegistrationState> states) {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
     when(manager.getCatalogRegistrationStates()).thenReturn(states);
-    return new GravitinoSystemTableCatalogStatus(manager).loadPageData();
+    return new GravitinoSystemTableCatalogStatus(manager, "test").loadPageData();
   }
 
   private static String varchar(Page page, int channel) {

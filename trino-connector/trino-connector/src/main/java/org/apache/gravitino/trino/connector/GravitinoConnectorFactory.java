@@ -62,8 +62,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
   @SuppressWarnings("UnusedVariable")
-  private GravitinoSystemTableFactory gravitinoSystemTableFactory;
-
   private CatalogConnectorManager catalogConnectorManager;
   private boolean catalogConnectorManagerStartTriggered = false;
 
@@ -127,12 +125,11 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogRegister catalogRegister = new CatalogRegister();
 
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
-          catalogConnectorManager =
+          CatalogConnectorManager manager =
               new CatalogConnectorManager(
                   catalogRegister, catalogConnectorFactory, this::getTrinoCatalogName);
-          catalogConnectorManager.config(config, client);
+          manager.config(config, client);
 
-          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
           if (isCoordinator(trinoConnectorContext)) {
             // Pin the system table splits here: the registration state the system tables report
             // is only recorded on the coordinator by the load loop started below. Starting the
@@ -140,6 +137,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
             GravitinoSystemConnector.Split.setCoordinatorAddress(
                 getCurrentNodeAddress(trinoConnectorContext));
           }
+          catalogConnectorManager = manager;
         }
 
         // The `trino.jdbc.*` settings that CatalogRegister needs to connect back to the
@@ -184,9 +182,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_METALAKE_NOT_EXISTS, "No gravitino metalake selected");
       }
+      // Built per entry catalog, like the stored procedures: both are scoped to this catalog's
+      // metalake even though the underlying manager is shared.
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
-      return createSystemConnector(gravitinoStoredProcedureFactory, gravitinoSystemTableFactory);
+      GravitinoSystemTableFactory systemTableFactory =
+          new GravitinoSystemTableFactory(catalogConnectorManager, metalake);
+      return createSystemConnector(gravitinoStoredProcedureFactory, systemTableFactory);
     }
   }
 

@@ -31,6 +31,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 public class GravitinoSystemTableFactory {
 
   private final CatalogConnectorManager catalogConnectorManager;
+  private final String metalake;
 
   // Per instance, not static: the tables are bound to one CatalogConnectorManager, and only the
   // manager on the coordinator runs the load loop that fills in the registration state. A shared
@@ -41,9 +42,13 @@ public class GravitinoSystemTableFactory {
    * Constructs a new GravitinoSystemTableFactory.
    *
    * @param catalogConnectorManager the manager for catalog connectors
+   * @param metalake the metalake this connector is configured with; the tables only report on it,
+   *     so that two entry catalogs pointed at different metalakes do not report each other's state
    */
-  public GravitinoSystemTableFactory(CatalogConnectorManager catalogConnectorManager) {
+  public GravitinoSystemTableFactory(
+      CatalogConnectorManager catalogConnectorManager, String metalake) {
     this.catalogConnectorManager = catalogConnectorManager;
+    this.metalake = metalake;
 
     registerSystemTables();
   }
@@ -52,13 +57,13 @@ public class GravitinoSystemTableFactory {
   private void registerSystemTables() {
     systemTables.put(
         GravitinoSystemTableCatalog.TABLE_NAME,
-        new GravitinoSystemTableCatalog(catalogConnectorManager));
+        new GravitinoSystemTableCatalog(catalogConnectorManager, metalake));
     systemTables.put(
         GravitinoSystemTableCatalogStatus.TABLE_NAME,
-        new GravitinoSystemTableCatalogStatus(catalogConnectorManager));
+        new GravitinoSystemTableCatalogStatus(catalogConnectorManager, metalake));
     systemTables.put(
         GravitinoSystemTableLoadStatus.TABLE_NAME,
-        new GravitinoSystemTableLoadStatus(catalogConnectorManager));
+        new GravitinoSystemTableLoadStatus(catalogConnectorManager, metalake));
   }
 
   /**
