@@ -340,6 +340,22 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    ConnectionFailedException legacyFailure =
+        new ConnectionFailedException(
+            new IllegalStateException("database connection detail"), "connection failed");
+    doThrow(legacyFailure).when(manager).testConnection(any(), any(), any(), any(), any());
+    Response failedResponse =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    ErrorResponse connectionError = failedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, connectionError.getCode());
+    Assertions.assertNotNull(connectionError.getStack());
+    Assertions.assertTrue(
+        String.join("\n", connectionError.getStack()).contains("database connection detail"));
   }
 
   @Test
