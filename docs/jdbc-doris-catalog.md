@@ -209,6 +209,7 @@ Index[] indexes = new Index[] {
 
 - Doris supports table properties, and you can set them in the table properties.
 - Only supports Doris table properties and doesn't support user-defined properties.
+- `replication_allocation` is supported for Doris 2.1 and later. Do not set it together with `replication_num`.
 
 ### Table Indexes
 
