@@ -57,8 +57,8 @@ class _OAuthHttpTestCase(unittest.TestCase):
     """Drive ``httpx.AsyncClient(auth=...)`` against a shared MockTransport.
 
     httpx-auth caches tokens in a process-global map, so every test clears it.
-    Token POSTs are sync; tests inject a sync ``httpx.Client`` on the same
-    transport so IdP calls never leave the process.
+    Tests inject a sync ``httpx.Client`` on the same transport so IdP calls
+    never leave the process. Production token POSTs use ``AsyncClient``.
     """
 
     def setUp(self):
@@ -235,6 +235,56 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(seen, ["Bearer t1", "Bearer t2"])
         self.assertEqual(calls["token"], 2)
+
+    def test_async_auth_flow_posts_token_with_async_client(self):
+        calls = {"token": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                calls["token"] += 1
+                return httpx.Response(
+                    200, json={"access_token": "tok-async", "expires_in": 3600}
+                )
+            self.assertEqual(
+                request.headers.get("authorization"), "Bearer tok-async"
+            )
+            return httpx.Response(200, json={"ok": True})
+
+        transport = httpx.MockTransport(handler)
+        auth = RefreshableBearerAuth(
+            token_endpoint="https://idp.example/token",
+            client_id="mcp",
+            client_secret="s3cret",
+        )
+        real_async_client = httpx.AsyncClient
+
+        def async_client_factory(*args, **kwargs):
+            kwargs["transport"] = transport
+            return real_async_client(*args, **kwargs)
+
+        with mock.patch(
+            "mcp_server.core.oauth.httpx.AsyncClient",
+            side_effect=async_client_factory,
+        ) as async_cls, mock.patch(
+            "mcp_server.core.oauth.httpx.Client"
+        ) as sync_cls:
+            sync_cls.side_effect = AssertionError(
+                "async_auth_flow must not use httpx.Client"
+            )
+
+            async def _run():
+                async with httpx.AsyncClient(
+                    auth=auth,
+                    transport=transport,
+                    base_url="https://gravitino.example",
+                ) as client:
+                    return await client.get("/api")
+
+            response = asyncio.run(_run())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(calls["token"], 1)
+        async_cls.assert_called()
 
 
 class TestSettingOAuth(unittest.TestCase):

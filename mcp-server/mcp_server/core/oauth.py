@@ -23,17 +23,20 @@ Java/Python Gravitino clients. httpx-auth defaults to HTTP Basic. This class
 retries once after Gravitino HTTP 401.
 """
 
+import asyncio
 import logging
-from collections.abc import Generator
+from collections.abc import AsyncGenerator, Generator
 from typing import Optional, Union
 
 import httpx
-from httpx_auth import OAuth2, OAuth2ClientCredentials
+from httpx_auth import AuthenticationFailed, OAuth2, OAuth2ClientCredentials
 
 _LOG = logging.getLogger(__name__)
 
 # Refresh this many seconds before recorded expiry. httpx-auth default is 30.
 DEFAULT_REFRESH_SKEW_SECONDS = 60
+
+_TokenTuple = Union[tuple[str, str], tuple[str, str, Union[int, str]]]
 
 
 class RefreshableBearerAuth(OAuth2ClientCredentials):
@@ -76,38 +79,33 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         with cache._forbid_concurrent_cache_access:  # pylint: disable=protected-access
             cache.tokens.pop(self.state, None)
 
-    def _configure_client(self, client: httpx.Client) -> None:
-        """Do not send HTTP Basic; id and secret go in the form body."""
-        client.timeout = self.timeout
-
-    def request_new_token(
-        self,
-    ) -> Union[tuple[str, str], tuple[str, str, Union[int, str]]]:
+    def request_new_token(self) -> _TokenTuple:
         """POST ``client_credentials`` with id/secret in the form body."""
-        data = dict(self.data)
-        data["client_id"] = self.client_id
-        data["client_secret"] = self.client_secret
+        data = self._token_form_data()
         client = self.client or httpx.Client()
         self._configure_client(client)
         try:
             response = client.post(self.token_url, data=data)
-            if response.status_code >= 400:
-                _LOG.error(
-                    "OAuth token request failed: HTTP %s", response.status_code
-                )
+            self._log_token_http_error(response)
             response.raise_for_status()
             body = response.json()
         finally:
             if self.client is None:
                 client.close()
-        token = body.get(self.token_field_name)
-        if not token or not isinstance(token, str):
-            raise ValueError("OAuth token response missing access_token")
-        expires_in = body.get("expires_in")
-        _LOG.info("Fetched OAuth access token")
-        if expires_in in (None, ""):
-            return self.state, token
-        return self.state, token, expires_in
+        return self._token_tuple(body)
+
+    async def request_new_token_async(self) -> _TokenTuple:
+        """POST ``client_credentials`` without blocking the event loop."""
+        if self.client is not None:
+            return await asyncio.to_thread(self.request_new_token)
+        data = self._token_form_data()
+        async with httpx.AsyncClient() as client:
+            client.timeout = self.timeout
+            response = await client.post(self.token_url, data=data)
+            self._log_token_http_error(response)
+            response.raise_for_status()
+            body = response.json()
+        return self._token_tuple(body)
 
     def auth_flow(
         self, request: httpx.Request
@@ -121,6 +119,58 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         self._apply_token(request)
         yield request
 
+    async def async_auth_flow(
+        self, request: httpx.Request
+    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+        """Attach a Bearer without a blocking IdP POST on the event loop."""
+        await self._apply_token_async(request)
+        response = yield request
+        if response.status_code != 401:
+            return
+        self.invalidate()
+        await self._apply_token_async(request)
+        yield request
+
+    def _configure_client(self, client: httpx.Client) -> None:
+        """Do not send HTTP Basic; id and secret go in the form body."""
+        client.timeout = self.timeout
+
+    def _token_form_data(self) -> dict:
+        data = dict(self.data)
+        data["client_id"] = self.client_id
+        data["client_secret"] = self.client_secret
+        return data
+
+    def _token_tuple(self, body: dict) -> _TokenTuple:
+        token = body.get(self.token_field_name)
+        if not token or not isinstance(token, str):
+            raise ValueError("OAuth token response missing access_token")
+        expires_in = body.get("expires_in")
+        _LOG.info("Fetched OAuth access token")
+        if expires_in in (None, ""):
+            return self.state, token
+        return self.state, token, expires_in
+
+    @staticmethod
+    def _log_token_http_error(response: httpx.Response) -> None:
+        if response.status_code >= 400:
+            _LOG.error("OAuth token request failed: HTTP %s", response.status_code)
+
+    def _cached_bearer(self) -> Optional[str]:
+        try:
+            return OAuth2.token_cache.get_token(
+                self.state, early_expiry=self.early_expiry
+            )
+        except AuthenticationFailed:
+            return None
+
+    def _store_and_get(self, fetched: _TokenTuple) -> str:
+        return OAuth2.token_cache.get_token(
+            self.state,
+            early_expiry=self.early_expiry,
+            on_missing_token=lambda: fetched,
+        )
+
     def _apply_token(self, request: httpx.Request) -> None:
         token = OAuth2.token_cache.get_token(
             self.state,
@@ -128,4 +178,10 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             on_missing_token=self.request_new_token,
             on_expired_token=self.refresh_token,
         )
+        self._update_user_request(request, token)
+
+    async def _apply_token_async(self, request: httpx.Request) -> None:
+        token = self._cached_bearer()
+        if token is None:
+            token = self._store_and_get(await self.request_new_token_async())
         self._update_user_request(request, token)
