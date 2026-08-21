@@ -143,17 +143,17 @@ public interface TagOperations {
   }
 
   /**
-   * Creates or replaces one policy association for a tag.
+   * Adds or updates one policy association for a tag.
    *
    * @param tagName The tag name.
    * @param policyName The policy name.
    * @param selector The selector, or null for tag-presence matching.
    * @return The resulting association.
-   * @throws UnsupportedOperationException If setting policy-to-tag associations is not supported.
+   * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
    */
-  default PolicyTagAssociation setPolicyForTag(
+  default PolicyTagAssociation addPolicyForTag(
       String tagName, String policyName, @Nullable PolicySelector selector) {
-    throw new UnsupportedOperationException("Setting a policy for a tag is not supported");
+    throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
   }
 
   /**
