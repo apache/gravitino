@@ -23,6 +23,7 @@ import io.trino.spi.Page;
 import io.trino.spi.connector.ConnectorTableMetadata;
 import io.trino.spi.connector.SchemaTableName;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 
@@ -30,8 +31,11 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 public class GravitinoSystemTableFactory {
 
   private final CatalogConnectorManager catalogConnectorManager;
-  /** Map of all registered system tables, keyed by their schema-qualified names. */
-  public static final Map<SchemaTableName, GravitinoSystemTable> SYSTEM_TABLES = new HashMap<>();
+
+  // Per instance, not static: the tables are bound to one CatalogConnectorManager, and only the
+  // manager on the coordinator runs the load loop that fills in the registration state. A shared
+  // registry would let any other connector in the JVM take it over.
+  private final Map<SchemaTableName, GravitinoSystemTable> systemTables = new HashMap<>();
 
   /**
    * Constructs a new GravitinoSystemTableFactory.
@@ -46,13 +50,13 @@ public class GravitinoSystemTableFactory {
 
   /** Register all the system tables */
   private void registerSystemTables() {
-    SYSTEM_TABLES.put(
+    systemTables.put(
         GravitinoSystemTableCatalog.TABLE_NAME,
         new GravitinoSystemTableCatalog(catalogConnectorManager));
-    SYSTEM_TABLES.put(
+    systemTables.put(
         GravitinoSystemTableCatalogStatus.TABLE_NAME,
         new GravitinoSystemTableCatalogStatus(catalogConnectorManager));
-    SYSTEM_TABLES.put(
+    systemTables.put(
         GravitinoSystemTableLoadStatus.TABLE_NAME,
         new GravitinoSystemTableLoadStatus(catalogConnectorManager));
   }
@@ -64,9 +68,9 @@ public class GravitinoSystemTableFactory {
    * @return the page containing the table's data
    * @throws IllegalArgumentException if the table does not exist
    */
-  public static Page loadPageData(SchemaTableName tableName) {
-    Preconditions.checkArgument(SYSTEM_TABLES.containsKey(tableName), "table does not exist");
-    return SYSTEM_TABLES.get(tableName).loadPageData();
+  public Page loadPageData(SchemaTableName tableName) {
+    Preconditions.checkArgument(systemTables.containsKey(tableName), "table does not exist");
+    return systemTables.get(tableName).loadPageData();
   }
 
   /**
@@ -76,8 +80,27 @@ public class GravitinoSystemTableFactory {
    * @return the table metadata
    * @throws IllegalArgumentException if the table does not exist
    */
-  public static ConnectorTableMetadata getTableMetaData(SchemaTableName tableName) {
-    Preconditions.checkArgument(SYSTEM_TABLES.containsKey(tableName), "table does not exist");
-    return SYSTEM_TABLES.get(tableName).getTableMetaData();
+  public ConnectorTableMetadata getTableMetaData(SchemaTableName tableName) {
+    Preconditions.checkArgument(systemTables.containsKey(tableName), "table does not exist");
+    return systemTables.get(tableName).getTableMetaData();
+  }
+
+  /**
+   * Lists the names of every registered system table.
+   *
+   * @return the schema-qualified table names
+   */
+  public List<SchemaTableName> listTableNames() {
+    return List.copyOf(systemTables.keySet());
+  }
+
+  /**
+   * Checks whether a system table is registered.
+   *
+   * @param tableName the schema-qualified name of the table
+   * @return true if the table exists, false otherwise
+   */
+  public boolean tableExists(SchemaTableName tableName) {
+    return systemTables.containsKey(tableName);
   }
 }

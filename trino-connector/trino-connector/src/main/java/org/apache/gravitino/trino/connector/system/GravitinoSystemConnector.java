@@ -58,14 +58,28 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFac
 public class GravitinoSystemConnector implements Connector {
 
   private final GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory;
+  private final GravitinoSystemTableFactory systemTableFactory;
 
   /**
    * Constructs a new GravitinoSystemConnector.
    *
    * @param gravitinoStoredProcedureFactory the factory for creating stored procedures
+   * @param systemTableFactory the registry of system tables to expose
    */
-  public GravitinoSystemConnector(GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
+  public GravitinoSystemConnector(
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
     this.gravitinoStoredProcedureFactory = gravitinoStoredProcedureFactory;
+    this.systemTableFactory = systemTableFactory;
+  }
+
+  /**
+   * Retrieves the registry of system tables this connector exposes.
+   *
+   * @return the system table factory
+   */
+  protected GravitinoSystemTableFactory getSystemTableFactory() {
+    return systemTableFactory;
   }
 
   @Override
@@ -86,7 +100,7 @@ public class GravitinoSystemConnector implements Connector {
   }
 
   protected ConnectorMetadata createMetadata() {
-    return new GravitinoSystemConnectorMetadata();
+    return new GravitinoSystemConnectorMetadata(systemTableFactory);
   }
 
   @Override
@@ -106,7 +120,7 @@ public class GravitinoSystemConnector implements Connector {
   }
 
   protected ConnectorPageSourceProvider createPageSourceProvider() {
-    return new DatasourceProvider();
+    return new DatasourceProvider(systemTableFactory);
   }
 
   /** The transaction handle for Gravitino system connector. */
@@ -117,6 +131,17 @@ public class GravitinoSystemConnector implements Connector {
 
   /** The datasource provider. */
   public static class DatasourceProvider implements ConnectorPageSourceProvider {
+
+    private final GravitinoSystemTableFactory systemTableFactory;
+
+    /**
+     * Constructs a new DatasourceProvider.
+     *
+     * @param systemTableFactory the registry the page data is read from
+     */
+    public DatasourceProvider(GravitinoSystemTableFactory systemTableFactory) {
+      this.systemTableFactory = systemTableFactory;
+    }
 
     @Override
     public ConnectorPageSource createPageSource(
@@ -129,7 +154,7 @@ public class GravitinoSystemConnector implements Connector {
 
       SchemaTableName tableName =
           ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).getName();
-      Page page = GravitinoSystemTableFactory.loadPageData(tableName);
+      Page page = systemTableFactory.loadPageData(tableName);
 
       // Project the page down to the requested columns. Trino only expects the columns it asked
       // for, so handing it the whole row breaks any query that is not a SELECT *.

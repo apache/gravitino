@@ -186,7 +186,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       }
       GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory =
           new GravitinoStoredProcedureFactory(catalogConnectorManager, metalake);
-      return createSystemConnector(gravitinoStoredProcedureFactory);
+      return createSystemConnector(gravitinoStoredProcedureFactory, gravitinoSystemTableFactory);
     }
   }
 
@@ -206,8 +206,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   protected GravitinoSystemConnector createSystemConnector(
-      GravitinoStoredProcedureFactory storedProcedureFactory) {
-    return new GravitinoSystemConnector(storedProcedureFactory);
+      GravitinoStoredProcedureFactory storedProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
+    return new GravitinoSystemConnector(storedProcedureFactory, systemTableFactory);
   }
 
   protected String getTrinoCatalogName(String metalakeName, String catalogName) {
