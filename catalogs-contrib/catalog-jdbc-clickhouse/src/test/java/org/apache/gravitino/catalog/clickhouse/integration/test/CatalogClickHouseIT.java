@@ -2832,6 +2832,18 @@ public class CatalogClickHouseIT extends BaseIT {
         };
     SortOrder[] sortOrders = getSortOrders(CLICKHOUSE_COL_NAME1);
     TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> ngramProperties =
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0");
+    Map<String, String> tokenProperties =
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "0",
+            "granularity", "4");
 
     // Create table with ngrambf_v1 index
     Index[] indexes =
@@ -2840,20 +2852,12 @@ public class CatalogClickHouseIT extends BaseIT {
               Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
               "idx_ngram",
               new String[][] {{CLICKHOUSE_COL_NAME3}},
-              Map.of(
-                  "ngram_size", "3",
-                  "bloom_filter_size", "512",
-                  "hash_functions", "3",
-                  "random_seed", "0")),
+              ngramProperties),
           Indexes.of(
               Index.IndexType.DATA_SKIPPING_TOKENBFV1,
               "idx_token",
               new String[][] {{CLICKHOUSE_COL_NAME3}},
-              Map.of(
-                  "bloom_filter_size", "256",
-                  "hash_functions", "2",
-                  "random_seed", "0",
-                  "granularity", "4")),
+              tokenProperties),
         };
     tableCatalog.createTable(
         tableIdentifier,
@@ -2870,32 +2874,79 @@ public class CatalogClickHouseIT extends BaseIT {
     Index[] loadedIndexes = loaded.index();
     Assertions.assertNotNull(loadedIndexes);
 
-    // ClickHouse's system.data_skipping_indices only returns the bare type name (e.g.
-    // "ngrambf_v1") without the parameter clause (e.g. "ngrambf_v1(3,512,3,0)"), so
-    // index.properties() on the loaded table will not contain bloom_filter_size,
-    // hash_functions, random_seed, or ngram_size. Only verify type, name, and field names.
-    //
-    // Verify ngrambf_v1 index
-    boolean hasNgrambf =
+    Index loadedNgram =
         Arrays.stream(loadedIndexes)
-            .anyMatch(
-                idx ->
-                    Objects.equals(idx.name(), "idx_ngram")
-                        && idx.type() == Index.IndexType.DATA_SKIPPING_NGRAMBFV1
-                        && Arrays.deepEquals(
-                            idx.fieldNames(), new String[][] {{CLICKHOUSE_COL_NAME3}}));
-    Assertions.assertTrue(hasNgrambf, "Loaded table should contain ngrambf_v1 index 'idx_ngram'");
+            .filter(idx -> Objects.equals(idx.name(), "idx_ngram"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_NGRAMBFV1, loadedNgram.type());
+    Assertions.assertArrayEquals(new String[][] {{CLICKHOUSE_COL_NAME3}}, loadedNgram.fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        loadedNgram.properties());
 
-    // Verify tokenbf_v1 index
-    boolean hasTokenbf =
+    Index loadedToken =
         Arrays.stream(loadedIndexes)
-            .anyMatch(
-                idx ->
-                    Objects.equals(idx.name(), "idx_token")
-                        && idx.type() == Index.IndexType.DATA_SKIPPING_TOKENBFV1
-                        && Arrays.deepEquals(
-                            idx.fieldNames(), new String[][] {{CLICKHOUSE_COL_NAME3}}));
-    Assertions.assertTrue(hasTokenbf, "Loaded table should contain tokenbf_v1 index 'idx_token'");
+            .filter(idx -> Objects.equals(idx.name(), "idx_token"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TOKENBFV1, loadedToken.type());
+    Assertions.assertArrayEquals(new String[][] {{CLICKHOUSE_COL_NAME3}}, loadedToken.fieldNames());
+    Assertions.assertEquals(tokenProperties, loadedToken.properties());
+
+    // Verify that both new index types also work through ALTER TABLE ADD INDEX.
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+            "idx_ngram_alter",
+            new String[][] {{CLICKHOUSE_COL_NAME3}},
+            ngramProperties));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+            "idx_token_alter",
+            new String[][] {{CLICKHOUSE_COL_NAME3}},
+            tokenProperties));
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    Index alteredNgram =
+        Arrays.stream(altered.index())
+            .filter(idx -> Objects.equals(idx.name(), "idx_ngram_alter"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_NGRAMBFV1, alteredNgram.type());
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        alteredNgram.properties());
+
+    Index alteredToken =
+        Arrays.stream(altered.index())
+            .filter(idx -> Objects.equals(idx.name(), "idx_token_alter"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TOKENBFV1, alteredToken.type());
+    Assertions.assertEquals(tokenProperties, alteredToken.properties());
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    String normalizedCreateSql = createSql.replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("ngrambf_v1(3,512,3,0)"),
+        "SHOW CREATE TABLE should retain ngrambf_v1 parameters: " + createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("tokenbf_v1(256,2,0)"),
+        "SHOW CREATE TABLE should retain tokenbf_v1 parameters: " + createSql);
   }
 
   /**

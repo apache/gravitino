@@ -248,6 +248,8 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 
   Custom `GRANULARITY` can be specified via the `Index.properties()` API (key `granularity`, value must be a positive integer). For `DATA_SKIPPING_SET`, the max unique values can be configured via `set_max_values` (non-negative integer). If not specified, the defaults above apply.
 
+  On ClickHouse versions without `system.data_skipping_indices.type_full`, Gravitino falls back to the legacy metadata query. If the legacy `type` value does not include the bloom-filter parameters, the index type and fields are preserved but the required parameter properties cannot be reconstructed; provide the properties explicitly before recreating the table.
+
 ### Partitioning, Sorting, and Distribution
 
 - `ORDER BY`: required for MergeTree-family engines and only columns identity are supported;
