@@ -280,7 +280,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     return authorizationPlugin;
   }
 
-  public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader) {
+  /**
+   * Initializes the authorization plugin for this catalog.
+   *
+   * @param classLoader the catalog isolated class loader
+   * @param metalakeId the stable entity ID of the metalake containing this catalog
+   */
+  public void initAuthorizationPluginInstance(IsolatedClassLoader classLoader, long metalakeId) {
     if (authorizationPlugin == null) {
       synchronized (this) {
         if (authorizationPlugin == null) {
@@ -295,11 +301,15 @@ public abstract class BaseCatalog<T extends BaseCatalog>
           try (BaseAuthorization<?> authorization =
               BaseAuthorization.createAuthorization(classLoader, authorizationProvider)) {
 
+            Map<String, String> authorizationConfig = Maps.newHashMap(conf);
+            authorizationConfig.put(BaseAuthorization.METALAKE_ID, String.valueOf(metalakeId));
+            authorizationConfig.put(BaseAuthorization.CATALOG_ID, String.valueOf(entity().id()));
+
             authorizationPlugin =
                 classLoader.withClassLoader(
                     cl ->
                         authorization.newPlugin(
-                            entity.namespace().level(0), provider(), this.conf));
+                            entity.namespace().level(0), provider(), authorizationConfig));
 
           } catch (Exception e) {
             LOG.error("Failed to load authorization with class loader", e);
