@@ -28,6 +28,7 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
@@ -49,6 +50,8 @@ public class GravitinoConfig {
   public static final String TRINO_CATALOG_STORE = "catalog.store";
   /** The Trino catalog management. */
   public static final String TRINO_CATALOG_MANAGEMENT = "catalog.management";
+  /** The common prefix of all internal Trino JDBC connection configurations. */
+  private static final String TRINO_JDBC_CONFIG_PREFIX = "trino.jdbc.";
 
   // Trino config default value
   /** The Trino catalog config directory default value. */
@@ -133,6 +136,63 @@ public class GravitinoConfig {
   private static final ConfigEntry TRINO_JDBC_PASSWORD =
       new ConfigEntry(
           "trino.jdbc.password", "The JDBC password for connecting to Trino", "", false);
+
+  private static final ConfigEntry TRINO_JDBC_SSL_ENABLED =
+      new ConfigEntry(
+          "trino.jdbc.ssl.enabled",
+          "Whether the internal JDBC connection to the Trino coordinator uses TLS. "
+              + "If not set, it is derived from the scheme of the Trino `discovery.uri`.",
+          "",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_SSL_TRUSTSTORE_PATH =
+      new ConfigEntry(
+          "trino.jdbc.ssl.truststore.path",
+          "Path of the truststore holding the Trino coordinator certificate. "
+              + "If omitted, the default JVM truststore is used.",
+          "",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_SSL_TRUSTSTORE_PASSWORD =
+      new ConfigEntry(
+          "trino.jdbc.ssl.truststore.password",
+          "Password of the truststore configured by `trino.jdbc.ssl.truststore.path`",
+          "",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_SSL_TRUSTSTORE_TYPE =
+      new ConfigEntry(
+          "trino.jdbc.ssl.truststore.type",
+          "Type of the truststore, for example JKS or PKCS12. "
+              + "If omitted, the default JVM truststore type is used.",
+          "",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_SSL_VERIFICATION =
+      new ConfigEntry(
+          "trino.jdbc.ssl.verification",
+          "Certificate verification mode of the internal JDBC connection: FULL, CA or NONE. "
+              + "NONE disables certificate verification and should only be used for troubleshooting.",
+          "FULL",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_ROLES =
+      new ConfigEntry(
+          "trino.jdbc.roles",
+          "Session roles applied to the internal JDBC connection, for example `system:sysadmin`. "
+              + "Required by deployments that only allow CREATE CATALOG with a privileged role.",
+          "",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_EXTRA_PROPERTIES_PREFIX =
+      new ConfigEntry(
+          "trino.jdbc.properties.",
+          "Prefix for Trino JDBC driver properties. Any property beginning with this prefix is "
+              + "passed to the driver verbatim with the prefix removed "
+              + "(e.g., trino.jdbc.properties.KerberosRemoteServiceName=trino), "
+              + "overriding the properties derived from the dedicated `trino.jdbc.*` configurations.",
+          "",
+          false);
 
   private static final ConfigEntry GRAVITINO_METADATA_REFRESH_INTERVAL_SECOND =
       new ConfigEntry(
@@ -282,15 +342,19 @@ public class GravitinoConfig {
    * @return the Trino JDBC URI
    */
   public String getTrinoJdbcURI() {
-    String uriString = "";
+    URI trinoURI = parseDiscoveryUri();
+    return String.format("jdbc:trino://%s:%s", trinoURI.getHost(), trinoURI.getPort());
+  }
+
+  private URI parseDiscoveryUri() {
+    String uriString;
     if (config.containsKey(TRINO_DISCOVERY_URI)) {
       uriString = config.get(TRINO_DISCOVERY_URI);
     } else {
       uriString = trinoConfig.getProperty(TRINO_DISCOVERY_URI);
     }
     try {
-      URI trinoURI = new URI(uriString);
-      return String.format("jdbc:trino://%s:%s", trinoURI.getHost(), trinoURI.getPort());
+      return new URI(uriString);
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
@@ -341,6 +405,88 @@ public class GravitinoConfig {
   }
 
   /**
+   * Returns whether the internal JDBC connection to the Trino coordinator uses TLS.
+   *
+   * <p>If `trino.jdbc.ssl.enabled` is not set, the value is derived from the scheme of the Trino
+   * `discovery.uri`, which is `https` on a TLS enabled coordinator.
+   *
+   * @return true if the internal JDBC connection uses TLS
+   */
+  public boolean isTrinoJdbcSslEnabled() {
+    String value = config.get(TRINO_JDBC_SSL_ENABLED.key);
+    if (StringUtils.isNotBlank(value)) {
+      return Boolean.parseBoolean(value);
+    }
+    return "https".equalsIgnoreCase(parseDiscoveryUri().getScheme());
+  }
+
+  /**
+   * Retrieves the truststore path of the internal JDBC connection.
+   *
+   * @return the truststore path, or an empty string if not configured
+   */
+  public String getTrinoJdbcSslTruststorePath() {
+    return config.getOrDefault(
+        TRINO_JDBC_SSL_TRUSTSTORE_PATH.key, TRINO_JDBC_SSL_TRUSTSTORE_PATH.defaultValue);
+  }
+
+  /**
+   * Retrieves the truststore password of the internal JDBC connection.
+   *
+   * @return the truststore password, or an empty string if not configured
+   */
+  public String getTrinoJdbcSslTruststorePassword() {
+    return config.getOrDefault(
+        TRINO_JDBC_SSL_TRUSTSTORE_PASSWORD.key, TRINO_JDBC_SSL_TRUSTSTORE_PASSWORD.defaultValue);
+  }
+
+  /**
+   * Retrieves the truststore type of the internal JDBC connection.
+   *
+   * @return the truststore type, or an empty string if not configured
+   */
+  public String getTrinoJdbcSslTruststoreType() {
+    return config.getOrDefault(
+        TRINO_JDBC_SSL_TRUSTSTORE_TYPE.key, TRINO_JDBC_SSL_TRUSTSTORE_TYPE.defaultValue);
+  }
+
+  /**
+   * Retrieves the certificate verification mode of the internal JDBC connection.
+   *
+   * @return the verification mode, one of FULL, CA or NONE
+   */
+  public String getTrinoJdbcSslVerification() {
+    return config
+        .getOrDefault(TRINO_JDBC_SSL_VERIFICATION.key, TRINO_JDBC_SSL_VERIFICATION.defaultValue)
+        .trim()
+        .toUpperCase(Locale.ROOT);
+  }
+
+  /**
+   * Retrieves the session roles applied to the internal JDBC connection.
+   *
+   * @return the session roles, or an empty string if not configured
+   */
+  public String getTrinoJdbcRoles() {
+    return config.getOrDefault(TRINO_JDBC_ROLES.key, TRINO_JDBC_ROLES.defaultValue);
+  }
+
+  /**
+   * Retrieves the Trino JDBC driver properties configured with the `trino.jdbc.properties.` prefix.
+   *
+   * @return a map of driver property names, with the prefix removed, to their values
+   */
+  public Map<String, String> getTrinoJdbcExtraProperties() {
+    return config.entrySet().stream()
+        .filter(entry -> entry.getKey().startsWith(TRINO_JDBC_EXTRA_PROPERTIES_PREFIX.key))
+        .filter(entry -> entry.getKey().length() > TRINO_JDBC_EXTRA_PROPERTIES_PREFIX.key.length())
+        .collect(
+            Collectors.toMap(
+                entry -> entry.getKey().substring(TRINO_JDBC_EXTRA_PROPERTIES_PREFIX.key.length()),
+                Map.Entry::getValue));
+  }
+
+  /**
    * Retrieves the catalog connector factory class name.
    *
    * @return the catalog connector factory class name
@@ -359,6 +505,13 @@ public class GravitinoConfig {
   public String toCatalogConfig() {
     List<String> stringList = new ArrayList<>();
     for (Map.Entry<String, ConfigEntry> entry : CONFIG_DEFINITIONS.entrySet()) {
+      // The `trino.jdbc.*` configurations are only used by the coordinator to connect back to
+      // Trino. They must not be propagated to the dynamic catalogs, otherwise credentials such as
+      // the JDBC password and the truststore password would end up in the generated CREATE CATALOG
+      // statement, which is logged and persisted into the Trino catalog properties files.
+      if (entry.getKey().startsWith(TRINO_JDBC_CONFIG_PREFIX)) {
+        continue;
+      }
       String value = config.get(entry.getKey());
       if (value != null) {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));

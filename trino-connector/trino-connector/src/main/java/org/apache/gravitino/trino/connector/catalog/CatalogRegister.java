@@ -21,6 +21,8 @@ package org.apache.gravitino.trino.connector.catalog;
 import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYNAMIC_CONNECTOR;
 import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG;
 
+import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import io.trino.jdbc.TrinoDriver;
 import io.trino.spi.TrinoException;
 import java.io.File;
@@ -31,7 +33,10 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -48,6 +53,11 @@ public class CatalogRegister {
 
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
+
+  private static final String SSL_VERIFICATION_FULL = "FULL";
+  private static final String SSL_VERIFICATION_NONE = "NONE";
+  private static final Set<String> SSL_VERIFICATION_MODES =
+      ImmutableSet.of(SSL_VERIFICATION_FULL, "CA", SSL_VERIFICATION_NONE);
 
   private Connection connection;
   private boolean isStarted = false;
@@ -82,15 +92,16 @@ public class CatalogRegister {
     TrinoDriver driver = new TrinoDriver();
     DriverManager.registerDriver(driver);
 
-    Properties properties = new Properties();
-    properties.put("user", config.getTrinoUser());
-    properties.put("password", config.getTrinoPassword());
+    Properties properties = buildJdbcProperties(config);
+    String jdbcUri = config.getTrinoJdbcURI();
     try {
-      connection = driver.connect(config.getTrinoJdbcURI(), properties);
+      connection = driver.connect(jdbcUri, properties);
     } catch (SQLException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-          "Failed to initialize the Trino connection.",
+          String.format(
+              "Failed to initialize the Trino connection to %s (TLS %s).",
+              jdbcUri, config.isTrinoJdbcSslEnabled() ? "enabled" : "disabled"),
           e);
     }
 
@@ -101,6 +112,104 @@ public class CatalogRegister {
           String.format(
               "Error config for Trino catalog store directory %s, file not found",
               catalogStoreDirectory));
+    }
+  }
+
+  /**
+   * Builds the JDBC properties used by the internal connection to the Trino coordinator.
+   *
+   * <p>The properties derived from the dedicated {@code trino.jdbc.*} configurations are applied
+   * first, then the raw driver properties configured with the {@code trino.jdbc.properties.} prefix
+   * are applied on top of them, so that any driver property can be overridden.
+   *
+   * @param config the Gravitino configuration
+   * @return the JDBC properties
+   */
+  @VisibleForTesting
+  static Properties buildJdbcProperties(GravitinoConfig config) {
+    boolean sslEnabled = config.isTrinoJdbcSslEnabled();
+    String verification = config.getTrinoJdbcSslVerification();
+    String truststorePath = config.getTrinoJdbcSslTruststorePath();
+    String truststorePassword = config.getTrinoJdbcSslTruststorePassword();
+    String truststoreType = config.getTrinoJdbcSslTruststoreType();
+    String roles = config.getTrinoJdbcRoles();
+
+    validateSslConfig(sslEnabled, verification, truststorePath);
+
+    Properties properties = new Properties();
+    properties.put("user", config.getTrinoUser());
+    String password = config.getTrinoPassword();
+    if (StringUtils.isNotEmpty(password)) {
+      properties.put("password", password);
+    }
+
+    if (sslEnabled) {
+      properties.put("SSL", "true");
+      properties.put("SSLVerification", verification);
+      if (StringUtils.isNotBlank(truststorePath)) {
+        properties.put("SSLTrustStorePath", truststorePath);
+      }
+      if (StringUtils.isNotEmpty(truststorePassword)) {
+        properties.put("SSLTrustStorePassword", truststorePassword);
+      }
+      if (StringUtils.isNotBlank(truststoreType)) {
+        properties.put("SSLTrustStoreType", truststoreType);
+      }
+    }
+
+    if (StringUtils.isNotBlank(roles)) {
+      properties.put("roles", roles);
+    }
+
+    Map<String, String> extraProperties = config.getTrinoJdbcExtraProperties();
+    if (!extraProperties.isEmpty()) {
+      // Log the names only, the values may contain credentials.
+      LOG.debug("Applying extra Trino JDBC properties: {}", extraProperties.keySet());
+      properties.putAll(extraProperties);
+    }
+    return properties;
+  }
+
+  private static void validateSslConfig(
+      boolean sslEnabled, String verification, String truststorePath) {
+    if (!SSL_VERIFICATION_MODES.contains(verification)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format(
+              "Invalid value for config 'trino.jdbc.ssl.verification': expected one of %s, got: %s",
+              SSL_VERIFICATION_MODES, verification));
+    }
+
+    if (!sslEnabled) {
+      if (!SSL_VERIFICATION_FULL.equals(verification)) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Config 'trino.jdbc.ssl.verification' requires 'trino.jdbc.ssl.enabled' to be true");
+      }
+      if (StringUtils.isNotBlank(truststorePath)) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Config 'trino.jdbc.ssl.truststore.path' requires 'trino.jdbc.ssl.enabled' to be true");
+      }
+      return;
+    }
+
+    if (StringUtils.isBlank(truststorePath)) {
+      return;
+    }
+
+    if (SSL_VERIFICATION_NONE.equals(verification)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Config 'trino.jdbc.ssl.truststore.path' cannot be used with "
+              + "'trino.jdbc.ssl.verification' = NONE");
+    }
+    if (!Files.exists(Path.of(truststorePath))) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
+          String.format(
+              "Error config for 'trino.jdbc.ssl.truststore.path' %s, file not found",
+              truststorePath));
     }
   }
 
