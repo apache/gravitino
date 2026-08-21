@@ -49,6 +49,12 @@ public class GravitinoSystemTableFactory {
     SYSTEM_TABLES.put(
         GravitinoSystemTableCatalog.TABLE_NAME,
         new GravitinoSystemTableCatalog(catalogConnectorManager));
+    SYSTEM_TABLES.put(
+        GravitinoSystemTableCatalogStatus.TABLE_NAME,
+        new GravitinoSystemTableCatalogStatus(catalogConnectorManager));
+    SYSTEM_TABLES.put(
+        GravitinoSystemTableLoadStatus.TABLE_NAME,
+        new GravitinoSystemTableLoadStatus(catalogConnectorManager));
   }
 
   /**

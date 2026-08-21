@@ -24,6 +24,7 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import io.trino.spi.HostAddress;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
@@ -107,10 +108,17 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.config(config, client);
 
           if (isCoordinator(trinoConnectorContext)) {
+            // Pin the system table splits here: the registration state the system tables report
+            // is only recorded on the coordinator by the load loop started below.
+            GravitinoSystemConnector.Split.setCoordinatorAddress(
+                getCurrentNodeAddress(trinoConnectorContext));
             catalogConnectorManager.start();
-          }
 
-          gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
+            // Register the system tables against the coordinator's manager only. The table
+            // registry is static, so a worker registering its own manager, which never runs the
+            // load loop, would leave the system tables reporting an empty state.
+            gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
+          }
         } catch (Exception e) {
           String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
           LOG.error(message);
@@ -207,6 +215,17 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   @SuppressWarnings("deprecation")
   protected boolean isCoordinator(ConnectorContext connectorContext) {
     return connectorContext.getNodeManager().getCurrentNode().isCoordinator();
+  }
+
+  /**
+   * Retrieves the address of the Trino node this connector is running on.
+   *
+   * @param connectorContext the Trino connector context
+   * @return the host and port of the current node
+   */
+  @SuppressWarnings("deprecation")
+  protected HostAddress getCurrentNodeAddress(ConnectorContext connectorContext) {
+    return connectorContext.getNodeManager().getCurrentNode().getHostAndPort();
   }
 
   private CatalogConnectorFactory createCatalogConnectorFactory(GravitinoConfig config) {

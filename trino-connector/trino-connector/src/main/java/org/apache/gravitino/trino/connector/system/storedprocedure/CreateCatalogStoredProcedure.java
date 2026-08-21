@@ -115,11 +115,12 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
               catalogName, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
 
       catalogConnectorManager.loadMetalakeSync();
-      if (!catalogConnectorManager.catalogConnectorExist(
-          catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))) {
+      String trinoCatalogName = catalogConnectorManager.getTrinoCatalogName(metalake, catalogName);
+      if (!catalogConnectorManager.catalogConnectorExist(trinoCatalogName)) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
-            "Create catalog failed due to the loading process fails");
+            "Create catalog failed due to the loading process fails. "
+                + catalogConnectorManager.describeRegistrationFailure(trinoCatalogName));
       }
 
       LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);
