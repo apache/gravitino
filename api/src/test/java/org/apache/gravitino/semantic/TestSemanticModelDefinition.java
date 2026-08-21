@@ -86,7 +86,7 @@ public class TestSemanticModelDefinition {
             .withMetrics(new Metric[0])
             .withCustomExtensions(new CustomExtension[0])
             .build();
-    SemanticModel semanticModel = semanticModel(dataset);
+    SemanticModel semanticModel = semanticModel(unset);
 
     assertNull(unset.relationships());
     assertNull(unset.metrics());
@@ -95,9 +95,7 @@ public class TestSemanticModelDefinition {
     assertArrayEquals(new Metric[0], empty.metrics());
     assertArrayEquals(new CustomExtension[0], empty.customExtensions());
     assertNotEquals(unset, empty);
-    assertNull(semanticModel.relationships());
-    assertNull(semanticModel.metrics());
-    assertNull(semanticModel.customExtensions());
+    assertEquals(unset, semanticModel.definition());
     assertEquals(Collections.emptyMap(), semanticModel.properties());
   }
 
@@ -154,7 +152,7 @@ public class TestSemanticModelDefinition {
         .build();
   }
 
-  private static SemanticModel semanticModel(Dataset dataset) {
+  private static SemanticModel semanticModel(SemanticModelDefinition definition) {
     return new SemanticModel() {
       @Override
       public String name() {
@@ -167,13 +165,8 @@ public class TestSemanticModelDefinition {
       }
 
       @Override
-      public AIContext aiContext() {
-        return null;
-      }
-
-      @Override
-      public Dataset[] datasets() {
-        return new Dataset[] {dataset};
+      public SemanticModelDefinition definition() {
+        return definition;
       }
 
       @Override

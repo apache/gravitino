@@ -307,25 +307,13 @@ public final class Relationship {
           fromColumns != null && fromColumns.length > 0, "fromColumns must not be null or empty");
       Preconditions.checkArgument(
           toColumns != null && toColumns.length > 0, "toColumns must not be null or empty");
-      validateColumnNames("fromColumns", fromColumns);
-      validateColumnNames("toColumns", toColumns);
+      SemanticModelDefinition.validateNonEmptyStringElements("fromColumns", fromColumns);
+      SemanticModelDefinition.validateNonEmptyStringElements("toColumns", toColumns);
       Preconditions.checkArgument(
           fromColumns.length == toColumns.length,
           "fromColumns and toColumns must have the same length");
-      Preconditions.checkArgument(
-          customExtensions == null || Arrays.stream(customExtensions).allMatch(Objects::nonNull),
-          "customExtensions must not contain null");
+      SemanticModelDefinition.validateNoNullElements("customExtensions", customExtensions);
       return new Relationship(this);
-    }
-  }
-
-  private static void validateColumnNames(String name, String[] columns) {
-    for (int index = 0; index < columns.length; index++) {
-      Preconditions.checkArgument(
-          columns[index] != null && !columns[index].isEmpty(),
-          "%s[%s] must not be null or empty",
-          name,
-          index);
     }
   }
 }

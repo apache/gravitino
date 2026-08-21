@@ -331,9 +331,7 @@ public final class Field {
       Preconditions.checkArgument(
           name != null && !name.isEmpty(), "name must not be null or empty");
       Preconditions.checkArgument(expression != null, "expression must not be null");
-      Preconditions.checkArgument(
-          customExtensions == null || Arrays.stream(customExtensions).allMatch(Objects::nonNull),
-          "customExtensions must not contain null");
+      SemanticModelDefinition.validateNoNullElements("customExtensions", customExtensions);
       return new Field(this);
     }
   }

@@ -171,6 +171,28 @@ public final class SemanticModelDefinition {
         + '}';
   }
 
+  static void validateNoNullElements(String name, @Nullable Object[] values) {
+    if (values == null) {
+      return;
+    }
+    for (int index = 0; index < values.length; index++) {
+      Preconditions.checkArgument(values[index] != null, "%s[%s] must not be null", name, index);
+    }
+  }
+
+  static void validateNonEmptyStringElements(String name, @Nullable String[] values) {
+    if (values == null) {
+      return;
+    }
+    for (int index = 0; index < values.length; index++) {
+      Preconditions.checkArgument(
+          values[index] != null && !values[index].isEmpty(),
+          "%s[%s] must not be null or empty",
+          name,
+          index);
+    }
+  }
+
   /** A builder for immutable {@link SemanticModelDefinition} values. */
   public static final class Builder {
 
@@ -248,17 +270,10 @@ public final class SemanticModelDefinition {
     public SemanticModelDefinition build() {
       Preconditions.checkArgument(
           datasets != null && datasets.length > 0, "datasets must not be null or empty");
-      Preconditions.checkArgument(
-          Arrays.stream(datasets).allMatch(Objects::nonNull), "datasets must not contain null");
-      Preconditions.checkArgument(
-          relationships == null || Arrays.stream(relationships).allMatch(Objects::nonNull),
-          "relationships must not contain null");
-      Preconditions.checkArgument(
-          metrics == null || Arrays.stream(metrics).allMatch(Objects::nonNull),
-          "metrics must not contain null");
-      Preconditions.checkArgument(
-          customExtensions == null || Arrays.stream(customExtensions).allMatch(Objects::nonNull),
-          "customExtensions must not contain null");
+      validateNoNullElements("datasets", datasets);
+      validateNoNullElements("relationships", relationships);
+      validateNoNullElements("metrics", metrics);
+      validateNoNullElements("customExtensions", customExtensions);
       return new SemanticModelDefinition(this);
     }
   }
