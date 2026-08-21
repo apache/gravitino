@@ -24,6 +24,8 @@ retries once after Gravitino HTTP 401.
 """
 
 import asyncio
+import base64
+import json
 import logging
 from collections.abc import AsyncGenerator, Generator
 from typing import Optional, Union
@@ -147,9 +149,32 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             raise ValueError("OAuth token response missing access_token")
         expires_in = body.get("expires_in")
         _LOG.info("Fetched OAuth access token")
-        if expires_in in (None, ""):
-            return self.state, token
-        return self.state, token, expires_in
+        if expires_in not in (None, ""):
+            return self.state, token, expires_in
+        if not self._has_jwt_exp(token):
+            raise ValueError(
+                "OAuth token response omitted expires_in and "
+                "access_token is not a JWT with exp"
+            )
+        return self.state, token
+
+    @staticmethod
+    def _has_jwt_exp(token: str) -> bool:
+        """Return True when token is a 3-part JWT whose payload has exp.
+
+        Mirrors DefaultOAuth2TokenProvider._expires_at_millis: opaque or
+        reference tokens must not be handed to httpx-auth as a 2-tuple,
+        which splits on '.' and crashes the next tool call.
+        """
+        parts = token.split(".")
+        if len(parts) != 3:
+            return False
+        try:
+            padded = parts[1] + "=" * (-len(parts[1]) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(padded))
+        except (ValueError, json.JSONDecodeError):
+            return False
+        return isinstance(payload.get("exp"), int)
 
     @staticmethod
     def _log_token_http_error(response: httpx.Response) -> None:

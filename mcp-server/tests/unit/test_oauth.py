@@ -202,6 +202,33 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self._get_twice(self._auth(handler))
         self.assertEqual(calls["token"], 1)
 
+    def test_opaque_token_without_expires_in_raises(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                return httpx.Response(200, json={"access_token": "opaque-ref"})
+            return httpx.Response(200)
+
+        with self.assertRaises(ValueError) as raised:
+            self._get(self._auth(handler))
+        self.assertIn("expires_in", str(raised.exception))
+        self.assertIn("JWT", str(raised.exception))
+
+    def test_jwt_without_exp_and_expires_in_raises(self):
+        header = base64.urlsafe_b64encode(b'{"alg":"none"}').rstrip(b"=").decode()
+        payload = (
+            base64.urlsafe_b64encode(b'{"sub":"mcp"}').rstrip(b"=").decode()
+        )
+        token = f"{header}.{payload}.sig"
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                return httpx.Response(200, json={"access_token": token})
+            return httpx.Response(200)
+
+        with self.assertRaises(ValueError) as raised:
+            self._get(self._auth(handler))
+        self.assertIn("expires_in", str(raised.exception))
+
     def test_http_error_is_raised(self):
         def handler(request: httpx.Request) -> httpx.Response:
             if request.method == "POST":
