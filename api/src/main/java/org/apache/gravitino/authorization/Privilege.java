@@ -132,14 +132,10 @@ public interface Privilege {
     CREATE_TAG(0L, 1L << 21),
     /** The privilege to apply a tag */
     APPLY_TAG(0L, 1L << 22),
-    /** The privilege to view a tag. */
-    VIEW_TAG(0L, 1L << 33),
     /** The privilege to create a policy */
     CREATE_POLICY(0L, 1L << 23),
     /** The privilege to apply a policy */
     APPLY_POLICY(0L, 1L << 24),
-    /** The privilege to view a policy. */
-    VIEW_POLICY(0L, 1L << 34),
     /** The privilege to register a job template */
     REGISTER_JOB_TEMPLATE(0L, 1L << 25),
     /** The privilege to use a job template */
@@ -155,7 +151,11 @@ public interface Privilege {
     /** The privilege to execute (invoke) a function. */
     EXECUTE_FUNCTION(0L, 1L << 31),
     /** The privilege to alter a function's metadata. */
-    MODIFY_FUNCTION(0L, 1L << 32);
+    MODIFY_FUNCTION(0L, 1L << 32),
+    /** The privilege to view a tag. */
+    VIEW_TAG(0L, 1L << 33),
+    /** The privilege to view a policy. */
+    VIEW_POLICY(0L, 1L << 34);
 
     private final long highBits;
     private final long lowBits;
