@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector;
 import static java.lang.String.format;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.google.common.base.Preconditions;
 import io.trino.testing.DistributedQueryRunner;
@@ -282,7 +283,10 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     assertQueryFails(
         "call gravitino.system.create_catalog("
             + "catalog=>'memory1', provider=>'memory', properties => Map(array['trino.bypass.unknown-direct-key'], array['10']))",
-        format("Create catalog failed. Create catalog failed due to the loading process fails"));
+        // The message must carry the reason the registration failed, not just the fact that it
+        // did. (?s) lets .* span the newlines of the underlying configuration error.
+        "(?s)Create catalog failed. Create catalog failed due to the loading process fails\\."
+            + ".*unknown-direct-key.*");
     assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory1");
 
     assertUpdate(
@@ -304,6 +308,49 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
     assertEquals(row.getField(0), "memory");
     assertEquals(row.getField(1), "memory");
     assertEquals(row.getField(2), "{\"max_ttl\":\"10\"}");
+  }
+
+  @Test
+  public void testCatalogStatusSystemTable() throws Exception {
+    MaterializedResult result =
+        computeActual(
+            "select metalake, catalog_name, trino_catalog_name, provider, status, last_error,"
+                + " failure_count from gravitino.system.catalog_status");
+    assertEquals(result.getRowCount(), 1);
+    MaterializedRow row = result.getMaterializedRows().get(0);
+    assertEquals(row.getField(1), "memory");
+    assertEquals(row.getField(2), "memory");
+    assertEquals(row.getField(3), "memory");
+    assertEquals(row.getField(4), "REGISTERED");
+    assertNull(row.getField(5));
+    assertEquals(row.getField(6), 0L);
+  }
+
+  @Test
+  public void testCatalogStatusSystemTableWithReorderedColumns() throws Exception {
+    // page.getColumns() honors the requested order; a projection that sorted or de-duplicated
+    // channels would return correct looking data in the wrong columns.
+    MaterializedResult result =
+        computeActual("select status, catalog_name, status from gravitino.system.catalog_status");
+    assertEquals(result.getRowCount(), 1);
+    MaterializedRow row = result.getMaterializedRows().get(0);
+    assertEquals(row.getField(0), "REGISTERED");
+    assertEquals(row.getField(1), "memory");
+    assertEquals(row.getField(2), "REGISTERED");
+  }
+
+  @Test
+  public void testLoadStatusSystemTable() throws Exception {
+    MaterializedResult result =
+        computeActual(
+            "select trino_started, consecutive_failures, last_error, metalake_errors"
+                + " from gravitino.system.load_status");
+    assertEquals(result.getRowCount(), 1);
+    MaterializedRow row = result.getMaterializedRows().get(0);
+    assertEquals(row.getField(0), true);
+    assertEquals(row.getField(1), 0L);
+    assertNull(row.getField(2));
+    assertNull(row.getField(3));
   }
 
   private TableName createTestTable(String fullTableName) throws Exception {

@@ -137,15 +137,15 @@ public class AlterCatalogStoredProcedure extends GravitinoStoredProcedure {
           .alterCatalog(catalogName, changes.toArray(changes.toArray(new CatalogChange[0])));
 
       catalogConnectorManager.loadMetalakeSync();
-      catalogConnectorContext =
-          catalogConnectorManager.getCatalogConnector(
-              catalogConnectorManager.getTrinoCatalogName(metalake, catalogName));
+      String trinoCatalogName = catalogConnectorManager.getTrinoCatalogName(metalake, catalogName);
+      catalogConnectorContext = catalogConnectorManager.getCatalogConnector(trinoCatalogName);
       if (catalogConnectorContext == null
           || catalogConnectorContext.getCatalog().getLastModifiedTime()
               == oldCatalog.getLastModifiedTime()) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
-            "Update catalog failed due to the reloading process fails");
+            "Update catalog failed due to the reloading process fails. "
+                + catalogConnectorManager.describeRegistrationFailure(metalake, trinoCatalogName));
       }
       LOG.info("Alter catalog {} in metalake {} successfully.", catalogName, metalake);
 
