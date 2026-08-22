@@ -240,7 +240,8 @@ public class TestAuthenticationFilter {
       throws ServletException, IOException {
     // /health, /health/live, /health/ready are root-level aliases; during a Jetty forward
     // getRequestURI() returns the original URI so the bypass must also match /health/* directly.
-    String[] healthPaths = {
+    // /api/version is also public — read-only, non-sensitive, no credentials needed.
+    String[] publicPaths = {
       "/health",
       "/health/live",
       "/health/ready",
@@ -248,9 +249,10 @@ public class TestAuthenticationFilter {
       "/api/health",
       "/api/health/",
       "/api/health/live",
-      "/api/health/ready"
+      "/api/health/ready",
+      "/api/version"
     };
-    for (String path : healthPaths) {
+    for (String path : publicPaths) {
       Authenticator authenticator = mock(Authenticator.class);
       AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
       FilterChain mockChain = mock(FilterChain.class);
@@ -273,7 +275,7 @@ public class TestAuthenticationFilter {
     // Regression guard against an overly broad exemption. Paths that merely contain
     // "health" or share a prefix with "/api/health" must still be authenticated.
     String[] nonHealthPaths = {
-      "/api/metalakes/health_metalake", "/api/healthcheck", "/api/version", "/api/metalakes"
+      "/api/metalakes/health_metalake", "/api/healthcheck", "/api/metalakes"
     };
     for (String path : nonHealthPaths) {
       Authenticator authenticator = mock(Authenticator.class);
