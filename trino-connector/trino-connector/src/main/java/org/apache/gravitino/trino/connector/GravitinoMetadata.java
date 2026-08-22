@@ -58,15 +58,19 @@ import io.trino.spi.connector.SystemTable;
 import io.trino.spi.connector.TopNApplicationResult;
 import io.trino.spi.expression.ConnectorExpression;
 import io.trino.spi.expression.Constant;
+import io.trino.spi.expression.Variable;
 import io.trino.spi.function.LanguageFunction;
 import io.trino.spi.function.SchemaFunctionName;
 import io.trino.spi.security.TrinoPrincipal;
 import io.trino.spi.statistics.ColumnStatistics;
 import io.trino.spi.statistics.TableStatistics;
 import io.trino.spi.type.Type;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Deque;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -503,37 +507,44 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       ConnectorTableHandle handle,
       List<ConnectorExpression> projections,
       Map<String, ColumnHandle> assignments) {
+    Map<String, ColumnHandle> internalAssignments =
+        assignments.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue())));
+    SchemaTableName tableName = getTableName(handle);
     return internalMetadata
-        .applyProjection(
-            session,
-            GravitinoHandle.unWrap(handle),
-            projections,
-            assignments.entrySet().stream()
-                .collect(
-                    Collectors.toMap(
-                        Map.Entry::getKey, entry -> GravitinoHandle.unWrap(entry.getValue()))))
+        .applyProjection(session, GravitinoHandle.unWrap(handle), projections, internalAssignments)
         .map(
-            result ->
-                new ProjectionApplicationResult<>(
-                    new GravitinoTableHandle(
-                        getTableName(handle).getSchemaName(),
-                        getTableName(handle).getTableName(),
-                        result.getHandle()),
-                    result.getProjections(),
-                    result.getAssignments().stream()
-                        .map(
-                            entry ->
-                                new Assignment(
-                                    entry.getVariable(),
-                                    new GravitinoColumnHandle(
-                                        getColumnName(
-                                            session,
-                                            GravitinoHandle.unWrap(handle),
-                                            entry.getColumn()),
-                                        entry.getColumn()),
-                                    entry.getType()))
-                        .toList(),
-                    result.isPrecalculateStatistics()));
+            result -> {
+              // The internal connector may type an assignment from its own column handle, which
+              // can disagree with the type this connector declared for the column, for example an
+              // unbounded varchar here and a varchar(255) there for MySQL tinytext. Since Trino
+              // 444 a plan whose symbol and expression types differ is rejected, so restore the
+              // types the engine assigned to the projected variables. Note:
+              // this normalization must stay even if the type systems are unified elsewhere - the
+              // engine requires exact type equality in assignments, while for columns like MySQL
+              // text the two layers legitimately disagree on the varchar length.
+              Map<String, Type> engineTypes = collectVariableTypes(projections);
+              return new ProjectionApplicationResult<>(
+                  new GravitinoTableHandle(
+                      tableName.getSchemaName(), tableName.getTableName(), result.getHandle()),
+                  result.getProjections(),
+                  result.getAssignments().stream()
+                      .map(
+                          entry ->
+                              new Assignment(
+                                  entry.getVariable(),
+                                  new GravitinoColumnHandle(
+                                      getColumnName(
+                                          session,
+                                          GravitinoHandle.unWrap(handle),
+                                          entry.getColumn()),
+                                      entry.getColumn()),
+                                  resolveAssignmentType(entry, engineTypes, internalAssignments)))
+                      .toList(),
+                  result.isPrecalculateStatistics());
+            });
   }
 
   @Override
@@ -909,5 +920,38 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     }
     sb.append(")");
     return sb.toString();
+  }
+
+  /**
+   * Resolves the type for an assignment returned by the internal connector. The engine type is
+   * applied only when the assignment still refers to the column the engine passed in under that
+   * name; columns the internal connector synthesized keep their internal types.
+   *
+   * @param assignment the assignment returned by the internal connector
+   * @param engineTypes the types the engine assigned to the projected variables, by variable name
+   * @param internalAssignments the column handles the engine passed in, by variable name
+   * @return the type the returned assignment must carry
+   */
+  private static Type resolveAssignmentType(
+      Assignment assignment,
+      Map<String, Type> engineTypes,
+      Map<String, ColumnHandle> internalAssignments) {
+    if (!assignment.getColumn().equals(internalAssignments.get(assignment.getVariable()))) {
+      return assignment.getType();
+    }
+    return engineTypes.getOrDefault(assignment.getVariable(), assignment.getType());
+  }
+
+  private static Map<String, Type> collectVariableTypes(List<ConnectorExpression> expressions) {
+    Map<String, Type> types = new HashMap<>();
+    Deque<ConnectorExpression> pending = new ArrayDeque<>(expressions);
+    while (!pending.isEmpty()) {
+      ConnectorExpression expression = pending.pop();
+      if (expression instanceof Variable) {
+        types.put(((Variable) expression).getName(), expression.getType());
+      }
+      pending.addAll(expression.getChildren());
+    }
+    return types;
   }
 }
