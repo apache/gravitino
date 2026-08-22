@@ -21,6 +21,8 @@ package org.apache.gravitino.iceberg.common;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
+import java.time.Duration;
+import java.time.format.DateTimeParseException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -397,6 +399,52 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(720);
 
+  /**
+   * Master switch for {@code Idempotency-Key} support. Disabled by default: when off the header is
+   * ignored and no key lifetime is advertised in {@code GET /v1/config}, which per the Iceberg REST
+   * spec tells clients the server does not support idempotency.
+   */
+  public static final ConfigEntry<Boolean> ICEBERG_IDEMPOTENCY_ENABLED =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_ENABLED)
+          .doc("Whether to honor the Idempotency-Key header on Iceberg REST mutation endpoints")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .booleanConf()
+          .createWithDefault(false);
+
+  /** Client reuse window for an idempotency key, as an ISO-8601 duration. */
+  public static final ConfigEntry<String> ICEBERG_IDEMPOTENCY_KEY_LIFETIME =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_KEY_LIFETIME)
+          .doc(
+              "The client reuse window for an Idempotency-Key, an ISO-8601 duration such as PT30M. "
+                  + "Advertised to clients as `idempotency-key-lifetime` in the config response")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(
+              IcebergConfig::isPositiveDuration, "The value must be a positive ISO-8601 duration")
+          .createWithDefault("PT30M");
+
+  /** Storage backend holding idempotency records. */
+  public static final ConfigEntry<String> ICEBERG_IDEMPOTENCY_STORE_TYPE =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_TYPE)
+          .doc(
+              "The store holding Iceberg idempotency records, either the `in-memory` short name or "
+                  + "the fully-qualified class name of an `IdempotencyStore` implementation")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .stringConf()
+          .checkValue(StringUtils::isNotBlank, ConfigConstants.NOT_BLANK_ERROR_MSG)
+          .createWithDefault(IcebergConstants.ICEBERG_IDEMPOTENCY_STORE_IN_MEMORY);
+
+  /** Capacity of the in-memory idempotency store. */
+  public static final ConfigEntry<Integer> ICEBERG_IDEMPOTENCY_MAX_ENTRIES =
+      new ConfigBuilder(IcebergConstants.ICEBERG_IDEMPOTENCY_MAX_ENTRIES)
+          .doc(
+              "The maximum number of idempotency records retained by the in-memory store, records "
+                  + "beyond it are evicted before their reuse window elapses")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(10000);
+
   public String getJdbcDriver() {
     return get(JDBC_DRIVER);
   }
@@ -420,6 +468,15 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
         IcebergPropertiesUtils.toIcebergCatalogProperties(config);
     transformedConfig.putAll(config);
     return transformedConfig;
+  }
+
+  private static boolean isPositiveDuration(String value) {
+    try {
+      Duration duration = Duration.parse(value);
+      return !duration.isNegative() && !duration.isZero();
+    } catch (DateTimeParseException e) {
+      return false;
+    }
   }
 
   @Override
