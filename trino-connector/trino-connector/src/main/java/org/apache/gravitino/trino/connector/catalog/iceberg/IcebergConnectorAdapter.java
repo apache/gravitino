@@ -24,11 +24,14 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.catalog.property.PropertyConverter;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Transforming Apache Iceberg connector configuration and components into Apache Gravitino
@@ -36,26 +39,52 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
 
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergConnectorAdapter.class);
+
   private static final String CONNECTOR_ICEBERG = "iceberg";
+  private static final String REST_CATALOG_BACKEND = "rest";
+
   private final IcebergPropertyMeta propertyMetadata;
-  private final PropertyConverter catalogConverter;
+  private final IcebergCatalogPropertyConverter catalogConverter;
+  private final GravitinoConfig config;
 
   /**
    * Constructs a new IcebergConnectorAdapter. Initializes the property metadata and catalog
    * converter for handling Iceberg-specific configurations.
+   *
+   * @param config the Gravitino connector configuration
    */
-  public IcebergConnectorAdapter() {
+  public IcebergConnectorAdapter(GravitinoConfig config) {
     this.propertyMetadata = new IcebergPropertyMeta();
     this.catalogConverter = new IcebergCatalogPropertyConverter();
+    this.config = config;
   }
 
   @Override
   public Map<String, String> buildInternalConnectorConfig(
       GravitinoCatalog catalog, Credential[] credentials) throws Exception {
-    Map<String, String> config =
+    // The catalog backend describes how Gravitino stores the metadata; it does not decide how
+    // Trino reaches the data. Unless the routing is disabled, every catalog is loaded through the
+    // Gravitino Iceberg REST server, the only path that supports temporary credentials.
+    // A catalog that already has a REST backend keeps pointing at its own configured endpoint.
+    if (config.isIcebergRestEnabled()
+        && !REST_CATALOG_BACKEND.equalsIgnoreCase(
+            catalog.getProperty(IcebergConstants.CATALOG_BACKEND, null))) {
+      // `credentials` is intentionally unused here: with vended credentials enabled, Trino obtains
+      // a fresh one per table access over the REST protocol, rather than the catalog-level
+      // snapshot applyCredentials installs.
+      LOG.debug(
+          "Routing catalog '{}' through the Iceberg REST server; its {} catalog-level credential(s)"
+              + " are not applied because the REST protocol vends one per table access.",
+          catalog.getName(),
+          credentials.length);
+      return catalogConverter.buildIcebergRestProperties(catalog, config);
+    }
+
+    Map<String, String> connectorConfig =
         new HashMap<>(catalogConverter.gravitinoToEngineProperties(catalog.getProperties()));
-    IcebergCatalogPropertyConverter.applyCredentials(credentials, config);
-    return config;
+    IcebergCatalogPropertyConverter.applyCredentials(credentials, connectorConfig);
+    return connectorConfig;
   }
 
   @Override

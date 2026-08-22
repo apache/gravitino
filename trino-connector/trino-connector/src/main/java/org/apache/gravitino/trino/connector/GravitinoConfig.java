@@ -34,9 +34,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Gravitino config. */
 public class GravitinoConfig {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConfig.class);
 
   // Trino config keys
   /** The Trino discovery URI. */
@@ -68,6 +72,9 @@ public class GravitinoConfig {
   /** The Gravitino dynamic connector catalog config. */
   public static final String GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG =
       "__gravitino.dynamic.connector.catalog.config";
+
+  /** The Trino Iceberg REST catalog property prefix. */
+  private static final String TRINO_ICEBERG_REST_CATALOG_PREFIX = "iceberg.rest-catalog.";
 
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
   private final Map<String, String> config;
@@ -144,7 +151,7 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_TRINO_SKIP_VERSION_VALIDATION =
       new ConfigEntry(
           "gravitino.trino.skip-version-validation",
-          "When true, skips Trino version validation and logs a warning instead of throwing an error. Gravitino supports Trino versions 435-439; other versions are untested.",
+          "When true, skips Trino version validation and logs a warning instead of throwing an error. Gravitino supports Trino versions 440-478; other versions are untested.",
           "false",
           false);
 
@@ -176,6 +183,32 @@ public class GravitinoConfig {
           "3600",
           false);
 
+  private static final ConfigEntry GRAVITINO_ICEBERG_REST_ENABLED =
+      new ConfigEntry(
+          "gravitino.iceberg.rest-enabled",
+          "When true, lakehouse-iceberg catalogs are loaded through the Gravitino Iceberg REST "
+              + "server instead of being translated into a Trino JDBC or Hive metastore Iceberg "
+              + "catalog. Requires gravitino.iceberg.rest-uri.",
+          "true",
+          false);
+
+  private static final ConfigEntry GRAVITINO_ICEBERG_REST_URI =
+      new ConfigEntry(
+          "gravitino.iceberg.rest-uri",
+          "The endpoint of the Gravitino Iceberg REST server, for example "
+              + "http://localhost:9001/iceberg.",
+          "",
+          false);
+
+  private static final ConfigEntry GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX =
+      new ConfigEntry(
+          "gravitino.iceberg.rest-catalog.",
+          "Prefix for properties passed through to the internal Trino Iceberg REST catalog. Any "
+              + "property beginning with this prefix is rewritten to iceberg.rest-catalog. and "
+              + "passed through (e.g., gravitino.iceberg.rest-catalog.security=OAUTH2).",
+          "",
+          false);
+
   /**
    * Constructs a new GravitinoConfig with the specified configuration.
    *
@@ -205,6 +238,28 @@ public class GravitinoConfig {
           "Config `gravitino.trino.skip-catalog-patterns` is invalid because it contains an illegal regular expression",
           e);
     }
+    warnOnMissingIcebergRestUri();
+  }
+
+  /**
+   * Warns at startup when the Iceberg REST routing is on but has no endpoint. Without this, the
+   * failure only surfaces once a lakehouse-iceberg catalog is loaded, and that error is swallowed
+   * by the catalog refresh loop, leaving the user with an unexplained missing catalog.
+   */
+  private void warnOnMissingIcebergRestUri() {
+    // Only the statically configured connector warns; the dynamic per-catalog ones would repeat it.
+    if (isDynamicConnector()
+        || !isIcebergRestEnabled()
+        || StringUtils.isNotBlank(getIcebergRestUri())) {
+      return;
+    }
+    LOG.warn(
+        "'{}' is enabled but '{}' is not set, so every lakehouse-iceberg catalog will fail to "
+            + "load. Set the Iceberg REST server endpoint, or set '{}=false' to load Iceberg "
+            + "catalogs through their catalog backend instead.",
+        GRAVITINO_ICEBERG_REST_ENABLED.key,
+        GRAVITINO_ICEBERG_REST_URI.key,
+        GRAVITINO_ICEBERG_REST_ENABLED.key);
   }
 
   /**
@@ -364,9 +419,13 @@ public class GravitinoConfig {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
-    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX
+    // copy the configuration by the prefix of GRAVITINO_CLIENT_CONFIG_PREFIX and
+    // GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX
     config.entrySet().stream()
-        .filter(entry -> entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key))
+        .filter(
+            entry ->
+                entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key)
+                    || entry.getKey().startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key))
         .forEach(
             entry ->
                 stringList.add(String.format("\"%s\"='%s'", entry.getKey(), entry.getValue())));
@@ -440,6 +499,45 @@ public class GravitinoConfig {
    */
   public long getSessionCacheExpireAfterAccessSeconds() {
     return parseLongConfigEntry(GRAVITINO_SESSION_CACHE_EXPIRE_AFTER_ACCESS_SECONDS);
+  }
+
+  /**
+   * Returns whether lakehouse-iceberg catalogs are routed through the Gravitino Iceberg REST
+   * server.
+   *
+   * @return true if the Iceberg REST routing is enabled
+   */
+  public boolean isIcebergRestEnabled() {
+    return Boolean.parseBoolean(
+        config.getOrDefault(
+            GRAVITINO_ICEBERG_REST_ENABLED.key, GRAVITINO_ICEBERG_REST_ENABLED.defaultValue));
+  }
+
+  /**
+   * Retrieves the endpoint of the Gravitino Iceberg REST server.
+   *
+   * @return the Iceberg REST server endpoint, or an empty string if not configured
+   */
+  public String getIcebergRestUri() {
+    return config.getOrDefault(
+        GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
+  }
+
+  /**
+   * Retrieves the properties passed through to the internal Trino Iceberg REST catalog, with the
+   * {@code gravitino.iceberg.rest-catalog.} prefix rewritten to {@code iceberg.rest-catalog.}.
+   *
+   * @return the Trino Iceberg REST catalog properties
+   */
+  public Map<String, String> getIcebergRestCatalogConfig() {
+    String prefix = GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key;
+    return config.entrySet().stream()
+        .filter(entry -> entry.getKey().startsWith(prefix))
+        .collect(
+            Collectors.toMap(
+                entry ->
+                    TRINO_ICEBERG_REST_CATALOG_PREFIX + entry.getKey().substring(prefix.length()),
+                Map.Entry::getValue));
   }
 
   private long parseLongConfigEntry(ConfigEntry entry) {
