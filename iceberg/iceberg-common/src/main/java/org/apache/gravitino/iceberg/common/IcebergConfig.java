@@ -341,6 +341,18 @@ public class IcebergConfig extends Config implements OverwriteDefaultConfig {
           .checkValue(value -> value > 0, ConfigConstants.POSITIVE_NUMBER_ERROR_MSG)
           .createWithDefault(60);
 
+  public static final ConfigEntry<Integer> SCAN_PLAN_TASK_BATCH_SIZE =
+      new ConfigBuilder(IcebergConstants.SCAN_PLAN_TASK_BATCH_SIZE)
+          .doc(
+              "Maximum number of file scan tasks returned inline by one scan planning response. "
+                  + "Tasks beyond this limit are handed out as plan-tasks that clients "
+                  + "exchange for the remaining tasks. Set to 0 to disable batching and always "
+                  + "return every task inline.")
+          .version(ConfigConstants.VERSION_2_0_0)
+          .intConf()
+          .checkValue(value -> value >= 0, ConfigConstants.NON_NEGATIVE_NUMBER_ERROR_MSG)
+          .createWithDefault(100);
+
   public static final ConfigEntry<Integer> ASYNC_CLEANUP_WORKER_THREADS =
       new ConfigBuilder("async-cleanup.worker-threads")
           .doc("Worker pool size per server (concurrent async cleanup jobs).")
