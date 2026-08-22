@@ -157,7 +157,8 @@ public class CapabilityHelpers {
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC
         || identScope == Capability.Scope.MODEL
-        || identScope == Capability.Scope.FUNCTION) {
+        || identScope == Capability.Scope.FUNCTION
+        || identScope == Capability.Scope.SEMANTIC_MODEL) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -227,7 +228,8 @@ public class CapabilityHelpers {
         || identScope == Capability.Scope.VIEW
         || identScope == Capability.Scope.FILESET
         || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.FUNCTION) {
+        || identScope == Capability.Scope.FUNCTION
+        || identScope == Capability.Scope.SEMANTIC_MODEL) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCapabilitiesOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -499,7 +501,7 @@ public class CapabilityHelpers {
         column.defaultValue());
   }
 
-  private static String applyCapabilitiesOnName(
+  static String applyCapabilitiesOnName(
       Capability.Scope scope, String name, Capability capabilities) {
     applyNameSpecification(scope, name, capabilities);
     return applyCaseSensitiveOnName(scope, name, capabilities);
