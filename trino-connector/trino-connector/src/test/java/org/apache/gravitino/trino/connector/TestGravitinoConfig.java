@@ -168,6 +168,106 @@ public class TestGravitinoConfig {
     assertTrue(catalogConfig.contains("\"gravitino.user\"='admin'"));
   }
 
+  @Test
+  public void testTrinoJdbcConfigDefaults() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "http://host:8080"));
+
+    assertEquals("admin", config.getTrinoUser());
+    assertEquals("", config.getTrinoPassword());
+    assertFalse(config.isTrinoJdbcSslEnabled());
+    assertEquals("FULL", config.getTrinoJdbcSslVerification());
+    assertEquals("", config.getTrinoJdbcSslTruststorePath());
+    assertEquals("", config.getTrinoJdbcSslTruststorePassword());
+    assertEquals("", config.getTrinoJdbcSslTruststoreType());
+    assertEquals("", config.getTrinoJdbcRoles());
+    assertTrue(config.getTrinoJdbcExtraProperties().isEmpty());
+  }
+
+  @Test
+  public void testTrinoJdbcSslEnabledDerivedFromDiscoveryUri() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001", "discovery.uri", "https://host:8443"));
+
+    assertTrue(config.isTrinoJdbcSslEnabled());
+    assertEquals("jdbc:trino://host:8443", config.getTrinoJdbcURI());
+  }
+
+  @Test
+  public void testTrinoJdbcExtraProperties() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "discovery.uri",
+                "http://host:8080",
+                "trino.jdbc.properties.KerberosRemoteServiceName",
+                "trino",
+                "trino.jdbc.properties.SSLKeyStorePath",
+                "/etc/trino/client.p12"));
+
+    Map<String, String> extraProperties = config.getTrinoJdbcExtraProperties();
+    assertEquals(2, extraProperties.size());
+    assertEquals("trino", extraProperties.get("KerberosRemoteServiceName"));
+    assertEquals("/etc/trino/client.p12", extraProperties.get("SSLKeyStorePath"));
+  }
+
+  @Test
+  public void testToCatalogConfigExcludesTrinoJdbcProperties() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "trino.jdbc.user",
+                "admin",
+                "trino.jdbc.password",
+                "jdbc-secret",
+                "trino.jdbc.ssl.truststore.password",
+                "truststore-secret",
+                "trino.jdbc.properties.SSLKeyStorePassword",
+                "keystore-secret"));
+
+    // The internal JDBC connection settings are coordinator only. They must never reach the
+    // generated CREATE CATALOG statement, which is logged and persisted to the catalog files.
+    String catalogConfig = config.toCatalogConfig();
+    assertFalse(catalogConfig.contains("trino.jdbc."));
+    assertFalse(catalogConfig.contains("secret"));
+    assertTrue(catalogConfig.contains("\"gravitino.metalake\"='user_001'"));
+  }
+
+  @Test
+  public void testTrinoJdbcUriUsesSchemeDefaultPort() {
+    GravitinoConfig httpsConfig =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "https://host"));
+    assertEquals("jdbc:trino://host:443", httpsConfig.getTrinoJdbcURI());
+
+    GravitinoConfig httpConfig =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "http://host"));
+    assertEquals("jdbc:trino://host:80", httpConfig.getTrinoJdbcURI());
+  }
+
+  @Test
+  public void testBlankSslVerificationFallsBackToDefault() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "discovery.uri",
+                "http://host:8080",
+                "trino.jdbc.ssl.verification",
+                "  "));
+
+    assertEquals("FULL", config.getTrinoJdbcSslVerification());
+  }
+
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {

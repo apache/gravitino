@@ -64,6 +64,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   private CatalogConnectorManager catalogConnectorManager;
+  private boolean catalogConnectorManagerStarted = false;
 
   private GravitinoAdminClient client;
   private int trinoVersion;
@@ -88,6 +89,16 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   /**
+   * Returns whether the catalog connector manager has been started.
+   *
+   * @return true if the catalog connector manager has been started
+   */
+  @VisibleForTesting
+  public boolean isCatalogConnectorManagerStarted() {
+    return catalogConnectorManagerStarted;
+  }
+
+  /**
    * This function call by Trino creates a connector. It creates GravitinoSystemConnector at first.
    * Another time's it get GravitinoConnector by CatalogConnectorManager
    *
@@ -104,9 +115,14 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     GravitinoConfig config = new GravitinoConfig(requiredConfig);
 
     synchronized (this) {
+      // Keep the version check out of the try below so that it keeps reporting its own error code
+      // instead of being wrapped as a generic initialization failure.
       if (catalogConnectorManager == null) {
         checkTrinoSpiVersion(trinoConnectorContext, config);
-        try {
+      }
+
+      try {
+        if (catalogConnectorManager == null) {
           CatalogRegister catalogRegister = new CatalogRegister();
 
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
@@ -115,16 +131,28 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
                   catalogRegister, catalogConnectorFactory, this::getTrinoCatalogName);
           catalogConnectorManager.config(config, client);
 
-          if (isCoordinator(trinoConnectorContext)) {
-            catalogConnectorManager.start();
-          }
-
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
-        } catch (Exception e) {
-          String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
-          LOG.error(message);
-          throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
         }
+
+        // The `trino.jdbc.*` settings that CatalogRegister needs to connect back to the
+        // coordinator are deliberately not propagated to the dynamic catalogs, so they are only
+        // present in the configuration of the static connector. Trino does not guarantee that the
+        // static catalog is loaded before the catalogs Gravitino created, therefore the manager is
+        // started from the static connector only, re-applying its configuration in case a dynamic
+        // connector was created first.
+        if (!catalogConnectorManagerStarted
+            && !config.isDynamicConnector()
+            && isCoordinator(trinoConnectorContext)) {
+          // Only the configuration is re-applied here: rebuilding the Gravitino client would leak
+          // the one a dynamic connector may have already built.
+          catalogConnectorManager.updateConfig(config);
+          catalogConnectorManager.start();
+          catalogConnectorManagerStarted = true;
+        }
+      } catch (Exception e) {
+        String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
+        LOG.error(message);
+        throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
       }
     }
 
