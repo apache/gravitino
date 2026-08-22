@@ -353,6 +353,18 @@ public class TestGravitinoConfig {
     assertTrue(catalogConfig.contains("\"gravitino.iceberg.rest-catalog.security\"='OAUTH2'"));
   }
 
+  @Test
+  public void testToCatalogConfigPropagatesIcebergRestEnabled() {
+    // The switch rides the exact-key loop rather than the prefix filter; if it fails to propagate,
+    // the coordinator and the workers build different configs for the same catalog.
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001", "gravitino.iceberg.rest-enabled", "false"));
+
+    assertTrue(config.toCatalogConfig().contains("\"gravitino.iceberg.rest-enabled\"='false'"));
+  }
+
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {

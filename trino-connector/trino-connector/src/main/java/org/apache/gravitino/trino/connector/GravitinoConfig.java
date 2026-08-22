@@ -35,9 +35,13 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Gravitino config. */
 public class GravitinoConfig {
+
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConfig.class);
 
   // Trino config keys
   /** The Trino discovery URI. */
@@ -321,6 +325,28 @@ public class GravitinoConfig {
           "Config `gravitino.trino.skip-catalog-patterns` is invalid because it contains an illegal regular expression",
           e);
     }
+    warnOnMissingIcebergRestUri();
+  }
+
+  /**
+   * Warns at startup when the Iceberg REST routing is on but has no endpoint. Without this, the
+   * failure only surfaces once a lakehouse-iceberg catalog is loaded, and that error is swallowed
+   * by the catalog refresh loop, leaving the user with an unexplained missing catalog.
+   */
+  private void warnOnMissingIcebergRestUri() {
+    // Only the statically configured connector warns; the dynamic per-catalog ones would repeat it.
+    if (isDynamicConnector()
+        || !isIcebergRestEnabled()
+        || StringUtils.isNotBlank(getIcebergRestUri())) {
+      return;
+    }
+    LOG.warn(
+        "'{}' is enabled but '{}' is not set, so every lakehouse-iceberg catalog will fail to "
+            + "load. Set the Iceberg REST server endpoint, or set '{}=false' to load Iceberg "
+            + "catalogs through their catalog backend instead.",
+        GRAVITINO_ICEBERG_REST_ENABLED.key,
+        GRAVITINO_ICEBERG_REST_URI.key,
+        GRAVITINO_ICEBERG_REST_ENABLED.key);
   }
 
   /**

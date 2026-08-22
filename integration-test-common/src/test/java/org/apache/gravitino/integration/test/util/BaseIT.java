@@ -688,7 +688,8 @@ public class BaseIT {
   }
 
   /**
-   * Returns the port the Iceberg REST auxiliary service listens on.
+   * Returns the port the Iceberg REST auxiliary service listens on. Only valid once {@link
+   * #startIntegrationTest()} has run, since it reads the started server's config.
    *
    * @return the Iceberg REST service port
    */
