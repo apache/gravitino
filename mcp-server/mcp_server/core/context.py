@@ -21,6 +21,7 @@ import re
 from collections import OrderedDict
 
 from mcp_server.client.factory import RESTClientFactory
+from mcp_server.core.oauth import RefreshableBearerAuth
 from mcp_server.core.setting import Setting
 
 _LOG = logging.getLogger(__name__)
@@ -93,6 +94,41 @@ def startup_authorization(setting: Setting) -> str:
     return f"Bearer {token}"
 
 
+def service_fallback_authorization(setting: Setting) -> str:
+    """Audit / fallback identity when no hop-1 Authorization header is present.
+
+    Prefers the static ``--token``. When only OAuth client-credentials is
+    configured, returns ``OAuth <client_id>`` so audit logs can attribute
+    stdio / no-header calls to the service client.
+    """
+    static = startup_authorization(setting)
+    if static:
+        return static
+    if setting.has_oauth_client():
+        return f"OAuth {setting.oauth_client_id.strip()}"
+    return ""
+
+
+def _service_auth(setting: Setting):
+    """httpx ``auth=`` hook for service OAuth, or None for static/anonymous."""
+    setting.validate_oauth()
+    static = startup_authorization(setting)
+    if static:
+        if setting.has_oauth_client():
+            _LOG.warning(
+                "Ignoring OAuth client credentials because --token is set"
+            )
+        return None
+    if not setting.has_oauth_client():
+        return None
+    return RefreshableBearerAuth(
+        token_endpoint=setting.oauth_token_endpoint.strip(),
+        client_id=setting.oauth_client_id.strip(),
+        client_secret=setting.oauth_client_secret.strip(),
+        scope=setting.oauth_scope.strip(),
+    )
+
+
 class GravitinoContext:
     def __init__(self, setting: Setting):
         self._setting = setting
@@ -100,6 +136,7 @@ class GravitinoContext:
             setting.metalake,
             setting.gravitino_uri,
             startup_authorization(setting),
+            auth=_service_auth(setting),
         )
         # LRU cache of per-principal clients keyed by the raw Authorization header.
         # Safe without locking: rest_client() runs on the single asyncio event
@@ -118,7 +155,8 @@ class GravitinoContext:
         token. This keeps concurrent sessions with different principals fully
         isolated — one principal's identity never leaks into another's calls.
 
-        Falls back to the shared default client (static startup token) when:
+        Falls back to the shared default client (static token or OAuth
+        client-credentials) when:
         - running in stdio mode (no HTTP request context), or
         - the incoming request carries no Authorization header.
 
