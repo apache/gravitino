@@ -51,7 +51,15 @@ public class CatalogMetaSQLProviderFactory {
 
   static class CatalogMetaMySQLProvider extends CatalogMetaBaseSQLProvider {}
 
-  static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {}
+  static class CatalogMetaH2Provider extends CatalogMetaBaseSQLProvider {
+    @Override
+    public String selectCatalogMetaByIdForShare(Long catalogId) {
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Schema
+      // creations under one catalog therefore serialize on H2, and a slow creation can make a
+      // concurrent one hit H2's lock timeout instead of a clean conflict.
+      return selectCatalogMetaByIdForUpdate(catalogId);
+    }
+  }
 
   public static String listCatalogPOsByMetalakeName(@Param("metalakeName") String metalakeName) {
     return getProvider().listCatalogPOsByMetalakeName(metalakeName);
@@ -102,6 +110,11 @@ public class CatalogMetaSQLProviderFactory {
   /** Builds SQL that returns and locks an active catalog by ID. */
   public static String selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId) {
     return getProvider().selectCatalogMetaByIdForUpdate(catalogId);
+  }
+
+  /** Returns SQL that selects and share-locks an active catalog by ID. */
+  public static String selectCatalogMetaByIdForShare(@Param("catalogId") Long catalogId) {
+    return getProvider().selectCatalogMetaByIdForShare(catalogId);
   }
 
   public static String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {

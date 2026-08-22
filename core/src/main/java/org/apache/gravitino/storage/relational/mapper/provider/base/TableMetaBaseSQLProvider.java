@@ -178,6 +178,23 @@ public class TableMetaBaseSQLProvider {
         + " WHERE tm.table_id = #{tableId} AND tm.deleted_at = 0";
   }
 
+  /**
+   * Returns the active table metadata row and holds it exclusively for the current transaction.
+   *
+   * @param tableId the table ID
+   * @return the locking select SQL
+   */
+  public String selectTableMetaByIdForUpdate(@Param("tableId") Long tableId) {
+    return "SELECT table_id as tableId, table_name as tableName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId,"
+        + " schema_id as schemaId, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE table_id = #{tableId} AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -225,6 +242,18 @@ public class TableMetaBaseSQLProvider {
         + " deleted_at = #{tableMeta.deletedAt}";
   }
 
+  /**
+   * Returns SQL that updates a table only while its OCC version is unchanged.
+   *
+   * <p>The WHERE clause intentionally compares only the stable ID, the version seen by the caller,
+   * and the active flag. Comparing serialized payload or audit fields would make harmless encoding
+   * differences look like conflicts; the version is the single source of truth for concurrency.
+   *
+   * @param newTablePO the table values to write
+   * @param oldTablePO the table values and OCC version read by the caller
+   * @param newSchemaId the target schema ID
+   * @return the version-checked update SQL
+   */
   public String updateTableMeta(
       @Param("newTableMeta") TablePO newTablePO,
       @Param("oldTableMeta") TablePO oldTablePO,
@@ -240,22 +269,27 @@ public class TableMetaBaseSQLProvider {
         + " last_version = #{newTableMeta.lastVersion},"
         + " deleted_at = #{newTableMeta.deletedAt}"
         + " WHERE table_id = #{oldTableMeta.tableId}"
-        + " AND table_name = #{oldTableMeta.tableName}"
-        + " AND metalake_id = #{oldTableMeta.metalakeId}"
-        + " AND catalog_id = #{oldTableMeta.catalogId}"
-        + " AND schema_id = #{oldTableMeta.schemaId}"
-        + " AND audit_info = #{oldTableMeta.auditInfo}"
         + " AND current_version = #{oldTableMeta.currentVersion}"
-        + " AND last_version = #{oldTableMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
+  /**
+   * Returns SQL that deletes only the table version observed by the caller.
+   *
+   * <p>For example, a drop that read version 3 must not delete version 4 after a concurrent alter.
+   *
+   * @param tableId the table ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        + " WHERE table_id = #{tableId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

@@ -58,6 +58,7 @@ import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -488,7 +489,16 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("test", alteredTable3.auditInfo().creator());
     Assertions.assertEquals("test", alteredTable3.auditInfo().lastModifier());
 
-    // Case 4: Test if the table entity is not matched
+    // Case 4: Optimistic-lock conflicts must reach the caller so it can retry.
+    reset(entityStore);
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .update(any(), any(), any(), any());
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> tableOperationDispatcher.alterTable(tableIdent, changes));
+
+    // Case 5: Test if the table entity is not matched
     reset(entityStore);
     TableEntity unmatchedEntity =
         TableEntity.builder()

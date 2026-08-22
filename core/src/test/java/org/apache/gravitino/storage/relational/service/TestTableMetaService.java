@@ -27,6 +27,12 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -34,6 +40,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -56,6 +63,10 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -99,6 +110,204 @@ public class TestTableMetaService extends TestJDBCBackend {
             AUDIT_INFO);
     backend.insert(table, false);
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(tableCopy, false));
+  }
+
+  @TestTemplate
+  public void testInsertWaitsForConcurrentSchemaDelete() throws Exception {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    SchemaEntity schema = createAndInsertSchema(metalakeName, catalogName, schemaName);
+    SchemaPO observedSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_racing_schema_delete",
+            AUDIT_INFO);
+
+    CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch tableInsertStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int deleted =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                      observedSchemaPO.getSchemaId(),
+                                      observedSchemaPO.getCurrentVersion()));
+                      Assertions.assertEquals(1, deleted);
+                      schemaDeleteLocked.countDown();
+                      try {
+                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+    try {
+      assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> insertResult =
+          executor.submit(
+              () -> {
+                tableInsertStarted.countDown();
+                try {
+                  TableMetaService.getInstance().insertTable(table, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(tableInsertStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> insertResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(
+          NoSuchEntityException.class, insertResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertTrue(
+          SessionUtils.getWithoutCommit(
+                  TableMetaMapper.class,
+                  mapper -> mapper.listTablePOsByTableIds(List.of(table.id())))
+              .isEmpty());
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @TestTemplate
+  public void testInsertRollsBackAllRowsWhenColumnWriteFails() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column")
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity invalidTable =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_insert_rollback")
+            .withNamespace(tableNamespace)
+            // The duplicate ID violates the column-version unique key. The failure happens after
+            // table_meta and table_version_info have already been written in this transaction.
+            .withColumns(List.of(column, column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    assertThrows(
+        RuntimeException.class,
+        () -> TableMetaService.getInstance().insertTable(invalidTable, false));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(invalidTable.nameIdentifier()));
+
+    // Reusing the same table ID, name, and column proves that the failed attempt left no metadata,
+    // version, or column row behind.
+    TableEntity validTable =
+        TableEntity.builder()
+            .withId(invalidTable.id())
+            .withName(invalidTable.name())
+            .withNamespace(tableNamespace)
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(validTable, false);
+    TableEntity inserted =
+        TableMetaService.getInstance().getTableByIdentifier(validTable.nameIdentifier());
+    Assertions.assertEquals(validTable.id(), inserted.id());
+    Assertions.assertEquals(1, inserted.columns().size());
+  }
+
+  @TestTemplate
+  public void testOverwriteRollsBackExistingTableAndThenSucceeds() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    ColumnEntity originalColumn =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("original_column")
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity original =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_overwrite_rollback")
+            .withNamespace(tableNamespace)
+            .withColumns(List.of(originalColumn))
+            .withComment("original")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(original, false);
+
+    ColumnEntity replacementColumn =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("replacement_column")
+            .withPosition(0)
+            .withDataType(Types.StringType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity invalidReplacement =
+        TableEntity.builder()
+            .withId(original.id())
+            .withName(original.name())
+            .withNamespace(tableNamespace)
+            // Overwrite deletes the old columns before inserting these. Repeating the same ID
+            // makes the final step fail, which must restore both the table and its old column.
+            .withColumns(List.of(replacementColumn, replacementColumn))
+            .withComment("must roll back")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    assertThrows(
+        RuntimeException.class,
+        () -> TableMetaService.getInstance().insertTable(invalidReplacement, true));
+
+    TableEntity afterFailure =
+        TableMetaService.getInstance().getTableByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals("original", afterFailure.comment());
+    Assertions.assertEquals(List.of(originalColumn), afterFailure.columns());
+
+    TableEntity validReplacement =
+        TableEntity.builder()
+            .withId(original.id())
+            .withName(original.name())
+            .withNamespace(tableNamespace)
+            .withColumns(List.of(replacementColumn))
+            .withComment("replaced")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(validReplacement, true);
+
+    TableEntity afterSuccess =
+        TableMetaService.getInstance().getTableByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals("replaced", afterSuccess.comment());
+    Assertions.assertEquals(List.of(replacementColumn), afterSuccess.columns());
   }
 
   @TestTemplate
@@ -319,6 +528,273 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testAlterReportsOptimisticLockConflictAndKeepsWinnerVersion() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_alter_conflict",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    TablePO initialPO = getTablePO(table.id());
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            TableMetaService.getInstance()
+                .updateTable(
+                    table.nameIdentifier(),
+                    entity -> {
+                      TableEntity current = (TableEntity) entity;
+                      // The updater runs before the outer CAS. Commit another update here so the
+                      // outer write continues with a stale current_version and must lose the CAS.
+                      updateTableUnchecked(
+                          table.nameIdentifier(),
+                          competing -> copyTableWithComment(competing, "competing update"));
+                      return copyTableWithComment(current, "requested update");
+                    }));
+
+    TableEntity current =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertEquals("competing update", current.comment());
+    TablePO currentPO = getTablePO(table.id());
+    Assertions.assertEquals(
+        initialPO.getCurrentVersion() + 1, currentPO.getCurrentVersion().longValue());
+    Assertions.assertEquals(currentPO.getCurrentVersion(), currentPO.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenDeletedConcurrently() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_alter_deleted",
+            AUDIT_INFO);
+    backend.insert(table, false);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableMetaService.getInstance()
+                .updateTable(
+                    table.nameIdentifier(),
+                    entity -> {
+                      TableMetaService.getInstance().deleteTable(table.nameIdentifier());
+                      return copyTableWithComment((TableEntity) entity, "requested update");
+                    }));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenRenamedConcurrently() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_alter_renamed",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    NameIdentifier renamedIdentifier =
+        NameIdentifier.of(table.namespace(), "table_alter_renamed_winner");
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableMetaService.getInstance()
+                .updateTable(
+                    table.nameIdentifier(),
+                    entity -> {
+                      TableEntity current = (TableEntity) entity;
+                      updateTableUnchecked(
+                          table.nameIdentifier(),
+                          competing ->
+                              copyTable(
+                                  competing,
+                                  renamedIdentifier.name(),
+                                  competing.namespace(),
+                                  "renamed winner"));
+                      return copyTableWithComment(current, "stale update");
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()));
+    Assertions.assertEquals(
+        "renamed winner",
+        TableMetaService.getInstance().getTableByIdentifier(renamedIdentifier).comment());
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenMovedConcurrently() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    String newSchemaName = "schema_for_concurrent_move";
+    createAndInsertSchema(metalakeName, catalogName, newSchemaName);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_alter_moved",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    Namespace movedNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, newSchemaName);
+    NameIdentifier movedIdentifier = NameIdentifier.of(movedNamespace, table.name());
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableMetaService.getInstance()
+                .updateTable(
+                    table.nameIdentifier(),
+                    entity -> {
+                      TableEntity current = (TableEntity) entity;
+                      updateTableUnchecked(
+                          table.nameIdentifier(),
+                          competing ->
+                              copyTable(
+                                  competing, competing.name(), movedNamespace, "moved winner"));
+                      return copyTableWithComment(current, "stale update");
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()));
+    Assertions.assertEquals(
+        "moved winner",
+        TableMetaService.getInstance().getTableByIdentifier(movedIdentifier).comment());
+  }
+
+  @TestTemplate
+  public void testDeleteRejectsStaleVersion() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    ColumnEntity column =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("column_that_must_survive")
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableEntity table =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_stale_delete")
+            .withNamespace(NamespaceUtil.ofTable(metalakeName, catalogName, schemaName))
+            .withColumns(List.of(column))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    backend.insert(table, false);
+    TablePO stalePO = getTablePO(table.id());
+
+    TableMetaService.getInstance()
+        .updateTable(
+            table.nameIdentifier(),
+            entity -> copyTableWithComment((TableEntity) entity, "winning update"));
+
+    // The stale drop still carries the original version. It must not delete the newer table.
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    TableMetaService.getInstance()
+                        .deleteTableWithVersion(table.nameIdentifier(), stalePO)));
+    TableEntity current =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertEquals("winning update", current.comment());
+    Assertions.assertEquals(1, current.columns().size());
+    Assertions.assertEquals(column.id(), current.columns().get(0).id());
+  }
+
+  @TestTemplate
+  public void testDeleteReportsNoSuchWhenDeletedConcurrently() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_delete_deleted",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    TablePO stalePO = getTablePO(table.id());
+
+    TableMetaService.getInstance().deleteTable(table.nameIdentifier());
+
+    // The second delete still has the first delete's snapshot. Since the table is now gone rather
+    // than merely newer, the result must be "not found", not an OCC conflict.
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    TableMetaService.getInstance()
+                        .deleteTableWithVersion(table.nameIdentifier(), stalePO)));
+  }
+
+  @TestTemplate
+  public void testUpdateRollsBackMetadataAndVersionWhenColumnWriteFails() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_update_rollback",
+            AUDIT_INFO);
+    backend.insert(table, false);
+    TablePO initialPO = getTablePO(table.id());
+
+    ColumnEntity duplicateColumn =
+        ColumnEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("duplicate_id")
+            .withPosition(0)
+            .withDataType(Types.IntegerType.get())
+            .withNullable(true)
+            .withAutoIncrement(false)
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    // The duplicate column ID fails after the table and version rows are updated. The assertions
+    // below verify that the outer transaction rolls both earlier writes back.
+    assertThrows(
+        IllegalStateException.class,
+        () ->
+            TableMetaService.getInstance()
+                .updateTable(
+                    table.nameIdentifier(),
+                    entity -> {
+                      TableEntity current = (TableEntity) entity;
+                      return TableEntity.builder()
+                          .withId(current.id())
+                          .withName(current.name())
+                          .withNamespace(current.namespace())
+                          .withColumns(List.of(duplicateColumn, duplicateColumn))
+                          .withProperties(current.properties())
+                          .withPartitioning(current.partitioning())
+                          .withSortOrders(current.sortOrders())
+                          .withDistribution(current.distribution())
+                          .withIndexes(current.indexes())
+                          .withComment("must roll back")
+                          .withAuditInfo(current.auditInfo())
+                          .build();
+                    }));
+
+    TableEntity current =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertNull(current.comment());
+    Assertions.assertTrue(current.columns().isEmpty());
+    TablePO currentPO = getTablePO(table.id());
+    Assertions.assertEquals(initialPO.getCurrentVersion(), currentPO.getCurrentVersion());
+    Assertions.assertEquals(initialPO.getLastVersion(), currentPO.getLastVersion());
+  }
+
+  @TestTemplate
   public void testBatchGetTableByIdentifierIncludesVersionInfoFields() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -448,5 +924,40 @@ public class TestTableMetaService extends TestJDBCBackend {
           Assertions.assertEquals(expectedColumn.defaultValue(), column.defaultValue());
           Assertions.assertEquals(expectedColumn.auditInfo(), column.auditInfo());
         });
+  }
+
+  private TablePO getTablePO(long tableId) {
+    return SessionUtils.getWithoutCommit(
+        TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(List.of(tableId)).get(0));
+  }
+
+  private TableEntity copyTableWithComment(TableEntity current, String comment) {
+    return copyTable(current, current.name(), current.namespace(), comment);
+  }
+
+  private TableEntity copyTable(
+      TableEntity current, String name, Namespace namespace, String comment) {
+    return TableEntity.builder()
+        .withId(current.id())
+        .withName(name)
+        .withNamespace(namespace)
+        .withColumns(current.columns())
+        .withProperties(current.properties())
+        .withPartitioning(current.partitioning())
+        .withSortOrders(current.sortOrders())
+        .withDistribution(current.distribution())
+        .withIndexes(current.indexes())
+        .withComment(comment)
+        .withAuditInfo(current.auditInfo())
+        .build();
+  }
+
+  private void updateTableUnchecked(
+      NameIdentifier identifier, Function<TableEntity, TableEntity> updater) {
+    try {
+      TableMetaService.getInstance().updateTable(identifier, updater);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
