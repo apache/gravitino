@@ -21,8 +21,10 @@ package org.apache.iceberg.jdbc;
 
 import com.google.common.base.Preconditions;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Map;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.ClosableJdbcCatalog;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.iceberg.MetastoreRegisterTableUtils;
@@ -30,6 +32,7 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.CommitFailedException;
 import org.apache.iceberg.jdbc.JdbcUtil.SchemaVersion;
+import org.apache.iceberg.util.PropertyUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -38,6 +41,14 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
     implements SupportsMetadataLocation {
   private static final Logger LOG =
       LoggerFactory.getLogger(JdbcCatalogWithMetadataLocationSupport.class);
+
+  /**
+   * Name of the supporting index created on {@value JdbcUtil#CATALOG_TABLE_VIEW_NAME} for
+   * PostgreSQL backends. See {@link #maybeCreateNamespaceIndex(Map)} for why it's needed.
+   */
+  private static final String NAMESPACE_INDEX_NAME = "gravitino_iceberg_tables_namespace_pattern";
+
+  private static final String POSTGRESQL_PRODUCT_NAME = "PostgreSQL";
 
   private String jdbcCatalogName;
   private JdbcClientPool jdbcConnections;
@@ -51,6 +62,7 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
   public void initialize(String name, Map<String, String> properties) {
     super.initialize(name, properties);
     loadFields();
+    maybeCreateNamespaceIndex(properties);
   }
 
   @Override
@@ -117,6 +129,64 @@ public class JdbcCatalogWithMetadataLocationSupport extends ClosableJdbcCatalog
       throw new UncheckedInterruptedException(e, "Interrupted during commit");
     } catch (SQLException e) {
       throw new UncheckedSQLException(e, "Unknown failure");
+    }
+  }
+
+  /**
+   * Creates a supporting index for the hierarchical-namespace existence and listing queries
+   * Iceberg's {@code JdbcCatalog} issues against {@value JdbcUtil#CATALOG_TABLE_VIEW_NAME} - an
+   * {@code OR(exact match, LIKE prefix-match)} predicate over {@value JdbcUtil#CATALOG_NAME} and
+   * {@value JdbcUtil#TABLE_NAMESPACE} that the table's primary key alone can only serve as a
+   * sequential scan, since a plain b-tree index built with PostgreSQL's default locale-aware
+   * operator class cannot bound a {@code LIKE} range scan. At a large number of tables this makes
+   * every namespace/table existence check, and therefore every namespace create/drop, scan the
+   * whole table.
+   *
+   * <p>PostgreSQL-only: detected at runtime via {@link java.sql.DatabaseMetaData}, so this is a
+   * no-op for MySQL, SQLite, H2, and any other JDBC backend. Controlled by {@link
+   * IcebergConstants#ICEBERG_JDBC_CREATE_NAMESPACE_INDEX} (default enabled). Never fails catalog
+   * initialization: a missing index is a performance issue, not a correctness one, so an operator
+   * whose database role lacks DDL privileges should still be able to start the catalog - a warning
+   * is logged instead.
+   *
+   * @param properties the properties passed to {@link #initialize(String, Map)}
+   */
+  private void maybeCreateNamespaceIndex(Map<String, String> properties) {
+    if (!PropertyUtil.propertyAsBoolean(
+        properties, IcebergConstants.ICEBERG_JDBC_CREATE_NAMESPACE_INDEX, true)) {
+      return;
+    }
+
+    try {
+      jdbcConnections.run(
+          conn -> {
+            if (!POSTGRESQL_PRODUCT_NAME.equals(conn.getMetaData().getDatabaseProductName())) {
+              return null;
+            }
+            String sql =
+                "CREATE INDEX IF NOT EXISTS "
+                    + NAMESPACE_INDEX_NAME
+                    + " ON "
+                    + JdbcUtil.CATALOG_TABLE_VIEW_NAME
+                    + " ("
+                    + JdbcUtil.CATALOG_NAME
+                    + ", "
+                    + JdbcUtil.TABLE_NAMESPACE
+                    + " text_pattern_ops)";
+            try (Statement stmt = conn.createStatement()) {
+              stmt.execute(sql);
+            }
+            return null;
+          });
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to create supporting index {} on {}; namespace/table existence checks may "
+              + "become slow as the catalog grows. This does not affect correctness and catalog "
+              + "initialization is continuing. Set {}=false to silence this warning.",
+          NAMESPACE_INDEX_NAME,
+          JdbcUtil.CATALOG_TABLE_VIEW_NAME,
+          IcebergConstants.ICEBERG_JDBC_CREATE_NAMESPACE_INDEX,
+          e);
     }
   }
 
