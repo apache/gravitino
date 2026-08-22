@@ -351,6 +351,25 @@ class GravitinoMetalake(
             url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
         )
 
+    def test_connection(self, name: str) -> None:
+        """Test an existing catalog connection using its stored configuration.
+
+        Args:
+            name: The name of the existing catalog.
+
+        Raises:
+            NoSuchCatalogException: If the catalog does not exist.
+            UnsupportedOperationException: If the catalog does not define a connection probe.
+            ConnectionFailedException: If the catalog cannot reach its external system.
+        """
+        url = (
+            self.API_METALAKES_CATALOGS_PATH.format(
+                encode_string(self.name()), encode_string(name)
+            )
+            + "/testConnection"
+        )
+        self.rest_client.post(url, error_handler=CATALOG_ERROR_HANDLER)
+
     ##########
     # Job operations
     ##########

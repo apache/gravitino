@@ -16,11 +16,28 @@
 # under the License.
 
 import unittest
+from unittest.mock import MagicMock
 
+from gravitino.client.gravitino_metalake import GravitinoMetalake
+from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.responses.metalake_response import MetalakeResponse
+from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 
 
 class TestMetalake(unittest.TestCase):
+    def test_existing_catalog_connection(self):
+        rest_client = MagicMock()
+        metalake = GravitinoMetalake(
+            MetalakeDTO("metalake", None, {}, None), rest_client
+        )
+
+        metalake.test_connection("catalog/name")
+
+        rest_client.post.assert_called_once_with(
+            "api/metalakes/metalake/catalogs/catalog%2Fname/testConnection",
+            error_handler=CATALOG_ERROR_HANDLER,
+        )
+
     def test_from_json_metalake_response(self):
         str_json = (
             b'{"code":0,"metalake":{"name":"example_name18","comment":"This is a sample comment",'

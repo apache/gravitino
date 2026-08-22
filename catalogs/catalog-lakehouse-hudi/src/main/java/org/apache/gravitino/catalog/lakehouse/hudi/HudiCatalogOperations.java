@@ -100,6 +100,11 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
       String comment,
       Map<String, String> properties)
       throws Exception {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       hudiCatalogBackendOps.listSchemas(
           Namespace.of(catalogIdent.namespace().level(0), catalogIdent.name()));

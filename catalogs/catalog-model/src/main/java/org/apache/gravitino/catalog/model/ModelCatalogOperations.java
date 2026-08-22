@@ -85,7 +85,13 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
       String provider,
       String comment,
       Map<String, String> properties) {
-    // No-op for model catalog.
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
+    throw new UnsupportedOperationException(
+        "Model catalogs do not define an external catalog-level connection probe");
   }
 
   @Override

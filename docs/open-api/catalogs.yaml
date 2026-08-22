@@ -88,6 +88,10 @@ paths:
       tags:
         - catalog
       summary: Test catalog connection
+      description: >-
+        Runs a lightweight, read-only provider probe against the supplied catalog configuration.
+        Fileset catalogs test all catalog-level `location` and `location-*` targets. Model and
+        Generic catalogs do not support connection testing.
       operationId: testConnection
       requestBody:
         content:
@@ -142,7 +146,73 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
-
+  /metalakes/{metalake}/catalogs/{catalog}/testConnection:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+      - $ref: "./openapi.yaml#/components/parameters/catalog"
+    post:
+      tags:
+        - catalog
+      summary: Test an existing catalog connection
+      description: >-
+        Uses the catalog's stored configuration to run a lightweight, read-only provider probe.
+        Fileset catalogs test all catalog-level `location` and `location-*` targets. Model and
+        Generic catalogs do not support connection testing. Expected test failures are returned as
+        application error codes in an HTTP 200 response.
+      operationId: testExistingCatalogConnection
+      responses:
+        "200":
+          description: Connection test completed, including expected test failures
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                type: object
+                required:
+                  - code
+                properties:
+                  code:
+                    type: integer
+                    format: int32
+                    description: Application status code; 0 indicates success
+                  type:
+                    type: string
+                    description: Internal exception type when the test fails
+                  message:
+                    type: string
+                    description: Sanitized failure message
+              examples:
+                TestConnectionSuccess:
+                  value:
+                    code: 0
+                TestConnectionFailed:
+                  value:
+                    code: 1007
+                    type: ConnectionFailedException
+                    message: "Failed to test Fileset catalog connection: location (access denied)"
+                InvalidProbeTarget:
+                  value:
+                    code: 1001
+                    type: IllegalArgumentException
+                    message: Fileset catalog has no catalog-level location to test
+                TestConnectionNotSupported:
+                  value:
+                    code: 1006
+                    type: UnsupportedOperationException
+                    message: Model catalogs do not define an external catalog-level connection probe
+                CatalogNotFound:
+                  value:
+                    code: 1003
+                    type: NoSuchCatalogException
+                    message: Catalog my_metalake.my_catalog does not exist
+                CatalogDisabled:
+                  value:
+                    code: 1009
+                    type: CatalogNotInUseException
+                    message: Catalog my_metalake.my_catalog is not in use
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
   /metalakes/{metalake}/catalogs/{catalog}:
     parameters:

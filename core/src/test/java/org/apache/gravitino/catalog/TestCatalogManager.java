@@ -58,6 +58,7 @@ import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -1363,12 +1364,15 @@ public class TestCatalogManager {
     catalogManager.disableCatalog(ident);
     CatalogEntity disabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
     Assertions.assertEquals("false", disabled.getProperties().get(Catalog.PROPERTY_IN_USE));
+    Assertions.assertThrows(
+        CatalogNotInUseException.class, () -> catalogManager.testConnection(ident));
 
     catalogManager.enableCatalog(ident);
     CatalogEntity enabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
     Assertions.assertEquals("true", enabled.getProperties().get(Catalog.PROPERTY_IN_USE));
-
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> catalogManager.testConnection(ident));
   }
 
   @Test

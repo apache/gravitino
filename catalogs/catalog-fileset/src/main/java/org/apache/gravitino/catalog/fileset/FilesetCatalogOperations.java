@@ -38,7 +38,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
+import java.net.URI;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -77,15 +79,22 @@ import org.apache.gravitino.catalog.FilesetFileOps;
 import org.apache.gravitino.catalog.ManagedSchemaOperations;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
+import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.InMemoryFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.credential.PathContext;
 import org.apache.gravitino.connector.credential.SupportsPathBasedCredentials;
+import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialUtils;
+import org.apache.gravitino.credential.PathBasedCredentialContext;
 import org.apache.gravitino.dto.file.FileInfoDTO;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -113,6 +122,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.fs.RemoteIterator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -145,6 +155,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private FileSystemProvider defaultFileSystemProvider;
 
   private boolean disableFSOps;
+
+  @Nullable private CatalogCredentialManager credentialManager;
 
   private FilesetCatalogMetricsSource catalogMetricsSource;
 
@@ -946,16 +958,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  /**
-   * Since the Fileset catalog was completely managed by Gravitino, we don't need to test the
-   * connection
-   *
-   * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
-   */
   @Override
   public void testConnection(
       NameIdentifier catalogIdent,
@@ -963,7 +965,36 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       String provider,
       String comment,
       Map<String, String> properties) {
-    // Do nothing
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
+    if (disableFSOps) {
+      throw new UnsupportedOperationException(
+          "Fileset connection testing requires filesystem operations to be enabled");
+    }
+    if (catalogStorageLocations.isEmpty()) {
+      throw new IllegalArgumentException("Fileset catalog has no catalog-level location to test");
+    }
+
+    Map<String, Path> probeLocations = resolveProbeLocations(catalogIdent);
+    List<String> failures = new ArrayList<>();
+    probeLocations.forEach(
+        (locationName, path) -> {
+          try {
+            probeLocation(path);
+          } catch (UnsupportedOperationException e) {
+            throw e;
+          } catch (Exception e) {
+            failures.add(displayLocationName(locationName) + " (" + failureCategory(e) + ")");
+          }
+        });
+
+    if (!failures.isEmpty()) {
+      throw new ConnectionFailedException(
+          "Failed to test Fileset catalog connection: %s", String.join("; ", failures));
+    }
   }
 
   @Override
@@ -989,6 +1020,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 }
               });
       fileSystemCache.cleanUp();
+    }
+
+    if (credentialManager != null) {
+      credentialManager.close();
+      credentialManager = null;
     }
 
     // Metrics System could be null in UT.
@@ -1064,31 +1100,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             }
 
             checkPlaceholderValue(v);
-
-            if (!disableFSOps && !containsPlaceholder(v)) {
-              Path path = new Path(v);
-              // At catalog initialization, only merge catalog config and user-defined location
-              // configs
-              Map<String, String> fsConf = new HashMap<>(conf);
-              fsConf.putAll(
-                  FilesetUtil.getUserDefinedFileSystemConfigs(
-                      path.toUri(),
-                      conf,
-                      FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
-              FileSystem fs = getFileSystemWithCache(path, fsConf);
-              try {
-                if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
-                  throw new IllegalArgumentException(
-                      "Fileset catalog location cannot be a file: "
-                          + v
-                          + ", location name: "
-                          + locationName);
-                }
-              } catch (IOException e) {
-                throw new RuntimeException(
-                    "Failed to check if fileset catalog location exists: " + v, e);
-              }
-            }
 
             catalogStorageLocations.put(locationName, new Path((ensureTrailingSlash(v))));
           }
@@ -1390,16 +1401,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
     Future<FileSystem> fileSystemFuture =
-        fileSystemExecutor.submit(
-            () -> {
-              if (scheme.equals(SCHEME_HDFS)) {
-                return new ImpersonationHDFSFileSystemProxy(
-                        path, config, PrincipalUtils::getCurrentUserName)
-                    .getProxy();
-              } else {
-                return provider.getFileSystem(path, config);
-              }
-            });
+        fileSystemExecutor.submit(() -> createFileSystem(path, config, scheme, provider));
 
     try {
       return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);
@@ -1439,6 +1441,226 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
       throw new IOException("Failed to create FileSystem", cause);
     }
+  }
+
+  private Map<String, Path> resolveProbeLocations(NameIdentifier catalogIdent) {
+    Map<String, Path> resolved = new HashMap<>();
+    catalogStorageLocations.forEach(
+        (locationName, location) ->
+            resolved.put(locationName, resolveProbeLocation(location.toString(), catalogIdent)));
+    return resolved;
+  }
+
+  private Path resolveProbeLocation(String location, NameIdentifier catalogIdent) {
+    String resolved = location.replace("{{catalog}}", catalogIdent.name());
+    Matcher matcher = LOCATION_PLACEHOLDER_PATTERN.matcher(resolved);
+    if (matcher.find()) {
+      String staticPrefix = resolved.substring(0, matcher.start());
+      int lastSeparator = staticPrefix.lastIndexOf(SLASH);
+      if (lastSeparator < 0) {
+        throw new IllegalArgumentException(
+            "Fileset catalog location has no concrete parent that can be tested");
+      }
+      resolved = staticPrefix.substring(0, lastSeparator + 1);
+    }
+
+    try {
+      URI uri = URI.create(resolved);
+      if (StringUtils.isBlank(resolved)
+          || containsPlaceholder(resolved)
+          || (uri.getScheme() != null
+              && resolved.contains("://")
+              && !"file".equalsIgnoreCase(uri.getScheme())
+              && StringUtils.isBlank(uri.getAuthority()))) {
+        throw new IllegalArgumentException(
+            "Fileset catalog location has no valid concrete target that can be tested");
+      }
+      return new Path(resolved);
+    } catch (IllegalArgumentException e) {
+      throw new IllegalArgumentException(
+          "Fileset catalog location has no valid concrete target that can be tested", e);
+    }
+  }
+
+  private void probeLocation(Path path) throws Exception {
+    Map<String, String> probeConf = new HashMap<>(conf);
+    probeConf.putAll(
+        FilesetUtil.getUserDefinedFileSystemConfigs(
+            path.toUri(),
+            probeConf,
+            FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
+
+    String scheme =
+        path.toUri().getScheme() != null
+            ? path.toUri().getScheme()
+            : defaultFileSystemProvider.scheme();
+    FileSystemProvider fileSystemProvider = fileSystemProvidersMap.get(scheme);
+    if (fileSystemProvider == null) {
+      throw new UnsupportedOperationException(
+          String.format("Fileset connection testing does not support scheme %s", scheme));
+    }
+
+    String credentialHandle = null;
+    Future<Void> probeFuture = null;
+    try {
+      credentialHandle = addVendedCredential(path, scheme, fileSystemProvider, probeConf);
+      int timeoutSeconds =
+          (int)
+              propertiesMetadata
+                  .catalogPropertiesMetadata()
+                  .getOrDefault(
+                      probeConf,
+                      FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
+      probeFuture =
+          fileSystemExecutor.submit(
+              () -> {
+                try (FileSystem fileSystem =
+                    createFileSystem(path, probeConf, scheme, fileSystemProvider)) {
+                  Path qualifiedPath =
+                      path.makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
+                  RemoteIterator<FileStatus> iterator =
+                      fileSystem.listStatusIterator(qualifiedPath);
+                  if (iterator.hasNext()) {
+                    FileStatus first = iterator.next();
+                    if (first.isFile() && first.getPath().equals(qualifiedPath)) {
+                      throw new IllegalArgumentException(
+                          "Fileset catalog location must be a directory");
+                    }
+                  }
+                  return null;
+                }
+              });
+      probeFuture.get(timeoutSeconds, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      if (probeFuture != null) {
+        probeFuture.cancel(true);
+      }
+      throw new IOException("Filesystem connection probe timed out", e);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IOException("Filesystem connection probe was interrupted", e);
+    } catch (ExecutionException e) {
+      Throwable cause = e.getCause();
+      if (cause instanceof Exception) {
+        throw (Exception) cause;
+      }
+      throw new IOException("Filesystem connection probe failed", cause);
+    } finally {
+      InMemoryFileSystemCredentialsProvider.unregister(credentialHandle);
+    }
+  }
+
+  @Nullable
+  private String addVendedCredential(
+      Path path,
+      String scheme,
+      FileSystemProvider fileSystemProvider,
+      Map<String, String> probeConf) {
+    Set<String> credentialTypes = CredentialUtils.getCredentialProvidersByOrder(() -> conf);
+    if (credentialTypes.isEmpty()) {
+      return null;
+    }
+
+    CatalogCredentialManager manager = credentialManager();
+    List<String> matchingTypes =
+        credentialTypes.stream()
+            .filter(
+                type ->
+                    manager
+                        .getCredentialProvider(type)
+                        .map(provider -> provider.supportsScheme(scheme))
+                        .orElse(false))
+            .collect(Collectors.toList());
+    if (matchingTypes.isEmpty()) {
+      return null;
+    }
+    if (matchingTypes.size() > 1) {
+      throw new UnsupportedOperationException(
+          String.format(
+              "Multiple credential providers match Fileset location scheme %s: %s",
+              scheme, matchingTypes));
+    }
+    if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
+      throw new UnsupportedOperationException(
+          String.format("Filesystem provider for scheme %s cannot use vended credentials", scheme));
+    }
+
+    PathBasedCredentialContext context =
+        new PathBasedCredentialContext(
+            PrincipalUtils.getCurrentUserName(),
+            Collections.emptySet(),
+            Collections.singleton(path.toString()));
+    Credential credential =
+        manager
+            .getCredential(matchingTypes.get(0), context)
+            .orElseThrow(
+                () ->
+                    new ConnectionFailedException(
+                        "Credential provider returned no credential for Fileset connection test"));
+    Credential[] credentials = new Credential[] {credential};
+    String handle = InMemoryFileSystemCredentialsProvider.register(credentials);
+    try {
+      probeConf.put(
+          GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
+          InMemoryFileSystemCredentialsProvider.class.getCanonicalName());
+      probeConf.put(InMemoryFileSystemCredentialsProvider.CREDENTIAL_HANDLE, handle);
+      probeConf.putAll(
+          ((SupportsCredentialVending) fileSystemProvider)
+              .getFileSystemCredentialConf(credentials));
+      return handle;
+    } catch (RuntimeException e) {
+      InMemoryFileSystemCredentialsProvider.unregister(handle);
+      throw e;
+    }
+  }
+
+  private synchronized CatalogCredentialManager credentialManager() {
+    if (credentialManager == null) {
+      credentialManager = new CatalogCredentialManager(catalogInfo.name(), conf);
+    }
+    return credentialManager;
+  }
+
+  private FileSystem createFileSystem(
+      Path path, Map<String, String> config, String scheme, FileSystemProvider provider)
+      throws IOException {
+    if (scheme.equals(SCHEME_HDFS)) {
+      return new ImpersonationHDFSFileSystemProxy(path, config, PrincipalUtils::getCurrentUserName)
+          .getProxy();
+    }
+    return provider.getFileSystem(path, config);
+  }
+
+  private String displayLocationName(String locationName) {
+    return LOCATION_NAME_UNKNOWN.equals(locationName) ? "location" : "location-" + locationName;
+  }
+
+  private String failureCategory(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      String simpleName = current.getClass().getSimpleName().toLowerCase();
+      String message = Optional.ofNullable(current.getMessage()).orElse("").toLowerCase();
+      if (message.contains("must be a directory")) {
+        return "location is not a directory";
+      }
+      if (current instanceof TimeoutException || message.contains("timed out")) {
+        return "timeout";
+      }
+      if (simpleName.contains("accessdenied")
+          || simpleName.contains("forbidden")
+          || message.contains("permission denied")
+          || message.contains("access denied")) {
+        return "access denied";
+      }
+      if (simpleName.contains("filenotfound") || simpleName.contains("notfound")) {
+        return "location not found";
+      }
+      if (current instanceof ConnectionFailedException) {
+        return "credential generation failed";
+      }
+      current = current.getCause();
+    }
+    return "probe failed";
   }
 
   private String getFileLocation(Fileset fileset, String subPath, String locationName) {

@@ -670,6 +670,11 @@ public class IcebergCatalogOperations
       String provider,
       String comment,
       Map<String, String> properties) {
+    testConnection(catalogIdent);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       icebergCatalogWrapper.listNamespace(IcebergCatalogWrapperHelper.getIcebergNamespace());
     } catch (Exception e) {
