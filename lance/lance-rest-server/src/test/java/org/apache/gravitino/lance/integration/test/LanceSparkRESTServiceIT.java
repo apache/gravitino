@@ -46,6 +46,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Row;
@@ -58,9 +59,10 @@ import org.junit.jupiter.api.Test;
 
 public class LanceSparkRESTServiceIT extends BaseIT {
 
-  private static final String LANCE_SPARK_CATALOG = "lance";
   private static final String LANCE_SPARK_CATALOG_CLASS =
       "org.lance.spark.LanceNamespaceSparkCatalog";
+  private static final String LANCE_SPARK_EXTENSIONS =
+      "org.lance.spark.extensions.LanceSparkSessionExtensions";
   private static final String LANCE_SPARK_BUNDLE_JAR_PATH_PROPERTY =
       "gravitino.lance.spark.bundle.jar";
   private static final String JAVA_MODULE_OPEN_OPTIONS =
@@ -140,6 +142,22 @@ public class LanceSparkRESTServiceIT extends BaseIT {
       dropSchema(schemaName);
     }
     createdSchemas.clear();
+  }
+
+  @Test
+  public void testCatalogRegisteredByDiscoveryPlugin() {
+    SparkConf sparkConf = sparkSession.sparkContext().getConf();
+
+    Assertions.assertEquals(
+        LANCE_SPARK_CATALOG_CLASS, sparkConf.get("spark.sql.catalog." + CATALOG_NAME));
+    Assertions.assertEquals("rest", sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".impl"));
+    Assertions.assertEquals(
+        getLanceRestServiceUrl(), sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".uri"));
+    Assertions.assertEquals(
+        CATALOG_NAME, sparkConf.get("spark.sql.catalog." + CATALOG_NAME + ".parent"));
+    Assertions.assertTrue(
+        Arrays.asList(sparkConf.get("spark.sql.extensions").split(","))
+            .contains(LANCE_SPARK_EXTENSIONS));
   }
 
   @Test
@@ -299,8 +317,8 @@ public class LanceSparkRESTServiceIT extends BaseIT {
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class, () -> createLanceTable(nonExistentSchemaName, tableName));
-    assertFailureContainsAll(
-        exception, "NoSuchSchemaException", nonExistentSchemaName, "does not exist");
+    assertFailureContainsAll(exception, nonExistentSchemaName, "does not exist");
+    assertFailureContainsAny(exception, "NoSuchSchemaException", "Namespace not found");
     Assertions.assertFalse(catalog.asSchemas().schemaExists(nonExistentSchemaName));
   }
 
@@ -385,11 +403,9 @@ public class LanceSparkRESTServiceIT extends BaseIT {
             .set("spark.jars", bundleJarPath)
             .set("spark.driver.extraClassPath", bundleJarPath)
             .set("spark.executor.extraClassPath", bundleJarPath)
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG, LANCE_SPARK_CATALOG_CLASS)
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".impl", "rest")
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".uri", getLanceRestServiceUrl())
-            .set("spark.sql.catalog." + LANCE_SPARK_CATALOG + ".parent", CATALOG_NAME)
-            .set("spark.sql.defaultCatalog", LANCE_SPARK_CATALOG)
+            .set("spark.plugins", GravitinoLakehouseRESTDiscoveryPlugin.class.getName())
+            .set("spark.sql.gravitino.lanceREST.uri", getLanceRestServiceUrl())
+            .set("spark.sql.defaultCatalog", CATALOG_NAME)
             .set("spark.driver.extraJavaOptions", JAVA_MODULE_OPEN_OPTIONS)
             .set("spark.executor.extraJavaOptions", JAVA_MODULE_OPEN_OPTIONS)
             .set("spark.ui.enabled", "false");
@@ -502,7 +518,7 @@ public class LanceSparkRESTServiceIT extends BaseIT {
   }
 
   private List<String> listNamespaces() {
-    return sql("SHOW NAMESPACES IN %s", LANCE_SPARK_CATALOG).stream()
+    return sql("SHOW NAMESPACES IN %s", CATALOG_NAME).stream()
         .map(row -> row.getString(0))
         .collect(Collectors.toList());
   }
