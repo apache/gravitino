@@ -199,13 +199,13 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws Exception {
-    // TODO: Support event dispatching for testConnection
+    // TODO(#12566): Support event dispatching for testConnection
     dispatcher.testConnection(ident, type, provider, comment, properties);
   }
 
   @Override
   public void testConnection(NameIdentifier ident) throws Exception {
-    // TODO: Support event dispatching for testConnection
+    // TODO(#12566): Support event dispatching for testConnection
     dispatcher.testConnection(ident);
   }
 
