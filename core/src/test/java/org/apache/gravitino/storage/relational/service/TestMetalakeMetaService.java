@@ -25,21 +25,33 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestMetalakeMetaService extends TestJDBCBackend {
 
@@ -244,6 +256,144 @@ public class TestMetalakeMetaService extends TestJDBCBackend {
                             metalake.id(),
                             stalePO.getCurrentVersion())));
     assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+  }
+
+  @TestTemplate
+  public void testCascadeDeleteReportsConcurrentSchemaAlter() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog");
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(METALAKE_NAME, catalog.name()),
+            "schema",
+            AUDIT_INFO);
+    backend.insert(schema, false);
+    SchemaPO schemaBeforeDelete =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    MetalakeMetaService service = Mockito.spy(MetalakeMetaService.getInstance());
+    try {
+      Mockito.doAnswer(
+              invocation -> {
+                Assertions.assertEquals(metalake.id(), invocation.getArgument(0));
+                List<SchemaPO> schemaPOs =
+                    SessionUtils.getWithoutCommit(
+                        SchemaMetaMapper.class,
+                        mapper -> mapper.listSchemaPOsByMetalakeId(metalake.id()));
+                SchemaPO observedSchemaPO =
+                    schemaPOs.stream()
+                        .filter(schemaPO -> schemaPO.getSchemaId().equals(schema.id()))
+                        .findFirst()
+                        .orElseThrow();
+                SchemaEntity competingSchema =
+                    SchemaEntity.builder()
+                        .withId(schema.id())
+                        .withName(schema.name())
+                        .withNamespace(schema.namespace())
+                        .withComment("competing update")
+                        .withProperties(schema.properties())
+                        .withAuditInfo(schema.auditInfo())
+                        .build();
+                SchemaPO competingSchemaPO =
+                    POConverters.updateSchemaPOWithVersion(observedSchemaPO, competingSchema);
+                Future<Integer> competingUpdate =
+                    executor.submit(
+                        () ->
+                            SessionUtils.doWithCommitAndFetchResult(
+                                SchemaMetaMapper.class,
+                                mapper ->
+                                    mapper.updateSchemaMeta(competingSchemaPO, observedSchemaPO)));
+                Assertions.assertEquals(1, competingUpdate.get(30, TimeUnit.SECONDS));
+                return schemaPOs;
+              })
+          .when(service)
+          .listSchemaPOsForCascade(metalake.id());
+
+      assertThrows(
+          OptimisticLockException.class,
+          () -> service.deleteMetalake(metalake.nameIdentifier(), true));
+    } finally {
+      executor.shutdownNow();
+    }
+
+    assertTrue(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    assertTrue(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertTrue(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
+    SchemaPO schemaAfterDelete =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+    Assertions.assertEquals(
+        schemaBeforeDelete.getCurrentVersion() + 1, schemaAfterDelete.getCurrentVersion());
+    Assertions.assertEquals("competing update", schemaAfterDelete.getSchemaComment());
+  }
+
+  @TestTemplate
+  public void testConcurrentMetalakeCascadeAndSchemaCreateLeavesNoOrphan() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog");
+    SchemaEntity schema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(METALAKE_NAME, catalog.name()),
+            "concurrent_schema",
+            AUDIT_INFO);
+    CountDownLatch catalogsLocked = new CountDownLatch(1);
+    CountDownLatch allowSchemaSnapshot = new CountDownLatch(1);
+    CountDownLatch createStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    MetalakeMetaService service = Mockito.spy(MetalakeMetaService.getInstance());
+    try {
+      Mockito.doAnswer(
+              invocation -> {
+                catalogsLocked.countDown();
+                assertTrue(allowSchemaSnapshot.await(30, TimeUnit.SECONDS));
+                return invocation.callRealMethod();
+              })
+          .when(service)
+          .listSchemaPOsForCascade(metalake.id());
+
+      Future<Throwable> deleteResult =
+          executor.submit(
+              () -> {
+                try {
+                  service.deleteMetalake(metalake.nameIdentifier(), true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(catalogsLocked.await(30, TimeUnit.SECONDS));
+
+      Future<Throwable> createResult =
+          executor.submit(
+              () -> {
+                createStarted.countDown();
+                try {
+                  SchemaMetaService.getInstance().insertSchema(schema, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(createStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> createResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowSchemaSnapshot.countDown();
+      Throwable createFailure = createResult.get(30, TimeUnit.SECONDS);
+      Throwable deleteFailure = deleteResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertInstanceOf(NoSuchEntityException.class, createFailure);
+      Assertions.assertNull(deleteFailure, () -> "Metalake cascade failed: " + deleteFailure);
+    } finally {
+      allowSchemaSnapshot.countDown();
+      executor.shutdownNow();
+    }
+
+    assertFalse(backend.exists(metalake.nameIdentifier(), Entity.EntityType.METALAKE));
+    assertFalse(backend.exists(catalog.nameIdentifier(), Entity.EntityType.CATALOG));
+    assertFalse(backend.exists(schema.nameIdentifier(), Entity.EntityType.SCHEMA));
   }
 
   @TestTemplate

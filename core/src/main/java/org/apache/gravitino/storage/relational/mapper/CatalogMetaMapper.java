@@ -85,6 +85,12 @@ public interface CatalogMetaMapper {
       method = "selectCatalogMetaByIdForUpdate")
   CatalogPO selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId);
 
+  /** Selects and share-locks an active catalog by ID for the current transaction. */
+  @SelectProvider(
+      type = CatalogMetaSQLProviderFactory.class,
+      method = "selectCatalogMetaByIdForShare")
+  CatalogPO selectCatalogMetaByIdForShare(@Param("catalogId") Long catalogId);
+
   @InsertProvider(type = CatalogMetaSQLProviderFactory.class, method = "insertCatalogMeta")
   void insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO);
 
