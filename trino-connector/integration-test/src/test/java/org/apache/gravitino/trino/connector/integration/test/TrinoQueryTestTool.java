@@ -99,7 +99,7 @@ public class TrinoQueryTestTool {
               + "otherwise fall back to a single-node setup with combined coordinator-worker roles.");
 
       options.addOption(
-          "trino_version", true, "Specify the Trino version to test, the default value is 435.");
+          "trino_version", true, "Specify the Trino version to test, the default value is 440.");
 
       options.addOption(
           "trino_connector_dir",
@@ -128,7 +128,7 @@ public class TrinoQueryTestTool {
                 + "Run all the testers in the 'testsets' directory with a distributed cluster:\n"
                 + "TrinoTestTool --auto=all --trino_worker_num=3\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino version:\n"
-                + "TrinoTestTool --auto=all --trino_version=435\n\n"
+                + "TrinoTestTool --auto=all --trino_version=440\n\n"
                 + "Run all the testers in the 'testsets' directory with specific trino connector JAR files:\n"
                 + "TrinoTestTool --auto=all --trino_connector_dir=./trino-connector/libs\n\n"
                 + "Run all the tpch testset's testers in the 'testsets/tpch' directory:\n"
