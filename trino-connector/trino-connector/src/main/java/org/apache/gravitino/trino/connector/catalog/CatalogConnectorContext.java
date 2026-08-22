@@ -22,11 +22,13 @@ import com.google.common.base.Preconditions;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.session.PropertyMetadata;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.secret.CatalogSecretProperties;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoConnector;
 import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
@@ -265,7 +267,8 @@ public class CatalogConnectorContext {
         credentials = new Credential[0];
       }
       Map<String, String> connectorConfig =
-          connectorAdapter.buildInternalConnectorConfig(catalog, credentials);
+          new HashMap<>(connectorAdapter.buildInternalConnectorConfig(catalog, credentials));
+      CatalogSecretProperties.applySecretProperties(liveCatalog, connectorConfig);
       String internalConnectorName = connectorAdapter.internalConnectorName();
 
       Connector connector =

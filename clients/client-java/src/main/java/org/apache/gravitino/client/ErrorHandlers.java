@@ -248,6 +248,15 @@ public class ErrorHandlers {
   }
 
   /**
+   * Creates an error handler specific to secret-properties operations.
+   *
+   * @return A Consumer representing the secret-properties error handler.
+   */
+  public static Consumer<ErrorResponse> secretPropertiesErrorHandler() {
+    return SecretPropertiesErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates an error handler specific to Owner operations.
    *
    * @return A Consumer representing the Owner error handler.
@@ -1026,6 +1035,42 @@ public class ErrorHandlers {
 
         case ErrorConstants.NOT_IN_USE_CODE:
           throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to secret-properties operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class SecretPropertiesErrorHandler extends RestErrorHandler {
+
+    private static final SecretPropertiesErrorHandler INSTANCE = new SecretPropertiesErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
         case ErrorConstants.INTERNAL_ERROR_CODE:
           throw new RuntimeException(errorMessage);

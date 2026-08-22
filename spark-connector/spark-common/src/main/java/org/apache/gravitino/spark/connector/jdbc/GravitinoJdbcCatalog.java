@@ -26,6 +26,7 @@ import org.apache.commons.collections4.MapUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.secret.CatalogSecretProperties;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -53,6 +54,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
     Map<String, String> all =
         getPropertiesConverter().toSparkCatalogProperties(options, properties);
     applyJdbcCredential(gravitinoCatalogClient, all);
+    CatalogSecretProperties.applySecretProperties(gravitinoCatalogClient, all);
     jdbcTableCatalog.initialize(name, new CaseInsensitiveStringMap(all));
     return jdbcTableCatalog;
   }
