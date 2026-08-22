@@ -151,7 +151,11 @@ public interface Privilege {
     /** The privilege to execute (invoke) a function. */
     EXECUTE_FUNCTION(0L, 1L << 31),
     /** The privilege to alter a function's metadata. */
-    MODIFY_FUNCTION(0L, 1L << 32);
+    MODIFY_FUNCTION(0L, 1L << 32),
+    /** The privilege to view a tag. */
+    VIEW_TAG(0L, 1L << 33),
+    /** The privilege to view a policy. */
+    VIEW_POLICY(0L, 1L << 34);
 
     private final long highBits;
     private final long lowBits;

@@ -24,6 +24,8 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.PolicySelector;
+import org.apache.gravitino.policy.PolicyTagAssociation;
 
 /**
  * Interface for supporting global tag operations. This interface will provide tag listing, getting,
@@ -115,4 +117,64 @@ public interface TagOperations {
    * @return True if the tag is deleted, false if the tag does not exist.
    */
   boolean deleteTag(String name);
+
+  /**
+   * Lists policy names directly associated with a tag.
+   *
+   * @param tagName The tag name.
+   * @return The directly associated policy names.
+   * @throws UnsupportedOperationException If listing policy-to-tag associations is not supported.
+   */
+  default String[] listPoliciesForTag(String tagName) {
+    throw new UnsupportedOperationException("Listing policies for a tag is not supported");
+  }
+
+  /**
+   * Lists detailed policy associations for a tag.
+   *
+   * @param tagName The tag name.
+   * @return The policy associations including selectors.
+   * @throws UnsupportedOperationException If listing policy-to-tag associations is not supported.
+   */
+  default PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName) {
+    throw new UnsupportedOperationException(
+        "Listing policy associations for a tag is not supported");
+  }
+
+  /**
+   * Adds or updates one policy association for a tag without a selector.
+   *
+   * @param tagName The tag name.
+   * @param policyName The policy name.
+   * @return The resulting association.
+   * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
+   */
+  default PolicyTagAssociation addPolicyForTag(String tagName, String policyName) {
+    throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
+  }
+
+  /**
+   * Adds or updates one policy association for a tag with a selector.
+   *
+   * @param tagName The tag name.
+   * @param policyName The policy name.
+   * @param selector The policy selector.
+   * @return The resulting association.
+   * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
+   */
+  default PolicyTagAssociation addPolicyForTag(
+      String tagName, String policyName, PolicySelector selector) {
+    throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
+  }
+
+  /**
+   * Removes one policy association from a tag.
+   *
+   * @param tagName The tag name.
+   * @param policyName The policy name.
+   * @throws UnsupportedOperationException If removing policy-to-tag associations is not supported.
+   */
+  default void removePolicyFromTag(String tagName, String policyName) {
+    throw new UnsupportedOperationException("Removing a policy from a tag is not supported");
+  }
 }
