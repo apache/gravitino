@@ -84,3 +84,30 @@ class FieldReference(NamedReference):
     def __str__(self) -> str:
         """Returns the string representation of the field reference."""
         return ".".join(self._field_names)
+
+
+class MetadataField(NamedReference):
+    """A NamedReference that references a metadata field."""
+
+    _field_names: list[str]
+
+    def __init__(self, field_names: list[str]) -> None:
+        super().__init__()
+        self._field_names = field_names
+
+    def field_name(self) -> list[str]:
+        return list(self._field_names)
+
+    def __eq__(self, value: object) -> bool:
+        if isinstance(value, MetadataField):
+            return self._field_names == value._field_names
+        return False
+
+    def __hash__(self) -> int:
+        return hash(tuple(self._field_names))
+
+    def __str__(self) -> str:
+        return ".".join(self._field_names)
+
+
+PARTITION_NAME_FIELD: NamedReference = MetadataField(["partition_name"])
