@@ -50,9 +50,20 @@ them, and one catalog could not serve two Trino clusters that reach the IRC by d
 The connector derives everything else from the catalog itself. The Gravitino catalog name is passed
 as both `iceberg.rest-catalog.warehouse` and `iceberg.rest-catalog.prefix` — the Iceberg client
 selects the catalog twice over, first as the query parameter of the `GET /v1/config` call that
-discovers it, then as the path segment of every request after that. The Trino native file system
-(`fs.native-s3.enabled` and `s3.region`, or the GCS and Azure equivalents) is derived from the
-catalog's `warehouse` scheme and storage properties.
+discovers it, then as the path segment of every request after that.
+
+The Trino native file system is derived from the catalog's `warehouse` scheme, because vended
+credentials are only consumed by Trino's native file systems:
+
+| Warehouse scheme                          | Derived properties                                                                                    |
+|:------------------------------------------|:------------------------------------------------------------------------------------------------------|
+| `s3://`, `s3a://`, `s3n://`               | `fs.native-s3.enabled`, plus `s3.region`, `s3.endpoint` and `s3.path-style-access` where the catalog defines `s3-region`, `s3-endpoint` and `s3-path-style-access` |
+| `gs://`                                   | `fs.native-gcs.enabled`                                                                                |
+| `abfs://`, `abfss://`, `wasb://`, `wasbs://` | `fs.native-azure.enabled`                                                                           |
+| anything else (`hdfs://`, `file://`, `oss://`) | none — only `fs.hadoop.enabled`                                                                   |
+
+A scheme in the last row has no Trino native file system, so a catalog that vends credentials for it
+cannot have them applied; the connector logs a warning when it detects that combination.
 
 On the Gravitino side, the IRC must run with the dynamic config provider so it can serve catalogs
 defined in Gravitino:
@@ -80,6 +91,11 @@ gravitino.iceberg.rest-catalog.oauth2.scope=email
 
 Omitting this block against an authenticated IRC surfaces as an authentication error rather than a
 missing-configuration error, which is easy to misdiagnose.
+
+Four keys are reserved: `iceberg.rest-catalog.uri`, `.warehouse`, `.prefix` and
+`iceberg.catalog.type`. The connector always derives these itself, so setting them through either
+`gravitino.iceberg.rest-catalog.` or a catalog's `trino.bypass.` has no effect — the connector logs
+when it ignores one.
 
 When `gravitino.client.session.forwardUser=true`, the connector also sets
 `iceberg.rest-catalog.session=USER` so that each query carries the end user's identity to the IRC,

@@ -84,6 +84,10 @@ public class TrinoITContainers implements AutoCloseable {
     env.put("GRAVITINO_SERVER_PORT", String.valueOf(gravitinoServerPort));
     if (icebergRestServerPort > 0) {
       env.put("GRAVITINO_ICEBERG_REST_PORT", String.valueOf(icebergRestServerPort));
+    } else {
+      LOG.info(
+          "No Iceberg REST server port supplied; Trino falls back to the compose default. "
+              + "Catalogs routed through the Iceberg REST server will not work in this container.");
     }
     env.put("TRINO_CONNECTOR_TEST", String.valueOf(isTrinoConnectorTest));
     if (hiveRuntimeVersion != null) {

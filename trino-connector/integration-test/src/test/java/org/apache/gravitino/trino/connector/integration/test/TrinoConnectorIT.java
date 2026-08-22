@@ -23,7 +23,6 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import java.net.URI;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -94,18 +93,19 @@ public class TrinoConnectorIT extends BaseIT {
   private static GravitinoMetalake metalake;
   private static Catalog catalog;
 
-  @BeforeAll
-  @Override
-  public void startIntegrationTest() throws Exception {
+  // Set from an instance initializer rather than an overridden @BeforeAll: BaseIT is PER_CLASS, so
+  // the instance exists before any lifecycle method runs, and JUnit only guarantees that a
+  // superclass @BeforeAll precedes a subclass one — two @BeforeAll methods declared on this same
+  // class would have no defined order relative to each other.
+  {
     // The Trino connector loads every lakehouse-iceberg catalog through the Iceberg REST server,
     // so the auxiliary service has to run and serve this test's metalake.
-    ignoreIcebergAuxRestService = false;
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
-        IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
-    customConfigs.put(
-        GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE, metalakeName);
-    super.startIntegrationTest();
+    enableIcebergAuxRestService(
+        ImmutableMap.of(
+            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
+            IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
+            GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE,
+            metalakeName));
   }
 
   @BeforeAll
@@ -131,7 +131,7 @@ public class TrinoConnectorIT extends BaseIT {
         trinoConfDir,
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
         getGravitinoServerPort(),
-        URI.create(getIcebergRestServiceUri()).getPort(),
+        getIcebergRestServicePort(),
         metalakeName);
     Assertions.assertTrue(
         containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, catalogName),
