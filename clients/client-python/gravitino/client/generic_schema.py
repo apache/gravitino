@@ -20,11 +20,15 @@ from __future__ import annotations
 from typing import Dict
 
 from gravitino.api.audit import Audit
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
+)
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.schema_dto import SchemaDTO
 from gravitino.utils.http_client import HTTPClient
@@ -32,6 +36,7 @@ from gravitino.utils.http_client import HTTPClient
 
 class GenericSchema(
     Schema,
+    SupportsRoles,
     SupportsTags,
 ):
     def __init__(
@@ -50,6 +55,11 @@ class GenericSchema(
             MetadataObject.Type.SCHEMA,
         )
         self._metadata_object_tag_operations = MetadataObjectTagOperations(
+            metalake,
+            metadata_object,
+            rest_client,
+        )
+        self._metadata_object_role_operations = MetadataObjectRoleOperations(
             metalake,
             metadata_object,
             rest_client,
@@ -103,3 +113,9 @@ class GenericSchema(
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
+    def list_binding_role_names(self) -> list[str]:
+        return self._metadata_object_role_operations.list_binding_role_names()
