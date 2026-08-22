@@ -23,16 +23,16 @@
 #
 # Arguments:
 # --trino_versions_map: Space-separated list of "version:module" pairs.
-#                       Defaults to "435:trino-connector" if not provided.
+#                       Defaults to "440:trino-connector" if not provided.
 # --trino_test_args:    Arguments passed directly to the underlying test script.
 #
 # Example:
 # ./run_test_with_versions.sh \
-#   --trino_versions_map="435:trino-connector 478:trino-connector-470-478" \
+#   --trino_versions_map="440:trino-connector 478:trino-connector-470-478" \
 #   --trino_test_args="--auto=all"
 #
 # This configuration will run tests for:
-# - Trino 435 using the connector in 'trino-connector' directory
+# - Trino 440 using the connector in 'trino-connector' directory
 # - Trino 478 using the connector in 'trino-connector-470-478' directory
 # And pass "--auto=all" to the underlying test script for each version.
 
@@ -64,7 +64,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [ -z "$trino_versions_map" ]; then
-  trino_versions_map="435:trino-connector"
+  trino_versions_map="440:trino-connector"
 fi
 
 for entry in $trino_versions_map; do

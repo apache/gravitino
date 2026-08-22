@@ -17,8 +17,6 @@ The Gravitino Trino connector supports multiple Trino versions (see [Requirement
 trino-connector/
 ├── trino-connector/              # Shared base source code
 │   └── src/main/java/            # Common implementation used by all versions
-├── trino-connector-435-439/      # Version-specific adapters for Trino 435-439
-│   └── src/main/java/
 ├── trino-connector-440-445/      # Version-specific adapters for Trino 440-445
 │   └── src/main/java/
 ├── trino-connector-446-451/      # Version-specific adapters for Trino 446-451
@@ -71,7 +69,6 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
 
    | Trino Version | Version-Segment Module    |
    |---------------|---------------------------|
-   | 435-439       | `trino-connector-435-439` |
    | 440-445       | `trino-connector-440-445` |
    | 446-451       | `trino-connector-446-451` |
    | 452-468       | `trino-connector-452-468` |
