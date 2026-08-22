@@ -272,9 +272,14 @@ public abstract class BaseCatalog extends AbstractCatalog {
       // Fall through to check views.
     } catch (ForbiddenException e) {
       // Flink/Calcite speculatively probes tables during multi-part identifier resolution.
-      // Treat authorization failure as table-not-exist to allow Calcite to fall back to
+      // When the table name is actually a schema name (speculative probe), treat the
+      // authorization failure as table-not-exist to allow Calcite to fall back to
       // alternative resolution paths (e.g., treating the name as a schema).
-      throw new TableNotExistException(catalogName(), tablePath, e);
+      // Otherwise, propagate the authorization failure as a CatalogException.
+      if (isSpeculativeSchemaProbe(tablePath)) {
+        throw new TableNotExistException(catalogName(), tablePath, e);
+      }
+      throw new CatalogException(e);
     } catch (CatalogException e) {
       throw e;
     } catch (Exception e) {
@@ -1018,6 +1023,30 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throw new TableNotExistException(catalogName(), tablePath, e);
     } catch (Exception e) {
       throw new CatalogException(e);
+    }
+  }
+
+  /**
+   * Checks whether a {@link ForbiddenException} during {@code getTable} is likely a speculative
+   * schema probe by Calcite during multi-part identifier resolution. If the table name is actually
+   * an existing database/schema, then Calcite is probing whether a schema name might be a table,
+   * and we should preserve the {@link TableNotExistException} fallback. Otherwise, the authorization
+   * failure is a genuine permission issue on an existing table.
+   *
+   * @param tablePath the table path being probed
+   * @return {@code true} if the object name is a known schema (speculative probe), {@code false}
+   *     otherwise (real auth failure)
+   */
+  private boolean isSpeculativeSchemaProbe(ObjectPath tablePath) {
+    try {
+      return databaseExists(tablePath.getObjectName());
+    } catch (Exception e) {
+      LOG.debug(
+          "Failed to check if {} is a schema; assuming speculative probe for table {}",
+          tablePath.getObjectName(),
+          tablePath,
+          e);
+      return true;
     }
   }
 

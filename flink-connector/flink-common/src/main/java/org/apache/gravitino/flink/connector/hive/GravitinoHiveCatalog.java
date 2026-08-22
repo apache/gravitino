@@ -207,7 +207,10 @@ public class GravitinoHiveCatalog extends BaseCatalog {
     } catch (NoSuchTableException e) {
       // Fall through to check views.
     } catch (ForbiddenException e) {
-      throw new TableNotExistException(catalogName(), tablePath, e);
+      if (isSpeculativeSchemaProbe(tablePath)) {
+        throw new TableNotExistException(catalogName(), tablePath, e);
+      }
+      throw new CatalogException(e);
     } catch (Exception e) {
       LOG.warn("Failed to load table {} from catalog {}", tablePath, catalogName(), e);
       throw new CatalogException(e);
