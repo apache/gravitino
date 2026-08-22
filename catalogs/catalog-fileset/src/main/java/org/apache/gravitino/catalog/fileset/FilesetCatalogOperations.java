@@ -1640,6 +1640,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     while (current != null) {
       String simpleName = current.getClass().getSimpleName().toLowerCase();
       String message = Optional.ofNullable(current.getMessage()).orElse("").toLowerCase();
+      if (message.contains("must be a directory")) {
+        return "location is not a directory";
+      }
       if (current instanceof TimeoutException || message.contains("timed out")) {
         return "timeout";
       }
