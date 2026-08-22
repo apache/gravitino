@@ -5,13 +5,18 @@ name: Iceberg REST Trino Integration Test
 # The module uses a Java 24 toolchain (Trino 478) and runs in deploy mode against
 # the built distribution, so it needs its own job rather than the catch-all backend IT.
 on:
+  workflow_call:
+    inputs:
+      required_ci:
+        description: Run this suite as part of the Required CI orchestrator.
+        required: false
+        type: boolean
+        default: false
   push:
-    branches: [ "main", "branch-*" ]
-  pull_request:
     branches: [ "main", "branch-*" ]
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ inputs.required_ci && 'required-iceberg-rest-trino' || 'standalone' }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

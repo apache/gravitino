@@ -1,0 +1,179 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#  http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+#
+
+# Aggregates the reusable CI suites into one stable `Required CI` check that a
+# `main` ruleset can require, so merges are gated on CI and not on review
+# alone. This parent is the sole pull-request listener; each child suite is
+# invoked via `workflow_call` and keeps its own path-based skip, so a PR that
+# touches only docs no-ops every suite but still reports a green `Required CI`.
+# Each called workflow also appears as its own check in the PR checks panel,
+# so contributors keep per-suite visibility. `push` triggers on the children
+# are unchanged, so branch builds behave exactly as before.
+#
+# Rollout is staged: land this workflow (no ruleset yet) -> canary on a few PRs
+# -> enable the `main` ruleset requiring `Required CI` (and the standalone
+# `conflict-marker-check`). Fully reversible: delete this file and restore the
+# children's `pull_request:` trigger.
+name: Required CI
+
+on:
+  pull_request:
+    branches: [main, branch-*]
+    # Minimal event set: a new PR, a new push to an open PR, or a reopened PR.
+    # Excluding labeled/unlabeled/edited avoids redundant runs (upstream has
+    # no opt-in label; every PR runs CI).
+    types: [opened, synchronize, reopened]
+
+concurrency:
+  group: required-ci-${{ github.event.pull_request.number || github.ref }}
+  # A run, once started, completes. cancel-in-progress would cancel a
+  # Required CI run mid-flight when multiple pull_request events fire for
+  # the same PR (opened/synchronize/labeled), leaving a failed Required CI
+  # check and blocking the PR. Let each run finish so the aggregate reports a
+  # stable result.
+  cancel-in-progress: false
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  backend:
+    uses: ./.github/workflows/backend-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  spark:
+    uses: ./.github/workflows/spark-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  flink:
+    uses: ./.github/workflows/flink-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  trino:
+    uses: ./.github/workflows/trino-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  iceberg_rest_trino:
+    uses: ./.github/workflows/iceberg-rest-trino-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  python:
+    uses: ./.github/workflows/python-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  frontend:
+    uses: ./.github/workflows/frontend-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  access_control:
+    uses: ./.github/workflows/access-control-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  idp_basic:
+    uses: ./.github/workflows/idp-basic-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  mcp:
+    uses: ./.github/workflows/mcp-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  maintenance:
+    uses: ./.github/workflows/maintenance-integration-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  contrib_catalog:
+    uses: ./.github/workflows/contrib-catalog-test.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  web_ui:
+    uses: ./.github/workflows/web-ui-tests.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  # Aggregate every reusable suite into one check. `if: always()` runs even
+  # when an upstream suite is skipped (path filter), because a skipped suite
+  # reports `success` and must not fail the aggregate. The job fails only if
+  # any suite reports a non-success result.
+  required_ci:
+    name: Required CI
+    if: always()
+    needs:
+      - build
+      - backend
+      - spark
+      - flink
+      - trino
+      - iceberg_rest_trino
+      - python
+      - frontend
+      - access_control
+      - idp_basic
+      - mcp
+      - maintenance
+      - contrib_catalog
+      - web_ui
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify required CI suites
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          failures="$(
+            jq -r '
+              to_entries[]
+              | select(.value.result != "success")
+              | "\(.key)=\(.value.result)"
+            ' <<< "${RESULTS}"
+          )"
+          if [ -n "${failures}" ]; then
+            echo "::error::One or more required CI suites did not succeed."
+            echo "${failures}"
+            exit 1
+          fi
+          echo "All required CI suites succeeded."
