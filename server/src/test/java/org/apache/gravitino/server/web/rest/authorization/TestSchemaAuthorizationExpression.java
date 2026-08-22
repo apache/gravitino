@@ -66,7 +66,8 @@ public class TestSchemaAuthorizationExpression {
   @Test
   public void testLoadSchema() throws NoSuchMethodException, OgnlException {
     Method method =
-        SchemaOperations.class.getMethod("loadSchema", String.class, String.class, String.class);
+        SchemaOperations.class.getMethod(
+            "loadSchema", String.class, String.class, String.class, String.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     String expression = authorizationExpressionAnnotation.expression();

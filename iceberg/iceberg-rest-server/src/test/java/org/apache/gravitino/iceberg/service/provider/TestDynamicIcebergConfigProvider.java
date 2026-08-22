@@ -94,12 +94,15 @@ public class TestDynamicIcebergConfigProvider {
   private void setMockCatalogFetcher(
       DynamicIcebergConfigProvider provider, Map<String, Catalog> catalogMap) {
     DynamicIcebergConfigProvider.CatalogFetcher mockFetcher =
-        catalogName -> {
-          Catalog catalog = catalogMap.get(catalogName);
-          if (catalog == null) {
-            throw new NoSuchCatalogException("Catalog not found: %s", catalogName);
+        new DynamicIcebergConfigProvider.CatalogFetcher() {
+          @Override
+          public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
+            Catalog catalog = catalogMap.get(catalogName);
+            if (catalog == null) {
+              throw new NoSuchCatalogException("Catalog not found: %s", catalogName);
+            }
+            return catalog;
           }
-          return catalog;
         };
     provider.setCatalogFetcher(mockFetcher);
   }
@@ -289,15 +292,15 @@ public class TestDynamicIcebergConfigProvider {
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
     Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    Map<String, String> catalogProperties =
+        new HashMap<String, String>() {
+          {
+            put(IcebergConstants.CATALOG_BACKEND, "custom");
+            put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+          }
+        };
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
-    Mockito.when(mockCatalog.properties())
-        .thenReturn(
-            new HashMap<String, String>() {
-              {
-                put(IcebergConstants.CATALOG_BACKEND, "custom");
-                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
-              }
-            });
+    Mockito.when(mockCatalog.properties()).thenReturn(catalogProperties);
 
     // Set the mock CatalogDispatchers to GravitinoEnv
     FieldUtils.writeField(
@@ -516,15 +519,15 @@ public class TestDynamicIcebergConfigProvider {
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
     Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    Map<String, String> catalogProperties =
+        new HashMap<String, String>() {
+          {
+            put(IcebergConstants.CATALOG_BACKEND, "custom");
+            put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+          }
+        };
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
-    Mockito.when(mockCatalog.properties())
-        .thenReturn(
-            new HashMap<String, String>() {
-              {
-                put(IcebergConstants.CATALOG_BACKEND, "custom");
-                put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
-              }
-            });
+    Mockito.when(mockCatalog.properties()).thenReturn(catalogProperties);
 
     // Set the mock CatalogDispatchers to GravitinoEnv
     FieldUtils.writeField(

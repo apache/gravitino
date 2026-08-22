@@ -208,19 +208,20 @@ public class GravitinoMockServer implements AutoCloseable {
               }
             });
 
-    when(metaLake.loadCatalog(anyString()))
-        .thenAnswer(
-            new Answer<Catalog>() {
-              @Override
-              public Catalog answer(InvocationOnMock invocation) throws Throwable {
-                String catalogName = invocation.getArgument(0);
-                if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
-                  throw new NoSuchCatalogException("catalog does not be found");
-                }
+    Answer<Catalog> loadCatalogAnswer =
+        new Answer<Catalog>() {
+          @Override
+          public Catalog answer(InvocationOnMock invocation) throws Throwable {
+            String catalogName = invocation.getArgument(0);
+            if (!metalakes.get(metalakeName).catalogs.containsKey(catalogName)) {
+              throw new NoSuchCatalogException("catalog does not be found");
+            }
 
-                return metalakes.get(metalakeName).catalogs.get(catalogName);
-              }
-            });
+            return metalakes.get(metalakeName).catalogs.get(catalogName);
+          }
+        };
+    when(metaLake.loadCatalog(anyString())).thenAnswer(loadCatalogAnswer);
+    // Connectors load catalogs with secrets resolved for backend configuration.
     when(metaLake.listCatalogsInfo())
         .thenAnswer(
             new Answer<Catalog[]>() {

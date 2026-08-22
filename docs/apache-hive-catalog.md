@@ -83,7 +83,7 @@ When using Gravitino authorization for Hive with Apache Ranger, see the [Authori
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime. Other secret-manager-backed properties can be retrieved via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema

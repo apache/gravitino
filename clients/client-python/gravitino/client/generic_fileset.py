@@ -18,6 +18,7 @@ from typing import Dict, List, Optional
 
 from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.supports_credentials import SupportsCredentials
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
@@ -25,6 +26,9 @@ from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
+)
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
 )
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
@@ -36,6 +40,7 @@ from gravitino.utils import HTTPClient
 class GenericFileset(
     Fileset,
     SupportsCredentials,
+    SupportsSecrets,
     SupportsTags,
 ):
     _fileset: FilesetDTO
@@ -43,6 +48,9 @@ class GenericFileset(
 
     _object_credential_operations: MetadataObjectCredentialOperations
     """The metadata object credential operations"""
+
+    _object_secret_operations: MetadataObjectSecretOperations
+    """The metadata object secret property operations"""
 
     def __init__(
         self, fileset: FilesetDTO, rest_client: HTTPClient, full_namespace: Namespace
@@ -53,6 +61,9 @@ class GenericFileset(
             MetadataObject.Type.FILESET,
         )
         self._object_credential_operations = MetadataObjectCredentialOperations(
+            full_namespace.level(0), metadata_object, rest_client
+        )
+        self._object_secret_operations = MetadataObjectSecretOperations(
             full_namespace.level(0), metadata_object, rest_client
         )
         self._object_tag_operations = MetadataObjectTagOperations(
@@ -85,6 +96,9 @@ class GenericFileset(
 
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
+
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()
 
     def list_tags(self) -> List[str]:
         return self._object_tag_operations.list_tags()

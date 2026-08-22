@@ -20,6 +20,7 @@
 package org.apache.gravitino.flink.connector.store;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -100,8 +101,11 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       BaseCatalogFactory catalogFactory = getCatalogFactory(catalog.provider());
       CatalogPropertiesConverter catalogPropertiesConverter =
           catalogFactory.catalogPropertiesConverter();
+      Map<String, String> catalogProperties =
+          new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+      catalogProperties.putAll(catalog.supportsSecrets().getSecrets());
       Map<String, String> flinkCatalogProperties =
-          catalogPropertiesConverter.toFlinkCatalogProperties(catalog.properties());
+          catalogPropertiesConverter.toFlinkCatalogProperties(catalogProperties);
       CatalogDescriptor descriptor =
           newCatalogDescriptor(catalogName, Configuration.fromMap(flinkCatalogProperties));
       return Optional.of(descriptor);

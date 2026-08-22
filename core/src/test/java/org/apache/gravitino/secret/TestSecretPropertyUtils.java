@@ -70,6 +70,74 @@ public class TestSecretPropertyUtils {
     }
   }
 
+  @Test
+  void testIsCredentialVendingProperty() {
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("s3-access-key-id"));
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("s3-secret-access-key"));
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("aws-access-key-id"));
+    Assertions.assertTrue(
+        SecretPropertyUtils.isCredentialVendingProperty("azure-storage-account-key"));
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("jdbc-password"));
+    Assertions.assertTrue(SecretPropertyUtils.isCredentialVendingProperty("jdbc-user"));
+    Assertions.assertFalse(SecretPropertyUtils.isCredentialVendingProperty(null));
+  }
+
+  @Test
+  void testBuildSecrets() {
+    try (SecretManager sm = memorySecretManager()) {
+      Map<String, String> entityProps = new HashMap<>();
+      entityProps.put("jdbc-url", "jdbc:mysql://localhost/db");
+      entityProps.put("jdbc-user", "root");
+      Map<String, SecretBinding> bindings =
+          Map.of(
+              "jdbc-password",
+              new SecretBinding("memory", "s3cr3t"),
+              "custom-secret",
+              new SecretBinding("memory", "custom-value"));
+      List<SecretMaterial> writes =
+          sm.assembleSecretMaterials(
+              Map.of("jdbc-url", "jdbc:mysql://localhost/db", "jdbc-user", "root"),
+              entityProps,
+              "catalog",
+              42L,
+              bindings,
+              Map.of());
+      sm.writeSecrets(writes);
+
+      entityProps.put("s3-access-key-id", "AKIA");
+      entityProps.put("s3-secret-access-key", "SECRET");
+      entityProps.put("visible", "ok");
+
+      Map<String, String> secrets = SecretPropertyUtils.buildSecrets(sm, entityProps);
+
+      // Only non-credential-vending secret URNs
+      Assertions.assertEquals("custom-value", secrets.get("custom-secret"));
+      Assertions.assertFalse(secrets.containsKey("jdbc-password"));
+      Assertions.assertFalse(secrets.containsKey("jdbc-user"));
+      Assertions.assertFalse(secrets.containsKey("jdbc-url"));
+      Assertions.assertFalse(secrets.containsKey("visible"));
+      Assertions.assertFalse(secrets.containsKey("s3-access-key-id"));
+      Assertions.assertFalse(secrets.containsKey("s3-secret-access-key"));
+    }
+  }
+
+  @Test
+  void testBuildSecretsNullAndEmpty() {
+    try (SecretManager sm = memorySecretManager()) {
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, null).isEmpty());
+      Assertions.assertTrue(SecretPropertyUtils.buildSecrets(sm, Map.of()).isEmpty());
+    }
+  }
+
+  @Test
+  void testMergeProperties() {
+    Map<String, String> merged =
+        SecretPropertyUtils.mergeProperties(Map.of("a", "1"), Map.of("b", "2", "a", "override"));
+    Assertions.assertEquals("override", merged.get("a"));
+    Assertions.assertEquals("2", merged.get("b"));
+    Assertions.assertTrue(SecretPropertyUtils.mergeProperties(null, null).isEmpty());
+  }
+
   private static SecretManager memorySecretManager() {
     Config config = new Config(false) {};
     Properties properties = new Properties();

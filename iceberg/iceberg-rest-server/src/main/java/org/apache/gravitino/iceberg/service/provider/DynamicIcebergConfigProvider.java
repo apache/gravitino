@@ -108,17 +108,27 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     // filtered out of catalog.properties(). We need two different strategies to recover them:
     //
     // Auxiliary mode: the catalog is a BaseCatalog running in the same JVM as the Gravitino
-    // server. Call propertiesWithCredentialProviders() which returns the raw entity properties
-    // including all hidden fields.
+    // server. Call propertiesWithCredentialProviders() then SecretManager.toPlaintextProperties
+    // so URNs become plaintext while credential-provider keys remain for provider detection.
     //
-    // Standalone mode: the catalog is a client-side object obtained via the Gravitino REST API.
-    // Call getCredentials() to retrieve vended credentials, then inject any JdbcCredential
-    // fields into the properties map so the JDBC backend can connect.
+    // Standalone mode: merge loadCatalog().properties() with getSecrets(), then inject
+    // JdbcCredential fields from getCredentials() when present.
     Map<String, String> catalogProperties;
     if (catalog instanceof BaseCatalog) {
-      catalogProperties = ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders();
+      catalogProperties =
+          new HashMap<>(
+              GravitinoEnv.getInstance()
+                  .secretManager()
+                  .toPlaintextProperties(
+                      ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
     } else {
-      catalogProperties = new HashMap<>(catalog.properties());
+      catalogProperties =
+          new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+      try {
+        catalogProperties.putAll(catalog.supportsSecrets().getSecrets());
+      } catch (UnsupportedOperationException ignored) {
+        // Catalog does not support secret property operations.
+      }
       if (catalog instanceof SupportsCredentials) {
         Arrays.stream(((SupportsCredentials) catalog).getCredentials())
             .filter(c -> c instanceof JdbcCredential)
@@ -317,7 +327,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-      return getGravitinoClient().loadMetalake(metalake).loadCatalog(catalogName);
+      return getGravitinoClient().loadCatalog(catalogName);
     }
 
     @Override

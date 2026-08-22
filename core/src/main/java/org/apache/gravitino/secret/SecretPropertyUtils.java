@@ -21,9 +21,11 @@ package org.apache.gravitino.secret;
 import static org.apache.gravitino.secret.SecretConstants.URN_PREFIX;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
@@ -35,7 +37,52 @@ import org.apache.commons.lang3.StringUtils;
  */
 public final class SecretPropertyUtils {
 
+  /**
+   * Property keys owned by credential vending ({@code SupportsCredentials} / credential providers),
+   * plus JDBC connection identity keys that are delivered via {@code JdbcCredential}.
+   *
+   * <p>These keys are omitted from {@link #buildSecrets}; callers should use {@code getCredentials}
+   * instead.
+   */
+  public static final Set<String> CREDENTIAL_VENDING_PROPERTY_KEYS =
+      ImmutableSet.of(
+          // S3
+          "s3-access-key-id",
+          "s3-secret-access-key",
+          "s3-session-token",
+          // OSS
+          "oss-access-key-id",
+          "oss-secret-access-key",
+          "oss-security-token",
+          // COS
+          "cos-access-key-id",
+          "cos-secret-access-key",
+          // AWS / Glue static keys
+          "aws-access-key-id",
+          "aws-secret-access-key",
+          // Azure
+          "azure-storage-account-key",
+          "azure-client-secret",
+          // GCS static credential material
+          "gcs-service-account-file",
+          "gcs-credential-path",
+          "gcs-credential-file-path",
+          // JDBC connection identity (JdbcCredential)
+          "jdbc-user",
+          "jdbc-password");
+
   private SecretPropertyUtils() {}
+
+  /**
+   * Returns whether a property key is owned by credential vending (or JDBC credential delivery) and
+   * must be omitted from secrets delivery.
+   *
+   * @param key the property key
+   * @return true when the key is a credential-vending property
+   */
+  public static boolean isCredentialVendingProperty(@Nullable String key) {
+    return key != null && CREDENTIAL_VENDING_PROPERTY_KEYS.contains(key);
+  }
 
   /**
    * Returns whether a property value is a Gravitino secret URN for the given key.
@@ -46,6 +93,66 @@ public final class SecretPropertyUtils {
    */
   public static boolean isSecretProperty(@Nullable String key, @Nullable String value) {
     return key != null && value != null && value.startsWith(URN_PREFIX) && value.endsWith(key);
+  }
+
+  /**
+   * Builds a map of secret-manager plaintext properties only.
+   *
+   * <p>Starting from raw entity properties:
+   *
+   * <ol>
+   *   <li>Include only entries where {@link #isSecretProperty} is true.
+   *   <li>Omit credential-vending keys including {@code jdbc-user} / {@code jdbc-password} (use
+   *       {@code getCredentials}).
+   *   <li>Resolve secret URN values to plaintext via {@link SecretManager#readSecret}.
+   * </ol>
+   *
+   * <p>Normal non-secret properties are not included.
+   *
+   * @param secretManager secret manager used to resolve URNs
+   * @param rawProperties raw entity properties (may be null)
+   * @return a new secret plaintext property map; never null
+   */
+  public static Map<String, String> buildSecrets(
+      SecretManager secretManager, @Nullable Map<String, String> rawProperties) {
+    Preconditions.checkArgument(secretManager != null, "secretManager must not be null");
+    if (rawProperties == null || rawProperties.isEmpty()) {
+      return Map.of();
+    }
+    Map<String, String> secrets = new HashMap<>();
+    for (Map.Entry<String, String> entry : rawProperties.entrySet()) {
+      String key = entry.getKey();
+      String value = entry.getValue();
+      if (key == null || value == null) {
+        continue;
+      }
+      if (isCredentialVendingProperty(key)) {
+        continue;
+      }
+      if (isSecretProperty(key, value)) {
+        secrets.put(key, secretManager.readSecret(SecretUrn.parse(value)));
+      }
+    }
+    return secrets;
+  }
+
+  /**
+   * Merges base properties with secret plaintext properties.
+   *
+   * <p>Returns a new mutable map containing all entries from {@code base}, then overlays {@code
+   * secrets}. Null maps are treated as empty.
+   *
+   * @param base non-secret / default-load properties (may be null)
+   * @param secrets secret plaintext properties from {@link #buildSecrets} (may be null)
+   * @return a new mutable merged property map; never null
+   */
+  public static Map<String, String> mergeProperties(
+      @Nullable Map<String, String> base, @Nullable Map<String, String> secrets) {
+    Map<String, String> merged = copyEntityProperties(base);
+    if (secrets != null && !secrets.isEmpty()) {
+      merged.putAll(secrets);
+    }
+    return merged;
   }
 
   /**

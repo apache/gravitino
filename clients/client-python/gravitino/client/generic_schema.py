@@ -23,8 +23,12 @@ from gravitino.api.audit import Audit
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
+)
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.schema_dto import SchemaDTO
 from gravitino.utils.http_client import HTTPClient
@@ -33,6 +37,7 @@ from gravitino.utils.http_client import HTTPClient
 class GenericSchema(
     Schema,
     SupportsTags,
+    SupportsSecrets,
 ):
     def __init__(
         self,
@@ -50,6 +55,11 @@ class GenericSchema(
             MetadataObject.Type.SCHEMA,
         )
         self._metadata_object_tag_operations = MetadataObjectTagOperations(
+            metalake,
+            metadata_object,
+            rest_client,
+        )
+        self._object_secret_operations = MetadataObjectSecretOperations(
             metalake,
             metadata_object,
             rest_client,
@@ -103,3 +113,9 @@ class GenericSchema(
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
+
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()

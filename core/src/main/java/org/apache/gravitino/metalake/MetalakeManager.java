@@ -50,10 +50,14 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.Executable;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -357,6 +361,13 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
                   "Metalake %s has catalogs, please drop them first or use force option", ident);
             }
 
+            // Force drop deletes the entity tree via store cascade and bypasses
+            // CatalogManager.dropCatalog / FilesetOperationDispatcher.dropFileset, so clean
+            // write-through secrets here before the metadata is gone.
+            if (!catalogEntities.isEmpty()) {
+              deleteWriteThroughSecretsUnderMetalake(ident, catalogEntities);
+            }
+
             return store.delete(ident, EntityType.METALAKE, true);
           } catch (NoSuchMetalakeException | NoSuchEntityException e) {
             // Another server may have completed the drop after the initial existence check.
@@ -367,6 +378,40 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  /**
+   * Best-effort delete of write-through secrets for catalog / schema / fileset entities under a
+   * metalake. Used when {@code dropMetalake(..., force=true)} cascade-deletes store metadata
+   * without going through per-entity drop dispatchers.
+   */
+  private void deleteWriteThroughSecretsUnderMetalake(
+      NameIdentifier metalakeIdent, List<CatalogEntity> catalogEntities) throws IOException {
+    SecretManager secretManager;
+    try {
+      secretManager = GravitinoEnv.getInstance().secretManager();
+    } catch (IllegalStateException e) {
+      LOG.debug(
+          "SecretManager is not initialized; skip secret cleanup when dropping metalake {}",
+          metalakeIdent);
+      return;
+    }
+
+    for (CatalogEntity catalog : catalogEntities) {
+      secretManager.deleteSecretsFromProperties(catalog.getProperties());
+      Namespace schemaNs = Namespace.of(metalakeIdent.name(), catalog.name());
+      List<SchemaEntity> schemas = store.list(schemaNs, SchemaEntity.class, EntityType.SCHEMA);
+      for (SchemaEntity schema : schemas) {
+        secretManager.deleteSecretsFromProperties(schema.properties());
+        Namespace filesetNs =
+            NamespaceUtil.ofFileset(metalakeIdent.name(), catalog.name(), schema.name());
+        List<FilesetEntity> filesets =
+            store.list(filesetNs, FilesetEntity.class, EntityType.FILESET);
+        for (FilesetEntity fileset : filesets) {
+          secretManager.deleteSecretsFromProperties(fileset.properties());
+        }
+      }
+    }
   }
 
   @Override

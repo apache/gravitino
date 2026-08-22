@@ -3283,4 +3283,66 @@ public class TestFilesetCatalogOperations {
       Assertions.assertEquals(urn.toString(), schema.properties().get("aws-sk"));
     }
   }
+
+  @Test
+  public void testDropSchemaCascadeDeletesSecrets() throws Exception {
+    long schemaEntityId = idGenerator.nextId();
+    long filesetEntityId = idGenerator.nextId();
+    SecretUrn schemaUrn =
+        SecretUrn.buildWriteThrough(
+            "memory",
+            Map.of(
+                SecretConstants.ATTR_ENTITY_TYPE, "schema",
+                SecretConstants.ATTR_ENTITY_ID, String.valueOf(schemaEntityId),
+                SecretConstants.ATTR_PROPERTY_KEY, "schema-sk"));
+    SecretUrn filesetUrn =
+        SecretUrn.buildWriteThrough(
+            "memory",
+            Map.of(
+                SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                SecretConstants.ATTR_ENTITY_ID, String.valueOf(filesetEntityId),
+                SecretConstants.ATTR_PROPERTY_KEY, "fileset-sk"));
+    secretManager.writeSecrets(
+        List.of(
+            new SecretMaterial(schemaUrn, "schema-secret"),
+            new SecretMaterial(filesetUrn, "fileset-secret")));
+
+    String schemaName = "schema_cascade_secret_" + generateTestId();
+    String filesetName = "fs_cascade_secret_" + generateTestId();
+    String catalogPath = TEST_ROOT_PATH + "/catalog_cascade_secret_" + generateTestId();
+    String schemaPath = catalogPath + "/" + schemaName;
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          Maps.newHashMap(Map.of(LOCATION, catalogPath)),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+
+      NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
+      Map<String, String> schemaProps =
+          Maps.newHashMap(
+              StringIdentifier.newPropertiesWithId(
+                  StringIdentifier.fromId(schemaEntityId),
+                  Map.of(LOCATION, schemaPath, "schema-sk", schemaUrn.toString())));
+      ops.createSchema(schemaIdent, "comment", schemaProps);
+
+      NameIdentifier filesetIdent =
+          NameIdentifierUtil.ofFileset("m1", "c1", schemaName, filesetName);
+      Map<String, String> filesetProps =
+          Maps.newHashMap(
+              StringIdentifier.newPropertiesWithId(
+                  StringIdentifier.fromId(filesetEntityId),
+                  Map.of("fileset-sk", filesetUrn.toString())));
+      ops.createFileset(filesetIdent, "comment", Fileset.Type.MANAGED, null, filesetProps);
+
+      Assertions.assertEquals("schema-secret", secretManager.readSecret(schemaUrn));
+      Assertions.assertEquals("fileset-secret", secretManager.readSecret(filesetUrn));
+
+      Assertions.assertTrue(ops.dropSchema(schemaIdent, true));
+
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(schemaUrn));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secretManager.readSecret(filesetUrn));
+    }
+  }
 }

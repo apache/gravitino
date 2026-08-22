@@ -165,8 +165,14 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     String provider = gravitinoCatalogClient.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    this.sparkCatalog =
-        createAndInitSparkCatalog(name, options, gravitinoCatalogClient.properties());
+    Map<String, String> catalogProperties =
+        new HashMap<>(
+            gravitinoCatalogClient.properties() == null
+                ? Map.of()
+                : gravitinoCatalogClient.properties());
+    catalogProperties.putAll(
+        gravitinoCatalogClient.supportsSecrets().getSecrets());
+    this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
     this.sparkTypeConverter = getSparkTypeConverter();

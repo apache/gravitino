@@ -28,7 +28,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
@@ -38,6 +40,7 @@ import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
@@ -371,6 +374,117 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
                   ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of()));
       Assertions.assertTrue(filesets.dropFileset(ident));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  public void testAlterFilesetRemovePropertyDeletesWriteThroughSecret() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(9200L);
+      IdGenerator ids = nextId::getAndIncrement;
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
+      String schemaName = "schema_secret_alter_" + UUID.randomUUID();
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets)
+          .createSchema(
+              NameIdentifier.of(metalake, catalog, schemaName),
+              "comment",
+              ImmutableMap.of("k1", "v1"));
+
+      NameIdentifier ident = NameIdentifier.of(metalake, catalog, schemaName, "fileset_alter_1");
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+      Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
+      Map<String, String> props = ImmutableMap.of("k1", "v1");
+      long entityId = nextId.get();
+      filesets.createMultipleLocationFileset(
+          ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
+
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+
+      filesets.alterFileset(ident, FilesetChange.removeProperty("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  public void testDropMetalakeForceCleansFilesetSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      Object previous = FieldUtils.readField(GravitinoEnv.getInstance(), "secretManager", true);
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", secrets, true);
+      try {
+        AtomicLong nextId = new AtomicLong(9300L);
+        IdGenerator ids = nextId::getAndIncrement;
+        String ml = "ml_force_secret_" + UUID.randomUUID().toString().replace("-", "");
+        String cat = "cat_force_secret";
+        String schemaName = "schema_force_secret";
+
+        entityStore.put(
+            org.apache.gravitino.meta.BaseMetalake.builder()
+                .withId(ids.nextId())
+                .withName(ml)
+                .withAuditInfo(
+                    org.apache.gravitino.meta.AuditInfo.builder()
+                        .withCreator("test")
+                        .withCreateTime(java.time.Instant.now())
+                        .build())
+                .withVersion(org.apache.gravitino.meta.SchemaVersion.V_0_1)
+                .build(),
+            true);
+
+        CatalogManager cm = new CatalogManager(new Config(false) {}, entityStore, ids, secrets);
+        cm.createCatalog(
+            NameIdentifier.of(ml, cat),
+            org.apache.gravitino.Catalog.Type.RELATIONAL,
+            "test",
+            "comment",
+            ImmutableMap.of(
+                org.apache.gravitino.TestCatalog.PROPERTY_KEY1,
+                "value1",
+                org.apache.gravitino.TestCatalog.PROPERTY_KEY2,
+                "value2",
+                org.apache.gravitino.TestCatalog.PROPERTY_KEY5_PREFIX + "1",
+                "value3"));
+
+        SchemaOperationDispatcher schemas =
+            new SchemaOperationDispatcher(cm, entityStore, ids, secrets);
+        FilesetOperationDispatcher filesets =
+            new FilesetOperationDispatcher(cm, entityStore, ids, secrets);
+        schemas.createSchema(
+            NameIdentifier.of(ml, cat, schemaName), "comment", ImmutableMap.of("k1", "v1"));
+
+        NameIdentifier filesetIdent = NameIdentifier.of(ml, cat, schemaName, "fs_force_1");
+        long entityId = nextId.get();
+        filesets.createMultipleLocationFileset(
+            filesetIdent,
+            "comment",
+            Fileset.Type.MANAGED,
+            Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc"),
+            ImmutableMap.of("k1", "v1"),
+            Map.of("k2", new SecretBinding("memory", "force-secret")),
+            Map.of());
+
+        SecretUrn urn =
+            SecretUrn.buildWriteThrough(
+                "memory",
+                Map.of(
+                    SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                    SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                    SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+        Assertions.assertEquals("force-secret", secrets.readSecret(urn));
+
+        MetalakeManager metalakeManager = new MetalakeManager(entityStore, ids);
+        Assertions.assertTrue(metalakeManager.dropMetalake(NameIdentifier.of(ml), true));
+        Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      } finally {
+        FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", previous, true);
+      }
     }
   }
 

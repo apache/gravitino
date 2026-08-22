@@ -84,7 +84,7 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Use the [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) for JDBC identity. Other secret-manager-backed properties can be retrieved via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`.
 :::
 
 ## Schema
