@@ -33,6 +33,8 @@ import javax.ws.rs.DELETE;
 import javax.ws.rs.Encoded;
 import javax.ws.rs.GET;
 import javax.ws.rs.HEAD;
+import javax.ws.rs.HeaderParam;
+import javax.ws.rs.HttpMethod;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -41,6 +43,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import javax.ws.rs.core.UriInfo;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.MetadataObject;
@@ -51,6 +54,7 @@ import org.apache.gravitino.iceberg.service.IcebergObjectMapper;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.dispatcher.IcebergViewOperationDispatcher;
+import org.apache.gravitino.iceberg.service.idempotency.IcebergIdempotencyManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -80,12 +84,16 @@ public class IcebergViewOperations {
 
   private ObjectMapper icebergObjectMapper;
   private IcebergViewOperationDispatcher viewOperationDispatcher;
+  private IcebergIdempotencyManager idempotencyManager;
 
   @Context private HttpServletRequest httpRequest;
 
   @Inject
-  public IcebergViewOperations(IcebergViewOperationDispatcher viewOperationDispatcher) {
+  public IcebergViewOperations(
+      IcebergViewOperationDispatcher viewOperationDispatcher,
+      IcebergIdempotencyManager idempotencyManager) {
     this.viewOperationDispatcher = viewOperationDispatcher;
+    this.idempotencyManager = idempotencyManager;
     this.icebergObjectMapper = IcebergObjectMapper.getInstance();
   }
 
@@ -144,7 +152,17 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      CreateViewRequest createViewRequest) {
+      CreateViewRequest createViewRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doCreateView(prefix, namespace, createViewRequest));
+  }
+
+  private Response doCreateView(
+      String prefix, String namespace, CreateViewRequest createViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -226,7 +244,17 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
       @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
-      UpdateTableRequest replaceViewRequest) {
+      UpdateTableRequest replaceViewRequest,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.POST, uriInfo),
+        () -> doReplaceView(prefix, namespace, view, replaceViewRequest));
+  }
+
+  private Response doReplaceView(
+      String prefix, String namespace, String view, UpdateTableRequest replaceViewRequest) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
@@ -265,7 +293,16 @@ public class IcebergViewOperations {
       @AuthorizationMetadata(type = Entity.EntityType.CATALOG) @PathParam("prefix") String prefix,
       @AuthorizationMetadata(type = EntityType.SCHEMA) @Encoded() @PathParam("namespace")
           String namespace,
-      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view) {
+      @AuthorizationMetadata(type = EntityType.VIEW) @Encoded() @PathParam("view") String view,
+      @HeaderParam(IcebergIdempotencyManager.IDEMPOTENCY_KEY) String idempotencyKey,
+      @Context UriInfo uriInfo) {
+    return idempotencyManager.replayOrExecute(
+        idempotencyKey,
+        IcebergIdempotencyManager.operationBinding(HttpMethod.DELETE, uriInfo),
+        () -> doDropView(prefix, namespace, view));
+  }
+
+  private Response doDropView(String prefix, String namespace, String view) {
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
