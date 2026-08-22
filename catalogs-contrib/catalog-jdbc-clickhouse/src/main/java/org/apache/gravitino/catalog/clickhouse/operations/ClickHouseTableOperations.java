@@ -92,9 +92,6 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
 
-  private static final Pattern ORDER_BY_PATTERN =
-      Pattern.compile(
-          "(?is)\\bORDER\\s+BY\\s*(.+?)(?=\\bPARTITION\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
@@ -782,25 +779,28 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       List<Index> indexes = getIndexes(connection, databaseName, tableName);
       jdbcTableBuilder.withIndexes(indexes.toArray(new Index[0]));
 
-      ShowCreateTableMetadata metadata = parseShowCreateTable(connection, tableName);
-      Transform[] partitioning = metadata.partitioning;
+      SystemTableMetadata systemTableMetadata =
+          getSystemTableMetadata(connection, databaseName, tableName);
+      ShowCreateTableMetadata showCreateMetadata = parseShowCreateTable(connection, tableName);
+      Transform[] partitioning = showCreateMetadata.partitioning;
       if (ArrayUtils.isEmpty(partitioning)) {
         partitioning = getTablePartitioning(connection, databaseName, tableName);
       }
       jdbcTableBuilder.withPartitioning(partitioning);
-      jdbcTableBuilder.withSortOrders(metadata.sortOrders);
+      jdbcTableBuilder.withSortOrders(systemTableMetadata.sortOrders());
 
       Distribution distribution = getDistributionInfo(connection, databaseName, tableName);
       jdbcTableBuilder.withDistribution(distribution);
 
       Map<String, String> tableProperties = getTableProperties(connection, tableName);
-      // Merge SETTINGS parsed from SHOW CREATE TABLE into table properties.
-      // SHOW CREATE TABLE is the authoritative source for SETTINGS; it takes precedence
+      // Merge SETTINGS parsed from system.tables.engine_full into table properties.
+      // engine_full contains only table-level storage clauses, so projection SETTINGS cannot be
+      // mistaken for table SETTINGS. These values take precedence
       // over any settings.* keys that might exist in system.tables (though getTableProperties()
       // currently does not read SETTINGS from system.tables, so no overlap occurs in practice).
-      if (!metadata.settings.isEmpty()) {
+      if (!systemTableMetadata.settings().isEmpty()) {
         Map<String, String> merged = new HashMap<>(tableProperties);
-        merged.putAll(metadata.settings);
+        merged.putAll(systemTableMetadata.settings());
         tableProperties = Collections.unmodifiableMap(merged);
       }
       jdbcTableBuilder.withProperties(tableProperties);
@@ -828,6 +828,26 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
     return kinds;
+  }
+
+  @VisibleForTesting
+  SystemTableMetadata getSystemTableMetadata(
+      Connection connection, String databaseName, String tableName) throws SQLException {
+    String sql =
+        "SELECT sorting_key, engine_full FROM system.tables WHERE database = ? AND name = ?";
+    try (PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setString(1, databaseName);
+      statement.setString(2, tableName);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        if (resultSet.next()) {
+          return new SystemTableMetadata(
+              parseOrderByClause(resultSet.getString("sorting_key")),
+              parseSettingsFromEngineFull(resultSet.getString("engine_full")));
+        }
+      }
+    }
+
+    throw new NoSuchTableException("Table %s does not exist in %s.", tableName, databaseName);
   }
 
   @Override
@@ -1382,19 +1402,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       return metadata;
     }
 
-    Matcher orderMatcher = ORDER_BY_PATTERN.matcher(createSql);
-    if (orderMatcher.find()) {
-      metadata.sortOrders = parseOrderByClause(orderMatcher.group(1));
-    }
-
     Matcher partitionMatcher = PARTITION_BY_PATTERN.matcher(createSql);
     if (partitionMatcher.find()) {
       metadata.partitioning = parsePartitioning(partitionMatcher.group(1));
-    }
-
-    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(createSql);
-    if (settingsMatcher.find()) {
-      metadata.settings = parseSettingsClause(settingsMatcher.group(1));
     }
 
     return metadata;
@@ -1420,13 +1430,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @VisibleForTesting
-  SortOrder[] parseSortOrdersFromCreateSql(String createSql) {
-    return parseCreateStatement(createSql).sortOrders;
-  }
+  Map<String, String> parseSettingsFromEngineFull(String engineFull) {
+    if (StringUtils.isBlank(engineFull)) {
+      return Collections.emptyMap();
+    }
 
-  @VisibleForTesting
-  Map<String, String> parseSettingsFromCreateSql(String createSql) {
-    return parseCreateStatement(createSql).settings;
+    Matcher settingsMatcher = SETTINGS_PATTERN.matcher(engineFull);
+    if (settingsMatcher.find()) {
+      return parseSettingsClause(settingsMatcher.group(1));
+    }
+    return Collections.emptyMap();
   }
 
   private ShowCreateTableMetadata parseShowCreateTable(Connection connection, String tableName)
@@ -1545,10 +1558,27 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
     return expression.toString();
   }
 
+  @VisibleForTesting
+  static final class SystemTableMetadata {
+    private final SortOrder[] sortOrders;
+    private final Map<String, String> settings;
+
+    private SystemTableMetadata(SortOrder[] sortOrders, Map<String, String> settings) {
+      this.sortOrders = sortOrders;
+      this.settings = settings;
+    }
+
+    SortOrder[] sortOrders() {
+      return sortOrders;
+    }
+
+    Map<String, String> settings() {
+      return settings;
+    }
+  }
+
   private static final class ShowCreateTableMetadata {
     private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
-    private SortOrder[] sortOrders = SortOrders.NONE;
-    private Map<String, String> settings = Collections.emptyMap();
   }
 
   @VisibleForTesting
