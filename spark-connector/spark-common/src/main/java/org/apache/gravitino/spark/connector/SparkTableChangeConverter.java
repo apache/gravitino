@@ -19,6 +19,7 @@
 package org.apache.gravitino.spark.connector;
 
 import com.google.common.base.Preconditions;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.spark.sql.connector.catalog.TableChange;
 
 public class SparkTableChangeConverter {
@@ -87,6 +88,12 @@ public class SparkTableChangeConverter {
           (TableChange.UpdateColumnNullability) change;
       return org.apache.gravitino.rel.TableChange.updateColumnNullability(
           updateColumnNullability.fieldNames(), updateColumnNullability.nullable());
+    } else if (change instanceof TableChange.UpdateColumnDefaultValue) {
+      TableChange.UpdateColumnDefaultValue updateColumnDefaultValue =
+          (TableChange.UpdateColumnDefaultValue) change;
+      return org.apache.gravitino.rel.TableChange.updateColumnDefaultValue(
+          updateColumnDefaultValue.fieldNames(),
+          Literals.stringLiteral(updateColumnDefaultValue.newDefaultValue()));
     } else {
       throw new UnsupportedOperationException(
           String.format("Unsupported table change %s", change.getClass().getName()));

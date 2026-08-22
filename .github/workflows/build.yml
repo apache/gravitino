@@ -133,8 +133,6 @@ jobs:
 
       - name: Build with Scala2.13
         run: |
-          ./gradlew :spark-connector:spark-3.3:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
-          ./gradlew :spark-connector:spark-3.4:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
           ./gradlew :spark-connector:spark-3.5:build -PscalaVersion=2.13 -PskipITs -PskipDockerTests=false -PskipWeb=true
 
       - name: Upload unit tests report
@@ -152,7 +150,12 @@ jobs:
     strategy:
       matrix:
         java-version: [ 17 ]
-    timeout-minutes: 90
+    # This job compiles and unit-tests every module. It has been finishing in 75-84 minutes against
+    # a 90-minute cap, and :core:test alone has varied from 27 to 45 minutes across runs on
+    # identical code, so the margin was already thinner than the runner's own variance. Adding a
+    # second Spark line spends some of what is left. 120 minutes matches the backend and cron
+    # integration test jobs.
+    timeout-minutes: 120
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
     # Steps represent a sequence of tasks that will be executed as part of the job

@@ -31,7 +31,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -46,10 +45,9 @@ import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
-import org.apache.gravitino.spark.connector.authorization.GravitinoAuthorizationSparkSessionExtensions;
 import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
+import org.apache.gravitino.spark.connector.catalog.SparkCatalogKind;
 import org.apache.gravitino.spark.connector.iceberg.extensions.GravitinoIcebergSparkSessionExtensions;
-import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
 import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
@@ -62,10 +60,15 @@ import org.slf4j.LoggerFactory;
 /**
  * GravitinoDriverPlugin creates GravitinoCatalogManager to fetch catalogs from Apache Gravitino and
  * register Gravitino catalogs to Apache Spark.
+ *
+ * <p>The classes it registers differ per Spark version, so it takes them as {@link SparkBindings}
+ * from the version module's {@code GravitinoSparkPlugin} rather than naming them itself.
  */
 public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
+
+  @VisibleForTesting static final String PAIMON_PROVIDER = "lakehouse-paimon";
 
   @VisibleForTesting
   static final String PAIMON_SPARK_EXTENSIONS =
@@ -75,17 +78,27 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   static final String ICEBERG_SPARK_EXTENSIONS =
       "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions";
 
-  private GravitinoCatalogManager catalogManager;
+  private final SparkBindings bindings;
   private final List<String> gravitinoIcebergExtensions =
       Arrays.asList(
           GravitinoIcebergSparkSessionExtensions.class.getName(), ICEBERG_SPARK_EXTENSIONS);
   private final List<String> gravitinoPaimonExtensions = Arrays.asList(PAIMON_SPARK_EXTENSIONS);
 
-  private final List<String> gravitinoDriverExtensions =
-      new ArrayList<>(
-          Collections.singletonList(GravitinoAuthorizationSparkSessionExtensions.class.getName()));
+  private final List<String> gravitinoDriverExtensions;
+  private GravitinoCatalogManager catalogManager;
   private boolean enableIcebergSupport = false;
   private boolean enablePaimonSupport = false;
+
+  /**
+   * Creates the plugin from the classes a connector build supplies.
+   *
+   * @param bindings the catalog and session extension classes of this build
+   */
+  public GravitinoDriverPlugin(SparkBindings bindings) {
+    this.bindings = bindings;
+    this.gravitinoDriverExtensions =
+        new ArrayList<>(Collections.singletonList(bindings.authorizationExtension()));
+  }
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -102,16 +115,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         String.format(
             "%s:%s, should not be empty", GravitinoSparkConfig.GRAVITINO_METALAKE, metalake));
 
-    this.enableIcebergSupport =
-        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
-    this.enablePaimonSupport =
-        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
-    if (enablePaimonSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
-    }
-    if (enableIcebergSupport) {
-      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
-    }
+    registerOptInExtensions(conf);
 
     this.catalogManager =
         GravitinoCatalogManager.create(
@@ -131,8 +135,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     }
   }
 
-  private void registerGravitinoCatalogs(
-      SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
+  @VisibleForTesting
+  void registerGravitinoCatalogs(SparkConf sparkConf, Map<String, Catalog> gravitinoCatalogs) {
     gravitinoCatalogs
         .entrySet()
         .forEach(
@@ -140,12 +144,15 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
-              if ("lakehouse-iceberg".equals(provider.toLowerCase(Locale.ROOT))
-                  && !enableIcebergSupport) {
+              // Resolve the kind once, so the two opt-in gates below stay in step with the
+              // provider-to-kind mapping instead of repeating provider literals. An unknown
+              // provider falls through to registerCatalog, which warns and skips.
+              SparkCatalogKind kind =
+                  StringUtils.isBlank(provider) ? null : SparkCatalogKind.fromProvider(provider);
+              if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
                 return;
               }
-              if ("lakehouse-paimon".equals(provider.toLowerCase(Locale.ROOT))
-                  && !enablePaimonSupport) {
+              if (SparkCatalogKind.LAKEHOUSE_PAIMON.equals(kind) && !enablePaimonSupport) {
                 return;
               }
               try {
@@ -156,14 +163,15 @@ public class GravitinoDriverPlugin implements DriverPlugin {
             });
   }
 
-  private void registerCatalog(SparkConf sparkConf, String catalogName, String provider) {
+  @VisibleForTesting
+  void registerCatalog(SparkConf sparkConf, String catalogName, @Nullable String provider) {
     if (StringUtils.isBlank(provider)) {
       LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
       return;
     }
 
-    String catalogClassName = CatalogNameAdaptor.getCatalogName(provider);
-    if (StringUtils.isBlank(catalogClassName)) {
+    String catalogClassName = catalogClassName(provider);
+    if (catalogClassName == null) {
       LOG.warn("Skip registering {} because {} is not supported yet.", catalogName, provider);
       return;
     }
@@ -174,6 +182,57 @@ public class GravitinoDriverPlugin implements DriverPlugin {
         catalogName + " is already registered to SparkCatalogManager");
     sparkConf.set(sparkCatalogConfigName, catalogClassName);
     LOG.info("Register {} catalog to Spark catalog manager.", catalogName);
+  }
+
+  /**
+   * Resolves the Spark catalog class a Gravitino catalog provider needs, from the bindings this
+   * build supplied. Returns null when the build has no catalog for the provider. The provider must
+   * not be blank; callers check that first, since this dereferences it.
+   */
+  @Nullable
+  @VisibleForTesting
+  String catalogClassName(String provider) {
+    SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
+    return kind == null ? null : bindings.catalogClassNames().get(kind);
+  }
+
+  /**
+   * Reads the two opt-in flags and queues the session extensions they ask for. Extracted from
+   * {@link #init(SparkContext, PluginContext)} so a test can exercise the flags without a live
+   * SparkContext, and takes the conf rather than two booleans so the config keys are covered too.
+   *
+   * @param conf the Spark conf to read the opt-in flags from
+   */
+  @VisibleForTesting
+  void registerOptInExtensions(SparkConf conf) {
+    this.enableIcebergSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_ICEBERG_SUPPORT, false);
+    this.enablePaimonSupport =
+        conf.getBoolean(GravitinoSparkConfig.GRAVITINO_ENABLE_PAIMON_SUPPORT, false);
+    if (enablePaimonSupport) {
+      registerPaimonExtensionsIfSupported();
+    }
+    if (enableIcebergSupport) {
+      gravitinoDriverExtensions.addAll(gravitinoIcebergExtensions);
+    }
+  }
+
+  /**
+   * Queues the Paimon session extensions, unless this build has no Paimon catalog. Paimon publishes
+   * no paimon-spark artifact for every Spark version and Scala version this connector supports, so
+   * some builds omit the Paimon classes; registering the extension there would fail SparkSession
+   * construction with a ClassNotFoundException. Skip it the way an unsupported catalog provider is
+   * skipped, so a config carried over from another build degrades to a warning.
+   */
+  @VisibleForTesting
+  void registerPaimonExtensionsIfSupported() {
+    if (!bindings.catalogClassNames().containsKey(SparkCatalogKind.LAKEHOUSE_PAIMON)) {
+      LOG.warn(
+          "Skip registering Paimon session extensions because {} is not supported yet.",
+          PAIMON_PROVIDER);
+      return;
+    }
+    gravitinoDriverExtensions.addAll(gravitinoPaimonExtensions);
   }
 
   @VisibleForTesting

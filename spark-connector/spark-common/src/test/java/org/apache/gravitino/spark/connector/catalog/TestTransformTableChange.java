@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.catalog;
 
 import org.apache.gravitino.rel.TableChange.UpdateComment;
+import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.spark.connector.ConnectorConstants;
 import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
@@ -42,6 +43,25 @@ public class TestTransformTableChange {
         (org.apache.gravitino.rel.TableChange.SetProperty) tableChange;
     Assertions.assertEquals("key", gravitinoSetProperty.getProperty());
     Assertions.assertEquals("value", gravitinoSetProperty.getValue());
+  }
+
+  @Test
+  void testTransformUpdateColumnDefaultValue() {
+    String[] fieldNames = new String[] {"col"};
+    String defaultValue = "col_default_value";
+    TableChange.UpdateColumnDefaultValue sparkChange =
+        (TableChange.UpdateColumnDefaultValue)
+            TableChange.updateColumnDefaultValue(fieldNames, defaultValue);
+
+    org.apache.gravitino.rel.TableChange gravitinoChange =
+        sparkTableChangeConverter.toGravitinoTableChange(sparkChange);
+
+    Assertions.assertInstanceOf(
+        org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue.class, gravitinoChange);
+    org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue converted =
+        (org.apache.gravitino.rel.TableChange.UpdateColumnDefaultValue) gravitinoChange;
+    Assertions.assertArrayEquals(sparkChange.fieldNames(), converted.fieldName());
+    Assertions.assertEquals(Literals.stringLiteral(defaultValue), converted.getNewDefaultValue());
   }
 
   @Test
@@ -117,7 +137,8 @@ public class TestTransformTableChange {
 
     TableChange.AddColumn sparkAddColumnFirst =
         (TableChange.AddColumn)
-            TableChange.addColumn(new String[] {"col1"}, DataTypes.StringType, true, "", first);
+            TableChange.addColumn(
+                new String[] {"col1"}, DataTypes.StringType, true, "", first, null);
     org.apache.gravitino.rel.TableChange gravitinoChangeFirst =
         sparkTableChangeConverter.toGravitinoTableChange(sparkAddColumnFirst);
 
@@ -136,7 +157,8 @@ public class TestTransformTableChange {
 
     TableChange.AddColumn sparkAddColumnAfter =
         (TableChange.AddColumn)
-            TableChange.addColumn(new String[] {"col1"}, DataTypes.StringType, true, "", after);
+            TableChange.addColumn(
+                new String[] {"col1"}, DataTypes.StringType, true, "", after, null);
     org.apache.gravitino.rel.TableChange gravitinoChangeAfter =
         sparkTableChangeConverter.toGravitinoTableChange(sparkAddColumnAfter);
 
@@ -155,7 +177,8 @@ public class TestTransformTableChange {
 
     TableChange.AddColumn sparkAddColumnDefault =
         (TableChange.AddColumn)
-            TableChange.addColumn(new String[] {"col1"}, DataTypes.StringType, true, "", null);
+            TableChange.addColumn(
+                new String[] {"col1"}, DataTypes.StringType, true, "", null, null);
     org.apache.gravitino.rel.TableChange gravitinoChangeDefault =
         sparkTableChangeConverter.toGravitinoTableChange(sparkAddColumnDefault);
 

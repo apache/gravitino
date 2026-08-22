@@ -377,8 +377,18 @@ subprojects {
     ":flink-connector"
   )
 
+  // Spark 4 requires JDK 17, so the Spark 4 connector modules opt out of the JDK 8 target even
+  // though the rest of :spark-connector (3.x) stays on Java 8.
+  val jdk17OnlyProjectPaths = setOf(
+    ":spark-connector:spark-4.0",
+    ":spark-connector:spark-runtime-4.0"
+  )
+
   fun compatibleWithJDK8(project: Project): Boolean {
     val path = project.path.lowercase()
+    if (jdk17OnlyProjectPaths.any { path == it.lowercase() }) {
+      return false
+    }
     return jdk8CompatibleProjectPathPrefixes.any { path.startsWith(it) }
   }
   extensions.extraProperties.set("excludePackagesForSparkConnector", ::excludePackagesForSparkConnector)

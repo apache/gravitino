@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-evaluationDependsOn(":spark-connector:spark-common")
+import com.diffplug.gradle.spotless.SpotlessExtension
 
 plugins {
   `maven-publish`
@@ -29,8 +29,7 @@ repositories {
   mavenCentral()
 }
 
-val glueHiveJarsDir: String? =
-  project(":spark-connector:spark-common").extra["glueHiveJarsDir"] as String?
+val glueHiveJarsDir: String? = project(":spark-connector").extra["glueHiveJarsDir"] as String?
 
 val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extra["defaultScalaVersion"].toString()
 val sparkVersion: String = libs.versions.spark35.get()
@@ -42,28 +41,95 @@ val scalaJava8CompatVersion: String = libs.versions.scala.java.compat.get()
 val scalaCollectionCompatVersion: String = libs.versions.scala.collection.compat.get()
 val artifactName = "${rootProject.name}-spark-${sparkMajorVersion}_$scalaVersion"
 
+// The connector's shared sources are compiled here rather than consumed as a jar, so that every
+// supported Spark version builds them against its own API. `spark35` holds the one thing a Spark 4
+// build cannot compile: the Paimon package, which has no paimon-spark-4.x artifact at the Paimon
+// version this repository pins.
+val sparkCommonDir = project(":spark-connector").projectDir.resolve("spark-common")
+
+sourceSets {
+  named("main") {
+    java {
+      setSrcDirs(
+        listOf(
+          "$sparkCommonDir/src/main/java",
+          "$sparkCommonDir/src/main/spark35",
+          "src/main/java"
+        )
+      )
+    }
+    resources {
+      setSrcDirs(listOf("src/main/resources"))
+    }
+  }
+  named("test") {
+    java {
+      setSrcDirs(
+        listOf(
+          "$sparkCommonDir/src/test/java",
+          "src/test/java"
+        )
+      )
+    }
+    resources {
+      // Only this module's test resources. spark-common's test resources were never packaged
+      // either: the golden-file suites read spark-test.conf, test-sqls and data from the source
+      // tree via GRAVITINO_ROOT_DIR, and its log4j2.properties would collide with this one.
+      setSrcDirs(listOf("src/test/resources"))
+    }
+  }
+}
+
 if (hasProperty("excludePackagesForSparkConnector")) {
   @Suppress("UNCHECKED_CAST")
   val configureFunc = properties["excludePackagesForSparkConnector"] as? (Project) -> Unit
   configureFunc?.invoke(project)
 }
 
+// The source dirs above reach outside this project, and Spotless rejects cross-project targets.
+// The shared tree is formatted by the :spark-connector project that owns it, so scope Spotless here
+// to this module's own sources. Same approach as the trino-connector version modules.
+plugins.withId("com.diffplug.spotless") {
+  configure<SpotlessExtension> {
+    java {
+      target(project.fileTree("src") { include("**/*.java") })
+    }
+  }
+}
+
 dependencies {
-  implementation(project(":spark-connector:spark-3.4"))
-  implementation(project(":spark-connector:spark-common"))
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("org.apache.logging.log4j")
+  }
+  implementation(libs.guava)
+  implementation(libs.caffeine)
+
   compileOnly("org.apache.kyuubi:kyuubi-spark-connector-hive_$scalaVersion:$kyuubiVersion")
   compileOnly("org.apache.spark:spark-catalyst_$scalaVersion:$sparkVersion") {
     exclude("com.fasterxml.jackson")
   }
+  compileOnly("org.apache.spark:spark-core_$scalaVersion:$sparkVersion")
+  compileOnly("org.apache.spark:spark-sql_$scalaVersion:$sparkVersion")
+  compileOnly("org.scala-lang.modules:scala-java8-compat_$scalaVersion:$scalaJava8CompatVersion")
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-spark-runtime-${sparkMajorVersion}_$scalaVersion:$icebergVersion")
+  compileOnly(libs.aws.glue)
   if (scalaVersion == "2.12") {
     compileOnly("org.apache.paimon:paimon-spark-$sparkMajorVersion:$paimonVersion") {
       exclude("org.apache.spark")
     }
   }
 
+  annotationProcessor(libs.lombok)
+  compileOnly(libs.lombok)
+
+  testAnnotationProcessor(libs.lombok)
+  testCompileOnly(libs.lombok)
+
   testImplementation(project(":api")) {
+    exclude("org.apache.logging.log4j")
+  }
+  testImplementation(project(":catalogs:catalog-glue")) {
     exclude("org.apache.logging.log4j")
   }
   testImplementation(project(":catalogs:catalog-jdbc-common")) {
@@ -96,13 +162,11 @@ dependencies {
     exclude("org.apache.logging.log4j")
     exclude("org.slf4j")
   }
-  testImplementation(project(":spark-connector:spark-common", "testArtifacts")) {
-    exclude("com.fasterxml.jackson")
-    exclude("org.apache.logging.log4j")
-    exclude("org.slf4j")
-  }
 
   testImplementation(libs.awaitility)
+  testImplementation(libs.mockito.core)
+  testImplementation(libs.mockito.inline)
+  testImplementation(libs.nimbus.jose.jwt)
   // Iceberg's GlueCatalog references several AWS SDK modules at runtime; must be on test classpath
   testImplementation(libs.aws.dynamodb)
   testImplementation(libs.aws.glue)
@@ -191,7 +255,7 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     if (glueHiveJarsDir != null) {
-      dependsOn(":spark-connector:spark-common:downloadGlueHiveJars")
+      dependsOn(":spark-connector:downloadGlueHiveJars")
       jvmArgs("-Dglue.hive-jars-dir=$glueHiveJarsDir")
     }
     dependsOn(tasks.jar)
