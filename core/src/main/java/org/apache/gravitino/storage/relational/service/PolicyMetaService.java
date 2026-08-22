@@ -40,6 +40,7 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
@@ -189,9 +190,15 @@ public class PolicyMetaService {
     String metalakeName = ident.namespace().level(0);
     int[] policyMetaDeletedCount = new int[] {0};
     int[] policyVersionDeletedCount = new int[] {0};
+    int[] policyTagRelDeletedCount = new int[] {0};
 
     // We should delete meta and version info
     SessionUtils.doMultipleWithCommit(
+        () ->
+            policyTagRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    PolicyTagRelMapper.class,
+                    mapper -> mapper.softDeleteByMetalakeAndPolicyName(metalakeName, ident.name())),
         () ->
             policyMetaDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
@@ -205,7 +212,8 @@ public class PolicyMetaService {
                     mapper ->
                         mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
                             metalakeName, ident.name())));
-    return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] > 0;
+    return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] + policyTagRelDeletedCount[0]
+        > 0;
   }
 
   @Monitored(
@@ -392,6 +400,11 @@ public class PolicyMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deletePolicyAndVersionMetasByLegacyTimeline")
   public int deletePolicyAndVersionMetasByLegacyTimeline(Long legacyTimeline, int limit) {
+    int policyTagRelDeletedCount =
+        SessionUtils.doWithCommitAndFetchResult(
+            PolicyTagRelMapper.class,
+            mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
+
     int policyDeletedCount =
         SessionUtils.doWithCommitAndFetchResult(
             PolicyMetaMapper.class,
@@ -402,7 +415,7 @@ public class PolicyMetaService {
             PolicyVersionMapper.class,
             mapper -> mapper.deletePolicyVersionsByLegacyTimeline(legacyTimeline, limit));
 
-    return policyDeletedCount + policyVersionDeletedCount;
+    return policyTagRelDeletedCount + policyDeletedCount + policyVersionDeletedCount;
   }
 
   @Monitored(

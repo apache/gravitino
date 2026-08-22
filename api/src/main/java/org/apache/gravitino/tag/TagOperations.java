@@ -24,6 +24,8 @@ import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.policy.PolicyTagAssociation;
+import org.apache.gravitino.policy.PolicyTagSelector;
 
 /**
  * Interface for supporting global tag operations. This interface will provide tag listing, getting,
@@ -115,4 +117,39 @@ public interface TagOperations {
    * @return True if the tag is deleted, false if the tag does not exist.
    */
   boolean deleteTag(String name);
+
+  /**
+   * Lists policy names directly associated with a tag.
+   *
+   * @param tagName The tag name.
+   * @return The directly associated policy names.
+   */
+  String[] listPoliciesForTag(String tagName);
+
+  /**
+   * Lists detailed policy associations for a tag.
+   *
+   * @param tagName The tag name.
+   * @return The policy associations including selectors.
+   */
+  PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName);
+
+  /**
+   * Creates or replaces one policy association for a tag.
+   *
+   * @param tagName The tag name.
+   * @param policyName The policy name.
+   * @param selector The selector, or null for tag-presence matching.
+   * @return The resulting association.
+   */
+  PolicyTagAssociation setPolicyForTag(
+      String tagName, String policyName, PolicyTagSelector selector);
+
+  /**
+   * Removes one policy association from a tag.
+   *
+   * @param tagName The tag name.
+   * @param policyName The policy name.
+   */
+  void removePolicyFromTag(String tagName, String policyName);
 }

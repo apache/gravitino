@@ -24,6 +24,8 @@ import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.meta.PolicyTagAssociationEntity;
+import org.apache.gravitino.policy.PolicyTagSelector;
 
 /**
  * {@code TagDispatcher} interface provides functionalities for managing tags within a metalake. It
@@ -116,6 +118,51 @@ public interface TagDispatcher {
    * @return The array of metadata objects associated with the specified tag.
    */
   MetadataObject[] listMetadataObjectsForTag(String metalake, String name);
+
+  /**
+   * List policy names directly associated with the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return The directly associated policy names.
+   */
+  default String[] listPoliciesForTag(String metalake, String name) {
+    return Arrays.stream(listPolicyAssociationsForTag(metalake, name))
+        .map(association -> association.policy().name())
+        .toArray(String[]::new);
+  }
+
+  /**
+   * List policy associations, including selectors, for the specified tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param name The name of the tag.
+   * @return The policy-to-tag associations.
+   */
+  PolicyTagAssociationEntity[] listPolicyAssociationsForTag(String metalake, String name);
+
+  /**
+   * Create or replace one policy association for a tag.
+   *
+   * @param metalake The name of the metalake.
+   * @param tagName The name of the tag.
+   * @param policyName The name of the policy.
+   * @param selector The selector, or null for tag-presence matching.
+   * @return The resulting association.
+   */
+  PolicyTagAssociationEntity setPolicyForTag(
+      String metalake, String tagName, String policyName, @Nullable PolicyTagSelector selector);
+
+  /**
+   * Remove one policy association from a tag.
+   *
+   * <p>Removing a missing association is an idempotent no-op. The policy and tag must still exist.
+   *
+   * @param metalake The name of the metalake.
+   * @param tagName The name of the tag.
+   * @param policyName The name of the policy.
+   */
+  void removePolicyFromTag(String metalake, String tagName, String policyName);
 
   /**
    * List all metadata objects associated with the specified tag and exact assignment value.

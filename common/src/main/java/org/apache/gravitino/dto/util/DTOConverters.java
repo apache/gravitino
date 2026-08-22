@@ -639,6 +639,7 @@ public class DTOConverters {
    * @param policyContent The policyContent to be converted.
    * @return The policy content DTO.
    */
+  @SuppressWarnings("deprecation")
   public static PolicyContentDTO toDTO(PolicyContent policyContent) {
     if (policyContent == null) {
       return null;
@@ -1419,6 +1420,7 @@ public class DTOConverters {
    * @param policyContentDTO The policy content DTO to be converted.
    * @return The policy content.
    */
+  @SuppressWarnings("deprecation")
   public static PolicyContent fromDTO(PolicyContentDTO policyContentDTO) {
     if (policyContentDTO == null) {
       return null;

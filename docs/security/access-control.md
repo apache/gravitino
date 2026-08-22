@@ -206,8 +206,10 @@ they will be removed in a future release. Use the current names in new roles.
 | `MANAGE_GRANTS`         | Metalake, Catalog, Schema, Table, View, Topic, Fileset, Model, Function | Grant and revoke privileges on any object in scope |
 | `CREATE_TAG`            | Metalake                                                                | Create tags                                        |
 | `APPLY_TAG`             | Metalake, Tag                                                           | Attach tags to metadata objects                    |
+| `VIEW_TAG`              | Metalake, Tag                                                           | View tag metadata and associations                 |
 | `CREATE_POLICY`         | Metalake                                                                | Create policies                                    |
-| `APPLY_POLICY`          | Metalake, Policy                                                        | Attach policies to metadata objects                |
+| `APPLY_POLICY`          | Metalake, Policy                                                        | Associate policies with tags                       |
+| `VIEW_POLICY`           | Metalake, Policy                                                        | View policy metadata, content, and associations    |
 | `REGISTER_JOB_TEMPLATE` | Metalake                                                                | Register job templates                             |
 | `USE_JOB_TEMPLATE`      | Metalake, JobTemplate                                                   | Run jobs from a job template                       |
 | `RUN_JOB`               | Metalake                                                                | Run jobs                                           |
@@ -217,13 +219,15 @@ groups across that metalake. Bound to anything else it covers privilege manageme
 object and its descendants.
 
 `APPLY_TAG`, `APPLY_POLICY`, and `USE_JOB_TEMPLATE` scope differently from every other privilege on
-this page. The object they bind to is the instrument the holder may use, not the object the operation
-acts on. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder attach that one policy
-and no other, while granting it on the metalake lets them attach any policy in the metalake.
+this page. The object they bind to is the instrument the holder may use, not the metadata object
+eventually governed by it. Granting `APPLY_POLICY` on the policy `pii_masking` lets the holder
+associate that one policy with tags and no other policy, while granting it on the metalake covers
+every policy in the metalake.
 
-Attaching a tag or a policy is checked twice: the holder needs `APPLY_TAG` or `APPLY_POLICY` for the
-tag or policy in question, and separately needs access to the metadata object being tagged. A user
-cannot tag an object they could not otherwise reach.
+Attaching a tag to a metadata object requires `APPLY_TAG` for the tag and access to the metadata
+object. Changing a policy-to-tag association requires `APPLY_POLICY` for the policy and `APPLY_TAG`
+for the tag. An `APPLY_TAG` or `APPLY_POLICY` grant also satisfies the corresponding read check,
+unless the matching `VIEW_TAG` or `VIEW_POLICY` privilege is explicitly denied.
 
 ### Required Privileges
 
@@ -265,8 +269,8 @@ object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on 
 | User         | `MANAGE_USERS`          | `MANAGE_USERS`, or the user themselves | `MANAGE_USERS`  |                                           |
 | Group        | `MANAGE_GROUPS`         | `MANAGE_GROUPS`, or a member           | `MANAGE_GROUPS` |                                           |
 | Role         | `CREATE_ROLE`           | `MANAGE_GRANTS`, or a holder or owner  | Owner           | Grant or revoke: `MANAGE_GRANTS`          |
-| Tag          | `CREATE_TAG`            | `APPLY_TAG`                            | Owner           | Attach: `APPLY_TAG` and access to the object |
-| Policy       | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
+| Tag          | `CREATE_TAG`            | `VIEW_TAG` (or `APPLY_TAG`)             | Owner           | Attach to object: `APPLY_TAG` and object access |
+| Policy       | `CREATE_POLICY`         | `VIEW_POLICY` (or `APPLY_POLICY`)       | Owner           | Associate with tag: `APPLY_POLICY` and `APPLY_TAG` |
 | Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
 | Job          |                         | Owner                                  | Owner           |                                           |
 
