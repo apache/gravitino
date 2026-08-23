@@ -34,12 +34,42 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       |
 | spark.sql.gravitino.enablePaimonSupport  | string | `false`       | Set to `true` to use Paimon catalog.                                                            | No       |
 | spark.sql.gravitino.client.              | string | (none)        | The configuration key prefix for the Gravitino client config.                                   | No       |
+| spark.sql.gravitino.authType             | string | `simple`      | The authentication type, one of `simple`, `basic`, `oauth2`, `kerberos`, `token`.               | No       |
+| spark.sql.gravitino.token.value          | string | (none)        | The bearer token to present to Gravitino, used when `authType` is `token`.                      | No       |
+| spark.sql.gravitino.token.file           | string | (none)        | Path to a file holding the bearer token. Takes precedence over `token.value` and is re-read per request. | No |
+| spark.sql.gravitino.token.principalFields | string | `sub`        | Comma separated, ordered JWT claim names used to identify the caller in `token` mode.           | No       |
+| spark.sql.gravitino.clientCacheMaxSize   | int    | `100`         | The maximum number of Gravitino clients cached, one per identity.                               | No       |
+| spark.sql.gravitino.clientCacheTtlSec    | long   | `3600`        | Evicts a cached Gravitino client this many seconds after it was last used.                      | No       |
+| spark.sql.gravitino.catalogCacheTtlSec   | long   | `300`         | Evicts a cached catalog this many seconds after it was loaded.                                  | No       |
 
 To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
 
 **Example:** Setting `spark.sql.gravitino.client.socketTimeoutMs` is equivalent to setting `gravitino.client.socketTimeoutMs` for the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
+
+### Per-user identity in `token` mode
+
+When `spark.sql.gravitino.authType` is `token`, the connector presents the bearer token found in
+`spark.sql.gravitino.token.file`, or failing that `spark.sql.gravitino.token.value`, resolving it again on
+every request and reading the active Spark session's configuration in preference to the
+application's. The identity of the caller is taken from the JWT claim named by
+`spark.sql.gravitino.token.principalFields`, which should be set to match the server's
+`gravitino.authenticator.oauth.principalFields` so that the connector and the server agree on who
+is asking. The claim is read without verifying the signature, because validating the token remains
+the server's job; the value is used only to partition the connector's caches. An opaque,
+non-JWT token is partitioned by a hash of the token instead.
+
+Gravitino clients and the catalog metadata they load are cached per identity, so two users sharing
+one Spark driver never see each other's cached metadata. All other authentication types keep a
+single application-wide identity and are unaffected by any of this.
+
+Two limits are worth stating plainly:
+
+* The list of catalogs registered with Spark at driver startup is resolved with the application's
+  identity, so a user may see a catalog name that they are not then allowed to open.
+* This governs metadata resolution only. Data is read by the executors using the credentials that
+  the underlying catalog was built with, not the end user's token.
 
 ```shell
 ./bin/spark-sql -v \
