@@ -49,6 +49,24 @@ public class GravitinoSparkConfig {
   public static final String GRAVITINO_KERBEROS_PRINCIPAL = "spark.kerberos.principal";
   public static final String GRAVITINO_KERBEROS_KEYTAB_FILE_PATH = "spark.kerberos.keytab";
 
+  public static final String GRAVITINO_TOKEN_VALUE =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_TOKEN_VALUE;
+  public static final String GRAVITINO_TOKEN_FILE =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_TOKEN_FILE;
+  public static final String GRAVITINO_TOKEN_PRINCIPAL_FIELDS =
+      GRAVITINO_PREFIX + AuthProperties.GRAVITINO_TOKEN_PRINCIPAL_FIELDS;
+  public static final String GRAVITINO_TOKEN_PRINCIPAL_FIELDS_DEFAULT = "sub";
+
+  public static final String GRAVITINO_CLIENT_CACHE_MAX_SIZE =
+      GRAVITINO_PREFIX + "clientCacheMaxSize";
+  public static final int GRAVITINO_CLIENT_CACHE_MAX_SIZE_DEFAULT = 100;
+  public static final String GRAVITINO_CLIENT_CACHE_TTL_SEC =
+      GRAVITINO_PREFIX + "clientCacheTtlSec";
+  public static final long GRAVITINO_CLIENT_CACHE_TTL_SEC_DEFAULT = 3600;
+  public static final String GRAVITINO_CATALOG_CACHE_TTL_SEC =
+      GRAVITINO_PREFIX + "catalogCacheTtlSec";
+  public static final long GRAVITINO_CATALOG_CACHE_TTL_SEC_DEFAULT = 300;
+
   public static final String GRAVITINO_HIVE_METASTORE_URI = "metastore.uris";
   public static final String SPARK_HIVE_METASTORE_URI = "hive.metastore.uris";
 

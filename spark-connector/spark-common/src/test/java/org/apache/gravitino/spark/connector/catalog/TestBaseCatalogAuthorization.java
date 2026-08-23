@@ -39,6 +39,7 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.authorization.AuthorizationTable;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
@@ -59,7 +60,8 @@ public class TestBaseCatalogAuthorization {
 
   @BeforeAll
   void initCatalogManager() {
-    GravitinoCatalogManager.create(() -> mock(GravitinoClient.class));
+    GravitinoCatalogManager.create(
+        new SparkConf(false), "user", identity -> mock(GravitinoClient.class));
   }
 
   @AfterAll
