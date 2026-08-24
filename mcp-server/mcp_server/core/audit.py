@@ -29,14 +29,22 @@ def _extract_principal(authorization: str) -> str:
 
     - "Basic <base64(user:secret)>" → "<user>"  (Gravitino simple auth)
     - "Bearer <token>"              → "bearer:<first-8-chars-of-token>"
+    - "<scheme> <credential>"       → "<scheme>:<first-8-chars-of-credential>"
     - empty / missing / unparsable  → "anonymous"
+
+    The credential may itself contain spaces (a custom scheme is free to use a
+    comma-separated parameter list), so only the scheme is split off. Falling
+    back to the scheme name keeps a static custom-scheme identity attributable
+    in the audit log instead of recording it as anonymous.
     """
     if not authorization:
         return "anonymous"
-    parts = authorization.split()
+    parts = authorization.split(None, 1)
     if len(parts) != 2:
         return "anonymous"
-    scheme, credential = parts[0].lower(), parts[1]
+    scheme, credential = parts[0].lower(), parts[1].strip()
+    if not credential:
+        return "anonymous"
     if scheme == "basic":
         try:
             decoded = base64.b64decode(credential, validate=True).decode(
@@ -46,9 +54,7 @@ def _extract_principal(authorization: str) -> str:
             return "anonymous"
         user = decoded.split(":", 1)[0]
         return user if user else "anonymous"
-    if scheme == "bearer":
-        return f"bearer:{credential[:8]}"
-    return "anonymous"
+    return f"{scheme}:{credential[:8]}"
 
 
 def emit(

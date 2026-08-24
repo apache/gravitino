@@ -82,7 +82,8 @@ public class IdpGroupOperations {
         () -> {
           request.validate();
           return IdpRESTUtils.ok(
-              new IdpGroupResponse(userGroupManager.addGroup(request.getGroup()).toDTO()));
+              new IdpGroupResponse(
+                  userGroupManager.addGroup(request.getGroup(), request.getComment()).toDTO()));
         },
         "group",
         IdpOperationType.ADD,

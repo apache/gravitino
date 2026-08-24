@@ -16,30 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.encryption.kms;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+package org.apache.gravitino.storage.relational.po;
 
-/** Common contract for KMS client factories. */
-public abstract class TestKmsClientFactoryContract {
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
-  /**
-   * Returns the factory under test.
-   *
-   * @return the factory
-   */
-  protected abstract KmsClientFactory factory();
+/** The persistence object that combines a group owner with its owned metadata object ID. */
+@Data
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class GroupOwnerRelPO extends GroupPO {
 
-  /**
-   * Returns the API expected from the factory.
-   *
-   * @return the expected API identifier
-   */
-  protected abstract String expectedApi();
-
-  @Test
-  void testReportsExpectedApi() {
-    Assertions.assertEquals(expectedApi(), factory().api());
-  }
+  private Long metadataObjectId;
 }

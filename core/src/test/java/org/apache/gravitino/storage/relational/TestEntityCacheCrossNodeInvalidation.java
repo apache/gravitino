@@ -45,12 +45,7 @@ public class TestEntityCacheCrossNodeInvalidation extends TestJDBCBackend {
   // A large poll interval so the background scheduler never fires during the test; the test drives
   // node B's poll explicitly via pollChanges().
   private EntityChangeLogPoller newIdlePoller(CaffeineEntityCache nodeBCache) {
-    EntityChangeLogPoller poller =
-        new EntityChangeLogPoller(
-            3600,
-            0,
-            EntityChangeLogPoller.ListenerFailureAction.EXIT,
-            () -> Assertions.fail("The entity cache listener must not exhaust its retries"));
+    EntityChangeLogPoller poller = new EntityChangeLogPoller(3600);
     poller.registerListener(new EntityCacheChangeLogListener(nodeBCache));
     // start() seeds the cursor with the current DB tail, modelling a node whose cache is already
     // warm: only changes written after this point are replayed.

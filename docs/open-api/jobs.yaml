@@ -195,6 +195,11 @@ paths:
       operationId: listJobs
       parameters:
         - $ref: "#/components/parameters/jobTemplateName"
+        - $ref: "#/components/parameters/queuedAfter"
+        - $ref: "#/components/parameters/startedAfter"
+        - $ref: "#/components/parameters/finishedAfter"
+        - $ref: "#/components/parameters/sortBy"
+        - $ref: "#/components/parameters/sortOrder"
       responses:
         "200":
           description: Returns the list of job objects
@@ -352,6 +357,58 @@ components:
       required: true
       schema:
         type: string
+    queuedAfter:
+      name: queuedAfter
+      in: query
+      description: >-
+        Only return jobs queued at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z)
+      required: false
+      schema:
+        type: string
+        format: date-time
+    startedAfter:
+      name: startedAfter
+      in: query
+      description: >-
+        Only return jobs started at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z).
+        Jobs that have not started yet are excluded
+      required: false
+      schema:
+        type: string
+        format: date-time
+    finishedAfter:
+      name: finishedAfter
+      in: query
+      description: >-
+        Only return jobs finished at or after this ISO-8601 instant (e.g. 2026-08-18T00:00:00Z).
+        Jobs that have not finished yet are excluded
+      required: false
+      schema:
+        type: string
+        format: date-time
+    sortBy:
+      name: sortBy
+      in: query
+      description: The field to sort the returned jobs by
+      required: false
+      schema:
+        type: string
+        enum:
+          - queuedAt
+          - startedAt
+          - finishedAt
+        default: queuedAt
+    sortOrder:
+      name: sortOrder
+      in: query
+      description: The sort order for the returned jobs
+      required: false
+      schema:
+        type: string
+        enum:
+          - asc
+          - desc
+        default: desc
 
   schemas:
 
@@ -495,6 +552,7 @@ components:
         - jobTemplateName
         - status
         - audit
+        - queuedAt
       properties:
         jobId:
           type: string
@@ -511,9 +569,23 @@ components:
             - "failed"
             - "succeeded"
             - "cancelling"
-            - "canceled"
+            - "cancelled"
         audit:
           $ref: "./openapi.yaml#/components/schemas/Audit"
+        queuedAt:
+          type: string
+          format: date-time
+          description: The time when the job was queued for execution, same as the job's creation time
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: The time when the job started execution, or null if the job has not started execution yet
+        finishedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: The time when the job finished execution, or null if the job has not finished execution yet
 
 
     TemplateUpdate:
@@ -758,6 +830,16 @@ components:
           description: A list of job objects
           items:
             $ref: "#/components/schemas/Job"
+        statusCounts:
+          type: object
+          description: >-
+            The number of jobs in "jobs", keyed by lower-case status name. Every status is
+            present, even at zero. Counted after queuedAfter/startedAfter/finishedAfter filtering,
+            so a time filter can make some statuses structurally zero - e.g. startedAfter always
+            yields queued: 0, since a queued job has no startedAt yet.
+          additionalProperties:
+            type: integer
+            format: int64
 
     JobResponse:
       type: object
@@ -920,7 +1002,10 @@ components:
               "audit": {
                 "createTime": "2025-08-12T02:14:28.205023Z",
                 "creator": "anonymous"
-              }
+              },
+              "queuedAt": "2025-08-12T02:14:28.205023Z",
+              "startedAt": "2025-08-12T02:14:31.098231Z",
+              "finishedAt": "2025-08-12T02:15:03.512847Z"
             },
             {
               "jobId": "job-67890",
@@ -929,9 +1014,20 @@ components:
               "audit": {
                 "createTime": "2025-08-12T02:14:28.205023Z",
                 "creator": "anonymous"
-              }
+              },
+              "queuedAt": "2025-08-12T02:14:28.205023Z",
+              "startedAt": "2025-08-12T02:14:35.442190Z",
+              "finishedAt": "2025-08-12T02:15:47.891023Z"
             }
-          ]
+          ],
+          "statusCounts": {
+            "queued": 0,
+            "started": 0,
+            "failed": 1,
+            "succeeded": 1,
+            "cancelling": 0,
+            "cancelled": 0
+          }
         }
 
     JobResponse:
@@ -944,7 +1040,10 @@ components:
           "audit": {
             "createTime": "2025-08-12T02:14:28.205023Z",
             "creator": "anonymous"
-          }
+          },
+          "queuedAt": "2025-08-12T02:14:28.205023Z",
+          "startedAt": "2025-08-12T02:14:31.098231Z",
+          "finishedAt": "2025-08-12T02:15:03.512847Z"
         }
       }
 

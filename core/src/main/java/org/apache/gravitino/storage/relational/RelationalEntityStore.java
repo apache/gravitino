@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
@@ -108,13 +107,7 @@ public class RelationalEntityStore
     // Polling and cleanup use separate single-threaded schedulers. Polling only dispatches changes
     // to local listeners, while cleanup independently removes records beyond the retention period.
     this.entityChangeLogPoller =
-        new EntityChangeLogPoller(
-            config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS),
-            config.get(Configs.ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES),
-            EntityChangeLogPoller.ListenerFailureAction.valueOf(
-                config
-                    .get(Configs.ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION)
-                    .toUpperCase(Locale.ROOT)));
+        new EntityChangeLogPoller(config.get(Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS));
     this.entityChangeLogCleaner =
         new EntityChangeLogCleaner(
             TimeUnit.SECONDS.toMillis(config.get(Configs.ENTITY_CHANGE_LOG_RETENTION_SECS)),

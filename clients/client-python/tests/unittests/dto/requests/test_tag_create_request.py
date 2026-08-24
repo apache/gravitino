@@ -42,3 +42,14 @@ class TestTagCreateRequest(unittest.TestCase):
         self.assertEqual("tag_test", deser_dict["name"])
         self.assertEqual("tag comment", deser_dict["comment"])
         self.assertIsNotNone(deser_dict.get("properties"))
+
+        # test with allowed values
+        tag_create_request = TagCreateRequest(
+            "tag_test",
+            "tag comment",
+            {"key1": "value1"},
+            ["finance", "risk"],
+        )
+        ser_json = _json.dumps(tag_create_request.to_dict())
+        deser_dict = _json.loads(ser_json)
+        self.assertEqual(["finance", "risk"], deser_dict.get("allowedValues"))

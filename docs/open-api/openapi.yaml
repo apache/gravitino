@@ -201,6 +201,12 @@ paths:
   /metalakes/{metalake}/roles/{role}:
     $ref: "./roles.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1roles~1%7Brole%7D"
 
+  /bulk/metalakes/{metalake}/users/add:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1add"
+
+  /bulk/metalakes/{metalake}/users/remove:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1users~1remove"
+
   /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
     $ref: "./owners.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1owners~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
 

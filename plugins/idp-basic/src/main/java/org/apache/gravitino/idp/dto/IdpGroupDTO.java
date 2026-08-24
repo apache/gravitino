@@ -41,6 +41,10 @@ public class IdpGroupDTO {
   @JsonProperty("name")
   private String name;
 
+  @JsonProperty("comment")
+  @JsonSetter(nulls = Nulls.AS_EMPTY)
+  private String comment = "";
+
   @JsonProperty("users")
   @JsonSetter(nulls = Nulls.AS_EMPTY)
   private List<String> users = Collections.emptyList();
@@ -49,10 +53,11 @@ public class IdpGroupDTO {
    * Creates a new instance of IdpGroupDTO.
    *
    * @param name The name of the built-in IdP group DTO.
+   * @param comment The comment of the built-in IdP group DTO.
    * @param users The users of the built-in IdP group DTO.
    */
   @Builder(setterPrefix = "with")
-  protected IdpGroupDTO(String name, List<String> users) {
+  protected IdpGroupDTO(String name, String comment, List<String> users) {
     Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
     if (users != null) {
       users.forEach(
@@ -61,6 +66,7 @@ public class IdpGroupDTO {
                   StringUtils.isNotBlank(user), "users cannot contain null or empty user names"));
     }
     this.name = name;
+    this.comment = comment == null ? "" : comment;
     this.users = users == null ? Collections.emptyList() : users;
   }
 
@@ -69,6 +75,13 @@ public class IdpGroupDTO {
    */
   public String name() {
     return name;
+  }
+
+  /**
+   * @return The comment of the built-in IdP group DTO, or an empty string if none.
+   */
+  public String comment() {
+    return comment == null ? "" : comment;
   }
 
   /**

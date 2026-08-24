@@ -25,7 +25,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -34,7 +33,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
-import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -64,12 +62,13 @@ import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.NamespaceUtil;
 
 /**
  * The service class for metalake metadata. It provides the basic database operations for metalake.
@@ -175,25 +174,27 @@ public class MetalakeMetaService {
     MetalakePO newMetalakePO =
         POConverters.updateMetalakePOWithVersion(oldMetalakePO, newMetalakeEntity);
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      MetalakeMetaMapper.class,
-                      mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO))));
+          () -> {
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    MetalakeMetaMapper.class,
+                    mapper -> mapper.updateMetalakeMeta(newMetalakePO, oldMetalakePO));
+            if (updated == 0) {
+              // The row may have a new version, or it may have been deleted or renamed. Re-read it
+              // to return the correct conflict or missing-entity error.
+              throw metalakeWriteFailure(
+                  ident, oldMetalakePO.getMetalakeId(), oldMetalakePO.getMetalakeName());
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.METALAKE, newMetalakeEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newMetalakeEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + ident);
-    }
+    return newMetalakeEntity;
   }
 
   @Monitored(
@@ -201,22 +202,27 @@ public class MetalakeMetaService {
       baseMetricName = "deleteMetalake")
   public boolean deleteMetalake(NameIdentifier ident, boolean cascade) {
     NameIdentifierUtil.checkMetalake(ident);
-    Long metalakeId = getMetalakeIdByName(ident.name());
+    MetalakePO metalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(ident.name()));
+    if (metalakePO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          ident.toString());
+    }
+    Long metalakeId = metalakePO.getMetalakeId();
+    Long currentVersion = metalakePO.getCurrentVersion();
     if (metalakeId != null) {
       if (cascade) {
         SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    CatalogMetaMapper.class,
-                    mapper -> mapper.softDeleteCatalogMetasByMetalakeId(metalakeId)),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    SchemaMetaMapper.class,
-                    mapper -> mapper.softDeleteSchemaMetasByMetalakeId(metalakeId)),
+            () -> {
+              // Take the parent lock before the child snapshot, so catalog creation cannot add a
+              // child after the snapshot. A later failure rolls back this soft delete as well.
+              deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
+              deleteCatalogsWithVersions(ident, metalakeId);
+              deleteSchemasWithVersions(ident, listSchemaPOsForCascade(metalakeId));
+            },
             () ->
                 SessionUtils.doWithoutCommit(
                     TableMetaMapper.class,
@@ -318,18 +324,24 @@ public class MetalakeMetaService {
                     ViewMetaMapper.class,
                     mapper -> mapper.softDeleteViewMetasByMetalakeId(metalakeId)));
       } else {
-        List<CatalogEntity> catalogEntities =
-            CatalogMetaService.getInstance()
-                .listCatalogsByNamespace(NamespaceUtil.ofCatalog(ident.name()));
-        if (!catalogEntities.isEmpty()) {
-          throw new NonEmptyEntityException(
-              "Entity %s has sub-entities, you should remove sub-entities first", ident);
-        }
         SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    MetalakeMetaMapper.class,
-                    mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId)),
+            () -> {
+              // Delete the metalake before checking its children. The UPDATE takes an exclusive
+              // lock on the metalake row, and catalog creation locks the same row before inserting.
+              // If creation gets its lock first, this delete waits and the check below sees the new
+              // catalog. If this delete gets the lock first, creation waits until this transaction
+              // commits or rolls back. Checking first would allow a catalog to be inserted between
+              // the check and this delete. A non-empty result rolls back the soft delete.
+              deleteMetalakeWithVersion(ident, metalakeId, currentVersion);
+              List<CatalogPO> catalogPOs =
+                  SessionUtils.getWithoutCommit(
+                      CatalogMetaMapper.class,
+                      mapper -> mapper.listCatalogPOsByMetalakeId(metalakeId));
+              if (!catalogPOs.isEmpty()) {
+                throw new NonEmptyEntityException(
+                    "Entity %s has sub-entities, you should remove sub-entities first", ident);
+              }
+            },
             () ->
                 SessionUtils.doWithoutCommit(
                     UserRoleRelMapper.class,
@@ -381,6 +393,81 @@ public class MetalakeMetaService {
       }
     }
     return true;
+  }
+
+  void deleteMetalakeWithVersion(NameIdentifier identifier, Long metalakeId, Long currentVersion) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class,
+            mapper -> mapper.softDeleteMetalakeMetaByMetalakeId(metalakeId, currentVersion));
+    if (deleted == 0) {
+      throw metalakeWriteFailure(identifier, metalakeId, identifier.name());
+    }
+  }
+
+  private RuntimeException metalakeWriteFailure(
+      NameIdentifier identifier, Long metalakeId, String observedName) {
+    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
+    // The locking read additionally waits for a writer that is still in flight, so a delete or
+    // rename that has not committed yet is reported as a missing metalake instead of as a stale
+    // version conflict. The lock is taken on the error path of a transaction that is about to roll
+    // back.
+    MetalakePO currentMetalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByIdForUpdate(metalakeId));
+    if (currentMetalakePO == null
+        || !Objects.equals(currentMetalakePO.getMetalakeName(), observedName)) {
+      return new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.METALAKE.name().toLowerCase(),
+          identifier.name());
+    }
+    return ExceptionUtils.concurrentModification(Entity.EntityType.METALAKE, identifier);
+  }
+
+  private void deleteCatalogsWithVersions(NameIdentifier metalakeIdentifier, Long metalakeId) {
+    // Lock all catalog rows before taking the schema snapshot. Schema creation and deletion lock
+    // their parent catalog, so they cannot add or remove a schema after this point. A schema alter
+    // can still run, but the version check below detects it. Taking parent locks before child rows
+    // also keeps the same lock order for every metalake cascade.
+    List<CatalogPO> catalogPOs =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.listCatalogPOsByMetalakeIdForUpdate(metalakeId));
+    if (catalogPOs.isEmpty()) {
+      return;
+    }
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            CatalogMetaMapper.class,
+            mapper -> mapper.softDeleteCatalogMetasWithVersion(catalogPOs));
+    // Never commit a partial cascade. A smaller count means that a catalog no longer matches the
+    // ID and version read above, so the outer transaction must roll back all deletes.
+    if (deleted != catalogPOs.size()) {
+      throw ExceptionUtils.concurrentChildModification(
+          Entity.EntityType.CATALOG, Entity.EntityType.METALAKE, metalakeIdentifier);
+    }
+  }
+
+  List<SchemaPO> listSchemaPOsForCascade(Long metalakeId) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByMetalakeId(metalakeId));
+  }
+
+  private void deleteSchemasWithVersions(
+      NameIdentifier metalakeIdentifier, List<SchemaPO> schemaPOs) {
+    if (schemaPOs.isEmpty()) {
+      return;
+    }
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
+    // The version check protects this snapshot from a schema alter that does not use the parent
+    // catalog lock. Roll back the whole cascade instead of silently losing that schema change.
+    if (deleted != schemaPOs.size()) {
+      throw ExceptionUtils.concurrentChildModification(
+          Entity.EntityType.SCHEMA, Entity.EntityType.METALAKE, metalakeIdentifier);
+    }
   }
 
   @Monitored(

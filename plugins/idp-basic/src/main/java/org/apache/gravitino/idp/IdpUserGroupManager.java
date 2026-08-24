@@ -183,8 +183,21 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP group.
    */
   public IdpGroup addGroup(String groupName) throws IOException {
-    GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName));
-    return new IdpGroup(groupName, Collections.emptyList());
+    return addGroup(groupName, "");
+  }
+
+  /**
+   * Adds a built-in IdP group.
+   *
+   * @param groupName The group name.
+   * @param comment The optional group comment.
+   * @return The created built-in IdP group.
+   */
+  public IdpGroup addGroup(String groupName, String comment) throws IOException {
+    IdpCredentialValidator.validateGroupComment(comment);
+    String normalizedComment = comment == null ? "" : comment;
+    GROUP_SERVICE.insertIdpGroup(newGroupPO(groupName, normalizedComment));
+    return new IdpGroup(groupName, Collections.emptyList(), normalizedComment);
   }
 
   /**
@@ -254,10 +267,11 @@ public class IdpUserGroupManager implements Closeable {
     }
   }
 
-  private IdpGroupPO newGroupPO(String groupName) {
+  private IdpGroupPO newGroupPO(String groupName, String comment) {
     return IdpGroupPO.builder()
         .withGroupId(idGenerator.nextId())
         .withGroupName(groupName)
+        .withGroupComment(comment == null ? "" : comment)
         .withCurrentVersion(POConverters.INIT_VERSION)
         .withLastVersion(POConverters.INIT_VERSION)
         .withDeletedAt(POConverters.DEFAULT_DELETED_AT)
