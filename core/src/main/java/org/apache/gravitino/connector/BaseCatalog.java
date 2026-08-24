@@ -48,7 +48,6 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
-import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -465,15 +464,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (properties == null) {
       synchronized (this) {
         if (properties == null) {
-          Preconditions.checkArgument(entity != null, ENTITY_IS_NOT_SET);
-          Map<String, String> tempProperties = Maps.newHashMap(entity.getProperties());
-          tempProperties
-              .entrySet()
-              .removeIf(
-                  entry ->
-                      catalogPropertiesMetadata().isHiddenProperty(entry.getKey())
-                          || SecretPropertyUtils.isSecretProperty(
-                              entry.getKey(), entry.getValue()));
+          Map<String, String> tempProperties =
+              HiddenPropertyMaskUtils.maskHiddenProperties(
+                  entity.getProperties(), catalogPropertiesMetadata());
           tempProperties.putIfAbsent(
               PROPERTY_IN_USE,
               catalogPropertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());

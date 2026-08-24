@@ -1359,8 +1359,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Get the resolved properties (filter out the hidden properties and add some required default
-   * properties) of the catalog entity.
+   * Get the resolved properties (mask hidden properties and add some required default properties)
+   * of the catalog entity.
    *
    * @param entity The catalog entity.
    * @return The resolved properties.

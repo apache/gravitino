@@ -277,6 +277,14 @@ public abstract class OperationDispatcher {
       } else if (item instanceof ViewChange.SetProperty) {
         ViewChange.SetProperty setProperty = (ViewChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof org.apache.gravitino.model.ModelChange.SetProperty) {
+        org.apache.gravitino.model.ModelChange.SetProperty setProperty =
+            (org.apache.gravitino.model.ModelChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
+      } else if (item instanceof org.apache.gravitino.model.ModelVersionChange.SetProperty) {
+        org.apache.gravitino.model.ModelVersionChange.SetProperty setProperty =
+            (org.apache.gravitino.model.ModelVersionChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
       }
     }
 

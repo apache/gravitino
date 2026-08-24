@@ -56,6 +56,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -1244,6 +1245,38 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
           Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
         });
+  }
+
+  @Test
+  public void testCreateAndAlterTableRejectMaskedPlaceholder() {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_masked_table");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_masked");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    Map<String, String> createProps =
+        ImmutableMap.of("k1", HiddenPropertyMaskUtils.MASKED_VALUE, "k2", "v2");
+    testMaskedPlaceholderRejected(
+        () ->
+            tableOperationDispatcher.createTable(
+                tableIdent, columns, "comment", createProps, new Transform[0]),
+        "k1");
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    testMaskedPlaceholderRejected(
+        () ->
+            tableOperationDispatcher.alterTable(
+                tableIdent, TableChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
+        "k3");
   }
 
   private void putSchemaEntity(NameIdentifier ident) throws IOException {

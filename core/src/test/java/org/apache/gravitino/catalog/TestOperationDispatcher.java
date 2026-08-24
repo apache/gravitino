@@ -48,6 +48,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
@@ -167,6 +168,14 @@ public abstract class TestOperationDispatcher {
     for (String msg : errorMessage) {
       Assertions.assertTrue(exception.getMessage().contains(msg));
     }
+  }
+
+  void testMaskedPlaceholderRejected(Executable operation, String propertyKey) {
+    testPropertyException(
+        operation,
+        propertyKey,
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        "cannot be set to the masked placeholder value");
   }
 
   public static void withMockedAuthorizationUtils(Runnable testCode) {
