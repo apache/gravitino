@@ -32,9 +32,9 @@ import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
 import org.apache.gravitino.metrics.MetricNames;
-import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.server.web.Utils;
 
 /**
@@ -52,6 +52,17 @@ public class IcebergRESTServiceOperations {
   // The post-strip key used by the Iceberg REST server itself; see
   // IcebergConstants.GRAVITINO_METALAKE and DynamicIcebergConfigProvider.
   private static final String SERVED_METALAKE_KEY = CONFIG_PREFIX + "gravitino-metalake";
+  private static final String HOST_KEY = CONFIG_PREFIX + "host";
+  private static final String HTTP_PORT_KEY = CONFIG_PREFIX + "httpPort";
+  private static final String HTTPS_PORT_KEY = CONFIG_PREFIX + "httpsPort";
+  private static final String ENABLE_HTTPS_KEY = CONFIG_PREFIX + "enableHttps";
+  // Match IcebergConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT/HTTPS_PORT: the server module
+  // cannot depend on iceberg-common, and JettyServerConfig's own defaults are the Gravitino
+  // server's (8090/8433), not the Iceberg REST server's — reading raw values with these
+  // defaults avoids silently reporting the wrong port when httpPort is not set explicitly.
+  private static final int DEFAULT_HTTP_PORT = 9001;
+  private static final int DEFAULT_HTTPS_PORT = 9433;
+  private static final String DEFAULT_HOST = "0.0.0.0";
 
   @Context private HttpServletRequest httpRequest;
 
@@ -67,15 +78,33 @@ public class IcebergRESTServiceOperations {
   @Timed(name = "iceberg-rest-service." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "iceberg-rest-service", absolute = true)
   public Response getIcebergRestServiceUri(@QueryParam("metalake") String metalake) {
-    return Utils.ok(new IcebergRESTServiceResponse(resolveUri(metalake)));
+    // The reported host can depend on the caller's own Host header (see resolveUri), so this
+    // response must never be cached and replayed to a different caller.
+    return Response.fromResponse(Utils.ok(new IcebergRESTServiceResponse(resolveUri(metalake))))
+        .header("Cache-Control", "no-store")
+        .build();
+  }
+
+  // Overridable so tests can inject a fixture without bootstrapping GravitinoEnv, matching
+  // HealthOperations's testing pattern.
+  AuxiliaryServiceManager getAuxServiceManager() {
+    return GravitinoEnv.getInstance().auxServiceManager();
+  }
+
+  Config getConfig() {
+    return GravitinoEnv.getInstance().config();
+  }
+
+  HttpServletRequest getHttpRequest() {
+    return httpRequest;
   }
 
   private String resolveUri(String metalake) {
-    if (!GravitinoEnv.getInstance().auxServiceManager().isAuxServiceRegistered(AUX_SERVICE_NAME)) {
+    if (!getAuxServiceManager().isAuxServiceRegistered(AUX_SERVICE_NAME)) {
       return null;
     }
 
-    Config config = GravitinoEnv.getInstance().config();
+    Config config = getConfig();
     String servedMetalake = config.getRawString(SERVED_METALAKE_KEY, "");
     if (StringUtils.isNotBlank(metalake)
         && StringUtils.isNotBlank(servedMetalake)
@@ -85,21 +114,42 @@ public class IcebergRESTServiceOperations {
       return null;
     }
 
-    JettyServerConfig icebergRestConfig = JettyServerConfig.fromConfig(config, CONFIG_PREFIX);
-    String host = icebergRestConfig.getHost();
+    String host = config.getRawString(HOST_KEY, DEFAULT_HOST);
     if (isWildcardHost(host)) {
       // The Iceberg REST server binds to all interfaces, so it has no single externally
       // reachable address of its own. The caller already reached this Gravitino server at some
       // resolvable host, so reuse it — this holds whenever both services share a host, which is
       // the common case, and callers with a genuinely split topology can still set
       // gravitino.iceberg.rest-uri manually.
-      host = httpRequest.getServerName();
+      host = getHttpRequest().getServerName();
     }
-    String scheme = icebergRestConfig.isEnableHttps() ? "https" : "http";
-    return String.format("%s://%s:%d/iceberg", scheme, host, icebergRestConfig.getHttpPort());
+    boolean enableHttps = Boolean.parseBoolean(config.getRawString(ENABLE_HTTPS_KEY, "false"));
+    String scheme = enableHttps ? "https" : "http";
+    int port =
+        parsePort(
+            config,
+            enableHttps ? HTTPS_PORT_KEY : HTTP_PORT_KEY,
+            enableHttps ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT);
+    return String.format("%s://%s:%d/iceberg", scheme, host, port);
+  }
+
+  private static int parsePort(Config config, String key, int defaultPort) {
+    String value = config.getRawString(key, "");
+    if (StringUtils.isBlank(value)) {
+      return defaultPort;
+    }
+    try {
+      return Integer.parseInt(value.trim());
+    } catch (NumberFormatException e) {
+      return defaultPort;
+    }
   }
 
   private static boolean isWildcardHost(String host) {
-    return StringUtils.isBlank(host) || "0.0.0.0".equals(host) || "::".equals(host);
+    return StringUtils.isBlank(host)
+        || "0.0.0.0".equals(host)
+        || "::".equals(host)
+        || "[::]".equals(host)
+        || "0:0:0:0:0:0:0:0".equals(host);
   }
 }

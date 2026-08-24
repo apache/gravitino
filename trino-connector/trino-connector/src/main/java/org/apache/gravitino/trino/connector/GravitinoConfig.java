@@ -710,9 +710,12 @@ public class GravitinoConfig {
 
   /**
    * Sets the Iceberg REST server endpoint discovered from the Gravitino server for the given
-   * metalake. Called by the catalog connector manager's periodic metalake poll; ignored for a
-   * metalake where {@code gravitino.iceberg.rest-uri} is explicitly configured, which always takes
-   * precedence.
+   * metalake. Called only by the catalog connector manager's periodic metalake poll, which runs on
+   * the coordinator only — {@link #getDiscoveredIcebergRestUri} is therefore not by itself a valid
+   * routing signal on a worker node. The coordinator is responsible for embedding the discovered
+   * value into each catalog's own properties at registration time, so that it travels to every node
+   * through the {@code CREATE CATALOG} statement Trino replicates cluster-wide; see {@code
+   * CatalogRegister.generateCreateCatalogCommand}.
    *
    * @param metalake the metalake the endpoint was discovered for
    * @param uri the discovered endpoint, or {@code null} when the Iceberg REST server is not running
@@ -727,22 +730,27 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the Iceberg REST server endpoint to route the given metalake's lakehouse-iceberg
-   * catalogs through. Prefers an explicitly configured {@code gravitino.iceberg.rest-uri};
-   * otherwise falls back to the endpoint discovered from the Gravitino server for this metalake, if
-   * any.
+   * Retrieves the Iceberg REST server endpoint discovered from the Gravitino server for the given
+   * metalake, with no fallback to the manually configured endpoint. Only valid on the node that
+   * runs the periodic discovery poll (the coordinator); see {@link #setDiscoveredIcebergRestUri}.
    *
    * @param metalake the metalake to resolve the endpoint for
-   * @return the Iceberg REST server endpoint, or an empty string when none is available
+   * @return the discovered endpoint, or an empty string when none is available
    */
-  public String getIcebergRestUri(String metalake) {
-    String configured =
-        config.getOrDefault(
-            GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
-    if (StringUtils.isNotBlank(configured)) {
-      return configured;
-    }
+  public String getDiscoveredIcebergRestUri(String metalake) {
     return discoveredIcebergRestUriByMetalake.getOrDefault(metalake, "");
+  }
+
+  /**
+   * Retrieves the manually configured {@code gravitino.iceberg.rest-uri}, if any. Unlike the
+   * discovered endpoint, this is plain local file configuration and is therefore identical and
+   * valid on every node — coordinator and workers alike.
+   *
+   * @return the manually configured Iceberg REST server endpoint, or an empty string when unset
+   */
+  public String getManualIcebergRestUri() {
+    return config.getOrDefault(
+        GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
   }
 
   /**

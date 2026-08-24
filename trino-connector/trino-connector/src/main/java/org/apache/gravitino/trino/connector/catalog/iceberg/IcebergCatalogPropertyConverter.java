@@ -149,14 +149,14 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
    * the backend path by {@link #applyCredentials}.
    *
    * @param catalog the Gravitino catalog to load
-   * @param gravitinoConfig the connector configuration holding the Iceberg REST server endpoint
+   * @param gravitinoConfig the connector configuration holding the Iceberg REST catalog's
+   *     authentication and other pass-through settings
+   * @param restUri the Iceberg REST server endpoint to route through, resolved by the caller
    * @return the Trino Iceberg connector config
-   * @throws TrinoException if no Iceberg REST server endpoint is configured or discovered for this
-   *     catalog's metalake
+   * @throws TrinoException if {@code restUri} is blank
    */
   public Map<String, String> buildIcebergRestProperties(
-      GravitinoCatalog catalog, GravitinoConfig gravitinoConfig) {
-    String restUri = gravitinoConfig.getIcebergRestUri(catalog.getMetalake());
+      GravitinoCatalog catalog, GravitinoConfig gravitinoConfig, String restUri) {
     if (StringUtils.isBlank(restUri)) {
       // The caller only reaches this method once it has already confirmed a non-blank URI, so
       // this is defensive: it can only fire if that URI disappeared between the two calls.

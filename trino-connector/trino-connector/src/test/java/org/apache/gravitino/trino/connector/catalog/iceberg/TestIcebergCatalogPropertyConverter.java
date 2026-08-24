@@ -353,7 +353,7 @@ public class TestIcebergCatalogPropertyConverter {
 
     Assertions.assertThrows(
         TrinoException.class,
-        () -> converter.buildIcebergRestProperties(catalog, icebergRestUnavailableConfig()));
+        () -> converter.buildIcebergRestProperties(catalog, icebergRestUnavailableConfig(), ""));
   }
 
   @Test
@@ -366,12 +366,15 @@ public class TestIcebergCatalogPropertyConverter {
             .build();
 
     // No manual gravitino.iceberg.rest-uri: only a per-metalake value discovered from the
-    // Gravitino server, exactly as CatalogConnectorManager's periodic poll would set it.
+    // Gravitino server, embedded onto the catalog exactly as CatalogRegister does before
+    // registering it — this is the only way a worker (which never runs discovery itself) can see
+    // the same routing decision as the coordinator.
     Map<String, String> config =
         buildConnectorConfig(
             "catalog1",
             properties,
-            icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg"));
+            icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg"),
+            /* embedDiscovery= */ true);
 
     Assertions.assertEquals("rest", config.get("iceberg.catalog.type"));
     Assertions.assertEquals(
@@ -388,12 +391,36 @@ public class TestIcebergCatalogPropertyConverter {
             .build();
 
     // Discovery reported an endpoint for a different metalake than the one this catalog belongs
-    // to (the mock catalog's metalake is "test"); it must not leak across metalakes.
+    // to (the mock catalog's metalake is "test"); embedDiscoveredIcebergRestUri must not embed it.
     Map<String, String> config =
         buildConnectorConfig(
             "catalog1",
             properties,
-            icebergRestDiscoveredConfig("other_metalake", "http://other:9001/iceberg"));
+            icebergRestDiscoveredConfig("other_metalake", "http://other:9001/iceberg"),
+            /* embedDiscovery= */ true);
+
+    Assertions.assertEquals("jdbc", config.get("iceberg.catalog.type"));
+    Assertions.assertNull(config.get("iceberg.rest-catalog.uri"));
+  }
+
+  @Test
+  public void testDiscoveredUriUnusedWithoutEmbedding() throws Exception {
+    // A worker never runs discovery, so its own GravitinoConfig never has a discovered value
+    // populated — this asserts that IcebergConnectorAdapter really does read the routing signal
+    // from the catalog, not from GravitinoConfig's discovered map directly.
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg"),
+            /* embedDiscovery= */ false);
 
     Assertions.assertEquals("jdbc", config.get("iceberg.catalog.type"));
     Assertions.assertNull(config.get("iceberg.rest-catalog.uri"));
@@ -690,6 +717,30 @@ public class TestIcebergCatalogPropertyConverter {
             catalogName, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
     return new IcebergConnectorAdapter(gravitinoConfig)
         .buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog), credentials);
+  }
+
+  /**
+   * Like {@link #buildConnectorConfig(String, Map, GravitinoConfig, Credential[])}, but for
+   * discovered-endpoint scenarios: {@code embedDiscovery} mirrors what {@code CatalogRegister} does
+   * before registering a catalog, so a discovered value only reaches the adapter the same way it
+   * would on a real node — through the catalog, never by reading {@code GravitinoConfig}'s
+   * discovered map directly.
+   */
+  private static Map<String, String> buildConnectorConfig(
+      String catalogName,
+      Map<String, String> properties,
+      GravitinoConfig gravitinoConfig,
+      boolean embedDiscovery)
+      throws Exception {
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            catalogName, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+    if (embedDiscovery) {
+      catalog = IcebergConnectorAdapter.embedDiscoveredIcebergRestUri(catalog, gravitinoConfig);
+    }
+    return new IcebergConnectorAdapter(gravitinoConfig)
+        .buildInternalConnectorConfig(catalog, new Credential[0]);
   }
 
   private static GravitinoConfig icebergRestUnavailableConfig() {

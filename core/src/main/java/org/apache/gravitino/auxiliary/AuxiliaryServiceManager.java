@@ -94,7 +94,6 @@ public class AuxiliaryServiceManager {
         });
   }
 
-  @VisibleForTesting
   /**
    * Returns whether the given auxiliary service was configured and registered.
    *
@@ -105,6 +104,7 @@ public class AuxiliaryServiceManager {
     return auxServices.containsKey(auxServiceName);
   }
 
+  @VisibleForTesting
   public IsolatedClassLoader getIsolatedClassLoader(List<String> classPaths) {
     return IsolatedClassLoader.buildClassLoader(classPaths);
   }
