@@ -109,6 +109,24 @@ public class AuxiliaryServiceManager {
     return IsolatedClassLoader.buildClassLoader(classPaths);
   }
 
+  /**
+   * Returns the effective configuration for one auxiliary service, with keys stripped of the {@code
+   * gravitino.<name>.} prefix (or the deprecated {@code gravitino.auxService.<name>.} prefix, which
+   * is still honored) — the same map the service itself receives in {@link
+   * GravitinoAuxiliaryService#serviceInit}. Callers outside this service (e.g. reporting an
+   * auxiliary service's own endpoint) should read its config through this method rather than the
+   * raw {@code gravitino.<name>.} prefix directly, so both config forms are honored consistently.
+   *
+   * @param gravitinoConfig the Gravitino server's configuration
+   * @param auxServiceName the auxiliary service's short name, e.g. {@code iceberg-rest}
+   * @return the auxiliary service's own configuration, with keys unprefixed
+   */
+  public static Map<String, String> getAuxServiceConfig(
+      Config gravitinoConfig, String auxServiceName) {
+    Map<String, String> serviceConfigs = extractAuxiliaryServiceConfigs(gravitinoConfig);
+    return MapUtils.getPrefixMap(serviceConfigs, DOT.join(auxServiceName, ""));
+  }
+
   @VisibleForTesting
   static String getValidPath(String auxServiceName, String pathString) {
     Path path = Paths.get(pathString);

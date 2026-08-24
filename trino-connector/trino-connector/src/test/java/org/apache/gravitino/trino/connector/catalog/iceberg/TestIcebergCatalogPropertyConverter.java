@@ -429,6 +429,46 @@ public class TestIcebergCatalogPropertyConverter {
   }
 
   @Test
+  public void testManualUriWinsOverDiscoveredUri() throws Exception {
+    // Both a manual gravitino.iceberg.rest-uri and a discovered per-metalake URI are set; the
+    // manual override must win, matching IcebergConnectorAdapter.buildInternalConnectorConfig's
+    // documented precedence.
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    GravitinoConfig config = icebergRestConfiguredConfig(ImmutableMap.of());
+    config.setDiscoveredIcebergRestUri("test", "http://discovered:9001/iceberg");
+
+    Map<String, String> connectorConfig =
+        buildConnectorConfig("catalog1", properties, config, /* embedDiscovery= */ true);
+
+    Assertions.assertEquals("rest", connectorConfig.get("iceberg.catalog.type"));
+    Assertions.assertEquals(
+        "http://localhost:9001/iceberg", connectorConfig.get("iceberg.rest-catalog.uri"));
+  }
+
+  @Test
+  public void testEmbedDiscoveredIcebergRestUriDoesNotAffectNonIcebergCatalog() {
+    // CatalogRegister calls embedDiscoveredIcebergRestUri unconditionally for every catalog being
+    // registered, not just Iceberg ones, so this guard is load-bearing: a Hive/MySQL/etc. catalog
+    // must never end up carrying the synthetic discovered-URI property.
+    GravitinoConfig config = icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg");
+    Catalog mockHiveCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "hive_catalog", "hive", "test catalog", Catalog.Type.RELATIONAL, ImmutableMap.of());
+    GravitinoCatalog hiveCatalog = new GravitinoCatalog("test", mockHiveCatalog);
+
+    GravitinoCatalog result =
+        IcebergConnectorAdapter.embedDiscoveredIcebergRestUri(hiveCatalog, config);
+
+    Assertions.assertEquals(hiveCatalog.getProperties(), result.getProperties());
+  }
+
+  @Test
   public void testBuildConnectorPropertiesWithIcebergRestAuthentication() throws Exception {
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()

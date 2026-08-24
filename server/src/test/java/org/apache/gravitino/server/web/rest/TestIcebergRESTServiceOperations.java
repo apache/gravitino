@@ -27,26 +27,25 @@ import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
 import org.junit.jupiter.api.Test;
 
 public class TestIcebergRESTServiceOperations {
 
-  private static class DummyConfig extends Config {
-    static DummyConfig of(Map<String, String> m) {
-      DummyConfig config = new DummyConfig();
-      config.loadFromMap(m, k -> true);
-      return config;
-    }
+  private static final String DYNAMIC_PROVIDER = "dynamic-config-provider";
+
+  private static Map<String, String> withDynamicProvider(Map<String, String> extra) {
+    return ImmutableMap.<String, String>builder()
+        .put("catalog-config-provider", DYNAMIC_PROVIDER)
+        .putAll(extra)
+        .buildKeepingLast();
   }
 
   private IcebergRESTServiceOperations newOps(
       boolean registered, Map<String, String> icebergConfig, String requestServerName) {
     AuxiliaryServiceManager auxServiceManager = mock(AuxiliaryServiceManager.class);
     when(auxServiceManager.isAuxServiceRegistered("iceberg-rest")).thenReturn(registered);
-    Config config = DummyConfig.of(icebergConfig);
     HttpServletRequest request = mock(HttpServletRequest.class);
     when(request.getServerName()).thenReturn(requestServerName);
 
@@ -57,8 +56,8 @@ public class TestIcebergRESTServiceOperations {
       }
 
       @Override
-      Config getConfig() {
-        return config;
+      Map<String, String> getIcebergRestServiceConfig() {
+        return icebergConfig;
       }
 
       @Override
@@ -79,12 +78,33 @@ public class TestIcebergRESTServiceOperations {
   }
 
   @Test
-  public void testDefaultPortIsTheIcebergRestDefaultNotTheGravitinoServerDefault() {
-    // Regression test: without an explicit gravitino.iceberg-rest.httpPort, the reported port
-    // must be the Iceberg REST server's own default (9001), not the Gravitino webserver's
-    // default (8090) that JettyServerConfig would otherwise fall back to.
+  public void testReturnsNullWhenNotUsingDynamicConfigProvider() {
+    // Regression test: the default (static) catalog config provider serves statically-declared
+    // catalogs unrelated to Gravitino catalog names, so it must never be reported for
+    // auto-discovery — even with a blank/absent catalog-config-provider, which is what the
+    // common no-provider-configured deployment looks like.
     IcebergRESTServiceOperations ops =
-        newOps(true, ImmutableMap.of("gravitino.iceberg-rest.host", "irc-host"), "gravitino-host");
+        newOps(true, ImmutableMap.of("host", "irc-host"), "gravitino-host");
+    assertNull(uriOf(ops.getIcebergRestServiceUri("test")));
+  }
+
+  @Test
+  public void testReturnsNullWhenStaticConfigProviderExplicit() {
+    IcebergRESTServiceOperations ops =
+        newOps(
+            true,
+            ImmutableMap.of("catalog-config-provider", "static-config-provider", "host", "h"),
+            "gravitino-host");
+    assertNull(uriOf(ops.getIcebergRestServiceUri("test")));
+  }
+
+  @Test
+  public void testDefaultPortIsTheIcebergRestDefaultNotTheGravitinoServerDefault() {
+    // Regression test: without an explicit httpPort, the reported port must be the Iceberg REST
+    // server's own default (9001), not the Gravitino webserver's default (8090) that
+    // JettyServerConfig would otherwise fall back to.
+    IcebergRESTServiceOperations ops =
+        newOps(true, withDynamicProvider(ImmutableMap.of("host", "irc-host")), "gravitino-host");
     assertEquals("http://irc-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
   }
 
@@ -93,9 +113,10 @@ public class TestIcebergRESTServiceOperations {
     IcebergRESTServiceOperations ops =
         newOps(
             true,
-            ImmutableMap.of(
-                "gravitino.iceberg-rest.host", "irc-host",
-                "gravitino.iceberg-rest.enableHttps", "true"),
+            withDynamicProvider(
+                ImmutableMap.of(
+                    "host", "irc-host",
+                    "enableHttps", "true")),
             "gravitino-host");
     assertEquals("https://irc-host:9433/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
   }
@@ -105,9 +126,10 @@ public class TestIcebergRESTServiceOperations {
     IcebergRESTServiceOperations ops =
         newOps(
             true,
-            ImmutableMap.of(
-                "gravitino.iceberg-rest.host", "irc-host",
-                "gravitino.iceberg-rest.httpPort", "19001"),
+            withDynamicProvider(
+                ImmutableMap.of(
+                    "host", "irc-host",
+                    "httpPort", "19001")),
             "gravitino-host");
     assertEquals("http://irc-host:19001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
   }
@@ -116,16 +138,15 @@ public class TestIcebergRESTServiceOperations {
   public void testWildcardHostFallsBackToRequestServerName() {
     IcebergRESTServiceOperations ops =
         newOps(
-            true,
-            ImmutableMap.of("gravitino.iceberg-rest.host", "0.0.0.0"),
-            "host.docker.internal");
+            true, withDynamicProvider(ImmutableMap.of("host", "0.0.0.0")), "host.docker.internal");
     assertEquals(
         "http://host.docker.internal:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
   }
 
   @Test
   public void testBlankHostIsTreatedAsWildcard() {
-    IcebergRESTServiceOperations ops = newOps(true, ImmutableMap.of(), "gravitino-host");
+    IcebergRESTServiceOperations ops =
+        newOps(true, withDynamicProvider(ImmutableMap.of()), "gravitino-host");
     assertEquals("http://gravitino-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
   }
 
@@ -134,9 +155,10 @@ public class TestIcebergRESTServiceOperations {
     IcebergRESTServiceOperations ops =
         newOps(
             true,
-            ImmutableMap.of(
-                "gravitino.iceberg-rest.host", "irc-host",
-                "gravitino.iceberg-rest.gravitino-metalake", "prod"),
+            withDynamicProvider(
+                ImmutableMap.of(
+                    "host", "irc-host",
+                    "gravitino-metalake", "prod")),
             "gravitino-host");
     assertNull(uriOf(ops.getIcebergRestServiceUri("test")));
   }
@@ -146,9 +168,10 @@ public class TestIcebergRESTServiceOperations {
     IcebergRESTServiceOperations ops =
         newOps(
             true,
-            ImmutableMap.of(
-                "gravitino.iceberg-rest.host", "irc-host",
-                "gravitino.iceberg-rest.gravitino-metalake", "test"),
+            withDynamicProvider(
+                ImmutableMap.of(
+                    "host", "irc-host",
+                    "gravitino-metalake", "test")),
             "gravitino-host");
     assertEquals("http://irc-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("test")));
   }
@@ -158,16 +181,18 @@ public class TestIcebergRESTServiceOperations {
     IcebergRESTServiceOperations ops =
         newOps(
             true,
-            ImmutableMap.of(
-                "gravitino.iceberg-rest.host", "irc-host",
-                "gravitino.iceberg-rest.gravitino-metalake", "prod"),
+            withDynamicProvider(
+                ImmutableMap.of(
+                    "host", "irc-host",
+                    "gravitino-metalake", "prod")),
             "gravitino-host");
     assertEquals("http://irc-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
   }
 
   @Test
   public void testResponseIsNotCacheable() {
-    IcebergRESTServiceOperations ops = newOps(true, ImmutableMap.of(), "gravitino-host");
+    IcebergRESTServiceOperations ops =
+        newOps(true, withDynamicProvider(ImmutableMap.of()), "gravitino-host");
     Response response = ops.getIcebergRestServiceUri("");
     assertEquals("no-store", response.getHeaderString("Cache-Control"));
   }

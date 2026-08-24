@@ -73,6 +73,9 @@ public class CatalogConnectorManager {
 
   private String targetMetalake;
   private final Map<String, GravitinoMetalake> metalakes = new ConcurrentHashMap<>();
+  // Tracks which metalakes' Iceberg REST discovery is currently failing, so a failure is logged
+  // at WARN only on the transition into/out of that state rather than on every poll.
+  private final Set<String> icebergRestDiscoveryFailing = ConcurrentHashMap.newKeySet();
 
   private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
@@ -200,15 +203,32 @@ public class CatalogConnectorManager {
    * caches the answer on the shared {@link GravitinoConfig} for {@code IcebergConnectorAdapter} to
    * read on the next catalog load. Failures — including talking to a Gravitino server older than
    * this endpoint — must not interrupt catalog loading, so they are swallowed here; Iceberg
-   * catalogs simply keep their last known routing decision until the next successful poll.
+   * catalogs simply keep their last known routing decision until the next successful poll. A
+   * failure is logged at WARN only on the transition into that state (not on every poll), so a
+   * persistently failing/misconfigured discovery is still visible at the default log level without
+   * spamming the log for the common case of an older Gravitino server that lacks this endpoint
+   * entirely.
    */
   private void refreshIcebergRestUri(String metalakeName) {
     try {
       config.setDiscoveredIcebergRestUri(
           metalakeName, gravitinoClient.icebergRestServiceUri(metalakeName).orElse(null));
+      if (icebergRestDiscoveryFailing.remove(metalakeName)) {
+        LOG.info("Iceberg REST service discovery for metalake {} recovered.", metalakeName);
+      }
     } catch (Exception e) {
-      LOG.debug(
-          "Failed to query the Iceberg REST service endpoint for metalake {}.", metalakeName, e);
+      if (icebergRestDiscoveryFailing.add(metalakeName)) {
+        LOG.warn(
+            "Failed to query the Iceberg REST service endpoint for metalake {}; keeping the "
+                + "last known routing decision. This is expected when talking to a Gravitino "
+                + "server that predates this endpoint, but is otherwise worth investigating. "
+                + "Further failures for this metalake are logged at DEBUG until it recovers.",
+            metalakeName,
+            e);
+      } else {
+        LOG.debug(
+            "Failed to query the Iceberg REST service endpoint for metalake {}.", metalakeName, e);
+      }
     }
   }
 

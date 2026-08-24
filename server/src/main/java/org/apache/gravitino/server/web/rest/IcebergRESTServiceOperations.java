@@ -20,6 +20,7 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.Consumes;
 import javax.ws.rs.GET;
@@ -30,12 +31,13 @@ import javax.ws.rs.core.Context;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.web.Utils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Reports the endpoint of the Gravitino Iceberg REST server, so that clients which already connect
@@ -46,16 +48,25 @@ import org.apache.gravitino.server.web.Utils;
 @Produces(MediaType.APPLICATION_JSON)
 public class IcebergRESTServiceOperations {
 
+  private static final Logger LOG = LoggerFactory.getLogger(IcebergRESTServiceOperations.class);
+
   // Matches gravitino.auxService.names / AuxiliaryServiceManager's registration key.
   private static final String AUX_SERVICE_NAME = "iceberg-rest";
-  private static final String CONFIG_PREFIX = "gravitino.iceberg-rest.";
+  // Keys below are read from AuxiliaryServiceManager.getAuxServiceConfig, which already strips
+  // the gravitino.iceberg-rest. (or deprecated gravitino.auxService.iceberg-rest.) prefix, so
+  // they must NOT be re-prefixed here.
+  // The provider name used by the Iceberg REST server itself; see
+  // IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER and DynamicIcebergConfigProvider. The
+  // server module cannot depend on iceberg-common/catalog-common, hence the literal here.
+  private static final String CATALOG_CONFIG_PROVIDER_KEY = "catalog-config-provider";
+  private static final String DYNAMIC_CATALOG_CONFIG_PROVIDER_NAME = "dynamic-config-provider";
   // The post-strip key used by the Iceberg REST server itself; see
   // IcebergConstants.GRAVITINO_METALAKE and DynamicIcebergConfigProvider.
-  private static final String SERVED_METALAKE_KEY = CONFIG_PREFIX + "gravitino-metalake";
-  private static final String HOST_KEY = CONFIG_PREFIX + "host";
-  private static final String HTTP_PORT_KEY = CONFIG_PREFIX + "httpPort";
-  private static final String HTTPS_PORT_KEY = CONFIG_PREFIX + "httpsPort";
-  private static final String ENABLE_HTTPS_KEY = CONFIG_PREFIX + "enableHttps";
+  private static final String SERVED_METALAKE_KEY = "gravitino-metalake";
+  private static final String HOST_KEY = "host";
+  private static final String HTTP_PORT_KEY = "httpPort";
+  private static final String HTTPS_PORT_KEY = "httpsPort";
+  private static final String ENABLE_HTTPS_KEY = "enableHttps";
   // Match IcebergConfig.DEFAULT_ICEBERG_REST_SERVICE_HTTP_PORT/HTTPS_PORT: the server module
   // cannot depend on iceberg-common, and JettyServerConfig's own defaults are the Gravitino
   // server's (8090/8433), not the Iceberg REST server's — reading raw values with these
@@ -91,8 +102,12 @@ public class IcebergRESTServiceOperations {
     return GravitinoEnv.getInstance().auxServiceManager();
   }
 
-  Config getConfig() {
-    return GravitinoEnv.getInstance().config();
+  // Resolved through AuxiliaryServiceManager.getAuxServiceConfig rather than reading
+  // gravitino.iceberg-rest.* directly, so the deprecated gravitino.auxService.iceberg-rest.*
+  // config form is honored too — the same precedence the Iceberg REST server itself sees.
+  Map<String, String> getIcebergRestServiceConfig() {
+    return AuxiliaryServiceManager.getAuxServiceConfig(
+        GravitinoEnv.getInstance().config(), AUX_SERVICE_NAME);
   }
 
   HttpServletRequest getHttpRequest() {
@@ -104,17 +119,34 @@ public class IcebergRESTServiceOperations {
       return null;
     }
 
-    Config config = getConfig();
-    String servedMetalake = config.getRawString(SERVED_METALAKE_KEY, "");
+    Map<String, String> config = getIcebergRestServiceConfig();
+    String provider = config.getOrDefault(CATALOG_CONFIG_PROVIDER_KEY, "");
+    if (!DYNAMIC_CATALOG_CONFIG_PROVIDER_NAME.equals(provider)) {
+      // Only the dynamic catalog config provider maps Iceberg REST catalog names onto Gravitino
+      // catalogs; the default static provider serves statically-declared catalogs unrelated to
+      // Gravitino catalog names, so routing at it would 404 on every request.
+      LOG.debug(
+          "Iceberg REST service does not use the dynamic catalog config provider "
+              + "(catalog-config-provider={}); not reporting its endpoint for auto-discovery.",
+          provider);
+      return null;
+    }
+
+    String servedMetalake = config.getOrDefault(SERVED_METALAKE_KEY, "");
     if (StringUtils.isNotBlank(metalake)
         && StringUtils.isNotBlank(servedMetalake)
         && !servedMetalake.equals(metalake)) {
       // The Iceberg REST server serves exactly one metalake. Routing a different metalake's
       // catalogs at it would 404 on every request, so report it as unavailable instead.
+      LOG.debug(
+          "Iceberg REST service serves metalake {}, not the requested metalake {}; not "
+              + "reporting its endpoint for auto-discovery.",
+          servedMetalake,
+          metalake);
       return null;
     }
 
-    String host = config.getRawString(HOST_KEY, DEFAULT_HOST);
+    String host = config.getOrDefault(HOST_KEY, DEFAULT_HOST);
     if (isWildcardHost(host)) {
       // The Iceberg REST server binds to all interfaces, so it has no single externally
       // reachable address of its own. The caller already reached this Gravitino server at some
@@ -123,7 +155,7 @@ public class IcebergRESTServiceOperations {
       // gravitino.iceberg.rest-uri manually.
       host = getHttpRequest().getServerName();
     }
-    boolean enableHttps = Boolean.parseBoolean(config.getRawString(ENABLE_HTTPS_KEY, "false"));
+    boolean enableHttps = Boolean.parseBoolean(config.getOrDefault(ENABLE_HTTPS_KEY, "false"));
     String scheme = enableHttps ? "https" : "http";
     int port =
         parsePort(
@@ -133,8 +165,8 @@ public class IcebergRESTServiceOperations {
     return String.format("%s://%s:%d/iceberg", scheme, host, port);
   }
 
-  private static int parsePort(Config config, String key, int defaultPort) {
-    String value = config.getRawString(key, "");
+  private static int parsePort(Map<String, String> config, String key, int defaultPort) {
+    String value = config.getOrDefault(key, "");
     if (StringUtils.isBlank(value)) {
       return defaultPort;
     }

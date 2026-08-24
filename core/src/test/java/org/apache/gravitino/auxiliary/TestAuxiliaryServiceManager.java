@@ -140,6 +140,45 @@ public class TestAuxiliaryServiceManager {
   }
 
   @Test
+  void testGetAuxServiceConfig() {
+    DummyConfig config =
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "iceberg-rest",
+                "gravitino.iceberg-rest.host",
+                "irc-host",
+                "gravitino.iceberg-rest.httpPort",
+                "9001"));
+
+    Map<String, String> resolved =
+        AuxiliaryServiceManager.getAuxServiceConfig(config, "iceberg-rest");
+
+    Assertions.assertEquals("irc-host", resolved.get("host"));
+    Assertions.assertEquals("9001", resolved.get("httpPort"));
+  }
+
+  @Test
+  void testGetAuxServiceConfigHonorsDeprecatedPrefix() {
+    // gravitino.auxService.<name>.<key> is deprecated but still honored; the effective config a
+    // caller reads through this method must match what the service itself receives.
+    DummyConfig config =
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "iceberg-rest",
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX + "iceberg-rest.host",
+                "irc-host"));
+
+    Map<String, String> resolved =
+        AuxiliaryServiceManager.getAuxServiceConfig(config, "iceberg-rest");
+
+    Assertions.assertEquals("irc-host", resolved.get("host"));
+  }
+
+  @Test
   void testAuxiliaryServiceConfigs() {
     Map<String, String> m =
         ImmutableMap.of(
