@@ -218,6 +218,8 @@ This path does not replace per-request user identity in HTTP mode (see below).
 
 When the server runs with HTTP transport, the `Authorization` header of each incoming MCP request is forwarded verbatim to Gravitino. The scheme is preserved, so OAuth2 (`Bearer`), Gravitino simple authentication (`Basic <base64(user:dummy)>`) and others all work. This keeps concurrent sessions from different principals isolated — one principal's identity never leaks into another's calls — and lets Gravitino enforce authorization per caller. The per-request header takes priority over the static `--token` and over OAuth client-credentials.
 
+**Security warning:** When OAuth client-credentials or `--token` is configured, an HTTP request with **no** `Authorization` header is authenticated as the **service identity**, not as anonymous. With OAuth, that identity refreshes automatically and stays valid for a long time. If the MCP HTTP endpoint is reachable by more than one caller, anyone who omits `Authorization` receives the service principal's full permissions. Use stdio transport for single-user integrations (for example Cursor), bind HTTP to a trusted network, or place the endpoint behind a reverse proxy that requires authentication.
+
 Authorization itself is always enforced by Gravitino: the MCP server forwards the identity but does not make access-control decisions of its own.
 
 ### Serving over HTTPS (TLS)

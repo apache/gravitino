@@ -42,6 +42,7 @@ from mcp_server.core.context import (
 from mcp_server.core.oauth import RefreshableBearerAuth
 from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args, do_main
+from mcp_server.server import warn_http_service_identity_fallback
 
 
 def _jwt_with_exp(exp) -> str:
@@ -137,7 +138,7 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertEqual(calls["api"], 2)
 
     def test_parallel_cold_cache_uses_single_token_post(self):
-        """Concurrent async callers must not stampede the IdP on a cache miss."""
+        """Concurrent async callers must not stampede the IdP on cache miss."""
         calls = {"token": 0, "api": 0}
         counter_lock = threading.Lock()
 
@@ -226,7 +227,7 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertGreaterEqual(calls["api"], 11)
 
     def test_config_401_does_not_refetch_on_every_call(self):
-        """Persistent Gravitino 401 must not POST to the IdP on every tool call."""
+        """Persistent Gravitino 401 must not POST to the IdP every call."""
         calls = {"token": 0, "api": 0}
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -638,6 +639,32 @@ class TestMainOAuthValidation(unittest.TestCase):
                 do_main()
             self.assertEqual(raised.exception.code, 1)
         init_log.assert_called_once()
+
+
+class TestHttpServiceIdentityWarning(unittest.TestCase):
+    def test_stdio_does_not_warn(self):
+        setting = Setting(
+            metalake="ml",
+            transport="stdio",
+            oauth_token_endpoint="https://idp/token",
+            oauth_client_id="mcp",
+            oauth_client_secret="s",
+        )
+        with self.assertNoLogs(level="WARNING"):
+            warn_http_service_identity_fallback(setting)
+
+    def test_http_oauth_warns(self):
+        setting = Setting(
+            metalake="ml",
+            transport="http",
+            oauth_token_endpoint="https://idp/token",
+            oauth_client_id="mcp-service",
+            oauth_client_secret="s",
+        )
+        with self.assertLogs(level="WARNING") as logs:
+            warn_http_service_identity_fallback(setting)
+        self.assertIn("mcp-service", logs.output[0])
+        self.assertIn("untrusted", logs.output[0])
 
 
 class TestServiceFallbackAuthorization(unittest.TestCase):

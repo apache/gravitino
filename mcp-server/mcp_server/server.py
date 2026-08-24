@@ -120,6 +120,26 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     return mcp
 
 
+def warn_http_service_identity_fallback(setting: Setting) -> None:
+    """Log when HTTP callers without Authorization use the service identity."""
+    if setting.transport == "stdio":
+        return
+    if setting.token.strip():
+        logging.warning(
+            "HTTP requests without an Authorization header will use the "
+            "configured --token service identity. Do not expose this "
+            "endpoint to untrusted callers."
+        )
+        return
+    if setting.has_oauth_client():
+        logging.warning(
+            "HTTP requests without an Authorization header will use the "
+            "OAuth client-credentials service identity (%s). Do not expose "
+            "this endpoint to untrusted callers.",
+            setting.oauth_client_id.strip(),
+        )
+
+
 def _parse_mcp_url(url: str) -> tuple[str, int, str]:
     try:
         parsed = urlparse(url)
@@ -161,6 +181,7 @@ class GravitinoMCPServer:
         asyncio.run(self.mcp.run_async(transport="stdio"))
 
     def _run_http(self):
+        warn_http_service_identity_fallback(self.setting)
         _host, _port, _path = _parse_mcp_url(self.setting.mcp_url)
         self._validate_tls_config()
         # FastMCP accepts "http" and "streamable-http" as equivalent aliases.

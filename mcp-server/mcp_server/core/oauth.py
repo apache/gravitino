@@ -172,8 +172,6 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         _LOG.info("Fetched OAuth access token")
         if expires_in:
             return self.state, token, expires_in
-        if expires_in:
-            return self.state, token, expires_in
         jwt_expires_in = self._jwt_expires_in(token)
         if jwt_expires_in is None:
             raise ValueError(
@@ -198,16 +196,6 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             return max(expires_at - int(time.time()), 1)
         except (ValueError, json.JSONDecodeError, TypeError):
             return None
-
-    @staticmethod
-    def _has_jwt_exp(token: str) -> bool:
-        """Return True when token is a 3-part JWT whose payload has exp.
-
-        Mirrors DefaultOAuth2TokenProvider._expires_at_millis: opaque or
-        reference tokens must not be handed to httpx-auth as a 2-tuple,
-        which splits on '.' and crashes the next tool call.
-        """
-        return RefreshableBearerAuth._jwt_expires_in(token) is not None
 
     @staticmethod
     def _is_numeric_date(value) -> bool:
