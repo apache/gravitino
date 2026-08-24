@@ -45,9 +45,11 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -57,6 +59,7 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockManager;
@@ -392,6 +395,41 @@ public class TestCatalogManager {
             .contains("Properties or property prefixes are reserved and cannot be set"),
         exception4.getMessage());
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(failedIdent));
+  }
+
+  @Test
+  void testCreateCatalogReturnsNoSuchMetalakeWhenParentDisappears() throws Exception {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    NoSuchEntityException missingMetalake =
+        new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.METALAKE.name().toLowerCase(),
+            metalake);
+    Mockito.doThrow(missingMetalake).when(store).put(any(CatalogEntity.class), eq(false));
+
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    NameIdentifier ident = NameIdentifier.of(metalake, "concurrent_parent_drop");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+
+    try {
+      NoSuchMetalakeException exception =
+          Assertions.assertThrows(
+              NoSuchMetalakeException.class,
+              () ->
+                  manager.createCatalog(
+                      ident, Catalog.Type.RELATIONAL, provider, "comment", props));
+      Assertions.assertSame(missingMetalake, exception.getCause());
+      Mockito.verify(store, Mockito.never()).delete(ident, EntityType.CATALOG, true);
+    } finally {
+      manager.close();
+      store.close();
+    }
   }
 
   @Test
@@ -854,6 +892,26 @@ public class TestCatalogManager {
   }
 
   @Test
+  void testDropCatalogReturnsFalseWhenConcurrentDeleteWins() throws Exception {
+    ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
+
+    CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config));
+    NameIdentifier ident = NameIdentifier.of("metalake", "concurrently_deleted");
+    Map<String, String> props =
+        ImmutableMap.of(
+            PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
+    manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    store.throwMissingCatalogForSchemaList = true;
+
+    Assertions.assertFalse(manager.dropCatalog(ident, true));
+    Assertions.assertNull(manager.getCatalogCache().getIfPresent(ident));
+    manager.close();
+  }
+
+  @Test
   void testFailedCreateCatalogCleanupMarksLocalMutation() throws Exception {
     ChangeLogAwareEntityStore store = new ChangeLogAwareEntityStore();
     store.initialize(config);
@@ -986,6 +1044,7 @@ public class TestCatalogManager {
     private final AtomicReference<EntityChangeLogListener> unregisteredListener =
         new AtomicReference<>();
     private boolean returnFalseForCatalogDelete;
+    private boolean throwMissingCatalogForSchemaList;
 
     @Override
     public boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade)
@@ -994,6 +1053,20 @@ public class TestCatalogManager {
         return false;
       }
       return super.delete(ident, entityType, cascade);
+    }
+
+    @Override
+    public <E extends Entity & HasIdentifier> List<E> list(
+        Namespace namespace, Class<E> cl, EntityType entityType) throws IOException {
+      // Mirrors the relational store: listing the schemas of a catalog that another server has
+      // already deleted resolves the parent catalog id first and reports the catalog as missing.
+      if (throwMissingCatalogForSchemaList && entityType == EntityType.SCHEMA) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            EntityType.CATALOG.name().toLowerCase(),
+            namespace.level(namespace.length() - 1));
+      }
+      return super.list(namespace, cl, entityType);
     }
 
     @Override

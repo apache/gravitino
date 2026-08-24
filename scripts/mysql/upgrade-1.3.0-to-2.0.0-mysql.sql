@@ -96,3 +96,6 @@ ALTER TABLE `table_version_info`
     MODIFY COLUMN `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'table deletion timestamp, 0 means not deleted',
     DROP INDEX `uk_table_id_version_deleted_at`,
     ADD PRIMARY KEY (`table_id`, `version`, `deleted_at`);
+
+ALTER TABLE `job_run_meta`
+    ADD COLUMN `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at' AFTER `job_run_status`;

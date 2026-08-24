@@ -69,7 +69,7 @@ once. To reach every object in a catalog, attach the tag to the catalog.
 The UI attaches tags on catalogs, schemas, tables, and columns. For the other types, use the
 REST API described at the end of this page.
 
-### Names and Properties
+### Names, Properties, and Assignment Values
 
 A tag name is unique within its metalake and is the identifier used everywhere else, so renaming a
 tag changes what every stored request has to ask for.
@@ -82,6 +82,24 @@ every object carrying the tag sees the same values. Properties suit facts about 
 which team owns it or which external system it came from. Properties do not suit facts about one
 tagged object.
 
+Assignment values describe one tag on one object. For example, the same `data_domain` tag can have
+the value `finance` on one table and `risk` on another. An assignment can have no value, one value,
+or several values. Adding a value is incremental, so adding `risk` to an assignment that already has
+`finance` leaves both values in place.
+
+When you create a tag, you can choose one of three value constraints:
+
+| Constraint     | Meaning                                                                        |
+| -------------- | ------------------------------------------------------------------------------ |
+| Any value      | The tag accepts any non-blank string, and can also be assigned without a value |
+| No value       | The tag can only be assigned without a value                                   |
+| Allowed values | The tag accepts only values from the configured list                           |
+
+Values are case-sensitive strings of up to 256 characters. The constraint cannot be changed after
+the tag is created. Tag properties and assignment values are separate: changing a property affects
+the tag everywhere, while changing an assignment value affects only that object. Assignment values
+are currently managed through the REST API or the Java and Python clients.
+
 ### Inheritance
 
 An object shows the tags attached to it plus the tags attached to each of its ancestors, so a tag
@@ -91,6 +109,12 @@ inherits from both of the schemas above it.
 
 Each tag appears once, whether it reaches the object through one ancestor or several. A tag attached
 directly to the object counts as direct even when an ancestor carries it too.
+
+Assignment values follow the same inheritance path. If a child has no direct assignment for a tag,
+it receives the values from the nearest effective ancestor. A direct assignment on the child
+overrides the inherited assignment for that tag; its values are not merged with ancestor values.
+For example, a table assigned `data_domain = risk` shows only `risk` even when its catalog is
+assigned `data_domain = finance`.
 
 The two are distinguishable. In the UI an inherited tag is marked with a lock icon. Over REST, a tag
 listing requested with `details=true` carries an `inherited` field on each tag, which a plain listing

@@ -45,3 +45,6 @@ ALTER TABLE tag_relation_meta DROP CONSTRAINT IF EXISTS tag_relation_meta_tag_id
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_ti_mi_mo_tv_del ON tag_relation_meta (tag_id, metadata_object_id, metadata_object_type, tag_value, deleted_at);
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id_value ON tag_relation_meta (tag_id, tag_value);
+
+ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS job_started_at BIGINT NOT NULL DEFAULT 0;
+COMMENT ON COLUMN job_run_meta.job_started_at IS 'job run started at';

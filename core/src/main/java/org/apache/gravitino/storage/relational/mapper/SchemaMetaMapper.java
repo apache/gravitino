@@ -111,11 +111,6 @@ public interface SchemaMetaMapper {
       method = "softDeleteSchemaMetasBySchemaIds")
   Integer softDeleteSchemaMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
-  @UpdateProvider(
-      type = SchemaMetaSQLProviderFactory.class,
-      method = "softDeleteSchemaMetasByCatalogId")
-  Integer softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId);
-
   /**
    * Soft-deletes schemas whose identifiers and OCC versions still match.
    *

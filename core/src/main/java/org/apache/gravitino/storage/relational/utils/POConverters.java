@@ -234,9 +234,11 @@ public class POConverters {
    */
   public static CatalogPO updateCatalogPOWithVersion(
       CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
-    Long lastVersion = oldCatalogPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Every update moves the version forward, even when nothing else changes. The version is what
+    // the UPDATE compares against, so a version that stands still would let two servers overwrite
+    // each other. Both columns get the same value because a catalog keeps no old versions to
+    // address, unlike a fileset.
+    Long nextVersion = oldCatalogPO.getCurrentVersion() + 1;
     try {
       return CatalogPO.builder()
           .withCatalogId(newCatalog.id())

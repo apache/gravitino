@@ -43,6 +43,22 @@ class JobDTO(DataClassJsonMixin):
         )
     )
     _audit: AuditDTO = field(metadata=config(field_name="audit"))
+    _queued_at: Optional[datetime] = field(
+        default=None,
+        metadata=config(
+            field_name="queuedAt",
+            encoder=_serialize_datetime,
+            decoder=_deserialize_datetime,
+        ),
+    )
+    _started_at: Optional[datetime] = field(
+        default=None,
+        metadata=config(
+            field_name="startedAt",
+            encoder=_serialize_datetime,
+            decoder=_deserialize_datetime,
+        ),
+    )
     _finished_at: Optional[datetime] = field(
         default=None,
         metadata=config(
@@ -53,6 +69,8 @@ class JobDTO(DataClassJsonMixin):
     )
 
     def __post_init__(self) -> None:
+        self._queued_at = _deserialize_datetime(self._queued_at)
+        self._started_at = _deserialize_datetime(self._started_at)
         self._finished_at = _deserialize_datetime(self._finished_at)
 
     def job_id(self) -> str:
@@ -70,6 +88,16 @@ class JobDTO(DataClassJsonMixin):
     def audit(self) -> AuditDTO:
         """Returns the audit information of the job."""
         return self._audit
+
+    def queued_at(self) -> Optional[datetime]:
+        """Returns the time the job was queued for execution."""
+        return self._queued_at
+
+    def started_at(self) -> Optional[datetime]:
+        """Returns the time the job started execution, or ``None`` if the job has not started
+        execution yet.
+        """
+        return self._started_at
 
     def finished_at(self) -> Optional[datetime]:
         """Returns the time the job finished execution, or ``None`` if the job has not finished

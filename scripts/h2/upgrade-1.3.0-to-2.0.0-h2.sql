@@ -38,3 +38,5 @@ ALTER TABLE `idp_group_meta` ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT ''
 
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);
 CREATE INDEX IF NOT EXISTS `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
+
+ALTER TABLE `job_run_meta` ADD COLUMN `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at' AFTER `job_run_status`;

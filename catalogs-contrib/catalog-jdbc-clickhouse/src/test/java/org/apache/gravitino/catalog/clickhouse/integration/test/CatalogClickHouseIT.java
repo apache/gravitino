@@ -78,6 +78,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -269,6 +270,50 @@ public class CatalogClickHouseIT extends BaseIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(GRAVITINO_ENGINE_KEY, MERGETREE.getValue());
     return properties;
+  }
+
+  private static String normalizeEnumFormatting(String value) {
+    StringBuilder normalized = new StringBuilder(value.length());
+    boolean inSingleQuote = false;
+    boolean pendingWhitespace = false;
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      boolean escapedQuote =
+          current == '\''
+              && i > 0
+              && value.charAt(i - 1) == '\\'
+              && (i < 2 || value.charAt(i - 2) != '\\');
+      if (current == '\'' && !escapedQuote) {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+        inSingleQuote = !inSingleQuote;
+      } else if (!inSingleQuote && Character.isWhitespace(current)) {
+        pendingWhitespace = true;
+      } else if (!inSingleQuote && (current == '=' || current == ',')) {
+        pendingWhitespace = false;
+        normalized.append(current);
+      } else {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+      }
+    }
+    return normalized.toString().trim();
+  }
+
+  private static void appendWhitespaceUnlessSeparator(StringBuilder builder) {
+    if (builder.length() == 0) {
+      return;
+    }
+    char previous = builder.charAt(builder.length() - 1);
+    if (previous != '=' && previous != ',') {
+      builder.append(' ');
+    }
   }
 
   @Test
@@ -2836,6 +2881,7 @@ public class CatalogClickHouseIT extends BaseIT {
     // may normalize the enum definition format (e.g., spacing around '=' and ',').
     Assertions.assertTrue(loadedTable.columns()[4].dataType() instanceof Types.ExternalType);
     Assertions.assertTrue(loadedTable.columns()[5].dataType() instanceof Types.ExternalType);
+    // Date32 remains ExternalType so its wider range and catalog type survive round-trip.
     Assertions.assertEquals(Types.ExternalType.of("Date32"), loadedTable.columns()[6].dataType());
   }
 
@@ -2871,5 +2917,84 @@ public class CatalogClickHouseIT extends BaseIT {
                     Distributions.NONE,
                     getSortOrders("id"),
                     Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testEnumRoundTrip() {
+    // Create a table in ClickHouse with Enum8 and Enum16 columns
+    String tableName = GravitinoITUtils.genRandomName("enum_test");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "id Int32, "
+                + "status Enum8('active' = 1, 'inactive' = 2), "
+                + "priority Enum16('low' = 100, 'medium' = 200, 'high' = 300)"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, tableName));
+
+    // Load through Gravitino and verify column types are ExternalType
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Column[] columns = loaded.columns();
+    Assertions.assertEquals(3, columns.length);
+
+    // Enum8 type verification
+    Type enum8Type = columns[1].dataType();
+    Assertions.assertTrue(
+        enum8Type instanceof Types.ExternalType,
+        "Enum8 should map to ExternalType, but got: " + enum8Type.simpleString());
+    Assertions.assertEquals(
+        normalizeEnumFormatting("Enum8('active' = 1, 'inactive' = 2)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()));
+
+    // Enum16 type verification
+    Type enum16Type = columns[2].dataType();
+    Assertions.assertTrue(
+        enum16Type instanceof Types.ExternalType,
+        "Enum16 should map to ExternalType, but got: " + enum16Type.simpleString());
+    Assertions.assertEquals(
+        normalizeEnumFormatting("Enum16('low' = 100, 'medium' = 200, 'high' = 300)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()));
+
+    // Round-trip: recreate table through Gravitino with the loaded schema
+    String rtTableName = GravitinoITUtils.genRandomName("enum_rt");
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, rtTableName),
+            columns,
+            "enum round-trip test",
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)});
+
+    // Verify types survived round-trip
+    Table rtLoaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, rtTableName));
+    Column[] rtColumns = rtLoaded.columns();
+    Type rtEnum8 = rtColumns[1].dataType();
+    Type rtEnum16 = rtColumns[2].dataType();
+    Assertions.assertTrue(
+        rtEnum8 instanceof Types.ExternalType, "Enum8 should survive round-trip as ExternalType");
+    Assertions.assertTrue(
+        rtEnum16 instanceof Types.ExternalType, "Enum16 should survive round-trip as ExternalType");
+    Assertions.assertEquals(
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum8).catalogString()));
+    Assertions.assertEquals(
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum16).catalogString()));
+
+    // Verify DDL on ClickHouse side contains full enum definitions
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, rtTableName));
+    Assertions.assertNotNull(createSql, "SHOW CREATE TABLE should return a result");
+    String normalizedCreateSql = normalizeEnumFormatting(createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("Enum8('active'=1,'inactive'=2)"),
+        "SHOW CREATE TABLE should contain Enum8 definition: " + createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("Enum16('low'=100,'medium'=200,'high'=300)"),
+        "SHOW CREATE TABLE should contain Enum16 definition: " + createSql);
   }
 }

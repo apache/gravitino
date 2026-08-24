@@ -125,10 +125,6 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 
-  public static String softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteSchemaMetasByCatalogId(catalogId);
-  }
-
   /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */
   public static String softDeleteSchemaMetasWithVersion(
       @Param("schemaMetas") List<SchemaPO> schemaPOs) {

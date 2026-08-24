@@ -130,6 +130,7 @@ public class TestJobMetaService extends TestJDBCBackend {
             .withNamespace(job.namespace())
             .withAuditInfo(job.auditInfo())
             .withJobTemplateName(job.jobTemplateName())
+            .withStartedAt(System.currentTimeMillis())
             .withFinishedAt(System.currentTimeMillis())
             .build();
     Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(jobOverwrite, true));
@@ -138,7 +139,7 @@ public class TestJobMetaService extends TestJDBCBackend {
             .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobOverwrite.name()));
     Assertions.assertEquals(jobOverwrite, updatedJob);
 
-    // Test insert and get job with finishedAt
+    // Test insert and get job with startedAt/finishedAt
     JobEntity finishedJob =
         TestJobTemplateMetaService.newJobEntity(
             jobTemplate.name(), JobHandle.Status.SUCCEEDED, METALAKE_NAME);
@@ -147,6 +148,7 @@ public class TestJobMetaService extends TestJDBCBackend {
     JobEntity retrievedFinishedJob =
         JobMetaService.getInstance()
             .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, finishedJob.name()));
+    Assertions.assertTrue(retrievedFinishedJob.startedAt() > 0);
     Assertions.assertTrue(retrievedFinishedJob.finishedAt() > 0);
   }
 
@@ -180,6 +182,7 @@ public class TestJobMetaService extends TestJDBCBackend {
             .withNamespace(job.namespace())
             .withAuditInfo(job.auditInfo())
             .withJobTemplateName(job.jobTemplateName())
+            .withStartedAt(timestamp)
             .withFinishedAt(timestamp)
             .build();
     Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(updatedJob, true));
