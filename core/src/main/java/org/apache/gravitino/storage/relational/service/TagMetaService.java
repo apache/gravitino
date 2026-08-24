@@ -49,6 +49,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -158,8 +159,15 @@ public class TagMetaService {
     String metalakeName = identifier.namespace().level(0);
     int[] tagDeletedCount = new int[] {0};
     int[] tagMetadataObjectRelDeletedCount = new int[] {0};
+    int[] policyTagRelDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
+        () ->
+            policyTagRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    PolicyTagRelMapper.class,
+                    mapper ->
+                        mapper.softDeleteByMetalakeAndTagName(metalakeName, identifier.name())),
         () ->
             tagDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
@@ -175,7 +183,8 @@ public class TagMetaService {
                         mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
                             metalakeName, identifier.name())));
 
-    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] > 0;
+    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] + policyTagRelDeletedCount[0]
+        > 0;
   }
 
   @Monitored(
