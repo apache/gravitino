@@ -41,10 +41,10 @@ from mcp_server.core.context import (
 )
 from mcp_server.core.oauth import RefreshableBearerAuth
 from mcp_server.core.setting import Setting
-from mcp_server.main import _parse_args
+from mcp_server.main import _parse_args, do_main
 
 
-def _jwt_with_exp(exp: int) -> str:
+def _jwt_with_exp(exp) -> str:
     header = base64.urlsafe_b64encode(b'{"alg":"none"}').rstrip(b"=").decode()
     payload = (
         base64.urlsafe_b64encode(json.dumps({"exp": exp}).encode())
@@ -350,6 +350,32 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self._get_twice(self._auth(handler))
         self.assertEqual(calls["token"], 1)
 
+    def test_jwt_exp_float_accepted(self):
+        token = _jwt_with_exp(float(int(time.time()) + 3600))
+        calls = {"token": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                calls["token"] += 1
+                return httpx.Response(200, json={"access_token": token})
+            return httpx.Response(200, json={"ok": True})
+
+        self._get_twice(self._auth(handler))
+        self.assertEqual(calls["token"], 1)
+
+    def test_jwt_exp_string_accepted(self):
+        token = _jwt_with_exp(str(int(time.time()) + 3600))
+        calls = {"token": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                calls["token"] += 1
+                return httpx.Response(200, json={"access_token": token})
+            return httpx.Response(200, json={"ok": True})
+
+        self._get_twice(self._auth(handler))
+        self.assertEqual(calls["token"], 1)
+
     def test_opaque_token_without_expires_in_raises(self):
         def handler(request: httpx.Request) -> httpx.Response:
             if request.method == "POST":
@@ -526,6 +552,12 @@ class TestSettingOAuth(unittest.TestCase):
         with self.assertRaises(ValueError):
             setting.validate_oauth()
 
+    def test_oauth_scope_without_credentials_is_rejected(self):
+        setting = Setting(metalake="ml", oauth_scope="gravitino")
+        with self.assertRaises(ValueError) as raised:
+            setting.validate_oauth()
+        self.assertIn("scope", str(raised.exception).lower())
+
     def test_complete_oauth_is_accepted(self):
         setting = Setting(
             metalake="ml",
@@ -589,6 +621,23 @@ class TestOAuthArgParsing(unittest.TestCase):
         self.assertEqual(args.oauth_client_id, "cli-id")
         self.assertEqual(args.oauth_client_secret, "cli-secret")
         self.assertEqual(args.oauth_token_endpoint, "https://cli/token")
+
+
+class TestMainOAuthValidation(unittest.TestCase):
+    def test_partial_oauth_inits_logging_before_exit(self):
+        with mock.patch(
+            "mcp_server.main._init_logging"
+        ) as init_log, mock.patch(
+            "mcp_server.main.GravitinoMCPServer"
+        ), mock.patch.object(
+            sys,
+            "argv",
+            ["mcp_server", "--metalake", "ml", "--oauth-client-id", "x"],
+        ):
+            with self.assertRaises(SystemExit) as raised:
+                do_main()
+            self.assertEqual(raised.exception.code, 1)
+        init_log.assert_called_once()
 
 
 class TestServiceFallbackAuthorization(unittest.TestCase):

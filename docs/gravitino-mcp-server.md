@@ -199,13 +199,18 @@ In Cursor, put the `GRAVITINO_OAUTH_*` values in the `env` block of `~/.cursor/m
 
 Gravitino maps the JWT to a metalake principal from claims configured in [`gravitino.authenticator.oauth.principalFields`](./security/how-to-authenticate.md#server-configuration) (often `sub`); that principal may differ from `--oauth-client-id`. It must exist as a metalake user with the needed grants, or tool calls fail with 403.
 
+Prefer environment variables (or the `env` block in `~/.cursor/mcp.json`) for the client secret so it does not appear in `ps` output or shell history:
+
 ```shell
-uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
-  --oauth-token-endpoint https://idp.example/realms/gravitino/protocol/openid-connect/token \
-  --oauth-client-id mcp-service \
-  --oauth-client-secret <secret> \
-  --oauth-scope gravitino
+export GRAVITINO_OAUTH_TOKEN_ENDPOINT=https://idp.example/realms/gravitino/protocol/openid-connect/token
+export GRAVITINO_OAUTH_CLIENT_ID=mcp-service
+export GRAVITINO_OAUTH_CLIENT_SECRET=<secret>
+export GRAVITINO_OAUTH_SCOPE=gravitino
+
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
 ```
+
+The matching CLI flags (`--oauth-token-endpoint`, `--oauth-client-id`, `--oauth-client-secret`, `--oauth-scope`) work the same way, but avoid passing `--oauth-client-secret` on the command line in production.
 
 This path does not replace per-request user identity in HTTP mode (see below).
 

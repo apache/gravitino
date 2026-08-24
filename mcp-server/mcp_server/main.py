@@ -40,8 +40,12 @@ def do_main():
         oauth_client_secret=args.oauth_client_secret,
         oauth_scope=args.oauth_scope,
     )
-    setting.validate_oauth()
     _init_logging(setting)
+    try:
+        setting.validate_oauth()
+    except ValueError as exc:
+        logging.error("%s", exc)
+        raise SystemExit(1) from None
     logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
     server.run()

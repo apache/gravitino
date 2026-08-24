@@ -28,6 +28,7 @@ import base64
 import json
 import logging
 import threading
+import time
 from collections.abc import AsyncGenerator, Generator
 from typing import Optional, Union
 
@@ -171,12 +172,32 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         _LOG.info("Fetched OAuth access token")
         if expires_in:
             return self.state, token, expires_in
-        if not self._has_jwt_exp(token):
+        if expires_in:
+            return self.state, token, expires_in
+        jwt_expires_in = self._jwt_expires_in(token)
+        if jwt_expires_in is None:
             raise ValueError(
                 "OAuth token response omitted expires_in and "
                 "access_token is not a JWT with exp"
             )
-        return self.state, token
+        return self.state, token, jwt_expires_in
+
+    @staticmethod
+    def _jwt_expires_in(token: str) -> Optional[int]:
+        """Return seconds until JWT ``exp``, or None when not cacheable."""
+        parts = token.split(".")
+        if len(parts) != 3:
+            return None
+        try:
+            padded = parts[1] + "=" * (-len(parts[1]) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(padded))
+            exp = payload.get("exp")
+            if not RefreshableBearerAuth._is_numeric_date(exp):
+                return None
+            expires_at = int(float(exp))
+            return max(expires_at - int(time.time()), 1)
+        except (ValueError, json.JSONDecodeError, TypeError):
+            return None
 
     @staticmethod
     def _has_jwt_exp(token: str) -> bool:
@@ -186,15 +207,22 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         reference tokens must not be handed to httpx-auth as a 2-tuple,
         which splits on '.' and crashes the next tool call.
         """
-        parts = token.split(".")
-        if len(parts) != 3:
+        return RefreshableBearerAuth._jwt_expires_in(token) is not None
+
+    @staticmethod
+    def _is_numeric_date(value) -> bool:
+        """Return True when value is a JWT NumericDate (RFC 7519)."""
+        if isinstance(value, bool):
             return False
-        try:
-            padded = parts[1] + "=" * (-len(parts[1]) % 4)
-            payload = json.loads(base64.urlsafe_b64decode(padded))
-        except (ValueError, json.JSONDecodeError):
-            return False
-        return isinstance(payload.get("exp"), int)
+        if isinstance(value, (int, float)):
+            return True
+        if isinstance(value, str):
+            try:
+                float(value)
+                return True
+            except ValueError:
+                return False
+        return False
 
     @staticmethod
     def _log_token_http_error(response: httpx.Response) -> None:

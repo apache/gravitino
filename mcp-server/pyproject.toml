@@ -25,7 +25,7 @@ dependencies = [
     # Pin FastMCP so breaking API changes are handled explicitly during dependency upgrades.
     "fastmcp==3.4.5",
     # httpx.Auth plugin for hop-2 client_credentials fetch/cache.
-    "httpx-auth>=0.22",
+    "httpx-auth>=0.22,<0.24",
     # TODO(#10754): pydocket (a transitive dep of fastmcp>=2.14.0)
     # requires fakeredis>=2.32.1, but fakeredis 2.35.0 removed FakeConnection from
     # fakeredis.aioredis, which pydocket still uses. Pin fakeredis to <2.35.0 until the

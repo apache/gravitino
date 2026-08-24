@@ -76,6 +76,13 @@ class Setting:  # pylint: disable=too-many-instance-attributes
                 "(or GRAVITINO_OAUTH_TOKEN_ENDPOINT / "
                 "GRAVITINO_OAUTH_CLIENT_ID / GRAVITINO_OAUTH_CLIENT_SECRET)."
             )
+        if self.oauth_scope.strip() and not all(filled):
+            raise ValueError(
+                "OAuth scope (--oauth-scope / GRAVITINO_OAUTH_SCOPE) requires "
+                "a complete client-credentials configuration "
+                "(--oauth-token-endpoint, --oauth-client-id, and "
+                "--oauth-client-secret)."
+            )
 
     def __str__(self) -> str:
         # Mirror startup_authorization: a whitespace-only token is anonymous on
