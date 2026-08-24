@@ -53,6 +53,15 @@ public class GravitinoConnectorPluginManager {
 
   private static final String PLUGIN_NAME_PREFIX = "gravitino-";
   private static final String PLUGIN_CLASSLOADER_CLASS_NAME = "io.trino.server.PluginClassLoader";
+  static final List<String> PARENT_FIRST_PACKAGES =
+      List.of(
+          "io.trino.spi.",
+          "com.fasterxml.jackson.annotation.",
+          "io.airlift.slice.",
+          "org.openjdk.jol.",
+          "io.opentelemetry.api.",
+          "io.opentelemetry.context.",
+          "io.starburst.ai.model.");
 
   private static volatile GravitinoConnectorPluginManager instance;
 
@@ -175,17 +184,7 @@ public class GravitinoConnectorPluginManager {
       String classLoaderName = PLUGIN_NAME_PREFIX + pluginName;
       // Load Trino SPI package and other dependencies refer to io.trino.server.PluginClassLoader
       Object pluginClassLoader =
-          constructor.newInstance(
-              classLoaderName,
-              urls,
-              appClassloader,
-              List.of(
-                  "io.trino.spi.",
-                  "com.fasterxml.jackson.annotation.",
-                  "io.airlift.slice.",
-                  "org.openjdk.jol.",
-                  "io.opentelemetry.api.",
-                  "io.opentelemetry.context."));
+          constructor.newInstance(classLoaderName, urls, appClassloader, PARENT_FIRST_PACKAGES);
 
       ServiceLoader<Plugin> serviceLoader =
           ServiceLoader.load(Plugin.class, (ClassLoader) pluginClassLoader);
