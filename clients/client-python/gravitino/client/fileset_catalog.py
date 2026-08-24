@@ -24,6 +24,7 @@ from gravitino.dto.requests.fileset_create_request import FilesetCreateRequest
 from gravitino.api.catalog import Catalog
 from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.supports_credentials import SupportsCredentials
+from gravitino.api.secret.supports_secrets import SupportsSecrets
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.file.fileset_change import FilesetChange
 from gravitino.api.secret import SecretBinding, SecretReference
@@ -50,7 +51,7 @@ _EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class FilesetCatalog(
-    BaseSchemaCatalog, SupportsCredentials
+    BaseSchemaCatalog, SupportsCredentials, SupportsSecrets
 ):  # pylint: disable=too-many-ancestors
     """
     Fileset catalog is a catalog implementation that supports fileset like metadata operations, for
@@ -402,3 +403,9 @@ class FilesetCatalog(
 
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
+
+    def support_secrets(self) -> SupportsSecrets:
+        return self
+
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()

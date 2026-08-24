@@ -574,6 +574,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
     try {
       store.put(filesetEntity, true /* overwrite */);
+    } catch (NoSuchEntityException exception) {
+      // The schema can disappear after the check near the start of this method. The relational
+      // store detects that race while taking the parent-schema lock; translate its storage-level
+      // exception into the catalog API's documented missing-schema exception.
+      throw new NoSuchSchemaException(exception, SCHEMA_DOES_NOT_EXIST_MSG, schemaIdent);
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to create fileset " + ident, ioe);
     }

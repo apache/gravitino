@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
 import javax.ws.rs.core.Application;
@@ -586,6 +587,24 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  private static TestCatalog buildCatalogWithProperties(
+      String metalake, String catalogName, Map<String, String> properties) {
+    CatalogEntity entity =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName(catalogName)
+            .withComment("comment")
+            .withNamespace(Namespace.of(metalake))
+            .withProperties(properties)
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+
+    return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {

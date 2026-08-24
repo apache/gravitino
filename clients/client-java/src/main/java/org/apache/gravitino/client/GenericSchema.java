@@ -31,18 +31,21 @@ import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic schema. */
-class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPolicies {
+class GenericSchema
+    implements Schema, SupportsTags, SupportsRoles, SupportsPolicies, SupportsSecrets {
 
   private final SchemaDTO schemaDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
 
   GenericSchema(SchemaDTO schemaDTO, RESTClient restClient, String metalake, String catalog) {
     this.schemaDTO = schemaDTO;
@@ -53,6 +56,8 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
         new MetadataObjectRoleOperations(metalake, schemaObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(metalake, schemaObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(metalake, schemaObject, restClient);
   }
 
   @Override
@@ -68,6 +73,16 @@ class GenericSchema implements Schema, SupportsTags, SupportsRoles, SupportsPoli
   @Override
   public SupportsRoles supportsRoles() {
     return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override

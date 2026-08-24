@@ -40,6 +40,9 @@ from gravitino.client.metadata_object_credential_operations import (
 from gravitino.client.metadata_object_role_operations import (
     MetadataObjectRoleOperations,
 )
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
+)
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.catalog_dto import CatalogDTO
@@ -81,6 +84,9 @@ class BaseSchemaCatalog(
     # The metadata object credential operations
     _object_credential_operations: MetadataObjectCredentialOperations
 
+    # The metadata object secret property operations
+    _object_secret_operations: MetadataObjectSecretOperations
+
     _function_operations: FunctionCatalogOperations
 
     def __init__(
@@ -109,6 +115,9 @@ class BaseSchemaCatalog(
         self._object_credential_operations = MetadataObjectCredentialOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
+        self._object_secret_operations = MetadataObjectSecretOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
         self._function_operations = FunctionCatalogOperations(
             rest_client, catalog_namespace, self.name()
         )
@@ -120,6 +129,9 @@ class BaseSchemaCatalog(
         )
 
         self.validate()
+
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()
 
     def as_schemas(self):
         return self
