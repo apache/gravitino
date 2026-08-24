@@ -107,6 +107,9 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
+    if (changes == null || changes.length == 0) {
+      throw new IllegalSemanticModelException("At least one Semantic Model change is required");
+    }
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     if (!schemaDispatcher.schemaExists(schemaIdent)) {
