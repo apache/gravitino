@@ -14,3 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+
+from gravitino.api.secret.secret_types import SecretBinding, SecretReference
+from gravitino.api.secret.supports_secrets import SupportsSecrets
+
+__all__ = ["SecretBinding", "SecretReference", "SupportsSecrets"]

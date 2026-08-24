@@ -27,9 +27,7 @@ from gravitino.exceptions.base import IllegalArgumentException
 class SecretsResponse(BaseResponse):
     """Response for secret properties."""
 
-    _secrets: Dict[str, str] = field(
-        metadata=config(field_name="secrets")
-    )
+    _secrets: Dict[str, str] = field(metadata=config(field_name="secrets"))
 
     def secrets(self) -> Dict[str, str]:
         return self._secrets
