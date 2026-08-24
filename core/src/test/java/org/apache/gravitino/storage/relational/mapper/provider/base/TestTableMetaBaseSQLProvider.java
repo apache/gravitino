@@ -26,6 +26,17 @@ class TestTableMetaBaseSQLProvider {
   private static final TableMetaBaseSQLProvider PROVIDER = new TableMetaBaseSQLProvider();
 
   @Test
+  void testOverwriteAdvancesStoredVersion() {
+    String sql = PROVIDER.insertTableMetaOnDuplicateKeyUpdate(null);
+    String updateClause = sql.substring(sql.indexOf(" ON DUPLICATE KEY UPDATE"));
+
+    Assertions.assertTrue(updateClause.contains("last_version = current_version + 1"));
+    Assertions.assertTrue(updateClause.contains("current_version = current_version + 1"));
+    Assertions.assertFalse(updateClause.contains("current_version = #{tableMeta.currentVersion}"));
+    Assertions.assertFalse(updateClause.contains("last_version = #{tableMeta.lastVersion}"));
+  }
+
+  @Test
   void testUpdateUsesOnlyIdVersionAndActiveStateForCas() {
     String sql = PROVIDER.updateTableMeta(null, null, null);
     String whereClause = sql.substring(sql.indexOf(" WHERE"));

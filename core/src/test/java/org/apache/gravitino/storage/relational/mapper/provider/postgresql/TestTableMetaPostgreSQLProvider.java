@@ -24,6 +24,18 @@ import org.junit.jupiter.api.Test;
 class TestTableMetaPostgreSQLProvider {
 
   @Test
+  void testOverwriteAdvancesStoredVersion() {
+    String sql = new TableMetaPostgreSQLProvider().insertTableMetaOnDuplicateKeyUpdate(null);
+    String updateClause = sql.substring(sql.indexOf(" ON CONFLICT"));
+
+    Assertions.assertTrue(
+        updateClause.contains("current_version = table_meta.current_version + 1"));
+    Assertions.assertTrue(updateClause.contains("last_version = table_meta.current_version + 1"));
+    Assertions.assertFalse(updateClause.contains("current_version = #{tableMeta.currentVersion}"));
+    Assertions.assertFalse(updateClause.contains("last_version = #{tableMeta.lastVersion}"));
+  }
+
+  @Test
   void testDirectDeleteUsesVersionCas() {
     String sql = new TableMetaPostgreSQLProvider().softDeleteTableMetasByTableId(null, null);
 

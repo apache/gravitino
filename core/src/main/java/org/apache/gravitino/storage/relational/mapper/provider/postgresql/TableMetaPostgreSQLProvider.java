@@ -50,8 +50,14 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
         + " catalog_id = #{tableMeta.catalogId},"
         + " schema_id = #{tableMeta.schemaId},"
         + " audit_info = #{tableMeta.auditInfo},"
-        + " current_version = #{tableMeta.currentVersion},"
-        + " last_version = #{tableMeta.lastVersion},"
+        // Qualify the stored row's version because a bare name is ambiguous on this side of
+        // ON CONFLICT in PostgreSQL.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{tableMeta.deletedAt}";
   }
 

@@ -25,6 +25,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
@@ -113,6 +114,7 @@ public class TableMetaService {
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
       TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
+      AtomicReference<TablePO> persistedPO = new AtomicReference<>(po);
       // The schema lock, table row, version row, and columns share one transaction. If any later
       // step fails, the earlier inserts are rolled back as well.
       SessionUtils.doMultipleWithCommit(
@@ -127,13 +129,29 @@ public class TableMetaService {
                       po.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
-                  TableMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
+                  TableMetaMapper.class,
+                  mapper -> {
+                    ops.insertPO(mapper, po, overwrite);
+                    if (overwrite) {
+                      TablePO storedPO = mapper.selectTableMetaByIdForUpdate(po.getTableId());
+                      Preconditions.checkState(
+                          storedPO != null,
+                          "The overwritten table with id %s does not exist",
+                          po.getTableId());
+                      persistedPO.set(tablePOWithPersistedVersions(po, storedPO));
+                    }
+                  }),
           () ->
               SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
                   mapper -> {
                     if (overwrite) {
-                      mapper.insertTableVersionOnDuplicateKeyUpdate(po);
+                      TablePO storedPO = persistedPO.get();
+                      if (storedPO.getCurrentVersion() > POConverters.INIT_VERSION) {
+                        mapper.softDeleteTableVersionByTableIdAndVersion(
+                            storedPO.getTableId(), storedPO.getCurrentVersion() - 1);
+                      }
+                      mapper.insertTableVersionOnDuplicateKeyUpdate(storedPO);
                     } else {
                       mapper.insertTableVersion(po);
                     }
@@ -141,12 +159,14 @@ public class TableMetaService {
           () -> {
             // We need to delete the columns first if we want to overwrite the table.
             if (overwrite) {
-              TableColumnMetaService.getInstance().deleteColumnsByTableId(po.getTableId());
+              TableColumnMetaService.getInstance()
+                  .deleteColumnsByTableId(persistedPO.get().getTableId());
             }
           },
           () -> {
             if (tableEntity.columns() != null && !tableEntity.columns().isEmpty()) {
-              TableColumnMetaService.getInstance().insertColumnPOs(po, tableEntity.columns());
+              TableColumnMetaService.getInstance()
+                  .insertColumnPOs(persistedPO.get(), tableEntity.columns());
             }
           });
 
@@ -349,6 +369,27 @@ public class TableMetaService {
     builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
     builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
     builder.withSchemaId(namespacedEntityId.entityId());
+  }
+
+  private TablePO tablePOWithPersistedVersions(TablePO incomingPO, TablePO persistedPO) {
+    return TablePO.builder()
+        .withTableId(incomingPO.getTableId())
+        .withTableName(incomingPO.getTableName())
+        .withMetalakeId(incomingPO.getMetalakeId())
+        .withCatalogId(incomingPO.getCatalogId())
+        .withSchemaId(incomingPO.getSchemaId())
+        .withAuditInfo(incomingPO.getAuditInfo())
+        .withCurrentVersion(persistedPO.getCurrentVersion())
+        .withLastVersion(persistedPO.getLastVersion())
+        .withDeletedAt(incomingPO.getDeletedAt())
+        .withFormat(incomingPO.getFormat())
+        .withProperties(incomingPO.getProperties())
+        .withPartitions(incomingPO.getPartitions())
+        .withSortOrders(incomingPO.getSortOrders())
+        .withDistribution(incomingPO.getDistribution())
+        .withIndexes(incomingPO.getIndexes())
+        .withComment(incomingPO.getComment())
+        .build();
   }
 
   private void deleteTableDependents(TablePO tablePO) {

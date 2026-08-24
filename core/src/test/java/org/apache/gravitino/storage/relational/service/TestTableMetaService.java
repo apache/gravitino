@@ -311,6 +311,38 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteAdvancesVersionAndRejectsStaleUpdate() throws IOException {
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    TableEntity original =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, schemaName),
+            "table_overwrite_occ",
+            AUDIT_INFO);
+    TableMetaService.getInstance().insertTable(original, false);
+    TablePO beforeOverwrite = getTablePO(original.id());
+    TableEntity replacement = copyTableWithComment(original, "overwrite winner");
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            updateTableUnchecked(
+                original.nameIdentifier(),
+                current -> {
+                  insertTableUnchecked(replacement, true);
+                  return copyTableWithComment(current, "stale update");
+                }));
+
+    TableEntity winner =
+        TableMetaService.getInstance().getTableByIdentifier(original.nameIdentifier());
+    TablePO afterOverwrite = getTablePO(original.id());
+    Assertions.assertEquals("overwrite winner", winner.comment());
+    Assertions.assertEquals(
+        beforeOverwrite.getCurrentVersion() + 1, afterOverwrite.getCurrentVersion());
+    Assertions.assertEquals(afterOverwrite.getCurrentVersion(), afterOverwrite.getLastVersion());
+  }
+
+  @TestTemplate
   public void testUpdateAlreadyExistsException() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
@@ -1056,6 +1088,14 @@ public class TestTableMetaService extends TestJDBCBackend {
       NameIdentifier identifier, Function<TableEntity, TableEntity> updater) {
     try {
       TableMetaService.getInstance().updateTable(identifier, updater);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void insertTableUnchecked(TableEntity table, boolean overwrite) {
+    try {
+      TableMetaService.getInstance().insertTable(table, overwrite);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }

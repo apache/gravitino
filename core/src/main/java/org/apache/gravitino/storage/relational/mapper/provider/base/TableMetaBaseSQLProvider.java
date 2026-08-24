@@ -237,8 +237,11 @@ public class TableMetaBaseSQLProvider {
         + " catalog_id = #{tableMeta.catalogId},"
         + " schema_id = #{tableMeta.schemaId},"
         + " audit_info = #{tableMeta.auditInfo},"
-        + " current_version = #{tableMeta.currentVersion},"
-        + " last_version = #{tableMeta.lastVersion},"
+        // Keep the OCC token monotonic on overwrite. Resetting it to the incoming initial version
+        // would let a writer that read the same old version pass its CAS after this statement.
+        // last_version is assigned first, so both columns advance from the stored current version.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{tableMeta.deletedAt}";
   }
 
