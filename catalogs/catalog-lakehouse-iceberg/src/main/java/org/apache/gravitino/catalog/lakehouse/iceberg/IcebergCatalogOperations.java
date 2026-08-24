@@ -33,7 +33,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -658,21 +657,7 @@ public class IcebergCatalogOperations
    * Performs `listNamespaces` operation on the Iceberg catalog to test the connection.
    *
    * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
    */
-  @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
-    testConnection(catalogIdent);
-  }
-
   @Override
   public void testConnection(NameIdentifier catalogIdent) {
     try {

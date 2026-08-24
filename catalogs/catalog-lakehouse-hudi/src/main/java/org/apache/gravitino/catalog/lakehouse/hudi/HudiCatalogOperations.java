@@ -22,7 +22,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import java.util.Objects;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
@@ -86,23 +85,7 @@ public class HudiCatalogOperations implements CatalogOperations, SupportsSchemas
    * Performs `listSchemas` operation on the Hudi Catalog to test the catalog connection.
    *
    * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
-   * @throws Exception if failed to run `listSchemas` operation on the Hudi Catalog.
    */
-  @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties)
-      throws Exception {
-    testConnection(catalogIdent);
-  }
-
   @Override
   public void testConnection(NameIdentifier catalogIdent) {
     try {

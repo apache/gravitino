@@ -201,6 +201,11 @@ public class CatalogMysqlIT extends BaseIT {
     return loadCatalog;
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
   private void createSchema(Catalog catalog, String schemaName) {
     Map<String, String> prop = Maps.newHashMap();
 

@@ -397,6 +397,21 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse unsupported = unsupportedResponse.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, unsupported.getCode());
     Assertions.assertNull(unsupported.getStack());
+
+    doThrow(new RuntimeException("unexpected failure"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response internalErrorResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+    Assertions.assertEquals(
+        INTERNAL_SERVER_ERROR.getStatusCode(), internalErrorResponse.getStatus());
+    ErrorResponse internalError = internalErrorResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, internalError.getCode());
+    Assertions.assertEquals("unexpected failure", internalError.getMessage());
+    Assertions.assertNull(internalError.getStack());
   }
 
   @Test

@@ -147,16 +147,6 @@ public class GenericCatalogOperations implements CatalogOperations, SupportsSche
   }
 
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
-    testConnection(catalogIdent);
-  }
-
-  @Override
   public void testConnection(NameIdentifier catalogIdent) {
     throw new UnsupportedOperationException(
         "Generic catalogs do not define a catalog-level connection probe");

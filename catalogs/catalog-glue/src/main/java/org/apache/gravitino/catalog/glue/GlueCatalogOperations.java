@@ -37,7 +37,6 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -152,17 +151,6 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
     }
     this.warehouseLocation = config.get(GlueConstants.WAREHOUSE);
     this.icebergGlueCatalog = GlueIcebergTableHelper.createGlueCatalog(config);
-  }
-
-  @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties)
-      throws Exception {
-    testConnection(catalogIdent);
   }
 
   @Override

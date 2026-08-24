@@ -60,13 +60,15 @@ public interface CatalogOperations extends Closeable {
    * @param properties the properties of the catalog.
    * @throws Exception if connection fails.
    */
-  void testConnection(
+  default void testConnection(
       NameIdentifier catalogIdent,
       Catalog.Type type,
       String provider,
       String comment,
       Map<String, String> properties)
-      throws Exception;
+      throws Exception {
+    testConnection(catalogIdent);
+  }
 
   /**
    * Test the connection of an existing catalog using its stored configuration.

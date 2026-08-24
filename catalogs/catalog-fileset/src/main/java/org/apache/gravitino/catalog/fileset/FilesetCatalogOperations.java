@@ -38,7 +38,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.IOException;
-import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -51,6 +50,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -58,12 +58,12 @@ import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -131,6 +131,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
+  private static final String CATALOG_PLACEHOLDER = "{{catalog}}";
 
   // location placeholder pattern format: {{placeholder}}
   private static final Pattern LOCATION_PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{(.*?)\\}\\}");
@@ -139,6 +140,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private final EntityStore store;
 
   private final SecretManager secretManager;
+
+  @Nullable private final Supplier<CatalogCredentialManager> credentialManagerSupplier;
 
   private HasPropertyMetadata propertiesMetadata;
 
@@ -155,8 +158,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private FileSystemProvider defaultFileSystemProvider;
 
   private boolean disableFSOps;
-
-  @Nullable private CatalogCredentialManager credentialManager;
 
   private FilesetCatalogMetricsSource catalogMetricsSource;
 
@@ -184,8 +185,23 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       };
 
   FilesetCatalogOperations(EntityStore store, SecretManager secretManager) {
+    this(store, secretManager, null);
+  }
+
+  FilesetCatalogOperations(
+      EntityStore store,
+      SecretManager secretManager,
+      @Nullable Supplier<CatalogCredentialManager> credentialManagerSupplier) {
     this.store = store;
     this.secretManager = secretManager;
+    this.credentialManagerSupplier = credentialManagerSupplier;
+  }
+
+  FilesetCatalogOperations(Supplier<CatalogCredentialManager> credentialManagerSupplier) {
+    this(
+        GravitinoEnv.getInstance().entityStore(),
+        GravitinoEnv.getInstance().secretManager(),
+        credentialManagerSupplier);
   }
 
   static class FileSystemCacheKey {
@@ -231,7 +247,8 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   public FilesetCatalogOperations() {
-    this(GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().secretManager());
+    this(
+        GravitinoEnv.getInstance().entityStore(), GravitinoEnv.getInstance().secretManager(), null);
   }
 
   @Override
@@ -964,16 +981,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   }
 
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
-    testConnection(catalogIdent);
-  }
-
-  @Override
   public void testConnection(NameIdentifier catalogIdent) {
     if (disableFSOps) {
       throw new UnsupportedOperationException(
@@ -989,8 +996,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         (locationName, path) -> {
           try {
             probeLocation(path);
-          } catch (UnsupportedOperationException e) {
-            throw e;
           } catch (Exception e) {
             failures.add(displayLocationName(locationName) + " (" + failureCategory(e) + ")");
           }
@@ -1025,11 +1030,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 }
               });
       fileSystemCache.cleanUp();
-    }
-
-    if (credentialManager != null) {
-      credentialManager.close();
-      credentialManager = null;
     }
 
     // Metrics System could be null in UT.
@@ -1105,6 +1105,31 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             }
 
             checkPlaceholderValue(v);
+
+            if (!disableFSOps && !containsPlaceholder(v)) {
+              Path path = new Path(v);
+              // At catalog initialization, only merge catalog config and user-defined location
+              // configs.
+              Map<String, String> fsConf = new HashMap<>(conf);
+              fsConf.putAll(
+                  FilesetUtil.getUserDefinedFileSystemConfigs(
+                      path.toUri(),
+                      conf,
+                      FilesetCatalogPropertiesMetadata.FS_GRAVITINO_PATH_CONFIG_PREFIX));
+              FileSystem fs = getFileSystemWithCache(path, fsConf);
+              try {
+                if (fs.exists(path) && fs.getFileStatus(path).isFile()) {
+                  throw new IllegalArgumentException(
+                      "Fileset catalog location cannot be a file: "
+                          + v
+                          + ", location name: "
+                          + locationName);
+                }
+              } catch (IOException e) {
+                throw new RuntimeException(
+                    "Failed to check if fileset catalog location exists: " + v, e);
+              }
+            }
 
             catalogStorageLocations.put(locationName, new Path((ensureTrailingSlash(v))));
           }
@@ -1405,14 +1430,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 .getOrDefault(
                     config, FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
 
-    Future<FileSystem> fileSystemFuture =
-        fileSystemExecutor.submit(() -> createFileSystem(path, config, scheme, provider));
-
     try {
-      return fileSystemFuture.get(timeoutSeconds, TimeUnit.SECONDS);
+      return executeFileSystemTask(
+          () -> createFileSystem(path, config, scheme, provider), timeoutSeconds);
     } catch (TimeoutException e) {
-      fileSystemFuture.cancel(true);
-
       LOG.warn(
           "Timeout when getting FileSystem for path: {}, scheme: {}, provider: {} within {} seconds",
           path,
@@ -1433,7 +1454,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
               FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS),
           e);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
       LOG.warn(
           "Interrupted when getting FileSystem for path: {}, possibly the server is"
               + " shutting down or catalog is been dropped",
@@ -1448,6 +1468,20 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
+  private <T> T executeFileSystemTask(Callable<T> task, int timeoutSeconds)
+      throws InterruptedException, ExecutionException, TimeoutException {
+    Future<T> future = fileSystemExecutor.submit(task);
+    try {
+      return future.get(timeoutSeconds, TimeUnit.SECONDS);
+    } catch (TimeoutException e) {
+      future.cancel(true);
+      throw e;
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw e;
+    }
+  }
+
   private Map<String, Path> resolveProbeLocations(NameIdentifier catalogIdent) {
     Map<String, Path> resolved = new HashMap<>();
     catalogStorageLocations.forEach(
@@ -1456,8 +1490,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     return resolved;
   }
 
-  private Path resolveProbeLocation(String location, NameIdentifier catalogIdent) {
-    String resolved = location.replace("{{catalog}}", catalogIdent.name());
+  @VisibleForTesting
+  Path resolveProbeLocation(String location, NameIdentifier catalogIdent) {
+    String resolved = location.replace(CATALOG_PLACEHOLDER, catalogIdent.name());
     Matcher matcher = LOCATION_PLACEHOLDER_PATTERN.matcher(resolved);
     if (matcher.find()) {
       String staticPrefix = resolved.substring(0, matcher.start());
@@ -1470,13 +1505,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     try {
-      URI uri = URI.create(resolved);
-      if (StringUtils.isBlank(resolved)
-          || containsPlaceholder(resolved)
-          || (uri.getScheme() != null
-              && resolved.contains("://")
-              && !"file".equalsIgnoreCase(uri.getScheme())
-              && StringUtils.isBlank(uri.getAuthority()))) {
+      if (StringUtils.isBlank(resolved) || containsPlaceholder(resolved)) {
         throw new IllegalArgumentException(
             "Fileset catalog location has no valid concrete target that can be tested");
       }
@@ -1506,7 +1535,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
 
     String credentialHandle = null;
-    Future<Void> probeFuture = null;
     try {
       credentialHandle = addVendedCredential(path, scheme, fileSystemProvider, probeConf);
       int timeoutSeconds =
@@ -1516,33 +1544,27 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                   .getOrDefault(
                       probeConf,
                       FilesetCatalogPropertiesMetadata.FILESYSTEM_CONNECTION_TIMEOUT_SECONDS);
-      probeFuture =
-          fileSystemExecutor.submit(
-              () -> {
-                try (FileSystem fileSystem =
-                    createFileSystem(path, probeConf, scheme, fileSystemProvider)) {
-                  Path qualifiedPath =
-                      path.makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
-                  RemoteIterator<FileStatus> iterator =
-                      fileSystem.listStatusIterator(qualifiedPath);
-                  if (iterator.hasNext()) {
-                    FileStatus first = iterator.next();
-                    if (first.isFile() && first.getPath().equals(qualifiedPath)) {
-                      throw new IllegalArgumentException(
-                          "Fileset catalog location must be a directory");
-                    }
-                  }
-                  return null;
+      executeFileSystemTask(
+          () -> {
+            try (FileSystem fileSystem =
+                createFileSystem(path, probeConf, scheme, fileSystemProvider)) {
+              Path qualifiedPath =
+                  path.makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
+              RemoteIterator<FileStatus> iterator = fileSystem.listStatusIterator(qualifiedPath);
+              if (iterator.hasNext()) {
+                FileStatus first = iterator.next();
+                if (first.isFile() && first.getPath().equals(qualifiedPath)) {
+                  throw new IllegalArgumentException(
+                      "Fileset catalog location must be a directory");
                 }
-              });
-      probeFuture.get(timeoutSeconds, TimeUnit.SECONDS);
+              }
+              return null;
+            }
+          },
+          timeoutSeconds);
     } catch (TimeoutException e) {
-      if (probeFuture != null) {
-        probeFuture.cancel(true);
-      }
       throw new IOException("Filesystem connection probe timed out", e);
     } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
       throw new IOException("Filesystem connection probe was interrupted", e);
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
@@ -1566,7 +1588,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       return null;
     }
 
-    CatalogCredentialManager manager = credentialManager();
+    CatalogCredentialManager manager = catalogCredentialManager();
     List<String> matchingTypes =
         credentialTypes.stream()
             .filter(
@@ -1619,11 +1641,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  private synchronized CatalogCredentialManager credentialManager() {
-    if (credentialManager == null) {
-      credentialManager = new CatalogCredentialManager(catalogInfo.name(), conf);
-    }
-    return credentialManager;
+  @VisibleForTesting
+  CatalogCredentialManager catalogCredentialManager() {
+    Preconditions.checkState(
+        credentialManagerSupplier != null,
+        "Catalog credential manager is not available for Fileset connection testing");
+    return Objects.requireNonNull(
+        credentialManagerSupplier.get(), "Catalog credential manager must not be null");
   }
 
   private FileSystem createFileSystem(
@@ -1645,6 +1669,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     while (current != null) {
       String simpleName = current.getClass().getSimpleName().toLowerCase();
       String message = Optional.ofNullable(current.getMessage()).orElse("").toLowerCase();
+      if (message.contains("multiple credential providers")) {
+        return "ambiguous credential provider configuration";
+      }
       if (message.contains("must be a directory")) {
         return "location is not a directory";
       }
@@ -1662,6 +1689,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       }
       if (current instanceof ConnectionFailedException) {
         return "credential generation failed";
+      }
+      if (current instanceof UnsupportedOperationException) {
+        return "probe unsupported";
       }
       current = current.getCause();
     }

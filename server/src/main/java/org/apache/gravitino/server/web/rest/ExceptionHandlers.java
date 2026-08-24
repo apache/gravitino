@@ -227,7 +227,7 @@ public class ExceptionHandlers {
       response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), throwable);
 
     } else {
-      return Utils.internalError(e.getMessage(), e);
+      return Utils.internalError(e.getMessage(), throwable);
     }
 
     return Response.status(Response.Status.OK)

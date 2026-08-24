@@ -757,19 +757,25 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   @Override
   public void testConnection(NameIdentifier ident) {
-    CatalogWrapper wrapper = loadCatalogAndWrap(ident);
-    wrapper.catalog().checkMetalakeAndCatalogInUse();
-    try {
-      wrapper.doWithCatalogOps(
-          c -> {
-            c.testConnection(ident);
-            return null;
-          });
-    } catch (RuntimeException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          CatalogWrapper wrapper = loadCatalogAndWrap(ident);
+          wrapper.catalog().checkMetalakeAndCatalogInUse();
+          try {
+            wrapper.doWithCatalogOps(
+                c -> {
+                  c.testConnection(ident);
+                  return null;
+                });
+          } catch (RuntimeException e) {
+            throw e;
+          } catch (Exception e) {
+            throw new RuntimeException(e);
+          }
+          return null;
+        });
   }
 
   @Override

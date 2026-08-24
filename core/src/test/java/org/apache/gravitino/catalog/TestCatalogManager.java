@@ -38,6 +38,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
@@ -64,6 +69,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -1373,6 +1380,57 @@ public class TestCatalogManager {
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
     Assertions.assertThrows(
         UnsupportedOperationException.class, () -> catalogManager.testConnection(ident));
+  }
+
+  @Test
+  void testExistingCatalogConnectionHoldsCatalogReadLock() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "connection_lock_test");
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    CountDownLatch connectionStarted = new CountDownLatch(1);
+    CountDownLatch releaseConnection = new CountDownLatch(1);
+    CountDownLatch writerStarted = new CountDownLatch(1);
+    CountDownLatch writeLockAcquired = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doReturn(catalog).when(wrapper).catalog();
+    Mockito.doAnswer(
+            invocation -> {
+              connectionStarted.countDown();
+              Assertions.assertTrue(releaseConnection.await(5, TimeUnit.SECONDS));
+              return null;
+            })
+        .when(wrapper)
+        .doWithCatalogOps(any());
+
+    Future<?> connectionFuture = executor.submit(() -> catalogManager.testConnection(ident));
+    Future<?> writerFuture = null;
+    try {
+      Assertions.assertTrue(connectionStarted.await(5, TimeUnit.SECONDS));
+      writerFuture =
+          executor.submit(
+              () -> {
+                writerStarted.countDown();
+                TreeLockUtils.doWithTreeLock(
+                    ident,
+                    LockType.WRITE,
+                    () -> {
+                      writeLockAcquired.countDown();
+                      return null;
+                    });
+              });
+      Assertions.assertTrue(writerStarted.await(5, TimeUnit.SECONDS));
+      Assertions.assertFalse(writeLockAcquired.await(200, TimeUnit.MILLISECONDS));
+
+      releaseConnection.countDown();
+      connectionFuture.get(5, TimeUnit.SECONDS);
+      writerFuture.get(5, TimeUnit.SECONDS);
+      Assertions.assertEquals(0, writeLockAcquired.getCount());
+    } finally {
+      releaseConnection.countDown();
+      executor.shutdownNow();
+    }
   }
 
   @Test
