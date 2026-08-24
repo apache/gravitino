@@ -59,6 +59,7 @@ import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.catalog.hive.HiveDataTypeTransformer;
@@ -241,15 +242,21 @@ public class GravitinoMockServer implements AutoCloseable {
     when(catalog.name()).thenReturn(catalogName);
     when(catalog.provider()).thenReturn(testCatalogProvider);
     when(catalog.type()).thenReturn(Catalog.Type.RELATIONAL);
-    when(catalog.properties())
-        .thenReturn(properties.isEmpty() ? Map.of("max_ttl", "10") : properties);
+    Map<String, String> baseProperties =
+        properties.isEmpty() ? Map.of("max_ttl", "10") : properties;
+    when(catalog.properties()).thenReturn(baseProperties);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(supportsSecrets.getSecrets()).thenReturn(Map.of());
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
 
     Audit mockAudit = mock(Audit.class);
     when(mockAudit.creator()).thenReturn("gravitino");
     when(mockAudit.createTime()).thenReturn(Instant.now());
     when(catalog.auditInfo()).thenReturn(mockAudit);
 
-    GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(testMetalake, catalog);
+    Map<String, String> resolved = new HashMap<>(baseProperties);
+    resolved.putAll(supportsSecrets.getSecrets());
+    GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(testMetalake, catalog, resolved);
     when(catalog.asTableCatalog()).thenAnswer(answer -> createTableCatalog(gravitinoCatalog));
 
     when(catalog.asSchemas()).thenAnswer(answer -> createSchemas(gravitinoCatalog));

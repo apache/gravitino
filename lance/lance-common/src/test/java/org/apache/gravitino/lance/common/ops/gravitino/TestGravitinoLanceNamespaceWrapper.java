@@ -36,6 +36,7 @@ import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -311,6 +312,53 @@ public class TestGravitinoLanceNamespaceWrapper {
   }
 
   @Test
+  public void testCatalogPropertiesWithSecrets() {
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper();
+    Catalog catalog =
+        createCatalogProxy(
+            Catalog.Type.RELATIONAL,
+            "lakehouse-generic",
+            Map.of("visible", "v1"),
+            Map.of("jdbc-password", "secret"));
+    wrapper.setCatalogOperator(
+        new GravitinoLanceNamespaceWrapper.CatalogOperator() {
+          @Override
+          public Catalog[] listCatalogsInfo() {
+            return new Catalog[0];
+          }
+
+          @Override
+          public Catalog loadCatalog(String catalogName) {
+            return catalog;
+          }
+
+          @Override
+          public Catalog createCatalog(
+              String catalogName,
+              Catalog.Type type,
+              String provider,
+              String comment,
+              Map<String, String> properties) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public Catalog alterCatalog(String catalogName, CatalogChange... changes) {
+            throw new UnsupportedOperationException();
+          }
+
+          @Override
+          public boolean dropCatalog(String catalogName, boolean force) {
+            throw new UnsupportedOperationException();
+          }
+        });
+
+    Map<String, String> merged = wrapper.catalogPropertiesWithSecrets(catalog);
+    Assertions.assertEquals("v1", merged.get("visible"));
+    Assertions.assertEquals("secret", merged.get("jdbc-password"));
+  }
+
+  @Test
   public void testLoadSchemaUsesSchemaDispatcherInAuxMode() throws Exception {
     Schema expectedSchema = createSchemaProxy();
     AtomicReference<NameIdentifier> loadedSchemaIdent = new AtomicReference<>();
@@ -435,10 +483,18 @@ public class TestGravitinoLanceNamespaceWrapper {
   }
 
   private Catalog createCatalogProxy(Catalog.Type type, String provider) {
+    return createCatalogProxy(type, provider, null, Map.of());
+  }
+
+  private Catalog createCatalogProxy(
+      Catalog.Type type,
+      String provider,
+      Map<String, String> properties,
+      Map<String, String> secrets) {
     return (Catalog)
         Proxy.newProxyInstance(
             Catalog.class.getClassLoader(),
-            new Class<?>[] {Catalog.class},
+            new Class<?>[] {Catalog.class, SupportsSecrets.class},
             (proxy, method, args) -> {
               switch (method.getName()) {
                 case "type":
@@ -448,7 +504,11 @@ public class TestGravitinoLanceNamespaceWrapper {
                 case "name":
                   return "test_catalog";
                 case "properties":
-                  return null;
+                  return properties;
+                case "supportsSecrets":
+                  return proxy;
+                case "getSecrets":
+                  return secrets;
                 default:
                   Class<?> returnType = method.getReturnType();
                   if (returnType.equals(boolean.class)) {

@@ -43,6 +43,7 @@ import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -126,7 +127,13 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
       catalogProperties =
           new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
       try {
-        catalogProperties.putAll(catalog.supportsSecrets().getSecrets());
+        SupportsSecrets supportsSecrets = catalog.supportsSecrets();
+        if (supportsSecrets != null) {
+          Map<String, String> secrets = supportsSecrets.getSecrets();
+          if (secrets != null) {
+            catalogProperties.putAll(secrets);
+          }
+        }
       } catch (UnsupportedOperationException ignored) {
         // Catalog does not support secret property operations.
       }

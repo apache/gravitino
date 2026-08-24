@@ -961,7 +961,8 @@ public abstract class BaseGVFSOperations implements Closeable {
     return cacheBuilder.build();
   }
 
-  private Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
+  @VisibleForTesting
+  Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
     Map<String, String> allProperties = new HashMap<>();
     String catalogName = filesetIdent.namespace().level(1);
     String schemaName = filesetIdent.namespace().level(2);

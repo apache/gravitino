@@ -22,6 +22,7 @@ package org.apache.gravitino.spark.connector.catalog;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -168,7 +169,7 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     Map<String, String> catalogProperties =
         new HashMap<>(
             gravitinoCatalogClient.properties() == null
-                ? Map.of()
+                ? Collections.emptyMap()
                 : gravitinoCatalogClient.properties());
     catalogProperties.putAll(gravitinoCatalogClient.supportsSecrets().getSecrets());
     this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
