@@ -74,6 +74,7 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         if client is not None:
             kwargs["client"] = client
         super().__init__(token_endpoint, client_id, client_secret, **kwargs)
+        self._token_lock = asyncio.Lock()
 
     def invalidate(self) -> None:
         """Drop the cached token so the next call fetches a new one."""
@@ -213,5 +214,10 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
     async def _apply_token_async(self, request: httpx.Request) -> None:
         token = self._cached_bearer()
         if token is None:
-            token = self._store_and_get(await self.request_new_token_async())
+            async with self._token_lock:
+                token = self._cached_bearer()
+                if token is None:
+                    token = self._store_and_get(
+                        await self.request_new_token_async()
+                    )
         self._update_user_request(request, token)

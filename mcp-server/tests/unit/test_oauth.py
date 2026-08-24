@@ -23,6 +23,7 @@ import asyncio
 import base64
 import json
 import sys
+import threading
 import time
 import unittest
 from unittest import mock
@@ -134,6 +135,37 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertEqual(second.status_code, 200)
         self.assertEqual(calls["token"], 1)
         self.assertEqual(calls["api"], 2)
+
+    def test_parallel_cold_cache_uses_single_token_post(self):
+        """Concurrent async callers must not stampede the IdP on a cache miss."""
+        calls = {"token": 0, "api": 0}
+        counter_lock = threading.Lock()
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                with counter_lock:
+                    calls["token"] += 1
+                time.sleep(0.05)
+                return httpx.Response(
+                    200, json={"access_token": "tok-1", "expires_in": 3600}
+                )
+            with counter_lock:
+                calls["api"] += 1
+            return httpx.Response(200, json={"ok": True})
+
+        auth = self._auth(handler)
+
+        async def run_parallel() -> None:
+            async with httpx.AsyncClient(
+                auth=auth,
+                transport=auth._test_transport,
+                base_url="https://gravitino.example",
+            ) as client:
+                await asyncio.gather(*[client.get("/api") for _ in range(10)])
+
+        asyncio.run(run_parallel())
+        self.assertEqual(calls["token"], 1)
+        self.assertEqual(calls["api"], 10)
 
     def test_sends_scope_when_configured(self):
         seen = {}
