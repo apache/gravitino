@@ -185,6 +185,41 @@ public class TestGravitinoCatalogStore {
   }
 
   @Test
+  public void testGetCatalog_mergesGetSecretsWithNullProperties() {
+    Catalog catalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(gravitinoCatalogMockManager.getGravitinoCatalogInfo("sec-null")).thenReturn(catalog);
+    when(catalog.provider()).thenReturn("test-provider");
+    when(catalog.properties()).thenReturn(null);
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets()).thenReturn(Map.of("jdbc-password", "secret"));
+
+    BaseCatalogFactory factory = mock(BaseCatalogFactory.class);
+    CatalogPropertiesConverter converter = mock(CatalogPropertiesConverter.class);
+    when(factory.catalogPropertiesConverter()).thenReturn(converter);
+    when(converter.toFlinkCatalogProperties(org.mockito.ArgumentMatchers.anyMap()))
+        .thenAnswer(
+            invocation -> {
+              Map<String, String> in = invocation.getArgument(0);
+              Map<String, String> out = new HashMap<>(in);
+              out.put("type", "generic_in_memory");
+              return out;
+            });
+
+    GravitinoCatalogStore store =
+        new GravitinoCatalogStore(gravitinoCatalogMockManager) {
+          @Override
+          BaseCatalogFactory catalogFactoryForProvider(String provider) {
+            return factory;
+          }
+        };
+
+    Optional<CatalogDescriptor> descriptor = store.getCatalog("sec-null");
+    assertTrue(descriptor.isPresent());
+    assertEquals("secret", descriptor.get().getConfiguration().toMap().get("jdbc-password"));
+  }
+
+  @Test
   public void testGetCatalog_mergesMemorySecretPlaintext() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();

@@ -78,6 +78,16 @@ public class TestBaseCatalogSecrets {
   }
 
   @Test
+  void testInitializeMergesGetSecretsWithNullProperties() {
+    setUpCatalog(null, Map.of("s3-sk", "secret-sk"));
+
+    catalog.initialize("hive", new CaseInsensitiveStringMap(Map.of()));
+
+    assertEquals("secret-sk", catalog.lastProperties.get("s3-sk"));
+    assertEquals(1, catalog.lastProperties.size());
+  }
+
+  @Test
   void testInitializeMergesMemorySecretPlaintext() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();

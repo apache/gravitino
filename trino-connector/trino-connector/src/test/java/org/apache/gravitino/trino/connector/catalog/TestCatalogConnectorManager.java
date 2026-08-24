@@ -30,7 +30,10 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
+import java.util.Map;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -138,6 +141,36 @@ public class TestCatalogConnectorManager {
     assertTrue(manager.skipCatalog("a1"));
     assertTrue(manager.skipCatalog("b1"));
     assertFalse(manager.skipCatalog("b2"));
+  }
+
+  @Test
+  public void testCatalogPropertiesWithSecretsMergesNonEmptySecrets() {
+    Catalog catalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets())
+        .thenReturn(Map.of("jdbc-password", "secret", "shared", "from-secret"));
+
+    Map<String, String> merged = CatalogConnectorManager.catalogPropertiesWithSecrets(catalog);
+
+    assertEquals("v1", merged.get("visible"));
+    assertEquals("secret", merged.get("jdbc-password"));
+    assertEquals("from-secret", merged.get("shared"));
+  }
+
+  @Test
+  public void testCatalogPropertiesWithSecretsHandlesNullProperties() {
+    Catalog catalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(catalog.properties()).thenReturn(null);
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets()).thenReturn(Map.of("jdbc-password", "secret"));
+
+    Map<String, String> merged = CatalogConnectorManager.catalogPropertiesWithSecrets(catalog);
+
+    assertEquals("secret", merged.get("jdbc-password"));
+    assertEquals(1, merged.size());
   }
 
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)

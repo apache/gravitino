@@ -37,6 +37,7 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
@@ -75,6 +76,7 @@ public class TestDynamicIcebergConfigProvider {
   public void tearDown() throws IllegalAccessException {
     // Clean up GravitinoEnv and IcebergRESTServerContext state after each test
     FieldUtils.writeField(GravitinoEnv.getInstance(), "internalCatalogDispatcher", null, true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", null, true);
     resetServerContext();
   }
 
@@ -731,6 +733,54 @@ public class TestDynamicIcebergConfigProvider {
       Assertions.assertEquals(
           "mem-jdbc-pwd",
           config.get().getIcebergCatalogProperties().get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
+    }
+  }
+
+  @Test
+  public void testAuxiliaryResolvesSecretUrnsViaSecretManager() throws Exception {
+    try (SecretManager sm = memorySecretManager()) {
+      String metalakeName = "test_metalake";
+      String catalogName = "jdbc_catalog";
+
+      Map<String, String> entityProps = new HashMap<>();
+      entityProps.put(IcebergConstants.CATALOG_BACKEND, "jdbc");
+      entityProps.put(IcebergConstants.CATALOG_BACKEND_NAME, catalogName);
+      entityProps.put(IcebergConstants.GRAVITINO_JDBC_USER, "root");
+      List<SecretMaterial> writes =
+          sm.assembleSecretMaterials(
+              Map.of(IcebergConstants.GRAVITINO_JDBC_USER, "root"),
+              entityProps,
+              "catalog",
+              9L,
+              Map.of(
+                  IcebergConstants.GRAVITINO_JDBC_PASSWORD,
+                  new SecretBinding("memory", "aux-mem-pwd")),
+              Map.of());
+      sm.writeSecrets(writes);
+
+      @SuppressWarnings("unchecked")
+      BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+      Mockito.when(baseCatalog.provider()).thenReturn("lakehouse-iceberg");
+      Mockito.when(baseCatalog.propertiesWithCredentialProviders()).thenReturn(entityProps);
+
+      FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", sm, true);
+
+      Map<String, String> properties = new HashMap<>();
+      properties.put(IcebergConstants.GRAVITINO_URI, "http://localhost:8090");
+      properties.put(IcebergConstants.GRAVITINO_METALAKE, metalakeName);
+
+      DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+      provider.initialize(properties);
+      setMockCatalogFetcher(provider, Map.of(catalogName, baseCatalog));
+
+      Optional<IcebergConfig> config = provider.getIcebergCatalogConfig(catalogName);
+      Assertions.assertTrue(config.isPresent());
+      Assertions.assertEquals(
+          "aux-mem-pwd",
+          config.get().getIcebergCatalogProperties().get(IcebergConstants.GRAVITINO_JDBC_PASSWORD));
+      Assertions.assertEquals(
+          "root",
+          config.get().getIcebergCatalogProperties().get(IcebergConstants.GRAVITINO_JDBC_USER));
     }
   }
 

@@ -26,16 +26,19 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -50,6 +53,8 @@ public class TestGravitinoLanceNamespaceWrapper {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", null, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "tableDispatcher", null, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "secretPropertyOperationDispatcher", null, true);
   }
 
   @Test
@@ -359,6 +364,93 @@ public class TestGravitinoLanceNamespaceWrapper {
   }
 
   @Test
+  public void testSchemaPropertiesWithSecretsMergesClientSecrets() {
+    Schema schema = createSchemaProxy(Map.of("visible", "s1"), Map.of("schema-pwd", "s-secret"));
+    Catalog catalog =
+        createCatalogProxy(
+            Catalog.Type.RELATIONAL, "lakehouse-generic", Map.of(), Map.of(), schema);
+    GravitinoLanceNamespaceWrapper wrapper =
+        new GravitinoLanceNamespaceWrapper(
+            new LanceConfig(ImmutableMap.of(LanceConfig.METALAKE_NAME.getKey(), "test_metalake")),
+            false);
+    wrapper.setCatalogOperator(catalogOperatorReturning(catalog));
+
+    Map<String, String> merged = wrapper.schemaPropertiesWithSecrets(catalog, "test_schema");
+    Assertions.assertEquals("s1", merged.get("visible"));
+    Assertions.assertEquals("s-secret", merged.get("schema-pwd"));
+  }
+
+  @Test
+  public void testCatalogAndSchemaPropertiesUseSecretDispatcher() throws Exception {
+    Catalog catalog =
+        createCatalogProxy(
+            Catalog.Type.RELATIONAL, "lakehouse-generic", Map.of("visible", "c1"), Map.of());
+    Schema schema = createSchemaProxy(Map.of("visible", "s1"), Map.of());
+
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog("test_metalake", "test_catalog");
+    NameIdentifier schemaIdent =
+        NameIdentifierUtil.ofSchema("test_metalake", "test_catalog", "test_schema");
+    SecretPropertyOperationDispatcher dispatcher =
+        new SecretPropertyOperationDispatcher(null, null, null, null) {
+          @Override
+          public Map<String, String> getSecrets(
+              NameIdentifier identifier, Entity.EntityType entityType) {
+            if (catalogIdent.equals(identifier) && entityType == Entity.EntityType.CATALOG) {
+              return Map.of("jdbc-password", "from-dispatcher");
+            }
+            if (schemaIdent.equals(identifier) && entityType == Entity.EntityType.SCHEMA) {
+              return Map.of("schema-pwd", "from-dispatcher-schema");
+            }
+            return Map.of();
+          }
+        };
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "secretPropertyOperationDispatcher", dispatcher, true);
+
+    SchemaDispatcher schemaDispatcher =
+        (SchemaDispatcher)
+            Proxy.newProxyInstance(
+                SchemaDispatcher.class.getClassLoader(),
+                new Class<?>[] {SchemaDispatcher.class},
+                (proxy, method, args) -> {
+                  if ("loadSchema".equals(method.getName())) {
+                    return schema;
+                  }
+                  Class<?> returnType = method.getReturnType();
+                  if (returnType.equals(boolean.class)) {
+                    return false;
+                  }
+                  if (returnType.equals(int.class)) {
+                    return 0;
+                  }
+                  return null;
+                });
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(),
+        "catalogDispatcher",
+        Proxy.newProxyInstance(
+            CatalogDispatcher.class.getClassLoader(),
+            new Class<?>[] {CatalogDispatcher.class},
+            (proxy, method, args) -> null),
+        true);
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "schemaDispatcher", schemaDispatcher, true);
+
+    LanceConfig lanceConfig =
+        new LanceConfig(ImmutableMap.of(LanceConfig.METALAKE_NAME.getKey(), "test_metalake"));
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper(lanceConfig, true);
+    wrapper.asNamespaceOps();
+    wrapper.setCatalogOperator(catalogOperatorReturning(catalog));
+
+    Map<String, String> catalogMerged = wrapper.catalogPropertiesWithSecrets(catalog);
+    Assertions.assertEquals("c1", catalogMerged.get("visible"));
+    Assertions.assertEquals("from-dispatcher", catalogMerged.get("jdbc-password"));
+
+    Map<String, String> schemaMerged = wrapper.schemaPropertiesWithSecrets(catalog, "test_schema");
+    Assertions.assertEquals("s1", schemaMerged.get("visible"));
+    Assertions.assertEquals("from-dispatcher-schema", schemaMerged.get("schema-pwd"));
+  }
+
+  @Test
   public void testLoadSchemaUsesSchemaDispatcherInAuxMode() throws Exception {
     Schema expectedSchema = createSchemaProxy();
     AtomicReference<NameIdentifier> loadedSchemaIdent = new AtomicReference<>();
@@ -467,11 +559,35 @@ public class TestGravitinoLanceNamespaceWrapper {
   }
 
   private Schema createSchemaProxy() {
+    return createSchemaProxy(null, Map.of());
+  }
+
+  private Schema createSchemaProxy(Map<String, String> properties, Map<String, String> secrets) {
     return (Schema)
         Proxy.newProxyInstance(
             Schema.class.getClassLoader(),
-            new Class<?>[] {Schema.class},
-            (proxy, method, args) -> null);
+            new Class<?>[] {Schema.class, SupportsSecrets.class},
+            (proxy, method, args) -> {
+              switch (method.getName()) {
+                case "name":
+                  return "test_schema";
+                case "properties":
+                  return properties;
+                case "supportsSecrets":
+                  return proxy;
+                case "getSecrets":
+                  return secrets;
+                default:
+                  Class<?> returnType = method.getReturnType();
+                  if (returnType.equals(boolean.class)) {
+                    return false;
+                  }
+                  if (returnType.equals(int.class)) {
+                    return 0;
+                  }
+                  return null;
+              }
+            });
   }
 
   private Table createTableProxy() {
@@ -491,10 +607,19 @@ public class TestGravitinoLanceNamespaceWrapper {
       String provider,
       Map<String, String> properties,
       Map<String, String> secrets) {
+    return createCatalogProxy(type, provider, properties, secrets, null);
+  }
+
+  private Catalog createCatalogProxy(
+      Catalog.Type type,
+      String provider,
+      Map<String, String> properties,
+      Map<String, String> secrets,
+      Schema schema) {
     return (Catalog)
         Proxy.newProxyInstance(
             Catalog.class.getClassLoader(),
-            new Class<?>[] {Catalog.class, SupportsSecrets.class},
+            new Class<?>[] {Catalog.class, SupportsSecrets.class, SupportsSchemas.class},
             (proxy, method, args) -> {
               switch (method.getName()) {
                 case "type":
@@ -509,6 +634,12 @@ public class TestGravitinoLanceNamespaceWrapper {
                   return proxy;
                 case "getSecrets":
                   return secrets;
+                case "asSchemas":
+                  return proxy;
+                case "loadSchema":
+                  return schema;
+                case "schemaExists":
+                  return schema != null;
                 default:
                   Class<?> returnType = method.getReturnType();
                   if (returnType.equals(boolean.class)) {
@@ -523,5 +654,39 @@ public class TestGravitinoLanceNamespaceWrapper {
                   return null;
               }
             });
+  }
+
+  private GravitinoLanceNamespaceWrapper.CatalogOperator catalogOperatorReturning(Catalog catalog) {
+    return new GravitinoLanceNamespaceWrapper.CatalogOperator() {
+      @Override
+      public Catalog[] listCatalogsInfo() {
+        return new Catalog[0];
+      }
+
+      @Override
+      public Catalog loadCatalog(String catalogName) {
+        return catalog;
+      }
+
+      @Override
+      public Catalog createCatalog(
+          String catalogName,
+          Catalog.Type type,
+          String provider,
+          String comment,
+          Map<String, String> properties) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public Catalog alterCatalog(String catalogName, CatalogChange... changes) {
+        throw new UnsupportedOperationException();
+      }
+
+      @Override
+      public boolean dropCatalog(String catalogName, boolean force) {
+        throw new UnsupportedOperationException();
+      }
+    };
   }
 }
