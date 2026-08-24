@@ -20,8 +20,15 @@ import logging
 import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
-from mcp_server.server import GravitinoMCPServer
+from mcp_server.server import (
+    GravitinoMCPServer,
+    log_service_identity_fallback_policy,
+)
 from mcp_server.tools import SUPPORTED_TOOL_TAGS
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
 
 
 def do_main():
@@ -39,6 +46,7 @@ def do_main():
         oauth_client_id=args.oauth_client_id,
         oauth_client_secret=args.oauth_client_secret,
         oauth_scope=args.oauth_scope,
+        no_service_identity_fallback=args.no_service_identity_fallback,
     )
     _init_logging(setting)
     try:
@@ -46,6 +54,7 @@ def do_main():
     except ValueError as exc:
         logging.error("%s", exc)
         raise SystemExit(1) from None
+    log_service_identity_fallback_policy(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
     server.run()
@@ -162,6 +171,16 @@ def _parse_args():
         default=os.environ.get("GRAVITINO_OAUTH_SCOPE", ""),
         help="Optional OAuth2 scope for client-credentials. "
         "Can also be set via GRAVITINO_OAUTH_SCOPE.",
+    )
+
+    parser.add_argument(
+        "--no-service-identity-fallback",
+        action="store_true",
+        default=_env_truthy("GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK"),
+        help="HTTP only: reject incoming requests that omit Authorization "
+        "when OAuth client-credentials or --token is configured, instead of "
+        "using the service identity. Ignored for stdio transport. Can also "
+        "be enabled via GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK.",
     )
 
     parser.add_argument(

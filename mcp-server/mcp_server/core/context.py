@@ -51,6 +51,22 @@ _CANONICAL_AUTH_SCHEMES = {
 }
 
 
+class ServiceIdentityFallbackDisabled(RuntimeError):
+    """HTTP omitted Authorization while service-identity fallback is disabled."""
+
+
+def _in_http_request() -> bool:
+    """Return True when ``rest_client()`` runs inside an active HTTP request."""
+    try:
+        # pylint: disable=import-outside-toplevel
+        from fastmcp.server.dependencies import get_http_request
+
+        get_http_request()
+        return True
+    except (LookupError, RuntimeError):
+        return False
+
+
 def _get_request_authorization() -> str:
     """Return the raw ``Authorization`` header of the current HTTP request.
 
@@ -165,6 +181,15 @@ class GravitinoContext:
         """
         authorization = _get_request_authorization()
         if not authorization:
+            if (
+                self._setting.no_service_identity_fallback
+                and _in_http_request()
+                and self._setting.has_service_identity()
+            ):
+                raise ServiceIdentityFallbackDisabled(
+                    "HTTP request omitted Authorization and "
+                    "--no-service-identity-fallback is set"
+                )
             return self._default_client
 
         cached = self._clients_by_auth.get(authorization)

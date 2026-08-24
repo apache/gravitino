@@ -52,6 +52,9 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     oauth_client_id: str = ""
     oauth_client_secret: str = field(default="", repr=False)
     oauth_scope: str = ""
+    # HTTP only: reject requests with no Authorization when service OAuth or
+    # --token is configured instead of falling back to the service identity.
+    no_service_identity_fallback: bool = False
 
     def has_oauth_client(self) -> bool:
         """Return True when client-credentials is fully configured."""
@@ -60,6 +63,10 @@ class Setting:  # pylint: disable=too-many-instance-attributes
             and self.oauth_client_id.strip()
             and self.oauth_client_secret.strip()
         )
+
+    def has_service_identity(self) -> bool:
+        """Return True when a static token or OAuth client-credentials is set."""
+        return bool(self.token.strip()) or self.has_oauth_client()
 
     def validate_oauth(self) -> None:
         """Reject a partial OAuth client-credentials configuration."""
@@ -97,5 +104,7 @@ class Setting:  # pylint: disable=too-many-instance-attributes
             f"oauth_token_endpoint={self.oauth_token_endpoint}, "
             f"oauth_client_id={self.oauth_client_id}, "
             f"oauth_client_secret={secret_display}, "
-            f"oauth_scope={self.oauth_scope})"
+            f"oauth_scope={self.oauth_scope}, "
+            f"no_service_identity_fallback="
+            f"{self.no_service_identity_fallback})"
         )

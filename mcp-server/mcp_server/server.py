@@ -120,9 +120,21 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
     return mcp
 
 
-def warn_http_service_identity_fallback(setting: Setting) -> None:
-    """Log when HTTP callers without Authorization use the service identity."""
+def log_service_identity_fallback_policy(setting: Setting) -> None:
+    """Log how HTTP requests without Authorization are handled at startup."""
     if setting.transport == "stdio":
+        if setting.no_service_identity_fallback:
+            logging.info(
+                "--no-service-identity-fallback is ignored for stdio transport"
+            )
+        return
+    if not setting.has_service_identity():
+        return
+    if setting.no_service_identity_fallback:
+        logging.info(
+            "HTTP requests without an Authorization header will be "
+            "rejected (--no-service-identity-fallback)"
+        )
         return
     if setting.token.strip():
         logging.warning(
@@ -181,7 +193,6 @@ class GravitinoMCPServer:
         asyncio.run(self.mcp.run_async(transport="stdio"))
 
     def _run_http(self):
-        warn_http_service_identity_fallback(self.setting)
         _host, _port, _path = _parse_mcp_url(self.setting.mcp_url)
         self._validate_tls_config()
         # FastMCP accepts "http" and "streamable-http" as equivalent aliases.

@@ -37,12 +37,13 @@ from mcp_server.client.plain.plain_rest_client_operation import (
 )
 from mcp_server.core.context import (
     GravitinoContext,
+    ServiceIdentityFallbackDisabled,
     service_fallback_authorization,
 )
 from mcp_server.core.oauth import RefreshableBearerAuth
 from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args, do_main
-from mcp_server.server import warn_http_service_identity_fallback
+from mcp_server.server import log_service_identity_fallback_policy
 
 
 def _jwt_with_exp(exp) -> str:
@@ -623,6 +624,14 @@ class TestOAuthArgParsing(unittest.TestCase):
         self.assertEqual(args.oauth_client_secret, "cli-secret")
         self.assertEqual(args.oauth_token_endpoint, "https://cli/token")
 
+    def test_no_service_identity_fallback_from_env(self):
+        env = {"GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK": "true"}
+        with mock.patch.dict("os.environ", env, clear=True), mock.patch.object(
+            sys, "argv", ["prog", "--metalake", "ml"]
+        ):
+            args = _parse_args()
+        self.assertTrue(args.no_service_identity_fallback)
+
 
 class TestMainOAuthValidation(unittest.TestCase):
     def test_partial_oauth_inits_logging_before_exit(self):
@@ -642,18 +651,20 @@ class TestMainOAuthValidation(unittest.TestCase):
 
 
 class TestHttpServiceIdentityWarning(unittest.TestCase):
-    def test_stdio_does_not_warn(self):
+    def test_stdio_flag_ignored_logs_info(self):
         setting = Setting(
             metalake="ml",
             transport="stdio",
             oauth_token_endpoint="https://idp/token",
             oauth_client_id="mcp",
             oauth_client_secret="s",
+            no_service_identity_fallback=True,
         )
-        with self.assertNoLogs(level="WARNING"):
-            warn_http_service_identity_fallback(setting)
+        with self.assertLogs(level="INFO") as logs:
+            log_service_identity_fallback_policy(setting)
+        self.assertIn("ignored for stdio", logs.output[0])
 
-    def test_http_oauth_warns(self):
+    def test_http_oauth_warns_when_fallback_enabled(self):
         setting = Setting(
             metalake="ml",
             transport="http",
@@ -662,9 +673,67 @@ class TestHttpServiceIdentityWarning(unittest.TestCase):
             oauth_client_secret="s",
         )
         with self.assertLogs(level="WARNING") as logs:
-            warn_http_service_identity_fallback(setting)
+            log_service_identity_fallback_policy(setting)
         self.assertIn("mcp-service", logs.output[0])
         self.assertIn("untrusted", logs.output[0])
+
+    def test_http_flag_logs_reject_policy(self):
+        setting = Setting(
+            metalake="ml",
+            transport="http",
+            oauth_token_endpoint="https://idp/token",
+            oauth_client_id="mcp-service",
+            oauth_client_secret="s",
+            no_service_identity_fallback=True,
+        )
+        with self.assertLogs(level="INFO") as logs:
+            log_service_identity_fallback_policy(setting)
+        self.assertIn("rejected", logs.output[0])
+
+
+class TestNoServiceIdentityFallback(unittest.TestCase):
+    def setUp(self):
+        RESTClientFactory.set_rest_client(PlainRESTClientOperation)
+
+    def test_http_without_auth_raises_when_flag_set(self):
+        setting = Setting(
+            metalake="ml",
+            gravitino_uri="http://localhost:8090",
+            transport="http",
+            oauth_token_endpoint="https://idp/token",
+            oauth_client_id="mcp",
+            oauth_client_secret="s",
+            no_service_identity_fallback=True,
+        )
+        ctx = GravitinoContext(setting)
+        with mock.patch(
+            "mcp_server.core.context._in_http_request", return_value=True
+        ), mock.patch(
+            "mcp_server.core.context._get_request_authorization",
+            return_value="",
+        ):
+            with self.assertRaises(ServiceIdentityFallbackDisabled):
+                ctx.rest_client()
+
+    def test_stdio_uses_default_client_even_when_flag_set(self):
+        setting = Setting(
+            metalake="ml",
+            gravitino_uri="http://localhost:8090",
+            transport="stdio",
+            oauth_token_endpoint="https://idp/token",
+            oauth_client_id="mcp",
+            oauth_client_secret="s",
+            no_service_identity_fallback=True,
+        )
+        ctx = GravitinoContext(setting)
+        with mock.patch(
+            "mcp_server.core.context._in_http_request", return_value=False
+        ), mock.patch(
+            "mcp_server.core.context._get_request_authorization",
+            return_value="",
+        ):
+            client = ctx.rest_client()
+        self.assertIs(client, ctx._default_client)
 
 
 class TestServiceFallbackAuthorization(unittest.TestCase):
