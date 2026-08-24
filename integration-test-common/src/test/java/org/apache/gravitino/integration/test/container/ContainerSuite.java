@@ -299,16 +299,23 @@ public class ContainerSuite implements Closeable {
           initIfNecessary();
           // Start Trino container
           String hiveContainerIp = hiveContainer.getContainerIpAddress();
+          ImmutableMap.Builder<String, String> envVars =
+              ImmutableMap.<String, String>builder()
+                  .put("HADOOP_USER_NAME", "anonymous")
+                  .put("GRAVITINO_HOST_IP", "host.docker.internal")
+                  .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
+                  .put("GRAVITINO_METALAKE_NAME", metalakeName);
+          if (icebergRestServerPort > 0) {
+            envVars.put("GRAVITINO_ICEBERG_REST_PORT", String.valueOf(icebergRestServerPort));
+          } else {
+            LOG.info(
+                "No Iceberg REST server port supplied; Trino falls back to the compose default. "
+                    + "Catalogs routed through the Iceberg REST server will not work in this "
+                    + "container.");
+          }
           TrinoContainer.Builder trinoBuilder =
               TrinoContainer.builder()
-                  .withEnvVars(
-                      ImmutableMap.<String, String>builder()
-                          .put("HADOOP_USER_NAME", "anonymous")
-                          .put("GRAVITINO_HOST_IP", "host.docker.internal")
-                          .put("GRAVITINO_HOST_PORT", String.valueOf(gravitinoServerPort))
-                          .put("GRAVITINO_ICEBERG_REST_PORT", String.valueOf(icebergRestServerPort))
-                          .put("GRAVITINO_METALAKE_NAME", metalakeName)
-                          .build())
+                  .withEnvVars(envVars.build())
                   .withNetwork(getNetwork())
                   .withExtraHosts(
                       ImmutableMap.<String, String>builder()
