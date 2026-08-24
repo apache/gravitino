@@ -175,42 +175,38 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
-    return TreeLockUtils.doWithTreeLock(
-        // Lock at fileset level (not schema level) to allow concurrent fileset creation.
-        // Trade-off: listFilesets() may temporarily miss in-progress creations until
-        // complete.
-        ident,
-        LockType.WRITE,
-        () -> {
-          // Persist the fileset first, then write secrets so already-exists / create failure
-          // does not leave provider-side secrets. Roll back only when writeSecrets ran and
-          // the create path still failed (needClean stays true).
-          boolean needClean = true;
-          try {
-            Fileset createdFileset =
-                doWithCatalog(
-                    catalogIdent,
-                    c ->
-                        c.doWithFilesetOps(
-                            f ->
-                                f.createMultipleLocationFileset(
-                                    ident, comment, type, storageLocations, updatedProperties)),
-                    NoSuchSchemaException.class,
-                    FilesetAlreadyExistsException.class);
-            secretManager.writeSecrets(secretMaterials);
-            needClean = false;
-            return EntityCombinedFileset.of(createdFileset)
-                .withHiddenProperties(
-                    getHiddenPropertyNames(
-                        catalogIdent,
-                        HasPropertyMetadata::filesetPropertiesMetadata,
-                        createdFileset.properties()));
-          } finally {
-            if (needClean) {
-              secretManager.rollbackSecrets(secretMaterials);
-            }
-          }
-        });
+    // Write secrets before create: FilesetCatalogOperations.createMultipleLocationFileset resolves
+    // URNs via mergeUpLevelConfigurations for managed FS mkdir. Persist-then-write would fail
+    // create with "Secret not found". Roll back on any create failure.
+    secretManager.writeSecrets(secretMaterials);
+    try {
+      Fileset createdFileset =
+          TreeLockUtils.doWithTreeLock(
+              // Lock at fileset level (not schema level) to allow concurrent fileset creation.
+              // Trade-off: listFilesets() may temporarily miss in-progress creations until
+              // complete.
+              ident,
+              LockType.WRITE,
+              () ->
+                  doWithCatalog(
+                      catalogIdent,
+                      c ->
+                          c.doWithFilesetOps(
+                              f ->
+                                  f.createMultipleLocationFileset(
+                                      ident, comment, type, storageLocations, updatedProperties)),
+                      NoSuchSchemaException.class,
+                      FilesetAlreadyExistsException.class));
+      return EntityCombinedFileset.of(createdFileset)
+          .withHiddenProperties(
+              getHiddenPropertyNames(
+                  catalogIdent,
+                  HasPropertyMetadata::filesetPropertiesMetadata,
+                  createdFileset.properties()));
+    } catch (RuntimeException e) {
+      secretManager.rollbackSecrets(secretMaterials);
+      throw e;
+    }
   }
 
   /**
