@@ -472,14 +472,14 @@ public class CatalogRegister {
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn("Failed to execute command: {}", sql, e);
+          LOG.warn("Failed to execute command: {}", redactSecrets(sql), e);
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
       throw failedException;
     } catch (Exception e) {
       throw new TrinoException(
-          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to execute query: " + sql, e);
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to execute query", e);
     }
   }
 

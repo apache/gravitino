@@ -80,6 +80,13 @@ public class GravitinoConfig {
   /** The Trino Iceberg REST catalog property prefix. */
   private static final String TRINO_ICEBERG_REST_CATALOG_PREFIX = "iceberg.rest-catalog.";
 
+  /** Prefix for environment-variable references propagated to dynamic catalogs. */
+  static final String GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX =
+      "gravitino.dynamic-catalog.environment-variable.";
+
+  private static final Pattern ENVIRONMENT_VARIABLE_NAME =
+      Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
+
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
   private final Map<String, String> config;
   private final List<Pattern> skipCatalogPatternList;
@@ -622,7 +629,8 @@ public class GravitinoConfig {
         continue;
       }
       String value = config.get(entry.getKey());
-      if (value != null) {
+      if (value != null
+          && !GravitinoConnectorFactory.isSecuritySensitivePropertyName(entry.getKey())) {
         stringList.add(String.format("\"%s\"='%s'", entry.getKey(), value));
       }
     }
@@ -631,11 +639,32 @@ public class GravitinoConfig {
     config.entrySet().stream()
         .filter(
             entry ->
-                entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key)
-                    || entry.getKey().startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key))
+                (entry.getKey().startsWith(GRAVITINO_CLIENT_CONFIG_PREFIX.key)
+                        || entry
+                            .getKey()
+                            .startsWith(GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key))
+                    && !GravitinoConnectorFactory.isSecuritySensitivePropertyName(entry.getKey()))
         .forEach(
             entry ->
                 stringList.add(String.format("\"%s\"='%s'", entry.getKey(), entry.getValue())));
+    config.entrySet().stream()
+        .filter(entry -> entry.getKey().startsWith(GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX))
+        .forEach(
+            entry -> {
+              String propertyName =
+                  entry.getKey().substring(GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX.length());
+              String environmentVariable = entry.getValue();
+              if (propertyName.isEmpty()
+                  || !ENVIRONMENT_VARIABLE_NAME.matcher(environmentVariable).matches()) {
+                throw new TrinoException(
+                    GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+                    String.format(
+                        "Invalid dynamic catalog environment-variable mapping '%s'='%s'",
+                        entry.getKey(), environmentVariable));
+              }
+              stringList.add(
+                  String.format("\"%s\"='${ENV:%s}'", propertyName, environmentVariable));
+            });
     return StringUtils.join(stringList, ',');
   }
 
