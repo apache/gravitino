@@ -37,8 +37,10 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -68,7 +70,14 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -1412,5 +1421,118 @@ public class TestCatalogManager {
         });
 
     Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+  }
+
+  @Test
+  void testSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_ok");
+      Catalog catalog =
+          manager.createCatalog(
+              ident,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "comment",
+              catalogProps(),
+              Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
+              Map.of());
+      Assertions.assertFalse(catalog.properties().containsKey(PROPERTY_KEY4));
+      String urn =
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testSecretRollback() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      IdGenerator ids = new AtomicLong(4242L)::getAndIncrement;
+      CatalogManager manager = Mockito.spy(new CatalogManager(config, entityStore, ids, secrets));
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_fail");
+      Mockito.doThrow(new RuntimeException("init failed"))
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), any());
+      SecretUrn urn = writeThroughUrn("catalog", 4242L, PROPERTY_KEY4);
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                  Map.of()));
+      Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      manager.close();
+    }
+  }
+
+  @Test
+  void testSecretNoMetalake() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(
+                config, entityStore, new AtomicLong(4343L)::getAndIncrement, secrets)) {
+      NameIdentifier ident = NameIdentifier.of("missing_metalake", "secret_catalog");
+      SecretUrn urn = writeThroughUrn("catalog", 4343L, PROPERTY_KEY4);
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                  Map.of()));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  private static Map<String, String> catalogProps() {
+    return ImmutableMap.of(
+        "provider",
+        "test",
+        PROPERTY_KEY1,
+        "value1",
+        PROPERTY_KEY2,
+        "value2",
+        PROPERTY_KEY5_PREFIX + "1",
+        "value3");
+  }
+
+  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
+    return SecretUrn.buildWriteThrough(
+        "memory",
+        Map.of(
+            SecretConstants.ATTR_ENTITY_TYPE, entityType,
+            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+            SecretConstants.ATTR_PROPERTY_KEY, key));
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
   }
 }

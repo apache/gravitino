@@ -17,7 +17,8 @@
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
@@ -32,12 +33,16 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.auth.auth_data_provider import AuthDataProvider
 from gravitino.client.gravitino_client_base import GravitinoClientBase
 from gravitino.client.gravitino_metalake import GravitinoMetalake
 
 from ..api.tag.tag import Tag
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
@@ -103,9 +108,17 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         provider: str,
         comment: str,
         properties: Dict[str, str],
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Catalog:
         return self.get_metalake().create_catalog(
-            name, catalog_type, provider, comment, properties
+            name,
+            catalog_type,
+            provider,
+            comment,
+            properties,
+            secret_bindings,
+            secret_references,
         )
 
     def alter_catalog(self, name: str, *changes: CatalogChange):

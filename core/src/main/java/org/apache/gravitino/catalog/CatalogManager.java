@@ -107,7 +107,11 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.SupportsEntityChangeLog;
 import org.apache.gravitino.utils.ClassLoaderKey;
@@ -361,8 +365,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final IdGenerator idGenerator;
 
-  // Held for create-time secret writes; consumed by the entity-secrets create follow-up.
-  @SuppressWarnings("UnusedVariable")
   private final SecretManager secretManager;
 
   private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
@@ -380,7 +382,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    * @param config The configuration for the manager.
    * @param store The entity store to use.
    * @param idGenerator The id generator to use.
-   * @param secretManager The secret manager used by catalog operations.
+   * @param secretManager The secret manager to use for create-time secret bindings/references.
    */
   public CatalogManager(
       Config config, EntityStore store, IdGenerator idGenerator, SecretManager secretManager) {
@@ -596,10 +598,31 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     NameIdentifier metalakeIdent = NameIdentifier.of(ident.namespace().levels());
 
-    Map<String, String> mergedConfig = buildCatalogConf(provider, properties);
+    Map<String, String> mergedConfig =
+        SecretPropertyUtils.copyEntityProperties(
+            buildCatalogConf(provider, properties), secretBindings, secretReferences);
     long uid = idGenerator.nextId();
+
+    List<SecretMaterial> secretMaterials =
+        secretManager.assembleSecretMaterials(
+            properties, mergedConfig, "catalog", uid, secretBindings, secretReferences);
+
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     Instant now = Instant.now();
     String creator = PrincipalUtils.getCurrentPrincipal().getName();
@@ -638,6 +661,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               throw new NoSuchMetalakeException(e1, "Metalake %s does not exist", metalakeIdent);
             }
             needClean = true;
+            secretManager.writeSecrets(secretMaterials);
             CatalogWrapper wrapper =
                 catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
 
@@ -645,6 +669,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             return wrapper.catalog;
 
           } catch (EntityAlreadyExistsException e1) {
+            // store.put failed first, so secrets were not written for this attempt.
             needClean = false;
             LOG.warn("Catalog {} already exists", ident, e1);
             throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
@@ -662,6 +687,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
           } finally {
             if (needClean) {
+              // Create failed after store.put / writeSecrets (or writeSecrets itself failed —
+              // rollback is best-effort / idempotent with writeSecrets' own partial cleanup).
+              secretManager.rollbackSecrets(secretMaterials);
               // since we put the catalog entity into the store but failed to create the catalog
               // instance,
               // we need to clean up the entity stored.
@@ -965,29 +993,49 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   "Catalog %s has schemas, please drop them first or use force option", ident);
             }
 
-            if (isManagedStorageCatalog(catalogWrapper)) {
-              // For managed catalog, we need to call drop schema API to drop the underlying
-              // entities as well as the related resource first. Directly deleting the metadata from
-              // the store is not enough.
-              schemaEntities.forEach(
-                  schema -> {
-                    try {
+            // Child write-through secrets: capture properties (URNs) from the entity, then
+            // deleteSecrets after a successful drop — same capture-before-delete pattern as
+            // FilesetCatalogOperations.dropSchema. Fileset secrets are cleaned inside that
+            // dropSchema path; schema secrets are cleaned here.
+            boolean managedStorage = isManagedStorageCatalog(catalogWrapper);
+            List<Map<String, String>> unmanagedSchemaSecrets =
+                managedStorage ? null : new ArrayList<>();
+            if (managedStorage) {
+              for (SchemaEntity schema : schemaEntities) {
+                Map<String, String> schemaProps = copyProperties(schema.properties());
+                try {
+                  boolean dropped =
                       catalogWrapper.doWithSchemaOps(
                           ops -> ops.dropSchema(schema.nameIdentifier(), true));
-                    } catch (Exception e) {
-                      LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
-                      throw new RuntimeException(
-                          "Failed to drop schema " + schema.nameIdentifier(), e);
-                    }
-                  });
+                  if (dropped) {
+                    secretManager.deleteSecretsFromProperties(schemaProps);
+                  }
+                } catch (Exception e) {
+                  LOG.warn("Failed to drop schema {}", schema.nameIdentifier());
+                  throw new RuntimeException("Failed to drop schema " + schema.nameIdentifier(), e);
+                }
+              }
+            } else {
+              for (SchemaEntity schema : schemaEntities) {
+                unmanagedSchemaSecrets.add(copyProperties(schema.properties()));
+              }
             }
 
             // Finally, delete the catalog entity as well as all its sub-entities from the store.
             // Invalidate after store.delete() to prevent a background thread from repopulating
             // the cache with stale data between invalidate and delete.
+            Map<String, String> catalogProperties =
+                copyProperties(catalogWrapper.catalog().entity().getProperties());
             boolean deleted = store.delete(ident, EntityType.CATALOG, true);
             if (deleted) {
               markLocalMutation(ident);
+              // Unmanaged: schemas removed only via store cascade — clean secrets captured above.
+              if (!managedStorage) {
+                for (Map<String, String> schemaProperties : unmanagedSchemaSecrets) {
+                  secretManager.deleteSecretsFromProperties(schemaProperties);
+                }
+              }
+              secretManager.deleteSecretsFromProperties(catalogProperties);
             }
             catalogCache.invalidate(ident);
             return deleted;
@@ -1007,6 +1055,12 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             throw new RuntimeException(e);
           }
         });
+  }
+
+  private static Map<String, String> copyProperties(Map<String, String> properties) {
+    return properties == null || properties.isEmpty()
+        ? Collections.emptyMap()
+        : new HashMap<>(properties);
   }
 
   /**
@@ -1333,7 +1387,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
-    // Fileset FS merge assumes catalog conf is already plaintext at this boundary.
     catalog
         .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
         .withCatalogEntity(entity);

@@ -16,7 +16,8 @@
 # under the License.
 # pylint: disable=too-many-lines
 import logging
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
@@ -33,6 +34,7 @@ from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
@@ -108,6 +110,9 @@ from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
 
 logger = logging.getLogger(__name__)
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class GravitinoMetalake(
@@ -229,6 +234,8 @@ class GravitinoMetalake(
         provider: str,
         comment: str,
         properties: Dict[str, str],
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Catalog:
         """Create a new catalog with specified name, catalog type, comment and properties.
 
@@ -240,6 +247,8 @@ class GravitinoMetalake(
             None provider. For the details, please refer to the Catalog.Type.
             comment: The comment of the catalog.
             properties: The properties of the catalog.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchMetalakeException if the metalake does not exist.
@@ -255,6 +264,8 @@ class GravitinoMetalake(
             provider=provider,
             comment=comment,
             properties=properties,
+            secret_bindings=secret_bindings,
+            secret_references=secret_references,
         )
         catalog_create_request.validate()
 
@@ -263,6 +274,7 @@ class GravitinoMetalake(
             url, json=catalog_create_request, error_handler=CATALOG_ERROR_HANDLER
         )
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
+        catalog_resp.validate()
 
         return DTOConverters.to_catalog(
             self.name(), catalog_resp.catalog(), self.rest_client
