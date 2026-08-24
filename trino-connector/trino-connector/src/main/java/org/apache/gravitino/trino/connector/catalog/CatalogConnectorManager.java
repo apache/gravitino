@@ -23,6 +23,7 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -250,7 +251,11 @@ public class CatalogConnectorManager {
             (String catalogName) -> {
               try {
                 Catalog catalog = metalake.loadCatalog(catalogName);
-                GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
+                Map<String, String> properties =
+                    new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+                properties.putAll(catalog.supportsSecrets().getSecrets());
+                GravitinoCatalog gravitinoCatalog =
+                    new GravitinoCatalog(metalake.name(), catalog, properties);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(gravitinoCatalog);

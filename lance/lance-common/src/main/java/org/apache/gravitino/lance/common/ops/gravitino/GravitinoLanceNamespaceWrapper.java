@@ -31,6 +31,7 @@ import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -127,6 +128,49 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
 
   Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
     return catalogOperator.loadCatalog(catalogName);
+  }
+
+  Map<String, String> catalogPropertiesWithSecrets(Catalog catalog) {
+    Map<String, String> properties =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    properties.putAll(getCatalogSecrets(catalog.name()));
+    return properties;
+  }
+
+  Map<String, String> schemaPropertiesWithSecrets(Catalog catalog, String schemaName) {
+    Schema schema = loadSchema(catalog, schemaName);
+    Map<String, String> properties =
+        new HashMap<>(schema.properties() == null ? Map.of() : schema.properties());
+    properties.putAll(getSchemaSecrets(catalog.name(), schemaName));
+    return properties;
+  }
+
+  private Map<String, String> getCatalogSecrets(String catalogName) {
+    org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
+        currentSecretPropertyDispatcher();
+    if (dispatcher != null) {
+      return dispatcher.getSecrets(
+          NameIdentifierUtil.ofCatalog(metalakeName, catalogName), Entity.EntityType.CATALOG);
+    }
+    return loadCatalog(catalogName).supportsSecrets().getSecrets();
+  }
+
+  private Map<String, String> getSchemaSecrets(String catalogName, String schemaName) {
+    org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
+        currentSecretPropertyDispatcher();
+    if (dispatcher != null) {
+      return dispatcher.getSecrets(schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA);
+    }
+    return loadSchema(loadCatalog(catalogName), schemaName).supportsSecrets().getSecrets();
+  }
+
+  private org.apache.gravitino.secret.SecretPropertyOperationDispatcher
+      currentSecretPropertyDispatcher() {
+    try {
+      return GravitinoEnv.getInstance().secretPropertyOperationDispatcher();
+    } catch (Exception e) {
+      return null;
+    }
   }
 
   Catalog createCatalog(
