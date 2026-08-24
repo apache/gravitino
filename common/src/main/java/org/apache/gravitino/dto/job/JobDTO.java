@@ -59,12 +59,18 @@ public class JobDTO {
   @JsonProperty("audit")
   private final AuditDTO audit;
 
+  @JsonProperty("queuedAt")
+  private final Instant queuedAt;
+
+  @JsonProperty("startedAt")
+  private final Instant startedAt;
+
   @JsonProperty("finishedAt")
   private final Instant finishedAt;
 
   /** Default constructor for Jackson deserialization. */
   private JobDTO() {
-    this(null, null, null, null, null);
+    this(null, null, null, null, null, null, null);
   }
 
   /**
@@ -74,6 +80,9 @@ public class JobDTO {
    * @param jobTemplateName The name of the job template used for this job.
    * @param status The current status of the job.
    * @param audit The audit information associated with the job.
+   * @param queuedAt The time when the job was queued for execution.
+   * @param startedAt The time when the job started execution, or null if the job has not started
+   *     execution yet.
    * @param finishedAt The time when the job finished execution, or null if the job has not finished
    *     execution yet.
    */
@@ -82,11 +91,15 @@ public class JobDTO {
       String jobTemplateName,
       JobHandle.Status status,
       AuditDTO audit,
+      Instant queuedAt,
+      Instant startedAt,
       Instant finishedAt) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.status = status;
     this.audit = audit;
+    this.queuedAt = queuedAt;
+    this.startedAt = startedAt;
     this.finishedAt = finishedAt;
   }
 

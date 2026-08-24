@@ -145,6 +145,11 @@ public class ExceptionHandlers {
     return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
   }
 
+  public static Response handleSecretException(
+      OperationType op, String metadataObjectName, Exception e) {
+    return SecretExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
+  }
+
   public static Response handleModelException(
       OperationType op, String model, String schema, Exception e) {
     return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
@@ -745,6 +750,34 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, credential, parent, e);
+      }
+    }
+  }
+
+  private static class SecretExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new SecretExceptionHandler();
+
+    private static String getSecretErrorMsg(String parent, String reason) {
+      return String.format("Failed to get secrets under object [%s], reason [%s]", parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String secret, String parent, Exception e) {
+      String errorMsg = getSecretErrorMsg(parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, secret, parent, e);
       }
     }
   }

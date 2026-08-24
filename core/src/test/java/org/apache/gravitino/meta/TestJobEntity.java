@@ -30,10 +30,10 @@ public class TestJobEntity {
       AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
 
   @Test
-  public void testBuildRequiresFinishedAt() {
-    // finishedAt is a required field - it must be explicitly set (using the storage layer's
-    // "not finished" sentinel, <= 0, when the job hasn't finished), regardless of status. This
-    // prevents JobPO from having to silently fabricate or default the value.
+  public void testBuildRequiresStartedAt() {
+    // startedAt is a required field - it must be explicitly set (using the storage layer's
+    // "not started" sentinel, <= 0, when the job hasn't started), regardless of status. finishedAt
+    // is set here so only the missing startedAt triggers the failure.
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
@@ -44,6 +44,7 @@ public class TestJobEntity {
                 .withStatus(JobHandle.Status.QUEUED)
                 .withNamespace(NamespaceUtil.ofJob("test"))
                 .withAuditInfo(AUDIT_INFO)
+                .withFinishedAt(0L)
                 .build());
 
     Assertions.assertThrows(
@@ -56,7 +57,59 @@ public class TestJobEntity {
                 .withStatus(JobHandle.Status.SUCCEEDED)
                 .withNamespace(NamespaceUtil.ofJob("test"))
                 .withAuditInfo(AUDIT_INFO)
+                .withFinishedAt(1700000000000L)
                 .build());
+  }
+
+  @Test
+  public void testBuildRequiresFinishedAt() {
+    // finishedAt is a required field - it must be explicitly set (using the storage layer's
+    // "not finished" sentinel, <= 0, when the job hasn't finished), regardless of status.
+    // startedAt is set here so only the missing finishedAt triggers the failure. Together with
+    // testBuildRequiresStartedAt, this prevents JobPO from having to silently fabricate or
+    // default either value.
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JobEntity.builder()
+                .withId(1L)
+                .withJobExecutionId("job-execution-1")
+                .withJobTemplateName("test-job-template")
+                .withStatus(JobHandle.Status.QUEUED)
+                .withNamespace(NamespaceUtil.ofJob("test"))
+                .withAuditInfo(AUDIT_INFO)
+                .withStartedAt(0L)
+                .build());
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            JobEntity.builder()
+                .withId(2L)
+                .withJobExecutionId("job-execution-2")
+                .withJobTemplateName("test-job-template")
+                .withStatus(JobHandle.Status.SUCCEEDED)
+                .withNamespace(NamespaceUtil.ofJob("test"))
+                .withAuditInfo(AUDIT_INFO)
+                .withStartedAt(1700000000000L)
+                .build());
+  }
+
+  @Test
+  public void testStartedAt() {
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.STARTED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(1700000000000L)
+            .withFinishedAt(0L)
+            .build();
+
+    Assertions.assertEquals(1700000000000L, jobEntity.startedAt());
   }
 
   @Test
@@ -69,10 +122,41 @@ public class TestJobEntity {
             .withStatus(JobHandle.Status.SUCCEEDED)
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(1699999999000L)
             .withFinishedAt(1700000000000L)
             .build();
 
     Assertions.assertEquals(1700000000000L, jobEntity.finishedAt());
+  }
+
+  @Test
+  public void testStartedAtAsInstantWhenNotStarted() {
+    // The storage layer's sentinel (<= 0) means "not started".
+    JobEntity zeroStartedAt =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+    Assertions.assertNull(zeroStartedAt.startedAtAsInstant());
+
+    JobEntity negativeStartedAt =
+        JobEntity.builder()
+            .withId(2L)
+            .withJobExecutionId("job-execution-2")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(-1L)
+            .withFinishedAt(0L)
+            .build();
+    Assertions.assertNull(negativeStartedAt.startedAtAsInstant());
   }
 
   @Test
@@ -86,6 +170,7 @@ public class TestJobEntity {
             .withStatus(JobHandle.Status.QUEUED)
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
             .withFinishedAt(0L)
             .build();
     Assertions.assertNull(zeroFinishedAt.finishedAtAsInstant());
@@ -98,9 +183,28 @@ public class TestJobEntity {
             .withStatus(JobHandle.Status.STARTED)
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(1700000000000L)
             .withFinishedAt(-1L)
             .build();
     Assertions.assertNull(negativeFinishedAt.finishedAtAsInstant());
+  }
+
+  @Test
+  public void testStartedAtAsInstantWhenStarted() {
+    long epochMilli = Instant.now().toEpochMilli();
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.STARTED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(epochMilli)
+            .withFinishedAt(0L)
+            .build();
+
+    Assertions.assertEquals(Instant.ofEpochMilli(epochMilli), jobEntity.startedAtAsInstant());
   }
 
   @Test
@@ -114,10 +218,58 @@ public class TestJobEntity {
             .withStatus(JobHandle.Status.SUCCEEDED)
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(epochMilli - 1000)
             .withFinishedAt(epochMilli)
             .build();
 
     Assertions.assertEquals(Instant.ofEpochMilli(epochMilli), jobEntity.finishedAtAsInstant());
+  }
+
+  @Test
+  public void testEqualsAndHashCodeIncludeStartedAt() {
+    JobEntity notStarted =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    JobEntity sameAsNotStarted =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    Assertions.assertEquals(notStarted, sameAsNotStarted);
+    Assertions.assertEquals(notStarted.hashCode(), sameAsNotStarted.hashCode());
+
+    // Same identity/status/audit but a different startedAt (e.g. the same job just after it
+    // transitioned to STARTED) must not compare equal.
+    JobEntity started =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(1700000000000L)
+            .withFinishedAt(0L)
+            .build();
+
+    Assertions.assertNotEquals(notStarted, started);
+    Assertions.assertNotEquals(notStarted.hashCode(), started.hashCode());
   }
 
   @Test
@@ -130,6 +282,7 @@ public class TestJobEntity {
             .withStatus(JobHandle.Status.STARTED)
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(1700000000000L)
             .withFinishedAt(0L)
             .build();
 
@@ -141,6 +294,7 @@ public class TestJobEntity {
             .withStatus(JobHandle.Status.STARTED)
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(1700000000000L)
             .withFinishedAt(0L)
             .build();
 
@@ -157,7 +311,8 @@ public class TestJobEntity {
             .withStatus(JobHandle.Status.STARTED)
             .withNamespace(NamespaceUtil.ofJob("test"))
             .withAuditInfo(AUDIT_INFO)
-            .withFinishedAt(1700000000000L)
+            .withStartedAt(1700000000000L)
+            .withFinishedAt(1700000001000L)
             .build();
 
     Assertions.assertNotEquals(notFinished, finished);
