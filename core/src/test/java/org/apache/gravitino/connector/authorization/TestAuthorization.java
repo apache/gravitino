@@ -24,6 +24,7 @@ import java.util.Collections;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
+import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorization;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHDFSPlugin;
 import org.apache.gravitino.connector.authorization.ranger.TestRangerAuthorizationHadoopSQLPlugin;
 import org.apache.gravitino.meta.AuditInfo;
@@ -34,6 +35,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestAuthorization {
+  private static final long METALAKE_ID = 10L;
   private static TestCatalog hiveCatalog;
   private static TestCatalog filesetCatalog;
 
@@ -64,7 +66,7 @@ public class TestAuthorization {
     IsolatedClassLoader isolatedClassLoader =
         new IsolatedClassLoader(
             Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
-    hiveCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
+    hiveCatalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
 
     CatalogEntity filesetEntity =
         CatalogEntity.builder()
@@ -85,13 +87,15 @@ public class TestAuthorization {
                     "authorization.ranger.service.type",
                     "HDFS"))
             .withCatalogEntity(filesetEntity);
-    filesetCatalog.initAuthorizationPluginInstance(isolatedClassLoader);
+    filesetCatalog.initAuthorizationPluginInstance(isolatedClassLoader, METALAKE_ID);
   }
 
   @Test
   public void testRangerHadoopSQLAuthorization() {
     AuthorizationPlugin rangerHiveAuthPlugin = hiveCatalog.getAuthorizationPlugin();
     Assertions.assertInstanceOf(TestRangerAuthorizationHadoopSQLPlugin.class, rangerHiveAuthPlugin);
+    Assertions.assertEquals("10", TestRangerAuthorization.hadoopSqlMetalakeId);
+    Assertions.assertEquals("1", TestRangerAuthorization.hadoopSqlCatalogId);
     TestRangerAuthorizationHadoopSQLPlugin testRangerAuthHadoopSQLPlugin =
         (TestRangerAuthorizationHadoopSQLPlugin) rangerHiveAuthPlugin;
     Assertions.assertFalse(testRangerAuthHadoopSQLPlugin.callOnCreateRole1);
@@ -103,6 +107,8 @@ public class TestAuthorization {
   public void testRangerHDFSAuthorization() {
     AuthorizationPlugin rangerHDFSAuthPlugin = filesetCatalog.getAuthorizationPlugin();
     Assertions.assertInstanceOf(TestRangerAuthorizationHDFSPlugin.class, rangerHDFSAuthPlugin);
+    Assertions.assertEquals("10", TestRangerAuthorization.hdfsMetalakeId);
+    Assertions.assertEquals("2", TestRangerAuthorization.hdfsCatalogId);
     TestRangerAuthorizationHDFSPlugin testRangerAuthHDFSPlugin =
         (TestRangerAuthorizationHDFSPlugin) rangerHDFSAuthPlugin;
     Assertions.assertFalse(testRangerAuthHDFSPlugin.callOnCreateRole2);

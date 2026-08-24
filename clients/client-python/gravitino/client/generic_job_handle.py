@@ -33,5 +33,11 @@ class GenericJobHandle(JobHandle):
     def job_status(self):
         return self._job_dto.status()
 
+    def queued_at(self):
+        return self._job_dto.queued_at()
+
+    def started_at(self):
+        return self._job_dto.started_at()
+
     def finished_at(self):
         return self._job_dto.finished_at()

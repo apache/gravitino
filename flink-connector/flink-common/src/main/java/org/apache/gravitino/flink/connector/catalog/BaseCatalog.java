@@ -271,10 +271,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
     } catch (NoSuchTableException e) {
       // Fall through to check views.
     } catch (ForbiddenException e) {
-      // Flink/Calcite speculatively probes tables during multi-part identifier resolution.
-      // Treat authorization failure as table-not-exist to allow Calcite to fall back to
-      // alternative resolution paths (e.g., treating the name as a schema).
-      throw new TableNotExistException(catalogName(), tablePath, e);
+      throw new CatalogException(e);
     } catch (CatalogException e) {
       throw e;
     } catch (Exception e) {
@@ -294,7 +291,7 @@ public abstract class BaseCatalog extends AbstractCatalog {
         return true;
       }
     } catch (ForbiddenException e) {
-      return false;
+      throw new CatalogException(e);
     } catch (Exception e) {
       throw new CatalogException(e);
     }

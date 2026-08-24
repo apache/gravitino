@@ -55,6 +55,16 @@ class JobHandle(ABC):
     def job_status(self) -> Status:
         pass
 
+    def queued_at(self) -> Optional[datetime]:
+        """Returns the time the job was queued for execution."""
+        raise NotImplementedError("queued_at is not implemented")
+
+    def started_at(self) -> Optional[datetime]:
+        """Returns the time the job started execution, or ``None`` if the job has not started
+        execution yet.
+        """
+        raise NotImplementedError("started_at is not implemented")
+
     def finished_at(self) -> Optional[datetime]:
         """Returns the time the job finished execution, or ``None`` if the job has not finished
         execution yet.

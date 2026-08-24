@@ -32,6 +32,13 @@ public class Privileges {
           MetadataObject.Type.CATALOG,
           MetadataObject.Type.SCHEMA,
           MetadataObject.Type.TABLE);
+  private static final Set<MetadataObject.Type> TABLE_LIKE_SUPPORTED_TYPES =
+      Sets.immutableEnumSet(
+          MetadataObject.Type.METALAKE,
+          MetadataObject.Type.CATALOG,
+          MetadataObject.Type.SCHEMA,
+          MetadataObject.Type.TABLE,
+          MetadataObject.Type.VIEW);
 
   private static final Set<MetadataObject.Type> MODEL_SUPPORTED_TYPES =
       Sets.immutableEnumSet(
@@ -127,6 +134,8 @@ public class Privileges {
         return ModifyTable.allow();
       case SELECT_TABLE:
         return SelectTable.allow();
+      case PROBE_TABLE_LIKE:
+        return ProbeTableLike.allow();
 
         // Fileset
       case CREATE_FILESET:
@@ -249,6 +258,8 @@ public class Privileges {
         return ModifyTable.deny();
       case SELECT_TABLE:
         return SelectTable.deny();
+      case PROBE_TABLE_LIKE:
+        return ProbeTableLike.deny();
 
         // Fileset
       case CREATE_FILESET:
@@ -595,6 +606,37 @@ public class Privileges {
     @Override
     public boolean canBindTo(MetadataObject.Type type) {
       return TABLE_SUPPORTED_TYPES.contains(type);
+    }
+  }
+
+  /** The privilege to probe whether a table-like object exists. */
+  public static class ProbeTableLike extends GenericPrivilege<ProbeTableLike> {
+    private static final ProbeTableLike ALLOW_INSTANCE =
+        new ProbeTableLike(Condition.ALLOW, Name.PROBE_TABLE_LIKE);
+    private static final ProbeTableLike DENY_INSTANCE =
+        new ProbeTableLike(Condition.DENY, Name.PROBE_TABLE_LIKE);
+
+    private ProbeTableLike(Condition condition, Name name) {
+      super(condition, name);
+    }
+
+    /**
+     * @return The instance with allow condition of the privilege.
+     */
+    public static ProbeTableLike allow() {
+      return ALLOW_INSTANCE;
+    }
+
+    /**
+     * @return The instance with deny condition of the privilege.
+     */
+    public static ProbeTableLike deny() {
+      return DENY_INSTANCE;
+    }
+
+    @Override
+    public boolean canBindTo(MetadataObject.Type type) {
+      return TABLE_LIKE_SUPPORTED_TYPES.contains(type);
     }
   }
 

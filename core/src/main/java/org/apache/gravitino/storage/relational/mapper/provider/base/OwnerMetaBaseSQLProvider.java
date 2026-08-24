@@ -115,6 +115,41 @@ public class OwnerMetaBaseSQLProvider {
         + " ot.deleted_at = 0 AND gt.deleted_at = 0";
   }
 
+  /**
+   * Builds SQL to select group owners for the specified metadata objects.
+   *
+   * @param metadataObjectIds IDs of the metadata objects
+   * @param metadataObjectType type of the metadata objects
+   * @return SQL for selecting group owners
+   */
+  public String batchSelectGroupOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
+      @Param("metadataObjectType") String metadataObjectType) {
+    return "<script>"
+        + "SELECT ot.metadata_object_id as metadataObjectId,"
+        + "gt.group_id as groupId, "
+        + "gt.group_name as groupName, "
+        + "gt.metalake_id as metalakeId, "
+        + "gt.audit_info as auditInfo, "
+        + "gt.current_version as currentVersion, "
+        + "gt.last_version as lastVersion, "
+        + "gt.deleted_at as deletedAt "
+        + "FROM "
+        + OWNER_TABLE_NAME
+        + " ot LEFT JOIN "
+        + GroupMetaMapper.GROUP_TABLE_NAME
+        + " gt ON gt.group_id = ot.owner_id "
+        + "WHERE "
+        + "ot.metadata_object_type = #{metadataObjectType} "
+        + "AND ot.owner_type = 'GROUP' "
+        + "AND ot.metadata_object_id IN "
+        + "<foreach collection='metadataObjectIds' item='itemId' open='(' separator=',' close=')'>"
+        + "#{itemId}"
+        + "</foreach> "
+        + "AND ot.deleted_at = 0 AND gt.deleted_at = 0 "
+        + "</script>";
+  }
+
   public String insertOwnerRel(@Param("ownerRelPO") OwnerRelPO ownerRelPO) {
     return "INSERT INTO "
         + OWNER_TABLE_NAME
