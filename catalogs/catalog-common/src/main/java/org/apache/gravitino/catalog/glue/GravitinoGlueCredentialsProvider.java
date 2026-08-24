@@ -30,7 +30,7 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * properties map.
  *
  * <p>Iceberg 1.10+ no longer supports {@code client.access-key-id} directly; credentials must be
- * supplied via {@code client.credentials-provider}. This class is configured in {@link
+ * supplied via {@code client.credentials-provider}. This class is configured in {@code
  * org.apache.gravitino.catalog.glue.GlueIcebergTableHelper#createGlueCatalog} when explicit
  * credentials are provided.
  *
