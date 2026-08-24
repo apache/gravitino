@@ -172,6 +172,63 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testUpdateModelVersionFailsWhenSchemaIsDeletedConcurrently() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_updated_during_schema_drop",
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity modelVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "old_path"),
+            aliases,
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(modelVersion);
+
+    ModelVersionEntity updatedVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "new_path"),
+            aliases,
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    NameIdentifier schemaIdent = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    modelVersion.nameIdentifier(),
+                    ignored -> {
+                      // The update has already resolved both the model and its version here. A
+                      // schema cascade that commits now must make the write fail before it can
+                      // reinsert the version with its new URI.
+                      Assertions.assertTrue(
+                          SchemaMetaService.getInstance().deleteSchema(schemaIdent, true));
+                      return updatedVersion;
+                    }));
+
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(
+                ModelVersionMetaMapper.class,
+                mapper -> mapper.listModelVersionMetasByModelId(model.id()))
+            .isEmpty());
+  }
+
+  @TestTemplate
   public void testInsertAndSelectModelVersion() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 

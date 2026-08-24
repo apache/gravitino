@@ -96,6 +96,7 @@ import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -106,6 +107,7 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
@@ -984,6 +986,46 @@ public class TestFilesetCatalogOperations {
           Assertions.assertThrows(
               NoSuchFilesetException.class, () -> ops.loadFileset(filesetIdent));
       Assertions.assertEquals("Fileset " + filesetIdent + " does not exist", e.getMessage());
+    }
+  }
+
+  @Test
+  public void testCreateFilesetMapsSchemaDeletionDuringStoreWrite() throws IOException {
+    long testId = generateTestId();
+    String schemaName = "schema" + testId;
+    String filesetName = "fileset" + testId;
+    String catalogPath = TEST_ROOT_PATH + "/catalog" + testId;
+    createSchema(schemaName, "comment", catalogPath, null, true);
+
+    EntityStore racingStore = Mockito.spy(store);
+    NoSuchEntityException deletedSchema =
+        new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "schema", schemaName);
+    Mockito.doThrow(deletedSchema)
+        .when(racingStore)
+        .put(Mockito.any(FilesetEntity.class), Mockito.eq(true));
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(racingStore, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(DISABLE_FILESYSTEM_OPS, "true", LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+      Map<String, String> filesetProperties =
+          StringIdentifier.newPropertiesWithId(
+              StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap());
+
+      NoSuchSchemaException exception =
+          Assertions.assertThrows(
+              NoSuchSchemaException.class,
+              () ->
+                  ops.createMultipleLocationFileset(
+                      filesetIdent,
+                      "comment",
+                      Fileset.Type.MANAGED,
+                      Collections.emptyMap(),
+                      filesetProperties));
+      Assertions.assertSame(deletedSchema, exception.getCause());
     }
   }
 
