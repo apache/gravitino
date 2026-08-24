@@ -21,10 +21,12 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -41,6 +43,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.semantic.Dataset;
@@ -131,16 +134,83 @@ public class TestSemanticModelOperationDispatcher {
   }
 
   @Test
-  public void testRemainingManagedCapabilitiesStayUnsupported() {
+  public void testListAlterAndDropLifecycleWithDefinitionValidation() {
+    dispatcher.createSemanticModel(MODEL_IDENT, "Original", validDefinition(), Map.of());
+
+    SemanticModel propertyUpdated =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT, SemanticModelChange.setProperty("owner", "analytics"));
+    SemanticModel renamed =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT,
+            SemanticModelChange.rename("renamed_sales_model"),
+            SemanticModelChange.updateComment("Updated"));
+    NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, renamed.name());
+    assertEquals(Map.of("owner", "analytics"), propertyUpdated.properties());
+    assertEquals("Updated", renamed.comment());
+
+    SemanticModel replaced =
+        dispatcher.alterSemanticModel(
+            renamedIdent, SemanticModelChange.replaceDefinition(validDefinition()));
+    assertEquals(2, replaced.definition().datasets().length);
+    assertArrayEquals(
+        new NameIdentifier[] {renamedIdent}, dispatcher.listSemanticModels(NAMESPACE));
+    assertTrue(dispatcher.dropSemanticModel(renamedIdent));
+    assertFalse(dispatcher.dropSemanticModel(renamedIdent));
+  }
+
+  @Test
+  public void testRejectedDefinitionReplacementDoesNotPersistOtherChanges() {
+    SemanticModel original =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT, "Original", validDefinition(), Map.of("owner", "sales"));
+
+    SemanticModelDefinition invalidReplacement =
+        SemanticModelDefinition.builder()
+            .withDatasets(
+                new Dataset[] {
+                  dataset("duplicate", "orders", null, null),
+                  dataset("duplicate", "customers", null, null)
+                })
+            .withRelationships(new Relationship[0])
+            .build();
+
     assertThrows(
-        UnsupportedOperationException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
-    assertThrows(
-        UnsupportedOperationException.class,
+        IllegalSemanticModelException.class,
         () ->
             dispatcher.alterSemanticModel(
-                MODEL_IDENT, SemanticModelChange.updateComment("Not implemented")));
+                MODEL_IDENT,
+                SemanticModelChange.rename("must_not_persist"),
+                SemanticModelChange.updateComment("Must not persist"),
+                SemanticModelChange.setProperty("owner", "changed"),
+                SemanticModelChange.replaceDefinition(invalidReplacement)));
+
+    SemanticModel loaded = dispatcher.loadSemanticModel(MODEL_IDENT);
+    assertEquals(original.name(), loaded.name());
+    assertEquals(original.comment(), loaded.comment());
+    assertEquals(original.properties(), loaded.properties());
+    assertEquals(original.definition(), loaded.definition());
+    assertFalse(dispatcher.semanticModelExists(NameIdentifier.of(NAMESPACE, "must_not_persist")));
+  }
+
+  @Test
+  public void testLifecycleMissingParentAndInvalidChangeSemantics() {
     assertThrows(
-        UnsupportedOperationException.class, () -> dispatcher.dropSemanticModel(MODEL_IDENT));
+        IllegalSemanticModelException.class,
+        () -> dispatcher.alterSemanticModel(MODEL_IDENT, (SemanticModelChange[]) null));
+    assertThrows(
+        IllegalSemanticModelException.class, () -> dispatcher.alterSemanticModel(MODEL_IDENT));
+
+    when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
+        .thenThrow(new NoSuchSchemaException("Schema does not exist"));
+    assertThrows(NoSuchSchemaException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
+    when(schemaDispatcher.schemaExists(SCHEMA_IDENT)).thenReturn(false);
+    assertThrows(
+        NoSuchSemanticModelException.class,
+        () ->
+            dispatcher.alterSemanticModel(
+                MODEL_IDENT, SemanticModelChange.updateComment("Missing")));
+    assertFalse(dispatcher.dropSemanticModel(MODEL_IDENT));
   }
 
   @Test
