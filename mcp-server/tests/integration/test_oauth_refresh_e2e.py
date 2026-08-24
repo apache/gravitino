@@ -111,7 +111,7 @@ def _gravitino_handler(state: _GravitinoState):
             auth = self.headers.get("Authorization", "")
             with state.lock:
                 state.authorizations.append(auth)
-                fail = state.fail_first and len(state.authorizations) == 1
+                fail = state.fail_first and auth == "Bearer tok-1"
             if fail:
                 payload = json.dumps(
                     {
@@ -300,11 +300,12 @@ def test_mcp_refetches_when_token_is_immediately_stale():
 
 def test_mcp_retries_once_after_gravitino_401(oauth_stack):
     """A 401 from Gravitino invalidates the cache and retries with a new token."""
+    _list_catalogs(oauth_stack["mcp_url"])
     oauth_stack["gravitino"].fail_first = True
     catalogs = _list_catalogs(oauth_stack["mcp_url"])
     assert catalogs[0]["name"] == CATALOG
     assert oauth_stack["idp"].hits == 2
-    assert oauth_stack["gravitino"].authorizations == [
+    assert oauth_stack["gravitino"].authorizations[-2:] == [
         "Bearer tok-1",
         "Bearer tok-2",
     ]
