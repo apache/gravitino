@@ -120,5 +120,6 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["f-secret"], "fs")
         self.assertEqual(len(merged), 3)
 
+
 if __name__ == "__main__":
     unittest.main()
