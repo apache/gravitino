@@ -26,6 +26,7 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
+import javax.ws.rs.Produces;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
 import org.apache.gravitino.dto.responses.IcebergRESTServiceResponse;
@@ -34,6 +35,16 @@ import org.junit.jupiter.api.Test;
 public class TestIcebergRESTServiceOperations {
 
   private static final String DYNAMIC_PROVIDER = "dynamic-config-provider";
+
+  @Test
+  public void testDiscoveryEndpointProducesVersionedJson() throws Exception {
+    Produces produces =
+        IcebergRESTServiceOperations.class
+            .getMethod("getIcebergRestServiceUri", String.class)
+            .getAnnotation(Produces.class);
+
+    assertEquals("application/vnd.gravitino.v1+json", produces.value()[0]);
+  }
 
   private static Map<String, String> withDynamicProvider(Map<String, String> extra) {
     return ImmutableMap.<String, String>builder()

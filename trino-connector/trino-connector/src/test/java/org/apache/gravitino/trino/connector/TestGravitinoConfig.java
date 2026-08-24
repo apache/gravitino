@@ -356,6 +356,31 @@ public class TestGravitinoConfig {
     assertTrue(catalogConfig.contains("\"gravitino.iceberg.rest-catalog.security\"='OAUTH2'"));
   }
 
+  @Test
+  public void testToCatalogConfigPropagatesSecretReferencesInsteadOfSecretValues() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.oauth2.credential", "client:management-secret",
+                "gravitino.iceberg.rest-catalog.oauth2.credential", "client:irc-secret",
+                "gravitino.dynamic-catalog.environment-variable.gravitino.client.oauth2.credential",
+                    "GRAVITINO_CLIENT_CREDENTIAL",
+                "gravitino.dynamic-catalog.environment-variable.gravitino.iceberg.rest-catalog.oauth2.credential",
+                    "IRC_CLIENT_CREDENTIAL"));
+
+    String catalogConfig = config.toCatalogConfig();
+
+    assertFalse(catalogConfig.contains("management-secret"));
+    assertFalse(catalogConfig.contains("irc-secret"));
+    assertTrue(
+        catalogConfig.contains(
+            "\"gravitino.client.oauth2.credential\"='${ENV:GRAVITINO_CLIENT_CREDENTIAL}'"));
+    assertTrue(
+        catalogConfig.contains(
+            "\"gravitino.iceberg.rest-catalog.oauth2.credential\"='${ENV:IRC_CLIENT_CREDENTIAL}'"));
+  }
+
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {

@@ -86,6 +86,7 @@ public class IcebergRESTServiceOperations {
    *     running, or does not serve the requested metalake
    */
   @GET
+  @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "iceberg-rest-service." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "iceberg-rest-service", absolute = true)
   public Response getIcebergRestServiceUri(@QueryParam("metalake") String metalake) {

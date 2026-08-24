@@ -245,6 +245,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   @VisibleForTesting
   static boolean isSecuritySensitivePropertyName(String propertyName) {
+    if (propertyName.startsWith(GravitinoConfig.GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX)) {
+      return false;
+    }
     String normalizedPropertyName = propertyName.toLowerCase(Locale.ROOT).replaceAll("[._-]", "");
     return SECURITY_SENSITIVE_PROPERTY_SUFFIXES.stream().anyMatch(normalizedPropertyName::endsWith);
   }
