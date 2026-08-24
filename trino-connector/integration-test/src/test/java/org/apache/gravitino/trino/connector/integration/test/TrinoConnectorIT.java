@@ -77,8 +77,6 @@ public class TrinoConnectorIT extends BaseIT {
 
   private static final ContainerSuite containerSuite = ContainerSuite.getInstance();
 
-  private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
-
   public static String metalakeName =
       GravitinoITUtils.genRandomName("TrinoIT_metalake").toLowerCase();
   public static String catalogName =

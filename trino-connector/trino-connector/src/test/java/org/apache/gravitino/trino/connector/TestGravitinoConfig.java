@@ -304,7 +304,8 @@ public class TestGravitinoConfig {
   public void testIcebergRestConfigDefaults() {
     GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
 
-    assertEquals("", config.getManualIcebergRestUri());
+    // Nothing configured, and nothing discovered yet.
+    assertEquals("", config.getManualIcebergRestUri("user_001"));
     assertEquals("", config.getDiscoveredIcebergRestUri("user_001"));
     assertTrue(config.getIcebergRestCatalogConfig().isEmpty());
   }
@@ -319,12 +320,35 @@ public class TestGravitinoConfig {
                 "gravitino.iceberg.rest-catalog.security", "OAUTH2",
                 "gravitino.iceberg.rest-catalog.oauth2.credential", "client_id:client_secret"));
 
-    assertEquals("http://127.0.0.1:9001/iceberg", config.getManualIcebergRestUri());
+    // The unscoped URI is honored as-is in single-metalake mode.
+    assertEquals("http://127.0.0.1:9001/iceberg", config.getManualIcebergRestUri("user_001"));
+
     Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
     assertEquals(2, restCatalogConfig.size());
     assertEquals("OAUTH2", restCatalogConfig.get("iceberg.rest-catalog.security"));
     assertEquals(
         "client_id:client_secret", restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+  }
+
+  @Test
+  public void testIcebergRestConfigScopedToMetalakeInMultiMetalakeMode() {
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of(
+            "gravitino.metalake",
+            "metalake_a",
+            "gravitino.use-single-metalake",
+            "false",
+            "gravitino.iceberg.rest-uri",
+            "http://unscoped:9001/iceberg",
+            "gravitino.iceberg.rest-uri.metalake_a",
+            "http://metalake-a:9001/iceberg");
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    // The scoped key wins for the metalake it names.
+    assertEquals("http://metalake-a:9001/iceberg", config.getManualIcebergRestUri("metalake_a"));
+    // The unscoped key is ignored in multi-metalake mode, since it would otherwise misroute every
+    // metalake other than the one the Iceberg REST server actually serves.
+    assertEquals("", config.getManualIcebergRestUri("metalake_b"));
   }
 
   @Test

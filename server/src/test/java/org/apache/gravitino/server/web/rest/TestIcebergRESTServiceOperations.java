@@ -146,6 +146,16 @@ public class TestIcebergRESTServiceOperations {
   }
 
   @Test
+  public void testMalformedPortFallsBackToDefaultPort() {
+    IcebergRESTServiceOperations ops =
+        newOps(
+            true,
+            withDynamicProvider(ImmutableMap.of("host", "irc-host", "httpPort", "not-a-number")),
+            "gravitino-host");
+    assertEquals("http://irc-host:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
   public void testWildcardHostFallsBackToRequestServerName() {
     IcebergRESTServiceOperations ops =
         newOps(

@@ -131,7 +131,8 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
         throw new UnsupportedOperationException("Unsupported backend type: " + backend);
     }
     Map<String, String> config = new HashMap<>();
-    // The order of put operations determines the priority of parameters.
+    // Later put/putAll calls override earlier ones for the same key; this is call-order
+    // precedence, unrelated to HashMap's (unspecified) iteration order.
     config.putAll(super.gravitinoToEngineProperties(properties));
     config.putAll(stringStringMap);
     config.put("fs.hadoop.enabled", "true");
@@ -169,7 +170,8 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
     }
 
     Map<String, String> config = new HashMap<>();
-    // The order of put operations determines the priority of parameters.
+    // Later put/putAll calls override earlier ones for the same key; this is call-order
+    // precedence, unrelated to HashMap's (unspecified) iteration order.
     config.putAll(buildStorageProperties(catalog.getProperties()));
     config.put(TRINO_ICEBERG_REST_VENDED_CREDENTIALS, "true");
     if (gravitinoConfig.isForwardUser()) {
