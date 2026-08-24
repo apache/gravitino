@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.client.Entity;
@@ -39,6 +40,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.SemanticModelDispatcher;
 import org.apache.gravitino.dto.requests.SemanticModelCreateRequest;
+import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
+import org.apache.gravitino.dto.requests.SemanticModelUpdatesRequest;
+import org.apache.gravitino.dto.responses.DropResponse;
+import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.dto.responses.SemanticModelResponse;
@@ -49,6 +54,7 @@ import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SemanticModelEntity;
@@ -63,6 +69,7 @@ import org.apache.gravitino.semantic.Expression;
 import org.apache.gravitino.semantic.Field;
 import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -118,6 +125,34 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
   @BeforeEach
   void resetDispatcher() {
     reset(dispatcher);
+  }
+
+  @Test
+  void testListSemanticModels() {
+    NameIdentifier first = semanticModelIdentifier("sales");
+    NameIdentifier second = semanticModelIdentifier("finance");
+    when(dispatcher.listSemanticModels(namespace)).thenReturn(new NameIdentifier[] {first, second});
+
+    Response response = get(semanticModelPath());
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    EntityListResponse body = response.readEntity(EntityListResponse.class);
+    Assertions.assertEquals(0, body.getCode());
+    Assertions.assertArrayEquals(new NameIdentifier[] {first, second}, body.identifiers());
+
+    when(dispatcher.listSemanticModels(namespace)).thenReturn(null);
+    Assertions.assertEquals(
+        0, get(semanticModelPath()).readEntity(EntityListResponse.class).identifiers().length);
+
+    doThrow(new NoSuchSchemaException("schema is missing"))
+        .when(dispatcher)
+        .listSemanticModels(namespace);
+    assertError(
+        get(semanticModelPath()),
+        Response.Status.NOT_FOUND,
+        ErrorConstants.NOT_FOUND_CODE,
+        NoSuchSchemaException.class.getSimpleName(),
+        "schema is missing");
   }
 
   @Test
@@ -344,6 +379,112 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         "catalog is not relational");
   }
 
+  @Test
+  void testAlterSemanticModelConvertsAllChangesAtomically() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    SemanticModelDefinition replacement = semanticModelDefinition("TRINO");
+    SemanticModelUpdatesRequest request =
+        new SemanticModelUpdatesRequest(
+            List.of(
+                new SemanticModelUpdateRequest.RenameSemanticModelRequest("sales_v2"),
+                new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
+                new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest("owner", "finance"),
+                new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest("legacy"),
+                new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+                    SemanticModelDefinitionDTO.fromDefinition(replacement))));
+    when(dispatcher.alterSemanticModel(eq(ident), any(SemanticModelChange[].class)))
+        .thenReturn(semanticModel("sales_v2", "Updated"));
+
+    Response response = put(semanticModelPath() + "/sales", request);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    SemanticModelResponse body = response.readEntity(SemanticModelResponse.class);
+    body.validate();
+    Assertions.assertEquals("sales_v2", body.getSemanticModel().name());
+
+    ArgumentCaptor<SemanticModelChange[]> changesCaptor =
+        ArgumentCaptor.forClass(SemanticModelChange[].class);
+    verify(dispatcher).alterSemanticModel(eq(ident), changesCaptor.capture());
+    SemanticModelChange[] changes = changesCaptor.getValue();
+    Assertions.assertEquals(5, changes.length);
+    Assertions.assertInstanceOf(SemanticModelChange.RenameSemanticModel.class, changes[0]);
+    Assertions.assertInstanceOf(SemanticModelChange.UpdateComment.class, changes[1]);
+    Assertions.assertInstanceOf(SemanticModelChange.SetProperty.class, changes[2]);
+    Assertions.assertInstanceOf(SemanticModelChange.RemoveProperty.class, changes[3]);
+    Assertions.assertInstanceOf(SemanticModelChange.ReplaceDefinition.class, changes[4]);
+    Assertions.assertEquals(
+        replacement, ((SemanticModelChange.ReplaceDefinition) changes[4]).getDefinition());
+  }
+
+  @Test
+  void testAlterSemanticModelRejectsInvalidBatchBeforeDispatch() {
+    SemanticModelDefinitionDTO invalidDefinition =
+        SemanticModelDefinitionDTO.builder().withDatasets(new DatasetDTO[] {null}).build();
+    SemanticModelUpdatesRequest request =
+        new SemanticModelUpdatesRequest(
+            List.of(
+                new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated"),
+                new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+                    invalidDefinition)));
+
+    assertError(
+        put(semanticModelPath() + "/sales", request),
+        Response.Status.BAD_REQUEST,
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE,
+        IllegalArgumentException.class.getSimpleName(),
+        "datasets[0] must not be null");
+    verifyNoMoreInteractions(dispatcher);
+  }
+
+  @Test
+  void testAlterSemanticModelErrors() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    SemanticModelUpdatesRequest request =
+        new SemanticModelUpdatesRequest(
+            List.of(new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest("Updated")));
+
+    doThrow(new NoSuchSemanticModelException("sales does not exist"))
+        .when(dispatcher)
+        .alterSemanticModel(eq(ident), any(SemanticModelChange[].class));
+    assertError(
+        put(semanticModelPath() + "/sales", request),
+        Response.Status.NOT_FOUND,
+        ErrorConstants.NOT_FOUND_CODE,
+        NoSuchSemanticModelException.class.getSimpleName(),
+        "sales does not exist");
+
+    doThrow(new OptimisticLockException("sales changed in this transaction"))
+        .when(dispatcher)
+        .alterSemanticModel(eq(ident), any(SemanticModelChange[].class));
+    assertError(
+        put(semanticModelPath() + "/sales", request),
+        Response.Status.CONFLICT,
+        ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE,
+        OptimisticLockException.class.getSimpleName(),
+        "sales changed in this transaction");
+  }
+
+  @Test
+  void testDropSemanticModel() {
+    NameIdentifier ident = semanticModelIdentifier("sales");
+    when(dispatcher.dropSemanticModel(ident)).thenReturn(true, false);
+
+    Response dropped = delete(semanticModelPath() + "/sales");
+    Assertions.assertTrue(dropped.readEntity(DropResponse.class).dropped());
+    Response missing = delete(semanticModelPath() + "/sales");
+    Assertions.assertFalse(missing.readEntity(DropResponse.class).dropped());
+
+    doThrow(new OptimisticLockException("sales changed in this transaction"))
+        .when(dispatcher)
+        .dropSemanticModel(ident);
+    assertError(
+        delete(semanticModelPath() + "/sales"),
+        Response.Status.CONFLICT,
+        ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE,
+        OptimisticLockException.class.getSimpleName(),
+        "sales changed in this transaction");
+  }
+
   private SemanticModelCreateRequest createRequest(
       String name, String comment, SemanticModelDefinition definition) {
     return new SemanticModelCreateRequest(
@@ -439,6 +580,17 @@ public class TestSemanticModelOperations extends BaseOperationsTest {
         .request(MediaType.APPLICATION_JSON_TYPE)
         .accept(VND_V1_JSON)
         .post(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response put(String path, SemanticModelUpdatesRequest request) {
+    return target(path)
+        .request(MediaType.APPLICATION_JSON_TYPE)
+        .accept(VND_V1_JSON)
+        .put(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response delete(String path) {
+    return target(path).request(MediaType.APPLICATION_JSON_TYPE).accept(VND_V1_JSON).delete();
   }
 
   private static ErrorResponse assertError(
