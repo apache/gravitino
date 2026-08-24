@@ -71,6 +71,7 @@ public enum OperationType {
   LIST_CATALOG,
   ENABLE_CATALOG,
   DISABLE_CATALOG,
+  TEST_CONNECTION_CATALOG,
 
   // Partition event
   ADD_PARTITION,
