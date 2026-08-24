@@ -652,6 +652,8 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
             .withJobTemplateName(job.jobTemplateName())
             .withStatus(JobHandle.Status.STARTED)
             .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(System.currentTimeMillis())
+            .withFinishedAt(0L)
             .build();
     backend.insert(runningJob, true);
     assertEntityChange(

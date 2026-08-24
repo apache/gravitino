@@ -33,9 +33,11 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     tags: Set[str] = field(default_factory=set)
     transport: str = DefaultSetting.default_transport
     mcp_url: str = DefaultSetting.default_mcp_url
-    # Static OAuth2 Bearer token. Sent on every request in stdio mode; in HTTP
-    # mode it is only the fallback used when an incoming request carries no
-    # Authorization header (per-request identity takes priority).
+    # Static authorization credential. A bare value is treated as an OAuth2 Bearer
+    # token; a value containing a valid scheme and credential (``Basic ...``) is
+    # forwarded as an Authorization credential. Sent on every request in stdio
+    # mode; in HTTP mode it is only the fallback used when an incoming request
+    # carries no Authorization header (per-request identity takes priority).
     # Empty string means anonymous (no Authorization header sent).
     # repr=False keeps the raw value out of the dataclass-generated __repr__.
     token: str = field(default="", repr=False)
@@ -45,7 +47,9 @@ class Setting:  # pylint: disable=too-many-instance-attributes
     tls_key: str = ""
 
     def __str__(self) -> str:
-        token_display = "***" if self.token else ""
+        # Mirror startup_authorization: a whitespace-only token is anonymous on
+        # the wire, so it must not be logged as a configured identity.
+        token_display = "***" if self.token.strip() else ""
         return (
             f"Setting(metalake={self.metalake}, gravitino_uri={self.gravitino_uri}, "
             f"tags={self.tags}, transport={self.transport}, mcp_url={self.mcp_url}, "

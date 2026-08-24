@@ -665,7 +665,7 @@ class GravitinoMetalake(
 
         return GenericTag(self.name(), tag_resp.tag(), self.rest_client)
 
-    def create_tag(self, tag_name, comment, properties) -> Tag:
+    def create_tag(self, tag_name, comment, properties, allowed_values=None) -> Tag:
         """
         Create a new tag under a metalake.
 
@@ -677,6 +677,7 @@ class GravitinoMetalake(
             tag_name (str): The name of the tag.
             comment (str): The comment of the tag.
             properties (dict[str, str]): The properties of the tag.
+            allowed_values (list[str] | None): The allowed assignment values.
 
         Returns:
             Tag: The tag information.
@@ -685,6 +686,7 @@ class GravitinoMetalake(
             tag_name,
             comment,
             properties,
+            allowed_values,
         )
         tag_create_request.validate()
 

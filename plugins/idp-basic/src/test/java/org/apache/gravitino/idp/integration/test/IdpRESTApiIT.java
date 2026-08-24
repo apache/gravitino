@@ -191,13 +191,23 @@ public class IdpRESTApiIT extends BaseIT {
 
     IdpGroupResponse group = postGroup(GROUP1);
     Assertions.assertEquals(GROUP1, group.getGroup().name());
+    Assertions.assertEquals("", group.getGroup().comment());
     Assertions.assertTrue(group.getGroup().users().isEmpty());
+
+    IdpGroupResponse commented = postGroup("commented-group", "on-call rotation");
+    Assertions.assertEquals("on-call rotation", commented.getGroup().comment());
+    Assertions.assertEquals("on-call rotation", getGroup("commented-group").getGroup().comment());
+    Assertions.assertTrue(deleteGroup("commented-group", false));
 
     assertError(
         409, post("/idp/groups", new AddGroupRequest(GROUP1)), ErrorConstants.ALREADY_EXISTS_CODE);
     assertError(
         400,
         post("/idp/groups", new AddGroupRequest("a".repeat(129))),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        400,
+        post("/idp/groups", new AddGroupRequest("too-long-comment", "a".repeat(1025))),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     assertError(
         404,
@@ -304,7 +314,20 @@ public class IdpRESTApiIT extends BaseIT {
   }
 
   private static IdpGroupResponse postGroup(String groupName) throws Exception {
-    HttpResponse<String> response = post("/idp/groups", new AddGroupRequest(groupName));
+    return postGroup(groupName, null);
+  }
+
+  private static IdpGroupResponse postGroup(String groupName, String comment) throws Exception {
+    HttpResponse<String> response = post("/idp/groups", new AddGroupRequest(groupName, comment));
+    Assertions.assertEquals(200, response.statusCode(), response.body());
+    IdpGroupResponse groupResponse =
+        JsonUtils.objectMapper().readValue(response.body(), IdpGroupResponse.class);
+    groupResponse.validate();
+    return groupResponse;
+  }
+
+  private static IdpGroupResponse getGroup(String groupName) throws Exception {
+    HttpResponse<String> response = get("/idp/groups/" + groupName, ADMIN, ADMIN_PASSWORD);
     Assertions.assertEquals(200, response.statusCode(), response.body());
     IdpGroupResponse groupResponse =
         JsonUtils.objectMapper().readValue(response.body(), IdpGroupResponse.class);

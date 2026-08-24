@@ -61,6 +61,11 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().listCatalogPOsByMetalakeId(metalakeId);
   }
 
+  /** Returns SQL that lists and locks all active catalogs in a metalake. */
+  public static String listCatalogPOsByMetalakeIdForUpdate(@Param("metalakeId") Long metalakeId) {
+    return getProvider().listCatalogPOsByMetalakeIdForUpdate(metalakeId);
+  }
+
   public static String listCatalogPOsByCatalogIds(@Param("catalogIds") List<Long> catalogIds) {
     return getProvider().listCatalogPOsByCatalogIds(catalogIds);
   }
@@ -94,6 +99,11 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().selectCatalogMetaById(catalogId);
   }
 
+  /** Builds SQL that returns and locks an active catalog by ID. */
+  public static String selectCatalogMetaByIdForUpdate(@Param("catalogId") Long catalogId) {
+    return getProvider().selectCatalogMetaByIdForUpdate(catalogId);
+  }
+
   public static String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return getProvider().insertCatalogMeta(catalogPO);
   }
@@ -109,12 +119,15 @@ public class CatalogMetaSQLProviderFactory {
     return getProvider().updateCatalogMeta(newCatalogPO, oldCatalogPO);
   }
 
-  public static String softDeleteCatalogMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId);
+  public static String softDeleteCatalogMetasByCatalogId(
+      @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteCatalogMetasByCatalogId(catalogId, currentVersion);
   }
 
-  public static String softDeleteCatalogMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
-    return getProvider().softDeleteCatalogMetasByMetalakeId(metalakeId);
+  /** Returns SQL that soft-deletes catalogs using identifier-and-version pairs. */
+  public static String softDeleteCatalogMetasWithVersion(
+      @Param("catalogMetas") List<CatalogPO> catalogPOs) {
+    return getProvider().softDeleteCatalogMetasWithVersion(catalogPOs);
   }
 
   public static String deleteCatalogMetasByLegacyTimeline(

@@ -21,8 +21,6 @@ package org.apache.gravitino.authorization;
 import static org.apache.gravitino.Configs.CATALOG_CACHE_EVICTION_INTERVAL_MS;
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
-import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION;
-import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
@@ -55,6 +53,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -65,6 +64,8 @@ import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
@@ -138,8 +139,6 @@ public class TestAccessControlManager {
     Mockito.when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     Mockito.when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
-    Mockito.when(config.get(ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES)).thenReturn(10);
-    Mockito.when(config.get(ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION)).thenReturn("SKIP");
     Mockito.when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     Mockito.when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(VERSION_RETENTION_COUNT)).thenReturn(1L);
@@ -248,6 +247,56 @@ public class TestAccessControlManager {
     // Test to remove non-existed user
     boolean removed1 = accessControlManager.removeUser(METALAKE, "no-exist");
     Assertions.assertFalse(removed1);
+  }
+
+  @Test
+  public void testBulkAddUsers() {
+    List<BulkItemResult<User>> results =
+        accessControlManager.addUsers(
+            METALAKE,
+            Lists.newArrayList(
+                new UserAdd("bulk_user_1", "bulk-user-ext-1", false),
+                new UserAdd("bulk_user_2", null, null),
+                new UserAdd("bulk_user_1", null, null)));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_user_1", results.get(0).value().get().name());
+    Assertions.assertEquals("bulk-user-ext-1", results.get(0).value().get().externalId());
+    Assertions.assertFalse(results.get(0).value().get().enabled());
+    Assertions.assertTrue(results.get(1).succeeded());
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof UserAlreadyExistsException);
+  }
+
+  @Test
+  public void testBulkRemoveUsers() {
+    accessControlManager.addUser(METALAKE, "bulk_remove_user");
+
+    List<BulkItemResult<String>> results =
+        accessControlManager.removeUsers(
+            METALAKE,
+            Lists.newArrayList("bulk_remove_user", "missing_bulk_user", "metalake_owner"),
+            Optional.of(
+                new Owner() {
+                  @Override
+                  public String name() {
+                    return "metalake_owner";
+                  }
+
+                  @Override
+                  public Type type() {
+                    return Type.USER;
+                  }
+                }));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_remove_user", results.get(0).name());
+    Assertions.assertFalse(results.get(1).succeeded());
+    Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchUserException);
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
   }
 
   @Test

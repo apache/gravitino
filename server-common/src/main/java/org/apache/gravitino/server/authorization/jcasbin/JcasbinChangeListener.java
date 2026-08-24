@@ -225,10 +225,16 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
    * change starts emitting the new post-rename name, this invalidation will silently miss and stale
    * entries will only clear via LRU eviction.
    *
-   * <p><b>Poison-row tolerance:</b> a record this listener cannot map is logged and skipped rather
-   * than propagated. The poller treats a listener throw as a batch failure and, after exhausting
-   * retries, its default action is to stop the server — so one unmappable row must never be able to
-   * take the node down.
+   * <p><b>Bad rows:</b> a record this listener cannot understand is logged and skipped instead of
+   * being thrown up. Such a row does not point at any cache key, so skipping it leaves nothing
+   * stale behind.
+   *
+   * <p><b>Recovering from a failure:</b> the poller hands each batch over only once and never sends
+   * it again, so a failed removal has to be handled here. Otherwise {@code metadataIdCache} would
+   * keep an out-of-date name&#8594;id entry and hand it to authorization checks until that entry's
+   * TTL runs out. So the whole {@code metadataIdCache} is cleared instead. That is safe: everything
+   * in it can be looked up again, and clearing it also covers the entry that failed plus the rest
+   * of the batch. The only cost is redoing those name&#8594;id lookups.
    *
    * <p>The {@code synchronized} modifier is defensive — see the note on {@link #pollOwnerChanges()}
    * for the rationale. The single-threaded scheduler already prevents overlapping runs in
@@ -325,18 +331,44 @@ public class JcasbinChangeListener implements EntityChangeLogListener, AutoClose
     if (prefixes.isEmpty() && leafKeys.isEmpty()) {
       return;
     }
-    // Hold the cache's exclusive invalidation lock for the whole batch so readers never observe
-    // a half-applied state where some prefix/leaf keys have been evicted and others have not.
-    metadataIdCache.runInvalidationBatch(
-        () -> {
-          for (String prefix : prefixes) {
-            metadataIdCache.invalidateByPrefix(prefix);
-          }
-          for (String leafKey : leafKeys) {
-            if (prefixes.stream().noneMatch(leafKey::startsWith)) {
-              metadataIdCache.invalidate(leafKey);
+    // Take the cache's exclusive lock for the whole batch, so a reader never sees a state where
+    // part of the batch has been removed and part has not. If removing one key fails, clear the
+    // whole cache while we still hold the lock. If we never got the lock at all, clear without it.
+    boolean[] batchStarted = {false};
+    try {
+      metadataIdCache.runInvalidationBatch(
+          () -> {
+            batchStarted[0] = true;
+            try {
+              for (String prefix : prefixes) {
+                metadataIdCache.invalidateByPrefix(prefix);
+              }
+              for (String leafKey : leafKeys) {
+                if (prefixes.stream().noneMatch(leafKey::startsWith)) {
+                  metadataIdCache.invalidate(leafKey);
+                }
+              }
+            } catch (RuntimeException e) {
+              LOG.error(
+                  "Failed to invalidate {} prefix(es) and {} leaf key(s) from the entity change "
+                      + "log, clearing the whole metadata id cache to stay coherent",
+                  prefixes.size(),
+                  leafKeys.size(),
+                  e);
+              metadataIdCache.invalidateAll();
             }
-          }
-        });
+          });
+    } catch (RuntimeException e) {
+      if (batchStarted[0]) {
+        throw e;
+      }
+      LOG.error(
+          "Failed to start an invalidation batch for {} prefix(es) and {} leaf key(s), clearing "
+              + "the whole metadata id cache without the batch lock",
+          prefixes.size(),
+          leafKeys.size(),
+          e);
+      metadataIdCache.invalidateAll();
+    }
   }
 }

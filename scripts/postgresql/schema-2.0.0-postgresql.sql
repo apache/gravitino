@@ -459,6 +459,7 @@ COMMENT ON COLUMN idp_user_meta.deleted_at IS 'idp user deleted at';
 CREATE TABLE IF NOT EXISTS idp_group_meta (
     group_id BIGINT NOT NULL,
     group_name VARCHAR(128) NOT NULL,
+    group_comment VARCHAR(1024) DEFAULT '',
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -469,6 +470,7 @@ COMMENT ON TABLE idp_group_meta IS 'local IdP group metadata';
 
 COMMENT ON COLUMN idp_group_meta.group_id IS 'idp group id';
 COMMENT ON COLUMN idp_group_meta.group_name IS 'idp group name';
+COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
 COMMENT ON COLUMN idp_group_meta.current_version IS 'idp group current version';
 COMMENT ON COLUMN idp_group_meta.last_version IS 'idp group last version';
 COMMENT ON COLUMN idp_group_meta.deleted_at IS 'idp group deleted at';
@@ -811,6 +813,7 @@ CREATE TABLE IF NOT EXISTS job_run_meta (
     metalake_id BIGINT NOT NULL,
     job_execution_id VARCHAR(256) NOT NULL,
     job_run_status VARCHAR(64) NOT NULL,
+    job_started_at BIGINT NOT NULL DEFAULT 0,
     job_finished_at BIGINT NOT NULL DEFAULT 0,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
@@ -828,6 +831,7 @@ COMMENT ON COLUMN job_run_meta.job_template_id IS 'job template id';
 COMMENT ON COLUMN job_run_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN job_run_meta.job_execution_id IS 'job execution id';
 COMMENT ON COLUMN job_run_meta.job_run_status IS 'job run status';
+COMMENT ON COLUMN job_run_meta.job_started_at IS 'job run started at';
 COMMENT ON COLUMN job_run_meta.job_finished_at IS 'job run finished at';
 COMMENT ON COLUMN job_run_meta.audit_info IS 'job run audit info';
 COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';

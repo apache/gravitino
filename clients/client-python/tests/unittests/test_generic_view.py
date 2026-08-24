@@ -76,7 +76,13 @@ class TestGenericView(unittest.TestCase):
         generic_view = self._generic_view()
 
         self.assertTrue(issubclass(GenericView, SupportsTags))
-        expected_methods = ["list_tags", "list_tags_info", "get_tag", "associate_tags"]
+        expected_methods = [
+            "list_tags",
+            "list_tags_info",
+            "get_tag",
+            "assign_tags",
+            "associate_tags",
+        ]
         self.assertTrue(
             all(
                 callable(getattr(generic_view, method, None))

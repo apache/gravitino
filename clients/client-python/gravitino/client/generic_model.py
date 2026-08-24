@@ -82,6 +82,13 @@ class GenericModel(Model, SupportsTags):
     def get_tag(self, name: str) -> Tag:
         return self._model_tag_operations.get_tag(name)
 
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        return self._model_tag_operations.assign_tags(tags_to_add, tags_to_remove)
+
     def associate_tags(
         self, tags_to_add: list[str], tags_to_remove: list[str]
     ) -> list[str]:

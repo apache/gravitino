@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
+import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
@@ -39,11 +40,13 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
+import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -208,6 +211,23 @@ public class TestMetalakeManager {
     NameIdentifier ident1 = NameIdentifier.of("test42");
     boolean dropped1 = metalakeManager.dropMetalake(ident1);
     Assertions.assertFalse(dropped1, "metalake should be non-existent");
+  }
+
+  @Test
+  public void testDropMetalakeReturnsFalseWhenConcurrentDeleteWins() throws IOException {
+    InMemoryEntityStore store = Mockito.spy(new InMemoryEntityStore());
+    store.initialize(config);
+    MetalakeManager manager = new MetalakeManager(store, new RandomIdGenerator());
+    NameIdentifier ident = NameIdentifier.of("concurrently_deleted_metalake");
+    manager.createMetalake(ident, "comment", ImmutableMap.of());
+    Mockito.doThrow(
+            new NoSuchEntityException(
+                NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "metalake", ident.toString()))
+        .when(store)
+        .delete(ident, EntityType.METALAKE, true);
+
+    Assertions.assertFalse(manager.dropMetalake(ident, true));
+    store.close();
   }
 
   @Test
