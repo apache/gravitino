@@ -16,8 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-
-package org.apache.gravitino.spark.connector.glue;
+package org.apache.gravitino.catalog.glue;
 
 import com.google.common.base.Preconditions;
 import java.util.Map;
@@ -30,10 +29,10 @@ import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider;
  * AWS credentials provider for Iceberg {@code GlueCatalog} that reads static credentials from a
  * properties map.
  *
- * <p>Iceberg 1.10+ loads credentials via {@code client.credentials-provider}. This class is
- * instantiated dynamically by Iceberg's {@code AwsClientProperties} using the {@code create(Map)}
- * static factory. The properties map contains the {@code client.credentials-provider.*} entries
- * with their prefix stripped, i.e. {@code access-key-id} and {@code secret-access-key}.
+ * <p>Iceberg 1.10+ no longer supports {@code client.access-key-id} directly; credentials must be
+ * supplied via {@code client.credentials-provider}. This class is configured in {@link
+ * org.apache.gravitino.catalog.glue.GlueIcebergTableHelper#createGlueCatalog} when explicit
+ * credentials are provided.
  *
  * <p>Adapted from Apache Doris's {@code CustomAwsCredentialsProvider} ({@code
  * org.apache.doris.datasource.iceberg.s3tables.CustomAwsCredentialsProvider}).
@@ -46,6 +45,11 @@ public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider 
   private final String accessKeyId;
   private final String secretAccessKey;
 
+  private GravitinoGlueCredentialsProvider(String accessKeyId, String secretAccessKey) {
+    this.accessKeyId = accessKeyId;
+    this.secretAccessKey = secretAccessKey;
+  }
+
   /**
    * Creates a credentials provider from the given properties map.
    *
@@ -57,21 +61,21 @@ public class GravitinoGlueCredentialsProvider implements AwsCredentialsProvider 
     String accessKeyId = properties.get(ACCESS_KEY_ID);
     String secretAccessKey = properties.get(SECRET_ACCESS_KEY);
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(accessKeyId),
-        "Glue credentials provider requires 'access-key-id' in client.credentials-provider.* properties");
+        StringUtils.isNotBlank(accessKeyId), "Glue credentials require 'access-key-id'");
     Preconditions.checkArgument(
-        StringUtils.isNotBlank(secretAccessKey),
-        "Glue credentials provider requires 'secret-access-key' in client.credentials-provider.* properties");
+        StringUtils.isNotBlank(secretAccessKey), "Glue credentials require 'secret-access-key'");
     return new GravitinoGlueCredentialsProvider(accessKeyId, secretAccessKey);
-  }
-
-  GravitinoGlueCredentialsProvider(String accessKeyId, String secretAccessKey) {
-    this.accessKeyId = accessKeyId;
-    this.secretAccessKey = secretAccessKey;
   }
 
   @Override
   public AwsCredentials resolveCredentials() {
+    if (StringUtils.isBlank(accessKeyId)) {
+      throw new IllegalStateException("Access key ID is not set");
+    }
+    if (StringUtils.isBlank(secretAccessKey)) {
+      throw new IllegalStateException("Secret access key is not set");
+    }
+
     return AwsBasicCredentials.create(accessKeyId, secretAccessKey);
   }
 }
