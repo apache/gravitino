@@ -504,12 +504,30 @@ public class SchemaMetaService {
   }
 
   /**
-   * Holds the parent schema row while a table, view, fileset, function, model, model version, or
-   * topic is written, so a child cannot be added below a schema that is going away. The lock is
-   * shared, so children of the same schema can still be written in parallel; dropping the schema
-   * takes the row exclusively and therefore waits for them.
+   * Runs schema-scoped writes while holding a shared lock on their parent schema.
+   *
+   * <p>This method owns the transaction boundary on purpose. If callers locked the schema in one
+   * transaction and wrote the child in another, the lock would be released too early and a schema
+   * deletion could slip between those two steps. Keeping the lock and every supplied operation in
+   * the same transaction makes that mistake impossible for callers of this entry point.
    */
-  void lockSchemaForEntityWrite(
+  void doWithSchemaWriteLock(
+      NameIdentifier entityIdentifier,
+      Long observedSchemaId,
+      Long observedCatalogId,
+      Long observedMetalakeId,
+      Runnable... entityWriteOperations) {
+    Runnable[] transactionOperations = new Runnable[entityWriteOperations.length + 1];
+    transactionOperations[0] =
+        () ->
+            lockSchemaForEntityWrite(
+                entityIdentifier, observedSchemaId, observedCatalogId, observedMetalakeId);
+    System.arraycopy(
+        entityWriteOperations, 0, transactionOperations, 1, entityWriteOperations.length);
+    SessionUtils.doMultipleWithCommit(transactionOperations);
+  }
+
+  private void lockSchemaForEntityWrite(
       NameIdentifier entityIdentifier,
       Long observedSchemaId,
       Long observedCatalogId,
@@ -585,49 +603,18 @@ public class SchemaMetaService {
     }
   }
 
-  /**
-   * Checks that nothing is left under the schema. Views and functions are included: they used to be
-   * missing here, which let a non-cascade drop leave their rows behind with no parent.
-   */
+  /** Checks that no active schema or metadata object is left below the schema. */
   private void checkSchemaIsEmpty(NameIdentifier identifier, SchemaPO schemaPO) {
     boolean hasDescendantSchemas = !listDescendantSchemaPOs(schemaPO).isEmpty();
-    boolean hasTables =
-        !SessionUtils.getWithoutCommit(
-                TableMetaMapper.class,
-                mapper -> mapper.listTablePOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasFilesets =
-        !SessionUtils.getWithoutCommit(
-                FilesetMetaMapper.class,
-                mapper -> mapper.listFilesetPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasModels =
-        !SessionUtils.getWithoutCommit(
-                ModelMetaMapper.class,
-                mapper -> mapper.listModelPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasTopics =
-        !SessionUtils.getWithoutCommit(
-                TopicMetaMapper.class,
-                mapper -> mapper.listTopicPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasViews =
-        !SessionUtils.getWithoutCommit(
-                ViewMetaMapper.class,
-                mapper -> mapper.listViewPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    boolean hasFunctions =
-        !SessionUtils.getWithoutCommit(
-                FunctionMetaMapper.class,
-                mapper -> mapper.listFunctionPOsBySchemaId(schemaPO.getSchemaId()))
-            .isEmpty();
-    if (hasDescendantSchemas
-        || hasTables
-        || hasFilesets
-        || hasModels
-        || hasTopics
-        || hasViews
-        || hasFunctions) {
+    // A non-cascade delete only needs to know whether any direct child exists. Asking the database
+    // for one literal avoids building every child PO and loading its version details while the
+    // schema delete lock is held.
+    boolean hasDirectChild =
+        SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper -> mapper.selectActiveChildBySchemaId(schemaPO.getSchemaId()))
+            != null;
+    if (hasDescendantSchemas || hasDirectChild) {
       throw new NonEmptyEntityException(
           "Entity %s has sub-entities, you should remove sub-entities first", identifier);
     }

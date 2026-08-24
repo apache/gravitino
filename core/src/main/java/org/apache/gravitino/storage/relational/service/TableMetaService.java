@@ -125,46 +125,42 @@ public class TableMetaService {
 
       AtomicReference<TablePO> tablePORef = new AtomicReference<>();
       TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the table cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      tableEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TableMetaMapper.class,
-                  mapper -> {
-                    tablePORef.set(po);
-                    ops.insertPO(mapper, po, overwrite);
-                  }),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TableVersionMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertTableVersionOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertTableVersion(po);
-                    }
-                  }),
-          () -> {
-            // We need to delete the columns first if we want to overwrite the table.
-            if (overwrite) {
-              TableColumnMetaService.getInstance()
-                  .deleteColumnsByTableId(tablePORef.get().getTableId());
-            }
-          },
-          () -> {
-            if (tableEntity.columns() != null && !tableEntity.columns().isEmpty()) {
-              TableColumnMetaService.getInstance()
-                  .insertColumnPOs(tablePORef.get(), tableEntity.columns());
-            }
-          });
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              tableEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TableMetaMapper.class,
+                      mapper -> {
+                        tablePORef.set(po);
+                        ops.insertPO(mapper, po, overwrite);
+                      }),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TableVersionMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertTableVersionOnDuplicateKeyUpdate(po);
+                        } else {
+                          mapper.insertTableVersion(po);
+                        }
+                      }),
+              () -> {
+                // We need to delete the columns first if we want to overwrite the table.
+                if (overwrite) {
+                  TableColumnMetaService.getInstance()
+                      .deleteColumnsByTableId(tablePORef.get().getTableId());
+                }
+              },
+              () -> {
+                if (tableEntity.columns() != null && !tableEntity.columns().isEmpty()) {
+                  TableColumnMetaService.getInstance()
+                      .insertColumnPOs(tablePORef.get(), tableEntity.columns());
+                }
+              });
 
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -202,38 +198,33 @@ public class TableMetaService {
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            // Only a rename that moves the table to another schema needs a lock here, and it is the
-            // new parent that has to stay alive, not the old one.
-            if (isSchemaChanged) {
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      newTableEntity.nameIdentifier(),
-                      newSchemaId,
-                      oldTablePO.getCatalogId(),
-                      oldTablePO.getMetalakeId());
-            }
-          },
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      TableMetaMapper.class,
-                      mapper -> ops.updatePO(mapper, newTablePO, oldTablePO))),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TableVersionMapper.class,
-                  mapper -> {
-                    mapper.softDeleteTableVersionByTableIdAndVersion(
-                        oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
-                    mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
-                  }),
-          () -> {
-            if (updateResult.get() > 0) {
-              TableColumnMetaService.getInstance()
-                  .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
-            }
-          });
+      // For a cross-schema rename, the new schema is the parent that must remain alive. For a
+      // regular update, newSchemaId is the existing parent, so the same entry point covers both.
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              newTableEntity.nameIdentifier(),
+              newSchemaId,
+              oldTablePO.getCatalogId(),
+              oldTablePO.getMetalakeId(),
+              () ->
+                  updateResult.set(
+                      SessionUtils.getWithoutCommit(
+                          TableMetaMapper.class,
+                          mapper -> ops.updatePO(mapper, newTablePO, oldTablePO))),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TableVersionMapper.class,
+                      mapper -> {
+                        mapper.softDeleteTableVersionByTableIdAndVersion(
+                            oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
+                        mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
+                      }),
+              () -> {
+                if (updateResult.get() > 0) {
+                  TableColumnMetaService.getInstance()
+                      .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
+                }
+              });
 
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(

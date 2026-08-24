@@ -165,36 +165,33 @@ public class FilesetMetaService {
       FilesetPO po = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
 
       // insert both fileset meta table and version table
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the fileset cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      filesetEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertFilesetMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertFilesetMeta(po);
-                    }
-                  }),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetVersionMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertFilesetVersionsOnDuplicateKeyUpdate(po.getFilesetVersionPOs());
-                    } else {
-                      mapper.insertFilesetVersions(po.getFilesetVersionPOs());
-                    }
-                  }));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              filesetEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetMetaMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertFilesetMetaOnDuplicateKeyUpdate(po);
+                        } else {
+                          mapper.insertFilesetMeta(po);
+                        }
+                      }),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetVersionMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertFilesetVersionsOnDuplicateKeyUpdate(
+                              po.getFilesetVersionPOs());
+                        } else {
+                          mapper.insertFilesetVersions(po.getFilesetVersionPOs());
+                        }
+                      }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, filesetEntity.nameIdentifier().toString());
@@ -231,22 +228,33 @@ public class FilesetMetaService {
         // back — including the version insert — and the update is treated as a conflict.
         int[] metaUpdateCountRef = new int[1];
         try {
-          SessionUtils.doMultipleWithCommit(
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      FilesetVersionMapper.class,
-                      mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
-              () -> {
-                metaUpdateCountRef[0] =
-                    SessionUtils.getWithoutCommit(
-                        FilesetMetaMapper.class,
-                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
-                if (metaUpdateCountRef[0] == 0) {
-                  throw new RuntimeException("Failed to update the entity: " + identifier);
-                }
-              });
+          SchemaMetaService.getInstance()
+              .doWithSchemaWriteLock(
+                  identifier,
+                  oldFilesetPO.getSchemaId(),
+                  oldFilesetPO.getCatalogId(),
+                  oldFilesetPO.getMetalakeId(),
+                  () ->
+                      SessionUtils.doWithoutCommit(
+                          FilesetVersionMapper.class,
+                          mapper ->
+                              mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
+                  () -> {
+                    metaUpdateCountRef[0] =
+                        SessionUtils.getWithoutCommit(
+                            FilesetMetaMapper.class,
+                            mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+                    if (metaUpdateCountRef[0] == 0) {
+                      throw new RuntimeException("Failed to update the entity: " + identifier);
+                    }
+                  });
           updateResult = 1;
         } catch (RuntimeException re) {
+          // The schema fence runs before the fileset update. Keep its missing-schema error rather
+          // than turning it into a fileset write conflict merely because the update count is zero.
+          if (re instanceof NoSuchEntityException) {
+            throw re;
+          }
           if (metaUpdateCountRef[0] == 0) {
             // The meta update matched no rows; the transaction was rolled back,
             // including the version insert above.
@@ -259,12 +267,17 @@ public class FilesetMetaService {
         }
       } else {
         int[] metaUpdateCountRef = new int[1];
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                metaUpdateCountRef[0] =
-                    SessionUtils.getWithoutCommit(
-                        FilesetMetaMapper.class,
-                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)));
+        SchemaMetaService.getInstance()
+            .doWithSchemaWriteLock(
+                identifier,
+                oldFilesetPO.getSchemaId(),
+                oldFilesetPO.getCatalogId(),
+                oldFilesetPO.getMetalakeId(),
+                () ->
+                    metaUpdateCountRef[0] =
+                        SessionUtils.getWithoutCommit(
+                            FilesetMetaMapper.class,
+                            mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)));
         updateResult = metaUpdateCountRef[0];
       }
     } catch (RuntimeException re) {

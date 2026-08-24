@@ -172,11 +172,9 @@ public class ModelVersionMetaService {
         POConverters.initializeModelVersionAliasRelPO(modelVersionEntity, modelId);
 
     try {
-      SessionUtils.doMultipleWithCommit(
-          // Model versions carry the schema ID directly, so they must take the same parent fence
-          // as models. Otherwise a schema cascade can pass its model-version cleanup and a
-          // concurrent registration can insert a new active version below the deleted schema.
-          () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
+      doWithSchemaWriteLock(
+          modelIdent,
+          modelPO,
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
@@ -190,9 +188,8 @@ public class ModelVersionMetaService {
                 mapper -> mapper.insertModelVersionAliasRels(aliasRelPOs));
           },
           () -> {
-            // If the model version is inserted successfully, update the model latest version. A
-            // zero result means the model disappeared after the read above, so the inserted version
-            // and aliases must roll back with this transaction.
+            // A missing model means the version and aliases inserted above must roll back with this
+            // transaction.
             int updated =
                 SessionUtils.getWithoutCommit(
                     ModelMetaMapper.class, mapper -> mapper.updateModelLatestVersion(modelId));
@@ -358,10 +355,9 @@ public class ModelVersionMetaService {
 
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      SessionUtils.doMultipleWithCommit(
-          // URI and alias updates can reinsert active model-version rows, so they need the same
-          // schema fence as a new version registration.
-          () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
+      doWithSchemaWriteLock(
+          modelIdent,
+          modelPO,
           () -> {
             if (isModelVersionUriUpdated) {
               // delete old model version POs first
@@ -446,14 +442,15 @@ public class ModelVersionMetaService {
     return !oldUris.equals(newUris);
   }
 
-  private void lockSchemaForModelVersionWrite(
-      NameIdentifier modelIdentifier, ModelPO observedModelPO) {
+  private void doWithSchemaWriteLock(
+      NameIdentifier modelIdentifier, ModelPO modelPO, Runnable... modelVersionWriteOperations) {
     SchemaMetaService.getInstance()
-        .lockSchemaForEntityWrite(
+        .doWithSchemaWriteLock(
             modelIdentifier,
-            observedModelPO.getSchemaId(),
-            observedModelPO.getCatalogId(),
-            observedModelPO.getMetalakeId());
+            modelPO.getSchemaId(),
+            modelPO.getCatalogId(),
+            modelPO.getMetalakeId(),
+            modelVersionWriteOperations);
   }
 
   private NoSuchEntityException noSuchModelException(NameIdentifier modelIdentifier) {
