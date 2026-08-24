@@ -38,9 +38,6 @@ Multi-metalake mode (`gravitino.use-single-metalake=false`) is supported on Trin
 
 ## Connecting to a TLS-enabled coordinator
 
-For a complete deployment guide, including truststore creation, verification modes, session roles,
-and troubleshooting, see [Configure the internal Trino JDBC connection](./internal-jdbc-connection.md).
-
 The Gravitino Trino connector registers catalogs by connecting back to the Trino coordinator over
 JDBC and running `CREATE CATALOG` / `DROP CATALOG`. This connection is established when the
 connector starts and is reused by the metadata refresh loop, so it must be configured for the
