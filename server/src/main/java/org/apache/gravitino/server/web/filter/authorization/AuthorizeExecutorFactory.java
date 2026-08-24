@@ -36,7 +36,8 @@ public class AuthorizeExecutorFactory {
       Parameter[] parameters,
       Object[] args,
       String secondaryExpression,
-      ExpressionCondition secondaryExpressionCondition) {
+      ExpressionCondition secondaryExpressionCondition,
+      String allowCheckExistenceExpression) {
     return switch (requestType) {
       case COMMON -> new CommonAuthorizerExecutor(
           expression, metadataContext, pathParams, entityType);
@@ -54,7 +55,8 @@ public class AuthorizeExecutorFactory {
           pathParams,
           entityType,
           secondaryExpression,
-          secondaryExpressionCondition);
+          secondaryExpressionCondition,
+          allowCheckExistenceExpression);
       case CREATE_SCHEMA -> new CreateSchemaAuthorizationExecutor(
           parameters, args, expression, metadataContext, pathParams, entityType);
     };
