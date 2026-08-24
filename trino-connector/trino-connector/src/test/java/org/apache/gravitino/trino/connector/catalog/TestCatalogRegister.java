@@ -26,14 +26,19 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
+import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
+import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -376,5 +381,88 @@ public class TestCatalogRegister {
     assertEquals(GRAVITINO_MISSING_CONFIG.toErrorCode(), e.getErrorCode());
     assertTrue(e.getMessage().contains("does not exist"));
     assertTrue(e.getMessage().contains("trino.jdbc.ssl.truststore.path"));
+  }
+
+  private static final String DISCOVERED_ICEBERG_REST_URI_PROPERTY = "__gravitino.iceberg.rest-uri";
+
+  @Test
+  public void testGenerateCreateCatalogCommandEmbedsDiscoveredUriForIcebergCatalog()
+      throws Exception {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test"));
+    config.setDiscoveredIcebergRestUri("test", "http://irc-host:9001/iceberg");
+
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(config);
+
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "iceberg_catalog",
+            "lakehouse-iceberg",
+            "test catalog",
+            Catalog.Type.RELATIONAL,
+            Collections.emptyMap());
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+
+    String command = catalogRegister.generateCreateCatalogCommand("iceberg_catalog", catalog);
+
+    assertTrue(
+        command.contains(
+            "\"" + DISCOVERED_ICEBERG_REST_URI_PROPERTY + "\":\"http://irc-host:9001/iceberg\""),
+        "Expected the discovered Iceberg REST URI to be embedded in: " + command);
+  }
+
+  @Test
+  public void testGenerateCreateCatalogCommandDoesNotEmbedUriForNonIcebergCatalog()
+      throws Exception {
+    // The discovered URI is per-Iceberg-catalog routing state; embedding it into every catalog's
+    // properties (e.g. a Hive catalog) would be a leaky abstraction and is guarded against in
+    // IcebergConnectorAdapter.embedDiscoveredIcebergRestUri. This asserts that guard actually
+    // takes effect when reached through CatalogRegister, not just when called directly.
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test"));
+    config.setDiscoveredIcebergRestUri("test", "http://irc-host:9001/iceberg");
+
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(config);
+
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "hive_catalog",
+            "hive",
+            "test catalog",
+            Catalog.Type.RELATIONAL,
+            Collections.emptyMap());
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+
+    String command = catalogRegister.generateCreateCatalogCommand("hive_catalog", catalog);
+
+    assertFalse(command.contains(DISCOVERED_ICEBERG_REST_URI_PROPERTY));
+  }
+
+  @Test
+  public void testRedactSecretsMasksSecretBearingProperties() {
+    String command =
+        "CREATE CATALOG c USING gravitino WITH ( "
+            + "\"gravitino.iceberg.rest-catalog.oauth2.credential\"='client:secretvalue', "
+            + "\"gravitino.iceberg.rest-catalog.uri\"='http://irc-host:9001/iceberg', "
+            + "\"some.token\"='abc123', "
+            + "\"trino.bypass.password\"='hunter2')";
+
+    String redacted = CatalogRegister.redactSecrets(command);
+
+    assertFalse(redacted.contains("secretvalue"));
+    assertFalse(redacted.contains("abc123"));
+    assertFalse(redacted.contains("hunter2"));
+    assertTrue(redacted.contains("\"gravitino.iceberg.rest-catalog.oauth2.credential\"='***'"));
+    assertTrue(redacted.contains("\"some.token\"='***'"));
+    assertTrue(redacted.contains("\"trino.bypass.password\"='***'"));
+    // Non-secret properties must survive redaction unchanged.
+    assertTrue(
+        redacted.contains("\"gravitino.iceberg.rest-catalog.uri\"='http://irc-host:9001/iceberg'"));
   }
 }

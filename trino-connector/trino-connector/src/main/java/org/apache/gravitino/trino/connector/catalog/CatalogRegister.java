@@ -35,6 +35,8 @@ import java.sql.Statement;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -59,6 +61,16 @@ public class CatalogRegister {
   private static final String SSL_VERIFICATION_NONE = "NONE";
   private static final Set<String> SSL_VERIFICATION_MODES =
       ImmutableSet.of(SSL_VERIFICATION_FULL, SSL_VERIFICATION_CA, SSL_VERIFICATION_NONE);
+
+  // Matches "some.key.credential"='value' style property assignments (as produced by
+  // GravitinoConfig.toCatalogConfig / GravitinoCatalog.toJson-embedded WITH(...) clauses) whose
+  // key looks like it carries a secret, e.g. gravitino.iceberg.rest-catalog.oauth2.credential.
+  // Values matching this are redacted before the CREATE CATALOG statement is logged, since it can
+  // otherwise leak IRC OAuth2 client secrets and similar into the log and Trino's query history.
+  private static final Pattern SECRET_PROPERTY_PATTERN =
+      Pattern.compile(
+          "\"([^\"]*(?:credential|token|secret|password)[^\"]*)\"\\s*=\\s*'([^']*)'",
+          Pattern.CASE_INSENSITIVE);
 
   private Connection connection;
   private boolean isStarted = false;
@@ -303,7 +315,15 @@ public class CatalogRegister {
     }
   }
 
-  private String generateCreateCatalogCommand(String name, GravitinoCatalog gravitinoCatalog)
+  // Package-private (rather than private) so tests can exercise the embed-then-serialize wiring
+  // without a live Trino JDBC connection, which init() otherwise requires.
+  @VisibleForTesting
+  void setConfigForTesting(GravitinoConfig config) {
+    this.config = config;
+  }
+
+  @VisibleForTesting
+  String generateCreateCatalogCommand(String name, GravitinoCatalog gravitinoCatalog)
       throws Exception {
     // This statement is replicated by Trino to every node in the cluster, coordinator and workers
     // alike, so it is the only place a value the coordinator alone knows (like the Iceberg REST
@@ -318,6 +338,18 @@ public class CatalogRegister {
         GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG,
         GravitinoCatalog.toJson(catalogToRegister),
         config.toCatalogConfig());
+  }
+
+  @VisibleForTesting
+  static String redactSecrets(String createCatalogCommand) {
+    Matcher matcher = SECRET_PROPERTY_PATTERN.matcher(createCatalogCommand);
+    StringBuffer redacted = new StringBuffer();
+    while (matcher.find()) {
+      matcher.appendReplacement(
+          redacted, Matcher.quoteReplacement("\"" + matcher.group(1) + "\"='***'"));
+    }
+    matcher.appendTail(redacted);
+    return redacted.toString();
   }
 
   private String generateDropCatalogCommand(String name) {
@@ -356,7 +388,7 @@ public class CatalogRegister {
       }
       String createCatalogCommand = generateCreateCatalogCommand(name, catalog);
       executeSql(createCatalogCommand);
-      LOG.info("Register catalog {} successfully: {}", name, createCatalogCommand);
+      LOG.info("Register catalog {} successfully: {}", name, redactSecrets(createCatalogCommand));
     } catch (SQLException e) {
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, e.getMessage(), e);
     } catch (Exception e) {
