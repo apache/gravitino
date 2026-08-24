@@ -47,8 +47,6 @@ import org.slf4j.LoggerFactory;
 public class TrinoQueryITBase {
   private static final Logger LOG = LoggerFactory.getLogger(TrinoQueryITBase.class);
 
-  private static final String GRAVITINO_ICEBERG_REST_PREFIX = "gravitino.iceberg-rest.";
-
   // Auto start docker containers and Gravitino server
   protected static boolean autoStart = true;
 
@@ -95,9 +93,10 @@ public class TrinoQueryITBase {
       // so the auxiliary service has to run and serve this test's metalake.
       baseIT.enableIcebergAuxRestService(
           ImmutableMap.of(
-              GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
+              BaseIT.GRAVITINO_ICEBERG_REST_PREFIX
+                  + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
               IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
-              GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE,
+              BaseIT.GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE,
               metalakeName));
       baseIT.startIntegrationTest();
       gravitinoClient = baseIT.getGravitinoClient();

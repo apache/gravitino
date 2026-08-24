@@ -42,6 +42,11 @@ before. See [Iceberg catalog](./catalog-iceberg.md#how-trino-reaches-the-catalog
 
 Multi-metalake mode (`gravitino.use-single-metalake=false`) is supported on Trino connector versions 440-445 and 469-478. On versions 446-468, a warning is logged and the connector initializes, but the mode is not fully supported and some operations may fail.
 
+**Note:** In multi-metalake mode, `gravitino.iceberg.rest-uri` is only honored when scoped to a
+metalake, as `gravitino.iceberg.rest-uri.<metalake_name>` — the unscoped form is ignored, since a
+single Iceberg REST server serves exactly one metalake and applying it to every metalake would
+misroute the others. The unscoped form remains valid in single-metalake mode.
+
 ## Connecting to a TLS-enabled coordinator
 
 The Gravitino Trino connector registers catalogs by connecting back to the Trino coordinator over

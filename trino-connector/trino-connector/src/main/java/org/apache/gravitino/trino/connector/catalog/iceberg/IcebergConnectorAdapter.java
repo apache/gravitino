@@ -88,7 +88,7 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
     // discovered endpoint is coordinator-only knowledge, so it is read from the catalog's own
     // properties, where the coordinator embeds it at registration time (see
     // embedDiscoveredIcebergRestUri), rather than from GravitinoConfig directly.
-    String restUri = config.getManualIcebergRestUri();
+    String restUri = config.getManualIcebergRestUri(catalog.getMetalake());
     if (StringUtils.isBlank(restUri)) {
       restUri = catalog.getProperty(DISCOVERED_ICEBERG_REST_URI_PROPERTY, "");
     }
@@ -145,6 +145,29 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
         catalog.getName(),
         properties,
         catalog.getLastModifiedTime());
+  }
+
+  /**
+   * Returns whether the Iceberg REST server endpoint currently discovered for {@code catalog}'s
+   * metalake differs from the one embedded into {@code oldCatalog} the last time it was registered.
+   * The catalog's Gravitino {@code lastModifiedTime} does not advance when only Iceberg REST
+   * availability changes, so callers that use it to decide whether to reload a catalog need this as
+   * a separate signal.
+   *
+   * @param catalog the freshly loaded catalog
+   * @param oldCatalog the previously registered version of the same catalog
+   * @param config the connector configuration holding the discovered endpoints
+   * @return {@code true} if {@code catalog} is a lakehouse-iceberg catalog and the discovered
+   *     endpoint for its metalake differs from what {@code oldCatalog} was registered with
+   */
+  public static boolean hasDiscoveredIcebergRestUriChanged(
+      GravitinoCatalog catalog, GravitinoCatalog oldCatalog, GravitinoConfig config) {
+    if (!ICEBERG_PROVIDER.equals(catalog.getProvider())) {
+      return false;
+    }
+    String currentUri = config.getDiscoveredIcebergRestUri(catalog.getMetalake());
+    String previousUri = oldCatalog.getProperty(DISCOVERED_ICEBERG_REST_URI_PROPERTY, "");
+    return !currentUri.equals(previousUri);
   }
 
   @Override

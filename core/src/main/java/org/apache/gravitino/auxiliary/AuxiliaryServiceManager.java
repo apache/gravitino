@@ -32,6 +32,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.ServiceLoader;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -53,6 +55,9 @@ public class AuxiliaryServiceManager {
 
   private static final Splitter splitter = Splitter.on(",");
   private static final Joiner DOT = Joiner.on(".");
+  // Tracks which deprecated keys have already been warned about, since getAuxServiceConfig
+  // re-extracts the config on every call.
+  private static final Set<String> warnedDeprecatedAuxServiceKeys = ConcurrentHashMap.newKeySet();
 
   private Map<String, GravitinoAuxiliaryService> auxServices = new HashMap<>();
   private Map<String, IsolatedClassLoader> auxServiceClassLoaders = new HashMap<>();
@@ -268,10 +273,12 @@ public class AuxiliaryServiceManager {
         .forEach(
             entry -> {
               String extractKey = entry.getKey().substring(GRAVITINO_AUX_SERVICE_PREFIX.length());
-              LOG.warn(
-                  "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
-                  entry.getKey(),
-                  extractKey);
+              if (warnedDeprecatedAuxServiceKeys.add(entry.getKey())) {
+                LOG.warn(
+                    "The configuration {} is deprecated(still working), please use gravitino.{} instead.",
+                    entry.getKey(),
+                    extractKey);
+              }
               serviceConfigs.put(extractKey, entry.getValue());
             });
     splitter

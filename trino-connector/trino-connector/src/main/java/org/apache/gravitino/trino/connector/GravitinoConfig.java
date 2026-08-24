@@ -742,15 +742,28 @@ public class GravitinoConfig {
   }
 
   /**
-   * Retrieves the manually configured {@code gravitino.iceberg.rest-uri}, if any. Unlike the
-   * discovered endpoint, this is plain local file configuration and is therefore identical and
-   * valid on every node — coordinator and workers alike.
+   * Retrieves the manually configured Iceberg REST server endpoint for the given metalake, if any.
+   * Unlike the discovered endpoint, this is plain local file configuration and is therefore
+   * identical and valid on every node — coordinator and workers alike.
    *
+   * <p>{@code gravitino.iceberg.rest-uri.<metalake>} is checked first. The unscoped {@code
+   * gravitino.iceberg.rest-uri} is honored only in single-metalake mode, where it is unambiguous;
+   * in multi-metalake mode it is ignored, since a single Iceberg REST server serves exactly one
+   * metalake and applying it to every metalake would misroute the others.
+   *
+   * @param metalake the metalake to resolve the override for
    * @return the manually configured Iceberg REST server endpoint, or an empty string when unset
    */
-  public String getManualIcebergRestUri() {
-    return config.getOrDefault(
-        GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
+  public String getManualIcebergRestUri(String metalake) {
+    String scopedValue = config.get(GRAVITINO_ICEBERG_REST_URI.key + "." + metalake);
+    if (StringUtils.isNotBlank(scopedValue)) {
+      return scopedValue;
+    }
+    if (singleMetalakeMode()) {
+      return config.getOrDefault(
+          GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
+    }
+    return GRAVITINO_ICEBERG_REST_URI.defaultValue;
   }
 
   /**
