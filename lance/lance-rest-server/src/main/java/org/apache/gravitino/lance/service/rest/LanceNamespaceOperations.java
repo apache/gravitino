@@ -36,6 +36,10 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
+import org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions;
+import org.apache.gravitino.lance.service.authorization.annotations.LanceAuthorizationExpression;
+import org.apache.gravitino.lance.service.authorization.annotations.LanceNamespaceDelimiter;
+import org.apache.gravitino.lance.service.authorization.annotations.LanceNamespaceId;
 import org.apache.gravitino.metrics.MetricNames;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.CreateNamespaceResponse;
@@ -63,9 +67,13 @@ public class LanceNamespaceOperations {
   @Path("/{id}/list")
   @Timed(name = "list-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespaces", absolute = true)
+  @LanceAuthorizationExpression(
+      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
+      schemaExpression = LanceAuthorizationExpressions.READ_SCHEMA_NAMESPACE)
   public Response listNamespaces(
-      @PathParam("id") String namespaceId,
-      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      @LanceNamespaceId @PathParam("id") String namespaceId,
+      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
+          String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     return listNamespacesInternal(namespaceId, delimiter, pageToken, limit);
@@ -75,8 +83,13 @@ public class LanceNamespaceOperations {
   @Path("/list")
   @Timed(name = "list-namespaces-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespaces-root", absolute = true)
+  @LanceAuthorizationExpression(
+      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
+      schemaExpression = LanceAuthorizationExpressions.READ_SCHEMA_NAMESPACE,
+      allowRootNamespace = true)
   public Response listNamespacesOnRoot(
-      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
+      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
+          String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     return listNamespacesInternal(ROOT_NAMESPACE_ID, delimiter, pageToken, limit);
@@ -99,9 +112,13 @@ public class LanceNamespaceOperations {
   @Path("/{id}/describe")
   @Timed(name = "describe-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "describe-namespaces", absolute = true)
+  @LanceAuthorizationExpression(
+      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
+      schemaExpression = LanceAuthorizationExpressions.READ_SCHEMA_NAMESPACE)
   public Response describeNamespace(
-      @PathParam("id") String namespaceId,
-      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
+      @LanceNamespaceId @PathParam("id") String namespaceId,
+      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
+          String delimiter) {
     try {
       DescribeNamespaceResponse response =
           lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, Pattern.quote(delimiter));
@@ -161,9 +178,13 @@ public class LanceNamespaceOperations {
   @Path("/{id}/exists")
   @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "namespace-exists", absolute = true)
+  @LanceAuthorizationExpression(
+      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
+      schemaExpression = LanceAuthorizationExpressions.SCHEMA_NAMESPACE_EXISTS)
   public Response namespaceExists(
-      @PathParam("id") String namespaceId,
-      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
+      @LanceNamespaceId @PathParam("id") String namespaceId,
+      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
+          String delimiter) {
     try {
       lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, Pattern.quote(delimiter));
       return Response.ok().build();
