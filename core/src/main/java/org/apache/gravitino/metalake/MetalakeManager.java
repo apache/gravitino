@@ -399,12 +399,20 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
    * Force-drop child catalogs via {@link CatalogManager#dropCatalog} so schema/fileset secrets are
    * cleaned on the same path as a normal catalog force-drop ({@code ops.dropSchema} →
    * FilesetCatalogOperations, then catalog secrets in CatalogManager).
+   *
+   * <p>Callers typically {@code disableMetalake} before force-drop. {@link
+   * CatalogManager#dropCatalog} requires catalog {@code metalake-in-use=true}, so a disabled
+   * metalake is briefly re-enabled for child cleanup. The metalake entity is deleted immediately
+   * afterward, so the temporary enable is not restored.
    */
   private void dropCatalogsUnderMetalake(NameIdentifier metalakeIdent) {
     if (catalogManager == null) {
       return;
     }
     try {
+      if (!metalakeInUse(store, metalakeIdent)) {
+        enableMetalake(metalakeIdent);
+      }
       List<CatalogEntity> catalogs =
           store.list(Namespace.of(metalakeIdent.name()), CatalogEntity.class, EntityType.CATALOG);
       for (CatalogEntity catalog : catalogs) {
