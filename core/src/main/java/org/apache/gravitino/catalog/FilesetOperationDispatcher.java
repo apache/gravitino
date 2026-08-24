@@ -175,9 +175,9 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
-    // Write secrets before create: FilesetCatalogOperations.createMultipleLocationFileset resolves
-    // URNs via mergeUpLevelConfigurations for managed FS mkdir. Persist-then-write would fail
-    // create with "Secret not found". Roll back on any create failure.
+    // Write secrets before create: paths that resolve URNs (e.g. mergeUpLevelConfigurations for FS
+    // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back on any create
+    // failure (same pattern as CatalogManager / SchemaOperationDispatcher).
     secretManager.writeSecrets(secretMaterials);
     try {
       Fileset createdFileset =

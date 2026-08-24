@@ -649,7 +649,11 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           checkMetalake(metalakeIdent, store);
-          boolean needClean = false;
+          // Write secrets before store.put / init: createBaseCatalog resolves URNs via
+          // toPlaintextProperties. Roll back on any create failure (same pattern as
+          // schema/fileset).
+          secretManager.writeSecrets(secretMaterials);
+          boolean entityStored = false;
           try {
             try {
               store.put(e, false /* overwrite */);
@@ -659,54 +663,23 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               // after checkMetalake() succeeds but before this insert starts.
               LOG.warn("Metalake {} does not exist", metalakeIdent, e1);
               throw new NoSuchMetalakeException(e1, "Metalake %s does not exist", metalakeIdent);
+            } catch (EntityAlreadyExistsException e1) {
+              LOG.warn("Catalog {} already exists", ident, e1);
+              throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
             }
-            needClean = true;
-            secretManager.writeSecrets(secretMaterials);
+            entityStored = true;
             CatalogWrapper wrapper =
                 catalogCache.get(ident, id -> createCatalogWrapper(e, mergedConfig));
-
-            needClean = false;
             return wrapper.catalog;
 
-          } catch (EntityAlreadyExistsException e1) {
-            // store.put failed first, so secrets were not written for this attempt.
-            needClean = false;
-            LOG.warn("Catalog {} already exists", ident, e1);
-            throw new CatalogAlreadyExistsException("Catalog %s already exists", ident);
+          } catch (RuntimeException re) {
+            rollbackFailedCatalogCreate(ident, secretMaterials, entityStored);
+            throw re;
 
-          } catch (IllegalArgumentException | NoSuchMetalakeException e2) {
-            throw e2;
-
-          } catch (Exception e3) {
-            catalogCache.invalidate(ident);
-            LOG.error("Failed to create catalog {}", ident, e3);
-            if (e3 instanceof RuntimeException) {
-              throw (RuntimeException) e3;
-            }
-            throw new RuntimeException(e3);
-
-          } finally {
-            if (needClean) {
-              // Create failed after store.put / writeSecrets (or writeSecrets itself failed —
-              // rollback is best-effort / idempotent with writeSecrets' own partial cleanup).
-              secretManager.rollbackSecrets(secretMaterials);
-              // since we put the catalog entity into the store but failed to create the catalog
-              // instance,
-              // we need to clean up the entity stored.
-              try {
-                if (store.delete(ident, EntityType.CATALOG, true)) {
-                  // This cleanup deletion writes a DROP record to the entity change log. Mark it as
-                  // a local mutation so the change-log poller consumes that record's token instead
-                  // of one meant for a later mutation of the same identifier. Without this, the
-                  // poller could treat a subsequent local change as remote and spuriously
-                  // invalidate (and asynchronously close) a cached catalog wrapper that is still in
-                  // use, causing a NullPointerException.
-                  markLocalMutation(ident);
-                }
-              } catch (IOException e4) {
-                LOG.error("Failed to clean up catalog {}", ident, e4);
-              }
-            }
+          } catch (Exception ex) {
+            rollbackFailedCatalogCreate(ident, secretMaterials, entityStored);
+            LOG.error("Failed to create catalog {}", ident, ex);
+            throw new RuntimeException(ex);
           }
         });
   }
@@ -1684,6 +1657,31 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     } catch (IOException ioe) {
       LOG.error("Failed to update catalog {} property {}", nameIdentifier, propertyKey, ioe);
       throw new RuntimeException(ioe);
+    }
+  }
+
+  /**
+   * Rolls back secrets written for a catalog create attempt and, when {@code store.put} succeeded,
+   * removes the catalog entity left behind by a failed init.
+   */
+  private void rollbackFailedCatalogCreate(
+      NameIdentifier ident, List<SecretMaterial> secretMaterials, boolean entityStored) {
+    secretManager.rollbackSecrets(secretMaterials);
+    if (!entityStored) {
+      return;
+    }
+    catalogCache.invalidate(ident);
+    try {
+      if (store.delete(ident, EntityType.CATALOG, true)) {
+        // This cleanup deletion writes a DROP record to the entity change log. Mark it as a local
+        // mutation so the change-log poller consumes that record's token instead of one meant for
+        // a later mutation of the same identifier. Without this, the poller could treat a
+        // subsequent local change as remote and spuriously invalidate (and asynchronously close) a
+        // cached catalog wrapper that is still in use, causing a NullPointerException.
+        markLocalMutation(ident);
+      }
+    } catch (IOException e) {
+      LOG.error("Failed to clean up catalog {}", ident, e);
     }
   }
 }

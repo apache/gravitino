@@ -175,8 +175,10 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
-    // Write secrets before createSchema: FilesetCatalogOperations may resolve URNs via
-    // mergeUpLevelConfigurations when creating schema locations on FS.
+    // Write secrets before createSchema: create paths that resolve URNs (e.g. Fileset FS
+    // mergeUpLevelConfigurations, catalog createBaseCatalog) require secrets to exist first.
+    // Roll back on any create failure (same pattern as CatalogManager /
+    // FilesetOperationDispatcher).
     secretManager.writeSecrets(secretMaterials);
     try {
       return TreeLockUtils.doWithTreeLock(
