@@ -194,13 +194,12 @@ Whether the coordinator can populate this extra-credential depends on the Trino 
 The `gravitino.client.oauth2.*` properties above still configure the shared bootstrap/admin client used for catalog discovery — they are unrelated to the per-user forwarded token.
 
 For an Iceberg catalog reached through the Gravitino Iceberg REST server (IRC) — every
-`lakehouse-iceberg` catalog, unless `gravitino.iceberg.rest-enabled=false`; see [Iceberg
+`lakehouse-iceberg` catalog for which the Gravitino server reports a running IRC; see [Iceberg
 catalog](./catalog-iceberg.md#how-trino-reaches-the-catalog) — the IRC's own authentication is
 configured once per Trino cluster with the `gravitino.iceberg.rest-catalog.` prefix, and
 `iceberg.rest-catalog.session=USER` is set automatically when `forwardUser=true`:
 
 ```properties
-gravitino.iceberg.rest-uri=http://gravitino-host:9001/iceberg
 gravitino.iceberg.rest-catalog.security=OAUTH2
 gravitino.iceberg.rest-catalog.oauth2.credential=service-account-id:service-account-secret
 gravitino.iceberg.rest-catalog.oauth2.server-uri=http://your-idp/realms/gravitino/protocol/openid-connect/token

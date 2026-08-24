@@ -304,8 +304,8 @@ public class TestGravitinoConfig {
   public void testIcebergRestConfigDefaults() {
     GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
 
-    assertTrue(config.isIcebergRestEnabled());
-    assertEquals("", config.getIcebergRestUri());
+    // Nothing configured, and nothing discovered yet.
+    assertEquals("", config.getIcebergRestUri("user_001"));
     assertTrue(config.getIcebergRestCatalogConfig().isEmpty());
   }
 
@@ -315,8 +315,6 @@ public class TestGravitinoConfig {
         ImmutableMap.of(
             "gravitino.metalake",
             "user_001",
-            "gravitino.iceberg.rest-enabled",
-            "false",
             "gravitino.iceberg.rest-uri",
             "http://127.0.0.1:9001/iceberg",
             "gravitino.iceberg.rest-catalog.security",
@@ -325,14 +323,47 @@ public class TestGravitinoConfig {
             "client_id:client_secret");
     GravitinoConfig config = new GravitinoConfig(configMap);
 
-    assertFalse(config.isIcebergRestEnabled());
-    assertEquals("http://127.0.0.1:9001/iceberg", config.getIcebergRestUri());
+    // A manually configured URI applies regardless of metalake.
+    assertEquals("http://127.0.0.1:9001/iceberg", config.getIcebergRestUri("user_001"));
+    assertEquals("http://127.0.0.1:9001/iceberg", config.getIcebergRestUri("other_metalake"));
 
     Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
     assertEquals(2, restCatalogConfig.size());
     assertEquals("OAUTH2", restCatalogConfig.get("iceberg.rest-catalog.security"));
     assertEquals(
         "client_id:client_secret", restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+  }
+
+  @Test
+  public void testDiscoveredIcebergRestUriIsPerMetalake() {
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
+
+    config.setDiscoveredIcebergRestUri("metalake_a", "http://irc-a:9001/iceberg");
+    config.setDiscoveredIcebergRestUri("metalake_b", "http://irc-b:9001/iceberg");
+
+    assertEquals("http://irc-a:9001/iceberg", config.getIcebergRestUri("metalake_a"));
+    assertEquals("http://irc-b:9001/iceberg", config.getIcebergRestUri("metalake_b"));
+    // Unknown/unmatched metalakes fall back to nothing.
+    assertEquals("", config.getIcebergRestUri("metalake_c"));
+
+    // Clearing (e.g. the server stopped reporting an endpoint) removes it again.
+    config.setDiscoveredIcebergRestUri("metalake_a", null);
+    assertEquals("", config.getIcebergRestUri("metalake_a"));
+  }
+
+  @Test
+  public void testManualIcebergRestUriOverridesDiscovery() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "gravitino.iceberg.rest-uri",
+                "http://manual:9001/iceberg"));
+
+    config.setDiscoveredIcebergRestUri("user_001", "http://discovered:9001/iceberg");
+
+    assertEquals("http://manual:9001/iceberg", config.getIcebergRestUri("user_001"));
   }
 
   @Test
@@ -351,18 +382,6 @@ public class TestGravitinoConfig {
     assertTrue(
         catalogConfig.contains("\"gravitino.iceberg.rest-uri\"='http://127.0.0.1:9001/iceberg'"));
     assertTrue(catalogConfig.contains("\"gravitino.iceberg.rest-catalog.security\"='OAUTH2'"));
-  }
-
-  @Test
-  public void testToCatalogConfigPropagatesIcebergRestEnabled() {
-    // The switch rides the exact-key loop rather than the prefix filter; if it fails to propagate,
-    // the coordinator and the workers build different configs for the same catalog.
-    GravitinoConfig config =
-        new GravitinoConfig(
-            ImmutableMap.of(
-                "gravitino.metalake", "user_001", "gravitino.iceberg.rest-enabled", "false"));
-
-    assertTrue(config.toCatalogConfig().contains("\"gravitino.iceberg.rest-enabled\"='false'"));
   }
 
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {

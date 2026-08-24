@@ -33,7 +33,17 @@ nowhere to put the session token of an STS temporary credential — so a catalog
 IRC means every table access gets a freshly issued temporary credential over the Iceberg REST
 protocol.
 
-Configure the IRC endpoint once per Trino cluster, in `etc/catalog/gravitino.properties`:
+The connector already connects to the Gravitino server (it is how catalogs are discovered in the
+first place), so it also asks that server whether it has an Iceberg REST server running for the
+connector's metalake, and uses the endpoint the server reports. Nothing needs to be configured for
+this: `etc/catalog/gravitino.properties` only needs the usual `gravitino.uri` and
+`gravitino.metalake`. If the server reports no endpoint — the IRC is not running, or it serves a
+different metalake — `lakehouse-iceberg` catalogs fall back to translating `catalog-backend` as
+before, and credential vending does not work.
+
+Set `gravitino.iceberg.rest-uri` only to override the discovered endpoint, for example when the IRC
+is not reachable at the address the Gravitino server itself reports (a split network, or the IRC
+deployed independently of the main server):
 
 ```properties
 connector.name=gravitino
@@ -42,10 +52,6 @@ gravitino.uri=http://gravitino-host:8090
 
 gravitino.iceberg.rest-uri=http://gravitino-host:9001/iceberg
 ```
-
-The endpoint is deployment topology, not a property of the data source, so it does not belong on the
-catalog: it would have to be repeated on every new catalog, moving the IRC would mean editing all of
-them, and one catalog could not serve two Trino clusters that reach the IRC by different hostnames.
 
 The connector derives everything else from the catalog itself. The Gravitino catalog name is passed
 as both `iceberg.rest-catalog.warehouse` and `iceberg.rest-catalog.prefix` — the Iceberg client
@@ -106,14 +112,14 @@ keeping per-user credential vending and per-user authorization intact. Set
 ### Limitations
 
 - One IRC serves exactly one metalake, fixed at startup by
-  `gravitino.iceberg-rest.gravitino-metalake`. In multi-metalake mode
-  (`gravitino.use-single-metalake=false`), only catalogs in that metalake are reachable; the others
-  fail on the IRC side with `NoSuchCatalogException`.
+  `gravitino.iceberg-rest.gravitino-metalake`. The Gravitino server only reports the IRC's endpoint
+  for that metalake; in multi-metalake mode (`gravitino.use-single-metalake=false`), catalogs in any
+  other metalake fall back to translating `catalog-backend` instead of failing outright.
 - A catalog created with `catalog-backend=rest` keeps pointing at its own configured `uri` and is
   not re-routed, since it already reaches an Iceberg REST catalog directly.
-- To disable this routing entirely — for a deployment that does not run the IRC — set
-  `gravitino.iceberg.rest-enabled=false`. Iceberg catalogs are then translated into Trino's `jdbc`
-  or `hive_metastore` catalog types as before, and credential vending does not work.
+- A deployment that does not run the IRC needs no configuration at all: the server reports no
+  endpoint, and `lakehouse-iceberg` catalogs are translated into Trino's `jdbc` or `hive_metastore`
+  catalog types as before.
 
 ## Schema Operations
 

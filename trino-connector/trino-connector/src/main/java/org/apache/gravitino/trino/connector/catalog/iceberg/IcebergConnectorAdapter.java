@@ -24,6 +24,7 @@ import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
@@ -64,10 +65,12 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
   public Map<String, String> buildInternalConnectorConfig(
       GravitinoCatalog catalog, Credential[] credentials) throws Exception {
     // The catalog backend describes how Gravitino stores the metadata; it does not decide how
-    // Trino reaches the data. Unless the routing is disabled, every catalog is loaded through the
-    // Gravitino Iceberg REST server, the only path that supports temporary credentials.
-    // A catalog that already has a REST backend keeps pointing at its own configured endpoint.
-    if (config.isIcebergRestEnabled()
+    // Trino reaches the data. Whenever the Gravitino server reports a running Iceberg REST
+    // server for this catalog's metalake, the catalog is loaded through it, the only path that
+    // supports temporary credentials. A catalog that already has a REST backend keeps pointing at
+    // its own configured endpoint. If the server reports nothing, this falls back to translating
+    // catalog-backend as before — nothing to configure either way.
+    if (StringUtils.isNotBlank(config.getIcebergRestUri(catalog.getMetalake()))
         && !REST_CATALOG_BACKEND.equalsIgnoreCase(
             catalog.getProperty(IcebergConstants.CATALOG_BACKEND, null))) {
       // `credentials` is intentionally unused here: with vended credentials enabled, Trino obtains
