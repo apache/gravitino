@@ -18,8 +18,8 @@
 import logging
 from typing import Dict, List, Optional
 
-from gravitino.api.catalog import Catalog
 from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.catalog import Catalog
 from gravitino.api.function.function import Function
 from gravitino.api.function.function_catalog import FunctionCatalog
 from gravitino.api.function.function_change import FunctionChange

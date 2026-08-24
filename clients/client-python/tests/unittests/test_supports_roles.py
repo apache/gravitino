@@ -18,15 +18,12 @@
 import unittest
 from unittest.mock import Mock, patch
 
-from gravitino.api.catalog import (
-    Catalog,
-    UnsupportedOperationException as CatalogUnsupportedOperationException,
-)
+from gravitino.api.authorization.supports_roles import SupportsRoles
+from gravitino.api.catalog import Catalog
 from gravitino.api.file.fileset import Fileset
 from gravitino.api.metalake import Metalake
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
-from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.model.model import Model
 from gravitino.api.rel.table import Table
 from gravitino.api.schema import Schema
@@ -131,17 +128,13 @@ class TestSupportsRoles(unittest.TestCase):
         )
 
     def test_default_supports_roles_raises_unsupported_operation(self) -> None:
-        metadata_object_types = [Metalake, Schema, Table, Fileset, Model]
+        metadata_object_types = [Metalake, Catalog, Schema, Table, Fileset, Model]
 
         for metadata_object_type in metadata_object_types:
             with self.subTest(metadata_object_type=metadata_object_type.__name__):
                 metadata_object = Mock(spec=metadata_object_type)
                 with self.assertRaises(UnsupportedOperationException):
                     metadata_object_type.supports_roles(metadata_object)
-
-        catalog = Mock(spec=Catalog)
-        with self.assertRaises(CatalogUnsupportedOperationException):
-            Catalog.supports_roles(catalog)
 
     def _test_list_roles(
         self, supports_roles: SupportsRoles, metadata_object: MetadataObject
