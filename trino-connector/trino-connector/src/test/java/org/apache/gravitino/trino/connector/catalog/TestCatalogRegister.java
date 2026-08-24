@@ -49,8 +49,8 @@ public class TestCatalogRegister {
     return new GravitinoConfig(configMap);
   }
 
-  private static Path createTruststore() throws IOException {
-    return Files.createTempFile(tempDir, "truststore", ".jks");
+  private static Path createStoreFile() throws IOException {
+    return Files.createTempFile(tempDir, "store", ".jks");
   }
 
   @Test
@@ -76,7 +76,7 @@ public class TestCatalogRegister {
 
   @Test
   public void testSslEnabledWithTruststore() throws IOException {
-    String truststore = createTruststore().toString();
+    String truststore = createStoreFile().toString();
     Properties properties =
         CatalogRegister.buildJdbcProperties(
             config(
@@ -155,6 +155,68 @@ public class TestCatalogRegister {
   }
 
   @Test
+  public void testKeystoreIsPassedThrough() throws IOException {
+    String keystore = createStoreFile().toString();
+    Properties properties =
+        CatalogRegister.buildJdbcProperties(
+            config(
+                Map.of(
+                    "trino.jdbc.ssl.enabled", "true",
+                    "trino.jdbc.ssl.keystore.path", keystore,
+                    "trino.jdbc.ssl.keystore.password", "keystore-secret",
+                    "trino.jdbc.ssl.keystore.type", "PKCS12")));
+
+    assertEquals(keystore, properties.get("SSLKeyStorePath"));
+    assertEquals("keystore-secret", properties.get("SSLKeyStorePassword"));
+    assertEquals("PKCS12", properties.get("SSLKeyStoreType"));
+  }
+
+  @Test
+  public void testKeystoreWithoutSslEnabled() throws IOException {
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                CatalogRegister.buildJdbcProperties(
+                    config(Map.of("trino.jdbc.ssl.keystore.path", createStoreFile().toString()))));
+
+    assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.keystore.path"));
+  }
+
+  @Test
+  public void testKeystorePasswordWithoutKeystorePath() {
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                CatalogRegister.buildJdbcProperties(
+                    config(
+                        Map.of(
+                            "trino.jdbc.ssl.enabled", "true",
+                            "trino.jdbc.ssl.keystore.password", "keystore-secret"))));
+
+    assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.keystore.path"));
+  }
+
+  @Test
+  public void testKeystoreFileNotFound() {
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                CatalogRegister.buildJdbcProperties(
+                    config(
+                        Map.of(
+                            "trino.jdbc.ssl.enabled", "true",
+                            "trino.jdbc.ssl.keystore.path", "/not/exists/keystore.p12"))));
+
+    assertEquals(GRAVITINO_MISSING_CONFIG.toErrorCode(), e.getErrorCode());
+    assertTrue(e.getMessage().contains("does not exist"));
+  }
+
+  @Test
   public void testInvalidSslVerification() {
     TrinoException e =
         assertThrows(
@@ -191,7 +253,7 @@ public class TestCatalogRegister {
             () ->
                 CatalogRegister.buildJdbcProperties(
                     config(
-                        Map.of("trino.jdbc.ssl.truststore.path", createTruststore().toString()))));
+                        Map.of("trino.jdbc.ssl.truststore.path", createStoreFile().toString()))));
 
     assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
     assertTrue(e.getMessage().contains("trino.jdbc.ssl.truststore.path"));
@@ -275,7 +337,7 @@ public class TestCatalogRegister {
                         Map.of(
                             "trino.jdbc.ssl.enabled", "true",
                             "trino.jdbc.ssl.verification", "NONE",
-                            "trino.jdbc.ssl.truststore.path", createTruststore().toString()))));
+                            "trino.jdbc.ssl.truststore.path", createStoreFile().toString()))));
 
     assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
     assertTrue(e.getMessage().contains("NONE"));

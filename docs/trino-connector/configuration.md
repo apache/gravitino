@@ -18,6 +18,9 @@ license: "This software is licensed under the Apache License version 2."
 | trino.jdbc.ssl.truststore.path              | string  | (none)                | Path of the truststore holding the Trino coordinator certificate. If omitted, the default JVM truststore is used. Requires `trino.jdbc.ssl.enabled`, otherwise the connector fails to start.                                                                                                                         | No       |
 | trino.jdbc.ssl.truststore.password          | string  | (none)                | Password of the truststore configured by `trino.jdbc.ssl.truststore.path`. Requires `trino.jdbc.ssl.enabled` and `trino.jdbc.ssl.truststore.path`, otherwise the connector fails to start.                                                                                                                           | No       |
 | trino.jdbc.ssl.truststore.type              | string  | (none)                | Type of the truststore, for example `JKS` or `PKCS12`. If omitted, the default JVM truststore type is used. Requires `trino.jdbc.ssl.enabled` and `trino.jdbc.ssl.truststore.path`, otherwise the connector fails to start.                                                                                          | No       |
+| trino.jdbc.ssl.keystore.path                | string  | (none)                | Path of the keystore holding the client certificate presented to the coordinator, for coordinators that require mutual TLS. Requires `trino.jdbc.ssl.enabled`. See the note on mutual TLS below.                                                                                                                     | No       |
+| trino.jdbc.ssl.keystore.password            | string  | (none)                | Password of the keystore configured by `trino.jdbc.ssl.keystore.path`. Requires `trino.jdbc.ssl.keystore.path`, otherwise the connector fails to start.                                                                                                                                                              | No       |
+| trino.jdbc.ssl.keystore.type                | string  | (none)                | Type of the keystore, for example `JKS` or `PKCS12`. If omitted, the default JVM keystore type is used. Requires `trino.jdbc.ssl.keystore.path`, otherwise the connector fails to start.                                                                                                                             | No       |
 | trino.jdbc.ssl.verification                 | string  | FULL                  | Certificate verification mode of the internal JDBC connection: `FULL`, `CA` or `NONE`. Any value other than `FULL` requires `trino.jdbc.ssl.enabled`, otherwise the connector fails to start. `NONE` disables certificate verification entirely and should only be used for troubleshooting.                          | No       |
 | trino.jdbc.roles                            | string  | (none)                | Session roles applied to the internal JDBC connection, for example `system:sysadmin`. Required by deployments that only allow `CREATE CATALOG` with a privileged role.                                                                                                                                               | No       |
 | trino.jdbc.properties.                      | string  | (none)                | The configuration key prefix for raw Trino JDBC driver properties, see [Connecting to a TLS-enabled coordinator](#connecting-to-a-tls-enabled-coordinator).                                                                                                                                                          | No       |
@@ -62,8 +65,8 @@ its scheme is used, that is `443` for `https` and `80` for `http`.
 The `trino.jdbc.ssl.*` configurations are only meaningful on a TLS-enabled connection. Setting any
 of them while TLS is disabled fails the connector at startup rather than being silently ignored, so
 a misconfigured truststore never degrades into a plaintext connection. Likewise, the truststore
-password and type require a truststore path: without one the driver uses the default JVM
-truststore, which they would not apply to.
+password and type require a truststore path, and the keystore password and type require a keystore
+path: without one the driver falls back to its default, which they would not apply to.
 
 If the coordinator certificate is signed by a CA the JVM does not trust, import it into a
 truststore and point `trino.jdbc.ssl.truststore.path` at it:
@@ -85,6 +88,27 @@ certificate into a truststore instead.
 The `trino.jdbc.*` properties are used by the coordinator only. They are never copied into the
 catalogs the connector creates, so the credentials they hold do not reach the generated
 `CREATE CATALOG` statements or the Trino catalog properties files.
+
+### Mutual TLS and certificate authentication
+
+A coordinator that requires mutual TLS also expects a client certificate. Point
+`trino.jdbc.ssl.keystore.path` at the keystore holding it:
+
+```properties
+trino.jdbc.ssl.enabled=true
+trino.jdbc.ssl.keystore.path=/etc/trino/client.p12
+trino.jdbc.ssl.keystore.password=YourSecureKeystorePassword
+```
+
+:::note
+The mutual TLS configuration is provided for completeness and has not been verified against a
+coordinator that requires client certificates.
+:::
+
+Trino can also be configured with `http-server.authentication.type=CERTIFICATE`, where the client
+certificate itself is the login and the coordinator derives the username from the certificate
+subject. The connector does not support that authentication type today: it always authenticates
+with `trino.jdbc.user`, so a coordinator configured this way rejects the internal JDBC connection.
 
 ### Passing arbitrary JDBC driver properties
 

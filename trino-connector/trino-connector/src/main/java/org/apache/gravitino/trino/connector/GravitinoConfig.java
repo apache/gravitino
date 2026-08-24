@@ -172,6 +172,29 @@ public class GravitinoConfig {
           "",
           false);
 
+  private static final ConfigEntry TRINO_JDBC_SSL_KEYSTORE_PATH =
+      new ConfigEntry(
+          "trino.jdbc.ssl.keystore.path",
+          "Path of the keystore holding the client certificate presented to the Trino coordinator, "
+              + "used by coordinators that require mutual TLS.",
+          "",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_SSL_KEYSTORE_PASSWORD =
+      new ConfigEntry(
+          "trino.jdbc.ssl.keystore.password",
+          "Password of the keystore configured by `trino.jdbc.ssl.keystore.path`",
+          "",
+          false);
+
+  private static final ConfigEntry TRINO_JDBC_SSL_KEYSTORE_TYPE =
+      new ConfigEntry(
+          "trino.jdbc.ssl.keystore.type",
+          "Type of the keystore, for example JKS or PKCS12. "
+              + "If omitted, the default JVM keystore type is used.",
+          "",
+          false);
+
   private static final ConfigEntry TRINO_JDBC_SSL_VERIFICATION =
       new ConfigEntry(
           "trino.jdbc.ssl.verification",
@@ -462,6 +485,36 @@ public class GravitinoConfig {
   public String getTrinoJdbcSslTruststoreType() {
     return config.getOrDefault(
         TRINO_JDBC_SSL_TRUSTSTORE_TYPE.key, TRINO_JDBC_SSL_TRUSTSTORE_TYPE.defaultValue);
+  }
+
+  /**
+   * Retrieves the keystore path of the internal JDBC connection.
+   *
+   * @return the keystore path, or an empty string if not configured
+   */
+  public String getTrinoJdbcSslKeystorePath() {
+    return config.getOrDefault(
+        TRINO_JDBC_SSL_KEYSTORE_PATH.key, TRINO_JDBC_SSL_KEYSTORE_PATH.defaultValue);
+  }
+
+  /**
+   * Retrieves the keystore password of the internal JDBC connection.
+   *
+   * @return the keystore password, or an empty string if not configured
+   */
+  public String getTrinoJdbcSslKeystorePassword() {
+    return config.getOrDefault(
+        TRINO_JDBC_SSL_KEYSTORE_PASSWORD.key, TRINO_JDBC_SSL_KEYSTORE_PASSWORD.defaultValue);
+  }
+
+  /**
+   * Retrieves the keystore type of the internal JDBC connection.
+   *
+   * @return the keystore type, or an empty string if not configured
+   */
+  public String getTrinoJdbcSslKeystoreType() {
+    return config.getOrDefault(
+        TRINO_JDBC_SSL_KEYSTORE_TYPE.key, TRINO_JDBC_SSL_KEYSTORE_TYPE.defaultValue);
   }
 
   /**
