@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -114,44 +115,21 @@ public class PolicyTagRelService {
       RelationEdgeTarget[] targetsToAdd,
       RelationEdgeTarget[] targetsToRemove)
       throws IOException {
-    boolean transactionOwner = !SessionUtils.isInTransaction();
-    if (transactionOwner) {
-      SessionUtils.beginTransaction();
-    }
-    boolean committed = false;
+    List<PolicyEntity> updatedPolicies = new ArrayList<>();
     try {
-      long tagId = EntityIdService.getEntityId(tagIdentifier, Entity.EntityType.TAG);
-      String metalake = tagIdentifier.namespace().level(0);
-      RelationEdgeTarget[] targetsToRemoveOrEmpty = nullToEmpty(targetsToRemove);
-      RelationEdgeTarget[] targetsToAddOrEmpty = nullToEmpty(targetsToAdd);
-
-      Map<String, Long> policyIdsToRemove = resolvePolicyIds(metalake, targetsToRemoveOrEmpty);
-      for (RelationEdgeTarget target : targetsToRemoveOrEmpty) {
-        long policyId = policyIdsToRemove.get(target.nameIdentifier().name());
-        SessionUtils.doWithoutCommit(
-            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(policyId, tagId));
-      }
-
-      Map<String, Long> policyIdsToAdd = resolvePolicyIds(metalake, targetsToAddOrEmpty);
-      for (RelationEdgeTarget target : targetsToAddOrEmpty) {
-        long policyId = policyIdsToAdd.get(target.nameIdentifier().name());
-        upsert(policyId, tagId, target.relationValue().orElse(null));
-      }
-
-      List<PolicyEntity> policies =
-          listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
-              .map(relation -> (PolicyEntity) relation.targetEntity())
-              .collect(Collectors.toList());
-      if (transactionOwner) {
-        SessionUtils.commitTransaction();
-      }
-      committed = true;
-      return policies;
-    } finally {
-      if (transactionOwner && !committed) {
-        SessionUtils.rollbackTransaction();
-      }
+      SessionUtils.doMultipleWithCommit(
+          () -> {
+            try {
+              updatedPolicies.addAll(
+                  updateRelationsWithoutCommit(tagIdentifier, targetsToAdd, targetsToRemove));
+            } catch (IOException e) {
+              throw new UncheckedIOException(e);
+            }
+          });
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
     }
+    return updatedPolicies;
   }
 
   /**
@@ -201,6 +179,34 @@ public class PolicyTagRelService {
   public int deleteRelationsByLegacyTimeline(long legacyTimeline, int limit) {
     return SessionUtils.doWithCommitAndFetchResult(
         PolicyTagRelMapper.class, mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  private List<PolicyEntity> updateRelationsWithoutCommit(
+      NameIdentifier tagIdentifier,
+      RelationEdgeTarget[] targetsToAdd,
+      RelationEdgeTarget[] targetsToRemove)
+      throws IOException {
+    long tagId = EntityIdService.getEntityId(tagIdentifier, Entity.EntityType.TAG);
+    String metalake = tagIdentifier.namespace().level(0);
+    RelationEdgeTarget[] targetsToRemoveOrEmpty = nullToEmpty(targetsToRemove);
+    RelationEdgeTarget[] targetsToAddOrEmpty = nullToEmpty(targetsToAdd);
+
+    Map<String, Long> policyIdsToRemove = resolvePolicyIds(metalake, targetsToRemoveOrEmpty);
+    for (RelationEdgeTarget target : targetsToRemoveOrEmpty) {
+      long policyId = policyIdsToRemove.get(target.nameIdentifier().name());
+      SessionUtils.doWithoutCommit(
+          PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(policyId, tagId));
+    }
+
+    Map<String, Long> policyIdsToAdd = resolvePolicyIds(metalake, targetsToAddOrEmpty);
+    for (RelationEdgeTarget target : targetsToAddOrEmpty) {
+      long policyId = policyIdsToAdd.get(target.nameIdentifier().name());
+      upsert(policyId, tagId, target.relationValue().orElse(null));
+    }
+
+    return listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
+        .map(relation -> (PolicyEntity) relation.targetEntity())
+        .collect(Collectors.toList());
   }
 
   private static List<RelationalEntity<?>> policyTargets(
