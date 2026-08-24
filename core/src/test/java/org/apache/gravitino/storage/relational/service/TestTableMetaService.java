@@ -795,6 +795,106 @@ public class TestTableMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testMoveTableWaitsForConcurrentTargetSchemaDelete() throws Exception {
+    String sourceSchemaName = "source_schema";
+    String targetSchemaName = "target_schema";
+    createParentEntities(metalakeName, catalogName, sourceSchemaName, AUDIT_INFO);
+    SchemaEntity targetSchema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            targetSchemaName,
+            AUDIT_INFO);
+    backend.insert(targetSchema, false);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, sourceSchemaName),
+            "moving_table",
+            AUDIT_INFO);
+    backend.insert(table, false);
+
+    SchemaPO observedTargetSchema =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(targetSchema.id()));
+    CountDownLatch targetDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch moveStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int deleted =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                      observedTargetSchema.getSchemaId(),
+                                      observedTargetSchema.getCurrentVersion()));
+                      Assertions.assertEquals(1, deleted);
+                      targetDeleteLocked.countDown();
+                      try {
+                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+    try {
+      assertTrue(targetDeleteLocked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> moveResult =
+          executor.submit(
+              () -> {
+                moveStarted.countDown();
+                try {
+                  TableEntity movedTable =
+                      TableEntity.builder()
+                          .withId(table.id())
+                          .withName(table.name())
+                          .withNamespace(
+                              NamespaceUtil.ofTable(metalakeName, catalogName, targetSchemaName))
+                          .withColumns(table.columns())
+                          .withAuditInfo(table.auditInfo())
+                          .build();
+                  backend.update(
+                      table.nameIdentifier(), Entity.EntityType.TABLE, ignored -> movedTable);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(moveStarted.await(30, TimeUnit.SECONDS));
+      // Resolving the target ID happens before the table transaction. The move must then wait on
+      // the target schema row instead of writing below a schema whose delete is about to commit.
+      assertThrows(TimeoutException.class, () -> moveResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(
+          NoSuchEntityException.class, moveResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    TableEntity unchanged =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertEquals(table.namespace(), unchanged.namespace());
+    assertFalse(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, targetSchemaName, table.name()),
+            Entity.EntityType.TABLE));
+  }
+
+  @TestTemplate
   public void testBatchGetTableByIdentifierIncludesVersionInfoFields() throws IOException {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);

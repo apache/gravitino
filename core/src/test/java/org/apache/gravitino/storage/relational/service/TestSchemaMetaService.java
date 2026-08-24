@@ -136,16 +136,68 @@ public class TestSchemaMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testEntityCreateWaitsForConcurrentSchemaDelete() throws Exception {
+  public void testSchemaChildServicesWaitForConcurrentSchemaDelete() throws Exception {
     createAndInsertMakeLake(metalakeName);
     createAndInsertCatalog(metalakeName, catalogName);
-    SchemaEntity schema =
-        createSchemaEntity(
-            RandomIdGenerator.INSTANCE.nextId(),
-            NamespaceUtil.ofSchema(metalakeName, catalogName),
-            "schema_for_entity_lock",
-            AUDIT_INFO);
-    backend.insert(schema, false);
+
+    List<SchemaChildWrite> childWrites =
+        Arrays.asList(
+            namespace ->
+                backend.insert(
+                    createTableEntity(
+                        RandomIdGenerator.INSTANCE.nextId(), namespace, "child_table", AUDIT_INFO),
+                    false),
+            namespace ->
+                backend.insert(
+                    createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, "child_view"),
+                    false),
+            namespace ->
+                backend.insert(
+                    createFilesetEntity(
+                        RandomIdGenerator.INSTANCE.nextId(),
+                        namespace,
+                        "child_fileset",
+                        AUDIT_INFO),
+                    false),
+            namespace ->
+                backend.insert(
+                    createFunctionEntity(
+                        RandomIdGenerator.INSTANCE.nextId(),
+                        namespace,
+                        "child_function",
+                        AUDIT_INFO),
+                    false),
+            namespace ->
+                backend.insert(
+                    createModelEntity(
+                        RandomIdGenerator.INSTANCE.nextId(),
+                        namespace,
+                        "child_model",
+                        "model comment",
+                        0,
+                        Collections.emptyMap(),
+                        AUDIT_INFO),
+                    false),
+            namespace ->
+                backend.insert(
+                    createTopicEntity(
+                        RandomIdGenerator.INSTANCE.nextId(), namespace, "child_topic", AUDIT_INFO),
+                    false));
+
+    for (int index = 0; index < childWrites.size(); index++) {
+      SchemaEntity schema =
+          createSchemaEntity(
+              RandomIdGenerator.INSTANCE.nextId(),
+              NamespaceUtil.ofSchema(metalakeName, catalogName),
+              "schema_for_entity_lock_" + index,
+              AUDIT_INFO);
+      backend.insert(schema, false);
+      assertChildWriteWaitsForConcurrentSchemaDelete(schema, childWrites.get(index));
+    }
+  }
+
+  private void assertChildWriteWaitsForConcurrentSchemaDelete(
+      SchemaEntity schema, SchemaChildWrite childWrite) throws Exception {
     SchemaPO observedSchemaPO =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
@@ -183,21 +235,14 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             });
     try {
       assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
-      NameIdentifier tableIdentifier =
-          NameIdentifier.of(metalakeName, catalogName, schema.name(), "new_table");
       Future<Throwable> createResult =
           executor.submit(
               () -> {
                 entityCreateStarted.countDown();
                 try {
-                  SessionUtils.doMultipleWithCommit(
-                      () ->
-                          SchemaMetaService.getInstance()
-                              .lockSchemaForEntityWrite(
-                                  tableIdentifier,
-                                  observedSchemaPO.getSchemaId(),
-                                  observedSchemaPO.getCatalogId(),
-                                  observedSchemaPO.getMetalakeId()));
+                  // Exercise the real JDBCBackend-to-service path. This test must fail if any
+                  // schema-scoped service forgets to take the parent lock in its own transaction.
+                  childWrite.run(Namespace.of(metalakeName, catalogName, schema.name()));
                   return null;
                 } catch (Throwable throwable) {
                   return throwable;
@@ -1163,5 +1208,10 @@ public class TestSchemaMetaService extends TestJDBCBackend {
     } catch (SQLException e) {
       throw new RuntimeException("SQL execution failed", e);
     }
+  }
+
+  @FunctionalInterface
+  private interface SchemaChildWrite {
+    void run(Namespace namespace) throws Exception;
   }
 }
