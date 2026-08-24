@@ -182,7 +182,9 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
     @staticmethod
     def _log_token_http_error(response: httpx.Response) -> None:
         if response.status_code >= 400:
-            _LOG.error("OAuth token request failed: HTTP %s", response.status_code)
+            _LOG.error(
+                "OAuth token request failed: HTTP %s", response.status_code
+            )
 
     def _cached_bearer(self) -> Optional[str]:
         try:

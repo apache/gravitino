@@ -214,7 +214,9 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertIn("JWT", str(raised.exception))
 
     def test_jwt_without_exp_and_expires_in_raises(self):
-        header = base64.urlsafe_b64encode(b'{"alg":"none"}').rstrip(b"=").decode()
+        header = (
+            base64.urlsafe_b64encode(b'{"alg":"none"}').rstrip(b"=").decode()
+        )
         payload = (
             base64.urlsafe_b64encode(b'{"sub":"mcp"}').rstrip(b"=").decode()
         )
