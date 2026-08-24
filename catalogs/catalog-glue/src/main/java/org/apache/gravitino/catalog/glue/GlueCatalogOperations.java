@@ -69,6 +69,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
@@ -159,7 +160,7 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
       GetDatabasesRequest.Builder req = GetDatabasesRequest.builder().maxResults(1);
       applyCatalogId(catalogId, req::catalogId);
       glueClient.getDatabases(req.build());
-    } catch (GlueException e) {
+    } catch (SdkException e) {
       throw new ConnectionFailedException(e, "Failed to connect to AWS Glue: %s", e.getMessage());
     }
   }

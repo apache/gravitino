@@ -35,12 +35,14 @@ import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.AlreadyExistsException;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
@@ -68,6 +70,20 @@ class TestGlueCatalogSchemaOperations {
     ops = new GlueCatalogOperations();
     ops.glueClient = mockClient;
     // catalogId is null by default (caller's AWS account)
+  }
+
+  @Test
+  void testConnectionMapsSdkClientException() {
+    SdkClientException cause = SdkClientException.create("connection refused");
+    when(mockClient.getDatabases(any(GetDatabasesRequest.class))).thenThrow(cause);
+
+    ConnectionFailedException exception =
+        assertThrows(
+            ConnectionFailedException.class,
+            () -> ops.testConnection(NameIdentifier.of("metalake", "catalog")));
+
+    assertEquals(cause, exception.getCause());
+    assertTrue(exception.getMessage().contains("connection refused"));
   }
 
   // -------------------------------------------------------------------------

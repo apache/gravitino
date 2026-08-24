@@ -73,6 +73,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
@@ -1419,6 +1420,23 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testResolveProbeLocationRejectsPlaceholderInAuthority() throws IOException {
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalogOperations.resolveProbeLocation(
+                      "s3a://bucket{{schema}}", NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "Fileset catalog location has no concrete parent that can be tested",
+          exception.getMessage());
+    }
+  }
+
+  @Test
   public void testInitializeRejectsNamedCatalogLocationThatIsAFile() throws IOException {
     File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/file-location");
     FileUtils.forceMkdir(fileLocation.getParentFile());
@@ -1552,6 +1570,33 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testTestConnectionAggregatesLocationResolutionAndProbeFailures() throws IOException {
+    String missingLocation =
+        new File(UNFORMALIZED_TEST_ROOT_PATH, "missing-" + UUID.randomUUID()).toURI().toString();
+    Map<String, String> properties =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "primary",
+            "{{schema}}",
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
+            missingLocation);
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location-primary (invalid location configuration)"));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location-archive (location not found)"));
+      Assertions.assertFalse(exception.getMessage().contains(missingLocation));
+    }
+  }
+
+  @Test
   public void testTestConnectionUsesVendedCredential() throws Exception {
     File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "credential-vending");
     FileUtils.forceMkdir(location);
@@ -1593,22 +1638,33 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testTestConnectionAggregatesMultipleMatchingCredentialProviderFailures()
-      throws IOException {
-    File primaryLocation =
-        new File(UNFORMALIZED_TEST_ROOT_PATH, "multiple-credential-providers/primary");
-    File archiveLocation =
-        new File(UNFORMALIZED_TEST_ROOT_PATH, "multiple-credential-providers/archive");
-    FileUtils.forceMkdir(primaryLocation);
-    FileUtils.forceMkdir(archiveLocation);
+  public void testTestConnectionUsesMultipleMatchingCredentialProviders() throws Exception {
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "multiple-credential-providers");
+    FileUtils.forceMkdir(location);
     Map<String, String> properties =
         ImmutableMap.of(
-            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "primary",
-            primaryLocation.toURI().toString(),
-            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
-            archiveLocation.toURI().toString(),
+            LOCATION,
+            location.toURI().toString(),
             CredentialConstants.CREDENTIAL_PROVIDERS,
             TestFilesetCredentialProvider.TYPE + "," + TestFilesetSecondCredentialProvider.TYPE);
+    AtomicBoolean credentialsObserved = new AtomicBoolean(false);
+
+    class CredentialAwareProvider extends LocalFileSystemProvider
+        implements SupportsCredentialVending {
+      @Override
+      public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
+        Configuration hadoopConfiguration = FileSystemUtils.createCompatibleConfiguration(config);
+        Credential[] credentials =
+            FileSystemUtils.getGvfsCredentialProvider(hadoopConfiguration).getCredentials();
+        Assertions.assertEquals(2, credentials.length);
+        Assertions.assertEquals(
+            Set.of(TestFilesetCredentialProvider.TYPE, TestFilesetSecondCredentialProvider.TYPE),
+            Arrays.stream(credentials).map(Credential::credentialType).collect(Collectors.toSet()));
+        credentialsObserved.set(true);
+        return super.getFileSystem(path, config);
+      }
+    }
+    FileSystemProvider provider = new CredentialAwareProvider();
 
     try (CatalogCredentialManager credentialManager =
             new CatalogCredentialManager("catalog", properties);
@@ -1616,23 +1672,10 @@ public class TestFilesetCatalogOperations {
             new FilesetCatalogOperations(store, secretManager, () -> credentialManager)) {
       catalogOperations.initialize(
           properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
-      ConnectionFailedException exception =
-          Assertions.assertThrows(
-              ConnectionFailedException.class,
-              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("location-primary (ambiguous credential provider configuration)"));
-      Assertions.assertTrue(
-          exception
-              .getMessage()
-              .contains("location-archive (ambiguous credential provider configuration)"));
-      Assertions.assertFalse(exception.getMessage().contains(primaryLocation.toString()));
-      Assertions.assertFalse(exception.getMessage().contains(archiveLocation.toString()));
-      Assertions.assertFalse(exception.getMessage().contains(TestFilesetCredentialProvider.TYPE));
-      Assertions.assertFalse(
-          exception.getMessage().contains(TestFilesetSecondCredentialProvider.TYPE));
+      FieldUtils.writeField(
+          catalogOperations, "fileSystemProvidersMap", ImmutableMap.of("file", provider), true);
+      catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog"));
+      Assertions.assertTrue(credentialsObserved.get());
     }
   }
 

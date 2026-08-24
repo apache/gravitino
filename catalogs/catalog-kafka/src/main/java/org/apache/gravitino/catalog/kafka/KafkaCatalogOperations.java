@@ -187,6 +187,10 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   public void testConnection(NameIdentifier catalogIdent) {
     try {
       adminClient.listTopics().names().get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new ConnectionFailedException(
+          e, "Failed to run listTopics in Kafka: %s", e.getMessage());
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listTopics in Kafka: %s", e.getMessage());

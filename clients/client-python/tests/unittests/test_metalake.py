@@ -19,14 +19,20 @@ import unittest
 from unittest.mock import MagicMock
 
 from gravitino.client.gravitino_metalake import GravitinoMetalake
+from gravitino.constants.error import ErrorConstants
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.responses.metalake_response import MetalakeResponse
+from gravitino.exceptions.base import (
+    ConnectionFailedException,
+    UnsupportedOperationException,
+)
 from gravitino.exceptions.handlers.catalog_error_handler import CATALOG_ERROR_HANDLER
 
 
 class TestMetalake(unittest.TestCase):
     def test_existing_catalog_connection(self):
         rest_client = MagicMock()
+        rest_client.post.return_value.body = b'{"code":0}'
         metalake = GravitinoMetalake(
             MetalakeDTO("metalake", None, {}, None), rest_client
         )
@@ -37,6 +43,34 @@ class TestMetalake(unittest.TestCase):
             "api/metalakes/metalake/catalogs/catalog%2Fname/testConnection",
             error_handler=CATALOG_ERROR_HANDLER,
         )
+
+    def test_existing_catalog_connection_failure(self):
+        rest_client = MagicMock()
+        rest_client.post.return_value.body = (
+            '{"code":%d,"type":"ConnectionFailedException",'
+            '"message":"connection failed","stack":null}'
+            % ErrorConstants.CONNECTION_FAILED_CODE.value
+        ).encode("utf-8")
+        metalake = GravitinoMetalake(
+            MetalakeDTO("metalake", None, {}, None), rest_client
+        )
+
+        with self.assertRaisesRegex(ConnectionFailedException, "connection failed"):
+            metalake.test_connection("catalog")
+
+    def test_existing_catalog_connection_unsupported(self):
+        rest_client = MagicMock()
+        rest_client.post.return_value.body = (
+            '{"code":%d,"type":"UnsupportedOperationException",'
+            '"message":"unsupported","stack":null}'
+            % ErrorConstants.UNSUPPORTED_OPERATION_CODE.value
+        ).encode("utf-8")
+        metalake = GravitinoMetalake(
+            MetalakeDTO("metalake", None, {}, None), rest_client
+        )
+
+        with self.assertRaisesRegex(UnsupportedOperationException, "unsupported"):
+            metalake.test_connection("catalog")
 
     def test_from_json_metalake_response(self):
         str_json = (

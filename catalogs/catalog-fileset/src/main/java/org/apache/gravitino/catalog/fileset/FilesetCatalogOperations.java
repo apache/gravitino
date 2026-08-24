@@ -131,6 +131,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
+  private static final String SCHEME_DELIMITER = "://";
   private static final String CATALOG_PLACEHOLDER = "{{catalog}}";
 
   // location placeholder pattern format: {{placeholder}}
@@ -990,14 +991,22 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw new IllegalArgumentException("Fileset catalog has no catalog-level location to test");
     }
 
-    Map<String, Path> probeLocations = resolveProbeLocations(catalogIdent);
     List<String> failures = new ArrayList<>();
-    probeLocations.forEach(
-        (locationName, path) -> {
+    catalogStorageLocations.forEach(
+        (locationName, location) -> {
           try {
+            Path path = resolveProbeLocation(location.toString(), catalogIdent);
             probeLocation(path);
           } catch (Exception e) {
-            failures.add(displayLocationName(locationName) + " (" + failureCategory(e) + ")");
+            String displayName = displayLocationName(locationName);
+            String category = failureCategory(e);
+            LOG.warn(
+                "Fileset catalog connection probe failed for catalog {} at {} ({})",
+                catalogIdent,
+                displayName,
+                category,
+                e);
+            failures.add(displayName + " (" + category + ")");
           }
         });
 
@@ -1482,14 +1491,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
-  private Map<String, Path> resolveProbeLocations(NameIdentifier catalogIdent) {
-    Map<String, Path> resolved = new HashMap<>();
-    catalogStorageLocations.forEach(
-        (locationName, location) ->
-            resolved.put(locationName, resolveProbeLocation(location.toString(), catalogIdent)));
-    return resolved;
-  }
-
   @VisibleForTesting
   Path resolveProbeLocation(String location, NameIdentifier catalogIdent) {
     String resolved = location.replace(CATALOG_PLACEHOLDER, catalogIdent.name());
@@ -1497,7 +1498,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     if (matcher.find()) {
       String staticPrefix = resolved.substring(0, matcher.start());
       int lastSeparator = staticPrefix.lastIndexOf(SLASH);
-      if (lastSeparator < 0) {
+      int schemeDelimiter = staticPrefix.indexOf(SCHEME_DELIMITER);
+      if (lastSeparator < 0
+          || (schemeDelimiter >= 0
+              && lastSeparator < schemeDelimiter + SCHEME_DELIMITER.length())) {
         throw new IllegalArgumentException(
             "Fileset catalog location has no concrete parent that can be tested");
       }
@@ -1601,12 +1605,6 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     if (matchingTypes.isEmpty()) {
       return null;
     }
-    if (matchingTypes.size() > 1) {
-      throw new UnsupportedOperationException(
-          String.format(
-              "Multiple credential providers match Fileset location scheme %s: %s",
-              scheme, matchingTypes));
-    }
     if (!(fileSystemProvider instanceof SupportsCredentialVending)) {
       throw new UnsupportedOperationException(
           String.format("Filesystem provider for scheme %s cannot use vended credentials", scheme));
@@ -1617,14 +1615,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             PrincipalUtils.getCurrentUserName(),
             Collections.emptySet(),
             Collections.singleton(path.toString()));
-    Credential credential =
-        manager
-            .getCredential(matchingTypes.get(0), context)
-            .orElseThrow(
-                () ->
-                    new ConnectionFailedException(
-                        "Credential provider returned no credential for Fileset connection test"));
-    Credential[] credentials = new Credential[] {credential};
+    Credential[] credentials =
+        matchingTypes.stream()
+            .map(type -> manager.getCredential(type, context))
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .toArray(Credential[]::new);
+    if (credentials.length == 0) {
+      throw new ConnectionFailedException(
+          "Credential providers returned no credential for Fileset connection test");
+    }
     String handle = InMemoryFileSystemCredentialsProvider.register(credentials);
     try {
       probeConf.put(
@@ -1669,11 +1669,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     while (current != null) {
       String simpleName = current.getClass().getSimpleName().toLowerCase();
       String message = Optional.ofNullable(current.getMessage()).orElse("").toLowerCase();
-      if (message.contains("multiple credential providers")) {
-        return "ambiguous credential provider configuration";
-      }
       if (message.contains("must be a directory")) {
         return "location is not a directory";
+      }
+      if (current instanceof IllegalArgumentException
+          && (message.contains("no concrete parent")
+              || message.contains("no valid concrete target"))) {
+        return "invalid location configuration";
       }
       if (current instanceof TimeoutException || message.contains("timed out")) {
         return "timeout";

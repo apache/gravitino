@@ -18,7 +18,7 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
-/** Second matching credential provider used to verify ambiguous vending configuration. */
+/** Second matching credential provider used to verify multi-provider credential vending. */
 public class TestFilesetSecondCredentialProvider extends TestFilesetCredentialProvider {
 
   static final String TYPE = "fileset-test-second";

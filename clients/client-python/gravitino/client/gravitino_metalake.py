@@ -57,10 +57,12 @@ from gravitino.dto.requests.privilege_grant_request import PrivilegeGrantRequest
 from gravitino.dto.requests.privilege_revoke_request import PrivilegeRevokeRequest
 from gravitino.dto.requests.role_grant_request import RoleGrantRequest
 from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
+from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.dto.responses.job_list_response import JobListResponse
 from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
@@ -368,7 +370,15 @@ class GravitinoMetalake(
             )
             + "/testConnection"
         )
-        self.rest_client.post(url, error_handler=CATALOG_ERROR_HANDLER)
+        response = self.rest_client.post(url, error_handler=CATALOG_ERROR_HANDLER)
+        base_response = BaseResponse.from_json(response.body, infer_missing=True)
+        base_response.validate()
+        if base_response.code() == 0:
+            return
+
+        error_response = ErrorResponse.from_json(response.body, infer_missing=True)
+        error_response.validate()
+        CATALOG_ERROR_HANDLER.handle(error_response)
 
     ##########
     # Job operations

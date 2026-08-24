@@ -44,7 +44,7 @@ public class TestFilesetCredentialProvider implements CredentialProvider {
 
   @Override
   public Credential getCredential(CredentialContext context) {
-    return new TestCredential();
+    return new TestCredential(credentialType());
   }
 
   @Override
@@ -52,9 +52,15 @@ public class TestFilesetCredentialProvider implements CredentialProvider {
 
   private static class TestCredential implements Credential {
 
+    private final String credentialType;
+
+    private TestCredential(String credentialType) {
+      this.credentialType = credentialType;
+    }
+
     @Override
     public String credentialType() {
-      return TYPE;
+      return credentialType;
     }
 
     @Override

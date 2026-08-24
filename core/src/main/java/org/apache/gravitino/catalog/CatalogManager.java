@@ -739,7 +739,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       } finally {
         wrapper.close();
       }
-    } catch (GravitinoRuntimeException e) {
+    } catch (GravitinoRuntimeException | UnsupportedOperationException e) {
       throw e;
     } catch (Exception e) {
       LOG.warn("Failed to test catalog creation {}", ident, e);
@@ -769,9 +769,13 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                   c.testConnection(ident);
                   return null;
                 });
-          } catch (RuntimeException e) {
+          } catch (UnsupportedOperationException e) {
             throw e;
           } catch (Exception e) {
+            LOG.warn("Failed to test existing catalog connection {}", ident, e);
+            if (e instanceof RuntimeException) {
+              throw (RuntimeException) e;
+            }
             throw new RuntimeException(e);
           }
           return null;
