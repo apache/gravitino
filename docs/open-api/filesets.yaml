@@ -79,7 +79,7 @@ paths:
         - fileset
       summary: Get fileset
       operationId: loadFileset
-      description: Returns the specified fileset object
+      description: Returns the specified fileset object.
       responses:
         "200":
           $ref: "#/components/responses/FilesetResponse"
