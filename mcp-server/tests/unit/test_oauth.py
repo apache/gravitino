@@ -306,6 +306,34 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self._get_twice(self._auth(handler))
         self.assertEqual(calls["token"], 1)
 
+    def test_expires_in_zero_falls_back_to_jwt_exp(self):
+        """expires_in: 0 is falsy; cache from JWT exp instead of refetching."""
+        token = _jwt_with_exp(int(time.time()) + 3600)
+        calls = {"token": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                calls["token"] += 1
+                return httpx.Response(
+                    200, json={"access_token": token, "expires_in": 0}
+                )
+            return httpx.Response(200, json={"ok": True})
+
+        self._get_twice(self._auth(handler))
+        self.assertEqual(calls["token"], 1)
+
+    def test_expires_in_zero_without_jwt_exp_raises(self):
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                return httpx.Response(
+                    200, json={"access_token": "opaque-ref", "expires_in": 0}
+                )
+            return httpx.Response(200)
+
+        with self.assertRaises(ValueError) as raised:
+            self._get(self._auth(handler))
+        self.assertIn("expires_in", str(raised.exception))
+
     def test_uses_jwt_exp_when_expires_in_missing(self):
         token = _jwt_with_exp(int(time.time()) + 3600)
         calls = {"token": 0}

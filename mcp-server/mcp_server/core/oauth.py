@@ -169,7 +169,7 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             raise ValueError("OAuth token response missing access_token")
         expires_in = body.get("expires_in")
         _LOG.info("Fetched OAuth access token")
-        if expires_in not in (None, ""):
+        if expires_in:
             return self.state, token, expires_in
         if not self._has_jwt_exp(token):
             raise ValueError(
