@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -169,6 +170,137 @@ public class TestGravitinoConfig {
   }
 
   @Test
+  public void testTrinoJdbcConfigDefaults() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "http://host:8080"));
+
+    assertEquals("admin", config.getTrinoUser());
+    assertEquals("", config.getTrinoPassword());
+    assertFalse(config.isTrinoJdbcSslEnabled());
+    assertEquals("FULL", config.getTrinoJdbcSslVerification());
+    assertEquals("", config.getTrinoJdbcSslTruststorePath());
+    assertEquals("", config.getTrinoJdbcSslTruststorePassword());
+    assertEquals("", config.getTrinoJdbcSslTruststoreType());
+    assertEquals("", config.getTrinoJdbcRoles());
+    assertTrue(config.getTrinoJdbcExtraProperties().isEmpty());
+  }
+
+  @Test
+  public void testTrinoJdbcSslEnabledDerivedFromDiscoveryUri() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001", "discovery.uri", "https://host:8443"));
+
+    assertTrue(config.isTrinoJdbcSslEnabled());
+    assertEquals("jdbc:trino://host:8443", config.getTrinoJdbcURI());
+  }
+
+  @Test
+  public void testTrinoJdbcExtraProperties() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "discovery.uri",
+                "http://host:8080",
+                "trino.jdbc.properties.KerberosRemoteServiceName",
+                "trino",
+                "trino.jdbc.properties.SSLKeyStorePath",
+                "/etc/trino/client.p12"));
+
+    Map<String, String> extraProperties = config.getTrinoJdbcExtraProperties();
+    assertEquals(2, extraProperties.size());
+    assertEquals("trino", extraProperties.get("KerberosRemoteServiceName"));
+    assertEquals("/etc/trino/client.p12", extraProperties.get("SSLKeyStorePath"));
+  }
+
+  @Test
+  public void testToCatalogConfigExcludesTrinoJdbcProperties() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "trino.jdbc.user",
+                "admin",
+                "trino.jdbc.password",
+                "jdbc-secret",
+                "trino.jdbc.ssl.truststore.password",
+                "truststore-secret",
+                "trino.jdbc.properties.SSLKeyStorePassword",
+                "keystore-secret"));
+
+    // The internal JDBC connection settings are coordinator only. They must never reach the
+    // generated CREATE CATALOG statement, which is logged and persisted to the catalog files.
+    String catalogConfig = config.toCatalogConfig();
+    assertFalse(catalogConfig.contains("trino.jdbc."));
+    assertFalse(catalogConfig.contains("secret"));
+    assertTrue(catalogConfig.contains("\"gravitino.metalake\"='user_001'"));
+  }
+
+  @Test
+  public void testTrinoJdbcUriUsesSchemeDefaultPort() {
+    GravitinoConfig httpsConfig =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "https://host"));
+    assertEquals("jdbc:trino://host:443", httpsConfig.getTrinoJdbcURI());
+
+    GravitinoConfig httpConfig =
+        new GravitinoConfig(
+            ImmutableMap.of("gravitino.metalake", "user_001", "discovery.uri", "http://host"));
+    assertEquals("jdbc:trino://host:80", httpConfig.getTrinoJdbcURI());
+  }
+
+  @Test
+  public void testBlankSslVerificationFallsBackToDefault() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                "discovery.uri",
+                "http://host:8080",
+                "trino.jdbc.ssl.verification",
+                "  "));
+
+    assertEquals("FULL", config.getTrinoJdbcSslVerification());
+  }
+
+  @Test
+  public void testInvalidSslEnabledIsRejected() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                // An HTTPS discovery.uri would have derived true, so a typo must not silently
+                // fall back to false.
+                "discovery.uri",
+                "https://host:8443",
+                "trino.jdbc.ssl.enabled",
+                "yes"));
+
+    TrinoException e = assertThrows(TrinoException.class, config::isTrinoJdbcSslEnabled);
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.enabled"));
+    assertTrue(e.getMessage().contains("expected true or false"));
+  }
+
+  @Test
+  public void testSslEnabledAcceptsMixedCase() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "discovery.uri", "http://host:8080",
+                "trino.jdbc.ssl.enabled", " TRUE "));
+
+    assertTrue(config.isTrinoJdbcSslEnabled());
+  }
+
+  @Test
   public void testIcebergRestConfigDefaults() {
     GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
 
@@ -180,17 +312,13 @@ public class TestGravitinoConfig {
 
   @Test
   public void testIcebergRestConfig() {
-    ImmutableMap<String, String> configMap =
-        ImmutableMap.of(
-            "gravitino.metalake",
-            "user_001",
-            "gravitino.iceberg.rest-uri",
-            "http://127.0.0.1:9001/iceberg",
-            "gravitino.iceberg.rest-catalog.security",
-            "OAUTH2",
-            "gravitino.iceberg.rest-catalog.oauth2.credential",
-            "client_id:client_secret");
-    GravitinoConfig config = new GravitinoConfig(configMap);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-uri", "http://127.0.0.1:9001/iceberg",
+                "gravitino.iceberg.rest-catalog.security", "OAUTH2",
+                "gravitino.iceberg.rest-catalog.oauth2.credential", "client_id:client_secret"));
 
     // The unscoped URI is honored as-is in single-metalake mode.
     assertEquals("http://127.0.0.1:9001/iceberg", config.getManualIcebergRestUri("user_001"));
@@ -232,25 +360,19 @@ public class TestGravitinoConfig {
 
     assertEquals("http://irc-a:9001/iceberg", config.getDiscoveredIcebergRestUri("metalake_a"));
     assertEquals("http://irc-b:9001/iceberg", config.getDiscoveredIcebergRestUri("metalake_b"));
-    // Unknown/unmatched metalakes fall back to nothing.
     assertEquals("", config.getDiscoveredIcebergRestUri("metalake_c"));
-
-    // Clearing (e.g. the server stopped reporting an endpoint) removes it again.
     config.setDiscoveredIcebergRestUri("metalake_a", null);
     assertEquals("", config.getDiscoveredIcebergRestUri("metalake_a"));
   }
 
   @Test
   public void testToCatalogConfigWithIcebergRestProperties() {
-    ImmutableMap<String, String> configMap =
-        ImmutableMap.of(
-            "gravitino.metalake",
-            "user_001",
-            "gravitino.iceberg.rest-uri",
-            "http://127.0.0.1:9001/iceberg",
-            "gravitino.iceberg.rest-catalog.security",
-            "OAUTH2");
-    GravitinoConfig config = new GravitinoConfig(configMap);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-uri", "http://127.0.0.1:9001/iceberg",
+                "gravitino.iceberg.rest-catalog.security", "OAUTH2"));
 
     String catalogConfig = config.toCatalogConfig();
     assertTrue(

@@ -96,17 +96,28 @@ public class ModelMetaService {
     try {
       ModelPO.Builder builder = ModelPO.builder();
       fillModelPOBuilderParentEntityId(builder, modelEntity.namespace());
+      ModelPO po = POConverters.initializeModelPO(modelEntity, builder);
 
-      SessionUtils.doWithCommit(
-          ModelMetaMapper.class,
-          mapper -> {
-            ModelPO po = POConverters.initializeModelPO(modelEntity, builder);
-            if (overwrite) {
-              mapper.insertModelMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertModelMeta(po);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the model cannot be
+          // written below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      modelEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertModelMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertModelMeta(po);
+                    }
+                  }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, modelEntity.nameIdentifier().toString());

@@ -33,6 +33,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -46,6 +47,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
@@ -243,11 +245,15 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
    * @return The altered {@link Table} object after applying the changes.
    * @throws NoSuchTableException If the table to alter does not exist.
    * @throws IllegalArgumentException If an unsupported or invalid change is specified.
+   * @throws GravitinoRuntimeException If a rename succeeds in the external catalog but Gravitino
+   *     cannot update the stored table registration consistently.
    */
   @Override
   public Table alterTable(NameIdentifier ident, TableChange... changes)
       throws NoSuchTableException, IllegalArgumentException {
     validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
+    boolean isRenameTable =
+        Arrays.stream(changes).anyMatch(change -> change instanceof TableChange.RenameTable);
 
     // use the read lock on the table if there does not exist TableChange.RenameTable in the
     // changes, or:
@@ -276,6 +282,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
         nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
+          Optional<TableEntity> tableEntityBeforeRename =
+              isRenameTable && !isManagedTable
+                  ? getTableEntityBeforeRename(ident)
+                  : Optional.empty();
           Table alteredTable =
               doWithCatalog(
                   catalogIdent,
@@ -285,7 +296,6 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   NoSuchTableException.class,
                   IllegalArgumentException.class);
 
-          boolean isManagedTable = isManagedEntity(catalogIdent, Capability.Scope.TABLE);
           if (isManagedTable) {
             return EntityCombinedTable.of(alteredTable)
                 .withHiddenProperties(
@@ -297,9 +307,11 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
 
           StringIdentifier stringId = getStringIdFromProperties(alteredTable.properties());
           // Case 1: The table is not created by Gravitino and this table is never imported.
-          TableEntity te = null;
+          TableEntity te = tableEntityBeforeRename.orElse(null);
           if (stringId == null) {
-            te = getEntity(ident, TABLE, TableEntity.class);
+            if (te == null) {
+              te = getEntity(ident, TABLE, TableEntity.class);
+            }
             if (te == null) {
               return EntityCombinedTable.of(alteredTable)
                   .withHiddenProperties(
@@ -350,6 +362,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                   "UPDATE",
                   tableId);
 
+          // operateOnEntity returns null if the store update fails or if the returned entity ID
+          // does not match the ID from the external catalog.
+          if (isRenameTable && updatedTableEntity == null) {
+            NameIdentifier newIdent =
+                NameIdentifier.of(getNewNamespace(ident, changes), alteredTable.name());
+            throw new GravitinoRuntimeException(
+                "Table %s was renamed to %s in the external catalog, but its registration in "
+                    + "Gravitino could not be updated consistently",
+                ident, newIdent);
+          }
+
           return EntityCombinedTable.of(alteredTable, updatedTableEntity)
               .withHiddenProperties(
                   getHiddenPropertyNames(
@@ -386,20 +409,18 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return droppedFromCatalog;
           }
 
-          // For unmanaged table, it could happen that the table:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the table from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, TABLE);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result is ambiguous: the external table may have been renamed or dropped out of
+          // band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+          // registration that requires separate cleanup.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, TABLE);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -442,21 +463,18 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
             return droppedFromCatalog;
           }
 
-          // For unmanaged table, it could happen that the table:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the table from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, TABLE);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
-            return false;
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result is ambiguous: the external table may have been renamed or dropped out of
+          // band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band purge can therefore leave a stale
+          // registration that requires separate cleanup.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, TABLE);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
           // Run unconditionally: an out-of-band purge may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -481,6 +499,17 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
                     ((TableChange.RenameTable) c).getNewSchemaName().get()))
         .reduce((c1, c2) -> c2)
         .orElse(tableIdent.namespace());
+  }
+
+  private Optional<TableEntity> getTableEntityBeforeRename(NameIdentifier ident) {
+    try {
+      return Optional.of(store.get(ident, TABLE, TableEntity.class));
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    } catch (Exception e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to read the stored registration for table %s before renaming it", ident);
+    }
   }
 
   private EntityCombinedTable importTable(NameIdentifier identifier) {
