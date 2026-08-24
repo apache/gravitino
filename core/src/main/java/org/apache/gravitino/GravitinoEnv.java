@@ -99,6 +99,7 @@ import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
@@ -156,6 +157,8 @@ public class GravitinoEnv {
   private MetalakeDispatcher metalakeDispatcher;
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
+
+  private SecretPropertyOperationDispatcher secretPropertyOperationDispatcher;
 
   private KmsClientRegistry kmsClientRegistry;
 
@@ -423,6 +426,15 @@ public class GravitinoEnv {
    */
   public CredentialOperationDispatcher credentialOperationDispatcher() {
     return credentialOperationDispatcher;
+  }
+
+  /**
+   * Get the {@link SecretPropertyOperationDispatcher} associated with the Gravitino environment.
+   *
+   * @return The {@link SecretPropertyOperationDispatcher} instance.
+   */
+  public SecretPropertyOperationDispatcher secretPropertyOperationDispatcher() {
+    return secretPropertyOperationDispatcher;
   }
 
   /**
@@ -744,6 +756,10 @@ public class GravitinoEnv {
 
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+
+    this.secretPropertyOperationDispatcher =
+        new SecretPropertyOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager);
 
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
