@@ -68,7 +68,7 @@ public class TestBaseCatalogSecrets {
   }
 
   @Test
-  void testInitializeMergesGetSecrets() {
+  void testMergeSecrets() {
     setUpCatalog(Map.of("metastore.uris", "thrift://localhost:9083"), Map.of("s3-sk", "secret-sk"));
 
     catalog.initialize("hive", new CaseInsensitiveStringMap(Map.of()));
@@ -78,7 +78,7 @@ public class TestBaseCatalogSecrets {
   }
 
   @Test
-  void testInitializeMergesGetSecretsWithNullProperties() {
+  void testMergeSecretsNullProps() {
     setUpCatalog(null, Map.of("s3-sk", "secret-sk"));
 
     catalog.initialize("hive", new CaseInsensitiveStringMap(Map.of()));
@@ -88,7 +88,7 @@ public class TestBaseCatalogSecrets {
   }
 
   @Test
-  void testInitializeMergesMemorySecretPlaintext() {
+  void testMergeMemorySecrets() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put("jdbc-user", "root");

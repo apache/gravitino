@@ -65,6 +65,7 @@ import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.lance.namespace.errors.NamespaceNotFoundException;
 import org.slf4j.Logger;
@@ -130,24 +131,21 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return catalogOperator.loadCatalog(catalogName);
   }
 
-  Map<String, String> catalogPropertiesWithSecrets(Catalog catalog) {
-    Map<String, String> properties =
-        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-    properties.putAll(getCatalogSecrets(catalog.name()));
-    return properties;
+  Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props = copyProps(catalog.properties());
+    props.putAll(catalogSecrets(catalog.name()));
+    return props;
   }
 
-  Map<String, String> schemaPropertiesWithSecrets(Catalog catalog, String schemaName) {
+  Map<String, String> schemaPropsWithSecrets(Catalog catalog, String schemaName) {
     Schema schema = loadSchema(catalog, schemaName);
-    Map<String, String> properties =
-        new HashMap<>(schema.properties() == null ? Map.of() : schema.properties());
-    properties.putAll(getSchemaSecrets(catalog.name(), schemaName));
-    return properties;
+    Map<String, String> props = copyProps(schema.properties());
+    props.putAll(schemaSecrets(catalog.name(), schemaName));
+    return props;
   }
 
-  private Map<String, String> getCatalogSecrets(String catalogName) {
-    org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
-        currentSecretPropertyDispatcher();
+  private Map<String, String> catalogSecrets(String catalogName) {
+    SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
     if (dispatcher != null) {
       return dispatcher.getSecrets(
           NameIdentifierUtil.ofCatalog(metalakeName, catalogName), Entity.EntityType.CATALOG);
@@ -155,22 +153,24 @@ public class GravitinoLanceNamespaceWrapper extends NamespaceWrapper {
     return loadCatalog(catalogName).supportsSecrets().getSecrets();
   }
 
-  private Map<String, String> getSchemaSecrets(String catalogName, String schemaName) {
-    org.apache.gravitino.secret.SecretPropertyOperationDispatcher dispatcher =
-        currentSecretPropertyDispatcher();
+  private Map<String, String> schemaSecrets(String catalogName, String schemaName) {
+    SecretPropertyOperationDispatcher dispatcher = secretDispatcher();
     if (dispatcher != null) {
       return dispatcher.getSecrets(schemaIdent(catalogName, schemaName), Entity.EntityType.SCHEMA);
     }
     return loadSchema(loadCatalog(catalogName), schemaName).supportsSecrets().getSecrets();
   }
 
-  private org.apache.gravitino.secret.SecretPropertyOperationDispatcher
-      currentSecretPropertyDispatcher() {
+  private SecretPropertyOperationDispatcher secretDispatcher() {
     try {
       return GravitinoEnv.getInstance().secretPropertyOperationDispatcher();
     } catch (Exception e) {
       return null;
     }
+  }
+
+  private static Map<String, String> copyProps(Map<String, String> props) {
+    return new HashMap<>(props == null ? Map.of() : props);
   }
 
   Catalog createCatalog(

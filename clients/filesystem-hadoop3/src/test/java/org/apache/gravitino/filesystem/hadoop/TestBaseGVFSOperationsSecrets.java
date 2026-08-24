@@ -46,7 +46,7 @@ import org.junit.jupiter.api.Test;
 public class TestBaseGVFSOperationsSecrets {
 
   @Test
-  public void testGetAllPropertiesMergesSecrets() throws Exception {
+  public void testMergeSecrets() throws Exception {
     Configuration conf = new Configuration();
     conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
     conf.set(
@@ -92,7 +92,7 @@ public class TestBaseGVFSOperationsSecrets {
   }
 
   @Test
-  public void testGetAllPropertiesSecretsOverrideSameKeys() throws Exception {
+  public void testSecretOverride() throws Exception {
     Configuration conf = new Configuration();
     conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
     conf.set(
@@ -133,7 +133,7 @@ public class TestBaseGVFSOperationsSecrets {
   }
 
   @Test
-  public void testGetAllPropertiesHandlesNullProperties() throws Exception {
+  public void testNullProps() throws Exception {
     Configuration conf = new Configuration();
     conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
     conf.set(

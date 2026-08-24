@@ -603,7 +603,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testStandaloneMergesGetSecrets() {
+  public void testMergeSecrets() {
     String metalakeName = "test_metalake";
     String catalogName = "jdbc_catalog";
 
@@ -639,7 +639,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testStandaloneCredentialsOverrideSecrets() {
+  public void testCredsOverrideSecrets() {
     String metalakeName = "test_metalake";
     String catalogName = "jdbc_catalog";
 
@@ -687,7 +687,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testStandaloneMergesMemorySecretPlaintext() {
+  public void testMergeMemorySecrets() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put(IcebergConstants.GRAVITINO_JDBC_USER, "root");
@@ -737,7 +737,7 @@ public class TestDynamicIcebergConfigProvider {
   }
 
   @Test
-  public void testAuxiliaryResolvesSecretUrnsViaSecretManager() throws Exception {
+  public void testAuxPlaintext() throws Exception {
     try (SecretManager sm = memorySecretManager()) {
       String metalakeName = "test_metalake";
       String catalogName = "jdbc_catalog";

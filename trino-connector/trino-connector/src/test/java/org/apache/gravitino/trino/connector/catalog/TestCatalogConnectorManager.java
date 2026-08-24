@@ -144,7 +144,7 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
-  public void testCatalogPropertiesWithSecretsMergesNonEmptySecrets() {
+  public void testPropsWithSecrets() {
     Catalog catalog = mock(Catalog.class);
     SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
     when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
@@ -152,7 +152,7 @@ public class TestCatalogConnectorManager {
     when(supportsSecrets.getSecrets())
         .thenReturn(Map.of("jdbc-password", "secret", "shared", "from-secret"));
 
-    Map<String, String> merged = CatalogConnectorManager.catalogPropertiesWithSecrets(catalog);
+    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
 
     assertEquals("v1", merged.get("visible"));
     assertEquals("secret", merged.get("jdbc-password"));
@@ -160,14 +160,14 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
-  public void testCatalogPropertiesWithSecretsHandlesNullProperties() {
+  public void testPropsWithSecretsNullProps() {
     Catalog catalog = mock(Catalog.class);
     SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
     when(catalog.properties()).thenReturn(null);
     when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
     when(supportsSecrets.getSecrets()).thenReturn(Map.of("jdbc-password", "secret"));
 
-    Map<String, String> merged = CatalogConnectorManager.catalogPropertiesWithSecrets(catalog);
+    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
 
     assertEquals("secret", merged.get("jdbc-password"));
     assertEquals(1, merged.size());

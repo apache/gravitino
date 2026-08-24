@@ -149,7 +149,7 @@ public class TestGravitinoCatalogStore {
   }
 
   @Test
-  public void testGetCatalog_mergesGetSecrets() {
+  public void testMergeSecrets() {
     Catalog catalog = mock(Catalog.class);
     SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
     when(gravitinoCatalogMockManager.getGravitinoCatalogInfo("sec")).thenReturn(catalog);
@@ -185,7 +185,7 @@ public class TestGravitinoCatalogStore {
   }
 
   @Test
-  public void testGetCatalog_mergesGetSecretsWithNullProperties() {
+  public void testMergeSecretsNullProps() {
     Catalog catalog = mock(Catalog.class);
     SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
     when(gravitinoCatalogMockManager.getGravitinoCatalogInfo("sec-null")).thenReturn(catalog);
@@ -220,7 +220,7 @@ public class TestGravitinoCatalogStore {
   }
 
   @Test
-  public void testGetCatalog_mergesMemorySecretPlaintext() {
+  public void testMergeMemorySecrets() {
     try (SecretManager sm = memorySecretManager()) {
       Map<String, String> entityProps = new HashMap<>();
       entityProps.put("jdbc-user", "root");

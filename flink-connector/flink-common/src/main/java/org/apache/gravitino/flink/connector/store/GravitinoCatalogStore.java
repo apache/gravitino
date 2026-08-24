@@ -102,10 +102,7 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       BaseCatalogFactory catalogFactory = catalogFactoryForProvider(catalog.provider());
       CatalogPropertiesConverter catalogPropertiesConverter =
           catalogFactory.catalogPropertiesConverter();
-      Map<String, String> catalogProperties =
-          new HashMap<>(
-              catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
-      catalogProperties.putAll(catalog.supportsSecrets().getSecrets());
+      Map<String, String> catalogProperties = propsWithSecrets(catalog);
       Map<String, String> flinkCatalogProperties =
           catalogPropertiesConverter.toFlinkCatalogProperties(catalogProperties);
       CatalogDescriptor descriptor =
@@ -221,5 +218,12 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       throw new RuntimeException(errorMessage);
     }
     return (BaseCatalogFactory) factories.get(0);
+  }
+
+  private static Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
+    props.putAll(catalog.supportsSecrets().getSecrets());
+    return props;
   }
 }

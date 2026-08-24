@@ -25,7 +25,7 @@ from gravitino.name_identifier import NameIdentifier
 class TestGVFSMergeSecrets(unittest.TestCase):
     """Unit tests for _merge_fileset_properties including get_secrets()."""
 
-    def test_merge_fileset_properties_includes_secrets(self):
+    def test_merge_secrets(self):
         operations = DefaultGVFSOperations(
             server_uri="http://localhost:8090", metalake_name="ml", options={}
         )
@@ -59,7 +59,7 @@ class TestGVFSMergeSecrets(unittest.TestCase):
         self.assertEqual(merged["f-vis"], "3")
         self.assertEqual(merged["f-secret"], "fs")
 
-    def test_merge_fileset_properties_secrets_override_same_keys(self):
+    def test_secret_override(self):
         operations = DefaultGVFSOperations(
             server_uri="http://localhost:8090", metalake_name="ml", options={}
         )
@@ -88,7 +88,7 @@ class TestGVFSMergeSecrets(unittest.TestCase):
 
         self.assertEqual(merged["shared"], "from-fileset-secret")
 
-    def test_merge_fileset_properties_handles_null_properties(self):
+    def test_null_props(self):
         operations = DefaultGVFSOperations(
             server_uri="http://localhost:8090", metalake_name="ml", options={}
         )

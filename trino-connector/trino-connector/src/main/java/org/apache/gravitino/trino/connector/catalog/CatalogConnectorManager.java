@@ -251,7 +251,7 @@ public class CatalogConnectorManager {
             (String catalogName) -> {
               try {
                 Catalog catalog = metalake.loadCatalog(catalogName);
-                Map<String, String> properties = catalogPropertiesWithSecrets(catalog);
+                Map<String, String> properties = propsWithSecrets(catalog);
                 GravitinoCatalog gravitinoCatalog =
                     new GravitinoCatalog(metalake.name(), catalog, properties);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
@@ -474,17 +474,12 @@ public class CatalogConnectorManager {
     return false;
   }
 
-  /**
-   * Merges visible catalog properties with resolved secrets for connector loading.
-   *
-   * @param catalog the Gravitino catalog
-   * @return mutable map of properties with secrets overlaid
-   */
-  static Map<String, String> catalogPropertiesWithSecrets(Catalog catalog) {
-    Map<String, String> properties =
+  /** Visible catalog properties overlaid with {@code getSecrets()}. */
+  static Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props =
         new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-    properties.putAll(catalog.supportsSecrets().getSecrets());
-    return properties;
+    props.putAll(catalog.supportsSecrets().getSecrets());
+    return props;
   }
 
   public interface TrinoCatalogNameHandler {

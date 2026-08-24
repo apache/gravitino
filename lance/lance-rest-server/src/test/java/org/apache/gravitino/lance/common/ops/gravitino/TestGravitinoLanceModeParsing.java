@@ -230,7 +230,7 @@ class TestGravitinoLanceModeParsing {
     when(catalog.name()).thenReturn("catalog");
     when(catalog.properties()).thenReturn(Map.of());
     when(namespaceWrapper.loadAndValidateLakehouseCatalog("catalog")).thenReturn(catalog);
-    when(namespaceWrapper.catalogPropertiesWithSecrets(catalog)).thenReturn(Map.of());
+    when(namespaceWrapper.propsWithSecrets(catalog)).thenReturn(Map.of());
     when(namespaceWrapper.asTableCatalog(catalog)).thenReturn(tableCatalog);
     return new GravitinoLanceTableOperations(namespaceWrapper);
   }

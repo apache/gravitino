@@ -147,7 +147,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
             .orElse(null));
     response.setStorageOptions(
         LancePropertiesUtils.resolveLanceStorageOptions(
-            namespaceWrapper.catalogPropertiesWithSecrets(catalog), table.properties()));
+            namespaceWrapper.propsWithSecrets(catalog), table.properties()));
     response.setManagedVersioning(false);
     if (checkDeclared) {
       response.setIsOnlyDeclared(
@@ -202,7 +202,7 @@ public class GravitinoLanceTableOperations implements LanceTableOperations {
     Map<String, String> properties = t.properties();
     Map<String, String> effectiveStorageOptions =
         LancePropertiesUtils.resolveLanceStorageOptions(
-            namespaceWrapper.catalogPropertiesWithSecrets(catalog), properties);
+            namespaceWrapper.propsWithSecrets(catalog), properties);
 
     CreateTableResponse response = new CreateTableResponse();
     response.setStorageOptions(effectiveStorageOptions);

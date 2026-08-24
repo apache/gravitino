@@ -317,7 +317,7 @@ public class TestGravitinoLanceNamespaceWrapper {
   }
 
   @Test
-  public void testCatalogPropertiesWithSecrets() {
+  public void testPropsWithSecrets() {
     GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper();
     Catalog catalog =
         createCatalogProxy(
@@ -358,13 +358,13 @@ public class TestGravitinoLanceNamespaceWrapper {
           }
         });
 
-    Map<String, String> merged = wrapper.catalogPropertiesWithSecrets(catalog);
+    Map<String, String> merged = wrapper.propsWithSecrets(catalog);
     Assertions.assertEquals("v1", merged.get("visible"));
     Assertions.assertEquals("secret", merged.get("jdbc-password"));
   }
 
   @Test
-  public void testSchemaPropertiesWithSecretsMergesClientSecrets() {
+  public void testSchemaPropsWithSecrets() {
     Schema schema = createSchemaProxy(Map.of("visible", "s1"), Map.of("schema-pwd", "s-secret"));
     Catalog catalog =
         createCatalogProxy(
@@ -375,13 +375,13 @@ public class TestGravitinoLanceNamespaceWrapper {
             false);
     wrapper.setCatalogOperator(catalogOperatorReturning(catalog));
 
-    Map<String, String> merged = wrapper.schemaPropertiesWithSecrets(catalog, "test_schema");
+    Map<String, String> merged = wrapper.schemaPropsWithSecrets(catalog, "test_schema");
     Assertions.assertEquals("s1", merged.get("visible"));
     Assertions.assertEquals("s-secret", merged.get("schema-pwd"));
   }
 
   @Test
-  public void testCatalogAndSchemaPropertiesUseSecretDispatcher() throws Exception {
+  public void testPropsViaDispatcher() throws Exception {
     Catalog catalog =
         createCatalogProxy(
             Catalog.Type.RELATIONAL, "lakehouse-generic", Map.of("visible", "c1"), Map.of());
@@ -441,11 +441,11 @@ public class TestGravitinoLanceNamespaceWrapper {
     wrapper.asNamespaceOps();
     wrapper.setCatalogOperator(catalogOperatorReturning(catalog));
 
-    Map<String, String> catalogMerged = wrapper.catalogPropertiesWithSecrets(catalog);
+    Map<String, String> catalogMerged = wrapper.propsWithSecrets(catalog);
     Assertions.assertEquals("c1", catalogMerged.get("visible"));
     Assertions.assertEquals("from-dispatcher", catalogMerged.get("jdbc-password"));
 
-    Map<String, String> schemaMerged = wrapper.schemaPropertiesWithSecrets(catalog, "test_schema");
+    Map<String, String> schemaMerged = wrapper.schemaPropsWithSecrets(catalog, "test_schema");
     Assertions.assertEquals("s1", schemaMerged.get("visible"));
     Assertions.assertEquals("from-dispatcher-schema", schemaMerged.get("schema-pwd"));
   }

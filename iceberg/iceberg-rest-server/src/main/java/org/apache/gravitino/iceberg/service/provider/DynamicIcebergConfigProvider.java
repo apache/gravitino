@@ -105,52 +105,44 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    // Sensitive credentials (e.g. jdbc-password) are marked hidden in PropertiesMetadata and
-    // filtered out of catalog.properties(). We need two different strategies to recover them:
-    //
-    // Auxiliary mode: the catalog is a BaseCatalog running in the same JVM as the Gravitino
-    // server. Call propertiesWithCredentialProviders() then SecretManager.toPlaintextProperties
-    // so URNs become plaintext while credential-provider keys remain for provider detection.
-    //
-    // Standalone mode: merge loadCatalog().properties() with getSecrets(), then overlay
-    // JdbcCredential fields from getCredentials() when present so credentials win over secrets
-    // (aligned with Spark / Flink / Trino JDBC connectors).
-    Map<String, String> catalogProperties;
+    // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets,
+    // then JdbcCredential overlays so credentials win.
+    return Optional.of(getIcebergConfigFromCatalogProperties(resolveProps(catalog)));
+  }
+
+  private static Map<String, String> resolveProps(Catalog catalog) {
     if (catalog instanceof BaseCatalog) {
-      catalogProperties =
-          new HashMap<>(
-              GravitinoEnv.getInstance()
-                  .secretManager()
-                  .toPlaintextProperties(
-                      ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
-    } else {
-      catalogProperties =
-          new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-      try {
-        SupportsSecrets supportsSecrets = catalog.supportsSecrets();
-        if (supportsSecrets != null) {
-          Map<String, String> secrets = supportsSecrets.getSecrets();
-          if (secrets != null) {
-            catalogProperties.putAll(secrets);
-          }
-        }
-      } catch (UnsupportedOperationException ignored) {
-        // Catalog does not support secret property operations.
-      }
-      if (catalog instanceof SupportsCredentials) {
-        Arrays.stream(((SupportsCredentials) catalog).getCredentials())
-            .filter(c -> c instanceof JdbcCredential)
-            .map(c -> (JdbcCredential) c)
-            .findFirst()
-            .ifPresent(
-                jdbc -> {
-                  catalogProperties.put(IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
-                  catalogProperties.put(
-                      IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
-                });
-      }
+      return new HashMap<>(
+          GravitinoEnv.getInstance()
+              .secretManager()
+              .toPlaintextProperties(
+                  ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
     }
-    return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    try {
+      SupportsSecrets supportsSecrets = catalog.supportsSecrets();
+      if (supportsSecrets != null) {
+        Map<String, String> secrets = supportsSecrets.getSecrets();
+        if (secrets != null) {
+          props.putAll(secrets);
+        }
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // Catalog does not support secret property operations.
+    }
+    if (catalog instanceof SupportsCredentials) {
+      Arrays.stream(((SupportsCredentials) catalog).getCredentials())
+          .filter(c -> c instanceof JdbcCredential)
+          .map(c -> (JdbcCredential) c)
+          .findFirst()
+          .ifPresent(
+              jdbc -> {
+                props.put(IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
+                props.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
+              });
+    }
+    return props;
   }
 
   /**

@@ -80,6 +80,7 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
@@ -963,27 +964,27 @@ public abstract class BaseGVFSOperations implements Closeable {
 
   @VisibleForTesting
   Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
-    Map<String, String> allProperties = new HashMap<>();
     String catalogName = filesetIdent.namespace().level(1);
     String schemaName = filesetIdent.namespace().level(2);
     Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
-    if (catalog.properties() != null) {
-      allProperties.putAll(catalog.properties());
-    }
-    allProperties.putAll(catalog.supportsSecrets().getSecrets());
     Schema schema = catalog.asSchemas().loadSchema(schemaName);
-    if (schema.properties() != null) {
-      allProperties.putAll(schema.properties());
-    }
-    allProperties.putAll(schema.supportsSecrets().getSecrets());
     Fileset fileset =
         catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
-    if (fileset.properties() != null) {
-      allProperties.putAll(fileset.properties());
+
+    Map<String, String> all = new HashMap<>();
+    putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
+    putPropsAndSecrets(all, schema.properties(), schema.supportsSecrets());
+    putPropsAndSecrets(all, fileset.properties(), fileset.supportsSecrets());
+    all.putAll(extractNonDefaultConfig(conf));
+    return all;
+  }
+
+  private static void putPropsAndSecrets(
+      Map<String, String> target, Map<String, String> props, SupportsSecrets secrets) {
+    if (props != null) {
+      target.putAll(props);
     }
-    allProperties.putAll(fileset.supportsSecrets().getSecrets());
-    allProperties.putAll(extractNonDefaultConfig(conf));
-    return allProperties;
+    target.putAll(secrets.getSecrets());
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {
