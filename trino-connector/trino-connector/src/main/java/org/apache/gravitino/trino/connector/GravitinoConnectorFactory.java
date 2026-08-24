@@ -55,7 +55,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   private CatalogConnectorManager catalogConnectorManager;
-  private boolean catalogConnectorManagerStarted = false;
+  private boolean catalogConnectorManagerStartTriggered = false;
 
   private GravitinoAdminClient client;
   private int trinoVersion;
@@ -80,13 +80,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   /**
-   * Returns whether the catalog connector manager has been started.
+   * Returns whether starting the catalog connector manager has been triggered.
    *
-   * @return true if the catalog connector manager has been started
+   * @return true if starting the catalog connector manager has been triggered
    */
   @VisibleForTesting
-  public boolean isCatalogConnectorManagerStarted() {
-    return catalogConnectorManagerStarted;
+  public boolean isCatalogConnectorManagerStartTriggered() {
+    return catalogConnectorManagerStartTriggered;
   }
 
   /**
@@ -131,14 +131,17 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
         // static catalog is loaded before the catalogs Gravitino created, therefore the manager is
         // started from the static connector only, re-applying its configuration in case a dynamic
         // connector was created first.
-        if (!catalogConnectorManagerStarted
+        if (!catalogConnectorManagerStartTriggered
             && !config.isDynamicConnector()
             && isCoordinator(trinoConnectorContext)) {
+          // Triggered before start() on purpose: everything that makes it fail is a
+          // configuration error, and retrying on the next create() would only open another
+          // connection.
+          catalogConnectorManagerStartTriggered = true;
           // Only the configuration is re-applied here: rebuilding the Gravitino client would leak
           // the one a dynamic connector may have already built.
           catalogConnectorManager.updateConfig(config);
           catalogConnectorManager.start();
-          catalogConnectorManagerStarted = true;
         }
       } catch (Exception e) {
         String message = "Initialization of the GravitinoConnector failed " + e.getMessage();

@@ -94,7 +94,7 @@ public class TestGravitinoConnectorFactoryStart {
     CoordinatorFactory factory = newFactory();
 
     assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
-    assertTrue(factory.isCatalogConnectorManagerStarted());
+    assertTrue(factory.isCatalogConnectorManagerStartTriggered());
   }
 
   @Test
@@ -110,7 +110,7 @@ public class TestGravitinoConnectorFactoryStart {
         e.getMessage().contains("jdbc:trino://"),
         "The manager must not be started from a dynamic connector, got: " + e.getMessage());
     assertNotNull(factory.getCatalogConnectorManager());
-    assertFalse(factory.isCatalogConnectorManagerStarted());
+    assertFalse(factory.isCatalogConnectorManagerStartTriggered());
   }
 
   @Test
@@ -124,7 +124,20 @@ public class TestGravitinoConnectorFactoryStart {
     // Had the dynamic config been used instead, `discovery.uri` would have been missing and the
     // register would have failed to build the JDBC URI.
     assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
-    assertTrue(factory.isCatalogConnectorManagerStarted());
+    assertTrue(factory.isCatalogConnectorManagerStartTriggered());
+  }
+
+  @Test
+  public void testStartIsAttemptedOnlyOnce() {
+    CoordinatorFactory factory = newFactory();
+
+    Map<String, String> brokenConfig = staticConfig();
+    brokenConfig.put("catalog.config-dir", "/not/exists/catalog");
+    assertThrows(Exception.class, () -> factory.create("gravitino", brokenConfig, mockContext()));
+
+    // Everything that makes start() fail is a configuration error, so the next create() must not
+    // try again: a second init() would open another connection and abandon the first one.
+    assertNotNull(factory.create("gravitino", brokenConfig, mockContext()));
   }
 
   @Test

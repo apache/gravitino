@@ -217,6 +217,24 @@ public class TestCatalogRegister {
   }
 
   @Test
+  public void testKeystoreWithVerificationNone() throws IOException {
+    TrinoException e =
+        assertThrows(
+            TrinoException.class,
+            () ->
+                CatalogRegister.buildJdbcProperties(
+                    config(
+                        Map.of(
+                            "trino.jdbc.ssl.enabled", "true",
+                            "trino.jdbc.ssl.verification", "NONE",
+                            "trino.jdbc.ssl.keystore.path", createStoreFile().toString()))));
+
+    assertEquals(GRAVITINO_ILLEGAL_ARGUMENT.toErrorCode(), e.getErrorCode());
+    assertTrue(e.getMessage().contains("NONE"));
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.keystore.path"));
+  }
+
+  @Test
   public void testInvalidSslVerification() {
     TrinoException e =
         assertThrows(

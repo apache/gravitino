@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertThrowsExactly;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -266,6 +267,37 @@ public class TestGravitinoConfig {
                 "  "));
 
     assertEquals("FULL", config.getTrinoJdbcSslVerification());
+  }
+
+  @Test
+  public void testInvalidSslEnabledIsRejected() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake",
+                "user_001",
+                // An HTTPS discovery.uri would have derived true, so a typo must not silently
+                // fall back to false.
+                "discovery.uri",
+                "https://host:8443",
+                "trino.jdbc.ssl.enabled",
+                "yes"));
+
+    TrinoException e = assertThrows(TrinoException.class, config::isTrinoJdbcSslEnabled);
+    assertTrue(e.getMessage().contains("trino.jdbc.ssl.enabled"));
+    assertTrue(e.getMessage().contains("expected true or false"));
+  }
+
+  @Test
+  public void testSslEnabledAcceptsMixedCase() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "discovery.uri", "http://host:8080",
+                "trino.jdbc.ssl.enabled", " TRUE "));
+
+    assertTrue(config.isTrinoJdbcSslEnabled());
   }
 
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {

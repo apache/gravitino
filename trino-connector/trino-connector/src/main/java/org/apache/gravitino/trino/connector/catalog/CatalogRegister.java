@@ -29,7 +29,6 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
@@ -91,8 +90,6 @@ public class CatalogRegister {
     this.config = config;
 
     TrinoDriver driver = new TrinoDriver();
-    DriverManager.registerDriver(driver);
-
     Properties properties = buildJdbcProperties(config);
     String jdbcUri = config.getTrinoJdbcURI();
     try {
@@ -186,6 +183,14 @@ public class CatalogRegister {
     if (!extraProperties.isEmpty()) {
       // Log the names only, the values may contain credentials.
       LOG.debug("Applying extra Trino JDBC properties: {}", extraProperties.keySet());
+      extraProperties.keySet().stream()
+          .filter(key -> key.startsWith("SSL") && properties.containsKey(key))
+          .forEach(
+              key ->
+                  LOG.warn(
+                      "Extra Trino JDBC property '{}' overrides the TLS setting derived from the "
+                          + "dedicated configuration and is applied without validation",
+                      key));
       properties.putAll(extraProperties);
     }
     return properties;
@@ -223,7 +228,7 @@ public class CatalogRegister {
       return;
     }
 
-    validateKeystoreConfig(keystorePath, keystorePassword, keystoreType);
+    validateKeystoreConfig(verification, keystorePath, keystorePassword, keystoreType);
 
     if (StringUtils.isBlank(truststorePath)) {
       // The driver falls back to the default JVM truststore, which the password and the type of a
@@ -253,12 +258,20 @@ public class CatalogRegister {
   }
 
   private static void validateKeystoreConfig(
-      String keystorePath, String keystorePassword, String keystoreType) {
+      String verification, String keystorePath, String keystorePassword, String keystoreType) {
     if (StringUtils.isBlank(keystorePath)) {
       checkRequires(
           "trino.jdbc.ssl.keystore.password", keystorePassword, "trino.jdbc.ssl.keystore.path");
       checkRequires("trino.jdbc.ssl.keystore.type", keystoreType, "trino.jdbc.ssl.keystore.path");
       return;
+    }
+    if (SSL_VERIFICATION_NONE.equals(verification)) {
+      // The driver rejects the keystore properties in this combination, so fail with a config
+      // error here rather than letting it surface as a connection failure.
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Config 'trino.jdbc.ssl.keystore.path' cannot be used with "
+              + "'trino.jdbc.ssl.verification' = NONE");
     }
     if (!Files.exists(Path.of(keystorePath))) {
       throw new TrinoException(

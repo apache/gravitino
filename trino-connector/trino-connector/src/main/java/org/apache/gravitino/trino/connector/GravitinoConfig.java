@@ -395,6 +395,21 @@ public class GravitinoConfig {
     }
   }
 
+  private static boolean parseBooleanConfig(String key, String value) {
+    // `Boolean.parseBoolean` maps every unrecognized value to false, which would silently disable
+    // TLS for a typo such as `yes`, even when the `discovery.uri` scheme implies it should be on.
+    if ("true".equalsIgnoreCase(value)) {
+      return true;
+    }
+    if ("false".equalsIgnoreCase(value)) {
+      return false;
+    }
+    throw new TrinoException(
+        GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+        String.format(
+            "Invalid value for config '%s': expected true or false, got: %s", key, value));
+  }
+
   private static boolean isHttpsScheme(URI uri) {
     return "https".equalsIgnoreCase(uri.getScheme());
   }
@@ -452,7 +467,7 @@ public class GravitinoConfig {
   public boolean isTrinoJdbcSslEnabled() {
     String value = config.get(TRINO_JDBC_SSL_ENABLED.key);
     if (StringUtils.isNotBlank(value)) {
-      return Boolean.parseBoolean(value.trim());
+      return parseBooleanConfig(TRINO_JDBC_SSL_ENABLED.key, value.trim());
     }
     return isHttpsScheme(parseDiscoveryUri());
   }
