@@ -27,6 +27,7 @@ import asyncio
 import base64
 import json
 import logging
+import threading
 from collections.abc import AsyncGenerator, Generator
 from typing import Optional, Union
 
@@ -75,6 +76,9 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             kwargs["client"] = client
         super().__init__(token_endpoint, client_id, client_secret, **kwargs)
         self._token_lock = asyncio.Lock()
+        self._sync_lock = threading.Lock()
+        self._rejected_tokens: set[str] = set()
+        self._retried_tokens: set[str] = set()
 
     def invalidate(self) -> None:
         """Drop the cached token so the next call fetches a new one."""
@@ -115,13 +119,20 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         self, request: httpx.Request
     ) -> Generator[httpx.Request, httpx.Response, None]:
         """Attach a cached or freshly fetched Bearer; retry once on HTTP 401."""
-        self._apply_token(request)
+        if self.requires_request_body:
+            request.read()
+        token, fetched = self._apply_token(request)
         response = yield request
         if response.status_code != 401:
             return
-        self.invalidate()
-        self._apply_token(request)
-        yield request
+        with self._sync_lock:
+            if not self._begin_401_retry(token, fetched):
+                return
+        self._invalidate_if_still_cached(token)
+        retry_token, _ = self._apply_token(request)
+        response = yield request
+        if response.status_code == 401:
+            self._rejected_tokens.add(retry_token)
 
     async def async_auth_flow(
         self, request: httpx.Request
@@ -129,13 +140,18 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         """Attach a Bearer without a blocking IdP POST on the event loop."""
         if self.requires_request_body:
             await request.aread()
-        await self._apply_token_async(request)
+        token, fetched = await self._apply_token_async(request)
         response = yield request
         if response.status_code != 401:
             return
-        self.invalidate()
-        await self._apply_token_async(request)
-        yield request
+        async with self._token_lock:
+            if not self._begin_401_retry(token, fetched):
+                return
+        self._invalidate_if_still_cached(token)
+        retry_token, _ = await self._apply_token_async(request)
+        response = yield request
+        if response.status_code == 401:
+            self._rejected_tokens.add(retry_token)
 
     def _configure_client(self, client: httpx.Client) -> None:
         """Do not send HTTP Basic; id and secret go in the form body."""
@@ -202,16 +218,39 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             on_missing_token=lambda: fetched,
         )
 
-    def _apply_token(self, request: httpx.Request) -> None:
-        token = OAuth2.token_cache.get_token(
-            self.state,
-            early_expiry=self.early_expiry,
-            on_missing_token=self.request_new_token,
-            on_expired_token=self.refresh_token,
-        )
-        self._update_user_request(request, token)
+    def _invalidate_if_still_cached(self, token: str) -> None:
+        """Drop the cache entry only when it still holds the rejected token."""
+        if self._cached_bearer() == token:
+            self.invalidate()
 
-    async def _apply_token_async(self, request: httpx.Request) -> None:
+    def _begin_401_retry(self, token: str, fetched: bool) -> bool:
+        """Reserve a single 401 retry for this token; skip hopeless cases."""
+        if fetched:
+            self._rejected_tokens.add(token)
+            return False
+        if token in self._rejected_tokens or token in self._retried_tokens:
+            return False
+        self._retried_tokens.add(token)
+        return True
+
+    def _apply_token(self, request: httpx.Request) -> tuple[str, bool]:
+        fetched = False
+        token = self._cached_bearer()
+        if token is None:
+            token = OAuth2.token_cache.get_token(
+                self.state,
+                early_expiry=self.early_expiry,
+                on_missing_token=self.request_new_token,
+                on_expired_token=self.refresh_token,
+            )
+            fetched = True
+        self._update_user_request(request, token)
+        return token, fetched
+
+    async def _apply_token_async(
+        self, request: httpx.Request
+    ) -> tuple[str, bool]:
+        fetched = False
         token = self._cached_bearer()
         if token is None:
             async with self._token_lock:
@@ -220,4 +259,6 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
                     token = self._store_and_get(
                         await self.request_new_token_async()
                     )
+                    fetched = True
         self._update_user_request(request, token)
+        return token, fetched

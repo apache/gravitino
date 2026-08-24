@@ -167,6 +167,94 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertEqual(calls["token"], 1)
         self.assertEqual(calls["api"], 10)
 
+    def test_fresh_token_401_skips_retry(self):
+        """A brand-new token that is rejected is not retried or refetched."""
+        calls = {"token": 0, "api": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                calls["token"] += 1
+                return httpx.Response(
+                    200, json={"access_token": "tok-1", "expires_in": 3600}
+                )
+            calls["api"] += 1
+            return httpx.Response(401)
+
+        response = self._get(self._auth(handler))
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(calls["token"], 1)
+        self.assertEqual(calls["api"], 1)
+
+    def test_parallel_401_does_not_stampede_token_refresh(self):
+        """Concurrent 401s must not each invalidate and refetch the token."""
+        calls = {"token": 0, "api": 0, "phase": "prime"}
+        counter_lock = threading.Lock()
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                with counter_lock:
+                    calls["token"] += 1
+                time.sleep(0.02)
+                return httpx.Response(
+                    200, json={"access_token": "tok-1", "expires_in": 3600}
+                )
+            with counter_lock:
+                calls["api"] += 1
+                if calls["phase"] == "prime":
+                    return httpx.Response(200, json={"ok": True})
+            return httpx.Response(401)
+
+        auth = self._auth(handler)
+
+        async def prime_and_parallel() -> None:
+            async with httpx.AsyncClient(
+                auth=auth,
+                transport=auth._test_transport,
+                base_url="https://gravitino.example",
+            ) as client:
+                await client.get("/api")
+                calls["phase"] = "parallel"
+                token_before = calls["token"]
+                await asyncio.gather(*[client.get("/api") for _ in range(10)])
+                self.assertLessEqual(
+                    calls["token"] - token_before,
+                    1,
+                    "parallel 401 retry must not stampede the IdP",
+                )
+
+        asyncio.run(prime_and_parallel())
+        self.assertGreaterEqual(calls["api"], 11)
+
+    def test_config_401_does_not_refetch_on_every_call(self):
+        """Persistent Gravitino 401 must not POST to the IdP on every tool call."""
+        calls = {"token": 0, "api": 0}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                calls["token"] += 1
+                return httpx.Response(
+                    200, json={"access_token": "tok-1", "expires_in": 3600}
+                )
+            calls["api"] += 1
+            return httpx.Response(401)
+
+        auth = self._auth(handler)
+
+        async def run_twice() -> None:
+            async with httpx.AsyncClient(
+                auth=auth,
+                transport=auth._test_transport,
+                base_url="https://gravitino.example",
+            ) as client:
+                first = await client.get("/api")
+                second = await client.get("/api")
+                self.assertEqual(first.status_code, 401)
+                self.assertEqual(second.status_code, 401)
+
+        asyncio.run(run_twice())
+        self.assertEqual(calls["token"], 1)
+        self.assertEqual(calls["api"], 2)
+
     def test_sends_scope_when_configured(self):
         seen = {}
 
@@ -273,7 +361,7 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
             self._get(self._auth(handler))
 
     def test_retries_once_after_401(self):
-        calls = {"token": 0, "api": 0}
+        calls = {"token": 0, "api": 0, "primed": False}
         seen = []
 
         def handler(request: httpx.Request) -> httpx.Response:
@@ -286,19 +374,34 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
                         "expires_in": 3600,
                     },
                 )
-            seen.append(request.headers.get("authorization"))
             calls["api"] += 1
-            if calls["api"] == 1:
+            if not calls["primed"]:
+                return httpx.Response(200, json={"ok": True})
+            seen.append(request.headers.get("authorization"))
+            if len(seen) == 1:
                 return httpx.Response(401)
             return httpx.Response(200, json={"ok": True})
 
-        response = self._get(self._auth(handler))
+        auth = self._auth(handler)
+
+        async def _run():
+            async with httpx.AsyncClient(
+                auth=auth,
+                transport=auth._test_transport,
+                base_url="https://gravitino.example",
+            ) as client:
+                await client.get("/api")
+                calls["primed"] = True
+                return await client.get("/api")
+
+        response = asyncio.run(_run())
         self.assertEqual(response.status_code, 200)
         self.assertEqual(seen, ["Bearer t1", "Bearer t2"])
         self.assertEqual(calls["token"], 2)
 
     def test_401_retry_replays_streaming_request_body(self):
         seen_bodies = []
+        primed = {"done": False}
 
         def handler(request: httpx.Request) -> httpx.Response:
             if request.method == "POST" and request.url.path == "/token":
@@ -306,7 +409,9 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
                     200, json={"access_token": "t1", "expires_in": 3600}
                 )
             seen_bodies.append(request.content)
-            if len(seen_bodies) == 1:
+            if not primed["done"]:
+                return httpx.Response(200, json={"ok": True})
+            if len(seen_bodies) == 2:
                 return httpx.Response(401)
             return httpx.Response(200, json={"ok": True})
 
@@ -321,11 +426,16 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
                 transport=auth._test_transport,
                 base_url="https://gravitino.example",
             ) as client:
+                await client.get("/api")
+                primed["done"] = True
                 return await client.post("/api", content=body())
 
         response = asyncio.run(_run())
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(seen_bodies, [b'{"name":"fileset"}'] * 2)
+        self.assertEqual(
+            seen_bodies,
+            [b"", b'{"name":"fileset"}', b'{"name":"fileset"}'],
+        )
 
     def test_async_auth_flow_posts_token_with_async_client(self):
         calls = {"token": 0}
