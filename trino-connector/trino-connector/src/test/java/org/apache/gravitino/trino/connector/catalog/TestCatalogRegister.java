@@ -75,13 +75,13 @@ public class TestCatalogRegister {
   }
 
   @Test
-  public void testSslEnabledWithTruststore() throws IOException {
+  public void testHttpsDiscoveryUriWithTruststore() throws IOException {
     String truststore = createStoreFile().toString();
     Properties properties =
         CatalogRegister.buildJdbcProperties(
             config(
                 Map.of(
-                    "trino.jdbc.ssl.enabled", "true",
+                    "discovery.uri", "https://localhost:8443",
                     "trino.jdbc.ssl.truststore.path", truststore,
                     "trino.jdbc.ssl.truststore.password", "truststore-secret",
                     "trino.jdbc.ssl.truststore.type", "PKCS12")));
@@ -155,13 +155,13 @@ public class TestCatalogRegister {
   }
 
   @Test
-  public void testKeystoreIsPassedThrough() throws IOException {
+  public void testHttpsDiscoveryUriWithKeystore() throws IOException {
     String keystore = createStoreFile().toString();
     Properties properties =
         CatalogRegister.buildJdbcProperties(
             config(
                 Map.of(
-                    "trino.jdbc.ssl.enabled", "true",
+                    "discovery.uri", "https://localhost:8443",
                     "trino.jdbc.ssl.keystore.path", keystore,
                     "trino.jdbc.ssl.keystore.password", "keystore-secret",
                     "trino.jdbc.ssl.keystore.type", "PKCS12")));

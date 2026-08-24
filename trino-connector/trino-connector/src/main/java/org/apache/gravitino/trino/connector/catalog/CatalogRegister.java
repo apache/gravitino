@@ -217,7 +217,8 @@ public class CatalogRegister {
       if (!SSL_VERIFICATION_FULL.equals(verification)) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-            "Config 'trino.jdbc.ssl.verification' requires 'trino.jdbc.ssl.enabled' to be true");
+            "Config 'trino.jdbc.ssl.verification' requires TLS to be enabled either by an HTTPS "
+                + "'discovery.uri' or by 'trino.jdbc.ssl.enabled=true'");
       }
       checkRequiresSslEnabled("trino.jdbc.ssl.truststore.path", truststorePath);
       checkRequiresSslEnabled("trino.jdbc.ssl.truststore.password", truststorePassword);
@@ -294,7 +295,10 @@ public class CatalogRegister {
     if (StringUtils.isNotEmpty(value)) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
-          String.format("Config '%s' requires 'trino.jdbc.ssl.enabled' to be true", key));
+          String.format(
+              "Config '%s' requires TLS to be enabled either by an HTTPS 'discovery.uri' or by "
+                  + "'trino.jdbc.ssl.enabled=true'",
+              key));
     }
   }
 
