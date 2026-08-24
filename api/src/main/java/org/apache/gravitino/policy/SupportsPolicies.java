@@ -44,6 +44,8 @@ public interface SupportsPolicies {
    * @param name The name of the policy.
    * @return The policy.
    * @throws NoSuchPolicyException If the policy does not associate with the object.
+   *     <p>Compatibility note: Object policies are now derived from effective tags. New callers
+   *     should use {@link #listPolicyInfos()} and select the desired policy from the result.
    */
   Policy getPolicy(String name) throws NoSuchPolicyException;
 
@@ -63,6 +65,9 @@ public interface SupportsPolicies {
    * @param policiesToRemove The policies to remove.
    * @return The list of applied policies.
    * @throws PolicyAlreadyAssociatedException If the policy is already applied to the object.
+   *     <p>Compatibility note: Direct object-policy mutation is no longer exposed by the REST API.
+   *     New callers should associate policies with tags through the metalake policy-to-tag APIs and
+   *     attach tags to metadata objects instead.
    */
   String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove)
       throws PolicyAlreadyAssociatedException;

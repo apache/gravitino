@@ -25,6 +25,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.PolicyTagAssociationEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
@@ -102,6 +103,12 @@ public class PolicyHookDispatcher implements PolicyDispatcher {
   @Override
   public MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName) {
     return dispatcher.listMetadataObjectsForPolicy(metalake, policyName);
+  }
+
+  @Override
+  public PolicyTagAssociationEntity[] listTagAssociationsForPolicy(
+      String metalake, String policyName) {
+    return dispatcher.listTagAssociationsForPolicy(metalake, policyName);
   }
 
   @Override

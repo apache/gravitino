@@ -28,8 +28,16 @@ import org.apache.gravitino.MetadataObject;
 public interface PolicyContent {
 
   /**
-   * @return the set of metadata object types that the policy can be applied to
+   * Returns the metadata object types historically declared by this policy content.
+   *
+   * <p>Policy applicability is now determined by policy-to-tag associations and their selectors;
+   * callers must not use this field as an object-policy resolution filter. It remains available for
+   * content compatibility and validation.
+   *
+   * @return The metadata object types declared by this policy content.
+   * @deprecated Use policy-to-tag associations to determine applicability.
    */
+  @Deprecated
   Set<MetadataObject.Type> supportedObjectTypes();
 
   /**

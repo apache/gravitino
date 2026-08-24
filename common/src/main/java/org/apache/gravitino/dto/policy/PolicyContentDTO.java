@@ -64,6 +64,7 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
+    @Deprecated
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return supportedObjectTypes;
     }
@@ -169,6 +170,8 @@ public interface PolicyContentDTO extends PolicyContent {
     }
 
     @Override
+    @Deprecated
+    @SuppressWarnings("deprecation")
     public Set<MetadataObject.Type> supportedObjectTypes() {
       return toDomainContent().supportedObjectTypes();
     }

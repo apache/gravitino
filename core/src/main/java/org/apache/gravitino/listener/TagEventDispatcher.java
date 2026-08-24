@@ -19,6 +19,7 @@
 package org.apache.gravitino.listener;
 
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -55,7 +56,16 @@ import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectFail
 import org.apache.gravitino.listener.api.event.ListTagsInfoForMetadataObjectPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsInfoPreEvent;
 import org.apache.gravitino.listener.api.event.ListTagsPreEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagFailureEvent;
+import org.apache.gravitino.listener.api.event.RemovePolicyFromTagPreEvent;
+import org.apache.gravitino.listener.api.event.SetPolicyForTagEvent;
+import org.apache.gravitino.listener.api.event.SetPolicyForTagFailureEvent;
+import org.apache.gravitino.listener.api.event.SetPolicyForTagPreEvent;
+import org.apache.gravitino.listener.api.info.PolicyTagAssociationInfo;
 import org.apache.gravitino.listener.api.info.TagInfo;
+import org.apache.gravitino.meta.PolicyTagAssociationEntity;
+import org.apache.gravitino.policy.PolicyTagSelector;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -239,6 +249,72 @@ public class TagEventDispatcher implements TagDispatcher {
   }
 
   @Override
+  public PolicyTagAssociationEntity[] listPolicyAssociationsForTag(String metalake, String name) {
+    return dispatcher.listPolicyAssociationsForTag(metalake, name);
+  }
+
+  @Override
+  public PolicyTagAssociationEntity setPolicyForTag(
+      String metalake, String tagName, String policyName, PolicyTagSelector selector) {
+    String user = PrincipalUtils.getCurrentUserName();
+    PolicyTagAssociationInfo previousAssociation;
+    try {
+      previousAssociation = findPolicyAssociation(metalake, tagName, policyName);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new SetPolicyForTagPreEvent(user, metalake, tagName, policyName, null, selector));
+      eventBus.dispatchEvent(
+          new SetPolicyForTagFailureEvent(user, metalake, tagName, policyName, null, selector, e));
+      throw e;
+    }
+
+    eventBus.dispatchEvent(
+        new SetPolicyForTagPreEvent(
+            user, metalake, tagName, policyName, previousAssociation, selector));
+    try {
+      PolicyTagAssociationEntity result =
+          dispatcher.setPolicyForTag(metalake, tagName, policyName, selector);
+      PolicyTagAssociationInfo resultingAssociation = toInfo(metalake, result);
+      eventBus.dispatchEvent(
+          new SetPolicyForTagEvent(user, previousAssociation, selector, resultingAssociation));
+      return result;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new SetPolicyForTagFailureEvent(
+              user, metalake, tagName, policyName, previousAssociation, selector, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    String user = PrincipalUtils.getCurrentUserName();
+    PolicyTagAssociationInfo previousAssociation;
+    try {
+      previousAssociation = findPolicyAssociation(metalake, tagName, policyName);
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new RemovePolicyFromTagPreEvent(user, metalake, tagName, policyName, null));
+      eventBus.dispatchEvent(
+          new RemovePolicyFromTagFailureEvent(user, metalake, tagName, policyName, null, e));
+      throw e;
+    }
+
+    eventBus.dispatchEvent(
+        new RemovePolicyFromTagPreEvent(user, metalake, tagName, policyName, previousAssociation));
+    try {
+      dispatcher.removePolicyFromTag(metalake, tagName, policyName);
+      eventBus.dispatchEvent(
+          new RemovePolicyFromTagEvent(user, metalake, tagName, policyName, previousAssociation));
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new RemovePolicyFromTagFailureEvent(
+              user, metalake, tagName, policyName, previousAssociation, e));
+      throw e;
+    }
+  }
+
+  @Override
   public String[] listTagsForMetadataObject(String metalake, MetadataObject metadataObject) {
     eventBus.dispatchEvent(
         new ListTagsForMetadataObjectPreEvent(
@@ -387,6 +463,27 @@ public class TagEventDispatcher implements TagDispatcher {
         tag.properties(),
         allowedValuesForInfo(tag.valueConstraint()),
         tag.assignment().map(assignment -> assignment.values()).orElse(null));
+  }
+
+  @Nullable
+  private PolicyTagAssociationInfo findPolicyAssociation(
+      String metalake, String tagName, String policyName) {
+    for (PolicyTagAssociationEntity association :
+        dispatcher.listPolicyAssociationsForTag(metalake, tagName)) {
+      if (association.policy().name().equals(policyName)) {
+        return toInfo(metalake, association);
+      }
+    }
+    return null;
+  }
+
+  private static PolicyTagAssociationInfo toInfo(
+      String metalake, PolicyTagAssociationEntity association) {
+    return new PolicyTagAssociationInfo(
+        metalake,
+        association.tag().name(),
+        association.policy().name(),
+        association.selector().orElse(null));
   }
 
   private static String[] allowedValuesForInfo(TagValueConstraint valueConstraint) {
