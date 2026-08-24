@@ -113,6 +113,33 @@ public class TestAuxiliaryServiceManager {
   }
 
   @Test
+  public void testIsAuxServiceRegistered() throws Exception {
+    GravitinoAuxiliaryService auxService = mock(GravitinoAuxiliaryService.class);
+    IsolatedClassLoader isolatedClassLoader =
+        new IsolatedClassLoader(
+            Collections.emptyList(), Collections.emptyList(), Collections.emptyList());
+
+    AuxiliaryServiceManager auxServiceManager = new AuxiliaryServiceManager();
+    AuxiliaryServiceManager spyAuxManager = spy(auxServiceManager);
+    doReturn(isolatedClassLoader).when(spyAuxManager).getIsolatedClassLoader(anyList());
+    doReturn(auxService).when(spyAuxManager).loadAuxService("iceberg-rest", isolatedClassLoader);
+
+    Assertions.assertFalse(spyAuxManager.isAuxServiceRegistered("iceberg-rest"));
+
+    spyAuxManager.serviceInit(
+        DummyConfig.of(
+            ImmutableMap.of(
+                AuxiliaryServiceManager.GRAVITINO_AUX_SERVICE_PREFIX
+                    + AuxiliaryServiceManager.AUX_SERVICE_NAMES,
+                "iceberg-rest",
+                "gravitino.iceberg-rest." + AuxiliaryServiceManager.AUX_SERVICE_CLASSPATH,
+                "/tmp")));
+
+    Assertions.assertTrue(spyAuxManager.isAuxServiceRegistered("iceberg-rest"));
+    Assertions.assertFalse(spyAuxManager.isAuxServiceRegistered("lance-rest"));
+  }
+
+  @Test
   void testAuxiliaryServiceConfigs() {
     Map<String, String> m =
         ImmutableMap.of(

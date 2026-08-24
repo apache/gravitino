@@ -34,6 +34,7 @@ import java.sql.Statement;
 import java.util.Properties;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,12 +107,18 @@ public class CatalogRegister {
 
   private String generateCreateCatalogCommand(String name, GravitinoCatalog gravitinoCatalog)
       throws Exception {
+    // This statement is replicated by Trino to every node in the cluster, coordinator and workers
+    // alike, so it is the only place a value the coordinator alone knows (like the Iceberg REST
+    // server endpoint it discovered) can reach every node that will build this catalog's internal
+    // connector config.
+    GravitinoCatalog catalogToRegister =
+        IcebergConnectorAdapter.embedDiscoveredIcebergRestUri(gravitinoCatalog, config);
     return String.format(
         "CREATE CATALOG %s USING gravitino WITH ( \"%s\" = 'true', \"%s\" = '%s', %s)",
         name,
         GRAVITINO_DYNAMIC_CONNECTOR,
         GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG,
-        GravitinoCatalog.toJson(gravitinoCatalog),
+        GravitinoCatalog.toJson(catalogToRegister),
         config.toCatalogConfig());
   }
 

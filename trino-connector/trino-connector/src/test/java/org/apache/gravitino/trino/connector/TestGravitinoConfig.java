@@ -173,7 +173,8 @@ public class TestGravitinoConfig {
     GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
 
     // Nothing configured, and nothing discovered yet.
-    assertEquals("", config.getIcebergRestUri("user_001"));
+    assertEquals("", config.getManualIcebergRestUri());
+    assertEquals("", config.getDiscoveredIcebergRestUri("user_001"));
     assertTrue(config.getIcebergRestCatalogConfig().isEmpty());
   }
 
@@ -191,9 +192,8 @@ public class TestGravitinoConfig {
             "client_id:client_secret");
     GravitinoConfig config = new GravitinoConfig(configMap);
 
-    // A manually configured URI applies regardless of metalake.
-    assertEquals("http://127.0.0.1:9001/iceberg", config.getIcebergRestUri("user_001"));
-    assertEquals("http://127.0.0.1:9001/iceberg", config.getIcebergRestUri("other_metalake"));
+    // A manually configured URI is plain local config, not scoped to any metalake.
+    assertEquals("http://127.0.0.1:9001/iceberg", config.getManualIcebergRestUri());
 
     Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
     assertEquals(2, restCatalogConfig.size());
@@ -209,29 +209,14 @@ public class TestGravitinoConfig {
     config.setDiscoveredIcebergRestUri("metalake_a", "http://irc-a:9001/iceberg");
     config.setDiscoveredIcebergRestUri("metalake_b", "http://irc-b:9001/iceberg");
 
-    assertEquals("http://irc-a:9001/iceberg", config.getIcebergRestUri("metalake_a"));
-    assertEquals("http://irc-b:9001/iceberg", config.getIcebergRestUri("metalake_b"));
+    assertEquals("http://irc-a:9001/iceberg", config.getDiscoveredIcebergRestUri("metalake_a"));
+    assertEquals("http://irc-b:9001/iceberg", config.getDiscoveredIcebergRestUri("metalake_b"));
     // Unknown/unmatched metalakes fall back to nothing.
-    assertEquals("", config.getIcebergRestUri("metalake_c"));
+    assertEquals("", config.getDiscoveredIcebergRestUri("metalake_c"));
 
     // Clearing (e.g. the server stopped reporting an endpoint) removes it again.
     config.setDiscoveredIcebergRestUri("metalake_a", null);
-    assertEquals("", config.getIcebergRestUri("metalake_a"));
-  }
-
-  @Test
-  public void testManualIcebergRestUriOverridesDiscovery() {
-    GravitinoConfig config =
-        new GravitinoConfig(
-            ImmutableMap.of(
-                "gravitino.metalake",
-                "user_001",
-                "gravitino.iceberg.rest-uri",
-                "http://manual:9001/iceberg"));
-
-    config.setDiscoveredIcebergRestUri("user_001", "http://discovered:9001/iceberg");
-
-    assertEquals("http://manual:9001/iceberg", config.getIcebergRestUri("user_001"));
+    assertEquals("", config.getDiscoveredIcebergRestUri("metalake_a"));
   }
 
   @Test
