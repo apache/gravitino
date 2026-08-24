@@ -715,6 +715,42 @@ class TestNoServiceIdentityFallback(unittest.TestCase):
             with self.assertRaises(ServiceIdentityFallbackDisabled):
                 ctx.rest_client()
 
+    def test_http_without_auth_allows_fallback_when_flag_false(self):
+        setting = Setting(
+            metalake="ml",
+            gravitino_uri="http://localhost:8090",
+            transport="http",
+            oauth_token_endpoint="https://idp/token",
+            oauth_client_id="mcp",
+            oauth_client_secret="s",
+        )
+        ctx = GravitinoContext(setting)
+        with mock.patch(
+            "mcp_server.core.context._in_http_request", return_value=True
+        ), mock.patch(
+            "mcp_server.core.context._get_request_authorization",
+            return_value="",
+        ):
+            client = ctx.rest_client()
+        self.assertIs(client, ctx._default_client)
+
+    def test_http_flag_noop_without_service_identity(self):
+        setting = Setting(
+            metalake="ml",
+            gravitino_uri="http://localhost:8090",
+            transport="http",
+            no_service_identity_fallback=True,
+        )
+        ctx = GravitinoContext(setting)
+        with mock.patch(
+            "mcp_server.core.context._in_http_request", return_value=True
+        ), mock.patch(
+            "mcp_server.core.context._get_request_authorization",
+            return_value="",
+        ):
+            client = ctx.rest_client()
+        self.assertIs(client, ctx._default_client)
+
     def test_stdio_uses_default_client_even_when_flag_set(self):
         setting = Setting(
             metalake="ml",
