@@ -50,13 +50,15 @@ public class PolicyTagRelSQLProviderFactory {
   }
 
   /** Delegates a tag-anchored list query. */
-  public static String listByTagIds(@Param("tagIds") List<Long> tagIds) {
-    return getProvider().listByTagIds(tagIds);
+  public static String listByTagNames(
+      @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames) {
+    return getProvider().listByTagNames(metalakeName, tagNames);
   }
 
   /** Delegates a policy-anchored list query. */
-  public static String listByPolicyIds(@Param("policyIds") List<Long> policyIds) {
-    return getProvider().listByPolicyIds(policyIds);
+  public static String listByPolicyNames(
+      @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
+    return getProvider().listByPolicyNames(metalakeName, policyNames);
   }
 
   /** Delegates a single relation query. */

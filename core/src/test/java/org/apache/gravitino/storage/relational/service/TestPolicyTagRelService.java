@@ -19,13 +19,17 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -130,6 +134,75 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
                 Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, tag.name())),
                 Entity.EntityType.TAG)
             .isEmpty());
+  }
+
+  @TestTemplate
+  public void testBatchListRelationsByMultipleAnchors() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    TagEntity firstTag = createAssociation(METALAKE, "domain_a", "retention_a");
+    TagEntity secondTag = createAssociation(METALAKE, "domain_b", "retention_b");
+    String otherMetalake = METALAKE + "_other";
+    createAndInsertMakeLake(otherMetalake);
+    createAssociation(otherMetalake, "domain_a", "retention_a");
+
+    List<RelationalEntity<?>> byTags =
+        backend.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Arrays.asList(
+                firstTag.nameIdentifier(),
+                secondTag.nameIdentifier(),
+                NameIdentifierUtil.ofTag(METALAKE, "missing_tag")),
+            Entity.EntityType.TAG);
+    Assertions.assertEquals(2, byTags.size());
+    Assertions.assertEquals(
+        Set.of("domain_a", "domain_b"),
+        byTags.stream().map(relation -> relation.source().name()).collect(Collectors.toSet()));
+
+    List<RelationalEntity<?>> byPolicies =
+        backend.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Arrays.asList(
+                NameIdentifierUtil.ofPolicy(METALAKE, "retention_a"),
+                NameIdentifierUtil.ofPolicy(METALAKE, "retention_b"),
+                NameIdentifierUtil.ofPolicy(METALAKE, "missing_policy")),
+            Entity.EntityType.POLICY);
+    Assertions.assertEquals(2, byPolicies.size());
+    Assertions.assertEquals(
+        Set.of("retention_a", "retention_b"),
+        byPolicies.stream().map(relation -> relation.source().name()).collect(Collectors.toSet()));
+  }
+
+  @TestTemplate
+  public void testUpdateRelationsRollsBackOnFailure() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    TagEntity tag = createAssociation(METALAKE, "domain", "retention");
+    RelationEdgeTarget existingTarget =
+        RelationEdgeTarget.of(
+            NameIdentifierUtil.ofPolicy(METALAKE, "retention"), Entity.EntityType.POLICY, null);
+    RelationEdgeTarget missingTarget =
+        RelationEdgeTarget.of(
+            NameIdentifierUtil.ofPolicy(METALAKE, "missing_policy"),
+            Entity.EntityType.POLICY,
+            null);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            backend.updateEntityRelations(
+                RelationUpdate.of(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    tag.nameIdentifier(),
+                    Entity.EntityType.TAG,
+                    new RelationEdgeTarget[] {missingTarget},
+                    new RelationEdgeTarget[] {existingTarget})));
+
+    List<RelationalEntity<?>> relations =
+        backend.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Collections.singletonList(tag.nameIdentifier()),
+            Entity.EntityType.TAG);
+    Assertions.assertEquals(1, relations.size());
+    Assertions.assertEquals("retention", relations.get(0).targetEntity().name());
   }
 
   @TestTemplate

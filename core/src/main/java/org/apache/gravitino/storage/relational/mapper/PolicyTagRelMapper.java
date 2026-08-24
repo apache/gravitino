@@ -32,22 +32,26 @@ public interface PolicyTagRelMapper {
   String POLICY_TAG_RELATION_TABLE_NAME = "policy_tag_relation_meta";
 
   /**
-   * Lists active policy-to-tag relations for the given tag IDs.
+   * Lists active policy-to-tag relations for the given tag names in a metalake.
    *
-   * @param tagIds The tag IDs.
+   * @param metalakeName The metalake name.
+   * @param tagNames The tag names.
    * @return The active policy-to-tag relations.
    */
-  @SelectProvider(type = PolicyTagRelSQLProviderFactory.class, method = "listByTagIds")
-  List<PolicyTagRelPO> listByTagIds(@Param("tagIds") List<Long> tagIds);
+  @SelectProvider(type = PolicyTagRelSQLProviderFactory.class, method = "listByTagNames")
+  List<PolicyTagRelPO> listByTagNames(
+      @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames);
 
   /**
-   * Lists active policy-to-tag relations for the given policy IDs.
+   * Lists active policy-to-tag relations for the given policy names in a metalake.
    *
-   * @param policyIds The policy IDs.
+   * @param metalakeName The metalake name.
+   * @param policyNames The policy names.
    * @return The active policy-to-tag relations.
    */
-  @SelectProvider(type = PolicyTagRelSQLProviderFactory.class, method = "listByPolicyIds")
-  List<PolicyTagRelPO> listByPolicyIds(@Param("policyIds") List<Long> policyIds);
+  @SelectProvider(type = PolicyTagRelSQLProviderFactory.class, method = "listByPolicyNames")
+  List<PolicyTagRelPO> listByPolicyNames(
+      @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames);
 
   /**
    * Gets one active relation by policy ID and tag ID.

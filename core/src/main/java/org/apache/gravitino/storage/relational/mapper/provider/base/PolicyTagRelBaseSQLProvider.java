@@ -30,14 +30,16 @@ import org.apache.ibatis.annotations.Param;
 /** Base SQL provider for policy-to-tag relations. */
 public class PolicyTagRelBaseSQLProvider {
 
-  /** Returns SQL for listing relations anchored by tag IDs. */
-  public String listByTagIds(@Param("tagIds") List<Long> tagIds) {
-    return listRelations("ptr.tag_id", "tagIds", "tagId");
+  /** Returns SQL for listing relations anchored by tag names. */
+  public String listByTagNames(
+      @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames) {
+    return listRelations("tm.metalake_id", "tm.tag_name", "tagNames", "tagName");
   }
 
-  /** Returns SQL for listing relations anchored by policy IDs. */
-  public String listByPolicyIds(@Param("policyIds") List<Long> policyIds) {
-    return listRelations("ptr.policy_id", "policyIds", "policyId");
+  /** Returns SQL for listing relations anchored by policy names. */
+  public String listByPolicyNames(
+      @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
+    return listRelations("pm.metalake_id", "pm.policy_name", "policyNames", "policyName");
   }
 
   /** Returns SQL for getting one active relation. */
@@ -138,12 +140,18 @@ public class PolicyTagRelBaseSQLProvider {
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
   }
 
-  private String listRelations(String column, String collection, String item) {
+  private String listRelations(
+      String metalakeIdColumn, String nameColumn, String collection, String item) {
     return "<script>"
         + selectColumns()
         + joins()
         + " WHERE "
-        + column
+        + metalakeIdColumn
+        + " IN (SELECT mm.metalake_id FROM "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
+        + " AND "
+        + nameColumn
         + " IN <foreach item='"
         + item
         + "' collection='"
