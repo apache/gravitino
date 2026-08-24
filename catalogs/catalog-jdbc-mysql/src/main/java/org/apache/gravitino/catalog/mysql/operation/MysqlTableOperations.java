@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.mysql.operation;
 
+import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_AUTO_INCREMENT_OFFSET_KEY;
 import static org.apache.gravitino.catalog.mysql.MysqlTablePropertiesMetadata.MYSQL_ENGINE_KEY;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -113,7 +114,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Add table comment if specified
     if (StringUtils.isNotEmpty(comment)) {
-      sqlBuilder.append(" COMMENT='").append(comment).append("'");
+      sqlBuilder.append(" COMMENT='").append(escapeSqlLiteral(comment, '\'')).append("'");
     }
 
     // Add table properties if any
@@ -295,7 +296,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
           newComment = StringIdentifier.addToComment(identifier, newComment);
         }
       }
-      alterSql.add("COMMENT '" + newComment + "'");
+      alterSql.add("COMMENT '" + escapeSqlLiteral(newComment, '\'') + "'");
     }
 
     if (!setProperties.isEmpty()) {
@@ -460,7 +461,10 @@ public class MysqlTableOperations extends JdbcTableOperations {
     }
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
-      columnDefinition.append("COMMENT '").append(addColumn.getComment()).append("' ");
+      columnDefinition
+          .append("COMMENT '")
+          .append(escapeSqlLiteral(addColumn.getComment(), '\''))
+          .append("' ");
     }
 
     // Append default value if available
@@ -626,7 +630,7 @@ public class MysqlTableOperations extends JdbcTableOperations {
 
     // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
-      sqlBuilder.append("COMMENT '").append(column.comment()).append("' ");
+      sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
   }

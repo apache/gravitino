@@ -1374,6 +1374,9 @@ public class ErrorHandlers {
 
     @Override
     public void accept(ErrorResponse errorResponse) {
+      if (errorResponse.getCode() == ErrorConstants.CONNECTION_FAILED_CODE) {
+        throw new ConnectionFailedException("%s", formatErrorMessage(errorResponse));
+      }
       if (errorResponse.getCode() == ErrorConstants.FORBIDDEN_CODE) {
         throw new ForbiddenException("Forbidden error :%s", errorResponse.getMessage());
       }

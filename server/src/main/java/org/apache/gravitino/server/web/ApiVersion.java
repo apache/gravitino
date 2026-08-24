@@ -18,17 +18,19 @@
  */
 package org.apache.gravitino.server.web;
 
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.TreeSet;
 
 public enum ApiVersion {
-  V_1(1);
+  V_1(1),
+  V_2(2);
 
   private static final TreeSet<ApiVersion> VERSIONS =
       new TreeSet<>(Comparator.comparingInt(o -> o.version));
 
   static {
-    VERSIONS.add(V_1);
+    VERSIONS.addAll(Arrays.asList(values()));
   }
 
   private final int version;
@@ -43,6 +45,11 @@ public enum ApiVersion {
 
   public static ApiVersion latestVersion() {
     return VERSIONS.last();
+  }
+
+  /** Returns the API version used when a request does not specify one. */
+  public static ApiVersion defaultVersion() {
+    return V_1;
   }
 
   public static boolean isSupportedVersion(int version) {

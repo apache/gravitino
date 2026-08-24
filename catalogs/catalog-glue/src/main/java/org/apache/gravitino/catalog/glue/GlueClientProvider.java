@@ -74,17 +74,9 @@ public final class GlueClientProvider {
     //   6. EC2 instance profile (IMDSv2)
     String accessKey = config.get(GlueConstants.AWS_ACCESS_KEY_ID);
     String secretKey = config.get(GlueConstants.AWS_SECRET_ACCESS_KEY);
-    boolean hasAccessKey = StringUtils.isNotBlank(accessKey);
-    boolean hasSecretKey = StringUtils.isNotBlank(secretKey);
-    Preconditions.checkArgument(
-        hasAccessKey == hasSecretKey,
-        "Both '%s' and '%s' must be set together. "
-            + "Either provide both keys for static authentication, "
-            + "or omit both to use the default credential chain.",
-        GlueConstants.AWS_ACCESS_KEY_ID,
-        GlueConstants.AWS_SECRET_ACCESS_KEY);
+    boolean hasStaticCredentials = hasAwsStaticCredentials(accessKey, secretKey);
 
-    if (hasAccessKey) {
+    if (hasStaticCredentials) {
       builder.credentialsProvider(
           StaticCredentialsProvider.create(AwsBasicCredentials.create(accessKey, secretKey)));
     } else {
@@ -98,5 +90,19 @@ public final class GlueClientProvider {
     }
 
     return builder.build();
+  }
+
+  static boolean hasAwsStaticCredentials(String accessKey, String secretKey) {
+    boolean hasAccessKey = StringUtils.isNotBlank(accessKey);
+    boolean hasSecretKey = StringUtils.isNotBlank(secretKey);
+    Preconditions.checkArgument(
+        hasAccessKey == hasSecretKey,
+        "Both '%s' and '%s' must be set together. "
+            + "Either provide both keys for static authentication, "
+            + "or omit both to use the default credential chain.",
+        GlueConstants.AWS_ACCESS_KEY_ID,
+        GlueConstants.AWS_SECRET_ACCESS_KEY);
+
+    return hasAccessKey;
   }
 }

@@ -39,10 +39,10 @@ GravitinoAdminClient gravitinoAdminClient = GravitinoAdminClient.builder("http:/
 
 ### Java Client Configuration
 
-| Configuration item                     | Description                                          | Default value       | Required | Since version |
-|----------------------------------------|------------------------------------------------------|---------------------|----------|---------------|
-| `gravitino.client.connectionTimeoutMs` | An optional http connection timeout in milliseconds. | `180000`(3 minutes) | No       | 1.0.0         |
-| `gravitino.client.socketTimeoutMs`     | An optional http socket timeout in milliseconds.     | `180000`(3 minutes) | No       | 1.0.0         |
+| Configuration item                     | Description                                          | Default value       | Required |
+|----------------------------------------|------------------------------------------------------|---------------------|----------|
+| `gravitino.client.connectionTimeoutMs` | An optional http connection timeout in milliseconds. | `180000`(3 minutes) | No       |
+| `gravitino.client.socketTimeoutMs`     | An optional http socket timeout in milliseconds.     | `180000`(3 minutes) | No       |
 
 **Note:** Invalid configuration properties will result in exceptions.
 
@@ -67,8 +67,8 @@ gravitino_client = GravitinoClient(
 
 ### Python Client Configuration
 
-| Configuration item                 | Description                            | Default value | Required | Since version |
-|------------------------------------|----------------------------------------|---------------|----------|---------------|
-| `gravitino_client_request_timeout` | An optional client timeout in seconds. | `10`          | No       | 1.0.0         |
+| Configuration item                 | Description                            | Default value | Required |
+|------------------------------------|----------------------------------------|---------------|----------|
+| `gravitino_client_request_timeout` | An optional client timeout in seconds. | `10`          | No       |
 
 **Note:** Invalid configuration properties will result in exceptions. 

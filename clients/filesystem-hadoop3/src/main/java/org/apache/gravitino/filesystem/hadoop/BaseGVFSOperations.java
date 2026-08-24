@@ -925,6 +925,17 @@ public abstract class BaseGVFSOperations implements Closeable {
                         1, newDaemonThreadFactory("gvfs-filesystem-cache-cleaner"))))
             .removalListener(
                 (key, value, cause) -> {
+                  FileSystemCacheKey cacheKey = (FileSystemCacheKey) key;
+                  String user =
+                      cacheKey == null || cacheKey.ugi() == null
+                          ? null
+                          : cacheKey.ugi().getUserName();
+                  LOG.debug(
+                      "Removing FileSystem from cache: scheme={}, authority={}, user={}, cause={}",
+                      cacheKey == null ? null : cacheKey.scheme(),
+                      cacheKey == null ? null : cacheKey.authority(),
+                      user,
+                      cause);
                   if (closeOnEviction) {
                     FileSystem fs = (FileSystem) value;
                     if (fs != null) {
@@ -933,13 +944,18 @@ public abstract class BaseGVFSOperations implements Closeable {
                       try {
                         fs.close();
                       } catch (IOException e) {
-                        LOG.error("Cannot close the file system for fileset: {}", key, e);
+                        LOG.error(
+                            "Failed to close cached FileSystem: scheme={}, authority={}, user={}, cause={}",
+                            cacheKey == null ? null : cacheKey.scheme(),
+                            cacheKey == null ? null : cacheKey.authority(),
+                            user,
+                            cause,
+                            e);
                       }
                     }
                     return;
                   }
                   // Default: do not close on eviction; close is deferred to GVFS shutdown.
-                  LOG.debug("FileSystem evicted from cache (key={}, cause={})", key, cause);
                 });
     cacheBuilder.expireAfterAccess(evictionMillsAfterAccess, TimeUnit.MILLISECONDS);
     return cacheBuilder.build();

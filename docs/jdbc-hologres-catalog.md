@@ -29,10 +29,10 @@ Gravitino saves some system information in schema and table comment, like `(From
 - Supports metadata management of Hologres.
 - Supports DDL operation for Hologres schemas and tables.
 - Supports table index (PRIMARY KEY in CREATE TABLE).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 - Supports LIST partitioning (physical and logical partition tables).
 - Supports Hologres-specific table properties via `WITH` clause (orientation, clustering_key, distribution_key, etc.).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment).
+- Does not support [auto-increment](./tables-and-views.md#table-column-auto-increment).
 
 ### Catalog Properties
 
@@ -43,15 +43,15 @@ Check the relevant data source configuration in [data source properties](https:/
 If you use a JDBC catalog, you must provide `jdbc-url`, `jdbc-driver`, `jdbc-database`, `jdbc-user` and `jdbc-password` to catalog properties.
 Besides the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration), the Hologres catalog has the following properties:
 
-| Configuration item      | Description                                                                                                                                                           | Default value | Required | Since Version    |
-|-------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `jdbc-url`              | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database`                                        | (none)        | Yes      | 1.3.0 |
-| `jdbc-driver`           | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                                                                   | (none)        | Yes      | 1.3.0 |
-| `jdbc-database`         | The database name. This is mandatory for Hologres.                                                                                                                    | (none)        | Yes      | 1.3.0 |
-| `jdbc-user`             | The JDBC user name (AccessKey ID or database username).                                                                                                               | (none)        | Yes      | 1.3.0 |
-| `jdbc-password`         | The JDBC password (AccessKey Secret or database password).                                                                                                            | (none)        | Yes      | 1.3.0 |
-| `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                                                                                        | `2`           | No       | 1.3.0 |
-| `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                                                                                       | `10`          | No       | 1.3.0 |
+| Configuration item   | Description                                                                                                                   | Default value | Required |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `jdbc-url`           | JDBC URL for connecting to the database. For example, `jdbc:postgresql://hgprecn-cn-xxx.hologres.aliyuncs.com:80/my_database` | (none)        | Yes      |
+| `jdbc-driver`        | The driver of the JDBC connection. Must be `org.postgresql.Driver`.                                                           | (none)        | Yes      |
+| `jdbc-database`      | The database name. This is mandatory for Hologres.                                                                            | (none)        | Yes      |
+| `jdbc-user`          | The JDBC user name (AccessKey ID or database username).                                                                       | (none)        | Yes      |
+| `jdbc-password`      | The JDBC password (AccessKey Secret or database password).                                                                    | (none)        | Yes      |
+| `jdbc.pool.min-size` | The minimum number of connections in the pool. `2` by default.                                                                | `2`           | No       |
+| `jdbc.pool.max-size` | The maximum number of connections in the pool. `10` by default.                                                               | `10`          | No       |
 
 :::caution
 Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). You need to download the PostgreSQL JDBC Driver and place it in the `catalogs/jdbc-hologres/libs` directory under the Gravitino distribution (e.g., `distribution/package/catalogs/jdbc-hologres/libs` or `distribution/package-all/catalogs/jdbc-hologres/libs`).
@@ -59,10 +59,10 @@ Hologres uses the PostgreSQL JDBC Driver (version 42.3.2 or later recommended). 
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response since Gravitino 1.3.0. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
 :::
 
 ## Schema
@@ -80,7 +80,7 @@ Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden 
 
 ### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
@@ -89,10 +89,10 @@ Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metada
 - Gravitino's table concept corresponds to the Hologres table.
 - Supports DDL operation for Hologres tables.
 - Supports PRIMARY KEY index in CREATE TABLE.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 - Supports expression columns via DEFAULT expressions (note: Gravitino maps these as column default values, not as true generated/computed columns in the Hologres sense).
 - Supports LIST partitioning (physical and logical).
-- Does not support [auto-increment](./manage-relational-metadata-using-gravitino.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
+- Does not support [auto-increment](./tables-and-views.md#table-column-auto-increment). Creating auto-increment columns is rejected in both CREATE TABLE and ALTER TABLE.
 
 ### Table Properties
 
@@ -145,7 +145,7 @@ Hologres-specific table properties are set via the `WITH` clause during CREATE T
 :::info
 - Hologres does not support precision syntax for `TIMESTAMP`/`TIMESTAMPTZ` (e.g., `timestamptz(6)` is invalid), so the type converter always emits the base type without precision.
 - Array element types must be non-nullable (Hologres limitation). Multidimensional arrays are not supported.
-- Types like `json`, `jsonb`, `uuid`, `inet`, `money`, `roaringbitmap` are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** with the original type name preserved.
+- Types like `json`, `jsonb`, `uuid`, `inet`, `money`, `roaringbitmap` are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** with the original type name preserved.
 :::
 
 ### Table Distribution

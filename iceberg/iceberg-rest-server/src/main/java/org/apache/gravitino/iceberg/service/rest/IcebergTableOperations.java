@@ -524,16 +524,21 @@ public class IcebergTableOperations {
       @Encoded() @PathParam("namespace") @AuthorizationMetadata(type = EntityType.SCHEMA)
           String namespace,
       @Encoded() @PathParam("table") @AuthorizationMetadata(type = EntityType.TABLE) String table,
-      PlanTableScanRequest scanRequest) {
+      PlanTableScanRequest scanRequest,
+      @HeaderParam(X_ICEBERG_ACCESS_DELEGATION) String accessDelegation) {
+    boolean isCredentialVending = isCredentialVending(accessDelegation);
     String catalogName = IcebergRESTUtils.getCatalogName(prefix);
     Namespace icebergNS =
         RESTUtil.decodeNamespace(namespace, IcebergRESTUtils.NAMESPACE_SEPARATOR_URLENCODED_UTF_8);
     String tableName = RESTUtil.decodeString(table);
     LOG.info(
-        "Plan table scan, catalog: {}, namespace: {}, table: {}",
+        "Plan table scan, catalog: {}, namespace: {}, table: {}, "
+            + "accessDelegation: {}, isCredentialVending: {}",
         catalogName,
         icebergNS,
-        tableName);
+        tableName,
+        accessDelegation,
+        isCredentialVending);
 
     try {
       return Utils.doAs(
@@ -541,7 +546,7 @@ public class IcebergTableOperations {
           () -> {
             TableIdentifier tableIdentifier = TableIdentifier.of(icebergNS, tableName);
             IcebergRequestContext context =
-                new IcebergRequestContext(httpServletRequest(), catalogName);
+                new IcebergRequestContext(httpServletRequest(), catalogName, isCredentialVending);
 
             PlanTableScanResponse scanResponse =
                 tableOperationDispatcher.planTableScan(context, tableIdentifier, scanRequest);

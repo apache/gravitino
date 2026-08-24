@@ -245,7 +245,7 @@ tableCatalog.createTable(
 
 ## Indexes
 
-To define an indexed table, you should utilize the following three components to construct a valid indexed table:
+To define an indexed table, you should utilize the following four components to construct a valid indexed table:
 
 - IndexType. Represents the type of index, such as primary key or unique key.
 
@@ -258,6 +258,8 @@ To define an indexed table, you should utilize the following three components to
 
 - FieldNames. It defines which table fields Gravitino uses to index the table.
 
+- Properties (optional). A map of extra index configuration properties (e.g., `granularity` for ClickHouse data-skipping indexes). If omitted, an empty map is used.
+
 <Tabs groupId='language' queryString>
 <TabItem value="Json" label="JSON">
 
@@ -265,7 +267,8 @@ To define an indexed table, you should utilize the following three components to
  {
   "indexType": "PRIMARY_KEY",
   "name": "PRIMARY",
-  "fieldNames": [["col_1"],["col_2"]]
+  "fieldNames": [["col_1"],["col_2"]],
+  "properties": {}
 }
 ```
 
@@ -319,12 +322,14 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
     {
       "indexType": "PRIMARY_KEY",
       "name": "PRIMARY",
-      "fieldNames": [["id"]]
+      "fieldNames": [["id"]],
+      "properties": {}
     },
     {
       "indexType": "UNIQUE_KEY",
       "name": "name_age_score_uk",
-      "fieldNames": [["name"],["age"],["score]]
+      "fieldNames": [["name"],["age"],["score"]],
+      "properties": {}
     }
   ]
 }' http://localhost:8090/api/metalakes/metalake/catalogs/catalog/schemas/schema/tables

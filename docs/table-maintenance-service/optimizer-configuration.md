@@ -1,23 +1,23 @@
 ---
-title: "Optimizer Configuration"
+title: "Configuration"
 slug: "/table-maintenance-service/optimizer-configuration"
-keyword: "table maintenance, optimizer, configuration, job template, spark"
+keywords:
+  - table maintenance
+  - configuration
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Configuration Layers
+Three layers of configuration apply, and they are set in different places for different lifetimes. Server configuration governs how jobs run at all, CLI configuration governs how the commands reach Gravitino, and `jobConf` governs a single job submission.
 
-Use these layers together:
+| Layer               | Where it lives                  | Lifetime            |
+|---------------------|----------------------------------|---------------------|
+| Server              | `gravitino.conf`                 | Until server restart |
+| CLI                 | `conf/gravitino-optimizer.conf`  | Per command          |
+| Job submission      | `jobConf` in the request body    | One job run          |
 
-| Layer | Scope | Typical keys |
-| --- | --- | --- |
-| Gravitino server config | Runtime for job manager and executor | `gravitino.job.executor`, `gravitino.job.statusPullIntervalInMs`, `gravitino.jobExecutor.local.sparkHome` |
-| Job submission `jobConf` | Per job run | `catalog_name`, `table_identifier`, `spark_*`, template-specific args |
-| Optimizer CLI config | CLI commands | `gravitino.optimizer.*` in `conf/gravitino-optimizer.conf` |
+## Server Configuration
 
-## Server-side Configuration
-
-Set server-level runtime behavior in `gravitino.conf`.
+Set these in `gravitino.conf`. They control the job executor rather than maintenance itself, so they apply to every job Gravitino runs.
 
 ```properties
 gravitino.job.executor=local
@@ -25,12 +25,39 @@ gravitino.job.statusPullIntervalInMs=300000
 gravitino.jobExecutor.local.sparkHome=/path/to/spark
 ```
 
-For local demo environments, you can reduce `gravitino.job.statusPullIntervalInMs` (for example
-`10000`) to get faster status updates. Restart Gravitino after changing this value.
+`gravitino.job.statusPullIntervalInMs` defaults to five minutes. Job status is polled rather than pushed, so REST status can lag the real Spark process by a full interval, which makes a working job look hung. Lower it to `10000` for local work and restart the server.
 
-## Built-In Update Stats `jobConf`
+## CLI Configuration
 
-Use `builtin-iceberg-update-stats` with at least these keys:
+The CLI needs to know where Gravitino is and which components to use. This is a minimal working file for `submit-strategy-jobs`.
+
+```properties
+gravitino.optimizer.gravitinoUri = http://localhost:8090
+gravitino.optimizer.gravitinoMetalake = test
+gravitino.optimizer.gravitinoDefaultCatalog = rest_catalog
+gravitino.optimizer.recommender.statisticsProvider = gravitino-statistics-provider
+gravitino.optimizer.recommender.strategyProvider = gravitino-strategy-provider
+gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-provider
+gravitino.optimizer.recommender.jobSubmitter = gravitino-job-submitter
+gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
+gravitino.optimizer.jobSubmitterConfig.catalog_name = rest_catalog
+gravitino.optimizer.jobSubmitterConfig.spark_master = local[2]
+gravitino.optimizer.jobSubmitterConfig.spark_executor_instances = 1
+gravitino.optimizer.jobSubmitterConfig.spark_executor_cores = 1
+gravitino.optimizer.jobSubmitterConfig.spark_executor_memory = 1g
+gravitino.optimizer.jobSubmitterConfig.spark_driver_memory = 1g
+gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
+gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
+# Leave empty for a local filesystem; set to your warehouse URI for cloud or HDFS storage.
+gravitino.optimizer.jobSubmitterConfig.warehouse_location =
+gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
+```
+
+Everything under `gravitino.optimizer.jobSubmitterConfig.` becomes the `jobConf` of jobs this CLI submits, so the two layers carry the same keys under different names.
+
+## Job Submission Configuration
+
+A direct job submission carries its own `jobConf`. This is `builtin-iceberg-update-stats` with the keys it needs.
 
 ```json
 {
@@ -50,58 +77,30 @@ Use `builtin-iceberg-update-stats` with at least these keys:
 }
 ```
 
-`warehouse_location` can be empty for local filesystem testing. Set it to your warehouse URI
-for HDFS or cloud object storage environments.
+`updater_options` and `spark_conf` are JSON strings inside a JSON object, so their quotes are escaped. That nesting is the most common source of malformed submissions.
 
-## Strategy Submission Configuration
+`warehouse_location` may be empty for local filesystem testing. Set it to the warehouse URI for HDFS or cloud object storage.
 
-`submit-strategy-jobs` needs optimizer CLI config. This is a minimal working example:
+## Running Against a Local Filesystem
 
-```properties
-gravitino.optimizer.gravitinoUri = http://localhost:8090
-gravitino.optimizer.gravitinoMetalake = test
-gravitino.optimizer.gravitinoDefaultCatalog = rest_catalog
-gravitino.optimizer.recommender.statisticsProvider = gravitino-statistics-provider
-gravitino.optimizer.recommender.strategyProvider = gravitino-strategy-provider
-gravitino.optimizer.recommender.tableMetaProvider = gravitino-table-metadata-provider
-gravitino.optimizer.recommender.jobSubmitter = gravitino-job-submitter
-gravitino.optimizer.strategyHandler.iceberg-data-compaction.className = org.apache.gravitino.maintenance.optimizer.recommender.handler.compaction.CompactionStrategyHandler
-gravitino.optimizer.jobSubmitterConfig.catalog_name = rest_catalog
-gravitino.optimizer.jobSubmitterConfig.spark_master = local[2]
-gravitino.optimizer.jobSubmitterConfig.spark_executor_instances = 1
-gravitino.optimizer.jobSubmitterConfig.spark_executor_cores = 1
-gravitino.optimizer.jobSubmitterConfig.spark_executor_memory = 1g
-gravitino.optimizer.jobSubmitterConfig.spark_driver_memory = 1g
-gravitino.optimizer.jobSubmitterConfig.catalog_type = rest
-gravitino.optimizer.jobSubmitterConfig.catalog_uri = http://localhost:9001/iceberg
-# Leave empty for local filesystem; set to your warehouse URI for cloud/HDFS storage.
-gravitino.optimizer.jobSubmitterConfig.warehouse_location =
-gravitino.optimizer.jobSubmitterConfig.spark_conf = {"spark.master":"local[2]","spark.hadoop.fs.defaultFS":"file:///"}
-```
-
-`--strategy-name` must be the policy name, for example `iceberg_compaction_default`.
-
-## Local Filesystem
-
-If your environment is local and not HDFS-based, set:
+On a machine with no HDFS, Spark still defaults to `hdfs://localhost:9000` and fails. Set the default filesystem explicitly, in `spark_conf` for job submissions and in the CLI `spark_conf` value:
 
 ```properties
 spark.hadoop.fs.defaultFS=file:///
 ```
 
-Without this, Spark jobs may try `hdfs://localhost:9000` and fail.
+## Checking Your Configuration
 
-## Validation Checklist
+Four things are worth confirming before assuming a configuration problem is a code problem.
 
-- Job templates exist: `builtin-iceberg-update-stats`, `builtin-iceberg-rewrite-data-files`.
-- Policies are attached to target tables.
-- `submit-strategy-jobs` prints `SUBMIT` lines.
-- Rewrite logs show `Rewritten data files: <N>` where `N > 0` for non-empty tables.
+- `builtin-iceberg-update-stats` and `builtin-iceberg-rewrite-data-files` appear in the job template list.
+- The policy is attached to the target table, not merely created.
+- `submit-strategy-jobs` prints `SUBMIT` lines rather than nothing.
+- The rewrite log shows `Rewritten data files: N` with `N` greater than zero for a non-empty table.
 
 ## Related
 
-- [Table Maintenance Service (Optimizer)](./optimizer.md)
-- [Optimizer Extension Guide](./optimizer-extension-guide.md)
-- [Optimizer Quick Start and Verification](./optimizer-quick-start.md)
-- [Optimizer CLI Reference](./optimizer-cli-reference.md)
-- [Optimizer Troubleshooting](./optimizer-troubleshooting.md)
+- [Table Maintenance Service](./optimizer.md) for the concepts and the walkthrough
+- [CLI Reference](./optimizer-cli-reference.md) for every command and the built-in job templates
+- [Troubleshooting](./optimizer-troubleshooting.md) when a command or job fails
+- [Extension Guide](./optimizer-extension-guide.md) for custom strategies and providers

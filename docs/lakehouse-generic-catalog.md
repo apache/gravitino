@@ -44,11 +44,11 @@ For detailed information on available operations, see [Manage Relational Metadat
 
 ### Catalog Properties
 
-| Property                    | Description                                                                                                                                                                                                    | Example                 | Required | Since Version |
-|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|---------------|
-| `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      | 1.1.0         |
-| `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       | 1.1.0         |
-| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       | 1.3.0         |
+| Property                    | Description                                                                                                                                                                                                    | Example                 | Required |
+|-----------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------|----------|
+| `provider`                  | Catalog provider type                                                                                                                                                                                          | `lakehouse-generic`     | Yes      |
+| `location`                  | Root storage path for all schemas and tables                                                                                                                                                                   | `s3://bucket/lakehouse` | No       |
+| `lance.schema-refresh-mode` | Lance table schema refresh mode. `DECLARED_AND_EMPTY` (default) refreshes declared tables and tables with empty stored columns. `VERSION_CHECK` additionally refreshes when the Lance dataset version changes. | `DECLARED_AND_EMPTY`    | No       |
 
 #### Key Property: `location`
 
@@ -126,7 +126,7 @@ Catalog catalog = gravitinoClient.createCatalog(
 </TabItem>
 </Tabs>
 
-Other catalog operations are general with relational catalogs. See [Catalog Operations](./manage-relational-metadata-using-gravitino.md#catalog-operations) for detailed documentation.
+Other catalog operations are general with relational catalogs. See [Catalog Operations](./manage-catalogs-and-schemas.md#catalog-operations) for detailed documentation.
 
 ## Schema Management
 
@@ -142,15 +142,15 @@ Schema operations follow the same patterns as relational catalogs:
 - ✅ Delete schemas
 - ✅ Check schema existence
 
-See [Schema Operations](./manage-relational-metadata-using-gravitino.md#schema-operations) for detailed documentation.
+See [Schema Operations](./manage-catalogs-and-schemas.md#schema-operations) for detailed documentation.
 
 ### Schema Properties
 
 Schemas inherit catalog properties and can override specific settings:
 
-| Property   | Description                                              | Example                      | Required | Since version | 
-|------------|----------------------------------------------------------|------------------------------|----------|---------------|
-| `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       | 1.1.0         |
+| Property   | Description                                              | Example                      | Required |
+|------------|----------------------------------------------------------|------------------------------|----------|
+| `location` | Custom storage root path for all tables under the schema | 's3://bucket/path_to_schema' | No       |
 
 For location resolution hierarchy, see [Key Property: `location`](#key-property-location) in the Catalog Management section for more details.
 
@@ -192,7 +192,7 @@ catalog.asSchemas().createSchema(
 </TabItem>
 </Tabs>
 
-For additional operations, refer to [Schema Operations documentation](./manage-relational-metadata-using-gravitino.md#schema-operations).
+For additional operations, refer to [Schema Operations documentation](./manage-catalogs-and-schemas.md#schema-operations).
 
 ## Table Management
 

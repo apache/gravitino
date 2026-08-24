@@ -27,6 +27,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.partitions.Partition;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 
 public class PartitionOperationDispatcher extends OperationDispatcher
@@ -38,10 +39,14 @@ public class PartitionOperationDispatcher extends OperationDispatcher
    * @param catalogManager The CatalogManager instance to be used for partition operations.
    * @param store The EntityStore instance to be used for partition operations.
    * @param idGenerator The IdGenerator instance to be used for partition operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public PartitionOperationDispatcher(
-      CatalogManager catalogManager, EntityStore store, IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      CatalogManager catalogManager,
+      EntityStore store,
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
   }
 
   @Override

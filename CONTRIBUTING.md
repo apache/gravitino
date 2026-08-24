@@ -169,7 +169,7 @@ bin/gravitino.sh stop
 You can also build manually with:
 
 ```bash
-./mvnw clean install
+./gradlew build
 ```
 
 ## 🧰 Setting Up Your IDE (Optional)
@@ -182,7 +182,7 @@ If using WSL on Windows, install Java and dev tools inside WSL. Access files via
 
 ## ⚙️ Build Profiles and JDK Requirements
 
-Gravitino uses Maven profiles for Scala:
+Gravitino uses Gradle properties for Scala:
 
 * `-Pscala-2.12` for Scala 2.12
 * `-Pscala-2.13` for Scala 2.13 (default)
@@ -228,7 +228,7 @@ Add or update tests in your PR. Test open PRs locally to help maintainers.
 Before contributing:
 
 * Review [ASF License and IP Guidelines](https://www.apache.org/legal/)
-* Ensure all code is original or properly licensed and compatable with the Apache License
+* Ensure all code is original or properly licensed and compatible with the Apache License
 
 ## 📄 License
 

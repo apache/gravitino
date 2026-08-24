@@ -1,63 +1,74 @@
 ---
 title: "Fileset Catalog with S3"
 slug: "/fileset-catalog-with-s3"
-date: 2025-01-03
 keyword: "Fileset catalog S3"
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-This document explains how to configure a Fileset catalog with S3 in Gravitino.
+This page shows how to store fileset data in Amazon S3 while Gravitino manages the metadata,
+and how to read and write that data through the Gravitino Virtual File System (GVFS).
+
+Everything on this page is specific to Amazon S3. The fileset model itself, the properties shared by
+every storage backend, and the way properties are inherited from catalog to schema to fileset are
+described in [Fileset Catalog](./fileset-catalog.md).
+
+The examples run in order and use the same names throughout: metalake `metalake`, catalog
+`s3_catalog`, schema `s3_schema`, fileset `example_fileset`, and `http://localhost:8090` as the
+server URL. Replace them with your own values.
 
 ## Prerequisites
 
-To create a Fileset catalog with S3, follow these steps:
-
 1. Download the [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle) file.
-2. Place this file in the Gravitino Fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
-3. Start the Gravitino server using the following command:
+2. Place it in the fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
+3. Start the Gravitino server:
 
 ```bash
-$ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
+${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Fileset catalog with S3. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
+The catalog automatically loads the Amazon S3 filesystem provider once the bundle jar is on the
+classpath. The deprecated `filesystem-providers` and `default-filesystem-provider` catalog
+properties do not need to be set.
 
-## S3 Catalog Configuration
+## Amazon S3 Properties
 
-### S3 Fileset Catalog Configuration
+These properties are needed in addition to the shared
+[catalog properties](./fileset-catalog.md#catalog-properties). The same values are also needed by
+the GVFS clients, so they are listed together here — note that the Python client spells them with
+underscores while the catalog and the Java client use hyphens.
 
-In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are necessary to configure a Fileset catalog with S3:
-
-| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Default value   | Required | Since version    |
-|-------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|------------------|
-| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `s3` if it's a S3 fileset, or a comma separated string that contains `s3` like `gs,s3` to support multiple kinds of fileset including `s3`.                                                                                                                                                                                                                                                                                                    | (none)          | Yes      | 0.7.0-incubating |
-| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for S3, if we set this value, we can omit the prefix 's3a://' in the location.                                                                                                                                                                                                                                                              | `builtin-local` | No       | 0.7.0-incubating |
-| `s3-endpoint`                 | The endpoint of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | (none)          | Yes      | 0.7.0-incubating |
-| `s3-access-key-id`            | The access key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | (none)          | Yes      | 0.7.0-incubating |
-| `s3-secret-access-key`        | The secret key of the AWS S3.                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | (none)          | Yes      | 0.7.0-incubating |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `s3-token`, `s3-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access S3 by GVFS. Once it's set, more configuration items are needed to make it works, see [s3-credential-vending](security/credential-vending.md#s3-credentials) | (none)          | No       | 0.8.0-incubating |
+| Catalog and Java client | Python client          | Description                                                                                                                                                                                                                                                                                                         | Required                                         |
+|-------------------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
+| `s3-endpoint`           | `s3_endpoint`          | Endpoint of the S3 service. S3-compatible storage such as MinIO always needs it.                                                                                                                                                                                                                                    | Yes, except for the Python client against AWS S3 |
+| `s3-access-key-id`      | `s3_access_key_id`     | Access key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
+| `s3-secret-access-key`  | `s3_secret_access_key` | Secret key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
+| `credential-providers`  | (n/a)                  | The credential provider types, separated by comma. Possible values are `s3-token`, `s3-secret-key`, `aws-irsa`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#s3) for the extra properties each provider takes. | No                                               |
 
 :::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated since 1.2.0. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aws-bundle`).
+- The location must start with `s3a://`, not `s3://`. The `hadoop-aws` library does not support the
+  `s3://` scheme.
+- For MinIO and other S3-compatible services, set `s3-endpoint` to that service. If it requires
+  path-style access, add `gravitino.bypass.fs.s3a.path.style.access=true` to
+  `${GRAVITINO_HOME}/catalogs/fileset/conf/fileset.conf` for server-side operations. Also set
+  `s3-path-style-access=true` on a GVFS Java client, or
+  `spark.hadoop.s3-path-style-access=true` in Spark. For the Python GVFS client, pass
+  `config_kwargs={"s3": {"addressing_style": "path"}}` to
+  `GravitinoVirtualFileSystem`; for pandas, add the same `config_kwargs` entry at the top level
+  of `storage_options`.
 :::
 
-### Schema Configuration
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
-To learn how to create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
-
-### Fileset Configuration
-
-For more details on creating a fileset, Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties).
+A fileset catalog stores its data under `location`, which for Amazon S3 looks like
+`s3a://bucket/root`.
 
 ## Create the Catalog, Schema, and Fileset
 
-This section demonstrates how to use the Fileset catalog with S3 in Gravitino, with a complete example.
-
-### Step 1: Create a Fileset Catalog with S3
-
-First of all, you need to create a Fileset catalog with S3. The following example shows how to create a Fileset catalog with S3:
+### Step 1: Create the catalog
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -65,14 +76,14 @@ First of all, you need to create a Fileset catalog with S3. The following exampl
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_catalog",
+  "name": "s3_catalog",
   "type": "FILESET",
-  "comment": "This is a S3 fileset catalog",
+  "comment": "A fileset catalog backed by Amazon S3",
   "properties": {
     "location": "s3a://bucket/root",
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
     "s3-access-key-id": "access_key",
-    "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
+    "s3-secret-access-key": "secret_key"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -86,56 +97,44 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Map<String, String> s3Properties = ImmutableMap.<String, String>builder()
+Map<String, String> catalogProperties = ImmutableMap.<String, String>builder()
     .put("location", "s3a://bucket/root")
+    .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
     .put("s3-access-key-id", "access_key")
     .put("s3-secret-access-key", "secret_key")
-    .put("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
     .build();
 
-Catalog s3Catalog = gravitinoClient.createCatalog("test_catalog",
-    Type.FILESET,
-    "This is a S3 fileset catalog",
-    s3Properties);
-// ...
-
+Catalog catalog = gravitinoClient.createCatalog("s3_catalog",
+    Catalog.Type.FILESET,
+    "A fileset catalog backed by Amazon S3",
+    catalogProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-s3_properties = {
+gravitino_client: GravitinoClient = GravitinoClient(
+    uri="http://localhost:8090", metalake_name="metalake")
+
+catalog_properties = {
     "location": "s3a://bucket/root",
-    "s3-access-key-id": "access_key"
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
+    "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com"
 }
 
-s3_catalog = gravitino_client.create_catalog(name="test_catalog",
-                                             catalog_type=Catalog.Type.FILESET,
-                                             provider=None,
-                                             comment="This is a S3 fileset catalog",
-                                             properties=s3_properties)
+catalog = gravitino_client.create_catalog(name="s3_catalog",
+                                          catalog_type=Catalog.Type.FILESET,
+                                          provider=None,
+                                          comment="A fileset catalog backed by Amazon S3",
+                                          properties=catalog_properties)
 ```
 
 </TabItem>
 </Tabs>
 
-:::note
-- When using S3, ensure that the location value starts with s3a:// (not s3://) for AWS S3. For example, use s3a://bucket/root, as the s3:// format is not supported by the hadoop-aws library.
-- When using MinIO or other S3-compatible storage services, make sure to set the `s3-endpoint` property to the appropriate endpoint URL. 
-- When using MinIO or other S3-compatible storage services, you may need to set additional properties such as `s3-path-style-access` to `true` depending on the storage service requirements. You can do this in Gravitino's `fileset.conf` file with the "gravitino.bypass." prefix: 
-```bash
-$ cat $GRAVITINO_HOME/catalogs/fileset/conf/fileset.conf
-gravitino.bypass.fs.s3a.path.style.access=true
-```
-:::
-
-### Step 2: Create a Schema
-
-Once your Fileset catalog with S3 is created, you can create a schema under the catalog. Here are examples of how to do that:
+### Step 2: Create the schema
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -143,49 +142,44 @@ Once your Fileset catalog with S3 is created, you can create a schema under the 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_schema",
-  "comment": "This is a S3 schema",
+  "name": "s3_schema",
+  "comment": "A schema in the Amazon S3 fileset catalog",
   "properties": {
     "location": "s3a://bucket/root/schema"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
+}' http://localhost:8090/api/metalakes/metalake/catalogs/s3_catalog/schemas
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Catalog catalog = gravitinoClient.loadCatalog("hive_catalog");
-
+Catalog catalog = gravitinoClient.loadCatalog("s3_catalog");
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "s3a://bucket/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema("test_schema",
-    "This is a S3 schema",
-    schemaProperties
-);
-// ...
+
+Schema schema = supportsSchemas.createSchema("s3_schema",
+    "A schema in the Amazon S3 fileset catalog",
+    schemaProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
-catalog.as_schemas().create_schema(name="test_schema",
-                                   comment="This is a S3 schema",
+catalog: Catalog = gravitino_client.load_catalog(name="s3_catalog")
+catalog.as_schemas().create_schema(name="s3_schema",
+                                   comment="A schema in the Amazon S3 fileset catalog",
                                    properties={"location": "s3a://bucket/root/schema"})
 ```
 
 </TabItem>
 </Tabs>
 
-### Step 3: Create a Fileset
-
-After creating the schema, you can create a fileset. Here are examples for creating a fileset:
+### Step 3: Create the fileset
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -200,339 +194,368 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+}' http://localhost:8090/api/metalakes/metalake/catalogs/s3_catalog/schemas/s3_schema/filesets
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("metalake")
-    .build();
-
-Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
+Catalog catalog = gravitinoClient.loadCatalog("s3_catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
-Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
-      .put("k1", "v1")
-      .build();
+Map<String, String> filesetProperties = ImmutableMap.<String, String>builder()
+    .put("k1", "v1")
+    .build();
 
 filesetCatalog.createFileset(
-    NameIdentifier.of("test_schema", "example_fileset"),
+    NameIdentifier.of("s3_schema", "example_fileset"),
     "This is an example fileset",
     Fileset.Type.MANAGED,
     "s3a://bucket/root/schema/example_fileset",
-    propertiesMap
-);
+    filesetProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-
-catalog: Catalog = gravitino_client.load_catalog(name="catalog")
-catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("schema", "example_fileset"),
-                                            type=Fileset.Type.MANAGED,
-                                            comment="This is an example fileset",
-                                            storage_location="s3a://bucket/root/schema/example_fileset",
-                                            properties={"k1": "v1"})
+catalog: Catalog = gravitino_client.load_catalog(name="s3_catalog")
+catalog.as_fileset_catalog().create_fileset(
+    ident=NameIdentifier.of("s3_schema", "example_fileset"),
+    type=Fileset.Type.MANAGED,
+    comment="This is an example fileset",
+    storage_location="s3a://bucket/root/schema/example_fileset",
+    properties={"k1": "v1"})
 ```
 
 </TabItem>
 </Tabs>
 
-## Access a Fileset with S3
+The fileset is now addressable as
+`gvfs://fileset/s3_catalog/s3_schema/example_fileset` from any GVFS client.
 
-### Access the Fileset with the GVFS Java Client
+## Access the Fileset
 
-To access fileset with S3 using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+### Java client jars
 
-| Configuration item     | Description                   | Default value | Required | Since version    |
-|------------------------|-------------------------------|---------------|----------|------------------|
-| `s3-endpoint`          | The endpoint of the AWS S3.   | (none)        | Yes      | 0.7.0-incubating |
-| `s3-access-key-id`     | The access key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
-| `s3-secret-access-key` | The secret key of the AWS S3. | (none)        | Yes      | 0.7.0-incubating |
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Amazon S3 filesystem implementation. Only the latter differs by
+environment:
+
+| Environment            | Jar providing the Amazon S3 filesystem                                                                                                                                             |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-aws-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle), a fat jar bundling the Amazon S3 filesystem implementation and the AWS SDK |
+| Hadoop already present | `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                                       |
+
+The artifacts in full:
+
+- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle):
+  a "fat" jar that includes the `gravitino-aws` functionality together with every dependency it needs,
+  such as `hadoop-aws` and the AWS SDK. Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-aws` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
+- `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`: the standard Hadoop
+  dependencies for Amazon S3 access, shipped with Hadoop under
+  `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself when running inside an existing
+  Hadoop environment.
+- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws):
+  a "thin" jar carrying only the AWS integration code. It is already contained in both jars above,
+  so it is not needed as a direct dependency unless you prefer to manage all Hadoop and AWS
+  dependencies yourself.
+
+```xml
+<!-- No Hadoop environment -->
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-aws-bundle</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+```
+
+```xml
+<!-- Existing Hadoop environment -->
+<dependency>
+  <groupId>org.apache.hadoop</groupId>
+  <artifactId>hadoop-common</artifactId>
+  <version>${HADOOP_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.hadoop</groupId>
+  <artifactId>hadoop-aws</artifactId>
+  <version>${HADOOP_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+```
 
 :::note
-- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
+The thin `gravitino-aws` jar is not needed. Its functionality is already included in both
+`gravitino-aws-bundle` and `gravitino-filesystem-hadoop3-runtime`.
 :::
+
+### GVFS Java client
+
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), set the Amazon S3
+properties from the table above.
 
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
-conf.set("fs.gravitino.client.metalake", "test_metalake");
-conf.set("s3-endpoint", "http://localhost:9000");
-conf.set("s3-access-key-id", "minio");
-conf.set("s3-secret-access-key", "minio123");
+conf.set("fs.gravitino.client.metalake", "metalake");
+conf.set("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com");
+conf.set("s3-access-key-id", "access_key");
+conf.set("s3-secret-access-key", "secret_key");
 
-Path filesetPath = new Path("gvfs://fileset/fileset_catalog/fileset_schema/my_fileset/new_dir");
+Path filesetPath = new Path("gvfs://fileset/s3_catalog/s3_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
-...
 ```
 
-Similar to Spark configurations, you need to add S3 (bundle) jars to the classpath according to your environment.
+### Apache Spark
 
-```xml
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-common</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-aws</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-```
-
-:::note
-Since version 1.1.0, the `gravitino-aws` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
-:::
-
-Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
-
-
-```xml
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aws-bundle</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-```
-
-### Access the Fileset with Spark
-
-The following Python code demonstrates how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
-
-Before running the following code, you need to install required packages:
+The example below uses PySpark 3.5.0 in an environment that already has Hadoop 3.3.4.
 
 ```bash
 pip install pyspark==3.5.0
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
-Then you can run the following code:
 
 ```python
-from pyspark.sql import SparkSession
 import os
+from pyspark.sql import SparkSession
 
-gravitino_url = "http://localhost:8090"
-metalake_name = "test"
+# On JDK 17, also add:
+#   --conf "spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+#   --conf "spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    "--jars /path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar,"
+    "/path/to/hadoop-aws-3.3.4.jar,"
+    "/path/to/aws-java-sdk-bundle-1.12.262.jar "
+    "--master local[1] pyspark-shell"
+)
 
-catalog_name = "your_s3_catalog"
-schema_name = "your_s3_schema"
-fileset_name = "your_s3_fileset"
-
-# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar,/path/to/hadoop-aws-3.3.4.jar,/path/to/aws-java-sdk-bundle-1.12.262.jar --master local[1] pyspark-shell"
-spark = SparkSession.builder
-    .appName("s3_fileset_test")
+spark = (SparkSession.builder
+    .appName("s3_fileset")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-    .config("spark.hadoop.s3-access-key-id", os.environ["S3_ACCESS_KEY_ID"])
-    .config("spark.hadoop.s3-secret-access-key", os.environ["S3_SECRET_ACCESS_KEY"])
+    .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
     .config("spark.hadoop.s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
+    .config("spark.hadoop.s3-access-key-id", "access_key")
+    .config("spark.hadoop.s3-secret-access-key", "secret_key")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
-    .getOrCreate()
+    .getOrCreate())
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
-columns = ["Name", "Age"]
-spark_df = spark.createDataFrame(data, schema=columns)
-gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
+spark_df = spark.createDataFrame(data, schema=["Name", "Age"])
+gvfs_path = "gvfs://fileset/s3_catalog/s3_schema/example_fileset/people"
 
-spark_df.coalesce(1).write
-    .mode("overwrite")
-    .option("header", "true")
-    .csv(gvfs_path)
+spark_df.coalesce(1).write.mode("overwrite").option("header", "true").csv(gvfs_path)
 ```
 
-If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
-    
+If Spark runs without a Hadoop environment, only the jar list changes:
+
 ```python
-## Replace the following code snippet with the above code snippet with the same environment variables
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}-SNAPSHOT.jar --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    "--jars /path/to/gravitino-aws-bundle-${gravitino-version}.jar,"
+    "/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar "
+    "--master local[1] pyspark-shell"
+)
 ```
-
-- [`gravitino-aws-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws-bundle): A "fat" JAR that includes `gravitino-aws` functionality and all necessary dependencies like `hadoop-aws` (3.3.1) and the `AWS SDK`. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
-- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-aws`. It is required for accessing Gravitino filesets.
-- `hadoop-aws-3.3.4.jar` and `aws-java-sdk-bundle-1.12.262.jar`: Standard Hadoop dependencies for S3 access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
-- [`gravitino-aws-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aws): A "thin" JAR that only provides the AWS integration code. Its functionality is already included in the `gravitino-aws-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and AWS dependencies manually.
-
-Please choose the correct jar according to your environment.
 
 :::note
-In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
+Some Spark versions need a Hadoop environment in the driver and do not pick up filesystem
+implementations passed with `--jars`. If that happens, add the jars to the Spark classpath directly.
 :::
 
-### Access a Fileset Using the Hadoop Fs Command
+### Hadoop fs command
 
-The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
-
-1. Adding the following contents to the `${HADOOP_HOME}/etc/hadoop/core-site.xml` file:
+1. Add the following to `${HADOOP_HOME}/etc/hadoop/core-site.xml`:
 
 ```xml
-  <property>
-    <name>fs.AbstractFileSystem.gvfs.impl</name>
-    <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
-  </property>
-
-  <property>
-    <name>fs.gvfs.impl</name>
-    <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
-  </property>
-
-  <property>
-    <name>fs.gravitino.server.uri</name>
-    <value>http://localhost:8090</value>
-  </property>
-
-  <property>
-    <name>fs.gravitino.client.metalake</name>
-    <value>test</value>
-  </property>
-
-  <property>
-    <name>s3-endpoint</name>
-    <value>http://s3.ap-northeast-1.amazonaws.com</value>
-  </property>
-
-  <property>
-    <name>s3-access-key-id</name>
-    <value>access-key</value>
-  </property>
-  
-  <property>
+<property>
+  <name>fs.AbstractFileSystem.gvfs.impl</name>
+  <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
+</property>
+<property>
+  <name>fs.gvfs.impl</name>
+  <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
+</property>
+<property>
+  <name>fs.gravitino.server.uri</name>
+  <value>http://localhost:8090</value>
+</property>
+<property>
+  <name>fs.gravitino.client.metalake</name>
+  <value>metalake</value>
+</property>
+<property>
+  <name>s3-endpoint</name>
+  <value>http://s3.ap-northeast-1.amazonaws.com</value>
+</property>
+<property>
+  <name>s3-access-key-id</name>
+  <value>access_key</value>
+</property>
+<property>
   <name>s3-secret-access-key</name>
-    <value>secret-key</value>
-  </property>
+  <value>secret_key</value>
+</property>
 ```
 
-2. Add the necessary jars to the Hadoop classpath. 
+2. Add these jars to the Hadoop classpath:
 
-For S3, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-aws-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
+   - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
+   - `hadoop-aws-${hadoop-version}.jar` and `aws-java-sdk-bundle-1.12.262.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
 
-3. Run the following command to access the fileset:
+3. Access the fileset:
 
 ```shell
-./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/s3_catalog/s3_schema/s3_fileset
-./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/s3_fileset
+${HADOOP_HOME}/bin/hadoop fs -ls gvfs://fileset/s3_catalog/s3_schema/example_fileset
+${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/s3_catalog/s3_schema/example_fileset
 ```
 
-### Access the Fileset with the GVFS Python Client
-
-To access fileset with S3 using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
-
-| Configuration item     | Description                                                                                                                                  | Default value | Required | Since version    |
-|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|------------------|
-| `s3_endpoint`          | The endpoint of the AWS S3. This configuration is optional for S3 service, but required for other S3-compatible storage services like MinIO. | (none)        | No       | 0.7.0-incubating |
-| `s3_access_key_id`     | The access key of the AWS S3.                                                                                                                | (none)        | Yes      | 0.7.0-incubating |
-| `s3_secret_access_key` | The secret key of the AWS S3.                                                                                                                | (none)        | Yes      | 0.7.0-incubating |
-
-:::note
-- `s3_endpoint` is an optional configuration for GVFS **Python** client but a required configuration for GVFS **Java** client to access Hadoop with AWS S3, and it is required for other S3-compatible storage services like MinIO.
-- If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
-:::
-
-Please install the `gravitino` package before running the following code:
+### GVFS Python client
 
 ```bash
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Amazon S3
+properties in `options`, spelled with underscores.
+
 ```python
 from gravitino import gvfs
+
 options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "s3_endpoint": "http://localhost:9000",
-    "s3_access_key_id": "minio",
-    "s3_secret_access_key": "minio123"
+    "s3_endpoint": "http://s3.ap-northeast-1.amazonaws.com",
+    "s3_access_key_id": "access_key",
+    "s3_secret_access_key": "secret_key",
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
-fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")                                                                         ")
+
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
+                                     metalake_name="metalake",
+                                     options=options)
+fs.ls("gvfs://fileset/s3_catalog/s3_schema/example_fileset/")
 ```
 
-### Access the Fileset with Pandas
+### pandas
 
-The following are examples of how to use the pandas library to access the S3 fileset
+pandas reaches the same paths through `storage_options`. Use the `fs` instance from the preceding
+GVFS example to discover the generated Spark part file.
 
 ```python
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://localhost:8090", 
-    "metalake_name": "test",
+    "server_uri": "http://localhost:8090",
+    "metalake_name": "metalake",
     "options": {
+        "s3_endpoint": "http://s3.ap-northeast-1.amazonaws.com",
         "s3_access_key_id": "access_key",
         "s3_secret_access_key": "secret_key",
-        "s3_endpoint": "http://s3.ap-northeast-1.amazonaws.com"
     }
 }
-ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}/people/part-00000-51d366e2-d5eb-448d-9109-32a96c8a14dc-c000.csv",
-                 storage_options=storage_options)
+
+csv_path = next(
+    f"gvfs://{path}"
+    for path in fs.ls(
+        "gvfs://fileset/s3_catalog/s3_schema/example_fileset/people",
+        detail=False,
+    )
+    if (
+        path.rsplit("/", 1)[-1].startswith("part-")
+        and path.endswith(".csv")
+    )
+)
+ds = pd.read_csv(csv_path, storage_options=storage_options)
 ds.head()
 ```
 
-For more use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
 
-## Fileset with Credential Vending
+## Credential Vending
 
-Since 0.8.0-incubating, Gravitino supports credential vending for S3 fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access S3 fileset without providing authentication information like `s3-access-key-id` and `s3-secret-access-key` in the properties.
+With credential vending the catalog holds the Amazon S3 credentials and the Gravitino server hands
+out a credential per request, so clients never hold cloud keys of their own. See
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[S3 credentials](./security/credential-vending.md#s3) for the properties
+each provider takes.
 
-### Create an S3 Fileset Catalog with Credential Vending
+The supported providers are `s3-token`, which vends a short-lived STS token;
+`s3-secret-key`, which vends the static access key configured on the catalog; and `aws-irsa`, which
+vends credentials from an IAM role for service accounts and currently reads the web identity token
+from a file. The example below uses `s3-token`.
 
-Apart from configuration method in [create-s3-fileset-catalog](#s3-fileset-catalog-configuration),
-properties needed by [s3-credential](./security/credential-vending.md#s3-credentials)
-should also be set to enable credential vending for S3 fileset. Take `s3-token` credential provider for example:
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "s3-catalog-with-token",
+  "name": "s3_catalog_with_vending",
   "type": "FILESET",
-  "comment": "This is a S3 fileset catalog",
+  "comment": "A fileset catalog backed by Amazon S3 with credential vending",
   "properties": {
     "location": "s3a://bucket/root",
+    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
     "s3-access-key-id": "access_key",
     "s3-secret-access-key": "secret_key",
-    "s3-endpoint": "http://s3.ap-northeast-1.amazonaws.com",
     "credential-providers": "s3-token",
-    "s3-region":"ap-northeast-1",
-    "s3-role-arn":"The ARN of the role to access the S3 data"
+    "s3-region": "ap-northeast-1",
+    "s3-role-arn": "arn:aws:iam::123456789012:role/gravitino-fileset"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### Access an S3 Fileset with Credential Vending
+Create the schema and fileset in the credential-vending catalog:
 
-When the catalog is configured with credentials and client-side credential vending is enabled,
-you can access S3 filesets directly using the GVFS Java/Python client or Spark without providing authentication details.
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "s3_schema",
+  "comment": "A schema in the Amazon S3 credential-vending catalog",
+  "properties": {
+    "location": "s3a://bucket/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/s3_catalog_with_vending/schemas
 
-GVFS Java client:
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "s3a://bucket/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/s3_catalog_with_vending/schemas/s3_schema/filesets
+```
+
+The `s3-token` provider needs two more catalog properties.
+
+| Property Name | Description                                        |
+|---------------|----------------------------------------------------|
+| `s3-region`   | Region of the bucket, for example `ap-northeast-1` |
+| `s3-role-arn` | ARN of the role that grants access to the data     |
+
+### Access without local credentials
+
+Enable vending on the client and drop the credential properties.
 
 ```java
 Configuration conf = new Configuration();
@@ -540,29 +563,34 @@ conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
-conf.set("fs.gravitino.client.metalake", "test_metalake");
-// No need to set s3-access-key-id and s3-secret-access-key
-Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
+conf.set("fs.gravitino.client.metalake", "metalake");
+// No need to set s3-access-key-id or s3-secret-access-key
+
+Path filesetPath = new Path(
+    "gvfs://fileset/s3_catalog_with_vending/s3_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
-...
 ```
 
-Spark:
-
 ```python
-spark = SparkSession.builder
-    .appName("s3_fileset_test")
+spark = (SparkSession.builder
+    .appName("s3_fileset")
     .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-    # No need to set s3-access-key-id and s3-secret-access-key
-    .config("spark.driver.memory", "2g")
-    .config("spark.driver.port", "2048")
-    .getOrCreate()
+    .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    # No need to set s3-access-key-id or s3-secret-access-key
+    .getOrCreate())
 ```
 
-Python client and Hadoop command are similar to the above examples.
-
+```python
+options = {
+    "auth_type": "simple",
+    "enable_credential_vending": True,
+    # No need to set s3-access-key-id or s3-secret-access-key
+}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
+                                     metalake_name="metalake",
+                                     options=options)
+```

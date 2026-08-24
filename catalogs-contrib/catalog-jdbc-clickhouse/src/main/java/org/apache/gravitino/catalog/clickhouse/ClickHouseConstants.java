@@ -47,6 +47,7 @@ public class ClickHouseConstants {
     public static final String ENGINE = "engine";
     public static final String ENGINE_UPPER = "ENGINE";
     public static final String SETTINGS_PREFIX = "settings.";
+    public static final String GRAPHITE_CONFIG = "graphite.config";
   }
 
   public static final class IndexConstants {
@@ -57,5 +58,14 @@ public class ClickHouseConstants {
 
     // The name of the data skipping index type for bloom filter index in clickhouse.
     public static final String DATA_SKIPPING_BLOOM_FILTER = "bloom_filter";
+
+    // The name of the data skipping index type for set index in clickhouse.
+    public static final String DATA_SKIPPING_SET = "set";
+
+    // Key for GRANULARITY in index properties (data-skipping index granularity).
+    public static final String GRANULARITY = "granularity";
+
+    // Key for max unique values (N) in set(N) data-skipping index properties.
+    public static final String SET_MAX_VALUES = "set_max_values";
   }
 }

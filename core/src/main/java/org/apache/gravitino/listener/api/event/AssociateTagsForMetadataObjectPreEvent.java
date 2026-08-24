@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.listener.api.event;
 
+import java.util.Arrays;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.tag.TagValue;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
 /** Represents an event triggered before associating tags with a specific metadata object. */
@@ -28,6 +30,8 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
   private final MetadataObject.Type objectType;
   private final String[] tagsToAdd;
   private final String[] tagsToRemove;
+  private final TagValue[] tagValuesToAdd;
+  private final TagValue[] tagValuesToRemove;
 
   /**
    * Constructs the pre-event with user, metalake, metadata object, tags to add, and tags to remove.
@@ -44,10 +48,30 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
       MetadataObject metadataObject,
       String[] tagsToAdd,
       String[] tagsToRemove) {
+    this(user, metalake, metadataObject, tagValues(tagsToAdd), tagValues(tagsToRemove));
+  }
+
+  /**
+   * Constructs the pre-event with user, metalake, metadata object, and tag values.
+   *
+   * @param user The user initiating the operation.
+   * @param metalake The metalake environment name.
+   * @param metadataObject The metadata object for which tags will be associated.
+   * @param tagsToAdd Tag values to be added to the metadata object.
+   * @param tagsToRemove Tag values to be removed from the metadata object.
+   */
+  public AssociateTagsForMetadataObjectPreEvent(
+      String user,
+      String metalake,
+      MetadataObject metadataObject,
+      TagValue[] tagsToAdd,
+      TagValue[] tagsToRemove) {
     super(user, MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
     this.objectType = metadataObject.type();
-    this.tagsToAdd = tagsToAdd;
-    this.tagsToRemove = tagsToRemove;
+    this.tagsToAdd = tagNames(tagsToAdd);
+    this.tagsToRemove = tagNames(tagsToRemove);
+    this.tagValuesToAdd = copyTagValues(tagsToAdd);
+    this.tagValuesToRemove = copyTagValues(tagsToRemove);
   }
 
   /**
@@ -65,7 +89,7 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
    * @return Array of tag names to be added.
    */
   public String[] tagsToAdd() {
-    return tagsToAdd;
+    return tagsToAdd.clone();
   }
 
   /**
@@ -74,7 +98,25 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
    * @return Array of tag names to be removed.
    */
   public String[] tagsToRemove() {
-    return tagsToRemove;
+    return tagsToRemove.clone();
+  }
+
+  /**
+   * Returns the tag values to be added.
+   *
+   * @return Array of tag values to be added.
+   */
+  public TagValue[] tagValuesToAdd() {
+    return tagValuesToAdd.clone();
+  }
+
+  /**
+   * Returns the tag values to be removed.
+   *
+   * @return Array of tag values to be removed.
+   */
+  public TagValue[] tagValuesToRemove() {
+    return tagValuesToRemove.clone();
   }
 
   /**
@@ -85,5 +127,25 @@ public class AssociateTagsForMetadataObjectPreEvent extends TagPreEvent {
   @Override
   public OperationType operationType() {
     return OperationType.ASSOCIATE_TAGS_FOR_METADATA_OBJECT;
+  }
+
+  private static TagValue[] tagValues(String[] tagNames) {
+    if (tagNames == null) {
+      return new TagValue[0];
+    }
+
+    return Arrays.stream(tagNames).map(TagValue::noValue).toArray(TagValue[]::new);
+  }
+
+  private static String[] tagNames(TagValue[] tagValues) {
+    if (tagValues == null) {
+      return new String[0];
+    }
+
+    return Arrays.stream(tagValues).map(TagValue::name).toArray(String[]::new);
+  }
+
+  private static TagValue[] copyTagValues(TagValue[] tagValues) {
+    return tagValues == null ? new TagValue[0] : tagValues.clone();
   }
 }

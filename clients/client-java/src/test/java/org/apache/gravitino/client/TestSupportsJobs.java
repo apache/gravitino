@@ -23,7 +23,9 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.job.JobDTO;
@@ -243,7 +245,7 @@ public class TestSupportsJobs extends TestBase {
     List<JobDTO> jobs =
         Lists.newArrayList(newJobDTO(jobId1, jobTemplateName), newJobDTO(jobId2, jobTemplateName));
 
-    JobListResponse resp = new JobListResponse(jobs);
+    JobListResponse resp = new JobListResponse(jobs, ImmutableMap.of());
 
     buildMockResource(Method.GET, jobRunsPath(), null, resp, HttpStatus.SC_OK);
 
@@ -275,10 +277,29 @@ public class TestSupportsJobs extends TestBase {
   }
 
   @Test
+  public void testListJobsAgainstServerWithoutStatusCounts() throws JsonProcessingException {
+    // Simulate an older server whose response predates the statusCounts field entirely (the key
+    // is absent, not just null) - a new client must still be able to parse it without
+    // JobListResponse.validate() failing.
+    String jobTemplateName = "shell-job-template";
+    JobDTO job = newJobDTO("job-1", jobTemplateName);
+
+    Map<String, Object> legacyRespBody = new LinkedHashMap<>();
+    legacyRespBody.put("code", 0);
+    legacyRespBody.put("jobs", Lists.newArrayList(job));
+
+    buildMockResource(Method.GET, jobRunsPath(), null, legacyRespBody, HttpStatus.SC_OK);
+
+    List<JobHandle> actualJobs = metalake.listJobs();
+    Assertions.assertEquals(1, actualJobs.size());
+    compare(job, actualJobs.get(0));
+  }
+
+  @Test
   public void testGetJob() throws JsonProcessingException {
     String jobId = "job-1";
     String jobTemplateName = "shell-job-template";
-    JobDTO expectedJob = newJobDTO(jobId, jobTemplateName);
+    JobDTO expectedJob = newJobDTO(jobId, jobTemplateName, Instant.now(), Instant.now());
     JobResponse resp = new JobResponse(expectedJob);
 
     buildMockResource(Method.GET, jobRunsPath() + "/" + jobId, null, resp, HttpStatus.SC_OK);
@@ -340,6 +361,9 @@ public class TestSupportsJobs extends TestBase {
     Assertions.assertEquals(expected.jobId(), actual.jobId());
     Assertions.assertEquals(expected.jobTemplateName(), actual.jobTemplateName());
     Assertions.assertEquals(expected.status(), actual.jobStatus());
+    Assertions.assertEquals(expected.queuedAt(), actual.queuedAt());
+    Assertions.assertEquals(expected.startedAt(), actual.startedAt());
+    Assertions.assertEquals(expected.finishedAt(), actual.finishedAt());
   }
 
   private String jobTemplatesPath() {
@@ -381,10 +405,23 @@ public class TestSupportsJobs extends TestBase {
   }
 
   private JobDTO newJobDTO(String jobId, String templateName) {
+    return newJobDTO(jobId, templateName, null);
+  }
+
+  private JobDTO newJobDTO(String jobId, String templateName, Instant finishedAt) {
+    return newJobDTO(jobId, templateName, null, finishedAt);
+  }
+
+  private JobDTO newJobDTO(
+      String jobId, String templateName, Instant startedAt, Instant finishedAt) {
+    Instant now = Instant.now();
     return new JobDTO(
         jobId,
         templateName,
         JobHandle.Status.QUEUED,
-        AuditDTO.builder().withCreator("test").withCreateTime(Instant.now()).build());
+        AuditDTO.builder().withCreator("test").withCreateTime(now).build(),
+        now,
+        startedAt,
+        finishedAt);
   }
 }

@@ -69,6 +69,7 @@ import org.apache.gravitino.stats.SupportsPartitionStatistics;
 import org.apache.gravitino.stats.SupportsStatistics;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValue;
 
 /** Represents a relational table. */
 class RelationalTable
@@ -389,6 +390,11 @@ class RelationalTable
 
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 

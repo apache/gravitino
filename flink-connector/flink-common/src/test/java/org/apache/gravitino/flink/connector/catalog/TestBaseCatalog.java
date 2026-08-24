@@ -33,20 +33,24 @@ import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
 import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -116,8 +120,9 @@ public class TestBaseCatalog {
             org.apache.gravitino.rel.TableChange.setProperty("key", "value"),
             org.apache.gravitino.rel.TableChange.removeProperty("key"));
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     org.apache.gravitino.rel.TableChange[] gravitinoTableChanges =
-        BaseCatalog.getGravitinoTableChanges(tableChanges);
+        catalog.getGravitinoTableChanges(tableChanges);
     Assertions.assertArrayEquals(expected.toArray(), gravitinoTableChanges);
   }
 
@@ -179,14 +184,49 @@ public class TestBaseCatalog {
   }
 
   @Test
+  public void testGetTableThrowsCatalogExceptionWhenForbidden() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    ForbiddenException forbiddenException = new ForbiddenException("denied");
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(tableCatalog.loadTable(Mockito.any())).thenThrow(forbiddenException);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    CatalogException catalogException =
+        Assertions.assertThrows(
+            CatalogException.class, () -> catalog.getTable(new ObjectPath("db", "tbl")));
+
+    Assertions.assertSame(forbiddenException, catalogException.getCause());
+  }
+
+  @Test
+  public void testTableExistsThrowsCatalogExceptionWhenForbidden() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    ForbiddenException forbiddenException = new ForbiddenException("denied");
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(tableCatalog.tableExists(Mockito.any())).thenThrow(forbiddenException);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    CatalogException catalogException =
+        Assertions.assertThrows(
+            CatalogException.class, () -> catalog.tableExists(new ObjectPath("db", "tbl")));
+
+    Assertions.assertSame(forbiddenException, catalogException.getCause());
+  }
+
+  @Test
   public void testGetGravitinoViewChangesSetAndRemoveProperty() {
     List<TableChange> tableChanges =
         ImmutableList.of(TableChange.set("k1", "v1"), TableChange.reset("k2"));
 
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     ViewChange[] changes =
-        BaseCatalog.toReplaceViewChange(
+        catalog.toReplaceViewChange(
             tableChanges, resolveView(schema, "SELECT 1", "comment"), Dialects.FLINK);
 
     Assertions.assertEquals(2, changes.length);
@@ -206,8 +246,9 @@ public class TestBaseCatalog {
 
     Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     ViewChange[] changes =
-        BaseCatalog.toReplaceViewChange(
+        catalog.toReplaceViewChange(
             tableChanges, resolveView(schema, "SELECT id FROM t", "new comment"), Dialects.FLINK);
 
     // Should have exactly one SetProperty and one ReplaceView (order may vary)
@@ -241,8 +282,9 @@ public class TestBaseCatalog {
     CatalogView existing =
         CatalogView.of(schema, "old comment", "SELECT 1", "SELECT 1", Collections.emptyMap());
 
+    BaseCatalog catalog = new TestableBaseCatalog(null, null);
     ViewChange[] changes =
-        BaseCatalog.toReplaceViewChange(
+        catalog.toReplaceViewChange(
             existing, resolveView(schema, "SELECT 2", "new comment"), Dialects.FLINK);
 
     Assertions.assertEquals(1, changes.length);

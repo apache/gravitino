@@ -58,6 +58,7 @@ import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
+import org.apache.gravitino.tag.TagValue;
 
 /**
  * BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
@@ -285,6 +286,11 @@ abstract class BaseSchemaCatalog extends CatalogDTO
 
   @Override
   public String[] associateTags(String[] tagsToAdd, String[] tagsToRemove) {
+    return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
+  }
+
+  @Override
+  public String[] associateTags(TagValue[] tagsToAdd, TagValue[] tagsToRemove) {
     return objectTagOperations.associateTags(tagsToAdd, tagsToRemove);
   }
 

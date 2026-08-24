@@ -78,6 +78,9 @@ CREATE CATALOG gravitino_irc WITH (
 
 ### Basic Authentication
 
+If Gravitino uses [local users and groups](../security/local-users-and-groups.md) for Basic
+authentication, set the auth properties on the catalog:
+
 ```sql
 CREATE CATALOG gravitino_irc WITH (
   'type'                     = 'iceberg',

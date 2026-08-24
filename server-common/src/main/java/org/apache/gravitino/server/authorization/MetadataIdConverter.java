@@ -35,6 +35,7 @@ import org.apache.gravitino.catalog.CapabilityHelpers;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.utils.EntityClassMapper;
 import org.apache.gravitino.utils.MetadataObjectUtil;
 
@@ -68,8 +69,13 @@ public class MetadataIdConverter {
     MetadataObject.Type metadataType = metadataObject.type();
     NameIdentifier ident = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
 
-    NameIdentifier normalizedIdent =
-        normalizeCaseSensitive(ident, METADATA_SCOPE_MAPPING.get(metadataType), catalogManager);
+    NameIdentifier normalizedIdent;
+    try {
+      normalizedIdent =
+          normalizeCaseSensitive(ident, METADATA_SCOPE_MAPPING.get(metadataType), catalogManager);
+    } catch (NotFoundException e) {
+      return Optional.empty();
+    }
 
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataType);
 

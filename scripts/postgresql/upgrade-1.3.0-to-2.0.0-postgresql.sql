@@ -28,3 +28,23 @@ COMMENT ON COLUMN group_meta.external_id IS 'external identifier from an upstrea
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_ueid_del ON user_meta (metalake_id, external_id, deleted_at);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_geid_del ON group_meta (metalake_id, external_id, deleted_at);
+
+ALTER TABLE table_column_version_info
+    ALTER COLUMN column_comment TYPE VARCHAR(4096);
+
+ALTER TABLE tag_meta ADD COLUMN IF NOT EXISTS allowed_values TEXT DEFAULT NULL;
+COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value';
+
+ALTER TABLE tag_relation_meta ADD COLUMN IF NOT EXISTS tag_value VARCHAR(256) NOT NULL DEFAULT '';
+COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value, empty string means no value';
+
+ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
+COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
+
+ALTER TABLE tag_relation_meta DROP CONSTRAINT IF EXISTS tag_relation_meta_tag_id_metadata_object_id_metadata_object_key;
+
+CREATE UNIQUE INDEX IF NOT EXISTS uk_ti_mi_mo_tv_del ON tag_relation_meta (tag_id, metadata_object_id, metadata_object_type, tag_value, deleted_at);
+CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id_value ON tag_relation_meta (tag_id, tag_value);
+
+ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS job_started_at BIGINT NOT NULL DEFAULT 0;
+COMMENT ON COLUMN job_run_meta.job_started_at IS 'job run started at';

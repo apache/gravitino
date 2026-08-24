@@ -127,9 +127,9 @@ SELECT * FROM jdbc_table_a;
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink JDBC connector configuration.
 
-| Gravitino catalog property name | Flink JDBC connector configuration | Description                    | Since Version    |
-|:--------------------------------|------------------------------------|--------------------------------|------------------|
-| `jdbc-url`                      | `base-url`                         | JDBC URL for MYSQL             | 0.9.0-incubating |
-| `username`                      | `username`                         | Username of MySQL account      | 0.9.0-incubating |
-| `password`                      | `password`                         | Password of the account        | 0.9.0-incubating |
-| `flink.bypass.default-database` | `default-database`                 | Default database to connect to | 0.9.0-incubating |
+| Gravitino catalog property name | Flink JDBC connector configuration | Description                    |
+|:--------------------------------|------------------------------------|--------------------------------|
+| `jdbc-url`                      | `base-url`                         | JDBC URL for MYSQL             |
+| `username`                      | `username`                         | Username of MySQL account      |
+| `password`                      | `password`                         | Password of the account        |
+| `flink.bypass.default-database` | `default-database`                 | Default database to connect to |

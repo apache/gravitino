@@ -222,7 +222,7 @@ paths:
       tags:
         - tag
       summary: Associate tags with metadata object
-      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN
+      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, VIEW, FILESET, TOPIC, COLUMN, MODEL, FUNCTION
       operationId: associateTags
       requestBody:
         content:
@@ -232,6 +232,12 @@ paths:
             examples:
               TagAssociate:
                 $ref: "#/components/examples/TagAssociate"
+          application/vnd.gravitino.v2+json:
+            schema:
+              $ref: "#/components/requests/TagValuesAssociateRequest"
+            examples:
+              TagValuesAssociate:
+                $ref: "#/components/examples/TagValuesAssociate"
       responses:
         "200":
           description: Returns the list of tag names associated with the specified metadata object
@@ -242,10 +248,31 @@ paths:
               examples:
                 NameListResponse:
                   $ref: "#/components/examples/NameListResponse"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/NameListResponse"
+              examples:
+                NameListResponse:
+                  $ref: "#/components/examples/NameListResponse"
+        "400":
+          description: Bad Request - The request body is malformed or violates tag association validation rules
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "404":
           description: Not Found - The specified metalake does not exist
           content:
             application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+            application/vnd.gravitino.v2+json:
               schema:
                 $ref: "./openapi.yaml#/components/schemas/ErrorModel"
               examples:
@@ -260,8 +287,21 @@ paths:
               examples:
                 TagAlreadyAssociatedException:
                   $ref: "#/components/examples/TagAlreadyAssociatedException"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                TagAlreadyAssociatedException:
+                  $ref: "#/components/examples/TagAlreadyAssociatedException"
         "5xx":
-          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+          description: A server-side problem that might not be addressable from the client side
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+            application/vnd.gravitino.v2+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
 
 
   /metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/tags/{tag}:
@@ -313,6 +353,8 @@ paths:
         - tag
       summary: list metadata objects for tag
       operationId: listTagObjects
+      parameters:
+        - $ref: "#/components/parameters/tagValue"
       responses:
         "200":
           description: Returns the list of metadata objects associated with specified tag
@@ -349,6 +391,15 @@ components:
         type: boolean
         default: false
 
+    tagValue:
+      name: value
+      in: query
+      description: Exact assignment value used to filter objects associated with the tag
+      required: false
+      schema:
+        type: string
+        maxLength: 256
+
   schemas:
 
     Tag:
@@ -377,6 +428,20 @@ components:
           type: boolean
           description: Whether the tag is inherited from the parent metadata object
           nullable: true
+        allowedValues:
+          type: array
+          description: Allowed assignment values. Null means any value is allowed, an empty array means the tag can only be assigned without a value.
+          nullable: true
+          items:
+            type: string
+            maxLength: 256
+        assignmentValues:
+          type: array
+          description: Assignment values in the current metadata object context. Null means no assignment context, an empty array means assigned without a value.
+          nullable: true
+          items:
+            type: string
+            maxLength: 256
 
     MetadataObject:
       type: object
@@ -392,9 +457,11 @@ components:
             - "CATALOG"
             - "SCHEMA"
             - "TABLE"
+            - "VIEW"
             - "FILESET"
             - "TOPIC"
             - "MODEL"
+            - "FUNCTION"
             - "COLUMN"
 
 
@@ -419,6 +486,13 @@ components:
           default: { }
           additionalProperties:
             type: string
+        allowedValues:
+          type: array
+          description: Allowed assignment values. Null means any value is allowed, an empty array means the tag can only be assigned without a value.
+          nullable: true
+          items:
+            type: string
+            maxLength: 256
 
     TagUpdatesRequest:
       type: object
@@ -537,6 +611,36 @@ components:
           description: The tags to remove
           nullable: true
 
+    TagValuesAssociateRequest:
+      type: object
+      properties:
+        tagsToAdd:
+          type: array
+          items:
+            $ref: "#/components/requests/TagValue"
+          description: The tag values to add
+          nullable: true
+        tagsToRemove:
+          type: array
+          items:
+            $ref: "#/components/requests/TagValue"
+          description: The tag values to remove
+          nullable: true
+
+    TagValue:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          description: The tag name
+        value:
+          type: string
+          description: The optional assignment value
+          nullable: true
+          maxLength: 256
+
   responses:
     TagListResponse:
       type: object
@@ -626,13 +730,25 @@ components:
         "properties": {
           "key1": "value1",
           "key2": "value2"
-        }
+        },
+        "allowedValues": ["finance", "engineering"]
       }
 
     TagAssociate:
       value: {
         "tagsToAdd": ["my_tag1", "my_tag2"],
         "tagsToRemove": ["my_tag3"]
+      }
+
+    TagValuesAssociate:
+      value: {
+        "tagsToAdd": [
+          {"name": "my_tag1", "value": "finance"},
+          {"name": "my_tag2"}
+        ],
+        "tagsToRemove": [
+          {"name": "my_tag3", "value": "engineering"}
+        ]
       }
 
     TagResponse:

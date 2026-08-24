@@ -40,13 +40,13 @@ Do not mix runtime JARs from different Flink minor versions in the same Flink de
 
 2. Configure the Flink configuration to use the Gravitino flink connector.
 
-| Property                                         | Type   | Default Value     | Description                                                          | Required | Since Version    |
-|--------------------------------------------------|--------|-------------------|----------------------------------------------------------------------|----------|------------------|
-| table.catalog-store.kind                         | string | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.metalake | string | (none)            | The metalake name that flink connector used to request to Gravitino. | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.uri      | string | (none)            | The uri of Gravitino server address.                                 | Yes      | 0.6.0-incubating |
-| table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport | boolean | false | Whether to enable support for Flink's session catalog in the Gravitino catalog store. | No | 1.3.0 |
-| table.catalog-store.gravitino.gravitino.client.  | string | (none)            | The configuration key prefix for the Gravitino client config.        | No       | 1.0.0            |
+| Property                                                            | Type    | Default Value     | Description                                                                           | Required |
+|---------------------------------------------------------------------|---------|-------------------|---------------------------------------------------------------------------------------|----------|
+| table.catalog-store.kind                                            | string  | generic_in_memory | The Catalog Store name, it should set to `gravitino`.                                 | Yes      |
+| table.catalog-store.gravitino.gravitino.metalake                    | string  | (none)            | The metalake name that flink connector used to request to Gravitino.                  | Yes      |
+| table.catalog-store.gravitino.gravitino.uri                         | string  | (none)            | The uri of Gravitino server address.                                                  | Yes      |
+| table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport | boolean | false             | Whether to enable support for Flink's session catalog in the Gravitino catalog store. | No       |
+| table.catalog-store.gravitino.gravitino.client.                     | string  | (none)            | The configuration key prefix for the Gravitino client config.                         | No       |
 
 When `table.catalog-store.gravitino.gravitino.enableSessionCatalogSupport` is set to `true`, Gravitino uses `GravitinoSessionCatalogStore`, which combines a `GravitinoCatalogStore` (backed by the Gravitino server) with an in-memory store to support Flink's session catalog. When `false` (the default), only `GravitinoCatalogStore` is used.
 
@@ -121,28 +121,28 @@ If you create a catalog with a name starting with a number, it will not be acces
 
 Gravitino flink connector support the following datatype mapping between Flink and Gravitino.
 
-| Flink Type                       | Gravitino Type                | Since Version    |
-|----------------------------------|-------------------------------|------------------|
-| `array`                          | `list`                        | 0.6.0-incubating |
-| `bigint`                         | `long`                        | 0.6.0-incubating |
-| `binary`                         | `fixed`                       | 0.6.0-incubating |
-| `boolean`                        | `boolean`                     | 0.6.0-incubating |
-| `char`                           | `char`                        | 0.6.0-incubating |
-| `date`                           | `date`                        | 0.6.0-incubating |
-| `decimal`                        | `decimal`                     | 0.6.0-incubating |
-| `double`                         | `double`                      | 0.6.0-incubating |
-| `float`                          | `float`                       | 0.6.0-incubating |
-| `integer`                        | `integer`                     | 0.6.0-incubating |
-| `map`                            | `map`                         | 0.6.0-incubating |
-| `null`                           | `null`                        | 0.6.0-incubating |
-| `row`                            | `struct`                      | 0.6.0-incubating |
-| `smallint`                       | `short`                       | 0.6.0-incubating |
-| `time`                           | `time`                        | 0.6.0-incubating |
-| `timestamp`                      | `timestamp without time zone` | 0.6.0-incubating |
-| `timestamp without time zone`    | `timestamp without time zone` | 0.6.0-incubating |
-| `timestamp with time zone`       | `timestamp with time zone`    | 0.6.0-incubating |
-| `timestamp with local time zone` | `timestamp with time zone`    | 0.6.0-incubating |
-| `timestamp_ltz`                  | `timestamp with time zone`    | 0.6.0-incubating |
-| `tinyint`                        | `byte`                        | 0.6.0-incubating |
-| `varbinary`                      | `binary`                      | 0.6.0-incubating |
-| `varchar`                        | `string`                      | 0.6.0-incubating |
+| Flink Type                       | Gravitino Type                |
+|----------------------------------|-------------------------------|
+| `array`                          | `list`                        |
+| `bigint`                         | `long`                        |
+| `binary`                         | `fixed`                       |
+| `boolean`                        | `boolean`                     |
+| `char`                           | `char`                        |
+| `date`                           | `date`                        |
+| `decimal`                        | `decimal`                     |
+| `double`                         | `double`                      |
+| `float`                          | `float`                       |
+| `integer`                        | `integer`                     |
+| `map`                            | `map`                         |
+| `null`                           | `null`                        |
+| `row`                            | `struct`                      |
+| `smallint`                       | `short`                       |
+| `time`                           | `time`                        |
+| `timestamp`                      | `timestamp without time zone` |
+| `timestamp without time zone`    | `timestamp without time zone` |
+| `timestamp with time zone`       | `timestamp with time zone`    |
+| `timestamp with local time zone` | `timestamp with time zone`    |
+| `timestamp_ltz`                  | `timestamp with time zone`    |
+| `tinyint`                        | `byte`                        |
+| `varbinary`                      | `binary`                      |
+| `varchar`                        | `string`                      |

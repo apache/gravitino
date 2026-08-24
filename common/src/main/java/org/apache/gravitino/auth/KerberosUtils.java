@@ -134,7 +134,11 @@ public class KerberosUtils {
       options.put("doNotPrompt", "true");
       options.put("refreshKrb5Config", "true");
       options.put("isInitiator", "true");
-      options.put("debug", "true");
+      // Enabling the login module's debug prints Kerberos details (principal, keytab path, etc.)
+      // to stdout on every login, which is noise/info-leak in normal client use. Gate it on the
+      // standard JDK Kerberos debug switch (-Dsun.security.krb5.debug=true) so it stays off by
+      // default but turns on when someone is already debugging Kerberos.
+      options.put("debug", String.valueOf(Boolean.getBoolean("sun.security.krb5.debug")));
 
       return new AppConfigurationEntry[] {
         new AppConfigurationEntry(

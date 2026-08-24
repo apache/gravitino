@@ -1,8 +1,7 @@
 ---
 title: "Manage Statistics"
 slug: "/manage-statistics-in-gravitino"
-date: 2025-08-21
-keyword: "statistics management, statistics, statistic, Gravitino"
+keyword: "statistics management, statistics, partition statistics, Gravitino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -11,232 +10,193 @@ import TabItem from '@theme/TabItem';
 
 ## Introduction
 
-Starting from 1.0.0, Gravitino introduces statistics of tables and partitions.
+This page covers the Gravitino API for statistics. For what a statistic is, the difference between
+reserved and custom, and how partition statistics relate to partitions, see
+[Statistics](./statistics.md).
 
-This document provides a brief introduction using both Gravitino Java client and
-REST APIs. If you want to know more about the statistics system in Gravitino, refer to the
-Javadoc and REST API documentation.
+Statistics attach to tables. Custom names must begin with `custom.` to stay clear of names Gravitino
+may reserve later.
 
-Statistics only support the custom statistics, which names must start with `custom-`.
-Gravitino will support built-in statistics in the future.
+## Table Statistics
 
-The query engine uses statistics for cost-based optimization (CBO). Meanwhile, statistics can also
-be used for metadata action systems to trigger some jobs, such as compaction, data archiving, etc.
+### Update Statistics
 
-Create statistics. And then you can create policies based on statistics. Users can analyze the statistics
-and policies to decide the next action. For example,
-you can create a statistic named `custom-tableLastModifiedTime` to record the last modified time of a table.
-Then you can create a policy to check if the table hasn't been modified for a long time, and archive the table data to
-cold storage.
-
-Gravitino doesn't handle the computation of the statistics, you need to compute the statistics
-and update them to Gravitino. Gravitino can't judge the expiration of the statistics, 
-Ensure the statistics are up-to-date.
-
-
-## Metadata Object Statistic Operations
-
-### Update Statistics of Metadata Objects
-
-Update the statistics of a metadata object by providing the statistics key and value.
-Now only table statistics can be updated.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
+Updating creates a statistic that does not exist and overwrites one that does. Reserved statistics
+maintained by the system are not modifiable and the request is rejected.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "updates" : {
-      "custom-tableLastModifiedTime": "20250128",
+  -H "Content-Type: application/json" -d '{
+  "updates": {
+    "custom.last_reviewed": "2026-08-02",
+    "custom.owner_team": "risk"
   }
-}' http://localhost:8090/api/metalakes/metalake/objects/table/catalog.schema.table/statistics
+}' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Table table = ...
-Map<String, StatisticValue<?>> updateStatistics = Maps.newHashMap();
-updateStatistics.put("custom-k1", StatisticValues.stringValue("v1"));
-updateStatistics.put("custom-k2", StatisticValues.stringValue("v2"));
-table.updateStatistics(updateStatistics);
+Table orders = ...
+Map<String, StatisticValue<?>> updates = Maps.newHashMap();
+updates.put("custom.last_reviewed", StatisticValues.stringValue("2026-08-02"));
+updates.put("custom.owner_team", StatisticValues.stringValue("risk"));
+
+orders.supportsStatistics().updateStatistics(updates);
 ```
 
 </TabItem>
 </Tabs>
 
-### List Statistics of Metadata Objects
-
-List all the statistics of a metadata object.
-Now only table statistics can be listed.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
+### List Statistics
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
- -H "Content-Type: application/json" \
- http://localhost:8090/api/metalakes/metalake/objects/table/catalog.schema.table/statistics
+  http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Table table = ...
-table.listStatistics();
+List<Statistic> statistics = orders.supportsStatistics().listStatistics();
 ```
 
 </TabItem>
 </Tabs>
 
-### Drop Statistics of Metadata Objects
-
-Drop the statistics of a metadata object by providing the statistics keys.
-Now only table statistics can be dropped.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectName}/statistics`.
+### Drop Statistics
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
- -H "Content-Type: application/json" -d '{
- "names":["custom-k1"]
-}' http://localhost:8090/api/metalakes/metalake/objects/table/catalog.schema.table/statistics
+  -H "Content-Type: application/json" -d '{
+  "names": ["custom.owner_team"]
+}' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Table table = ...
-List<String> statisticsToDrop = Lists.newArrayList("custom-k1");
-table.dropStatistics(statisticsToDrop);
+orders.supportsStatistics().dropStatistics(ImmutableList.of("custom.owner_team"));
 ```
 
 </TabItem>
 </Tabs>
 
-### Partition Statistics Operations
+## Partition Statistics
 
-### Update Statistics of Partitions
+Partition statistics are held by Gravitino rather than by the catalog, so they work on any table
+including catalogs that expose no partition objects. Partition names are supplied by the caller, and
+several partitions are read or written in one request.
 
-Update the statistics of a partition by providing the statistics key and value. If the statistics
-already exist, it will be updated; otherwise, a new statistic will be created.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
+### Update Partition Statistics
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X PUT -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "updates":[{
-  "partitionName" : "p0" ,
-  "statistics" : {
-    "custom-k1" : "v1"
-  }
-  }]
-}' http://localhost:8090/api/metalakes/metalake/objects/table/catalog.schema.table/statistics/partitions
+  -H "Content-Type: application/json" -d '{
+  "updates": [
+    {
+      "partitionName": "dt=2026-08-02",
+      "statistics": {"custom.row_estimate": "18000"}
+    }
+  ]
+}' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Table table = ...
-List<PartitionStatisticsUpdate> statisticsToUpdate = Lists.newArrayList();
 Map<String, StatisticValue<?>> stats = Maps.newHashMap();
-stats.put("custom-k1", StatisticValues.stringValue("v1"));
-stats.put("custom-k2", StatisticValues.stringValue("v2"));
-statisticsToUpdate.add(PartitionStatisticsModification.update("p1", stats));
-table.updatePartitionStatistics(statisticsToUpdate);
+stats.put("custom.row_estimate", StatisticValues.longValue(18000L));
+
+orders.supportsPartitionStatistics().updatePartitionStatistics(
+    ImmutableList.of(PartitionStatisticsModification.update("dt=2026-08-02", stats)));
 ```
 
 </TabItem>
 </Tabs>
 
+### List Partition Statistics
 
-### List Statistics of Partitions
-
-List the statistics of specified partitions.
-Specify a range of partitions by providing the `from` and `to` parameters,
-and whether the range is inclusive using `fromInclusive` and `toInclusive` parameters.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
+Listing takes a partition range rather than a single name.
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X GET -H "Accept: application/vnd.gravitino.v1+json" \
- -H "Content-Type: application/json" \
- 'http://localhost:8090/api/metalakes/metalake/objects/table/catalog.schema.table/statistics/partitions?from=p0&to=p1&fromInclusive=true&toInclusive=false'
+  "http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions?from=dt=2026-08-01&to=dt=2026-08-31"
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Table table = ...
-PartitionRange range = PartitionRange.downTo("p0", PartitionRange.BoundType.CLOSED);
-table.listPartitionStatistics(range);
+List<PartitionStatistics> statistics = orders.supportsPartitionStatistics().listPartitionStatistics(
+    PartitionRange.between(
+        "dt=2026-08-01", PartitionRange.BoundType.CLOSED,
+        "dt=2026-08-31", PartitionRange.BoundType.CLOSED));
 ```
 
 </TabItem>
 </Tabs>
 
-
-### Drop Statistics of Partitions
-
-Drop the statistics of specified partitions by providing the statistics keys.
-
-The request path for REST API is `/api/metalakes/{metalake}/objects/table/{metadataObjectName}/statistics/partitions`.
+### Drop Partition Statistics
 
 <Tabs groupId='language' queryString>
-<TabItem value="shell" label="Shell">
+<TabItem value="shell" label="REST">
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
--H "Content-Type: application/json" -d '{
-  "drops" : [{
-  "partitionName" : "p0",
-  "statisticNames": ["custom-k1"]
-  }]
-}' http://localhost:8090/api/metalakes/metalake/objects/table/catalog.schema.table/statistics/partitions 
+  -H "Content-Type: application/json" -d '{
+  "drops": [
+    {
+      "partitionName": "dt=2026-08-02",
+      "statisticNames": ["custom.row_estimate"]
+    }
+  ]
+}' http://localhost:8090/api/metalakes/example/objects/table/sales.public.orders/statistics/partitions
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-
-List<PartitionStatisticsDrop> statisticsToDrop = Lists.newArrayList();
-statisticsToDrop.add(
-    PartitionStatisticsModification.drop("p0", Lists.newArrayList("custom-k1")));
-
-table.dropPartitionStatistics(statisticsToDrop);
-
+orders.supportsPartitionStatistics().dropPartitionStatistics(
+    ImmutableList.of(
+        PartitionStatisticsModification.drop(
+            "dt=2026-08-02", ImmutableList.of("custom.row_estimate"))));
 ```
 
 </TabItem>
 </Tabs>
 
+## Storage Configuration
+
+Partition statistics use a pluggable storage backend, configured on the server. See
+[Server Configuration](#server-configuration) below. Writing a custom backend is covered in
+[Custom partition storage](./development/custom-partition-storage.md).
 
 ### Server Configuration
 
-| Configuration item                              | Description                                                                                                                                                                                                                          | Default value                                                            | Required  | Since version |
-|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------|-----------|---------------|
-| `gravitino.stats.partition.storageFactoryClass` | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for testing. | `org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory` |  No       | 1.0.0         |
+| Configuration item                              | Description                                                                                                                                                                                                                          | Default value                                                             | Required |
+|-------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------|----------|
+| `gravitino.stats.partition.storageFactoryClass` | The storage factory class for partition statistics, which is used to store partition statistics in the different storage. The `org.apache.gravitino.stats.storage.MemoryPartitionStatsStorageFactory`  can only be used for testing. | `org.apache.gravitino.stats.storage.JdbcPartitionStatisticStorageFactory` | No       |
 
 
 #### JDBC Storage (Default)
@@ -250,16 +210,16 @@ This provides a reliable, production-ready solution that supports multiple datab
 
 To use JDBC storage, configure the following options by adding the prefix `gravitino.stats.partition.storageOption.`:
 
-| Configuration item                                              | Description                                                        | Default value              | Required | Since version |
-|-----------------------------------------------------------------|--------------------------------------------------------------------|----------------------------|----------|---------------|
-| `gravitino.stats.partition.storageOption.jdbcUrl`               | JDBC connection URL (e.g., jdbc:mysql://localhost:3306/gravitino) | None                       | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbcUser`              | Database username                                                  | None                       | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbcPassword`          | Database password                                                  | None                       | Yes      | 1.2.0         |
-| `gravitino.stats.partition.storageOption.jdbcDriver`            | JDBC driver class name                                             | `com.mysql.cj.jdbc.Driver` | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.poolMaxSize`           | Maximum connection pool size                                       | `10`                       | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.poolMinIdle`           | Minimum idle connections in pool                                   | `2`                        | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.connectionTimeoutMs`   | Connection timeout in milliseconds                                 | `30000`                    | No       | 1.2.0         |
-| `gravitino.stats.partition.storageOption.testOnBorrow`          | Test connections before use                                        | `true`                     | No       | 1.2.0         |
+| Configuration item                                            | Description                                                       | Default value              | Required |
+|---------------------------------------------------------------|-------------------------------------------------------------------|----------------------------|----------|
+| `gravitino.stats.partition.storageOption.jdbcUrl`             | JDBC connection URL (e.g., jdbc:mysql://localhost:3306/gravitino) | None                       | Yes      |
+| `gravitino.stats.partition.storageOption.jdbcUser`            | Database username                                                 | None                       | Yes      |
+| `gravitino.stats.partition.storageOption.jdbcPassword`        | Database password                                                 | None                       | Yes      |
+| `gravitino.stats.partition.storageOption.jdbcDriver`          | JDBC driver class name                                            | `com.mysql.cj.jdbc.Driver` | No       |
+| `gravitino.stats.partition.storageOption.poolMaxSize`         | Maximum connection pool size                                      | `10`                       | No       |
+| `gravitino.stats.partition.storageOption.poolMinIdle`         | Minimum idle connections in pool                                  | `2`                        | No       |
+| `gravitino.stats.partition.storageOption.connectionTimeoutMs` | Connection timeout in milliseconds                                | `30000`                    | No       |
+| `gravitino.stats.partition.storageOption.testOnBorrow`        | Test connections before use                                       | `true`                     | No       |
 
 **Example MySQL Configuration:**
 
@@ -307,17 +267,17 @@ For example, if you set an extra property `foo` to `bar` for Lance storage optio
 For Lance remote storage, you can refer to the document [here](https://lancedb.github.io/lance/usage/storage/).
 
 
-| Configuration item                                                   | Description                                                | Default value                        | Required | Since version |
-|----------------------------------------------------------------------|------------------------------------------------------------|--------------------------------------|----------|---------------|
-| `gravitino.stats.partition.storageOption.location`                   | The location of Lance files                                | `${GRAVITINO_HOME}/data/lance`       | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerFile`             | The maximum rows per file                                  | `1000000`                            | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file                                 | `104857600`                          | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group                                 | `1000000`                            | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading                       | `10000`                              | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                            | `0`, It means we don't use the cache | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                       | `102400`                             | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                               | `102400`                             | No       | 1.0.0         |
-| `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation  | `100`                                | No       | 1.2.0         |
+| Configuration item                                                   | Description                                               | Default value                        | Required |
+|----------------------------------------------------------------------|-----------------------------------------------------------|--------------------------------------|----------|
+| `gravitino.stats.partition.storageOption.location`                   | The location of Lance files                               | `${GRAVITINO_HOME}/data/lance`       | No       |
+| `gravitino.stats.partition.storageOption.maxRowsPerFile`             | The maximum rows per file                                 | `1000000`                            | No       |
+| `gravitino.stats.partition.storageOption.maxBytesPerFile`            | The maximum bytes per file                                | `104857600`                          | No       |
+| `gravitino.stats.partition.storageOption.maxRowsPerGroup`            | The maximum rows per group                                | `1000000`                            | No       |
+| `gravitino.stats.partition.storageOption.readBatchSize`              | The batch record number when reading                      | `10000`                              | No       |
+| `gravitino.stats.partition.storageOption.datasetCacheSize`           | size of dataset cache for Lance                           | `0`, It means we don't use the cache | No       |
+| `gravitino.stats.partition.storageOption.metadataFileCacheSizeBytes` | The Lance's metadata file cache size                      | `102400`                             | No       |
+| `gravitino.stats.partition.storageOption.indexCacheSizeBytes`        | The Lance's index cache size                              | `102400`                             | No       |
+| `gravitino.stats.partition.storageOption.maxStatisticsPerUpdate`     | Maximum number of statistics allowed per update operation | `100`                                | No       |
 
 If you have many tables with a small number of partitions, you should set a smaller metadataFileCacheSizeBytes and indexCacheSizeBytes.
 
@@ -326,49 +286,4 @@ If you have many tables with a small number of partitions, you should set a smal
 ```properties
 gravitino.stats.partition.storageFactoryClass = org.apache.gravitino.stats.storage.LancePartitionStatisticStorageFactory
 gravitino.stats.partition.storageOption.location = /data/lance
-```
-
-### Implement a Custom Partition Storage
-
-Implement a custom partition storage by implementing the interface `org.apache.gravitino.stats.storage.PartitionStatisticStorageFactory` and
-setting the configuration item `gravitino.stats.partition.storageFactoryClass` to your class name.
-
-For example:
-
-```java
-public class MyPartitionStatsStorageFactory implements PartitionStatisticStorageFactory {
-    @Override
-    public PartitionStatisticStorage create(Map<String, String> options) {
-        // Create your custom PartitionStatsStorage here
-        return new MyPartitionStatsStorage(...);
-    }
-}
-```
-
-```java
-public class MyPartitionStatsStorage implements PartitionStatisticStorage {
-
-
-    @Override
-    public void close() {
-        // Close your storage here
-    }
-
-    @Override
-    public void updateStatistics(String metalake, List<MetadataObjectStatisticsUpdate> updates) {
-        // Update partition statistics in your storage here
-    }
-
-    @Override
-    public List<PersistedPartitionStatistics> listStatistics(
-            String metalake, MetadataObject metadataObject, PartitionRange range) {
-        // List partition statistics from your storage here
-        return Maps.newHashMap();
-    }
-
-    @Override
-    public int dropStatistics(String metalake, List<MetadataObjectStatisticsDrop> drops) {    
-        // Drop partition statistics from your storage here
-    }
-}
 ```

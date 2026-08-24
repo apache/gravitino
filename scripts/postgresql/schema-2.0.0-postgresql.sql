@@ -150,7 +150,7 @@ CREATE TABLE IF NOT EXISTS table_column_version_info (
     column_name VARCHAR(128) NOT NULL,
     column_position INT NOT NULL,
     column_type TEXT NOT NULL,
-    column_comment VARCHAR(256) DEFAULT '',
+    column_comment VARCHAR(4096) DEFAULT '',
     column_nullable SMALLINT NOT NULL DEFAULT 1,
     column_auto_increment SMALLINT NOT NULL DEFAULT 0,
     column_default_value TEXT DEFAULT NULL,
@@ -459,6 +459,7 @@ COMMENT ON COLUMN idp_user_meta.deleted_at IS 'idp user deleted at';
 CREATE TABLE IF NOT EXISTS idp_group_meta (
     group_id BIGINT NOT NULL,
     group_name VARCHAR(128) NOT NULL,
+    group_comment VARCHAR(1024) DEFAULT '',
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -469,6 +470,7 @@ COMMENT ON TABLE idp_group_meta IS 'local IdP group metadata';
 
 COMMENT ON COLUMN idp_group_meta.group_id IS 'idp group id';
 COMMENT ON COLUMN idp_group_meta.group_name IS 'idp group name';
+COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
 COMMENT ON COLUMN idp_group_meta.current_version IS 'idp group current version';
 COMMENT ON COLUMN idp_group_meta.last_version IS 'idp group last version';
 COMMENT ON COLUMN idp_group_meta.deleted_at IS 'idp group deleted at';
@@ -500,6 +502,7 @@ CREATE TABLE IF NOT EXISTS tag_meta (
     metalake_id BIGINT NOT NULL,
     tag_comment VARCHAR(256) DEFAULT '',
     properties TEXT DEFAULT NULL,
+    allowed_values TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
@@ -515,6 +518,7 @@ COMMENT ON COLUMN tag_meta.tag_name IS 'tag name';
 COMMENT ON COLUMN tag_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN tag_meta.tag_comment IS 'tag comment';
 COMMENT ON COLUMN tag_meta.properties IS 'tag properties';
+COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value';
 COMMENT ON COLUMN tag_meta.audit_info IS 'tag audit info';
 
 
@@ -523,21 +527,24 @@ CREATE TABLE IF NOT EXISTS tag_relation_meta (
     tag_id BIGINT NOT NULL,
     metadata_object_id BIGINT NOT NULL,
     metadata_object_type VARCHAR(64) NOT NULL,
+    tag_value VARCHAR(256) NOT NULL DEFAULT '',
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    UNIQUE (tag_id, metadata_object_id, metadata_object_type, deleted_at)
+    CONSTRAINT uk_ti_mi_mo_tv_del UNIQUE (tag_id, metadata_object_id, metadata_object_type, tag_value, deleted_at)
 );
 
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id ON tag_relation_meta (tag_id);
 CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_metadata_object_id ON tag_relation_meta (metadata_object_id);
+CREATE INDEX IF NOT EXISTS tag_relation_meta_idx_tag_id_value ON tag_relation_meta (tag_id, tag_value);
 COMMENT ON TABLE tag_relation_meta IS 'tag metadata object relation';
 COMMENT ON COLUMN tag_relation_meta.id IS 'auto increment id';
 COMMENT ON COLUMN tag_relation_meta.tag_id IS 'tag id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_id IS 'metadata object id';
 COMMENT ON COLUMN tag_relation_meta.metadata_object_type IS 'metadata object type';
+COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value, empty string means no value';
 COMMENT ON COLUMN tag_relation_meta.audit_info IS 'tag relation audit info';
 COMMENT ON COLUMN tag_relation_meta.current_version IS 'tag relation current version';
 COMMENT ON COLUMN tag_relation_meta.last_version IS 'tag relation last version';
@@ -806,6 +813,7 @@ CREATE TABLE IF NOT EXISTS job_run_meta (
     metalake_id BIGINT NOT NULL,
     job_execution_id VARCHAR(256) NOT NULL,
     job_run_status VARCHAR(64) NOT NULL,
+    job_started_at BIGINT NOT NULL DEFAULT 0,
     job_finished_at BIGINT NOT NULL DEFAULT 0,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
@@ -823,6 +831,7 @@ COMMENT ON COLUMN job_run_meta.job_template_id IS 'job template id';
 COMMENT ON COLUMN job_run_meta.metalake_id IS 'metalake id';
 COMMENT ON COLUMN job_run_meta.job_execution_id IS 'job execution id';
 COMMENT ON COLUMN job_run_meta.job_run_status IS 'job run status';
+COMMENT ON COLUMN job_run_meta.job_started_at IS 'job run started at';
 COMMENT ON COLUMN job_run_meta.job_finished_at IS 'job run finished at';
 COMMENT ON COLUMN job_run_meta.audit_info IS 'job run audit info';
 COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';
@@ -1059,7 +1068,7 @@ COMMENT ON TABLE entity_change_log IS 'Append-only log of entity structural chan
 COMMENT ON COLUMN entity_change_log.id IS 'auto increment id';
 COMMENT ON COLUMN entity_change_log.metalake_name IS 'metalake name';
 COMMENT ON COLUMN entity_change_log.entity_type IS 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW';
-COMMENT ON COLUMN entity_change_log.entity_full_name IS 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.';
+COMMENT ON COLUMN entity_change_log.entity_full_name IS 'Encoded full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.';
 COMMENT ON COLUMN entity_change_log.operate_type IS 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.';
 COMMENT ON COLUMN entity_change_log.created_at IS 'timestamp of the change in millis';
 

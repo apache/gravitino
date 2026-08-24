@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRe
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -31,10 +32,29 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetadataObjectRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRelBaseSQLProvider {
+  @Override
+  public String batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      Long metadataObjectId, String metadataObjectType, List<TagMetadataObjectRelPO> tagRelPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + " AND ("
+        + "<foreach item='item' collection='tagRels' separator=' OR '>"
+        + "(tag_id = #{item.tagId} AND tag_value = #{item.tagValue})"
+        + "</foreach>"
+        + ")"
+        + "</script>";
+  }
+
   @Override
   public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       String metalakeName, String tagName) {
@@ -111,6 +131,16 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.catalog_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.catalog_id = #{catalogId} AND"
+        + " vt.view_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -169,6 +199,22 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
         + "#{schemaId}"
         + "</foreach>"
         + " AND mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND vt.view_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND fnt.function_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FUNCTION'"
         + ")"
         + "</script>";
   }
@@ -210,7 +256,8 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   @Override
   public String listTagMetadataObjectRelsByMetalakeAndTagName(String metalakeName, String tagName) {
     return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
-        + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.audit_info as auditInfo,"
         + " te.current_version as currentVersion, te.last_version as lastVersion,"
         + " te.deleted_at as deletedAt"
         + " FROM "

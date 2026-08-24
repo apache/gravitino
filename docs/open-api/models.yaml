@@ -385,7 +385,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The uri name of the model version
       responses:
         "200":
@@ -423,7 +422,6 @@ paths:
           required: false
           schema:
             type: string
-            default: null
           description: The uri name of the model version
       responses:
         "200":
@@ -889,6 +887,7 @@ components:
           type: array
           description: The list of model versions
           items:
+            type: integer
             format: int32
 
     ModelVersionInfoListResponse:

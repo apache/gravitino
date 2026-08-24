@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
@@ -35,6 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
@@ -45,6 +47,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -75,6 +78,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -266,6 +270,50 @@ public class CatalogClickHouseIT extends BaseIT {
     Map<String, String> properties = Maps.newHashMap();
     properties.put(GRAVITINO_ENGINE_KEY, MERGETREE.getValue());
     return properties;
+  }
+
+  private static String normalizeEnumFormatting(String value) {
+    StringBuilder normalized = new StringBuilder(value.length());
+    boolean inSingleQuote = false;
+    boolean pendingWhitespace = false;
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      boolean escapedQuote =
+          current == '\''
+              && i > 0
+              && value.charAt(i - 1) == '\\'
+              && (i < 2 || value.charAt(i - 2) != '\\');
+      if (current == '\'' && !escapedQuote) {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+        inSingleQuote = !inSingleQuote;
+      } else if (!inSingleQuote && Character.isWhitespace(current)) {
+        pendingWhitespace = true;
+      } else if (!inSingleQuote && (current == '=' || current == ',')) {
+        pendingWhitespace = false;
+        normalized.append(current);
+      } else {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+      }
+    }
+    return normalized.toString().trim();
+  }
+
+  private static void appendWhitespaceUnlessSeparator(StringBuilder builder) {
+    if (builder.length() == 0) {
+      return;
+    }
+    char previous = builder.charAt(builder.length() - 1);
+    if (previous != '=' && previous != ',') {
+      builder.append(' ');
+    }
   }
 
   @Test
@@ -509,7 +557,9 @@ public class CatalogClickHouseIT extends BaseIT {
         new Index[] {
           Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"user_id"}}),
           Indexes.of(
-              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_amount", new String[][] {{"amount"}})
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_amount", new String[][] {{"amount"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_SET, "idx_userid_set", new String[][] {{"user_id"}})
         };
 
     catalog
@@ -554,6 +604,181 @@ public class CatalogClickHouseIT extends BaseIT {
                 idx ->
                     idx.type() == Index.IndexType.DATA_SKIPPING_MINMAX
                         && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"amount"}})));
+    Assertions.assertTrue(
+        Arrays.stream(loadedIndexes)
+            .anyMatch(
+                idx ->
+                    idx.type() == Index.IndexType.DATA_SKIPPING_SET
+                        && idx.name().equals("idx_userid_set")
+                        && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"user_id"}})));
+  }
+
+  @Test
+  void testCreateAndLoadWithCustomGranularity() {
+    String table = GravitinoITUtils.genRandomName("granularity_roundtrip");
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.StringType.get(), "val", true, false, DEFAULT_VALUE_NOT_SET),
+        };
+
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"id"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX,
+              "idx_minmax",
+              new String[][] {{"val"}},
+              Map.of("granularity", "5")),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
+              "idx_bloom",
+              new String[][] {{"val"}},
+              Map.of("granularity", "10")),
+        };
+
+    SortOrder[] sortOrders =
+        new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)};
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "granularity test",
+            createProperties(),
+            null,
+            Distributions.NONE,
+            sortOrders,
+            indexes);
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Index[] loadedIndexes = loaded.index();
+
+    // Verify minmax index has custom GRANULARITY
+    Optional<Index> minmaxIdx =
+        Arrays.stream(loadedIndexes).filter(idx -> "idx_minmax".equals(idx.name())).findFirst();
+    Assertions.assertTrue(minmaxIdx.isPresent(), "idx_minmax should exist");
+    Assertions.assertEquals("5", minmaxIdx.get().properties().get("granularity"));
+
+    // Verify bloom_filter index has custom GRANULARITY
+    Optional<Index> bloomIdx =
+        Arrays.stream(loadedIndexes).filter(idx -> "idx_bloom".equals(idx.name())).findFirst();
+    Assertions.assertTrue(bloomIdx.isPresent(), "idx_bloom should exist");
+    Assertions.assertEquals("10", bloomIdx.get().properties().get("granularity"));
+  }
+
+  @Test
+  void testCreateAndLoadWithDefaultGranularity() {
+    String table = GravitinoITUtils.genRandomName("default_granularity");
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.StringType.get(), "val", true, false, DEFAULT_VALUE_NOT_SET),
+        };
+
+    // Create index without specifying GRANULARITY — should default to 1
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"id"}}),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_MINMAX, "idx_minmax_default", new String[][] {{"val"}}),
+        };
+
+    SortOrder[] sortOrders =
+        new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)};
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "default granularity test",
+            createProperties(),
+            null,
+            Distributions.NONE,
+            sortOrders,
+            indexes);
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Index[] loadedIndexes = loaded.index();
+
+    // Default GRANULARITY (1) should NOT be persisted in properties
+    Optional<Index> minmaxIdx =
+        Arrays.stream(loadedIndexes)
+            .filter(idx -> "idx_minmax_default".equals(idx.name()))
+            .findFirst();
+    Assertions.assertTrue(minmaxIdx.isPresent(), "idx_minmax_default should exist");
+    Assertions.assertFalse(
+        minmaxIdx.get().properties().containsKey("granularity"),
+        "Default GRANULARITY (1) should not be stored in properties");
+  }
+
+  @Test
+  void testLoadSqlCreatedTableWithCustomGranularity() {
+    String tableName = GravitinoITUtils.genRandomName("sql_granularity");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "  id UInt64,"
+                + "  val String,"
+                + "  INDEX idx_sql_gran val TYPE minmax GRANULARITY 7"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, tableName));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Index[] loadedIndexes = loaded.index();
+
+    Optional<Index> idx =
+        Arrays.stream(loadedIndexes).filter(i -> "idx_sql_gran".equals(i.name())).findFirst();
+    Assertions.assertTrue(idx.isPresent(), "idx_sql_gran should exist");
+    Assertions.assertEquals(
+        "7",
+        idx.get().properties().get("granularity"),
+        "SQL-created index with GRANULARITY 7 should be readable");
+  }
+
+  @Test
+  void testAlterTableAddIndexUsesDefaultGranularity() {
+    String table = GravitinoITUtils.genRandomName("alter_idx_gran");
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.StringType.get(), "val", true, false, DEFAULT_VALUE_NOT_SET),
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "alter index granularity test",
+            createProperties(),
+            null,
+            Distributions.NONE,
+            new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)},
+            Indexes.EMPTY_INDEXES);
+
+    // Add index via ALTER TABLE — GRANULARITY should default to 1
+    catalog
+        .asTableCatalog()
+        .alterTable(
+            ident,
+            TableChange.addIndex(
+                Index.IndexType.DATA_SKIPPING_MINMAX,
+                "idx_alter_minmax",
+                new String[][] {{"val"}}));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Optional<Index> idx =
+        Arrays.stream(loaded.index()).filter(i -> "idx_alter_minmax".equals(i.name())).findFirst();
+    Assertions.assertTrue(idx.isPresent(), "idx_alter_minmax should exist");
+    Assertions.assertFalse(
+        idx.get().properties().containsKey("granularity"),
+        "ALTER TABLE ADD INDEX should use default GRANULARITY (1), not persisted in properties");
   }
 
   @Test
@@ -921,6 +1146,160 @@ public class CatalogClickHouseIT extends BaseIT {
                   + column.name()
                   + ", default value: "
                   + column.defaultValue());
+      }
+    }
+  }
+
+  @Test
+  @EnabledIf("supportColumnDefaultValueExpression")
+  void testMATERIALIZEDAndALIASColumnDefaultKinds() {
+    // Verify that MATERIALIZED and ALIAS columns are correctly distinguished from DEFAULT
+    // columns on round-trip through the Gravitino API. The ClickHouse JDBC driver hardcodes
+    // IS_GENERATEDCOLUMN to 'NO', so the catalog must query system.columns.default_kind
+    // to correctly identify these column kinds.
+    String tableName = GravitinoITUtils.genRandomName("test_default_kind");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  id Int64,\n"
+            + "  created_date Date DEFAULT today(),\n"
+            + "  computed_date Date MATERIALIZED today(),\n"
+            + "  alias_date Date ALIAS today(),\n"
+            + "  computed_int Int64 MATERIALIZED id + 1,\n"
+            + "  alias_int Int64 ALIAS id * 2,\n"
+            + "  materialized_str String MATERIALIZED concat('prefix_', toString(id)),\n"
+            + "  alias_str String ALIAS concat('suffix_', toString(id)),\n"
+            + "  nullable_default Nullable(Date) DEFAULT today(),\n"
+            + "  nullable_materialized Nullable(Date) MATERIALIZED today(),\n"
+            + "  nullable_alias Nullable(Date) ALIAS today()\n"
+            + ") ENGINE = MergeTree ORDER BY id;\n";
+
+    clickhouseService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "id":
+          // No default value
+          Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "created_date":
+          // DEFAULT column: today() is an expression, not a literal
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "computed_date":
+          // MATERIALIZED column: must resolve to UnparsedExpression, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "alias_date":
+          // ALIAS column: must resolve to UnparsedExpression, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          Assertions.assertEquals(
+              "today()", ((UnparsedExpression) column.defaultValue()).unparsedExpression());
+          break;
+        case "computed_int":
+          // MATERIALIZED with arithmetic expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "alias_int":
+          // ALIAS with arithmetic expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "materialized_str":
+          // MATERIALIZED with function expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "alias_str":
+          // ALIAS with function expression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "nullable_default":
+          // Nullable + DEFAULT: should have a default value
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "nullable_materialized":
+          // Nullable + MATERIALIZED: should have a default value, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        case "nullable_alias":
+          // Nullable + ALIAS: should have a default value, not DEFAULT_VALUE_NOT_SET
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertTrue(column.defaultValue() instanceof UnparsedExpression);
+          break;
+        default:
+          Assertions.fail(
+              "Unexpected column name: "
+                  + column.name()
+                  + ", default value: "
+                  + column.defaultValue());
+      }
+    }
+  }
+
+  @Test
+  @EnabledIf("supportColumnDefaultValueExpression")
+  void testDefaultColumnsNotMismarkedAsMaterialized() {
+    // Regression guard: columns with DEFAULT (not MATERIALIZED/ALIAS) must remain as DEFAULT
+    // on round-trip. The getDefaultKinds() query should not cause plain DEFAULT columns to be
+    // re-processed through the expression branch intended for MATERIALIZED/ALIAS.
+    String tableName = GravitinoITUtils.genRandomName("test_default_only");
+    String fullTableName = schemaName + "." + tableName;
+    String sql =
+        "CREATE TABLE "
+            + fullTableName
+            + " (\n"
+            + "  id Int64,\n"
+            + "  status UInt8 DEFAULT 0,\n"
+            + "  name String DEFAULT 'unknown',\n"
+            + "  created_at DateTime DEFAULT now()\n"
+            + ") ENGINE = MergeTree ORDER BY id;\n";
+
+    clickhouseService.executeQuery(sql);
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+
+    for (Column column : loadedTable.columns()) {
+      switch (column.name()) {
+        case "id":
+          Assertions.assertEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        case "status":
+          // DEFAULT literal 0 — must NOT be UnparsedExpression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertFalse(
+              column.defaultValue() instanceof UnparsedExpression,
+              "DEFAULT column 'status' should not be treated as MATERIALIZED/ALIAS");
+          break;
+        case "name":
+          // DEFAULT literal 'unknown' — must NOT be UnparsedExpression
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          Assertions.assertFalse(
+              column.defaultValue() instanceof UnparsedExpression,
+              "DEFAULT column 'name' should not be treated as MATERIALIZED/ALIAS");
+          break;
+        case "created_at":
+          // DEFAULT now() is a function expression → UnparsedExpression is acceptable here
+          // (falls back because now() is not a valid timestamp literal).
+          // The key assertion: it must NOT be DEFAULT_VALUE_NOT_SET.
+          Assertions.assertNotEquals(DEFAULT_VALUE_NOT_SET, column.defaultValue());
+          break;
+        default:
+          Assertions.fail("Unexpected column: " + column.name());
       }
     }
   }
@@ -1334,7 +1713,8 @@ public class CatalogClickHouseIT extends BaseIT {
         };
     Index[] indexes =
         new Index[] {
-          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_note", new String[][] {{"note"}})
+          Indexes.of(Index.IndexType.DATA_SKIPPING_MINMAX, "idx_note", new String[][] {{"note"}}),
+          Indexes.of(Index.IndexType.DATA_SKIPPING_SET, "idx_note_set", new String[][] {{"note"}})
         };
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
@@ -1352,12 +1732,18 @@ public class CatalogClickHouseIT extends BaseIT {
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.updateColumnComment(new String[] {"score"}, "score column changed"));
-    tableCatalog.alterTable(tableIdentifier, TableChange.deleteIndex("idx_note", false));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_note", false),
+        TableChange.deleteIndex("idx_note_set", false));
     Table loaded = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertTrue(loaded.columns()[1].nullable());
     Assertions.assertEquals("score column changed", loaded.columns()[1].comment());
     Assertions.assertFalse(
         Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_note")));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_note_set")));
 
     Assertions.assertDoesNotThrow(
         () ->
@@ -1416,7 +1802,8 @@ public class CatalogClickHouseIT extends BaseIT {
           Indexes.of(
               Index.IndexType.DATA_SKIPPING_BLOOM_FILTER,
               "idx_note_bloom",
-              new String[][] {{"note"}})
+              new String[][] {{"note"}}),
+          Indexes.of(Index.IndexType.DATA_SKIPPING_SET, "idx_score_set", new String[][] {{"score"}})
         };
     TableCatalog tableCatalog = catalog.asTableCatalog();
     tableCatalog.createTable(
@@ -1433,15 +1820,27 @@ public class CatalogClickHouseIT extends BaseIT {
         tableIdentifier,
         TableChange.addIndex(
             Index.IndexType.DATA_SKIPPING_MINMAX, "idx_new", new String[][] {{"score"}}));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_SET, "idx_new_set", new String[][] {{"note"}}));
     Table loaded = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertTrue(
         Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(
+                index ->
+                    Objects.equals(index.name(), "idx_new_set")
+                        && index.type() == Index.IndexType.DATA_SKIPPING_SET));
 
     tableCatalog.alterTable(
         tableIdentifier,
         TableChange.deleteIndex("idx_score_minmax", false),
         TableChange.deleteIndex("idx_note_bloom", false),
-        TableChange.deleteIndex("idx_new", false));
+        TableChange.deleteIndex("idx_score_set", false),
+        TableChange.deleteIndex("idx_new", false),
+        TableChange.deleteIndex("idx_new_set", false));
     loaded = tableCatalog.loadTable(tableIdentifier);
     Assertions.assertFalse(
         Arrays.stream(loaded.index())
@@ -1450,7 +1849,13 @@ public class CatalogClickHouseIT extends BaseIT {
         Arrays.stream(loaded.index())
             .anyMatch(index -> Objects.equals(index.name(), "idx_note_bloom")));
     Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_score_set")));
+    Assertions.assertFalse(
         Arrays.stream(loaded.index()).anyMatch(index -> Objects.equals(index.name(), "idx_new")));
+    Assertions.assertFalse(
+        Arrays.stream(loaded.index())
+            .anyMatch(index -> Objects.equals(index.name(), "idx_new_set")));
 
     RuntimeException autoIncrementTrueException =
         Assertions.assertThrows(
@@ -1471,6 +1876,52 @@ public class CatalogClickHouseIT extends BaseIT {
                     TableChange.updateColumnAutoIncrement(new String[] {"id"}, false)));
     Assertions.assertTrue(
         autoIncrementFalseException.getMessage().contains("auto increment is not supported"));
+  }
+
+  @Test
+  void testAlterTableAddIndexWithCustomGranularity() {
+    String tableName = GravitinoITUtils.genRandomName("alter_idx_gran");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.IntegerType.get(), "val", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("id"));
+
+    // ALTER TABLE ADD INDEX with custom GRANULARITY via AddIndex properties
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_MINMAX,
+            "idx_val_minmax",
+            new String[][] {{"val"}},
+            Collections.singletonMap("granularity", "5")));
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertTrue(
+        Arrays.stream(loaded.index())
+            .anyMatch(
+                index ->
+                    Objects.equals(index.name(), "idx_val_minmax")
+                        && index.type() == Index.IndexType.DATA_SKIPPING_MINMAX));
+
+    // Verify DDL-level: SHOW CREATE TABLE should contain GRANULARITY 5
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    Assertions.assertNotNull(createSql);
+    Assertions.assertTrue(
+        createSql.contains("GRANULARITY 5"),
+        "SHOW CREATE TABLE output should contain GRANULARITY 5: " + createSql);
   }
 
   @Test
@@ -2260,5 +2711,290 @@ public class CatalogClickHouseIT extends BaseIT {
 
     loadCatalog.asSchemas().dropSchema("test", true);
     metalake.dropCatalog(testCatalogName, true);
+  }
+
+  @Test
+  void testLoadTableWithSettingsFromNativeSql() {
+    String name = GravitinoITUtils.genRandomName("settings_native");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+                + " SETTINGS index_granularity = 2048",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Map<String, String> props = loaded.properties();
+    Assertions.assertEquals(
+        "2048", props.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    // Ensure no spurious keys from the SETTINGS parsing
+    long settingsCount =
+        props.keySet().stream().filter(k -> k.startsWith(TableConstants.SETTINGS_PREFIX)).count();
+    Assertions.assertEquals(1, settingsCount);
+  }
+
+  @Test
+  void testCreateTableWithSettingsViaGravitinoApi() {
+    String name = GravitinoITUtils.genRandomName("settings_api");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(TableConstants.SETTINGS_PREFIX + "index_granularity", "2048");
+    properties.put(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part", "0");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, cols, "settings roundtrip", properties, Distributions.NONE, getSortOrders("id"));
+
+    // Verify Gravitino API round-trip
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "2048", loadedProps.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", loadedProps.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+
+    // Verify DDL-level round-trip: SHOW CREATE TABLE should contain SETTINGS clause
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertNotNull(createSql);
+    Assertions.assertTrue(
+        createSql.contains("SETTINGS"),
+        "SHOW CREATE TABLE output should contain SETTINGS clause: " + createSql);
+    Assertions.assertTrue(
+        createSql.contains("index_granularity = 2048"),
+        "SHOW CREATE TABLE output should contain index_granularity = 2048: " + createSql);
+  }
+
+  @Test
+  void testLoadTableWithMultipleSettingsAndComment() {
+    String name = GravitinoITUtils.genRandomName("settings_multi");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id"
+                + " SETTINGS index_granularity = 2048, min_bytes_for_wide_part = 0"
+                + " COMMENT 'test comment'",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Map<String, String> props = loaded.properties();
+    Assertions.assertEquals(
+        "2048", props.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", props.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+    Assertions.assertEquals("test comment", loaded.comment());
+  }
+
+  @Test
+  void testCreateTableWithSettingsAndCommentViaGravitinoApi() {
+    String name = GravitinoITUtils.genRandomName("settings_comment_api");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(TableConstants.SETTINGS_PREFIX + "index_granularity", "2048");
+    properties.put(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part", "0");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "settings and comment roundtrip",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    // Verify Gravitino API round-trip
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "2048", loadedProps.get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+    Assertions.assertEquals(
+        "0", loadedProps.get(TableConstants.SETTINGS_PREFIX + "min_bytes_for_wide_part"));
+    Assertions.assertEquals("settings and comment roundtrip", loaded.comment());
+
+    // Verify DDL-level round-trip
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertNotNull(createSql);
+    Assertions.assertTrue(
+        createSql.contains("SETTINGS"),
+        "SHOW CREATE TABLE output should contain SETTINGS clause: " + createSql);
+    Assertions.assertTrue(
+        createSql.contains("index_granularity = 2048"),
+        "SHOW CREATE TABLE output should contain index_granularity = 2048: " + createSql);
+  }
+
+  @Test
+  void testLoadTableWithoutSettings() {
+    String name = GravitinoITUtils.genRandomName("no_settings");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32) ENGINE = MergeTree ORDER BY id", schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    long settingsCount =
+        loaded.properties().keySet().stream()
+            .filter(k -> k.startsWith(TableConstants.SETTINGS_PREFIX))
+            .count();
+    // ClickHouse 24.8 always includes default SETTINGS (index_granularity = 8192) in
+    // SHOW CREATE TABLE output, so one settings key is expected even without explicit SETTINGS.
+    Assertions.assertEquals(1, settingsCount);
+  }
+
+  /**
+   * Verifies round-trip for new ClickHouse types (Int128/256, UInt128/256, Enum8/16, Date32) via
+   * SQL CREATE TABLE + Gravitino loadTable. BFloat16 is excluded because it requires ClickHouse
+   * 24.12+ (the Gravitino CI image is 24.8.14). The BFloat16 converter mapping is verified in
+   * {@link org.apache.gravitino.catalog.clickhouse.converter.TestClickHouseTypeConverter}.
+   */
+  @Test
+  void testCreateTableWithNewTypeMappings() {
+    String tableName = GravitinoITUtils.genRandomName("test_new_types");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE %s.%s ("
+                + "c_int128 Int128, c_int256 Int256, "
+                + "c_uint128 UInt128, c_uint256 UInt256, "
+                + "c_enum8 Enum8('a'=1,'b'=2), "
+                + "c_enum16 Enum16('x'=1,'y'=2), "
+                + "c_date32 Date32"
+                + ") ORDER BY c_int128",
+            schemaName, tableName));
+    Table loadedTable =
+        catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Assertions.assertEquals(Types.ExternalType.of("Int128"), loadedTable.columns()[0].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("Int256"), loadedTable.columns()[1].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("UInt128"), loadedTable.columns()[2].dataType());
+    Assertions.assertEquals(Types.ExternalType.of("UInt256"), loadedTable.columns()[3].dataType());
+    // Enum types use instanceof check (not exact value match) because the ClickHouse JDBC driver
+    // may normalize the enum definition format (e.g., spacing around '=' and ',').
+    Assertions.assertTrue(loadedTable.columns()[4].dataType() instanceof Types.ExternalType);
+    Assertions.assertTrue(loadedTable.columns()[5].dataType() instanceof Types.ExternalType);
+    // Date32 remains ExternalType so its wider range and catalog type survive round-trip.
+    Assertions.assertEquals(Types.ExternalType.of("Date32"), loadedTable.columns()[6].dataType());
+  }
+
+  /**
+   * Tests that GraphiteMergeTree engine creation fails when graphite.config property is missing.
+   * Note: Positive path test (successful creation with valid config) is not included because it
+   * requires a pre-configured graphite_rollup element on the ClickHouse server side, which is not
+   * available in the standard test container.
+   */
+  @Test
+  void testGraphiteMergeTreeEngineCreation() {
+    String tableName = GravitinoITUtils.genRandomName("test_graphite");
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "pk", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("val", Types.StringType.get(), "data", true, false, DEFAULT_VALUE_NOT_SET)
+        };
+    Assertions.assertTrue(ENGINE.GRAPHITEMERGETREE.isRequireOrderBy());
+    Map<String, String> properties = new HashMap<>();
+    properties.put(GRAVITINO_ENGINE_KEY, ENGINE.GRAPHITEMERGETREE.getValue());
+    // GraphiteMergeTree requires graphite.config property
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            catalog
+                .asTableCatalog()
+                .createTable(
+                    NameIdentifier.of(schemaName, tableName),
+                    columns,
+                    table_comment,
+                    properties,
+                    Transforms.EMPTY_TRANSFORM,
+                    Distributions.NONE,
+                    getSortOrders("id"),
+                    Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testEnumRoundTrip() {
+    // Create a table in ClickHouse with Enum8 and Enum16 columns
+    String tableName = GravitinoITUtils.genRandomName("enum_test");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "id Int32, "
+                + "status Enum8('active' = 1, 'inactive' = 2), "
+                + "priority Enum16('low' = 100, 'medium' = 200, 'high' = 300)"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, tableName));
+
+    // Load through Gravitino and verify column types are ExternalType
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Column[] columns = loaded.columns();
+    Assertions.assertEquals(3, columns.length);
+
+    // Enum8 type verification
+    Type enum8Type = columns[1].dataType();
+    Assertions.assertTrue(
+        enum8Type instanceof Types.ExternalType,
+        "Enum8 should map to ExternalType, but got: " + enum8Type.simpleString());
+    Assertions.assertEquals(
+        normalizeEnumFormatting("Enum8('active' = 1, 'inactive' = 2)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()));
+
+    // Enum16 type verification
+    Type enum16Type = columns[2].dataType();
+    Assertions.assertTrue(
+        enum16Type instanceof Types.ExternalType,
+        "Enum16 should map to ExternalType, but got: " + enum16Type.simpleString());
+    Assertions.assertEquals(
+        normalizeEnumFormatting("Enum16('low' = 100, 'medium' = 200, 'high' = 300)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()));
+
+    // Round-trip: recreate table through Gravitino with the loaded schema
+    String rtTableName = GravitinoITUtils.genRandomName("enum_rt");
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, rtTableName),
+            columns,
+            "enum round-trip test",
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)});
+
+    // Verify types survived round-trip
+    Table rtLoaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, rtTableName));
+    Column[] rtColumns = rtLoaded.columns();
+    Type rtEnum8 = rtColumns[1].dataType();
+    Type rtEnum16 = rtColumns[2].dataType();
+    Assertions.assertTrue(
+        rtEnum8 instanceof Types.ExternalType, "Enum8 should survive round-trip as ExternalType");
+    Assertions.assertTrue(
+        rtEnum16 instanceof Types.ExternalType, "Enum16 should survive round-trip as ExternalType");
+    Assertions.assertEquals(
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum8).catalogString()));
+    Assertions.assertEquals(
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum16).catalogString()));
+
+    // Verify DDL on ClickHouse side contains full enum definitions
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, rtTableName));
+    Assertions.assertNotNull(createSql, "SHOW CREATE TABLE should return a result");
+    String normalizedCreateSql = normalizeEnumFormatting(createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("Enum8('active'=1,'inactive'=2)"),
+        "SHOW CREATE TABLE should contain Enum8 definition: " + createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("Enum16('low'=100,'medium'=200,'high'=300)"),
+        "SHOW CREATE TABLE should contain Enum16 definition: " + createSql);
   }
 }

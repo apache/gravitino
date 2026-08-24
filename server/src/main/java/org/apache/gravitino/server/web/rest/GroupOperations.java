@@ -31,12 +31,14 @@ import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.dto.requests.GroupAddRequest;
@@ -47,10 +49,12 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -59,6 +63,9 @@ import org.slf4j.LoggerFactory;
 public class GroupOperations {
 
   private static final Logger LOG = LoggerFactory.getLogger(GroupOperations.class);
+
+  private static final String LOAD_GROUP_PRIVILEGE =
+      "METALAKE::OWNER || METALAKE::MANAGE_GROUPS || GROUP::SELF";
 
   private final AccessControlDispatcher accessControlManager;
   private final OwnerDispatcher ownerDispatcher;
@@ -78,8 +85,11 @@ public class GroupOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "get-group." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "get-group", absolute = true)
+  @AuthorizationExpression(expression = LOAD_GROUP_PRIVILEGE)
   public Response getGroup(
-      @PathParam("metalake") String metalake, @PathParam("group") String group) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("group") @AuthorizationMetadata(type = Entity.EntityType.GROUP) String group) {
     try {
       return Utils.doAs(
           httpRequest,
@@ -109,10 +119,12 @@ public class GroupOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
-            return Utils.ok(
-                new GroupResponse(
-                    DTOConverters.toDTO(
-                        accessControlManager.addGroup(metalake, request.getName()))));
+            Group addedGroup =
+                StringUtils.isNotBlank(request.getExternalId())
+                    ? accessControlManager.addGroup(
+                        metalake, request.getName(), request.getExternalId())
+                    : accessControlManager.addGroup(metalake, request.getName());
+            return Utils.ok(new GroupResponse(DTOConverters.toDTO(addedGroup)));
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(
@@ -175,11 +187,26 @@ public class GroupOperations {
           () -> {
             MetalakeManager.checkMetalakeInUse(metalake);
             if (verbose) {
-              return Utils.ok(
-                  new GroupListResponse(
-                      DTOConverters.toDTOs(accessControlManager.listGroups(metalake))));
+              Group[] groups = accessControlManager.listGroups(metalake);
+              groups =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      LOAD_GROUP_PRIVILEGE,
+                      Entity.EntityType.GROUP,
+                      groups,
+                      groupEntity -> NameIdentifierUtil.ofGroup(metalake, groupEntity.name()));
+
+              return Utils.ok(new GroupListResponse(DTOConverters.toDTOs(groups)));
             } else {
-              return Utils.ok(new NameListResponse(accessControlManager.listGroupNames(metalake)));
+              String[] groups = accessControlManager.listGroupNames(metalake);
+              groups =
+                  MetadataAuthzHelper.filterByExpression(
+                      metalake,
+                      LOAD_GROUP_PRIVILEGE,
+                      Entity.EntityType.GROUP,
+                      groups,
+                      groupName -> NameIdentifierUtil.ofGroup(metalake, groupName));
+              return Utils.ok(new NameListResponse(groups));
             }
           });
 

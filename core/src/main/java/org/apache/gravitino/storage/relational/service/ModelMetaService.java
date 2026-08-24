@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
@@ -129,7 +130,8 @@ public class ModelMetaService {
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
     String modelFullName =
-        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()).toString();
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()));
 
     AtomicInteger modelDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
@@ -373,8 +375,9 @@ public class ModelMetaService {
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
     String oldFullName =
-        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, oldModelEntity.name())
-            .toString();
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofModel(
+                metalakeName, catalogName, schemaName, oldModelEntity.name()));
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
     AtomicInteger updateResult = new AtomicInteger(0);

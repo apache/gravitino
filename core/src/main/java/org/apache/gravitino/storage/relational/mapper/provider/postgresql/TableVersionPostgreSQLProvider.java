@@ -63,7 +63,7 @@ public class TableVersionPostgreSQLProvider extends TableVersionBaseSQLProvider 
         + TABLE_NAME
         + " SET deleted_at = round(extract(epoch from(current_timestamp -"
         + " timestamp '1970-01-01 00:00:00')) * 1000)"
-        + " WHERE table_id = #{tableId} AND version = #{version}";
+        + " WHERE table_id = #{tableId} AND version = #{version} AND deleted_at = 0";
   }
 
   @Override

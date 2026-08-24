@@ -143,7 +143,7 @@ public class TestCredentialOperationDispatcher extends TestOperationDispatcher {
     Mockito.when(baseCatalog.ops()).thenReturn(ops);
 
     CredentialOperationDispatcher dispatcher =
-        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
     List<Credential> credentials =
         dispatcher.getCredentials(

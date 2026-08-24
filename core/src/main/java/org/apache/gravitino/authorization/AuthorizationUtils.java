@@ -66,7 +66,13 @@ public class AuthorizationUtils {
   static final String USER_DOES_NOT_EXIST_MSG = "User %s does not exist in the metalake %s";
   static final String USER_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
       "User with external id %s does not exist in the metalake %s";
+  static final String USER_WITH_ID_DOES_NOT_EXIST_MSG =
+      "User with id %s does not exist in the metalake %s";
   static final String GROUP_DOES_NOT_EXIST_MSG = "Group %s does not exist in the metalake %s";
+  static final String GROUP_WITH_EXTERNAL_ID_DOES_NOT_EXIST_MSG =
+      "Group with external id %s does not exist in the metalake %s";
+  static final String GROUP_WITH_ID_DOES_NOT_EXIST_MSG =
+      "Group with id %s does not exist in the metalake %s";
   static final String ROLE_DOES_NOT_EXIST_MSG = "Role %s does not exist in the metalake %s";
 
   /**
@@ -105,7 +111,10 @@ public class AuthorizationUtils {
           Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
   private static final Set<Privilege.Name> TABLE_PRIVILEGES =
       Sets.immutableEnumSet(
-          Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
+          Privilege.Name.CREATE_TABLE,
+          Privilege.Name.MODIFY_TABLE,
+          Privilege.Name.SELECT_TABLE,
+          Privilege.Name.PROBE_TABLE_LIKE);
   private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
@@ -163,6 +172,58 @@ public class AuthorizationUtils {
         externalId);
   }
 
+  /**
+   * Creates a synthetic {@link NameIdentifier} used only as a tree-lock path for user operations
+   * keyed by Gravitino-assigned id.
+   *
+   * @param metalake the metalake name
+   * @param userId the Gravitino-assigned user id
+   * @return a synthetic name identifier for tree locking only
+   */
+  public static NameIdentifier ofUserId(String metalake, long userId) {
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.USER_ID_SCHEMA_NAME,
+        String.valueOf(userId));
+  }
+
+  /**
+   * Creates a synthetic {@link NameIdentifier} used only as a tree-lock path for group operations
+   * keyed by Gravitino-assigned id.
+   *
+   * @param metalake the metalake name
+   * @param groupId the Gravitino-assigned group id
+   * @return a synthetic name identifier for tree locking only
+   */
+  public static NameIdentifier ofGroupId(String metalake, long groupId) {
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.GROUP_ID_SCHEMA_NAME,
+        String.valueOf(groupId));
+  }
+
+  /**
+   * Creates a synthetic {@link NameIdentifier} used only as a {@link
+   * org.apache.gravitino.lock.TreeLockUtils} lock path for group operations keyed by external id.
+   *
+   * <p>This is <strong>not</strong> the entity's storage identifier. Group entities are stored and
+   * retrieved by Gravitino group name via {@link #ofGroup(String, String)}. At lock time the group
+   * name may be unknown, so external-id operations need a dedicated lock path.
+   *
+   * @param metalake the metalake name
+   * @param externalId the external id of the group
+   * @return a synthetic name identifier for tree locking only
+   */
+  public static NameIdentifier ofGroupExternalId(String metalake, String externalId) {
+    return NameIdentifier.of(
+        metalake,
+        Entity.SYSTEM_CATALOG_RESERVED_NAME,
+        Entity.GROUP_EXTERNAL_ID_SCHEMA_NAME,
+        externalId);
+  }
+
   public static Namespace ofRoleNamespace(String metalake) {
     return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.ROLE_SCHEMA_NAME);
   }
@@ -180,6 +241,19 @@ public class AuthorizationUtils {
         metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_EXTERNAL_ID_SCHEMA_NAME);
   }
 
+  public static Namespace ofUserIdNamespace(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.USER_ID_SCHEMA_NAME);
+  }
+
+  public static Namespace ofGroupExternalIdNamespace(String metalake) {
+    return Namespace.of(
+        metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_EXTERNAL_ID_SCHEMA_NAME);
+  }
+
+  public static Namespace ofGroupIdNamespace(String metalake) {
+    return Namespace.of(metalake, Entity.SYSTEM_CATALOG_RESERVED_NAME, Entity.GROUP_ID_SCHEMA_NAME);
+  }
+
   public static void checkUser(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "User identifier must not be null");
     checkUserNamespace(ident.namespace());
@@ -195,9 +269,39 @@ public class AuthorizationUtils {
     checkUserExternalIdNamespace(ident.namespace());
   }
 
+  /**
+   * Validates that the name identifier refers to a user id in a metalake.
+   *
+   * @param ident the user id name identifier to validate
+   */
+  public static void checkUserId(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "User id identifier must not be null");
+    checkUserIdNamespace(ident.namespace());
+  }
+
   public static void checkGroup(NameIdentifier ident) {
     NameIdentifier.check(ident != null, "Group identifier must not be null");
     checkGroupNamespace(ident.namespace());
+  }
+
+  /**
+   * Validates that the name identifier refers to a group external id in a metalake.
+   *
+   * @param ident the external id name identifier to validate
+   */
+  public static void checkGroupExternalId(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "External id identifier must not be null");
+    checkGroupExternalIdNamespace(ident.namespace());
+  }
+
+  /**
+   * Validates that the name identifier refers to a group id in a metalake.
+   *
+   * @param ident the group id name identifier to validate
+   */
+  public static void checkGroupId(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Group id identifier must not be null");
+    checkGroupIdNamespace(ident.namespace());
   }
 
   public static void checkRole(NameIdentifier ident) {
@@ -216,6 +320,27 @@ public class AuthorizationUtils {
     Namespace.check(
         namespace != null && namespace.length() == 3,
         "User external id namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkUserIdNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "User id namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkGroupExternalIdNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "Group external id namespace must have 3 levels, the input namespace is %s",
+        namespace);
+  }
+
+  public static void checkGroupIdNamespace(Namespace namespace) {
+    Namespace.check(
+        namespace != null && namespace.length() == 3,
+        "Group id namespace must have 3 levels, the input namespace is %s",
         namespace);
   }
 

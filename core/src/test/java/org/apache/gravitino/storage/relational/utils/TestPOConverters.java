@@ -665,6 +665,8 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
     assertEquals("this is test2", updatePO.getMetalakeComment());
   }
 
@@ -679,6 +681,8 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
     assertEquals("this is test2", updatePO.getCatalogComment());
   }
 
@@ -891,6 +895,7 @@ public class TestPOConverters {
     assertEquals(1L, tagMetadataObjectRelPO.getMetadataObjectId());
     assertEquals(
         MetadataObject.Type.CATALOG.toString(), tagMetadataObjectRelPO.getMetadataObjectType());
+    assertEquals("", tagMetadataObjectRelPO.getTagValue());
 
     assertEquals(1, tagMetadataObjectRelPO.getCurrentVersion());
     assertEquals(1, tagMetadataObjectRelPO.getLastVersion());

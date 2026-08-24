@@ -203,6 +203,51 @@ public class AccessControlIT extends BaseIT {
   }
 
   @Test
+  void testManageUsersAndGroupsWithExternalId() {
+    String userExtId = "ext-user-it-1";
+    String username = "ext_user_it";
+    User user = metalake.addUser(username, userExtId, false);
+    Assertions.assertEquals(userExtId, user.externalId());
+    Assertions.assertFalse(user.enabled());
+
+    user = metalake.getUser(username);
+    Assertions.assertEquals(userExtId, user.externalId());
+    Assertions.assertFalse(user.enabled());
+
+    User listedUser =
+        Arrays.stream(metalake.listUsers())
+            .filter(u -> username.equals(u.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(userExtId, listedUser.externalId());
+    Assertions.assertFalse(listedUser.enabled());
+
+    Assertions.assertThrows(
+        UserAlreadyExistsException.class, () -> metalake.addUser("dup_ext_user", userExtId, true));
+
+    String groupExtId = "ext-group-it-1";
+    String groupName = "ext_group_it";
+    Group group = metalake.addGroup(groupName, groupExtId);
+    Assertions.assertEquals(groupExtId, group.externalId());
+
+    group = metalake.getGroup(groupName);
+    Assertions.assertEquals(groupExtId, group.externalId());
+
+    Group listedGroup =
+        Arrays.stream(metalake.listGroups())
+            .filter(g -> groupName.equals(g.name()))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(groupExtId, listedGroup.externalId());
+
+    Assertions.assertThrows(
+        GroupAlreadyExistsException.class, () -> metalake.addGroup("dup_ext_group", groupExtId));
+
+    Assertions.assertTrue(metalake.removeUser(username));
+    Assertions.assertTrue(metalake.removeGroup(groupName));
+  }
+
+  @Test
   @SuppressWarnings("deprecation")
   void testManageRoles() {
     String roleName = "role#123";

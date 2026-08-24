@@ -35,9 +35,11 @@ import org.apache.gravitino.iceberg.service.IcebergCatalogWrapperManager;
 import org.apache.gravitino.listener.api.event.IcebergRequestContext;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.RegisterViewRequest;
 import org.apache.iceberg.rest.responses.CreateNamespaceResponse;
 import org.apache.iceberg.rest.responses.GetNamespaceResponse;
 import org.apache.iceberg.rest.responses.ListNamespacesResponse;
+import org.apache.iceberg.rest.responses.LoadViewResponse;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -173,6 +175,19 @@ public class TestIcebergNamespaceOperationExecutor {
     GetNamespaceResponse result = executor.loadNamespace(mockContext, ns);
 
     verify(mockCatalogWrapper).loadNamespace(ns);
+    Assertions.assertEquals(mockResponse, result);
+  }
+
+  @Test
+  public void testRegisterViewDelegatesToCatalogWrapper() {
+    Namespace ns = Namespace.of("test_ns");
+    RegisterViewRequest mockRequest = mock(RegisterViewRequest.class);
+    LoadViewResponse mockResponse = mock(LoadViewResponse.class);
+    when(mockCatalogWrapper.registerView(ns, mockRequest)).thenReturn(mockResponse);
+
+    LoadViewResponse result = executor.registerView(mockContext, ns, mockRequest);
+
+    verify(mockCatalogWrapper).registerView(ns, mockRequest);
     Assertions.assertEquals(mockResponse, result);
   }
 

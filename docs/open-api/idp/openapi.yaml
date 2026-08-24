@@ -18,17 +18,17 @@
 ---
 openapi: 3.0.3
 info:
-  title: Gravitino Built-in IDP REST API
+  title: Gravitino Local Users and Groups REST API
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
   version: 1.3.0-SNAPSHOT
   description: |
-    OpenAPI specification for built-in IDP user and group management APIs exposed
+    OpenAPI specification for local user store user and group management APIs exposed
     by the `idp-basic` plugin. Clients authenticate with Basic credentials validated against
-    built-in IdP user metadata. Enable built-in IdP by registering
+    local user metadata. Enable local user store by registering
     `org.apache.gravitino.idp.web.rest.feature` in `gravitino.server.rest.extensionPackages`.
-    Built-in IdP is incompatible with the `simple` authenticator (the default),
+    Local user store is incompatible with the `simple` authenticator (the default),
     `gravitino.authenticators` must include `basic` and must not include `simple`.
 
 servers:

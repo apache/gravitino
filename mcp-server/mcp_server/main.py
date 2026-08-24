@@ -21,6 +21,7 @@ import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
 from mcp_server.server import GravitinoMCPServer
+from mcp_server.tools import SUPPORTED_TOOL_TAGS
 
 
 def do_main():
@@ -85,9 +86,9 @@ def _parse_args():
         "--include-tool-tags",
         type=_comma_separated_set,
         default=set(),
-        help="The tool tags to include, separated by commas, support tags:[catalog, "
-        "schema, table, topic, model, fileset, tag, policy]. default: empty, "
-        "all tools will be included).",
+        help="The tool tags to include, separated by commas, support tags:"
+        f"[{', '.join(sorted(SUPPORTED_TOOL_TAGS))}]. default: empty, "
+        "all tools will be included.",
     )
 
     parser.add_argument(
@@ -112,9 +113,12 @@ def _parse_args():
         "--token",
         type=str,
         default=os.environ.get("GRAVITINO_TOKEN", ""),
-        help="Static OAuth2 Bearer token used to authenticate to Gravitino. "
-        "In stdio mode it is sent on every request; in HTTP mode it is only the "
-        "fallback when an incoming request carries no Authorization header "
+        help="Static credential used as the Authorization header when "
+        "authenticating to Gravitino. A bare token is treated as an OAuth2 Bearer "
+        "token; a value containing a valid scheme and credential, such as "
+        "'Basic <base64>', is sent as an Authorization credential. In stdio mode "
+        "it is sent on every request; in HTTP mode it is only the fallback when an "
+        "incoming request carries no Authorization header "
         "(per-request identity takes priority). "
         "Can also be set via the GRAVITINO_TOKEN environment variable. "
         "When omitted, requests are sent without authentication.",

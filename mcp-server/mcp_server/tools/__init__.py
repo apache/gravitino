@@ -22,12 +22,32 @@ from mcp_server.tools.fileset import load_fileset_tools
 from mcp_server.tools.job import load_job_tool
 from mcp_server.tools.metadata import load_metadata_tool
 from mcp_server.tools.model import load_model_tools
+from mcp_server.tools.partition import load_partition_tools
 from mcp_server.tools.policy import load_policy_tools
 from mcp_server.tools.schema import load_schema_tools
 from mcp_server.tools.statistic import load_statistic_tools
 from mcp_server.tools.table import load_table_tools
 from mcp_server.tools.tag import load_tag_tool
 from mcp_server.tools.topic import load_topic_tools
+from mcp_server.tools.view import load_view_tools
+
+# Mirrors the tags the tools declare; enforced by tests/unit/test_tool_tags.py.
+SUPPORTED_TOOL_TAGS = frozenset(
+    {
+        "catalog",
+        "fileset",
+        "job",
+        "model",
+        "partition",
+        "policy",
+        "schema",
+        "statistic",
+        "table",
+        "tag",
+        "topic",
+        "view",
+    }
+)
 
 
 def load_tools(mcp: FastMCP):
@@ -42,3 +62,5 @@ def load_tools(mcp: FastMCP):
     load_metadata_tool(mcp)
     load_statistic_tools(mcp)
     load_policy_tools(mcp)
+    load_partition_tools(mcp)
+    load_view_tools(mcp)

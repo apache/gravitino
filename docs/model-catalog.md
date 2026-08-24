@@ -1,91 +1,88 @@
 ---
 title: "Model Catalog"
 slug: "/model-catalog"
-date: 2024-12-26
-keyword: "model catalog"
+keyword: "model catalog, ML model, model version, model registry, Gravitino"
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-A Model catalog is a metadata catalog that provides the unified interface to manage the metadata of
-machine learning models in a centralized way. It follows the typical Gravitino 3-level namespace
-(catalog, schema, and model) to manage the ML models metadata. In addition, it supports
-managing the versions for each model.
+A model catalog is a registry for machine learning models. It follows the same three-level namespace
+as every other catalog, catalog then schema then model, and adds a fourth level beneath each model
+for its versions.
 
-The advantages of using model catalog are:
+What it stores is the mapping from a name to a location. Instead of jobs and notebooks carrying a
+path to a model file, they resolve a model by name and get the version they asked for. The model
+files themselves stay wherever they live.
 
-* Centralized management of ML models with user defined namespaces. Users can better discover
-  and govern the models from semantic level, rather than managing the model files directly.
-* Version management for each model. Users can easily track the model versions and manage the
-  model lifecycle.
+That indirection is what makes the rest possible. Models sit in the same hierarchy as the tables
+they were trained on, carry tags and policies like anything else, and are governed by the same roles
+and privileges.
 
-The key concept of model management is to manage the path (URI) of the model. Instead of
-managing the model storage path physically and separately, model metadata defines the mapping
-relation between the model name and the storage path. In the meantime, with the support of
-extensible properties of model metadata, users can define the model metadata with more detailed information
-rather than just the storage path.
+Gravitino manages this catalog itself rather than federating an external registry, so a model
+catalog takes no provider.
 
-* **Model**: A model is a metadata object defined in the model catalog, to manage a ML model. Each
-  model can have many **Model Versions**, and each version can have its own properties. Models
-  can be retrieved by the name.
-* **ModelVersion**: The model version is a metadata defined in the model catalog, to manage each
-  version of the ML model. Each version has a unique version number, and can have its own
-  properties and storage path. ModelVersion can be retrieved by the model name and version
-  number. Also, each version can have a list of aliases, which can also be used to retrieve.
+## Quick Start
 
-## Catalog
+**1. Create a model catalog and schema.** See
+[Catalogs and Schemas](./catalogs-and-schemas.md). A model catalog takes no provider and has no
+required properties.
 
-### Catalog Properties
+**2. Register a model.** Registering creates the model as a named object with no versions yet.
 
-A Model catalog doesn't have specific properties. It uses the [common catalog properties](./gravitino-server-config.md#catalog-properties-configuration).
+**3. Link a version.** A version carries the URI where the model lives, plus any aliases you want to
+resolve it by.
 
-### Catalog Operations
+## The Model Registry
 
-Refer to [Catalog operations](./manage-model-metadata-using-gravitino.md#catalog-operations) for more details.
+### Models and Versions
 
-## Schema
+A model is a named object in a schema, and holds no location of its own.
 
-### Schema Capabilities
+A model version is one release of that model. It carries the URI where the files live, an optional
+comment, its own properties, and a version number assigned in sequence starting at zero. A new
+release is a new version rather than an edit of an existing one.
 
-Schema is the second level of the model catalog namespace, the model catalog supports creating, updating, deleting, and listing schemas.
+### Aliases
 
-### Schema Properties
+A version can carry aliases, and an alias resolves to a version the same way its number does. That
+is how a moving pointer such as `production` or `champion` is expressed: link a new version, move
+the alias, and everything resolving by that alias picks up the new release without any code
+changing.
 
-Schema in the model catalog doesn't have predefined properties. Users can define the properties for each schema.
+An alias belongs to one version at a time within a model.
 
-### Schema Operations
+### Several URIs on One Version
 
-Refer to [Schema operation](./manage-model-metadata-using-gravitino.md#schema-operations) for more details.
+A version can carry more than one URI, each with a name, held as a map rather than a single value.
+That is how the same release is described in more than one place, such as a copy per region or per
+storage system.
 
-## Model
+`default-uri-name` picks which one is returned when a caller does not name one, and can be set on
+the version or on the model as a default for all of its versions. A URI supplied without a name is
+recorded as `unknown`.
 
-### Model Capabilities
+### Properties
 
-The Model catalog supports registering, listing and deleting models and model versions.
+Neither the catalog nor its schemas have predefined properties beyond the
+[common catalog properties](./gravitino-server-config.md#catalog-properties-configuration). Models
+and versions carry free-form properties of their own, with `default-uri-name` reserved.
 
-### Model Properties
+## Working With Models in the UI
 
-| Property name      | Description                                         | Default value | Required | Immutable | Since Version |
-|--------------------|-----------------------------------------------------|---------------|----------|-----------|---------------|
-| `default-uri-name` | The default URI name for the versions of the model. | (none)        | No       | No        | 1.0.0         |
+Opening a model catalog lists its schemas and the models inside them. A model shows its versions,
+their URIs, and their aliases, and versions can be linked from there.
 
-### Model Operations
+Models display the tags they carry, including inherited ones, but cannot be tagged from the UI
+today. Attaching a tag to a model goes through the API.
 
-Refer to [Model operation](./manage-model-metadata-using-gravitino.md#model-operations) for more details.
+## Permissions
 
-## ModelVersion
+Models follow the privileges of the catalog and schema that hold them. See
+[Catalogs and Schemas](./catalogs-and-schemas.md).
 
-### ModelVersion Capabilities
+## Using the API
 
-The Model catalog supports linking, listing and deleting model versions.
-
-### ModelVersion Properties
-
-| Property name      | Description                                                                                                          | Default value | Required | Immutable | Since Version |
-|--------------------|----------------------------------------------------------------------------------------------------------------------|---------------|----------|-----------|---------------|
-| `default-uri-name` | The default URI name for the model version. If set, it will override the `default-uri-name` property at model level. | (none)        | No       | No        | 1.0.0         |
-
-### ModelVersion Operations
-
-Refer to [ModelVersion operation](./manage-model-metadata-using-gravitino.md#modelversion-operations) for more details.
+Models and versions can be registered, linked, listed, altered, and dropped over REST and through
+the Java and Python clients. Endpoints, payload shapes, and worked examples are in
+[Manage Model Metadata](./manage-model-metadata-using-gravitino.md).

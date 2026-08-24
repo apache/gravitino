@@ -153,9 +153,9 @@ DROP VIEW summary_view;
 
 Gravitino Flink connector will transform below property names which are defined in catalog properties to Flink Paimon connector configuration.
 
-| Gravitino catalog property name | Flink Paimon connector configuration | Description                                                                                                                                                                                                | Since Version    |
-|---------------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------|
-| `catalog-backend`               | `metastore`                          | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`.                                                                                                                                        | 0.8.0-incubating |
-| `warehouse`                     | `warehouse`                          | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS | 0.8.0-incubating |
+| Gravitino catalog property name | Flink Paimon connector configuration | Description                                                                                                                                                                                                |
+|---------------------------------|--------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `catalog-backend`               | `metastore`                          | Catalog backend of Gravitino Paimon catalog. Supports `filesystem`.                                                                                                                                        |
+| `warehouse`                     | `warehouse`                          | Warehouse directory of catalog. `file:///user/hive/warehouse-paimon/` for local fs, `hdfs://namespace/hdfs/path` for HDFS , `s3://{bucket-name}/path/` for S3 or `oss://{bucket-name}/path` for Aliyun OSS |
 
 Gravitino catalog property names with the prefix `flink.bypass.` are passed to Flink Paimon connector. For example, using `flink.bypass.clients` to pass the `clients` to the Flink Paimon connector.

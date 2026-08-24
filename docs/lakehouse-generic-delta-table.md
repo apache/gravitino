@@ -55,34 +55,34 @@ For Delta tables in a Generic Lakehouse Catalog, the following table summarizes 
 
 Delta Lake uses Apache Spark data types. The following table shows type mappings between Gravitino and Delta/Spark:
 
-| Gravitino Type      | Delta/Spark Type       | Notes                           |
-|---------------------|------------------------|---------------------------------|
-| `Boolean`           | `BooleanType`          |                                 |
-| `Byte`              | `ByteType`             |                                 |
-| `Short`             | `ShortType`            |                                 |
-| `Integer`           | `IntegerType`          |                                 |
-| `Long`              | `LongType`             |                                 |
-| `Float`             | `FloatType`            |                                 |
-| `Double`            | `DoubleType`           |                                 |
-| `Decimal(p, s)`     | `DecimalType(p, s)`    |                                 |
-| `String`            | `StringType`           |                                 |
-| `Binary`            | `BinaryType`           |                                 |
-| `Date`              | `DateType`             |                                 |
-| `Timestamp`         | `TimestampNTZType`     | No timezone, Spark 3.4+         |
-| `Timestamp_tz`      | `TimestampType`        | With timezone                   |
-| `List`              | `ArrayType`            |                                 |
-| `Map`               | `MapType`              |                                 |
-| `Struct`            | `StructType`           |                                 |
+| Gravitino Type  | Delta/Spark Type    | Notes                   |
+|-----------------|---------------------|-------------------------|
+| `Boolean`       | `BooleanType`       |                         |
+| `Byte`          | `ByteType`          |                         |
+| `Short`         | `ShortType`         |                         |
+| `Integer`       | `IntegerType`       |                         |
+| `Long`          | `LongType`          |                         |
+| `Float`         | `FloatType`         |                         |
+| `Double`        | `DoubleType`        |                         |
+| `Decimal(p, s)` | `DecimalType(p, s)` |                         |
+| `String`        | `StringType`        |                         |
+| `Binary`        | `BinaryType`        |                         |
+| `Date`          | `DateType`          |                         |
+| `Timestamp`     | `TimestampNTZType`  | No timezone, Spark 3.4+ |
+| `Timestamp_tz`  | `TimestampType`     | With timezone           |
+| `List`          | `ArrayType`         |                         |
+| `Map`           | `MapType`           |                         |
+| `Struct`        | `StructType`        |                         |
 
 ### Table Properties
 
 Required and optional properties for Delta tables in a Generic Lakehouse Catalog:
 
-| Property   | Description                                                                                                                                                                                                            | Default | Required | Since Version |
-|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|----------|---------------|
-| `format`   | Table format: must be `delta`                                                                                                                                                                                          | (none)  | Yes      | 1.2.0         |
-| `location` | Storage path for the Delta table. Must point to a directory containing Delta Lake metadata (_delta_log). Supports file://, s3://, hdfs://, abfs://, gs://, and other Hadoop-compatible file systems.                  | (none)  | Yes      | 1.2.0         |
-| `external` | Must be `true` for Delta tables. Indicates that Gravitino manages metadata only <br/>and will not delete physical data when the table is dropped.                                                                           | (none)  | Yes      | 1.2.0         |
+| Property   | Description                                                                                                                                                                                          | Default | Required |
+|------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------|----------|
+| `format`   | Table format: must be `delta`                                                                                                                                                                        | (none)  | Yes      |
+| `location` | Storage path for the Delta table. Must point to a directory containing Delta Lake metadata (_delta_log). Supports file://, s3://, hdfs://, abfs://, gs://, and other Hadoop-compatible file systems. | (none)  | Yes      |
+| `external` | Must be `true` for Delta tables. Indicates that Gravitino manages metadata only <br/>and will not delete physical data when the table is dropped.                                                    | (none)  | Yes      |
 
 **Location Requirement:** Must be specified at table level for external Delta table. See [Location Resolution](./lakehouse-generic-catalog.md#key-property-location).
 

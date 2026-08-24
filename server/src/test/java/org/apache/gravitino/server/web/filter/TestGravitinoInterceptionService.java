@@ -17,7 +17,11 @@
 
 package org.apache.gravitino.server.web.filter;
 
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA_AND_TAG;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -30,29 +34,40 @@ import java.lang.reflect.Method;
 import java.security.Principal;
 import java.util.Collections;
 import java.util.List;
+import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.catalog.TableDispatcher;
+import org.apache.gravitino.dto.requests.TagValuesAssociateRequest;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationFullName;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationObjectType;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
+import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.AfterEach;
@@ -118,6 +133,55 @@ public class TestGravitinoInterceptionService {
       assertEquals(
           "User 'tester' is not authorized to perform operation 'testMethod' on metadata 'testMetalake2'",
           ((ErrorResponse) response2.getEntity()).getMessage());
+    }
+  }
+
+  @Test
+  public void testRejectsUnheldActiveRolesWith403() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class);
+        MockedStatic<MetalakeManager> metalakeManagerMocked = mockStatic(MetalakeManager.class)) {
+      // The caller declares an active role via the header; the authorizer reports it as unheld.
+      UserPrincipal principal =
+          new UserPrincipal("tester")
+              .withActiveRoles(ActiveRoles.of(Collections.singletonList("ghostRole")));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      when(authorizer.findUnheldRoles(
+              ArgumentMatchers.any(),
+              ArgumentMatchers.eq("testMetalake"),
+              ArgumentMatchers.any(),
+              ArgumentMatchers.any()))
+          .thenReturn(Collections.singleton("ghostRole"));
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      EntityStore mockStore = mock(EntityStore.class);
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.entityStore()).thenReturn(mockStore);
+      metalakeManagerMocked
+          .when(() -> MetalakeManager.checkMetalake(ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoInterceptionService service = new GravitinoInterceptionService();
+      Method testMethod = TestOperations.class.getMethods()[0];
+      MethodInterceptor interceptor = service.getMethodInterceptors(testMethod).get(0);
+      when(methodInvocation.getMethod()).thenReturn(testMethod);
+      when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
+
+      Response response = (Response) interceptor.invoke(methodInvocation);
+
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+      Assertions.assertTrue(
+          ((ErrorResponse) response.getEntity()).getMessage().contains("ghostRole"));
+      verify(methodInvocation, never()).proceed();
     }
   }
 
@@ -267,6 +331,75 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  @Test
+  public void testInvalidV2TagAssociationBodyReturnsBadRequestAfterAuthorization()
+      throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class)) {
+
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked
+          .when(() -> PrincipalUtils.doAs(ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenCallRealMethod();
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      when(authorizer.authorize(any(), any(), any(), any(), any())).thenReturn(true);
+      when(authorizer.deny(any(), any(), any(), any(), any())).thenReturn(false);
+      when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      TagValuesAssociateRequest request =
+          JsonUtils.objectMapper()
+              .readValue(
+                  "{\"tagsToAdd\":[{\"name\":\"data_domain\",\"value\":\" \"}]}",
+                  TagValuesAssociateRequest.class);
+      Method method =
+          TestMetadataObjectTagAssociationOperations.class.getMethod(
+              "associateTagValuesForObject",
+              String.class,
+              String.class,
+              String.class,
+              TagValuesAssociateRequest.class);
+      Object[] args = new Object[] {"testMetalake", "catalog", "object1", request};
+      TagDispatcher tagDispatcher = mock(TagDispatcher.class);
+      MetadataObjectTagOperations operations = new MetadataObjectTagOperations(tagDispatcher);
+      HttpServletRequest httpRequest = mock(HttpServletRequest.class);
+      FieldUtils.writeField(operations, "httpRequest", httpRequest, true);
+      Response invalidBodyResponse =
+          operations.associateTagValuesForObject(
+              (String) args[0],
+              (String) args[1],
+              (String) args[2],
+              (TagValuesAssociateRequest) args[3]);
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      when(methodInvocation.getMethod()).thenReturn(method);
+      when(methodInvocation.getArguments()).thenReturn(args);
+      when(methodInvocation.proceed()).thenReturn(invalidBodyResponse);
+
+      MethodInterceptor methodInterceptor =
+          new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+      Response response = (Response) methodInterceptor.invoke(methodInvocation);
+
+      assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+      verify(tagDispatcher, never())
+          .associateTagValuesForMetadataObject(any(), any(), any(), any());
+    }
+  }
+
   /**
    * When the authorization executor returns {@code false}, {@code buildNoAuthResponse} is called
    * with {@code emitEvent=true}. Verify that:
@@ -385,6 +518,99 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  @Test
+  public void testLoadTableAuthorizationProceedsWhenProbeAllowedTableDoesNotExist()
+      throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+      EventBus mockEventBus = mock(EventBus.class);
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.tableDispatcher()).thenReturn(tableDispatcher);
+      when(mockEnv.eventBus()).thenReturn(mockEventBus);
+      when(tableDispatcher.tableExists(ArgumentMatchers.any())).thenReturn(false);
+
+      MethodInterceptor interceptor = tableLoadInterceptor();
+      MethodInvocation invocation = tableLoadInvocation();
+      Response notFound = Utils.notFound("NoSuchTableException", "Table does not exist");
+      when(invocation.proceed()).thenReturn(notFound);
+
+      Response response = (Response) interceptor.invoke(invocation);
+
+      assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
+      verify(invocation).proceed();
+      verify(tableDispatcher).tableExists(ArgumentMatchers.any());
+      verify(mockEventBus, never()).dispatchEvent(ArgumentMatchers.any());
+    }
+  }
+
+  @Test
+  public void testLoadTableAuthorizationReturnsForbiddenWhenProbeAllowedTableExists()
+      throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> authorizerMocked =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<AuthorizationUtils> authUtilsMocked = mockStatic(AuthorizationUtils.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      authUtilsMocked
+          .when(
+              () ->
+                  AuthorizationUtils.checkCurrentUser(
+                      ArgumentMatchers.any(), ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      GravitinoAuthorizer authorizer = tableProbeAuthorizer();
+      authorizerMocked.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      TableDispatcher tableDispatcher = mock(TableDispatcher.class);
+      EventBus mockEventBus = spy(new EventBus(Collections.emptyList()));
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.tableDispatcher()).thenReturn(tableDispatcher);
+      when(mockEnv.eventBus()).thenReturn(mockEventBus);
+      when(tableDispatcher.tableExists(ArgumentMatchers.any())).thenReturn(true);
+
+      MethodInterceptor interceptor = tableLoadInterceptor();
+      MethodInvocation invocation = tableLoadInvocation();
+
+      Response response = (Response) interceptor.invoke(invocation);
+
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+      verify(invocation, never()).proceed();
+      verify(tableDispatcher).tableExists(ArgumentMatchers.any());
+      verify(mockEventBus)
+          .dispatchEvent(ArgumentMatchers.any(AuthorizationDenialFailureEvent.class));
+    }
+  }
+
   /**
    * When {@code checkCurrentUser} throws {@link NoSuchMetalakeException}, the 403 is a
    * resource-not-found masquerading as forbidden — no {@link AuthorizationDenialFailureEvent} is
@@ -439,6 +665,36 @@ public class TestGravitinoInterceptionService {
     }
   }
 
+  public static class TestMetadataObjectTagAssociationOperations {
+
+    @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+    public Response associateTagValuesForObject(
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationObjectType String type,
+        @AuthorizationFullName String fullName,
+        @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+            TagValuesAssociateRequest request) {
+      return Utils.ok("unused");
+    }
+  }
+
+  public static class TestTableLoadOperations {
+
+    @AuthorizationExpression(
+        expression = LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+        allowCheckExistence = PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+        accessMetadataType = MetadataObject.Type.TABLE)
+    public Response loadTable(
+        @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake,
+        @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+        @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+        @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
+        @AuthorizationRequest(type = AuthorizationRequest.RequestType.LOAD_TABLE)
+            String requiredPrivileges) {
+      return Utils.ok("unused");
+    }
+  }
+
   public static class TestOperations {
 
     @AuthorizationExpression(
@@ -457,6 +713,60 @@ public class TestGravitinoInterceptionService {
         @AuthorizationMetadata(type = Entity.EntityType.METALAKE) String metalake) {
       return Utils.ok("success");
     }
+  }
+
+  private MethodInterceptor tableLoadInterceptor() throws NoSuchMethodException {
+    Method method =
+        TestTableLoadOperations.class.getMethod(
+            "loadTable", String.class, String.class, String.class, String.class, String.class);
+    return new GravitinoInterceptionService().getMethodInterceptors(method).get(0);
+  }
+
+  private MethodInvocation tableLoadInvocation() throws NoSuchMethodException {
+    Method method =
+        TestTableLoadOperations.class.getMethod(
+            "loadTable", String.class, String.class, String.class, String.class, String.class);
+    MethodInvocation invocation = mock(MethodInvocation.class);
+    when(invocation.getMethod()).thenReturn(method);
+    when(invocation.getArguments())
+        .thenReturn(
+            new Object[] {"testMetalake", "testCatalog", "testSchema", "missingTable", null});
+    return invocation;
+  }
+
+  private GravitinoAuthorizer tableProbeAuthorizer() {
+    GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+    when(authorizer.authorize(
+            ArgumentMatchers.any(),
+            ArgumentMatchers.eq("testMetalake"),
+            ArgumentMatchers.argThat(
+                metadataObject ->
+                    metadataObject.type() == MetadataObject.Type.CATALOG
+                        && "testCatalog".equals(metadataObject.name())),
+            ArgumentMatchers.eq(Privilege.Name.USE_CATALOG),
+            ArgumentMatchers.any()))
+        .thenReturn(true);
+    when(authorizer.authorize(
+            ArgumentMatchers.any(),
+            ArgumentMatchers.eq("testMetalake"),
+            ArgumentMatchers.argThat(
+                metadataObject ->
+                    metadataObject.type() == MetadataObject.Type.SCHEMA
+                        && "testSchema".equals(metadataObject.name())),
+            ArgumentMatchers.eq(Privilege.Name.USE_SCHEMA),
+            ArgumentMatchers.any()))
+        .thenReturn(true);
+    when(authorizer.authorize(
+            ArgumentMatchers.any(),
+            ArgumentMatchers.eq("testMetalake"),
+            ArgumentMatchers.argThat(
+                metadataObject ->
+                    metadataObject.type() == MetadataObject.Type.METALAKE
+                        && "testMetalake".equals(metadataObject.name())),
+            ArgumentMatchers.eq(Privilege.Name.PROBE_TABLE_LIKE),
+            ArgumentMatchers.any()))
+        .thenReturn(true);
+    return authorizer;
   }
 
   private static class MockGravitinoAuthorizer implements GravitinoAuthorizer {

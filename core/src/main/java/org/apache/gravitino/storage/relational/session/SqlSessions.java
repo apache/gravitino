@@ -103,6 +103,15 @@ public final class SqlSessions {
     return getSqlSession().getMapper(className);
   }
 
+  /**
+   * Returns whether the current thread already owns an open SQL session.
+   *
+   * @return {@code true} when an SQL session is active on the current thread
+   */
+  public static boolean hasActiveSession() {
+    return sessions.get() != null;
+  }
+
   private static void handleSessionClose(boolean commit, boolean rollback) {
     SqlSession sqlSession = sessions.get();
     if (sqlSession == null) {

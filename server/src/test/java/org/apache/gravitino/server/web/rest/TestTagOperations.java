@@ -67,6 +67,7 @@ import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
 import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.glassfish.jersey.internal.inject.AbstractBinder;
 import org.glassfish.jersey.server.ResourceConfig;
 import org.glassfish.jersey.test.TestProperties;
@@ -280,7 +281,9 @@ public class TestTagOperations extends BaseOperationsTest {
             .withComment("tag1 comment")
             .withAuditInfo(testAuditInfo1)
             .build();
-    when(tagManager.createTag(metalake, "tag1", "tag1 comment", null)).thenReturn(tag1);
+    when(tagManager.createTag(
+            metalake, "tag1", "tag1 comment", null, TagValueConstraint.anyValue()))
+        .thenReturn(tag1);
 
     TagCreateRequest request = new TagCreateRequest("tag1", "tag1 comment", null);
     Response resp =
@@ -303,7 +306,7 @@ public class TestTagOperations extends BaseOperationsTest {
     // Test throw TagAlreadyExistsException
     doThrow(new TagAlreadyExistsException("mock error"))
         .when(tagManager)
-        .createTag(any(), any(), any(), any());
+        .createTag(any(), any(), any(), any(), any());
     Response resp1 =
         target(tagPath(metalake))
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -319,7 +322,7 @@ public class TestTagOperations extends BaseOperationsTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(tagManager)
-        .createTag(any(), any(), any(), any());
+        .createTag(any(), any(), any(), any(), any());
 
     Response resp2 =
         target(tagPath(metalake))
@@ -953,7 +956,6 @@ public class TestTagOperations extends BaseOperationsTest {
   public void testAssociateTagsForObject() {
     String[] tagsToAdd = new String[] {"tag1", "tag2"};
     String[] tagsToRemove = new String[] {"tag3", "tag4"};
-
     MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
     when(tagManager.associateTagsForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
         .thenReturn(tagsToAdd);
@@ -1015,7 +1017,8 @@ public class TestTagOperations extends BaseOperationsTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(tagManager)
-        .associateTagsForMetadataObject(any(), any(), any(), any());
+        .associateTagsForMetadataObject(
+            any(String.class), any(MetadataObject.class), any(String[].class), any(String[].class));
 
     Response response3 =
         target(tagPath(metalake))
@@ -1043,7 +1046,7 @@ public class TestTagOperations extends BaseOperationsTest {
           MetadataObjects.parse("object1.object2.object3.object4", MetadataObject.Type.COLUMN)
         };
 
-    when(tagManager.listMetadataObjectsForTag(metalake, "tag1")).thenReturn(objects);
+    when(tagManager.listMetadataObjectsForTag(metalake, "tag1", null)).thenReturn(objects);
 
     Response response =
         target(tagPath(metalake))
@@ -1068,10 +1071,43 @@ public class TestTagOperations extends BaseOperationsTest {
       Assertions.assertEquals(objects[i].fullName(), respObjects[i].fullName());
     }
 
+    when(tagManager.listMetadataObjectsForTag(metalake, "tag1", "finance")).thenReturn(objects);
+    Response filteredResponse =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .queryParam("value", "finance")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), filteredResponse.getStatus());
+
+    Response emptyValueResponse =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .queryParam("value", "")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), emptyValueResponse.getStatus());
+
+    Response tooLongValueResponse =
+        target(tagPath(metalake))
+            .path("tag1")
+            .path("objects")
+            .queryParam("value", "v".repeat(257))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+    Assertions.assertEquals(
+        Response.Status.BAD_REQUEST.getStatusCode(), tooLongValueResponse.getStatus());
+
     // Test throw NoSuchTagException
     doThrow(new NoSuchTagException("mock error"))
         .when(tagManager)
-        .listMetadataObjectsForTag(metalake, "tag1");
+        .listMetadataObjectsForTag(metalake, "tag1", null);
 
     Response response1 =
         target(tagPath(metalake))
@@ -1090,7 +1126,7 @@ public class TestTagOperations extends BaseOperationsTest {
     // Test throw RuntimeException
     doThrow(new RuntimeException("mock error"))
         .when(tagManager)
-        .listMetadataObjectsForTag(any(), any());
+        .listMetadataObjectsForTag(any(), any(), any());
 
     Response response2 =
         target(tagPath(metalake))

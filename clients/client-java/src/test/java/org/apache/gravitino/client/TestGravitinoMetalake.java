@@ -74,6 +74,7 @@ import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.hc.core5.http.HttpStatus;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
@@ -578,6 +579,41 @@ public class TestGravitinoMetalake extends TestBase {
     Assertions.assertEquals(tagName, tag.name());
     Assertions.assertNull(tag.comment());
     Assertions.assertNull(tag.properties());
+
+    TagValueConstraint valueConstraint = TagValueConstraint.ofAllowedValues("finance", "risk");
+    TagCreateRequest constrainedRequest =
+        new TagCreateRequest(tagName, null, null, new String[] {"finance", "risk"});
+    TagDTO constrainedTagDTO =
+        TagDTO.builder()
+            .withName(tagName)
+            .withAllowedValues(new String[] {"finance", "risk"})
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    buildMockResource(
+        Method.POST,
+        path,
+        constrainedRequest,
+        new TagResponse(constrainedTagDTO),
+        HttpStatus.SC_OK);
+
+    Tag constrainedTag = gravitinoClient.createTag(tagName, null, null, valueConstraint);
+    Assertions.assertEquals(valueConstraint, constrainedTag.valueConstraint());
+
+    TagValueConstraint noValueConstraint = TagValueConstraint.noValue();
+    TagCreateRequest noValueRequest = new TagCreateRequest(tagName, null, null, new String[0]);
+    TagDTO noValueTagDTO =
+        TagDTO.builder()
+            .withName(tagName)
+            .withAllowedValues(new String[0])
+            .withAudit(
+                AuditDTO.builder().withCreator("creator").withCreateTime(Instant.now()).build())
+            .build();
+    buildMockResource(
+        Method.POST, path, noValueRequest, new TagResponse(noValueTagDTO), HttpStatus.SC_OK);
+
+    Tag noValueTag = gravitinoClient.createTag(tagName, null, null, noValueConstraint);
+    Assertions.assertEquals(noValueConstraint, noValueTag.valueConstraint());
 
     // Test with null name
     Throwable ex =

@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -29,6 +30,7 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -39,6 +41,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
+        + " tm.allowed_values as allowedValues,"
+        + " NULLIF(te.tag_value, '') as assignmentValue,"
         + " tm.audit_info as auditInfo,"
         + " tm.current_version as currentVersion,"
         + " tm.last_version as lastVersion,"
@@ -59,6 +63,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
       @Param("tagName") String tagName) {
     return "SELECT tm.tag_id as tagId, tm.tag_name as tagName,"
         + " tm.metalake_id as metalakeId, tm.tag_comment as comment, tm.properties as properties,"
+        + " tm.allowed_values as allowedValues,"
+        + " NULLIF(te.tag_value, '') as assignmentValue,"
         + " tm.audit_info as auditInfo,"
         + " tm.current_version as currentVersion,"
         + " tm.last_version as lastVersion,"
@@ -76,7 +82,8 @@ public class TagMetadataObjectRelBaseSQLProvider {
   public String listTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
     return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
-        + " te.metadata_object_type as metadataObjectType, te.audit_info as auditInfo,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.audit_info as auditInfo,"
         + " te.current_version as currentVersion, te.last_version as lastVersion,"
         + " te.deleted_at as deletedAt"
         + " FROM "
@@ -90,18 +97,40 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
   }
 
+  public String listTagMetadataObjectRelsByMetalakeAndTagNameAndValue(
+      @Param("metalakeName") String metalakeName,
+      @Param("tagName") String tagName,
+      @Param("tagValue") String tagValue) {
+    return "SELECT te.tag_id as tagId, te.metadata_object_id as metadataObjectId,"
+        + " te.metadata_object_type as metadataObjectType, te.tag_value as tagValue,"
+        + " te.audit_info as auditInfo,"
+        + " te.current_version as currentVersion, te.last_version as lastVersion,"
+        + " te.deleted_at as deletedAt"
+        + " FROM "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " te JOIN "
+        + TagMetaMapper.TAG_TABLE_NAME
+        + " tm ON te.tag_id = tm.tag_id JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm ON tm.metalake_id = mm.metalake_id"
+        + " WHERE mm.metalake_name = #{metalakeName} AND tm.tag_name = #{tagName}"
+        + " AND te.tag_value = #{tagValue}"
+        + " AND te.deleted_at = 0 AND tm.deleted_at = 0 AND mm.deleted_at = 0";
+  }
+
   public String batchInsertTagMetadataObjectRels(
       @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs) {
     return "<script>"
         + "INSERT INTO "
         + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " (tag_id, metadata_object_id, metadata_object_type, audit_info,"
+        + " (tag_id, metadata_object_id, metadata_object_type, tag_value, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES "
         + "<foreach collection='tagRels' item='item' separator=','>"
         + "(#{item.tagId},"
         + " #{item.metadataObjectId},"
         + " #{item.metadataObjectType},"
+        + " #{item.tagValue},"
         + " #{item.auditInfo},"
         + " #{item.currentVersion},"
         + " #{item.lastVersion},"
@@ -125,6 +154,25 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + "</foreach>"
         + " AND metadata_object_id = #{metadataObjectId}"
         + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + "</script>";
+  }
+
+  public String batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+      @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType,
+      @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs) {
+    return "<script>"
+        + "UPDATE "
+        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE metadata_object_id = #{metadataObjectId}"
+        + " AND metadata_object_type = #{metadataObjectType} AND deleted_at = 0"
+        + " AND ("
+        + "<foreach item='item' collection='tagRels' separator=' OR '>"
+        + "(tag_id = #{item.tagId} AND tag_value = #{item.tagValue})"
+        + "</foreach>"
+        + ")"
         + "</script>";
   }
 
@@ -204,6 +252,16 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + ModelMetaMapper.TABLE_NAME
         + " mt WHERE mt.catalog_id = #{catalogId} AND"
         + " mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.catalog_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.catalog_id = #{catalogId} AND"
+        + " vt.view_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.catalog_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.catalog_id = #{catalogId} AND"
+        + " fnt.function_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FUNCTION'"
         + ")";
   }
 
@@ -262,6 +320,22 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + "#{schemaId}"
         + "</foreach>"
         + " AND mt.model_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'MODEL'"
+        + " UNION"
+        + " SELECT vt.schema_id FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " vt WHERE vt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND vt.view_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'VIEW'"
+        + " UNION"
+        + " SELECT fnt.schema_id FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " fnt WHERE fnt.schema_id IN "
+        + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + " AND fnt.function_id = tmt.metadata_object_id AND tmt.metadata_object_type = 'FUNCTION'"
         + ")"
         + "</script>";
   }

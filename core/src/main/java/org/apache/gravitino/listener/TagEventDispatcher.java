@@ -59,6 +59,8 @@ import org.apache.gravitino.listener.api.info.TagInfo;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagChange;
 import org.apache.gravitino.tag.TagDispatcher;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -115,7 +117,7 @@ public class TagEventDispatcher implements TagDispatcher {
     eventBus.dispatchEvent(new GetTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
     try {
       Tag tag = dispatcher.getTag(metalake, name);
-      TagInfo tagInfo = new TagInfo(tag.name(), tag.comment(), tag.properties());
+      TagInfo tagInfo = tagInfo(tag);
       eventBus.dispatchEvent(
           new GetTagEvent(PrincipalUtils.getCurrentUserName(), metalake, name, tagInfo));
       return tag;
@@ -129,16 +131,24 @@ public class TagEventDispatcher implements TagDispatcher {
   @Override
   public Tag createTag(
       String metalake, String name, String comment, Map<String, String> properties) {
-    TagInfo tagInfo = new TagInfo(name, comment, properties);
+    return createTag(metalake, name, comment, properties, TagValueConstraint.anyValue());
+  }
+
+  @Override
+  public Tag createTag(
+      String metalake,
+      String name,
+      String comment,
+      Map<String, String> properties,
+      TagValueConstraint valueConstraint) {
+    TagInfo tagInfo =
+        new TagInfo(name, comment, properties, allowedValuesForInfo(valueConstraint), null);
     eventBus.dispatchEvent(
         new CreateTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo));
     try {
-      Tag tag = dispatcher.createTag(metalake, name, comment, properties);
+      Tag tag = dispatcher.createTag(metalake, name, comment, properties, valueConstraint);
       eventBus.dispatchEvent(
-          new CreateTagEvent(
-              PrincipalUtils.getCurrentUserName(),
-              metalake,
-              new TagInfo(tag.name(), tag.comment(), tag.properties())));
+          new CreateTagEvent(PrincipalUtils.getCurrentUserName(), metalake, tagInfo(tag)));
       return tag;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -157,11 +167,7 @@ public class TagEventDispatcher implements TagDispatcher {
     try {
       Tag tag = dispatcher.alterTag(metalake, name, changes);
       eventBus.dispatchEvent(
-          new AlterTagEvent(
-              PrincipalUtils.getCurrentUserName(),
-              metalake,
-              changes,
-              new TagInfo(tag.name(), tag.comment(), tag.properties())));
+          new AlterTagEvent(PrincipalUtils.getCurrentUserName(), metalake, changes, tagInfo(tag)));
       return tag;
     } catch (Exception e) {
       eventBus.dispatchEvent(
@@ -195,6 +201,28 @@ public class TagEventDispatcher implements TagDispatcher {
         new ListMetadataObjectsForTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
     try {
       MetadataObject[] metadataObjects = dispatcher.listMetadataObjectsForTag(metalake, name);
+      eventBus.dispatchEvent(
+          new ListMetadataObjectsForTagEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              name,
+              metadataObjects != null ? metadataObjects.length : -1));
+      return metadataObjects;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new ListMetadataObjectsForTagFailureEvent(
+              PrincipalUtils.getCurrentUserName(), metalake, name, e));
+      throw e;
+    }
+  }
+
+  @Override
+  public MetadataObject[] listMetadataObjectsForTag(String metalake, String name, String value) {
+    eventBus.dispatchEvent(
+        new ListMetadataObjectsForTagPreEvent(PrincipalUtils.getCurrentUserName(), metalake, name));
+    try {
+      MetadataObject[] metadataObjects =
+          dispatcher.listMetadataObjectsForTag(metalake, name, value);
       eventBus.dispatchEvent(
           new ListMetadataObjectsForTagEvent(
               PrincipalUtils.getCurrentUserName(),
@@ -293,13 +321,53 @@ public class TagEventDispatcher implements TagDispatcher {
   }
 
   @Override
+  public String[] associateTagValuesForMetadataObject(
+      String metalake,
+      MetadataObject metadataObject,
+      TagValue[] tagsToAdd,
+      TagValue[] tagsToRemove) {
+    eventBus.dispatchEvent(
+        new AssociateTagsForMetadataObjectPreEvent(
+            PrincipalUtils.getCurrentUserName(),
+            metalake,
+            metadataObject,
+            tagsToAdd,
+            tagsToRemove));
+
+    try {
+      String[] associatedTags =
+          dispatcher.associateTagValuesForMetadataObject(
+              metalake, metadataObject, tagsToAdd, tagsToRemove);
+      eventBus.dispatchEvent(
+          new AssociateTagsForMetadataObjectEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              metadataObject,
+              tagsToAdd,
+              tagsToRemove,
+              associatedTags));
+      return associatedTags;
+    } catch (Exception e) {
+      eventBus.dispatchEvent(
+          new AssociateTagsForMetadataObjectFailureEvent(
+              PrincipalUtils.getCurrentUserName(),
+              metalake,
+              metadataObject,
+              tagsToAdd,
+              tagsToRemove,
+              e));
+      throw e;
+    }
+  }
+
+  @Override
   public Tag getTagForMetadataObject(String metalake, MetadataObject metadataObject, String name) {
     eventBus.dispatchEvent(
         new GetTagForMetadataObjectPreEvent(
             PrincipalUtils.getCurrentUserName(), metalake, metadataObject, name));
     try {
       Tag tag = dispatcher.getTagForMetadataObject(metalake, metadataObject, name);
-      TagInfo tagInfo = new TagInfo(tag.name(), tag.comment(), tag.properties());
+      TagInfo tagInfo = tagInfo(tag);
       eventBus.dispatchEvent(
           new GetTagForMetadataObjectEvent(
               PrincipalUtils.getCurrentUserName(), metalake, metadataObject, tagInfo));
@@ -309,6 +377,29 @@ public class TagEventDispatcher implements TagDispatcher {
           new GetTagForMetadataObjectFailureEvent(
               PrincipalUtils.getCurrentUserName(), metalake, metadataObject, name, e));
       throw e;
+    }
+  }
+
+  private static TagInfo tagInfo(Tag tag) {
+    return new TagInfo(
+        tag.name(),
+        tag.comment(),
+        tag.properties(),
+        allowedValuesForInfo(tag.valueConstraint()),
+        tag.assignment().map(assignment -> assignment.values()).orElse(null));
+  }
+
+  private static String[] allowedValuesForInfo(TagValueConstraint valueConstraint) {
+    TagValueConstraint normalizedConstraint =
+        valueConstraint == null ? TagValueConstraint.anyValue() : valueConstraint;
+    switch (normalizedConstraint.type()) {
+      case ANY_VALUE:
+        return null;
+      case NO_VALUE:
+      case ALLOWED_VALUES:
+        return normalizedConstraint.allowedValues();
+      default:
+        throw new IllegalArgumentException("Unknown tag value constraint: " + normalizedConstraint);
     }
   }
 }

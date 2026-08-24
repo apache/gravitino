@@ -705,6 +705,25 @@ public class TestIcebergTable {
     Assertions.assertEquals(distributionName, DistributionMode.RANGE.modeName());
   }
 
+  @Test
+  void testRebuildCreatePropertiesResolvesFormatVersion() {
+    // The format-version mapping Gravitino applies at create time:
+    //   absent -> 2, empty -> 2, "2" -> 2, "3" -> 3.
+    Assertions.assertEquals("2", rebuiltFormatVersion(null));
+    Assertions.assertEquals("2", rebuiltFormatVersion(""));
+    Assertions.assertEquals("2", rebuiltFormatVersion("2"));
+    Assertions.assertEquals("3", rebuiltFormatVersion("3"));
+  }
+
+  private static String rebuiltFormatVersion(String input) {
+    Map<String, String> properties = new HashMap<>();
+    if (input != null) {
+      properties.put(IcebergTablePropertiesMetadata.FORMAT_VERSION, input);
+    }
+    return IcebergTable.rebuildCreateProperties(properties)
+        .get(IcebergTablePropertiesMetadata.FORMAT_VERSION);
+  }
+
   protected static String genRandomName() {
     return UUID.randomUUID().toString().replace("-", "");
   }

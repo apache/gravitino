@@ -80,12 +80,16 @@ public class ContainerSuite implements Closeable {
   private static volatile MySQLContainer mySQLVersion5Container;
   private static volatile Map<PGImageName, PostgreSQLContainer> pgContainerMap =
       new EnumMap<>(PGImageName.class);
+  private static volatile Map<DorisImageName, DorisContainer> dorisContainerMap =
+      new EnumMap<>(DorisImageName.class);
   private static volatile OceanBaseContainer oceanBaseContainer;
   private static volatile ClickHouseContainer clickHouseContainer;
   private static volatile ClickHouseContainer clickHouseClusterContainer;
   private static volatile ZooKeeperContainer zooKeeperContainer;
 
   private static volatile GravitinoLocalStackContainer gravitinoLocalStackContainer;
+
+  private static volatile MinIOContainer minIOContainer;
 
   /**
    * We can share the same Hive container as Hive container with S3 contains the following
@@ -329,17 +333,28 @@ public class ContainerSuite implements Closeable {
   }
 
   public void startDorisContainer() {
+    startDorisContainer(DorisImageName.VERSION_1_2);
+  }
+
+  public void startDorisContainer(DorisImageName imageName) {
     ITUtils.cleanDisk();
-    if (dorisContainer == null) {
+    if (!dorisContainerMap.containsKey(imageName)) {
       synchronized (ContainerSuite.class) {
-        if (dorisContainer == null) {
+        if (!dorisContainerMap.containsKey(imageName)) {
           initIfNecessary();
-          // Start Doris docker-compose containers
           DorisContainer.Builder dorisBuilder =
-              DorisContainer.builder().withHostName("gravitino-ci-doris").withNetwork(network);
+              DorisContainer.builder()
+                  .withHostName(
+                      "gravitino-ci-doris-" + imageName.name().toLowerCase().replace("_", ""))
+                  .withImage(imageName.toString())
+                  .withNetwork(network);
           DorisContainer container = closer.register(dorisBuilder.build());
           container.start();
-          dorisContainer = container;
+          dorisContainerMap.put(imageName, container);
+          // Keep backward-compatible reference for getDorisContainer()
+          if (imageName == DorisImageName.VERSION_1_2) {
+            dorisContainer = container;
+          }
         }
       }
     }
@@ -664,6 +679,29 @@ public class ContainerSuite implements Closeable {
     return gravitinoLocalStackContainer;
   }
 
+  public void startMinIOContainer() {
+    ITUtils.cleanDisk();
+    if (minIOContainer == null) {
+      synchronized (ContainerSuite.class) {
+        if (minIOContainer == null) {
+          MinIOContainer.Builder builder = MinIOContainer.builder().withNetwork(network);
+          MinIOContainer container = closer.register(builder.build());
+          try {
+            container.start();
+          } catch (Exception e) {
+            LOG.error("Failed to start MinIO container", e);
+            throw new RuntimeException("Failed to start MinIO container", e);
+          }
+          minIOContainer = container;
+        }
+      }
+    }
+  }
+
+  public MinIOContainer getMinIOContainer() {
+    return minIOContainer;
+  }
+
   public HiveContainer getHiveContainerWithS3() {
     return hiveContainerWithS3;
   }
@@ -726,6 +764,10 @@ public class ContainerSuite implements Closeable {
 
   public DorisContainer getDorisContainer() {
     return dorisContainer;
+  }
+
+  public DorisContainer getDorisContainer(DorisImageName imageName) {
+    return dorisContainerMap.get(imageName);
   }
 
   public MySQLContainer getMySQLContainer() {
@@ -890,6 +932,7 @@ public class ContainerSuite implements Closeable {
       rangerContainer = null;
       kafkaContainer = null;
       dorisContainer = null;
+      dorisContainerMap.clear();
       kerberosHiveContainer = null;
       sqlBaseHiveContainer = null;
       pgContainerMap.clear();

@@ -123,10 +123,11 @@ public class CatalogsPageTest extends BaseWebIT {
     trinoITContainers = ContainerSuite.getTrinoITContainers();
     trinoITContainers.launch(getGravitinoServerPort());
 
-    hiveMetastoreUri = trinoITContainers.getHiveMetastoreUri();
-    hdfsUri = trinoITContainers.getHdfsUri();
-    mysqlUri = trinoITContainers.getMysqlUri();
-    postgresqlUri = trinoITContainers.getPostgresqlUri();
+    Map<String, String> serviceUrls = trinoITContainers.getServiceUrls();
+    hiveMetastoreUri = serviceUrls.get("hive_uri");
+    hdfsUri = serviceUrls.get("hdfs_uri");
+    mysqlUri = serviceUrls.get("mysql_uri");
+    postgresqlUri = serviceUrls.get("postgresql_uri");
 
     metalakePage = new MetalakePage(driver);
     catalogsPage = new CatalogsPage(driver);

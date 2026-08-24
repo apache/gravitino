@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
@@ -486,6 +487,9 @@ public class TestJobEventDispatcher {
     Assertions.assertEquals(expected.jobId(), actual.jobId());
     Assertions.assertEquals(expected.jobTemplateName(), actual.jobTemplateName());
     Assertions.assertEquals(expected.jobStatus(), actual.jobStatus());
+    Assertions.assertEquals(expected.queuedAt(), actual.queuedAt());
+    Assertions.assertEquals(expected.startedAt(), actual.startedAt());
+    Assertions.assertEquals(expected.finishedAt(), actual.finishedAt());
   }
 
   private JobOperationDispatcher mockJobDispatcher() {
@@ -542,11 +546,18 @@ public class TestJobEventDispatcher {
   }
 
   private JobEntity mockJobEntity() {
+    AuditInfo auditInfo = mock(AuditInfo.class);
+    when(auditInfo.createTime()).thenReturn(Instant.ofEpochMilli(1699999000000L));
+
     JobEntity entity = mock(JobEntity.class);
     when(entity.jobTemplateName()).thenReturn("testJob");
     when(entity.name()).thenReturn("job-12345");
-    when(entity.auditInfo()).thenReturn(mock(AuditInfo.class));
+    when(entity.auditInfo()).thenReturn(auditInfo);
     when(entity.status()).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(entity.startedAt()).thenReturn(1699999500000L);
+    when(entity.startedAtAsInstant()).thenReturn(Instant.ofEpochMilli(1699999500000L));
+    when(entity.finishedAt()).thenReturn(1700000000000L);
+    when(entity.finishedAtAsInstant()).thenReturn(Instant.ofEpochMilli(1700000000000L));
 
     return entity;
   }
@@ -556,6 +567,9 @@ public class TestJobEventDispatcher {
     when(info.jobId()).thenReturn("job-12345");
     when(info.jobTemplateName()).thenReturn("testJob");
     when(info.jobStatus()).thenReturn(JobHandle.Status.SUCCEEDED);
+    when(info.queuedAt()).thenReturn(Instant.ofEpochMilli(1699999000000L));
+    when(info.startedAt()).thenReturn(Instant.ofEpochMilli(1699999500000L));
+    when(info.finishedAt()).thenReturn(Instant.ofEpochMilli(1700000000000L));
     return info;
   }
 }

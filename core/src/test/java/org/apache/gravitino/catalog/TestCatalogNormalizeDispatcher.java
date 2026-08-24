@@ -27,15 +27,19 @@ import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.EntityStore;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.junit.jupiter.api.AfterAll;
@@ -61,7 +65,7 @@ public class TestCatalogNormalizeDispatcher {
           .build();
 
   @BeforeAll
-  public static void setUp() throws IOException {
+  public static void setUp() throws IOException, IllegalAccessException {
     Config config = new Config(false) {};
     config.set(Configs.CATALOG_LOAD_ISOLATED, false);
 
@@ -70,7 +74,9 @@ public class TestCatalogNormalizeDispatcher {
 
     entityStore.put(metalakeEntity, true);
 
-    catalogManager = new CatalogManager(config, entityStore, new RandomIdGenerator());
+    catalogManager =
+        new CatalogManager(config, entityStore, new RandomIdGenerator(), new SecretManager(config));
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     catalogManager = Mockito.spy(catalogManager);
     catalogNormalizeDispatcher = new CatalogNormalizeDispatcher(catalogManager);
   }

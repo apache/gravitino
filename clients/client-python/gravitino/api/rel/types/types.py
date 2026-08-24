@@ -706,6 +706,157 @@ class Types:
         def simple_string(self) -> str:
             return "binary"
 
+    class VariantType(PrimitiveType):
+        """The variant type in Gravitino, holding semi-structured data not described by the
+        schema."""
+
+        _instance: Types.VariantType = None
+
+        def __new__(cls):
+            if cls._instance is None:
+                cls._instance = super(Types.VariantType, cls).__new__(cls)
+                cls._instance.__init__()
+            return cls._instance
+
+        @classmethod
+        def get(cls) -> Types.VariantType:
+            return cls()
+
+        def name(self) -> Name:
+            return Name.VARIANT
+
+        def simple_string(self) -> str:
+            return "variant"
+
+    class GeometryType(PrimitiveType):
+        """The geometry type in Gravitino. A geometry column holds a geospatial shape
+        (WKB-encoded) on a planar coordinate reference system (CRS). The CRS is carried as type
+        metadata."""
+
+        DEFAULT_CRS: str = "OGC:CRS84"
+
+        _crs: str
+
+        def __init__(self, crs: str):
+            if not crs:
+                raise ValueError("crs cannot be null or empty")
+            self._crs = crs
+
+        @classmethod
+        def crs84(cls) -> Types.GeometryType:
+            """
+            Returns:
+                A GeometryType instance with the default CRS ("OGC:CRS84").
+            """
+            return cls(cls.DEFAULT_CRS)
+
+        @classmethod
+        def of(cls, crs: str) -> Types.GeometryType:
+            """
+            Args:
+                crs: The coordinate reference system, e.g. "OGC:CRS84", "EPSG:4326" or "srid:3857".
+
+            Returns:
+                A GeometryType instance with the given CRS.
+            """
+            return cls(crs)
+
+        def name(self) -> Name:
+            return Name.GEOMETRY
+
+        def crs(self) -> str:
+            return self._crs
+
+        def simple_string(self) -> str:
+            # The default CRS elides to a bare "geometry"; a custom CRS is carried verbatim.
+            if self._crs.lower() == self.DEFAULT_CRS.lower():
+                return "geometry"
+            return f"geometry({self._crs})"
+
+        def __eq__(self, other):
+            if not isinstance(other, Types.GeometryType):
+                return False
+            return self._crs.lower() == other._crs.lower()
+
+        def __hash__(self):
+            return hash(self._crs.lower())
+
+    class GeographyType(PrimitiveType):
+        """The geography type in Gravitino. A geography column holds a geospatial shape
+        (WKB-encoded) on a spheroidal coordinate reference system (CRS), with an edge-interpolation
+        algorithm. Both are carried as type metadata."""
+
+        DEFAULT_CRS: str = "OGC:CRS84"
+        DEFAULT_ALGORITHM: str = "spherical"
+        _VALID_ALGORITHMS = frozenset(
+            {"spherical", "vincenty", "thomas", "andoyer", "karney"}
+        )
+
+        _crs: str
+        _algorithm: str
+
+        def __init__(self, crs: str, algorithm: str):
+            if not crs:
+                raise ValueError("crs cannot be null or empty")
+            if algorithm is None or algorithm.lower() not in self._VALID_ALGORITHMS:
+                raise ValueError(
+                    f"algorithm must be one of {sorted(self._VALID_ALGORITHMS)}, "
+                    f"but got: {algorithm}"
+                )
+            self._crs = crs
+            self._algorithm = algorithm.lower()
+
+        @classmethod
+        def crs84(cls) -> Types.GeographyType:
+            """
+            Returns:
+                A GeographyType instance with the default CRS ("OGC:CRS84") and algorithm
+                ("spherical").
+            """
+            return cls(cls.DEFAULT_CRS, cls.DEFAULT_ALGORITHM)
+
+        @classmethod
+        def of(cls, crs: str, algorithm: str) -> Types.GeographyType:
+            """
+            Args:
+                crs: The coordinate reference system, e.g. "OGC:CRS84" or "EPSG:4326".
+                algorithm: The edge-interpolation algorithm: one of "spherical", "vincenty",
+                    "thomas", "andoyer" or "karney".
+
+            Returns:
+                A GeographyType instance with the given CRS and algorithm.
+            """
+            return cls(crs, algorithm)
+
+        def name(self) -> Name:
+            return Name.GEOGRAPHY
+
+        def crs(self) -> str:
+            return self._crs
+
+        def algorithm(self) -> str:
+            return self._algorithm
+
+        def simple_string(self) -> str:
+            # The default CRS and algorithm elide to a bare "geography"; otherwise both are carried.
+            if (
+                self._crs.lower() == self.DEFAULT_CRS.lower()
+                and self._algorithm == self.DEFAULT_ALGORITHM
+            ):
+                return "geography"
+            return f"geography({self._crs},{self._algorithm})"
+
+        def __eq__(self, other):
+            if not isinstance(other, Types.GeographyType):
+                return False
+            return (
+                self._crs.lower() == other._crs.lower()
+                and self._algorithm == other._algorithm
+            )
+
+        def __hash__(self):
+            return hash((self._crs.lower(), self._algorithm))
+
     class StructType(ComplexType):
         """The struct type in Gravitino."""
 

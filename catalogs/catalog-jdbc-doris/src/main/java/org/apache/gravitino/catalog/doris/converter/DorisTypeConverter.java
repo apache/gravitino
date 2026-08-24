@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.catalog.doris.converter;
 
-import java.util.Optional;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -36,10 +35,49 @@ public class DorisTypeConverter extends JdbcTypeConverter {
   static final String DATETIME = "datetime";
   static final String CHAR = "char";
   static final String STRING = "string";
+  static final String BINARY = "binary";
+  static final String VARBINARY = "varbinary";
+  static final String JSON = "json";
+  static final String VARIANT = "variant";
+  static final String IPV4 = "ipv4";
+  static final String IPV6 = "ipv6";
+  static final String LARGEINT = "largeint";
+  static final String BITMAP = "bitmap";
+  static final String HLL = "hll";
+  static final String DATEV2 = "datev2";
+  static final String BIGINT_UNSIGNED = "bigint unsigned";
 
   @Override
   public Type toGravitino(JdbcTypeBean typeBean) {
-    switch (typeBean.getTypeName().toLowerCase()) {
+    String typeName = typeBean.getTypeName().toLowerCase();
+
+    // Extract base type name by stripping parenthesized parameters.
+    // SHOW CREATE TABLE returns full type strings like "int(11)", "decimal(10,2)",
+    // but the switch matches base names like "int", "decimal".
+    String baseType = typeName;
+    int parenIndex = typeName.indexOf('(');
+    if (parenIndex > 0) {
+      baseType = typeName.substring(0, parenIndex);
+    }
+
+    // Handle datetime(N) format — parse precision from type string when not in typeBean
+    if ("datetime".equals(baseType)) {
+      if (typeBean.getDatetimePrecision() != null) {
+        return Types.TimestampType.withoutTimeZone(typeBean.getDatetimePrecision());
+      }
+      if (parenIndex > 0 && typeName.endsWith(")")) {
+        try {
+          String precisionStr = typeName.substring(parenIndex + 1, typeName.length() - 1);
+          int precision = Integer.parseInt(precisionStr);
+          return Types.TimestampType.withoutTimeZone(precision);
+        } catch (NumberFormatException e) {
+          // Fall through to default datetime handling
+        }
+      }
+      return Types.TimestampType.withoutTimeZone();
+    }
+
+    switch (baseType) {
       case BOOLEAN:
         return Types.BooleanType.get();
       case TINYINT:
@@ -55,22 +93,71 @@ public class DorisTypeConverter extends JdbcTypeConverter {
       case DOUBLE:
         return Types.DoubleType.get();
       case DECIMAL:
-        return Types.DecimalType.of(typeBean.getColumnSize(), typeBean.getScale());
+        return parseTypeParamsOrExternal(
+            typeName, parenIndex, typeBean.getColumnSize(), typeBean.getScale());
       case DATE:
+      case DATEV2:
         return Types.DateType.get();
-      case DATETIME:
-        return Optional.ofNullable(typeBean.getDatetimePrecision())
-            .map(Types.TimestampType::withoutTimeZone)
-            .orElseGet(Types.TimestampType::withoutTimeZone);
       case CHAR:
-        return Types.FixedCharType.of(typeBean.getColumnSize());
+        return parseTypeParamsOrExternal(typeName, parenIndex, typeBean.getColumnSize(), null);
       case VARCHAR:
-        return Types.VarCharType.of(typeBean.getColumnSize());
+        return parseTypeParamsOrExternal(typeName, parenIndex, typeBean.getColumnSize(), null);
       case STRING:
       case TEXT:
         return Types.StringType.get();
+      case BINARY:
+      case VARBINARY:
+        return Types.BinaryType.get();
+        // Explicitly enumerate known Doris-specific types to signal intentional coverage,
+        // even though the behaviour is the same as default. BIGINT_UNSIGNED is reachable
+        // from SHOW CREATE TABLE parsing; JDBC getColumns() returns "BIGINT" for this type.
+      case BIGINT_UNSIGNED:
+      case JSON:
+      case VARIANT:
+      case IPV4:
+      case IPV6:
+      case LARGEINT:
+      case BITMAP:
+      case HLL:
+        return Types.ExternalType.of(typeName);
       default:
-        return Types.ExternalType.of(typeBean.getTypeName());
+        return Types.ExternalType.of(typeName);
+    }
+  }
+
+  /**
+   * Parse type parameters from the type string or typeBean values. For DECIMAL, returns
+   * DecimalType(p1, p2). For CHAR/VARCHAR, returns FixedCharType/VarCharType with default fallback.
+   * Returns ExternalType if the type string is malformed and cannot be parsed.
+   */
+  private static Type parseTypeParamsOrExternal(
+      String typeName, int parenIndex, Integer beanParam1, Integer beanParam2) {
+    int p1 = beanParam1 != null ? beanParam1 : 0;
+    int p2 = beanParam2 != null ? beanParam2 : 0;
+    if (p1 == 0 && parenIndex > 0 && typeName.endsWith(")")) {
+      try {
+        String[] parts = typeName.substring(parenIndex + 1, typeName.length() - 1).split(",");
+        p1 = Integer.parseInt(parts[0].trim());
+        p2 = parts.length >= 2 ? Integer.parseInt(parts[1].trim()) : 0;
+      } catch (NumberFormatException e) {
+        return Types.ExternalType.of(typeName);
+      }
+    }
+
+    String baseType = parenIndex > 0 ? typeName.substring(0, parenIndex) : typeName;
+    switch (baseType) {
+      case DECIMAL:
+        return Types.DecimalType.of(p1, p2);
+      case CHAR:
+        // 1 = minimum valid length for CHAR; fallback when JDBC metadata and type string
+        // both lack length info (unlikely in practice)
+        return Types.FixedCharType.of(p1 > 0 ? p1 : 1);
+      case VARCHAR:
+        // 255 = MySQL/Doris legacy default for VARCHAR; fallback when JDBC metadata and
+        // type string both lack length info (unlikely in practice)
+        return Types.VarCharType.of(p1 > 0 ? p1 : 255);
+      default:
+        return Types.ExternalType.of(typeName);
     }
   }
 
@@ -98,7 +185,7 @@ public class DorisTypeConverter extends JdbcTypeConverter {
           + ((Types.DecimalType) type).scale()
           + ")";
     } else if (type instanceof Types.DateType) {
-      return DATE;
+      return DATEV2;
     } else if (type instanceof Types.TimestampType) {
       Types.TimestampType timestampType = (Types.TimestampType) type;
       return timestampType.hasPrecisionSet()
@@ -123,6 +210,10 @@ public class DorisTypeConverter extends JdbcTypeConverter {
       return CHAR + "(" + ((Types.FixedCharType) type).length() + ")";
     } else if (type instanceof Types.StringType) {
       return STRING;
+    } else if (type instanceof Types.BinaryType) {
+      return BINARY;
+    } else if (type instanceof Types.ExternalType) {
+      return ((Types.ExternalType) type).catalogString();
     }
     throw new IllegalArgumentException(
         String.format("Couldn't convert Gravitino type %s to Doris type", type.simpleString()));

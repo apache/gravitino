@@ -32,18 +32,23 @@ import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.security.Principal;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Vector;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.apache.gravitino.UserPrincipal;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -64,6 +69,81 @@ public class TestAuthenticationFilter {
     when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
     filter.doFilter(mockRequest, mockResponse, mockChain);
     verify(mockResponse, never()).sendError(anyInt(), anyString());
+  }
+
+  @Test
+  public void testDoFilterSetsActiveRolesFromHeader() throws ServletException, IOException {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    when(mockRequest.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER))
+        .thenReturn("analyst,reader");
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+
+    // The active roles must be visible on the principal to the downstream chain (where
+    // authorization runs).
+    AtomicReference<Principal> seenDuringChain = new AtomicReference<>();
+    FilterChain capturingChain =
+        (req, resp) -> seenDuringChain.set(PrincipalUtils.getCurrentPrincipal());
+    filter.doFilter(mockRequest, mockResponse, capturingChain);
+
+    Assertions.assertInstanceOf(UserPrincipal.class, seenDuringChain.get());
+    Assertions.assertEquals(
+        ActiveRoles.of(Arrays.asList("analyst", "reader")),
+        ((UserPrincipal) seenDuringChain.get()).getActiveRoles());
+  }
+
+  @Test
+  public void testDoFilterDefaultsToAllWhenHeaderAbsent() throws ServletException, IOException {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+
+    AtomicReference<Principal> seenDuringChain = new AtomicReference<>();
+    FilterChain capturingChain =
+        (req, resp) -> seenDuringChain.set(PrincipalUtils.getCurrentPrincipal());
+    filter.doFilter(mockRequest, mockResponse, capturingChain);
+
+    // No header means today's behavior: every role the caller holds is active.
+    Assertions.assertInstanceOf(UserPrincipal.class, seenDuringChain.get());
+    Assertions.assertEquals(
+        ActiveRoles.all(), ((UserPrincipal) seenDuringChain.get()).getActiveRoles());
+  }
+
+  @Test
+  public void testDoFilterRejectsMalformedActiveRolesHeader() throws ServletException, IOException {
+    Authenticator authenticator = mock(Authenticator.class);
+    AuthenticationFilter filter = new AuthenticationFilter(Lists.newArrayList(authenticator));
+    FilterChain mockChain = mock(FilterChain.class);
+    HttpServletRequest mockRequest = mock(HttpServletRequest.class);
+    HttpServletResponse mockResponse = mock(HttpServletResponse.class);
+    StringWriter stringWriter = new StringWriter();
+    PrintWriter printWriter = new PrintWriter(stringWriter);
+    when(mockResponse.getWriter()).thenReturn(printWriter);
+    when(mockRequest.getHeaders(AuthConstants.HTTP_HEADER_AUTHORIZATION))
+        .thenReturn(new Vector<>(Collections.singletonList("user")).elements());
+    // A reserved keyword combined with a role name is syntactically invalid.
+    when(mockRequest.getHeader(AuthConstants.X_GRAVITINO_ACTIVE_ROLES_HEADER))
+        .thenReturn("ALL,analyst");
+    when(authenticator.supportsToken(any())).thenReturn(true);
+    when(authenticator.isDataFromToken()).thenReturn(true);
+    when(authenticator.authenticateToken(any())).thenReturn(new UserPrincipal("user"));
+
+    filter.doFilter(mockRequest, mockResponse, mockChain);
+
+    verify(mockResponse).setStatus(HttpServletResponse.SC_BAD_REQUEST);
+    verify(mockChain, never()).doFilter(any(), any());
   }
 
   @Test

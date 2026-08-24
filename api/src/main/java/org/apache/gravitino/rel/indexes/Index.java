@@ -129,5 +129,8 @@ public interface Index {
 
     /** Bloom filter data skipping index */
     DATA_SKIPPING_BLOOM_FILTER,
+
+    /** Set data skipping index */
+    DATA_SKIPPING_SET,
   }
 }

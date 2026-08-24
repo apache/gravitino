@@ -635,6 +635,7 @@ components:
         "@type": "updateContent",
         "policyType": "custom",
         "newContent": {
+          "policyType": "custom",
           "customRules": {
             "rule1": 456
           },

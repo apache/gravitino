@@ -76,8 +76,12 @@ public abstract class IcebergRESTServiceBaseIT {
   void stopIcebergTestEnv() throws Exception {
     stopSparkEnv();
     icebergRESTServerManager.stopIcebergRESTServer();
+    afterIcebergRESTServerStopped();
     LOG.info("Gravitino and Spark env stopped,{}", catalogType);
   }
+
+  /** Hook invoked after the Iceberg REST server is stopped during test teardown. */
+  protected void afterIcebergRESTServerStopped() {}
 
   boolean catalogTypeNotMemory() {
     return !catalogType.equals(IcebergCatalogBackend.MEMORY);
@@ -152,8 +156,13 @@ public abstract class IcebergRESTServiceBaseIT {
           "spark.sql.catalog.rest.header.X-Iceberg-Access-Delegation", "vended-credentials");
     }
 
+    customizeSparkConf(sparkConf);
+
     sparkSession = SparkSession.builder().master("local[1]").config(sparkConf).getOrCreate();
   }
+
+  /** Hook to customize Spark configuration before the test Spark session is created. */
+  protected void customizeSparkConf(SparkConf sparkConf) {}
 
   private void stopSparkEnv() {
     if (sparkSession != null) {

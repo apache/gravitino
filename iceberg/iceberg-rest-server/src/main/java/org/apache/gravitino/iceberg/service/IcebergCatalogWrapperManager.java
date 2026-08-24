@@ -65,7 +65,10 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
             .removalListener(
                 (k, v, c) -> {
                   String catalogName = (String) k;
-                  LOG.info("Remove IcebergCatalogWrapper cache {}.", catalogName);
+                  LOG.debug(
+                      "Removing IcebergCatalogWrapper from cache: catalog={}, cause={}",
+                      catalogName,
+                      c);
                   closeIcebergCatalogWrapper((IcebergCatalogWrapper) v);
                 })
             .scheduler(
@@ -100,6 +103,10 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
   }
 
   public CatalogWrapperForREST getCatalogWrapper(String catalogName) {
+    if (LOG.isDebugEnabled()) {
+      boolean cacheHit = catalogWrapperCache.getIfPresent(catalogName) != null;
+      LOG.debug("getCatalogWrapper catalogName={} cacheHit={}", catalogName, cacheHit);
+    }
     CatalogWrapperForREST catalogWrapperForREST =
         catalogWrapperCache.get(catalogName, k -> createCatalogWrapper(catalogName));
     // Reload conf to reset UserGroupInformation or icebergTableOps will always use

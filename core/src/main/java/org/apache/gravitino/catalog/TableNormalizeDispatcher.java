@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -38,6 +37,10 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listTables(Namespace)}) are
+ * assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class TableNormalizeDispatcher implements TableDispatcher {
   private final CatalogManager catalogManager;
   private final TableDispatcher dispatcher;
@@ -52,8 +55,7 @@ public class TableNormalizeDispatcher implements TableDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    NameIdentifier[] identifiers = dispatcher.listTables(caseSensitiveNs);
-    return normalizeCaseSensitive(identifiers);
+    return dispatcher.listTables(caseSensitiveNs);
   }
 
   @Override
@@ -121,15 +123,6 @@ public class TableNormalizeDispatcher implements TableDispatcher {
   private NameIdentifier normalizeCaseSensitive(NameIdentifier tableIdent) {
     Capability capability = getCapability(tableIdent, catalogManager);
     return applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capability);
-  }
-
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] tableIdents) {
-    if (ArrayUtils.isEmpty(tableIdents)) {
-      return tableIdents;
-    }
-
-    Capability capabilities = getCapability(tableIdents[0], catalogManager);
-    return applyCaseSensitive(tableIdents, Capability.Scope.TABLE, capabilities);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier tableIdent) {

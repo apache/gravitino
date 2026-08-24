@@ -49,6 +49,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("dev")
+            .withGroupComment("")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -61,12 +62,33 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
 
   @ParameterizedTest
   @MethodSource("storageProvider")
+  void testInsertIdpGroupPersistsComment(String type) throws IOException {
+    init(type);
+    IdpGroupPO group =
+        IdpGroupPO.builder()
+            .withGroupId(1L)
+            .withGroupName("dev")
+            .withGroupComment("on-call rotation")
+            .withCurrentVersion(1L)
+            .withLastVersion(0L)
+            .withDeletedAt(0L)
+            .build();
+    idpGroupMetaMapper.insertIdpGroup(group);
+
+    assertEquals(group, idpGroupMetaMapper.selectIdpGroup("dev"));
+    assertEquals(
+        "on-call rotation", idpGroupMetaMapper.selectIdpGroupWithUsers("dev").getComment());
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
   void testSelectIdpGroupWithUsers(String type) throws IOException {
     init(type);
     idpGroupMetaMapper.insertIdpGroup(
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("dev")
+            .withGroupComment("")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -113,6 +135,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
 
     var groupWithUsers = idpGroupMetaMapper.selectIdpGroupWithUsers("dev");
     assertEquals("dev", groupWithUsers.getName());
+    assertEquals("", groupWithUsers.getComment());
     assertTrue(groupWithUsers.getUsernames().contains("alice"));
     assertTrue(groupWithUsers.getUsernames().contains("bob"));
     assertNull(idpGroupMetaMapper.selectIdpGroupWithUsers("unknown"));
@@ -126,6 +149,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("dev")
+            .withGroupComment("")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)
@@ -152,6 +176,7 @@ class TestIdpGroupMetaStorage extends AbstractIdpMetaStorageTest {
         IdpGroupPO.builder()
             .withGroupId(1L)
             .withGroupName("dev")
+            .withGroupComment("")
             .withCurrentVersion(1L)
             .withLastVersion(0L)
             .withDeletedAt(0L)

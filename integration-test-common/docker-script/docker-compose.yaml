@@ -21,7 +21,7 @@ services:
   hive:
     image: apache/gravitino-ci:hive-0.1.20
     networks:
-      - trino-net
+      - default
     container_name: trino-ci-hive
     environment:
       - HADOOP_USER_NAME=anonymous
@@ -45,7 +45,7 @@ services:
       POSTGRES_PASSWORD: ds123
       ALLOW_IP_RANGE: 0.0.0.0/0
     networks:
-      - trino-net
+      - default
     volumes:
       - ./init/postgres:/docker-entrypoint-initdb.d/
     healthcheck:
@@ -58,7 +58,7 @@ services:
     image: mysql:8.0
     container_name: trino-ci-mysql
     networks:
-      - trino-net
+      - default
     volumes:
       - ./init/mysql:/docker-entrypoint-initdb.d/
     environment:
@@ -81,7 +81,7 @@ services:
   trino:
     image: trinodb/trino:${TRINO_VERSION:-478}
     networks:
-      - trino-net
+      - default
     container_name: trino-ci-trino
     environment:
       - HADOOP_USER_NAME=anonymous
@@ -115,7 +115,7 @@ services:
   trino-worker:
     image: trinodb/trino:${TRINO_VERSION:-478}
     networks:
-      - trino-net
+      - default
     deploy:
       replicas: ${TRINO_WORKER_NUM:-0}
     environment:
@@ -140,9 +140,9 @@ services:
         condition: service_healthy
 
 networks:
-  trino-net:
-    driver: bridge
+  default:
     name: trino-net
+    driver: bridge
     ipam:
       config:
         - subnet: 10.20.31.16/28

@@ -36,6 +36,9 @@ public interface EntityChangeLogMapper {
 
   String ENTITY_CHANGE_LOG_TABLE_NAME = "entity_change_log";
 
+  /** Max expired rows removed in one cleanup transaction. */
+  int ENTITY_CHANGE_LOG_PRUNE_BATCH_SIZE = 1000;
+
   @SelectProvider(type = EntityChangeLogSQLProviderFactory.class, method = "selectEntityChanges")
   List<EntityChangeRecord> selectEntityChanges(
       @Param("lastConsumedId") long lastConsumedId, @Param("maxRows") int maxRows);
@@ -51,5 +54,5 @@ public interface EntityChangeLogMapper {
       @Param("operateType") OperateType operateType);
 
   @DeleteProvider(type = EntityChangeLogSQLProviderFactory.class, method = "pruneOldEntityChanges")
-  void pruneOldEntityChanges(@Param("before") long before);
+  int pruneOldEntityChanges(@Param("retentionMs") long retentionMs);
 }

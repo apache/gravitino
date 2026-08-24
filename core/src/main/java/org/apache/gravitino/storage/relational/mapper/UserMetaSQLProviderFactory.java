@@ -94,6 +94,17 @@ public class UserMetaSQLProviderFactory {
     return getProvider().listExtendedUserPOsByMetalakeId(metalakeId);
   }
 
+  public static String countUserMetasByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return getProvider().countUserMetasByMetalakeName(metalakeName);
+  }
+
+  public static String listExtendedUserPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return getProvider().listExtendedUserPOsByMetalakeNamePaginated(metalakeName, offset, limit);
+  }
+
   public static String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deleteUserMetasByLegacyTimeline(legacyTimeline, limit);
@@ -118,6 +129,11 @@ public class UserMetaSQLProviderFactory {
   public static String selectUserMetaByMetalakeNameAndExternalId(
       @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
     return getProvider().selectUserMetaByMetalakeNameAndExternalId(metalakeName, externalId);
+  }
+
+  public static String selectUserMetaByMetalakeNameAndId(
+      @Param("metalakeName") String metalakeName, @Param("userId") Long userId) {
+    return getProvider().selectUserMetaByMetalakeNameAndId(metalakeName, userId);
   }
 
   public static String updateUserMetaByExternalId(

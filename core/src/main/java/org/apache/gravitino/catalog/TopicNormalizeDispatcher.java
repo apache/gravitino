@@ -23,7 +23,6 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
 import java.util.Map;
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.capability.Capability;
@@ -34,6 +33,10 @@ import org.apache.gravitino.messaging.DataLayout;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.messaging.TopicChange;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link #listTopics(Namespace)}) are
+ * assumed to already be in their canonical, legal form and are not re-normalized here.
+ */
 public class TopicNormalizeDispatcher implements TopicDispatcher {
   private final CatalogManager catalogManager;
   private final TopicDispatcher dispatcher;
@@ -48,8 +51,7 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
     // The constraints of the name spec may be more strict than underlying catalog,
     // and for compatibility reasons, we only apply case-sensitive capabilities here.
     Namespace caseSensitiveNs = normalizeCaseSensitive(namespace);
-    NameIdentifier[] identifiers = dispatcher.listTopics(caseSensitiveNs);
-    return normalizeCaseSensitive(identifiers);
+    return dispatcher.listTopics(caseSensitiveNs);
   }
 
   @Override
@@ -96,15 +98,6 @@ public class TopicNormalizeDispatcher implements TopicDispatcher {
   private NameIdentifier normalizeCaseSensitive(NameIdentifier topicIdent) {
     Capability capabilities = getCapability(topicIdent, catalogManager);
     return applyCaseSensitive(topicIdent, Capability.Scope.TOPIC, capabilities);
-  }
-
-  private NameIdentifier[] normalizeCaseSensitive(NameIdentifier[] topicIdents) {
-    if (ArrayUtils.isEmpty(topicIdents)) {
-      return topicIdents;
-    }
-
-    Capability capabilities = getCapability(topicIdents[0], catalogManager);
-    return applyCaseSensitive(topicIdents, Capability.Scope.TOPIC, capabilities);
   }
 
   private NameIdentifier normalizeNameIdentifier(NameIdentifier topicIdent) {

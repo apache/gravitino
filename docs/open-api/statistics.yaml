@@ -445,8 +445,10 @@ components:
               items: { }
             - type: object
               additionalProperties: { }
-            - type: "null"
-          description: The value of the statistic
+          description: >-
+            The statistic's value, present only when the statistic has one. Its
+            type depends on the statistic — a string, number, integer, boolean,
+            array, or object.
         reserved:
           type: boolean
           description: Whether the statistic is reserved

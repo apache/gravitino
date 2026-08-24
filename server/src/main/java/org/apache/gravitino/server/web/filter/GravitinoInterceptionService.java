@@ -41,17 +41,20 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
+import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationRequest;
 import org.apache.gravitino.server.authorization.annotations.ExpressionCondition;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
+import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.FunctionOperations;
@@ -99,6 +102,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             FunctionOperations.class.getName(),
             TopicOperations.class.getName(),
             FilesetOperations.class.getName(),
+            BulkOperations.class.getName(),
             UserOperations.class.getName(),
             GroupOperations.class.getName(),
             PermissionOperations.class.getName(),
@@ -189,6 +193,28 @@ public class GravitinoInterceptionService implements InterceptionService {
                   ex);
               return Utils.internalError("Failed to validate user", ex);
             }
+
+            // Role assumption: reject a NAMED declaration that names roles the caller does not
+            // hold (403); ALL/NONE need no membership check.
+            ActiveRoles activeRoles = authorizationRequestContext.getActiveRoles();
+            if (activeRoles.mode() == ActiveRoles.Mode.NAMED) {
+              Set<String> unheldRoles =
+                  GravitinoAuthorizerProvider.getInstance()
+                      .getGravitinoAuthorizer()
+                      .findUnheldRoles(
+                          PrincipalUtils.getCurrentPrincipal(),
+                          metalakeIdent.name(),
+                          activeRoles.roleNames(),
+                          authorizationRequestContext);
+              if (!unheldRoles.isEmpty()) {
+                dispatchAuthzDenialEvent(currentUser, metalakeIdent, method.getName(), expression);
+                return Utils.forbidden(
+                    String.format(
+                        "User '%s' cannot assume active role(s) that are not held: %s",
+                        currentUser, unheldRoles),
+                    null);
+              }
+            }
           }
 
           // If expression is empty, skip authorization check (method handles its own filtering)
@@ -208,7 +234,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                     parameters,
                     args,
                     secondaryExpression,
-                    secondaryExpressionCondition);
+                    secondaryExpressionCondition,
+                    expressionAnnotation.allowCheckExistence());
             boolean authorizeResult = executor.execute(authorizationRequestContext);
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();

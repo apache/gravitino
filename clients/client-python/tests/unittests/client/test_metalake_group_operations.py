@@ -18,8 +18,6 @@
 import unittest
 from unittest.mock import patch
 
-from gravitino.client.gravitino_client import GravitinoClient
-from gravitino.dto.authorization.group_dto import GroupDTO
 from gravitino.dto.requests.group_add_request import GroupAddRequest
 from gravitino.dto.responses.remove_response import RemoveResponse
 from gravitino.dto.responses.group_response import (
@@ -35,16 +33,11 @@ from gravitino.exceptions.base import (
 )
 from gravitino.exceptions.handlers.group_error_handler import GROUP_ERROR_HANDLER
 from tests.unittests import mock_base
-
-
-def _build_group_dto(name: str = "engineers", roles: list | None = None) -> GroupDTO:
-    return (
-        GroupDTO.builder()
-        .with_name(name)
-        .with_roles(roles if roles is not None else [])
-        .with_audit(mock_base.build_audit_info())
-        .build()
-    )
+from tests.unittests.client.operation_test_fixtures import (
+    build_group_dto,
+    make_gravitino_client,
+    mock_get_metalake,
+)
 
 
 class TestMetalakeGroupOperations(unittest.TestCase):
@@ -53,7 +46,7 @@ class TestMetalakeGroupOperations(unittest.TestCase):
 
     def test_add_group(self):
         metalake = mock_base.mock_load_metalake()
-        group = _build_group_dto()
+        group = build_group_dto()
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
 
         with patch(
@@ -87,7 +80,7 @@ class TestMetalakeGroupOperations(unittest.TestCase):
 
     def test_get_group(self):
         metalake = mock_base.mock_load_metalake()
-        group = _build_group_dto(roles=["role_a", "role_b"])
+        group = build_group_dto(roles=["role_a", "role_b"])
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
 
         with patch(
@@ -139,7 +132,7 @@ class TestMetalakeGroupOperations(unittest.TestCase):
 
     def test_list_groups(self):
         metalake = mock_base.mock_load_metalake()
-        groups = [_build_group_dto("alice"), _build_group_dto("bob")]
+        groups = [build_group_dto("alice"), build_group_dto("bob")]
         mock_resp = mock_base.mock_http_response(GroupListResponse(0, groups).to_json())
 
         with patch(
@@ -185,20 +178,12 @@ class TestMetalakeGroupOperations(unittest.TestCase):
 class TestGravitinoClientGroupDelegates(unittest.TestCase):
     """Verify that GravitinoClient correctly delegates Group operations."""
 
-    def _make_client(self):
-        client = GravitinoClient.__new__(GravitinoClient)
-        return client
-
     def test_client_add_group(self):
-        client = self._make_client()
-        group = _build_group_dto()
+        client = make_gravitino_client()
+        group = build_group_dto()
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.post", return_value=mock_resp
             ),
@@ -207,29 +192,21 @@ class TestGravitinoClientGroupDelegates(unittest.TestCase):
             self.assertEqual("engineers", result.name())
 
     def test_client_get_group(self):
-        client = self._make_client()
-        group = _build_group_dto(roles=["r1"])
+        client = make_gravitino_client()
+        group = build_group_dto(roles=["r1"])
         mock_resp = mock_base.mock_http_response(GroupResponse(0, group).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch("gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp),
         ):
             result = client.get_group("engineers")
             self.assertEqual(["r1"], result.roles())
 
     def test_client_remove_group(self):
-        client = self._make_client()
+        client = make_gravitino_client()
         mock_resp = mock_base.mock_http_response(RemoveResponse(0, True).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch(
                 "gravitino.utils.http_client.HTTPClient.delete", return_value=mock_resp
             ),
@@ -237,31 +214,23 @@ class TestGravitinoClientGroupDelegates(unittest.TestCase):
             self.assertTrue(client.remove_group("engineers"))
 
     def test_client_list_groups(self):
-        client = self._make_client()
-        groups = [_build_group_dto("alice"), _build_group_dto("bob")]
+        client = make_gravitino_client()
+        groups = [build_group_dto("alice"), build_group_dto("bob")]
         mock_resp = mock_base.mock_http_response(GroupListResponse(0, groups).to_json())
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch("gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp),
         ):
             result = client.list_groups()
             self.assertEqual(["alice", "bob"], [u.name() for u in result])
 
     def test_client_list_group_names(self):
-        client = self._make_client()
+        client = make_gravitino_client()
         mock_resp = mock_base.mock_http_response(
             GroupNamesListResponse(0, ["alice", "bob"]).to_json()
         )
         with (
-            patch.object(
-                GravitinoClient,
-                "get_metalake",
-                return_value=mock_base.mock_load_metalake(),
-            ),
+            mock_get_metalake(),
             patch("gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp),
         ):
             result = client.list_group_names()

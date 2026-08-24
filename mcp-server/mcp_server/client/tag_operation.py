@@ -78,7 +78,7 @@ class TagOperation(ABC):
         pass
 
     @abstractmethod
-    async def delete_tag(self, name: str) -> None:
+    async def delete_tag(self, name: str) -> str:
         """
         Delete a tag by its name.
 
@@ -86,7 +86,7 @@ class TagOperation(ABC):
             name: Name of the tag to delete
 
         Returns:
-            None
+            str: JSON-formatted string indicating whether the tag was deleted
         """
         pass
 

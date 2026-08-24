@@ -37,7 +37,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -45,7 +44,6 @@ import org.apache.gravitino.storage.relational.mapper.StatisticMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.po.TopicPO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -113,14 +111,6 @@ public class TopicMetaService {
         newEntity.id(),
         oldTopicEntity.id());
 
-    String metalakeName = ident.namespace().level(0);
-    String catalogName = ident.namespace().level(1);
-    String schemaName = ident.namespace().level(2);
-    String oldFullName =
-        NameIdentifierUtil.ofTopic(metalakeName, catalogName, schemaName, oldTopicEntity.name())
-            .toString();
-    boolean isRenamed = !Objects.equals(oldTopicEntity.name(), newEntity.name());
-
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
@@ -131,19 +121,7 @@ public class TopicMetaService {
                       mapper ->
                           mapper.updateTopicMeta(
                               POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity),
-                              oldTopicPO))),
-          () -> {
-            if (isRenamed && updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.TOPIC.name(),
-                          oldFullName,
-                          OperateType.ALTER));
-            }
-          });
+                              oldTopicPO))));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, newEntity.nameIdentifier().toString());
@@ -293,13 +271,6 @@ public class TopicMetaService {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
     Long topicId = topicPO.getTopicId();
 
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.namespace().level(2);
-    String topicFullName =
-        NameIdentifierUtil.ofTopic(metalakeName, catalogName, schemaName, identifier.name())
-            .toString();
-
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -332,18 +303,6 @@ public class TopicMetaService {
                 mapper ->
                     mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
                         topicId, MetadataObject.Type.TOPIC.name()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.TOPIC.name(),
-                        topicFullName,
-                        OperateType.DROP));
           }
         });
 

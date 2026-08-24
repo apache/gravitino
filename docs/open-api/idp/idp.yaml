@@ -23,10 +23,10 @@ paths:
     post:
       tags:
         - IDP
-      summary: Add built-in IDP user
+      summary: Add local user store user
       description: >
-        Creates a built-in IDP user with the given username and password.
-        Requires the `idp-basic` plugin and built-in IdP Basic authentication. Built-in IdP is
+        Creates a local user store user with the given username and password.
+        Requires the `idp-basic` plugin and local user store Basic authentication. Local user store is
         incompatible with the `simple` authenticator (the default), `gravitino.authenticators` must
         include `basic` and must not include `simple`.
       operationId: addIdpUser
@@ -41,7 +41,7 @@ paths:
                 $ref: "#/components/examples/AddUserRequest"
       responses:
         "200":
-          description: Returns the added built-in IDP user
+          description: Returns the added local user store user
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -59,7 +59,7 @@ paths:
                 IllegalArgumentException:
                   $ref: "#/components/examples/IdpAddUserIllegalArgumentException"
         "409":
-          description: Conflict - The built-in IDP user already exists
+          description: Conflict - The local user store user already exists
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -79,12 +79,12 @@ paths:
     get:
       tags:
         - IDP
-      summary: Get built-in IDP user
-      description: Returns the specified built-in IDP user, including group membership (empty if none; the example shows a user who already belongs to groups).
+      summary: Get local user store user
+      description: Returns the specified local user store user, including group membership (empty if none; the example shows a user who already belongs to groups).
       operationId: getIdpUser
       responses:
         "200":
-          description: Returns the built-in IDP user object
+          description: Returns the local user store user object
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -95,7 +95,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IDP user does not exist
+          description: Not Found - The specified local user store user does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -109,8 +109,8 @@ paths:
     put:
       tags:
         - IDP
-      summary: Change built-in IDP user password
-      description: Updates the password of the specified built-in IDP user and returns the user object with unchanged group membership.
+      summary: Change local user store user password
+      description: Updates the password of the specified local user store user and returns the user object with unchanged group membership.
       operationId: changeIdpUserPassword
       requestBody:
         required: true
@@ -123,7 +123,7 @@ paths:
                 $ref: "#/components/examples/ChangePasswordRequest"
       responses:
         "200":
-          description: Returns the built-in IDP user after the password change
+          description: Returns the local user store user after the password change
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -143,7 +143,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IDP user does not exist
+          description: Not Found - The specified local user store user does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -157,8 +157,8 @@ paths:
     delete:
       tags:
         - IDP
-      summary: Remove built-in IDP user
-      description: Removes the specified built-in IDP user.
+      summary: Remove local user store user
+      description: Removes the specified local user store user.
       operationId: removeIdpUser
       responses:
         "200":
@@ -172,8 +172,8 @@ paths:
     post:
       tags:
         - IDP
-      summary: Add built-in IDP group
-      description: Creates a built-in IDP group with the given name.
+      summary: Add local user store group
+      description: Creates a local user store group with the given name.
       operationId: addIdpGroup
       requestBody:
         required: true
@@ -186,7 +186,7 @@ paths:
                 $ref: "#/components/examples/AddGroupRequest"
       responses:
         "200":
-          description: Returns the added built-in IDP group
+          description: Returns the added local user store group
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -204,7 +204,7 @@ paths:
                 IllegalArgumentException:
                   $ref: "#/components/examples/IdpAddGroupIllegalArgumentException"
         "409":
-          description: Conflict - The built-in IDP group already exists
+          description: Conflict - The local user store group already exists
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -224,12 +224,12 @@ paths:
     get:
       tags:
         - IDP
-      summary: Get built-in IDP group
-      description: Returns the specified built-in IDP group, including member usernames (empty if none; the example shows a group that already has members).
+      summary: Get local user store group
+      description: Returns the specified local user store group, including member usernames (empty if none; the example shows a group that already has members).
       operationId: getIdpGroup
       responses:
         "200":
-          description: Returns the built-in IDP group object
+          description: Returns the local user store group object
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -240,7 +240,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IDP group does not exist
+          description: Not Found - The specified local user store group does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -254,8 +254,8 @@ paths:
     delete:
       tags:
         - IDP
-      summary: Remove built-in IDP group
-      description: Removes the specified built-in IDP group.
+      summary: Remove local user store group
+      description: Removes the specified local user store group.
       operationId: removeIdpGroup
       parameters:
         - $ref: "../openapi.yaml#/components/parameters/force"
@@ -283,8 +283,8 @@ paths:
     put:
       tags:
         - IDP
-      summary: Change built-in IDP group membership
-      description: Adds and/or removes users from the specified built-in IDP group.
+      summary: Change local user store group membership
+      description: Adds and/or removes users from the specified local user store group.
       operationId: changeIdpGroupMembership
       requestBody:
         required: true
@@ -297,7 +297,7 @@ paths:
                 $ref: "#/components/examples/GroupMembershipChangeRequest"
       responses:
         "200":
-          description: Returns the built-in IDP group after membership changes
+          description: Returns the local user store group after membership changes
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -317,7 +317,7 @@ paths:
         "403":
           $ref: "#/components/responses/IdpForbiddenErrorResponse"
         "404":
-          description: Not Found - The specified built-in IDP group or user does not exist
+          description: Not Found - The specified local user store group or user does not exist
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -340,13 +340,13 @@ components:
         name:
           type: string
           maxLength: 128
-          description: The username of the built-in IDP user
+          description: The username of the local user store user
         groups:
           type: array
           items:
             type: string
             maxLength: 128
-          description: The built-in IDP groups the user belongs to
+          description: The local user store groups the user belongs to
 
     IdpGroup:
       type: object
@@ -356,13 +356,17 @@ components:
         name:
           type: string
           maxLength: 128
-          description: The name of the built-in IDP group
+          description: The name of the local user store group
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the local user store group
         users:
           type: array
           items:
             type: string
             maxLength: 128
-          description: The usernames of members in the built-in IDP group
+          description: The usernames of members in the local user store group
 
     AddUserRequest:
       type: object
@@ -381,7 +385,7 @@ components:
           format: password
           minLength: 12
           maxLength: 64
-          description: The password of the built-in IDP user to add.
+          description: The password of the local user store user to add.
           writeOnly: true
 
     ChangePasswordRequest:
@@ -394,7 +398,7 @@ components:
           format: password
           minLength: 12
           maxLength: 64
-          description: The new password of the built-in IDP user.
+          description: The new password of the local user store user.
           writeOnly: true
 
     AddGroupRequest:
@@ -407,6 +411,10 @@ components:
           minLength: 1
           maxLength: 128
           description: The group name to add.
+        comment:
+          type: string
+          maxLength: 1024
+          description: Optional description of the group.
 
     GroupMembershipChangeRequest:
       type: object
@@ -423,7 +431,7 @@ components:
             minLength: 1
             maxLength: 128
           minItems: 1
-          description: The usernames to add to the built-in IDP group
+          description: The usernames to add to the local user store group
         usersToRemove:
           type: array
           items:
@@ -431,7 +439,7 @@ components:
             minLength: 1
             maxLength: 128
           minItems: 1
-          description: The usernames to remove from the built-in IDP group
+          description: The usernames to remove from the local user store group
 
     IdpUserResponse:
       type: object
@@ -461,7 +469,7 @@ components:
     IdpForbiddenErrorResponse:
       description:
         Forbidden - Only callers listed in `gravitino.authorization.serviceAdmins` may
-        manage built-in IDP users and groups. Unauthenticated requests and authenticated
+        manage local user store users and groups. Unauthenticated requests and authenticated
         non-service-admin users receive this response.
       content:
         application/vnd.gravitino.v1+json:
@@ -485,7 +493,8 @@ components:
 
     AddGroupRequest:
       value: {
-        "group": "engineers"
+        "group": "engineers",
+        "comment": "Platform engineering"
       }
 
     GroupMembershipChangeRequest:
@@ -526,6 +535,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": []
         }
       }
@@ -535,6 +545,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": ["alice", "bob"]
         }
       }
@@ -544,6 +555,7 @@ components:
         "code": 0,
         "group": {
           "name": "engineers",
+          "comment": "Platform engineering",
           "users": ["alice", "bob"]
         }
       }
@@ -552,89 +564,89 @@ components:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate built-in IdP user [] operation [ADD], reason [\"user\" field is required and cannot be empty]"
+        "message": "Failed to operate local user store user [] operation [ADD], reason [\"user\" field is required and cannot be empty]"
       }
 
     IdpChangePasswordIllegalArgumentException:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate built-in IdP user [alice] operation [UPDATE], reason [\"password\" field is required and cannot be empty]"
+        "message": "Failed to operate local user store user [alice] operation [UPDATE], reason [\"password\" field is required and cannot be empty]"
       }
 
     IdpAddGroupIllegalArgumentException:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate built-in IdP group [] operation [ADD], reason [\"group\" field is required and cannot be empty]"
+        "message": "Failed to operate local user store group [] operation [ADD], reason [\"group\" field is required and cannot be empty]"
       }
 
     IdpGroupMembershipIllegalArgumentException:
       value: {
         "code": 1001,
         "type": "IllegalArgumentException",
-        "message": "Failed to operate built-in IdP group [engineers] operation [UPDATE], reason [usersToAdd and usersToRemove cannot both be null]"
+        "message": "Failed to operate local user store group [engineers] operation [UPDATE], reason [usersToAdd and usersToRemove cannot both be null]"
       }
 
     IdpNotFoundException:
       value: {
         "code": 1003,
         "type": "NotFoundException",
-        "message": "Failed to operate built-in IdP user [missing-user] operation [GET], reason [IdP user not found: missing-user]"
+        "message": "Failed to operate local user store user [missing-user] operation [GET], reason [IdP user not found: missing-user]"
       }
 
     IdpAlreadyExistsException:
       value: {
         "code": 1004,
         "type": "AlreadyExistsException",
-        "message": "Failed to operate built-in IdP user [alice] operation [ADD], reason [IdP user alice already exists]"
+        "message": "Failed to operate local user store user [alice] operation [ADD], reason [IdP user alice already exists]"
       }
 
     IdpUserUpdateNotFoundException:
       value: {
         "code": 1003,
         "type": "NotFoundException",
-        "message": "Failed to operate built-in IdP user [missing-user] operation [UPDATE], reason [IdP user not found: missing-user]"
+        "message": "Failed to operate local user store user [missing-user] operation [UPDATE], reason [IdP user not found: missing-user]"
       }
 
     IdpGroupNotFoundException:
       value: {
         "code": 1003,
         "type": "NotFoundException",
-        "message": "Failed to operate built-in IdP group [missing-group] operation [GET], reason [IdP group not found: missing-group]"
+        "message": "Failed to operate local user store group [missing-group] operation [GET], reason [IdP group not found: missing-group]"
       }
 
     IdpGroupUpdateNotFoundException:
       value: {
         "code": 1003,
         "type": "NotFoundException",
-        "message": "Failed to operate built-in IdP group [missing-group] operation [UPDATE], reason [IdP group not found: missing-group]"
+        "message": "Failed to operate local user store group [missing-group] operation [UPDATE], reason [IdP group not found: missing-group]"
       }
 
     IdpMembershipUserNotFoundException:
       value: {
         "code": 1003,
         "type": "NotFoundException",
-        "message": "Failed to operate built-in IdP group [engineers] operation [UPDATE], reason [IdP user not found: missing-user]"
+        "message": "Failed to operate local user store group [engineers] operation [UPDATE], reason [IdP user not found: missing-user]"
       }
 
     IdpGroupAlreadyExistsException:
       value: {
         "code": 1004,
         "type": "AlreadyExistsException",
-        "message": "Failed to operate built-in IdP group [engineers] operation [ADD], reason [IdP group engineers already exists]"
+        "message": "Failed to operate local user store group [engineers] operation [ADD], reason [IdP group engineers already exists]"
       }
 
     IdpGroupNotEmptyException:
       value: {
         "code": 1006,
         "type": "IllegalStateException",
-        "message": "Failed to operate built-in IdP group [engineers] operation [REMOVE], reason [IdP group engineers is not empty, use force=true to delete it]"
+        "message": "Failed to operate local user store group [engineers] operation [REMOVE], reason [IdP group engineers is not empty, use force=true to delete it]"
       }
 
     IdpForbiddenException:
       value: {
         "code": 1008,
         "type": "ForbiddenException",
-        "message": "Only service admins can manage built-in IdP users and groups."
+        "message": "Only service admins can manage local user store users and groups."
       }

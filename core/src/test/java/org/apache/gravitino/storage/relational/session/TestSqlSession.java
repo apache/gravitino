@@ -30,9 +30,11 @@ import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_STORE;
 import static org.apache.gravitino.Configs.RELATIONAL_ENTITY_STORE;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
 import java.io.IOException;
@@ -137,10 +139,13 @@ public class TestSqlSession {
 
   @Test
   public void testOpenAndCloseSqlSession() {
+    assertFalse(SqlSessions.hasActiveSession());
     SqlSession session = SqlSessions.getSqlSession();
     assertNotNull(session);
+    assertTrue(SqlSessions.hasActiveSession());
     assertEquals(1, SqlSessions.getSessionCount());
     SqlSessions.closeSqlSession();
+    assertFalse(SqlSessions.hasActiveSession());
     assertNull(SqlSessions.getSessions().get());
     assertEquals(0, SqlSessions.getSessionCount());
   }

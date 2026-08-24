@@ -203,7 +203,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withColumns(List.of(column1))
             .withAuditInfo(AUDIT_INFO)
             .build();
-    TableMetaService.getInstance().insertTable(createdTable, false);
+    backend.insert(createdTable, false);
 
     // test update table without changing schema name
     long maxIdBeforeRename = maxEntityChangeId();
@@ -216,7 +216,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withAuditInfo(AUDIT_INFO)
             .build();
     Function<TableEntity, TableEntity> updater = oldTable -> updatedTable;
-    TableMetaService.getInstance().updateTable(createdTable.nameIdentifier(), updater);
+    backend.update(createdTable.nameIdentifier(), Entity.EntityType.TABLE, updater);
 
     TableEntity retrievedTable =
         TableMetaService.getInstance().getTableByIdentifier(updatedTable.nameIdentifier());
@@ -254,9 +254,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     Exception e =
         Assertions.assertThrows(
             NoSuchEntityException.class,
-            () ->
-                TableMetaService.getInstance()
-                    .updateTable(updatedTable.nameIdentifier(), updater2));
+            () -> backend.update(updatedTable.nameIdentifier(), Entity.EntityType.TABLE, updater2));
     Assertions.assertTrue(e.getMessage().contains(newSchemaName));
 
     // test update table with changing schema name to an existing schema
@@ -277,8 +275,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withColumns(updatedTable.columns())
             .withAuditInfo(AUDIT_INFO)
             .build();
-    TableMetaService.getInstance()
-        .updateTable(updatedTable.nameIdentifier(), oldTable -> movedTable);
+    backend.update(updatedTable.nameIdentifier(), Entity.EntityType.TABLE, oldTable -> movedTable);
     Assertions.assertTrue(
         listEntityChanges(maxIdBeforeSchemaMove).stream()
             .anyMatch(
@@ -293,7 +290,7 @@ public class TestTableMetaService extends TestJDBCBackend {
                                     .toString())
                         && record.getOperateType() == OperateType.ALTER));
 
-    TableMetaService.getInstance().updateTable(movedTable.nameIdentifier(), updater2);
+    backend.update(movedTable.nameIdentifier(), Entity.EntityType.TABLE, updater2);
 
     TableEntity retrievedTable2 =
         TableMetaService.getInstance().getTableByIdentifier(updatedTable2.nameIdentifier());
@@ -305,7 +302,7 @@ public class TestTableMetaService extends TestJDBCBackend {
 
     long maxIdBeforeDelete = maxEntityChangeId();
     Assertions.assertTrue(
-        TableMetaService.getInstance().deleteTable(updatedTable2.nameIdentifier()));
+        backend.delete(updatedTable2.nameIdentifier(), Entity.EntityType.TABLE, false));
     Assertions.assertTrue(
         listEntityChanges(maxIdBeforeDelete).stream()
             .anyMatch(

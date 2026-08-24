@@ -41,11 +41,28 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
   const store = useAppSelector(state => state.metalakes)
   const dispatch = useAppDispatch()
 
+  // Sync currentLocation with storageLocations/defaultLocationName.
+  // When currentLocation is undefined or no longer exists in
+  // storageLocations, derive the correct value from props.
   useEffect(() => {
-    if (defaultLocationName) {
-      setCurrentLocation(defaultLocationName)
+    if (!storageLocations || Object.keys(storageLocations).length === 0) {
+      setCurrentLocation(undefined)
+
+      return
     }
-  }, [defaultLocationName])
+
+    // If currentLocation is valid in current storageLocations, keep it
+    if (currentLocation && storageLocations[currentLocation]) {
+      return
+    }
+
+    // Otherwise, derive from props
+    if (defaultLocationName && storageLocations[defaultLocationName]) {
+      setCurrentLocation(defaultLocationName)
+    } else {
+      setCurrentLocation(Object.keys(storageLocations)[0])
+    }
+  }, [currentLocation, defaultLocationName, storageLocations])
 
   useEffect(() => {
     if (sub_path) {
@@ -56,7 +73,7 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
   }, [sub_path])
 
   useEffect(() => {
-    if (metalake && catalog && schema && fileset) {
+    if (metalake && catalog && schema && fileset && currentLocation && storageLocations?.[currentLocation]) {
       dispatch(
         getFilesetFiles({
           metalake,
@@ -149,25 +166,16 @@ const ListFiles = ({ metalake, catalog, schema, fileset, storageLocations, defau
     return { columns, minWidth: 100 }
   }, [columns])
 
-  if (!storageLocations || Object.keys(storageLocations).length === 0) {
-    return <p>No storage locations configured</p>
-  }
-
-  if (!currentLocation && defaultLocationName) {
-    setCurrentLocation(defaultLocationName)
-
+  if (!storageLocations) {
     return <Spin />
   }
 
-  if (!currentLocation && Object.keys(storageLocations).length > 0) {
-    const firstLocation = Object.keys(storageLocations)[0]
-    setCurrentLocation(firstLocation)
-
-    return <Spin />
+  if (Object.keys(storageLocations).length === 0) {
+    return <Text type='secondary'>No storage locations configured</Text>
   }
 
-  if (!currentLocation) {
-    return <p>Please select a storage location</p>
+  if (!currentLocation || !storageLocations[currentLocation]) {
+    return <Spin />
   }
 
   const displayedFiles = [...store.tableData] || []

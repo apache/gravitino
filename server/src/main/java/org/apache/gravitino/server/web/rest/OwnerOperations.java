@@ -75,7 +75,7 @@ public class OwnerOperations {
   @ResponseMetered(name = "get-object-owner", absolute = true)
   @AuthorizationExpression(
       expression = CAN_ACCESS_METADATA,
-      errorMessage = "Current user can not get this objects's owner")
+      errorMessage = "Current user cannot get this object's owner")
   public Response getOwnerForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -110,7 +110,7 @@ public class OwnerOperations {
   @ResponseMetered(name = "set-object-owner", absolute = true)
   @AuthorizationExpression(
       expression = CAN_SET_OWNER,
-      errorMessage = "Current user can not set this objects's owner")
+      errorMessage = "Current user cannot set this object's owner")
   public Response setOwnerForObject(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

@@ -39,6 +39,9 @@ from mcp_server.client.plain.plain_rest_client_job_operation import (
 from mcp_server.client.plain.plain_rest_client_model_operation import (
     PlainRESTClientModelOperation,
 )
+from mcp_server.client.plain.plain_rest_client_partition_operation import (
+    PlainRESTClientPartitionOperation,
+)
 from mcp_server.client.plain.plain_rest_client_policy_operation import (
     PlainRESTClientPolicyOperation,
 )
@@ -56,6 +59,9 @@ from mcp_server.client.plain.plain_rest_client_tag_operation import (
 )
 from mcp_server.client.plain.plain_rest_client_topic_operation import (
     PlainRESTClientTopicOperation,
+)
+from mcp_server.client.plain.plain_rest_client_view_operation import (
+    PlainRESTClientViewOperation,
 )
 from mcp_server.client.topic_operation import TopicOperation
 
@@ -109,6 +115,12 @@ class PlainRESTClientOperation(GravitinoOperation):
         self._statistic_operation = PlainRESTClientStatisticOperation(
             metalake_name, _rest_client
         )
+        self._partition_operation = PlainRESTClientPartitionOperation(
+            metalake_name, _rest_client
+        )
+        self._view_operation = PlainRESTClientViewOperation(
+            metalake_name, _rest_client
+        )
 
     async def close(self) -> None:
         """Close the shared httpx client and release its connection pool."""
@@ -143,3 +155,9 @@ class PlainRESTClientOperation(GravitinoOperation):
 
     def as_policy_operation(self) -> PolicyOperation:
         return self._policy_operation
+
+    def as_partition_operation(self):
+        return self._partition_operation
+
+    def as_view_operation(self):
+        return self._view_operation

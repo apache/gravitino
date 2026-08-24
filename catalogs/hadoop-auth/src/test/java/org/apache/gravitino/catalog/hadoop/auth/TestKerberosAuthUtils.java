@@ -21,6 +21,12 @@ package org.apache.gravitino.catalog.hadoop.auth;
 
 import java.io.File;
 import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.security.UserGroupInformation;
@@ -86,6 +92,44 @@ public class TestKerberosAuthUtils {
                     null /* hadoopConf */));
 
     Assertions.assertTrue(exception.getMessage().contains("HDFS"));
+  }
+
+  @Test
+  public void testConcurrentFetchKeytabCreatesParentDirectoryOnce() throws Exception {
+    File source = new File(tempDir, "source.keytab");
+    Files.writeString(source.toPath(), "keytab-content");
+    String sourceUri = source.toURI().toString();
+
+    int threads = 4;
+    int iterations = 200;
+    ExecutorService executor = Executors.newFixedThreadPool(threads);
+    try {
+      for (int i = 0; i < iterations; i++) {
+        File parent = new File(tempDir, "race-" + i + "/keytabs");
+        CyclicBarrier barrier = new CyclicBarrier(threads);
+        List<Future<File>> futures = new ArrayList<>(threads);
+        for (int t = 0; t < threads; t++) {
+          File destination = new File(parent, "destination-" + t + ".keytab");
+          futures.add(
+              executor.submit(
+                  () -> {
+                    barrier.await();
+                    return KerberosAuthUtils.fetchKeytabFromUri(
+                        sourceUri,
+                        destination,
+                        1,
+                        false /* allowHdfsKeytabUri */,
+                        null /* hadoopConf */);
+                  }));
+        }
+        for (Future<File> future : futures) {
+          File fetched = future.get();
+          Assertions.assertTrue(fetched.exists());
+        }
+      }
+    } finally {
+      executor.shutdownNow();
+    }
   }
 
   @Test

@@ -115,6 +115,17 @@ public class TestIcebergCatalog {
   }
 
   @Test
+  public void testShouldValidateWarehouseProperty() {
+    Assertions.assertTrue(
+        IcebergCatalog.shouldValidateWarehouseProperty("rest", "s3://warehouse/"));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateWarehouseProperty("rest", null));
+    Assertions.assertFalse(
+        IcebergCatalog.shouldValidateWarehouseProperty("jdbc", "file:///tmp/iceberg-jdbc"));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateWarehouseProperty("rest", "   "));
+    Assertions.assertFalse(IcebergCatalog.shouldValidateWarehouseProperty(null, "s3://warehouse/"));
+  }
+
+  @Test
   void testCatalogProperty() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();

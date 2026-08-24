@@ -87,6 +87,7 @@ public class IcebergConfigOperations {
           .add(Endpoint.V1_DELETE_VIEW)
           .add(Endpoint.V1_RENAME_VIEW)
           .add(Endpoint.V1_VIEW_EXISTS)
+          .add(Endpoint.V1_REGISTER_VIEW)
           .build();
 
   @Inject

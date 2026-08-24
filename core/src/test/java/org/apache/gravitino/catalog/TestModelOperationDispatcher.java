@@ -65,16 +65,16 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
 
     modelOperationDispatcher =
-        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new ModelOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
   }
 
   @Test
   public void testRegisterAndGetModel() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -105,7 +105,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testRegisterAndListModels() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName1 = randomModelName();
@@ -129,7 +129,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testRegisterAndDeleteModel() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -151,7 +151,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndGetModelVersion() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -202,7 +202,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndListModelVersion() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -230,7 +230,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndListModelVersionInfos() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -257,7 +257,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndDeleteModelVersion() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -294,7 +294,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndGetModelVersionUriWithoutDefaultUriName() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
     String modelName = randomModelName();
@@ -363,7 +363,7 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   public void testLinkAndGetModelVersionUriWithDefaultUriName() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, schemaName);
-    schemaOperationDispatcher.createSchema(schemaIdent, "comment", null);
+    schemaOperationDispatcher.createSchema(schemaIdent, "comment", ImmutableMap.of("k1", "v1"));
 
     // set default uri name to "n1" at model level
     Map<String, String> modelProps =

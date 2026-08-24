@@ -26,6 +26,7 @@ import com.google.common.base.Preconditions;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
@@ -126,9 +127,11 @@ public class JobManager implements JobOperationDispatcher {
             String.format("Staging directory %s is not accessible", stagingDirPath));
       }
     } else {
-      if (!stagingDir.mkdirs()) {
+      try {
+        Files.createDirectories(stagingDir.toPath());
+      } catch (IOException e) {
         throw new IllegalArgumentException(
-            String.format("Failed to create staging directory %s", stagingDirPath));
+            String.format("Failed to create staging directory %s", stagingDirPath), e);
       }
     }
 
@@ -428,9 +431,12 @@ public class JobManager implements JobOperationDispatcher {
         stagingDir.getAbsolutePath()
             + String.format(JOB_STAGING_DIR, metalake, jobTemplateName, jobId);
     File jobStagingDir = new File(jobStagingPath);
-    if (!jobStagingDir.mkdirs()) {
+    try {
+      Files.createDirectories(jobStagingDir.toPath());
+    } catch (IOException e) {
       throw new RuntimeException(
-          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId));
+          String.format("Failed to create staging directory %s for job %s", jobStagingDir, jobId),
+          e);
     }
 
     // Create a JobTemplate by replacing the template parameters with the jobConf values, and
@@ -459,6 +465,9 @@ public class JobManager implements JobOperationDispatcher {
                     .withCreator(PrincipalUtils.getCurrentPrincipal().getName())
                     .withCreateTime(Instant.now())
                     .build())
+            // A newly submitted job is queued, not started or finished yet.
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
             .build();
 
     try {
@@ -495,32 +504,42 @@ public class JobManager implements JobOperationDispatcher {
     }
 
     // Update the job status to CANCELING
-    JobEntity newJobEntity =
-        JobEntity.builder()
-            .withId(jobEntity.id())
-            .withJobExecutionId(jobEntity.jobExecutionId())
-            .withJobTemplateName(jobEntity.jobTemplateName())
-            .withStatus(JobHandle.Status.CANCELLING)
-            .withNamespace(jobEntity.namespace())
-            .withAuditInfo(
-                AuditInfo.builder()
-                    .withCreator(jobEntity.auditInfo().creator())
-                    .withCreateTime(jobEntity.auditInfo().createTime())
-                    .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                    .withLastModifiedTime(Instant.now())
-                    .build())
-            .build();
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofJob(metalake, jobId),
         LockType.WRITE,
         () -> {
           try {
+            // Re-fetch under the lock rather than reusing the snapshot taken before the
+            // (potentially slow) external cancel call above - a concurrent status poll could
+            // have persisted a real startedAt/finishedAt in that gap, and carrying forward the
+            // stale snapshot would clobber it back to the sentinel.
+            JobEntity latestJobEntity = getJob(metalake, jobId);
+            JobEntity newJobEntity =
+                JobEntity.builder()
+                    .withId(latestJobEntity.id())
+                    .withJobExecutionId(latestJobEntity.jobExecutionId())
+                    .withJobTemplateName(latestJobEntity.jobTemplateName())
+                    .withStatus(JobHandle.Status.CANCELLING)
+                    .withNamespace(latestJobEntity.namespace())
+                    .withAuditInfo(
+                        AuditInfo.builder()
+                            .withCreator(latestJobEntity.auditInfo().creator())
+                            .withCreateTime(latestJobEntity.auditInfo().createTime())
+                            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                            .withLastModifiedTime(Instant.now())
+                            .build())
+                    // CANCELLING is not a terminal state; carry forward whatever
+                    // startedAt/finishedAt the job already had.
+                    .withStartedAt(latestJobEntity.startedAt())
+                    .withFinishedAt(latestJobEntity.finishedAt())
+                    .build();
+
             // Update the job entity in the entity store
             entityStore.put(newJobEntity, true /* overwrite */);
             return newJobEntity;
           } catch (IOException e) {
             throw new RuntimeException(
-                String.format("Failed to update job entity %s to CANCELING status", newJobEntity),
+                String.format("Failed to update job entity for job %s to CANCELING status", jobId),
                 e);
           }
         });
@@ -582,6 +601,30 @@ public class JobManager implements JobOperationDispatcher {
             }
 
             if (newStatus != job.status()) {
+              boolean isStarted = newStatus == JobHandle.Status.STARTED;
+              boolean isFinished =
+                  newStatus == JobHandle.Status.SUCCEEDED
+                      || newStatus == JobHandle.Status.FAILED
+                      || newStatus == JobHandle.Status.CANCELLED;
+
+              // Only a directly-observed STARTED transition is trustworthy evidence of when a
+              // job started. SUCCEEDED/FAILED do not prove the job ever reached STARTED: FAILED
+              // in particular can be reached directly from QUEUED (e.g. NoSuchJobException from
+              // the executor, or LocalJobExecutor failing before it records STARTED), and even
+              // for SUCCEEDED, backfilling startedAt from the queued time would understate queue
+              // latency and overstate execution duration in any derived metric. So startedAt is
+              // left unset unless a STARTED transition was actually observed.
+              //
+              // Only stamp startedAt on the first STARTED observation (job.startedAt() <= 0).
+              // A CANCELLING job already carries forward a real startedAt from cancelJob, and
+              // since cancellation is asynchronous, a poll can still observe STARTED while
+              // cancellation is in flight - overwriting the recorded start time with this later
+              // poll timestamp would lose the accurate value.
+              long startedAt =
+                  isStarted && job.startedAt() <= 0
+                      ? Instant.now().toEpochMilli()
+                      : job.startedAt();
+
               JobEntity newJobEntity =
                   JobEntity.builder()
                       .withId(job.id())
@@ -596,6 +639,8 @@ public class JobManager implements JobOperationDispatcher {
                               .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
                               .withLastModifiedTime(Instant.now())
                               .build())
+                      .withStartedAt(startedAt)
+                      .withFinishedAt(isFinished ? Instant.now().toEpochMilli() : job.finishedAt())
                       .build();
 
               // Update the job entity with new status.

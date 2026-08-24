@@ -55,3 +55,36 @@ class TableOperation(ABC):
             str: JSON-formatted string containing full table metadata
         """
         pass
+
+    @abstractmethod
+    # pylint: disable=too-many-positional-arguments
+    async def create_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        name: str,
+        comment: str,
+        columns: list,
+        properties: dict,
+        partitioning: list = None,
+        distribution: dict = None,
+        sort_orders: list = None,
+        indexes: list = None,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def alter_table(
+        self,
+        catalog_name: str,
+        schema_name: str,
+        table_name: str,
+        updates: list,
+    ) -> str:
+        pass
+
+    @abstractmethod
+    async def drop_table(
+        self, catalog_name: str, schema_name: str, table_name: str, purge: bool
+    ) -> str:
+        pass

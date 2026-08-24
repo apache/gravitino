@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, loginApi, basicLoginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
@@ -98,6 +98,36 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   return { token: access_token, expired: expires_in }
 })
 
+export const basicLoginAction = createAsyncThunk(
+  'auth/basicLoginAction',
+  async ({ username, password, router }, { dispatch }) => {
+    const basicToken = `Basic ${btoa(`${username}:${password}`)}`
+
+    const [err, res] = await to(basicLoginApi(basicToken))
+
+    if (err || !res) {
+      const message =
+        err?.response?.status === 401 ? 'Invalid username or password' : err?.response?.data?.err || err?.message
+
+      toast.error(message, {
+        id: `global_error_message_status_${err?.response?.status}`
+      })
+
+      throw new Error(message)
+    }
+
+    sessionStorage.setItem('accessToken', basicToken)
+    sessionStorage.setItem('isIdle', false)
+    sessionStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
+
+    dispatch(setAuthToken(basicToken))
+    await dispatch(initialVersion())
+    router.push('/metalakes')
+
+    return { token: basicToken, expired: '' }
+  }
+)
+
 export const logoutAction = createAsyncThunk(
   'auth/logoutAction',
   async ({ router, reason }, { getState, dispatch }) => {
@@ -144,24 +174,28 @@ export const logoutAction = createAsyncThunk(
       } catch (error) {
         console.warn('[Logout Action] Provider cleanup failed:', error)
       }
-
-      // Clear legacy auth tokens
-      localStorage.removeItem('accessToken')
-      localStorage.removeItem('authParams')
-      localStorage.removeItem('expiredIn')
-      localStorage.removeItem('version')
-
-      dispatch(clearIntervalId())
-      dispatch(setAuthToken(''))
     }
+
+    // Clear legacy auth tokens (local and session storage) after provider cleanup
+    localStorage.removeItem('accessToken')
+    sessionStorage.removeItem('accessToken')
+
+    localStorage.removeItem('authParams')
+    sessionStorage.removeItem('authParams')
+
+    localStorage.removeItem('expiredIn')
+    sessionStorage.removeItem('expiredIn')
+
+    localStorage.removeItem('version')
+    sessionStorage.removeItem('version')
+
+    dispatch(clearIntervalId())
+    dispatch(setAuthToken(''))
 
     // Always clear authUser in Redux and sessionStorage on logout
     // This ensures consistent behavior for both OAuth and simple auth
     dispatch(setAuthUser(null))
     sessionStorage.removeItem('simpleAuthToken')
-
-    // Clear persisted authType to avoid stale auth mode on next visit
-    localStorage.removeItem('authType')
 
     // Reset provider factory to ensure clean state for next login
     oauthProviderFactory.reset()
@@ -194,10 +228,15 @@ export const authSlice = createSlice({
   name: 'auth',
   initialState: {
     oauthUrl: null,
-    authType: null,
-    authToken: null,
-    authParams: null,
-    expiredIn: null,
+    authType: typeof window !== 'undefined' ? localStorage.getItem('authType') : null,
+    authToken:
+      typeof window !== 'undefined'
+        ? localStorage.getItem('authType') === 'basic'
+          ? sessionStorage.getItem('accessToken')
+          : localStorage.getItem('accessToken')
+        : null,
+    authParams: typeof window !== 'undefined' ? localStorage.getItem('authParams') : null,
+    expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
     intervalId: null,
     anthEnable: null,
     serviceAdmins: null,

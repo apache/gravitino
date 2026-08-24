@@ -43,6 +43,7 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
@@ -1095,6 +1096,21 @@ public class ExceptionHandlers {
 
       String errorMsg =
           getBaseErrorMsg(formattedObject, op.name(), formattedParent, getErrorMsg(e));
+
+      // A backend a catalog federates to being unreachable is a downstream-dependency failure, not
+      // an internal Gravitino error: surface it as 502 Bad Gateway so callers can tell a dependency
+      // outage from a server bug.
+      if (e instanceof ConnectionFailedException) {
+        // WARN, not ERROR: a dependency outage is not a Gravitino bug, but still trace it here.
+        LOG.warn(errorMsg, e);
+        return Utils.connectionFailed(errorMsg, e);
+      }
+
+      if (e instanceof OptimisticLockException) {
+        LOG.warn(errorMsg, e);
+        return Utils.optimisticLockConflict(errorMsg, e);
+      }
+
       LOG.error(errorMsg, e);
       return Utils.internalError(errorMsg, e);
     }

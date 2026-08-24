@@ -100,7 +100,7 @@ Once all configurations have been correctly set, restart the Hive cluster to app
 
 ## Create Tables or Databases with S3 Storage Using Gravitino
 
-Assuming you have already set up a Hive catalog with Gravitino, you can proceed to create tables or databases using S3 storage. For more information on catalog operations, refer to [Catalog operations](./manage-fileset-metadata-using-gravitino.md#catalog-operations)
+Assuming you have already set up a Hive catalog with Gravitino, you can proceed to create tables or databases using S3 storage. For more information on catalog operations, refer to [Catalog operations](./manage-catalogs-and-schemas.md#catalog-operations)
 
 ### Example: Creating a Database with S3 Storage
 

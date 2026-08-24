@@ -34,6 +34,7 @@ import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.IdGenerator;
 
 /**
@@ -56,15 +57,18 @@ public class FunctionOperationDispatcher extends OperationDispatcher implements 
    * Creates a new FunctionOperationDispatcher instance.
    *
    * @param catalogManager The CatalogManager instance to be used for function operations.
+   * @param schemaOps The SchemaOperationDispatcher used to validate schema existence.
    * @param store The EntityStore instance to be used for function operations.
    * @param idGenerator The IdGenerator instance to be used for function operations.
+   * @param secretManager The SecretManager instance to be used for secret operations.
    */
   public FunctionOperationDispatcher(
       CatalogManager catalogManager,
       SchemaOperationDispatcher schemaOps,
       EntityStore store,
-      IdGenerator idGenerator) {
-    super(catalogManager, store, idGenerator);
+      IdGenerator idGenerator,
+      SecretManager secretManager) {
+    super(catalogManager, store, idGenerator, secretManager);
     this.schemaOps = schemaOps;
     this.managedFunctionOps = new ManagedFunctionOperations(store, idGenerator);
   }

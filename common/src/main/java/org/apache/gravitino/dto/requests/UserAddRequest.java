@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import javax.annotation.Nullable;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -39,9 +40,17 @@ public class UserAddRequest implements RESTRequest {
   @JsonProperty("name")
   private final String name;
 
+  @Nullable
+  @JsonProperty("externalId")
+  private final String externalId;
+
+  @Nullable
+  @JsonProperty("enabled")
+  private final Boolean enabled;
+
   /** Default constructor for UserAddRequest. (Used for Jackson deserialization.) */
   public UserAddRequest() {
-    this(null);
+    this(null, null, null);
   }
 
   /**
@@ -50,8 +59,21 @@ public class UserAddRequest implements RESTRequest {
    * @param name The name of the user.
    */
   public UserAddRequest(String name) {
+    this(name, null, null);
+  }
+
+  /**
+   * Creates a new UserAddRequest.
+   *
+   * @param name The name of the user.
+   * @param externalId The external identifier of the user.
+   * @param enabled Whether the user is enabled.
+   */
+  public UserAddRequest(String name, String externalId, Boolean enabled) {
     super();
     this.name = name;
+    this.externalId = externalId;
+    this.enabled = enabled;
   }
 
   /**
@@ -63,5 +85,9 @@ public class UserAddRequest implements RESTRequest {
   public void validate() throws IllegalArgumentException {
     Preconditions.checkArgument(
         StringUtils.isNotBlank(name), "\"name\" field is required and cannot be empty");
+    if (externalId != null) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(externalId), "\"externalId\" field cannot be blank when provided");
+    }
   }
 }

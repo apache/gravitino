@@ -359,7 +359,7 @@ class RelationalCatalog extends BaseSchemaCatalog
             ErrorHandlers.viewErrorHandler());
     resp.validate();
 
-    return resp.getView();
+    return new GenericView(resp.getView(), restClient, fullNamespace);
   }
 
   /**
@@ -415,7 +415,7 @@ class RelationalCatalog extends BaseSchemaCatalog
             ErrorHandlers.viewErrorHandler());
     resp.validate();
 
-    return resp.getView();
+    return new GenericView(resp.getView(), restClient, fullNamespace);
   }
 
   /**
@@ -449,7 +449,7 @@ class RelationalCatalog extends BaseSchemaCatalog
             ErrorHandlers.viewErrorHandler());
     resp.validate();
 
-    return resp.getView();
+    return new GenericView(resp.getView(), restClient, fullNamespace);
   }
 
   /**

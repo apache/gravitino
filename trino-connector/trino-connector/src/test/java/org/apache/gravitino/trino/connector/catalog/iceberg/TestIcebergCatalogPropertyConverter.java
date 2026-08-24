@@ -58,6 +58,33 @@ public class TestIcebergCatalogPropertyConverter {
   }
 
   @Test
+  public void testRestBackendProperty() {
+    PropertyConverter propertyConverter = new IcebergCatalogPropertyConverter();
+    Map<String, String> gravitinoIcebergConfig =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "http://localhost:9001/iceberg")
+            .put("catalog-backend", "rest")
+            .put("warehouse", "gt_iceberg_rest")
+            .build();
+    Map<String, String> restBackendConfig =
+        propertyConverter.gravitinoToEngineProperties(gravitinoIcebergConfig);
+
+    Assertions.assertEquals(restBackendConfig.get("iceberg.catalog.type"), "rest");
+    Assertions.assertEquals(
+        restBackendConfig.get("iceberg.rest-catalog.uri"), "http://localhost:9001/iceberg");
+    Assertions.assertEquals(
+        restBackendConfig.get("iceberg.rest-catalog.warehouse"), "gt_iceberg_rest");
+
+    Map<String, String> wrongMap = Maps.newHashMap(gravitinoIcebergConfig);
+    wrongMap.remove("uri");
+
+    Assertions.assertThrows(
+        TrinoException.class,
+        () -> propertyConverter.gravitinoToEngineProperties(wrongMap),
+        "Missing required property for Rest backend: [uri]");
+  }
+
+  @Test
   public void testJDBCBackendProperty() {
     PropertyConverter propertyConverter = new IcebergCatalogPropertyConverter();
     Map<String, String> gravitinoIcebergConfig =

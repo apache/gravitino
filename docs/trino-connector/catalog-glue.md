@@ -166,9 +166,9 @@ WITH (
 );
 ```
 
-| Property   | Description              | Default Value | Required | Since Version |
-|------------|--------------------------|---------------|----------|---------------|
-| `location` | S3 location for the schema | (none)      | No       | 1.3.0         |
+| Property   | Description                | Default Value | Required |
+|------------|----------------------------|---------------|----------|
+| `location` | S3 location for the schema | (none)        | No       |
 
 ### Create a Table with Properties
 
@@ -188,15 +188,15 @@ CREATE TABLE glue_test.db01.table_name
 );
 ```
 
-| Property        | Description                                                                 | Default Value | Required | Since Version |
-|-----------------|-----------------------------------------------------------------------------|---------------|----------|---------------|
-| `type`          | Table format: `HIVE` or `ICEBERG`                                           | `HIVE`        | No       | 1.3.0         |
-| `format`        | File format for Hive-format tables: `PARQUET`, `ORC`, `TEXTFILE`, etc.      | `TEXTFILE`    | No       | 1.3.0         |
-| `location`      | S3 storage location for the table                                           | (derived from catalog `warehouse`) | No | 1.3.0 |
-| `partitioned_by`| Partition columns or expressions. For Iceberg, use transform syntax such as `year(col)`. | (none) | No | 1.3.0 |
-| `bucketed_by`   | Bucket columns (Hive-format tables only)                                    | (none)        | No       | 1.3.0         |
-| `bucket_count`  | Number of buckets (required when `bucketed_by` is set)                      | (none)        | No       | 1.3.0         |
-| `sorted_by`     | Sort order columns, e.g. `ARRAY['col ASC NULLS LAST', 'col2 DESC']`        | (none)        | No       | 1.3.0         |
+| Property         | Description                                                                              | Default Value                      | Required |
+|------------------|------------------------------------------------------------------------------------------|------------------------------------|----------|
+| `type`           | Table format: `HIVE` or `ICEBERG`                                                        | `HIVE`                             | No       |
+| `format`         | File format for Hive-format tables: `PARQUET`, `ORC`, `TEXTFILE`, etc.                   | `TEXTFILE`                         | No       |
+| `location`       | S3 storage location for the table                                                        | (derived from catalog `warehouse`) | No       |
+| `partitioned_by` | Partition columns or expressions. For Iceberg, use transform syntax such as `year(col)`. | (none)                             | No       |
+| `bucketed_by`    | Bucket columns (Hive-format tables only)                                                 | (none)                             | No       |
+| `bucket_count`   | Number of buckets (required when `bucketed_by` is set)                                   | (none)                             | No       |
+| `sorted_by`      | Sort order columns, e.g. `ARRAY['col ASC NULLS LAST', 'col2 DESC']`                      | (none)                             | No       |
 
 ## Examples
 

@@ -20,8 +20,6 @@
 package org.apache.gravitino.cache;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.Maps;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -30,35 +28,13 @@ import org.apache.gravitino.Entity;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.utils.TestUtil;
 
 public class BenchmarkHelper {
-  public static final int RELATION_CNT = 5;
   private static final Random random = new Random();
 
   private BenchmarkHelper() {
     // Utility class, no constructor needed
-  }
-
-  /**
-   * Generates a map of entities with their relations.
-   *
-   * @param entityCnt the count of entities to generate.
-   * @return a map of entities with their relations.
-   * @param <E> the type of the entity.
-   */
-  public static <E extends Entity & HasIdentifier> Map<RoleEntity, List<E>> getRelationEntities(
-      int entityCnt) {
-    Map<RoleEntity, List<E>> entitiesWithRelations = Maps.newHashMap();
-    for (int i = 0; i < entityCnt; i++) {
-      RoleEntity testRoleEntity = TestUtil.getTestRoleEntity();
-      int userCnt = random.nextInt(RELATION_CNT);
-      List<E> userList = BaseEntityCache.convertEntities(getUserList(testRoleEntity, userCnt));
-      entitiesWithRelations.put(testRoleEntity, userList);
-    }
-
-    return entitiesWithRelations;
   }
 
   /**
@@ -116,16 +92,5 @@ public class BenchmarkHelper {
     Preconditions.checkArgument(entity != null, "Entity cannot be null");
     Preconditions.checkArgument(
         entity instanceof HasIdentifier, "Unsupported EntityType: " + entity.type());
-  }
-
-  private static List<Entity> getUserList(RoleEntity roleEntity, int userCnt) {
-    List<Entity> userList = new ArrayList<>(userCnt);
-    List<Long> roleIds = ImmutableList.of(roleEntity.id());
-
-    for (int i = 0; i < userCnt; i++) {
-      userList.add(TestUtil.getTestUserEntity(roleIds));
-    }
-
-    return userList;
   }
 }

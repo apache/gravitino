@@ -22,13 +22,17 @@ import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitive;
 import static org.apache.gravitino.catalog.CapabilityHelpers.applyCaseSensitiveOnName;
 import static org.apache.gravitino.catalog.CapabilityHelpers.getCapability;
 
-import java.util.Arrays;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.rel.partitions.Partition;
 
+/**
+ * Note on list operations: names returned by list methods (e.g. {@link
+ * #listPartitionNames(NameIdentifier)}, {@link #listPartitions(NameIdentifier)}) are assumed to
+ * already be in their canonical, legal form and are not re-normalized here.
+ */
 public class PartitionNormalizeDispatcher implements PartitionDispatcher {
   private final CatalogManager catalogManager;
   private final PartitionDispatcher dispatcher;
@@ -42,23 +46,15 @@ public class PartitionNormalizeDispatcher implements PartitionDispatcher {
   @Override
   public String[] listPartitionNames(NameIdentifier tableIdent) {
     Capability capabilities = getCapability(tableIdent, catalogManager);
-    String[] partitionNames =
-        dispatcher.listPartitionNames(
-            applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities));
-    return Arrays.stream(partitionNames)
-        .map(
-            partitionName ->
-                applyCaseSensitiveOnName(Capability.Scope.PARTITION, partitionName, capabilities))
-        .toArray(String[]::new);
+    return dispatcher.listPartitionNames(
+        applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities));
   }
 
   @Override
   public Partition[] listPartitions(NameIdentifier tableIdent) {
     Capability capabilities = getCapability(tableIdent, catalogManager);
-    Partition[] partitions =
-        dispatcher.listPartitions(
-            CapabilityHelpers.applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities));
-    return applyCaseSensitive(partitions, capabilities);
+    return dispatcher.listPartitions(
+        CapabilityHelpers.applyCaseSensitive(tableIdent, Capability.Scope.TABLE, capabilities));
   }
 
   @Override

@@ -54,6 +54,11 @@ public class TestDorisUtils {
     result = DorisUtils.generatePropertiesSql(properties);
     assertEquals(" PROPERTIES (\n\"key\"=\"value\"\n)", result);
 
+    properties = Collections.singletonMap("key\"name", "owner's \"comment\" C:\\tmp; --");
+    result = DorisUtils.generatePropertiesSql(properties);
+    assertEquals(
+        " PROPERTIES (\n\"key\"\"name\"=\"owner's \"\"comment\"\" C:\\\\tmp; --\"\n)", result);
+
     // Test when properties has multiple entries
     properties = new HashMap<>();
     properties.put("key1", "value1");
@@ -92,6 +97,22 @@ public class TestDorisUtils {
     result = DorisUtils.extractPropertiesFromSql(createTableSql);
     assertEquals("value1", result.get("property1"));
     assertEquals("comment", result.get("comment"));
+
+    // Escaped SHOW CREATE output (doubled quotes and backslashes, as generatePropertiesSql
+    // emits) round-trips back to the original key/value text.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n"
+            + "\"key\"\"name\" = \"owner's \"\"comment\"\" D:\\\\data; --\"\n)";
+    result = DorisUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner's \"comment\" D:\\data; --", result.get("key\"name"));
+
+    // Backslash-style escaping (\" and \\) is unescaped too, and a lone backslash before an
+    // ordinary character passes through unchanged.
+    createTableSql =
+        "CREATE DATABASE `test`\nPROPERTIES (\n"
+            + "\"plain\" = \"owner\\\\s \\\"comment\\\" D:\\data; --\"\n)";
+    result = DorisUtils.extractPropertiesFromSql(createTableSql);
+    assertEquals("owner\\s \"comment\" D:\\data; --", result.get("plain"));
   }
 
   @Test
@@ -113,6 +134,27 @@ public class TestDorisUtils {
     // test multi-column list partition
     createTableSql =
         "CREATE TABLE `testTable` (\n`col1` date NOT NULL,\n`col2` int(11) NOT NULL\n) ENGINE=OLAP\n PARTITION BY LIST(`col1`, `col2`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertTrue(transform.isPresent());
+    assertEquals(Transforms.list(new String[][] {{"col1"}, {"col2"}}), transform.get());
+
+    // test range partition with space (Doris 3.0+ SHOW CREATE TABLE format)
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL\n) ENGINE=OLAP\n PARTITION BY RANGE (`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertTrue(transform.isPresent());
+    assertEquals(Transforms.range(new String[] {"col1"}), transform.get());
+
+    // test list partition with space (Doris 3.0+ SHOW CREATE TABLE format)
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` int(11) NOT NULL\n) ENGINE=OLAP\n PARTITION BY LIST (`col1`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
+    transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
+    assertTrue(transform.isPresent());
+    assertEquals(Transforms.list(new String[][] {{"col1"}}), transform.get());
+
+    // test multi-column list partition with space
+    createTableSql =
+        "CREATE TABLE `testTable` (\n`col1` date NOT NULL,\n`col2` int(11) NOT NULL\n) ENGINE=OLAP\n PARTITION BY LIST (`col1`, `col2`)\n()\n DISTRIBUTED BY HASH(`col1`) BUCKETS 2";
     transform = DorisUtils.extractPartitionInfoFromSql(createTableSql);
     assertTrue(transform.isPresent());
     assertEquals(Transforms.list(new String[][] {{"col1"}, {"col2"}}), transform.get());

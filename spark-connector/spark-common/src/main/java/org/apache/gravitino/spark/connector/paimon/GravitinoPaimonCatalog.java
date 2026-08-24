@@ -27,14 +27,20 @@ import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
+import org.apache.paimon.catalog.Catalog;
 import org.apache.paimon.spark.SparkCatalog;
+import org.apache.paimon.spark.SparkProcedures;
 import org.apache.paimon.spark.SparkTable;
+import org.apache.paimon.spark.analysis.NoSuchProcedureException;
+import org.apache.paimon.spark.catalog.ProcedureCatalog;
+import org.apache.paimon.spark.procedure.Procedure;
+import org.apache.paimon.spark.procedure.ProcedureBuilder;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 
-public class GravitinoPaimonCatalog extends BaseCatalog {
+public class GravitinoPaimonCatalog extends BaseCatalog implements ProcedureCatalog {
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -83,5 +89,22 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
     return gravitinoCatalogClient
         .asTableCatalog()
         .purgeTable(NameIdentifier.of(getDatabase(ident), ident.name()));
+  }
+
+  /**
+   * Procedures will validate the equality of the catalog registered to Spark catalogManager and the
+   * catalog passed to {@code ProcedureBuilder} which invokes {@code loadProcedure()}. To meet the
+   * requirement, override the method to pass {@code GravitinoPaimonCatalog} to the {@code
+   * ProcedureBuilder} instead of the internal spark catalog.
+   */
+  @Override
+  public Procedure loadProcedure(Identifier identifier) throws NoSuchProcedureException {
+    if (Catalog.SYSTEM_DATABASE_NAME.equals(identifier.namespace()[0])) {
+      ProcedureBuilder builder = SparkProcedures.newBuilder(identifier.name());
+      if (builder != null) {
+        return builder.withTableCatalog(this).build();
+      }
+    }
+    throw new NoSuchProcedureException(identifier);
   }
 }

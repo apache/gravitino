@@ -105,10 +105,13 @@ class CatalogUpdateRequest:
             if not self._value:
                 raise ValueError('"value" field is required and cannot be empty')
 
+    @dataclass
     class RemoveCatalogPropertyRequest(CatalogUpdateRequestBase):
         """Request to remove a property from a catalog."""
 
-        property: Optional[str] = None
+        _property: Optional[str] = field(
+            default=None, metadata=config(field_name="property")
+        )
         """The property to remove."""
 
         def __init__(self, catalog_property: str):

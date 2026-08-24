@@ -110,7 +110,7 @@ To manage table and partition statistics, see [Manage statistics in Gravitino](.
 If you want to automate table maintenance workflows, see [Table Maintenance Service (Optimizer)](./table-maintenance-service/optimizer.md).
 Start with Gravitino built-in policies and built-in job templates, and extend via optimizer interfaces when needed.
 
-Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image since 1.2.0.  In 1.2.0, Gravitino introduces 
+Catalogs with an asterisk (\*) aren’t in the standard release tarball and Docker image.  Gravitino provides a
 folder `catalogs-contrib` to host the contributed catalogs, which aren’t in the standard release but can be built and used separately. See [how to build Gravitino](./how-to-build.md#quick-start) for details.
 
 ## Apache Gravitino Playground
@@ -212,7 +212,7 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 
 * [HTTPS](./security/how-to-use-https.md): provides HTTPS configurations.
 * [Authentication](./security/how-to-authenticate.md): provides authentication configurations including simple, basic, OAuth, and Kerberos.
-* [Built-in IDP](./security/how-to-use-built-in-idp.md): operator guide for the built-in identity provider (`idp-basic` plugin), including service admin setup and `/api/idp` management APIs.
+* [Local users and groups](./security/local-users-and-groups.md): operator guide for the local user store behind HTTP Basic authentication, including service admin setup and `/api/idp` management APIs.
 * [Access Control](./security/access-control.md): provides access control configurations.
 * [CORS](./security/how-to-use-cors.md): provides CORS configurations.
 

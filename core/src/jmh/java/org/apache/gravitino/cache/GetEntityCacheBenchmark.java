@@ -19,57 +19,27 @@
 
 package org.apache.gravitino.cache;
 
-import java.util.List;
-import java.util.Optional;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.HasIdentifier;
-import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.meta.ModelEntity;
-import org.apache.gravitino.meta.RoleEntity;
 import org.openjdk.jmh.annotations.Benchmark;
 
 /**
  * EntityCacheGetBenchmark benchmarks the performance of the {@link EntityCache#getIfPresent}
- * operation for both individual entities and entity relations.
+ * operation for individual entities.
  *
  * <p>This benchmark measures the efficiency of cache lookups under varying data sizes (e.g., 10,
  * 100, 1000 entries), helping evaluate the speed and consistency of the cache's get operations.
  *
- * <p>It includes two benchmark methods:
- *
- * <ul>
- *   <li>{@code benchmarkGet}: Retrieves a {@link ModelEntity} by its identifier and type.
- *   <li>{@code benchmarkGetWithRelations}: Retrieves a list of related entities (e.g., users under
- *       a role) using a relation type and a {@link RoleEntity} as the lookup key.
- * </ul>
- *
- * @param <E> the type of related entity, extending {@link Entity} and implementing {@link
- *     HasIdentifier}
  * @see org.apache.gravitino.cache.EntityCache
  * @see org.openjdk.jmh.annotations.Benchmark
  */
-public class GetEntityCacheBenchmark<E extends Entity & HasIdentifier>
-    extends AbstractEntityBenchmark {
+public class GetEntityCacheBenchmark extends AbstractEntityBenchmark {
 
   @Benchmark
   public Entity benchmarkGet() {
     int idx = random.nextInt(entities.size());
-    ModelEntity sampleEntity = (ModelEntity) entities.get(idx);
+    ModelEntity sampleEntity = entities.get(idx);
 
     return cache.getIfPresent(sampleEntity.nameIdentifier(), sampleEntity.type()).orElse(null);
-  }
-
-  @Benchmark
-  @SuppressWarnings("unchecked")
-  public List<E> benchmarkGetWithRelations() {
-    RoleEntity sampleRoleEntity = (RoleEntity) BenchmarkHelper.getRandomKey(entitiesWithRelations);
-
-    Optional<List<E>> relationFromCache =
-        cache.getIfPresent(
-            SupportsRelationOperations.Type.ROLE_USER_REL,
-            sampleRoleEntity.nameIdentifier(),
-            sampleRoleEntity.type());
-
-    return relationFromCache.orElse(null);
   }
 }

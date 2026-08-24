@@ -136,6 +136,22 @@ public class Utils {
         .build();
   }
 
+  /**
+   * Creates an HTTP conflict response for a failed optimistic-lock update.
+   *
+   * @param message the conflict message
+   * @param throwable the conflict exception
+   * @return the HTTP conflict response
+   */
+  public static Response optimisticLockConflict(String message, Throwable throwable) {
+    return Response.status(Response.Status.CONFLICT)
+        .entity(
+            ErrorResponse.optimisticLockConflict(
+                throwable.getClass().getSimpleName(), message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
   public static Response notInUse(String message, Throwable throwable) {
     return notInUse(throwable.getClass().getSimpleName(), message, throwable);
   }

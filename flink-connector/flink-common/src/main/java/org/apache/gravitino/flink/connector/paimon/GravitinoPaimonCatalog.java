@@ -28,7 +28,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.CatalogBaseTable;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -45,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
+import org.apache.gravitino.flink.connector.utils.PropertyUtils;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -53,9 +53,14 @@ import org.apache.gravitino.rel.expressions.NamedReference;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
+import org.apache.hadoop.conf.Configuration;
+import org.apache.paimon.catalog.CatalogContext;
 import org.apache.paimon.catalog.Identifier;
 import org.apache.paimon.flink.FlinkCatalog;
 import org.apache.paimon.flink.FlinkCatalogFactory;
+import org.apache.paimon.flink.FlinkFileIOLoader;
+import org.apache.paimon.fs.FileIOLoader;
+import org.apache.paimon.options.Options;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,10 +79,15 @@ import org.slf4j.LoggerFactory;
 public class GravitinoPaimonCatalog extends BaseCatalog {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoPaimonCatalog.class);
+  private static final String PAIMON_S3_ACCESS_KEY_ALIAS = "s3.access.key";
+  private static final String PAIMON_S3_SECRET_KEY_ALIAS = "s3.secret.key";
+  private static final String HADOOP_S3_ENDPOINT = "fs.s3a.endpoint";
+  private static final String HADOOP_S3_ACCESS_KEY = "fs.s3a.access.key";
+  private static final String HADOOP_S3_SECRET_KEY = "fs.s3a.secret.key";
 
   private final CatalogFactory.Context context;
-  // Mutable copy shared with BaseCatalog.catalogOptions so credential injection in open() is
-  // visible to the inner Paimon catalog context.
+  // Mutable copy shared with BaseCatalog.catalogOptions. The inner Paimon catalog is created from a
+  // sanitized copy so Hadoop-prefixed options can be moved to Hadoop configuration before logging.
   private final Map<String, String> mutableOptions;
   private AbstractCatalog paimonCatalog;
 
@@ -129,9 +139,11 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
       super.open();
       return;
     }
+    Map<String, String> paimonOptions = new HashMap<>(mutableOptions);
+    Configuration hadoopConf = PropertyUtils.extractHadoopConfiguration(paimonOptions);
     try {
       CredentialPropertyUtils.applyPaimonCredentials(
-          CredentialPropertyUtils.getCredentials(catalog()), mutableOptions);
+          CredentialPropertyUtils.getCredentials(catalog()), paimonOptions);
     } catch (NoSuchCatalogException e) {
       LOG.warn(
           "Catalog '{}' not found in Gravitino during open(); credential injection skipped."
@@ -139,31 +151,58 @@ public class GravitinoPaimonCatalog extends BaseCatalog {
           getName(),
           e);
     }
-    CatalogFactory.Context contextWithCredentials =
-        new CatalogFactory.Context() {
-          @Override
-          public String getName() {
-            return context.getName();
-          }
-
-          @Override
-          public Map<String, String> getOptions() {
-            return mutableOptions;
-          }
-
-          @Override
-          public ReadableConfig getConfiguration() {
-            return context.getConfiguration();
-          }
-
-          @Override
-          public ClassLoader getClassLoader() {
-            return context.getClassLoader();
-          }
-        };
-    this.paimonCatalog =
-        (AbstractCatalog) new FlinkCatalogFactory().createCatalog(contextWithCredentials);
+    movePaimonStorageOptionsToConf(paimonOptions, hadoopConf);
+    this.paimonCatalog = createInnerCatalog(paimonOptions, hadoopConf);
     super.open();
+  }
+
+  /**
+   * Creates the inner Paimon Flink catalog from sanitized Paimon options and Hadoop configuration.
+   *
+   * @param paimonOptions Paimon catalog options without Hadoop-prefixed sensitive properties.
+   * @param hadoopConf Hadoop configuration carrying filesystem credentials and Hadoop options.
+   * @return the created inner Paimon catalog.
+   */
+  @VisibleForTesting
+  protected AbstractCatalog createInnerCatalog(
+      Map<String, String> paimonOptions, Configuration hadoopConf) {
+    FileIOLoader preferIOLoader = null;
+    FileIOLoader fallbackIOLoader = new FlinkFileIOLoader();
+    CatalogContext catalogContext =
+        CatalogContext.create(
+            Options.fromMap(paimonOptions), hadoopConf, preferIOLoader, fallbackIOLoader);
+    return (AbstractCatalog)
+        FlinkCatalogFactory.createCatalog(
+            context.getName(), catalogContext, context.getClassLoader());
+  }
+
+  private static void movePaimonStorageOptionsToConf(
+      Map<String, String> paimonOptions, Configuration hadoopConf) {
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.S3_ENDPOINT, HADOOP_S3_ENDPOINT);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PAIMON_S3_ACCESS_KEY_ALIAS, HADOOP_S3_ACCESS_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.S3_ACCESS_KEY, HADOOP_S3_ACCESS_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PAIMON_S3_SECRET_KEY_ALIAS, HADOOP_S3_SECRET_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.S3_SECRET_KEY, HADOOP_S3_SECRET_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.OSS_ACCESS_KEY, PaimonConstants.OSS_ACCESS_KEY);
+    moveOptionToHadoopConf(
+        paimonOptions, hadoopConf, PaimonConstants.OSS_SECRET_KEY, PaimonConstants.OSS_SECRET_KEY);
+  }
+
+  private static void moveOptionToHadoopConf(
+      Map<String, String> paimonOptions,
+      Configuration hadoopConf,
+      String paimonKey,
+      String hadoopKey) {
+    String value = paimonOptions.remove(paimonKey);
+    if (value != null) {
+      hadoopConf.set(hadoopKey, value);
+    }
   }
 
   // ---------------------------------------------------------------------------

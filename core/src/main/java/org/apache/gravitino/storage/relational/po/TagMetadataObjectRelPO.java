@@ -28,6 +28,7 @@ public class TagMetadataObjectRelPO {
   private Long tagId;
   private Long metadataObjectId;
   private String metadataObjectType;
+  private String tagValue;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -49,6 +50,7 @@ public class TagMetadataObjectRelPO {
     return Objects.equal(tagId, tagRelPO.tagId)
         && Objects.equal(metadataObjectId, tagRelPO.metadataObjectId)
         && Objects.equal(metadataObjectType, tagRelPO.metadataObjectType)
+        && Objects.equal(tagValue, tagRelPO.tagValue)
         && Objects.equal(auditInfo, tagRelPO.auditInfo)
         && Objects.equal(currentVersion, tagRelPO.currentVersion)
         && Objects.equal(lastVersion, tagRelPO.lastVersion)
@@ -61,6 +63,7 @@ public class TagMetadataObjectRelPO {
         tagId,
         metadataObjectId,
         metadataObjectType,
+        tagValue,
         auditInfo,
         currentVersion,
         lastVersion,
@@ -86,6 +89,11 @@ public class TagMetadataObjectRelPO {
 
     public Builder withMetadataObjectType(String metadataObjectType) {
       tagRelPO.metadataObjectType = metadataObjectType;
+      return this;
+    }
+
+    public Builder withTagValue(String tagValue) {
+      tagRelPO.tagValue = tagValue;
       return this;
     }
 

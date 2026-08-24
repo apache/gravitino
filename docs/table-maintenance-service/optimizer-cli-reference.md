@@ -1,7 +1,10 @@
 ---
-title: "Optimizer CLI Reference"
+title: "CLI Reference"
 slug: "/table-maintenance-service/optimizer-cli-reference"
-keyword: "table maintenance, optimizer, cli, commands, metrics, statistics"
+keywords:
+  - table maintenance
+  - cli
+  - job template
 license: "This software is licensed under the Apache License version 2."
 ---
 
@@ -24,7 +27,7 @@ directory. Use `--conf-path` only when you need a custom config file.
 | `list-job-metrics` | `--identifiers` | None | Query stored job metrics |
 | `submit-update-stats-job` | `--identifiers` | `--dry-run`, `--update-mode`, `--updater-options`, `--spark-conf` | Submit built-in Iceberg update stats/metrics Spark jobs |
 
-### Option Field Meanings
+## Option Field Meanings
 
 | Option | Meaning | Used by |
 | --- | --- | --- |
@@ -50,7 +53,7 @@ Global option:
 
 `local-stats-calculator` reads JSON Lines (one JSON object per line).
 
-### Reserved Fields
+## Reserved Fields
 
 - `stats-type`: `table`, `partition`, or `job`
 - `identifier`: object identifier
@@ -59,7 +62,7 @@ Global option:
 
 All other fields are treated as metric or statistic values.
 
-### Supported Examples by Scope
+## Supported Examples by Scope
 
 Use JSON Lines (one JSON object per line). The following examples focus on table, partition, and
 job scopes with multiple metric/statistic fields:
@@ -73,7 +76,7 @@ job scopes with multiple metric/statistic fields:
 {"stats-type":"job","identifier":"job-1","timestamp":1735689800,"duration_ms":12500,"rewritten_files":18}
 ```
 
-### Identifier Rules
+## Identifier Rules
 
 - Table and partition records: `catalog.schema.table`
 - If `gravitino.optimizer.gravitinoDefaultCatalog` is set, `schema.table` is also accepted
@@ -81,7 +84,7 @@ job scopes with multiple metric/statistic fields:
 
 ## CLI Workflow Examples
 
-### Batch Statistics Update
+## Batch Statistics Update
 
 Calculate and persist table or partition statistics from JSONL input.
 
@@ -92,7 +95,7 @@ Calculate and persist table or partition statistics from JSONL input.
   --file-path ./table-stats.jsonl
 ```
 
-### Batch Metrics Append
+## Batch Metrics Append
 
 Calculate and append table or job metrics from JSONL input.
 
@@ -103,7 +106,7 @@ Calculate and append table or job metrics from JSONL input.
   --file-path ./table-stats.jsonl
 ```
 
-### Dry-Run Strategy Submission
+## Dry-Run Strategy Submission
 
 Preview recommendations without actually submitting jobs.
 
@@ -116,7 +119,7 @@ Preview recommendations without actually submitting jobs.
   --limit 10
 ```
 
-### Submit Strategy Jobs
+## Submit Strategy Jobs
 
 Submit jobs for identifiers that match the given policy name.
 
@@ -128,7 +131,7 @@ Submit jobs for identifiers that match the given policy name.
   --limit 10
 ```
 
-### Monitor Metrics
+## Monitor Metrics
 
 Evaluate monitor rules around an action time.
 
@@ -156,7 +159,7 @@ When metrics are produced by `submit-update-stats-job --update-mode metrics`, me
 often `custom-*` (for example `custom-data-file-mse`). Use `list-table-metrics` first and
 configure rules with the exact metric names returned by your environment.
 
-### Submit Built-In Update Stats Jobs
+## Submit Built-In Update Stats Jobs
 
 Submit built-in Iceberg update stats/metrics Spark jobs directly.
 
@@ -179,7 +182,7 @@ Notes:
   runtime classpath (for example via `spark.jars` in `--spark-conf`).
 - `--spark-conf` and `--updater-options` are flat JSON maps.
 
-### List Table Metrics
+## List Table Metrics
 
 Query stored metrics at table scope.
 
@@ -198,7 +201,7 @@ For partition scope, provide a partition path JSON array:
   --partition-path '[{"dt":"2026-01-01"}]'
 ```
 
-### List Job Metrics
+## List Job Metrics
 
 Query stored metrics at job scope.
 
@@ -229,10 +232,117 @@ MetricsResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<tab
 EvaluationResult{scopeType=TABLE, identifier=rest_catalog.db.t1, partitionPath=<table-or-job-scope>, evaluation=true, evaluatorName=gravitino-metrics-evaluator, actionTimeSeconds=1735689600, rangeSeconds=86400, beforeMetrics={row_count=[MetricSample{timestampSeconds=1735686000, value=120}]}, afterMetrics={row_count=[MetricSample{timestampSeconds=1735689600, value=100}]}}
 ```
 
+## Built-in Job Templates
+
+Three job templates ship with the service, and they are complementary rather than alternatives. A full maintenance pass collects statistics, compacts data files, and then expires the snapshot history that compaction just created.
+
+| Job template                          | What it does                             |
+|---------------------------------------|-------------------------------------------|
+| `builtin-iceberg-update-stats`        | Collects file statistics and metrics      |
+| `builtin-iceberg-rewrite-data-files`  | Compacts small data files                 |
+| `builtin-iceberg-expire-snapshots`    | Removes old snapshot metadata             |
+
+Each can be submitted directly over REST, and the first two are also what the policy-driven workflow submits on your behalf. See [Quick Start](./optimizer.md#walkthrough) for the policy-driven path.
+
+## Update Statistics
+
+`builtin-iceberg-update-stats` reads a table and writes back the statistics and metrics that policies evaluate. Compaction policies read `custom-data-file-mse` and `custom-delete-file-number`, so nothing else will fire until this job has run at least once.
+
+Its `jobConf` is documented in [Configuration](./optimizer-configuration.md#job-submission-configuration).
+
+## Rewrite Data Files
+
+`builtin-iceberg-rewrite-data-files` performs the compaction itself, merging small data files into larger ones. It is what a compaction policy submits when its thresholds are crossed.
+
+In alpha this works only on Iceberg tables where every partition uses an identity transform. Tables combining identity with a time or bucket transform fail during the rewrite, which is covered in [Troubleshooting](./optimizer-troubleshooting.md#job-execution-failures).
+
+For the policy that drives it, including threshold tuning, see [Iceberg Compaction Policy](../iceberg-compaction-policy.md).
+
+## Expire Snapshots
+
+`builtin-iceberg-expire-snapshots` removes old Iceberg snapshots and the metadata files behind them. Without periodic expiration, snapshot JSON files and manifest lists accumulate indefinitely, which slows table operations and wastes storage. Compaction makes this worse, since every rewrite creates a snapshot.
+
+The job calls Iceberg's `expire_snapshots` stored procedure through Spark SQL.
+
+| Property    | Value                                                                       |
+|-------------|-----------------------------------------------------------------------------|
+| Name        | `builtin-iceberg-expire-snapshots`                                          |
+| Type        | Spark                                                                       |
+| Version     | `v1`                                                                        |
+| Main class  | `org.apache.gravitino.maintenance.jobs.iceberg.IcebergExpireSnapshotsJob`   |
+
+## Parameters
+
+`catalog_name` and `table_identifier` are required. The rest are optional.
+
+| Key              | Description                                                          | Default                     |
+|------------------|-----------------------------------------------------------------------|-----------------------------|
+| `catalog_name`   | Iceberg catalog name as registered in Spark                          | Required                    |
+| `table_identifier` | Fully qualified table name, such as `db.sample`                    | Required                    |
+| `older_than`     | Expire snapshots older than this `yyyy-MM-dd HH:mm:ss` timestamp     | Five days ago               |
+| `retain_last`    | Minimum number of recent snapshots to keep regardless of age         | `1`                         |
+| `stream_results` | Streams intermediate delete results when present                     | Disabled                    |
+| `spark_conf`     | JSON map of Spark configuration                                      | None                        |
+
+`older_than` and `retain_last` work together, and `retain_last` wins. Setting `older_than` to yesterday with `retain_last` at `5` keeps five snapshots even if all five are older than yesterday.
+
+## Submitting the Job
+
+```bash
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobTemplateName": "builtin-iceberg-expire-snapshots",
+    "jobConf": {
+      "catalog_name": "rest_catalog",
+      "table_identifier": "db.t1",
+      "older_than": "2024-01-01 00:00:00",
+      "retain_last": "3",
+      "spark_master": "local[2]",
+      "spark_executor_instances": "1",
+      "spark_executor_cores": "1",
+      "spark_executor_memory": "1g",
+      "spark_driver_memory": "1g",
+      "catalog_type": "rest",
+      "catalog_uri": "http://localhost:9001/iceberg",
+      "warehouse_location": ""
+    }
+  }' \
+  http://localhost:8090/api/metalakes/test/jobs
+```
+
+Omitting `older_than` and passing only `retain_last` is the safer default for a first run, since it bounds the result by count rather than by a date you have to reason about.
+
+The job builds this statement, including only the optional parameters you supplied:
+
+```sql
+CALL `rest_catalog`.system.expire_snapshots(
+  table => 'db.t1',
+  older_than => TIMESTAMP '2024-01-01 00:00:00',
+  retain_last => 3,
+  stream_results => true
+)
+```
+
+## Verifying the Result
+
+```bash
+curl -sS "http://localhost:8090/api/metalakes/test/jobs/{job_id}" | jq '.job.state'
+cat /tmp/gravitino/jobs/staging/test/builtin-iceberg-expire-snapshots/{job_id}/stdout.log
+```
+
+A successful run reports its state as `SUCCEEDED` and logs the counts it removed:
+
+```text
+Expire Snapshots Results:
+  Deleted data files: 12
+  Deleted manifest files: 8
+  Deleted manifest lists: 3
+```
+
 ## Related
 
-- [Table Maintenance Service (Optimizer)](./optimizer.md)
-- [Optimizer Configuration](./optimizer-configuration.md)
-- [Optimizer Extension Guide](./optimizer-extension-guide.md)
-- [Optimizer Quick Start and Verification](./optimizer-quick-start.md)
-- [Optimizer Troubleshooting](./optimizer-troubleshooting.md)
+- [Table Maintenance Service](./optimizer.md) for the concepts and the walkthrough
+- [Configuration](./optimizer-configuration.md) for the three configuration layers
+- [Iceberg Compaction Policy](../iceberg-compaction-policy.md) for tuning the built-in strategy
+- [Manage Jobs](../manage-jobs-in-gravitino.md) for job status and templates

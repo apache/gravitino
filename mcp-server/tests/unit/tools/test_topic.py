@@ -57,3 +57,59 @@ class TestTopicTool(unittest.TestCase):
                 self.assertEqual("mock_topic", result.content[0].text)
 
         asyncio.run(_test_load_topic(self.mcp))
+
+    def test_create_topic(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_topic",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "name": "tp",
+                        "comment": "c",
+                        "properties": {"k": "v"},
+                    },
+                )
+                self.assertEqual(
+                    "mock_topic_created: cat.sch.tp", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_topic(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "setProperty", "property": "k", "value": "v"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_topic",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "topic_name": "tp",
+                        "updates": updates,
+                    },
+                )
+                self.assertEqual(
+                    f"mock_topic_altered: cat.sch.tp with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_delete_topic(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "delete_topic",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "topic_name": "tp",
+                    },
+                )
+                self.assertEqual(
+                    "mock_topic_deleted: cat.sch.tp", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))

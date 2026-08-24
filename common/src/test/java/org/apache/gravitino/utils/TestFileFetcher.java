@@ -25,6 +25,8 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -37,11 +39,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+/**
+ * Tests for {@link FileFetcher}.
+ *
+ * <p>The hdfs happy path is exercised reflectively against Hadoop and is covered by the catalog
+ * Kerberos integration tests; the common module has no Hadoop on its test classpath, so here we
+ * only assert that an hdfs uri without a Hadoop configuration is rejected.
+ */
 public class TestFileFetcher {
 
-  // The hdfs happy path is exercised reflectively against Hadoop and is covered by the catalog
-  // Kerberos integration tests; the common module has no Hadoop on its test classpath, so here we
-  // only assert that an hdfs uri without a Hadoop configuration is rejected.
   @TempDir File tempDir;
 
   @Test
@@ -65,6 +71,15 @@ public class TestFileFetcher {
     Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
     Assertions.assertEquals(
         srcFile.toPath().normalize(), Files.readSymbolicLink(destFile.toPath()).normalize());
+  }
+
+  @Test
+  public void testOpaqueFileUriWithNullPathShouldFail() {
+    // An opaque file URI (no authority/path) must fail with a clear IOException, not a raw NPE.
+    File destFile = new File(tempDir, "dest_opaque");
+    Assertions.assertThrows(
+        IOException.class,
+        () -> FileFetcher.get().fetchFileFromUri("file:relative", destFile, 10, null));
   }
 
   @Test
@@ -184,6 +199,74 @@ public class TestFileFetcher {
       FileFetcher.get().initialize(true);
       server.stop(0);
     }
+  }
+
+  @Test
+  public void testRelativeLocalSourceProducesResolvableSymlink() throws Exception {
+    File srcFile = new File(tempDir, "rel_src");
+    Assertions.assertTrue(srcFile.createNewFile());
+    File destFile = new File(tempDir, "rel_dest");
+    // A relative source path (as an operator might configure) must still produce a symlink that
+    // resolves to the real file, not a dangling one.
+    Path cwd = Paths.get("").toAbsolutePath();
+    String relative = cwd.relativize(srcFile.toPath().toAbsolutePath()).toString();
+
+    FileFetcher.get().fetchFileFromUri(relative, destFile, 10, null);
+
+    Assertions.assertTrue(Files.isSymbolicLink(destFile.toPath()));
+    Assertions.assertTrue(
+        Files.exists(destFile.toPath()), "symlink must resolve to an existing file, not dangle");
+  }
+
+  @Test
+  public void testLocalFileMoveFailureCleansTempSymlink() throws Exception {
+    File srcFile = new File(tempDir, "src_movefail");
+    Assertions.assertTrue(srcFile.createNewFile());
+    // Make the destination a non-empty directory so the final atomic rename fails.
+    File destDir = new File(tempDir, "dest_is_dir");
+    Assertions.assertTrue(destDir.mkdir());
+    Assertions.assertTrue(new File(destDir, "occupant").createNewFile());
+
+    Assertions.assertThrows(
+        IOException.class,
+        () -> FileFetcher.get().fetchFileFromUri(srcFile.toURI().toString(), destDir, 10, null));
+
+    File tmpSymlink = new File(tempDir, "dest_is_dir.symlink.tmp");
+    Assertions.assertFalse(
+        tmpSymlink.exists(), "temp symlink must be cleaned up after a failed move");
+  }
+
+  @Test
+  public void testUpperCaseSchemeIsCaseInsensitive() {
+    // RFC 3986 schemes are case-insensitive: "HTTP" must route like "http" (i.e. through the SSRF
+    // validator), not fall through to the unsupported-scheme branch.
+    File destFile = new File(tempDir, "uppercase");
+    FileFetcher.get().initialize(true);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                FileFetcher.get().fetchFileFromUri("HTTP://127.0.0.1/keytab", destFile, 10, null));
+    Assertions.assertTrue(exception.getMessage().contains("Gravitino server side"));
+  }
+
+  @Test
+  public void testFtpSchemeRejectedWhenBlockingEnabled() {
+    // FTP's data channel cannot be pinned to the validated address (PASV/EPSV SSRF), so it must be
+    // rejected on the blocking path rather than handed to the JDK FTP client.
+    File destFile = new File(tempDir, "ftp");
+    FileFetcher.get().initialize(true);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                FileFetcher.get()
+                    .fetchFileFromUri("ftp://files.example.com/keytab", destFile, 10, null));
+    Assertions.assertTrue(exception.getMessage().contains("FTP"));
+    Assertions.assertTrue(
+        exception.getMessage().contains(FileFetcher.BLOCK_UNSAFE_REMOTE_URI_CONFIG));
   }
 
   @Test

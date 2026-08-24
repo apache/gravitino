@@ -1,17 +1,18 @@
 ---
-title: "Optimizer Extension Guide"
+title: "Extension Guide"
 slug: "/table-maintenance-service/extension-guide"
-keyword: "table maintenance, optimizer, extension, provider, ServiceLoader"
+keywords:
+  - table maintenance
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-Use this guide when built-in optimizer components do not match your environment and you need custom implementations.
+Use this guide when the built-in components do not match your environment and you need custom implementations.
 
 ## Extension Model
 
-Optimizer supports three loading patterns:
+The service supports three loading patterns:
 
 1. `Provider` SPI (`name()` + `initialize()`): loaded by `ServiceLoader` and selected by config value.
 2. Class-name mapping for strategy handlers and job adapters.
@@ -48,7 +49,7 @@ public class MyStatisticsProvider implements StatisticsProvider {
 
   @Override
   public void initialize(OptimizerEnv optimizerEnv) {
-    // Initialize clients/resources from optimizer config.
+    // Initialize clients and resources from the configuration file.
   }
 
   @Override
@@ -110,8 +111,8 @@ Notes:
 ## Package and Deploy
 
 - Build a JAR containing your classes and `META-INF/services` files.
-- Put the JAR on optimizer runtime classpath, for example `${GRAVITINO_HOME}/optimizer/libs/`.
-- Restart optimizer process before testing.
+- Put the JAR on the runtime classpath, for example `${GRAVITINO_HOME}/optimizer/libs/`.
+- Restart the process before testing.
 
 If you also extend Gravitino server job execution, see [Manage jobs in Gravitino](../manage-jobs-in-gravitino.md).
 
@@ -124,7 +125,7 @@ If you also extend Gravitino server job execution, see [Manage jobs in Gravitino
 
 ## Related
 
-- [Table Maintenance Service (Optimizer)](./optimizer.md)
-- [Optimizer Configuration](./optimizer-configuration.md)
-- [Optimizer CLI Reference](./optimizer-cli-reference.md)
-- [Optimizer Troubleshooting](./optimizer-troubleshooting.md)
+- [Table Maintenance Service](./optimizer.md)
+- [Configuration](./optimizer-configuration.md)
+- [CLI Reference](./optimizer-configuration.md)
+- [Troubleshooting](./optimizer-troubleshooting.md)

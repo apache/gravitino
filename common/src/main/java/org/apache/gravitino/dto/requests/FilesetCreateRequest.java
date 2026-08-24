@@ -18,8 +18,10 @@
  */
 package org.apache.gravitino.dto.requests;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.AllArgsConstructor;
@@ -29,6 +31,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.rest.RESTRequest;
 
@@ -63,6 +67,44 @@ public class FilesetCreateRequest implements RESTRequest {
   @Nullable
   @JsonProperty("properties")
   private Map<String, String> properties;
+
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonProperty("secretBindings")
+  @Builder.Default
+  private Map<String, SecretBindingDTO> secretBindings = Collections.emptyMap();
+
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonProperty("secretReferences")
+  @Builder.Default
+  private Map<String, SecretReferenceDTO> secretReferences = Collections.emptyMap();
+
+  /**
+   * Constructor for FilesetCreateRequest without secret maps.
+   *
+   * @param name The name of the fileset.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocation The storage location of the fileset.
+   * @param storageLocations The storage locations of the fileset.
+   * @param properties The properties of the fileset.
+   */
+  public FilesetCreateRequest(
+      String name,
+      String comment,
+      Fileset.Type type,
+      String storageLocation,
+      Map<String, String> storageLocations,
+      Map<String, String> properties) {
+    this(
+        name,
+        comment,
+        type,
+        storageLocation,
+        storageLocations,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
 
   /**
    * Validates the request.

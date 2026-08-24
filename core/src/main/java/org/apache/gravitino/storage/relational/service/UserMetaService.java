@@ -36,6 +36,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.UserEntity;
@@ -386,5 +387,128 @@ public class UserMetaService {
       throw re;
     }
     return newEntity;
+  }
+
+  private UserPO getUserPOByMetalakeNameAndId(String metalakeName, Long userId) {
+    UserPO userPO =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper -> mapper.selectUserMetaByMetalakeNameAndId(metalakeName, userId));
+
+    if (userPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.USER.name().toLowerCase(),
+          String.valueOf(userId));
+    }
+    return userPO;
+  }
+
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "getUserById")
+  public UserEntity getUserById(String metalake, long userId) {
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
+    UserPO userPO = getUserPOByMetalakeNameAndId(metalake, userId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(userPO.getUserId());
+    return POConverters.fromUserPO(userPO, rolePOs, userNamespace);
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateUserById")
+  public <E extends Entity & HasIdentifier> UserEntity updateUserById(
+      String metalake, long userId, Function<E, E> updater) throws IOException {
+    Namespace userNamespace = AuthorizationUtils.ofUserNamespace(metalake);
+    UserPO oldUserPO = getUserPOByMetalakeNameAndId(metalake, userId);
+    List<RolePO> rolePOs = RoleMetaService.getInstance().listRolesByUserId(oldUserPO.getUserId());
+    UserEntity oldEntity = POConverters.fromUserPO(oldUserPO, rolePOs, userNamespace);
+    UserEntity newEntity = (UserEntity) updater.apply((E) oldEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldEntity.id(), newEntity.id()),
+        "The updated user entity id: %s should be same with the user entity id before: %s",
+        newEntity.id(),
+        oldEntity.id());
+
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper ->
+                      mapper.updateUserMeta(
+                          POConverters.updateUserPOWithVersion(oldUserPO, newEntity), oldUserPO)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  UserMetaMapper.class,
+                  mapper -> mapper.touchUserUpdatedAt(oldUserPO.getUserId())));
+    } catch (RuntimeException re) {
+      ExceptionUtils.checkSQLException(
+          re, Entity.EntityType.USER, newEntity.nameIdentifier().toString());
+      throw re;
+    }
+    return newEntity;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "deleteUserById")
+  public boolean deleteUserById(String metalake, long userId) {
+    try {
+      getUserPOByMetalakeNameAndId(metalake, userId);
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+
+    SessionUtils.doMultipleWithCommit(
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserMetaMapper.class, mapper -> mapper.softDeleteUserMetaByUserId(userId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByOwnerIdAndType(
+                        userId, Entity.EntityType.USER.name())));
+    return true;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "countUsersByMetalake")
+  public long countUsersByMetalake(String metalakeName) {
+    Long count =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeName(metalakeName));
+    return count == null ? 0L : count;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByMetalakePaginated")
+  public PagedResult<UserEntity> listUsersByMetalakePaginated(
+      String metalakeName, int offset, int limit) {
+    Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
+    Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
+
+    long totalCount = countUsersByMetalake(metalakeName);
+    if (limit == 0 || offset >= totalCount) {
+      return new PagedResult<>(totalCount, Collections.emptyList());
+    }
+
+    List<ExtendedUserPO> userPOs =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper ->
+                mapper.listExtendedUserPOsByMetalakeNamePaginated(metalakeName, offset, limit));
+    List<UserEntity> users =
+        userPOs.stream()
+            .map(
+                po ->
+                    POConverters.fromExtendedUserPO(
+                        po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+            .collect(Collectors.toList());
+    return new PagedResult<>(totalCount, users);
   }
 }

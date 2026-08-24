@@ -29,6 +29,7 @@ public class IdpGroupMetaBaseSQLProvider {
 
   public String selectIdpGroup(@Param("groupName") String groupName) {
     return "SELECT group_id as groupId, group_name as groupName,"
+        + " COALESCE(group_comment, '') as groupComment,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -38,6 +39,7 @@ public class IdpGroupMetaBaseSQLProvider {
 
   public String selectIdpGroupWithUsers(@Param("groupName") String groupName) {
     return "SELECT g.group_name as name,"
+        + " COALESCE(g.group_comment, '') as comment,"
         + " COALESCE(JSON_ARRAYAGG(u.user_name), JSON_ARRAY()) as usernames"
         + " FROM "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
@@ -48,16 +50,17 @@ public class IdpGroupMetaBaseSQLProvider {
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " u ON u.user_id = r.user_id AND u.deleted_at = 0"
         + " WHERE g.group_name = #{groupName} AND g.deleted_at = 0"
-        + " GROUP BY g.group_id, g.group_name";
+        + " GROUP BY g.group_id, g.group_name, g.group_comment";
   }
 
   public String insertIdpGroup(@Param("groupMeta") IdpGroupPO groupPO) {
     return "INSERT INTO "
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
-        + " (group_id, group_name, current_version, last_version, deleted_at)"
+        + " (group_id, group_name, group_comment, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{groupMeta.groupId},"
         + " #{groupMeta.groupName},"
+        + " COALESCE(#{groupMeta.groupComment}, ''),"
         + " #{groupMeta.currentVersion},"
         + " #{groupMeta.lastVersion},"
         + " #{groupMeta.deletedAt}"

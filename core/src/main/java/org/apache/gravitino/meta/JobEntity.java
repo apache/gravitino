@@ -20,9 +20,11 @@
 package org.apache.gravitino.meta;
 
 import com.google.common.collect.Maps;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import lombok.ToString;
 import org.apache.gravitino.Auditable;
 import org.apache.gravitino.Entity;
@@ -48,8 +50,18 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   public static final Field AUDIT_INFO =
       Field.required(
           "audit_info", AuditInfo.class, "The audit details of the job template entity.");
+  public static final Field STARTED_AT =
+      Field.required(
+          "job_started_at",
+          Long.class,
+          "The time when the job started execution, using the storage layer's "
+              + "\"not started\" sentinel (<= 0) when the job has not started execution yet.");
   public static final Field FINISHED_AT =
-      Field.optional("job_finished_at", Long.class, "The time when the job finished execution.");
+      Field.required(
+          "job_finished_at",
+          Long.class,
+          "The time when the job finished execution, using the storage layer's "
+              + "\"not finished\" sentinel (<= 0) when the job has not finished execution yet.");
 
   private Long id;
   private String jobExecutionId;
@@ -57,6 +69,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
   private String jobTemplateName;
   private Namespace namespace;
   private AuditInfo auditInfo;
+  private Long startedAt;
   private Long finishedAt;
 
   private JobEntity() {}
@@ -69,6 +82,7 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     fields.put(TEMPLATE_NAME, jobTemplateName);
     fields.put(STATUS, status);
     fields.put(AUDIT_INFO, auditInfo);
+    fields.put(STARTED_AT, startedAt);
     fields.put(FINISHED_AT, finishedAt);
     return Collections.unmodifiableMap(fields);
   }
@@ -100,8 +114,38 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
     return jobTemplateName;
   }
 
+  public Long startedAt() {
+    return startedAt;
+  }
+
+  /**
+   * Converts the raw {@code startedAt} epoch-millis value to an {@link Instant}, treating {@code
+   * null} or a non-positive value (the "not started" sentinel used by the storage layer) as {@code
+   * null}.
+   *
+   * @return the {@link Instant} the job started execution, or {@code null} if the job has not
+   *     started execution yet
+   */
+  @Nullable
+  public Instant startedAtAsInstant() {
+    return (startedAt == null || startedAt <= 0) ? null : Instant.ofEpochMilli(startedAt);
+  }
+
   public Long finishedAt() {
     return finishedAt;
+  }
+
+  /**
+   * Converts the raw {@code finishedAt} epoch-millis value to an {@link Instant}, treating {@code
+   * null} or a non-positive value (the "not finished" sentinel used by the storage layer) as {@code
+   * null}.
+   *
+   * @return the {@link Instant} the job finished execution, or {@code null} if the job has not
+   *     finished execution yet
+   */
+  @Nullable
+  public Instant finishedAtAsInstant() {
+    return (finishedAt == null || finishedAt <= 0) ? null : Instant.ofEpochMilli(finishedAt);
   }
 
   @Override
@@ -129,12 +173,15 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
         && Objects.equals(status, that.status)
         && Objects.equals(jobTemplateName, that.jobTemplateName)
         && Objects.equals(namespace, that.namespace)
-        && Objects.equals(auditInfo, that.auditInfo);
+        && Objects.equals(auditInfo, that.auditInfo)
+        && Objects.equals(startedAt, that.startedAt)
+        && Objects.equals(finishedAt, that.finishedAt);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, jobExecutionId, namespace, status, jobTemplateName, auditInfo);
+    return Objects.hash(
+        id, jobExecutionId, namespace, status, jobTemplateName, auditInfo, startedAt, finishedAt);
   }
 
   public static Builder builder() {
@@ -175,6 +222,11 @@ public class JobEntity implements Entity, Auditable, HasIdentifier {
 
     public Builder withAuditInfo(AuditInfo auditInfo) {
       jobEntity.auditInfo = auditInfo;
+      return this;
+    }
+
+    public Builder withStartedAt(Long startedAt) {
+      jobEntity.startedAt = startedAt;
       return this;
     }
 

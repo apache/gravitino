@@ -208,6 +208,10 @@ public class LancePartitionStatisticStorage implements PartitionStatisticStorage
                   .removalListener(
                       (RemovalListener<Long, DatasetHolder>)
                           (key, value, cause) -> {
+                            LOG.debug(
+                                "Removed Lance dataset cache entry, tableId={}, cause={}",
+                                key,
+                                cause);
                             if (value != null && cause != RemovalCause.EXPLICIT) {
                               closeDatasetHolder(value);
                             }

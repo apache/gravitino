@@ -20,14 +20,15 @@ package org.apache.gravitino.hook;
 
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CapabilityHelpers;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -50,9 +51,24 @@ import org.apache.gravitino.utils.PrincipalUtils;
  */
 public class TableHookDispatcher implements TableDispatcher {
   private final TableDispatcher dispatcher;
+  private final Supplier<OwnerDispatcher> ownerDispatcher;
+  private final CatalogManager catalogManager;
 
-  public TableHookDispatcher(TableDispatcher dispatcher) {
+  /**
+   * Creates a table hook dispatcher.
+   *
+   * @param dispatcher the underlying table dispatcher
+   * @param ownerDispatcher supplies the owner dispatcher, or {@code null} when authorization is
+   *     disabled
+   * @param catalogManager the catalog manager used to apply catalog capabilities
+   */
+  public TableHookDispatcher(
+      TableDispatcher dispatcher,
+      Supplier<OwnerDispatcher> ownerDispatcher,
+      CatalogManager catalogManager) {
     this.dispatcher = dispatcher;
+    this.ownerDispatcher = ownerDispatcher;
+    this.catalogManager = catalogManager;
   }
 
   @Override
@@ -81,15 +97,14 @@ public class TableHookDispatcher implements TableDispatcher {
             ident, columns, comment, properties, partitions, distribution, sortOrders, indexes);
 
     // Set the creator as the owner of the table.
-    OwnerDispatcher ownerManager = GravitinoEnv.getInstance().ownerDispatcher();
+    OwnerDispatcher ownerManager = ownerDispatcher.get();
     if (ownerManager != null) {
       // The inner NormalizeDispatcher case-folds the table name (and its schema namespace)
       // based on catalog capabilities, so the entity is stored under the normalized identifier.
       // Apply the same normalization here so the owner is attached to the same identifier the
       // manager sees.
       NameIdentifier normalizedIdent =
-          CapabilityHelpers.applyCapabilities(
-              ident, Capability.Scope.TABLE, GravitinoEnv.getInstance().catalogManager());
+          CapabilityHelpers.applyCapabilities(ident, Capability.Scope.TABLE, catalogManager);
       ownerManager.setOwner(
           normalizedIdent.namespace().level(0),
           NameIdentifierUtil.toMetadataObject(normalizedIdent, Entity.EntityType.TABLE),

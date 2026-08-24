@@ -200,7 +200,7 @@ public class PermissionOperations {
   @ResponseMetered(name = "grant-privilege-to-role", absolute = true)
   @AuthorizationExpression(
       expression = CAN_OPERATE_METADATA_PRIVILEGE,
-      errorMessage = "Current user can not grant privilege to role.")
+      errorMessage = "Current user cannot grant privilege to role")
   public Response grantPrivilegeToRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
@@ -248,7 +248,7 @@ public class PermissionOperations {
   @ResponseMetered(name = "revoke-privilege-from-role", absolute = true)
   @AuthorizationExpression(
       expression = CAN_OPERATE_METADATA_PRIVILEGE,
-      errorMessage = "Current user can not revoke privilege from role.")
+      errorMessage = "Current user cannot revoke privilege from role")
   public Response revokePrivilegeFromRole(
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,

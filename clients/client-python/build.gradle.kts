@@ -186,11 +186,22 @@ tasks {
     args = listOf("scripts/generate_version.py")
   }
 
-  val integrationTest by registering(VenvTask::class) {
-    doFirst {
+  val stopGravitinoServer by registering {
+    doLast {
+      gravitinoServer("stop")
+    }
+  }
+
+  val startGravitinoServer by registering {
+    finalizedBy(stopGravitinoServer)
+    doLast {
       gravitinoServer("start")
     }
+  }
 
+  val integrationTest by registering(VenvTask::class) {
+    dependsOn(startGravitinoServer)
+    finalizedBy(stopGravitinoServer)
     venvExec = "coverage"
     args = listOf("run", "--branch", "-m", "unittest")
     workingDir = projectDir.resolve("./tests/integration")
@@ -213,10 +224,6 @@ tasks {
       "PYTHONPATH" to "${project.rootDir.path}/clients/client-python"
     ))
     environment = envMap
-
-    doLast {
-      gravitinoServer("stop")
-    }
   }
 
   val unitCoverageReport by registering(VenvTask::class){

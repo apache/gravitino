@@ -58,7 +58,7 @@ The Gravitino binary distribution package contains the following files:
 ```
 
 :::note
-Catalogs `OceanBase` and `ClickHouse` are not included in the Gravitino binary distribution package (see above) by default due to package size limitations and License compatibility issues since 1.2.0.
+Catalogs `OceanBase` and `ClickHouse` are not included in the Gravitino binary distribution package (see above) by default due to package size limitations and License compatibility issues.
 If you want to use these two catalogs, build the Gravitino binary distribution package yourself and use tarball `gravitino-<version>-bin-all.tar.gz`, which contains all catalogs including those in the `catalogs-contrib` module.
 For more details about it, refer to [Reorg catalogs structure](https://github.com/apache/gravitino/pull/9781)
 :::

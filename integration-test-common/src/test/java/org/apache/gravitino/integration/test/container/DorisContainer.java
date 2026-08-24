@@ -73,6 +73,7 @@ public class DorisContainer extends BaseContainer {
 
   private final ComposeContainer composeContainer;
   private String feIpAddress;
+  private int feMysqlPort;
 
   public static Builder builder() {
     return new Builder();
@@ -96,16 +97,29 @@ public class DorisContainer extends BaseContainer {
         ITUtils.joinPath(
             dir, "integration-test-common", "doris-docker-script", "docker-compose.yaml");
 
-    String effectiveImage =
-        (DEFAULT_IMAGE != null && !DEFAULT_IMAGE.isEmpty()) ? DEFAULT_IMAGE : image;
     Preconditions.check(
-        "Doris Docker image must be configured via GRAVITINO_CI_DORIS_DOCKER_IMAGE or "
-            + "DorisContainer builder image",
-        effectiveImage != null && !effectiveImage.isEmpty());
+        "Doris Docker image must be configured via GRAVITINO_CI_DORIS_DOCKER_IMAGE "
+            + "environment variable or DorisContainer builder withImage()",
+        image != null && !image.isEmpty());
+
+    // Support both all-in-one images (e.g. apache/gravitino-ci:doris-0.1.5) and
+    // split FE/BE images (e.g. apache/doris:fe-3.0.6.2 / apache/doris:be-3.0.6.2).
+    // The compose file uses FE_IMAGE/BE_IMAGE with fallback to DOCKER_IMAGE.
+    String feImage = image;
+    String beImage = image;
+    int feIdx = image.indexOf(":fe-");
+    if (feIdx > 0) {
+      String base = image.substring(0, feIdx);
+      String version = image.substring(feIdx + 4);
+      feImage = base + ":fe-" + version;
+      beImage = base + ":be-" + version;
+    }
 
     composeContainer =
         new ComposeContainer(new File(composeFile))
-            .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", effectiveImage)
+            .withEnv("GRAVITINO_CI_DORIS_DOCKER_IMAGE", image)
+            .withEnv("GRAVITINO_CI_DORIS_FE_IMAGE", feImage)
+            .withEnv("GRAVITINO_CI_DORIS_BE_IMAGE", beImage)
             .withExposedService(
                 FE_SERVICE,
                 FE_MYSQL_PORT,
@@ -180,9 +194,14 @@ public class DorisContainer extends BaseContainer {
     return feIpAddress;
   }
 
+  /** Returns the host-mapped MySQL port (random, not the container-internal 9030). */
+  public int getFeMysqlPort() {
+    return feMysqlPort;
+  }
+
   @Override
   protected boolean checkContainerStatus(int retryLimit) {
-    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, FE_MYSQL_PORT);
+    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, feMysqlPort);
     LOG.info("Doris JDBC url is {}", dorisJdbcUrl);
 
     await()
@@ -232,11 +251,12 @@ public class DorisContainer extends BaseContainer {
     // Use the host-accessible address from Testcontainers (works on macOS/Linux).
     // The internal Docker network IP is not reachable from the host on macOS.
     feIpAddress = composeContainer.getServiceHost(FE_SERVICE, FE_MYSQL_PORT);
-    LOG.info("Doris FE host address: {}", feIpAddress);
+    feMysqlPort = composeContainer.getServicePort(FE_SERVICE, FE_MYSQL_PORT);
+    LOG.info("Doris FE host address: {}:{}", feIpAddress, feMysqlPort);
   }
 
   private boolean changePassword() {
-    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, FE_MYSQL_PORT);
+    String dorisJdbcUrl = format("jdbc:mysql://%s:%d/", feIpAddress, feMysqlPort);
 
     // change password for root user, Gravitino API must set password in catalog properties
     try (Connection connection = DriverManager.getConnection(dorisJdbcUrl, USER_NAME, "");
@@ -255,7 +275,7 @@ public class DorisContainer extends BaseContainer {
   public static class Builder
       extends BaseContainer.Builder<DorisContainer.Builder, DorisContainer> {
     private Builder() {
-      this.image = DEFAULT_IMAGE;
+      this.image = (DEFAULT_IMAGE != null && !DEFAULT_IMAGE.isEmpty()) ? DEFAULT_IMAGE : null;
       this.hostName = HOST_NAME;
       this.exposePorts = ImmutableSet.of(FE_HTTP_PORT, FE_MYSQL_PORT);
     }

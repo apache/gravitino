@@ -1,102 +1,83 @@
 ---
 title: "HTTPS"
 slug: "/security/how-to-use-https"
-keyword: "security HTTPS protocol"
+keywords:
+  - security
+  - https
+  - tls
 license: "This software is licensed under the Apache License version 2."
 ---
 
-## Introduction
+## Overview
 
-For users choosing OAuth 2.0 as the authentication method, it is recommended to use HTTPS instead of HTTP. HTTPS encrypts the request headers, offering better protection against smuggling attacks.
+HTTPS encrypts request headers, which matters most when those headers carry credentials. Any deployment using OAuth 2.0 or [local users and groups](local-users-and-groups.md) should enable it, since both put a token or a password in a header on every request.
 
-Note that Gravitino cannot simultaneously support both HTTP and HTTPS within a single server instance. If HTTPS is enabled, Gravitino will no longer provide HTTP service.
+A server instance serves one protocol. Enabling HTTPS stops the plain HTTP listener rather than adding to it, so clients configured against the HTTP port need updating at the same time.
 
-Both the Gravitino server and Iceberg REST service can configure and support HTTPS.
+## Configuration
 
-### Apache Gravitino Server Configuration
+The Gravitino server and the Iceberg REST service are configured separately with the same property names under different prefixes. Use `gravitino.server.webserver.` for the Gravitino server and `gravitino.iceberg-rest.` for the Iceberg REST service.
 
-| Configuration item                                  | Description                                                        | Default value       | Required                                          | Since version |
-|-----------------------------------------------------|--------------------------------------------------------------------|---------------------|---------------------------------------------------|---------------|
-| `gravitino.server.webserver.enableHttps`            | Enables HTTPS.                                                     | `false`             | No                                                | 0.3.0         |
-| `gravitino.server.webserver.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `8433`              | No                                                | 0.3.0         |
-| `gravitino.server.webserver.keyStorePath`           | Path to the key store file.                                        | (none)              | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.server.webserver.keyStorePassword`       | Password to the key store.                                         | (none)              | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.server.webserver.keyStoreType`           | The type to the key store.                                         | `JKS`               | No                                                | 0.3.0         |
-| `gravitino.server.webserver.managerPassword`        | Manager password to the key store.                                 | (none)              | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.server.webserver.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)              | No                                                | 0.3.0         |
-| `gravitino.server.webserver.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | '' (empty string)   | No                                                | 0.3.0         |
-| `gravitino.server.webserver.enableClientAuth`       | Enables the authentication of the client.                          | `false`             | No                                                | 0.3.0         |
-| `gravitino.server.webserver.trustStorePath`         | Path to the trust store file.                                      | (none)              | Yes if use HTTPS and the authentication of client | 0.3.0         |
-| `gravitino.server.webserver.trustStorePassword`     | Password to the trust store.                                       | (none)              | Yes if use HTTPS and the authentication of client | 0.3.0         |
-| `gravitino.server.webserver.trustStoreType`         | The type to the trust store.                                       | `JKS`               | No                                                | 0.3.0         |
+| Property Name             | Description                                    | Default Value | Required                       |
+|---------------------------|------------------------------------------------|---------------|--------------------------------|
+| `enableHttps`             | Enables HTTPS                                  | `false`       | No                             |
+| `httpsPort`               | HTTPS port for the Jetty web server            | `8433` and `9433` | No                         |
+| `keyStorePath`            | Path to the key store file                     | (none)        | Yes                            |
+| `keyStorePassword`        | Password for the key store                     | (none)        | Yes                            |
+| `managerPassword`         | Manager password for the key store             | (none)        | Yes                            |
+| `keyStoreType`            | Key store type                                 | `JKS`         | No                             |
+| `tlsProtocol`             | TLS protocol to use, which the JVM must support| (none)        | No                             |
+| `enableCipherAlgorithms`  | Cipher algorithms to enable                    | (empty)       | No                             |
+| `enableClientAuth`        | Requires clients to authenticate with a certificate | `false`  | No                             |
+| `trustStorePath`          | Path to the trust store file                   | (none)        | Yes with client authentication |
+| `trustStorePassword`      | Password for the trust store                   | (none)        | Yes with client authentication |
+| `trustStoreType`          | Trust store type                               | `JKS`         | No                             |
 
-### Apache Iceberg REST Service Configuration
+The default HTTPS port is `8433` for the Gravitino server and `9433` for the Iceberg REST service. Everything in the Required column applies once `enableHttps` is `true`.
 
-| Configuration item                              | Description                                                        | Default value     | Required                                          | Since version |
-|-------------------------------------------------|--------------------------------------------------------------------|-------------------|---------------------------------------------------|---------------|
-| `gravitino.iceberg-rest.enableHttps`            | Enables HTTPS.                                                     | `false`           | No                                                | 0.3.0         |
-| `gravitino.iceberg-rest.httpsPort`              | The HTTPS port number of the Jetty web server.                     | `9433`            | No                                                | 0.3.0         |
-| `gravitino.iceberg-rest.keyStorePath`           | Path to the key store file.                                        | (none)            | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.iceberg-rest.keyStorePassword`       | Password to the key store.                                         | (none)            | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.iceberg-rest.keyStoreType`           | The type to the key store.                                         | `JKS`             | No                                                | 0.3.0         |
-| `gravitino.iceberg-rest.managerPassword`        | Manager password to the key store.                                 | (none)            | Yes if use HTTPS                                  | 0.3.0         |
-| `gravitino.iceberg-rest.tlsProtocol`            | TLS protocol to use. The JVM must support the TLS protocol to use. | (none)            | No                                                | 0.3.0         |
-| `gravitino.iceberg-rest.enableCipherAlgorithms` | The collection of enabled cipher algorithms.                       | '' (empty string) | No                                                | 0.3.0         |
-| `gravitino.iceberg-rest.enableClientAuth`       | Enables the authentication of the client.                          | `false`           | No                                                | 0.3.0         |
-| `gravitino.iceberg-rest.trustStorePath`         | Path to the trust store file.                                      | (none)            | Yes if use HTTPS and the authentication of client | 0.3.0         |
-| `gravitino.iceberg-rest.trustStorePassword`     | Password to the trust store.                                       | (none)            | Yes if use HTTPS and the authentication of client | 0.3.0         |
-| `gravitino.iceberg-rest.trustStoreType`         | The type to the trust store.                                       | `JKS`             | No                                                | 0.3.0         |
+For the values `tlsProtocol` and `enableCipherAlgorithms` accept, see the "Additional JSSE Standard Names" section of the Java security guide, under [protocols](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames) and [cipher suites](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites) respectively.
 
-Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#jssenames) for the list of protocols related to tlsProtocol. You can find the list of `tlsProtocol` values for Java 8 in this document.
+## Local Development Example
 
-Refer to the "Additional JSSE Standard Names" section of the [Java security guide](https://docs.oracle.com/javase/8/docs/technotes/guides/security/StandardNames.html#ciphersuites) for the list of protocols related to tlsProtocol. You can find the list of `enableCipherAlgorithms` values for Java 8 in this document.
+The following produces a self-signed certificate so you can exercise an HTTPS endpoint on one machine. It is not a production setup, since a self-signed certificate trusted by editing a JVM trust store is not how certificates are managed in a real deployment.
 
-### Example
-
-Follow these steps to set up an HTTPS server:
-
-1. Prerequisite
-   - You need to install the JDK8, wget, and set the environment JAVA_HOME.
-   - If you want to use the command `curl` to request the Gravitino server, you should install openSSL.
-2. Generate the key store
+**1. Generate a key store.**
 
 ```shell
 cd $JAVA_HOME
-bin/keytool -genkeypair  -alias localhost \
--keyalg RSA -keysize 4096 -keypass localhost \
--sigalg SHA256withRSA \
--keystore localhost.jks -storetype JKS -storepass localhost \
--dname "cn=localhost,ou=localhost,o=localhost,l=beijing,st=beijing,c=cn" \
--validity 36500
+bin/keytool -genkeypair -alias localhost \
+  -keyalg RSA -keysize 4096 -keypass {key_password} \
+  -sigalg SHA256withRSA \
+  -keystore localhost.jks -storetype JKS -storepass {store_password} \
+  -dname "cn=localhost,ou=localhost,o=localhost,l=beijing,st=beijing,c=cn" \
+  -validity 36500
 ```
 
-3. Generate the certificate
+**2. Export the certificate.**
 
 ```shell
-bin/keytool -export -alias localhost -keystore localhost.jks -file  localhost.crt -storepass localhost
+bin/keytool -export -alias localhost -keystore localhost.jks \
+  -file localhost.crt -storepass {store_password}
 ```
 
-4. Import the certificate
+**3. Import it into the JVM trust store** so a local Java client will accept it.
 
 ```shell
-bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts -file localhost.crt -storepass changeit -noprompt
+bin/keytool -import -alias localhost -keystore jre/lib/security/cacerts \
+  -file localhost.crt -storepass changeit -noprompt
 ```
 
-5. Refer to the [Configurations](../gravitino-server-config.md) and append the configuration to the conf/gravitino.conf.
-   Configuration doesn't support resolving environment variables, so you should replace `${JAVA_HOME}` with the actual value.
-   Then, You can start the Gravitino server.
+**4. Configure the server.** Append the following to `conf/gravitino.conf`, then start Gravitino. Configuration files do not resolve environment variables, so write the expanded path rather than `${JAVA_HOME}`.
 
-```text
+```properties
 gravitino.server.webserver.host = localhost
 gravitino.server.webserver.enableHttps = true
-gravitino.server.webserver.keyStorePath = ${JAVA_HOME}/localhost.jks
-gravitino.server.webserver.keyStorePassword = localhost
-gravitino.server.webserver.managerPassword = localhost
+gravitino.server.webserver.keyStorePath = {java_home}/localhost.jks
+gravitino.server.webserver.keyStorePassword = {store_password}
+gravitino.server.webserver.managerPassword = {key_password}
 ```
 
-6. Request the Gravitino server
-
-- If you use Java, you can copy the code below to a file named Main.java
+**5. Connect.** From Java, the client takes the HTTPS URI directly:
 
 ```java
 import org.apache.gravitino.client.GravitinoClient;
@@ -112,9 +93,16 @@ public class Main {
 }
 ```
 
-- If you want to use the command `curl`, you can follow the commands:
+From `curl`, convert the certificate to PEM first:
 
 ```shell
 openssl x509 -inform der -in $JAVA_HOME/localhost.crt -out certificate.pem
-curl -v -X GET --cacert ./certificate.pem -H "Accept: application/vnd.gravitino.v1+json" -H "Content-Type: application/json" https://localhost:8433/api/version
+curl -v -X GET --cacert ./certificate.pem \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  https://localhost:8433/api/version
 ```
+
+## Further Reading
+
+- [Configurations](../gravitino-server-config.md) for the rest of the web server settings
+- [How to Authenticate](how-to-authenticate.md) for the authentication methods HTTPS protects

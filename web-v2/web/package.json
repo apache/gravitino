@@ -2,7 +2,7 @@
   "name": "gravitino-web",
   "private": true,
   "engines": {
-    "node": "20.19.0",
+    "node": ">=20.19.0",
     "npm": ">=9.8.1"
   },
   "scripts": {

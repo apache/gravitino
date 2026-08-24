@@ -72,10 +72,14 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   @BeforeAll
   public static void initialize() throws IOException, IllegalAccessException {
     schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator);
+        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     viewOperationDispatcher =
         new ViewOperationDispatcher(
-            catalogManager, entityStore, idGenerator, () -> schemaOperationDispatcher);
+            catalogManager,
+            entityStore,
+            idGenerator,
+            () -> schemaOperationDispatcher,
+            secretManager);
 
     Config config = mock(Config.class);
     doReturn(100000L).when(config).get(TREE_LOCK_MAX_NODE_IN_MEMORY);
@@ -207,7 +211,9 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
   public void testViewOperationDispatcherRejectsNullSchemaDispatcherSupplier() {
     Assertions.assertThrows(
         NullPointerException.class,
-        () -> new ViewOperationDispatcher(catalogManager, entityStore, idGenerator, null));
+        () ->
+            new ViewOperationDispatcher(
+                catalogManager, entityStore, idGenerator, null, secretManager));
   }
 
   @Test
@@ -219,7 +225,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Supplier<SchemaDispatcher> nullSchemaDispatcherSupplier = () -> null;
     ViewOperationDispatcher dispatcher =
         new ViewOperationDispatcher(
-            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier);
+            catalogManager, entityStore, idGenerator, nullSchemaDispatcherSupplier, secretManager);
     NameIdentifier viewIdent = NameIdentifier.of(viewNs, "view_null_dispatcher");
     Representation[] representations =
         new Representation[] {

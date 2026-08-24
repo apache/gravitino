@@ -20,11 +20,13 @@ package org.apache.gravitino.utils;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.Optional;
 import javax.annotation.Nullable;
 import org.apache.commons.io.FileUtils;
@@ -90,17 +92,33 @@ public final class FileFetcher {
       throws IOException {
     try {
       URI uri = new URI(fileUri);
-      String scheme = Optional.ofNullable(uri.getScheme()).orElse("file");
+      // URI schemes are case-insensitive (RFC 3986); normalize so e.g. "HTTP" routes like "http".
+      String scheme = Optional.ofNullable(uri.getScheme()).orElse("file").toLowerCase(Locale.ROOT);
 
       switch (scheme) {
         case "http":
         case "https":
         case "ftp":
-          RemoteUriValidator.validate(
-              uri,
-              blockUnsafeRemoteUri,
-              String.format("'%s' to false", BLOCK_UNSAFE_REMOTE_URI_CONFIG));
-          FileUtils.copyURLToFile(uri.toURL(), destFile, timeoutMs, timeoutMs);
+          if (!blockUnsafeRemoteUri) {
+            FileUtils.copyURLToFile(uri.toURL(), destFile, timeoutMs, timeoutMs);
+          } else if (scheme.equals("ftp")) {
+            // FTP opens its data channel to an address the server chooses in its PASV/EPSV reply,
+            // which cannot be pinned to the validated host and is therefore vulnerable to SSRF. The
+            // operator must opt out of blocking to use FTP from a trusted source.
+            throw new IllegalArgumentException(
+                String.format(
+                    "Refusing to fetch ftp uri '%s' from the Gravitino server side: FTP's data "
+                        + "channel cannot be restricted to the validated address. Set %s to false "
+                        + "to allow it if the source is trusted.",
+                    SafeUri.redact(uri), BLOCK_UNSAFE_REMOTE_URI_CONFIG));
+          } else {
+            // Resolve and validate the host exactly once, then pin the download to the validated
+            // address so the hostname cannot be re-resolved to an unsafe address (DNS rebinding).
+            InetAddress pinnedAddress =
+                RemoteUriValidator.resolveAndValidate(
+                    uri, String.format("'%s' to false", BLOCK_UNSAFE_REMOTE_URI_CONFIG));
+            RemoteFileDownloader.download(uri, pinnedAddress, destFile, timeoutMs);
+          }
           break;
 
         case "file":
@@ -123,7 +141,15 @@ public final class FileFetcher {
   }
 
   private synchronized void linkLocalFile(URI uri, File destFile) throws IOException {
-    Path srcPath = new File(uri.getPath()).toPath().normalize();
+    String sourcePath = uri.getPath();
+    if (sourcePath == null) {
+      // Opaque file URIs (e.g. "file:relative", no authority) have a null path; fail with a clear
+      // message rather than a context-free NullPointerException.
+      throw new IOException("file uri has no path: " + SafeUri.redact(uri));
+    }
+    // Resolve to an absolute path: a relative source would otherwise be stored as the symlink
+    // target and resolved against the link's own directory, producing a dangling symlink.
+    Path srcPath = new File(sourcePath).toPath().toAbsolutePath().normalize();
     if (!Files.exists(srcPath)) {
       throw new IOException(
           String.format("Source file does not exist: %s", srcPath.toAbsolutePath()));
@@ -142,7 +168,19 @@ public final class FileFetcher {
     Path tmpPath = destPath.resolveSibling(destPath.getFileName() + ".symlink.tmp");
     Files.deleteIfExists(tmpPath);
     Files.createSymbolicLink(tmpPath, srcPath);
-    Files.move(tmpPath, destPath, StandardCopyOption.REPLACE_EXISTING);
+    try {
+      Files.move(tmpPath, destPath, StandardCopyOption.REPLACE_EXISTING);
+    } catch (Throwable e) {
+      // Do not orphan the temporary symlink if the rename fails (e.g. read-only or cross-device
+      // destination). This method is synchronized on the singleton, so the fixed temp name cannot
+      // race with a concurrent local fetch.
+      try {
+        Files.deleteIfExists(tmpPath);
+      } catch (IOException suppressed) {
+        e.addSuppressed(suppressed);
+      }
+      throw e;
+    }
   }
 
   /**
@@ -156,7 +194,8 @@ public final class FileFetcher {
             () ->
                 new IllegalArgumentException(
                     String.format(
-                        "A Hadoop configuration is required to fetch an 'hdfs' uri: %s", uri)));
+                        "A Hadoop configuration is required to fetch an 'hdfs' uri: %s",
+                        SafeUri.redact(uri))));
     try {
       Class<?> configurationClass = Class.forName("org.apache.hadoop.conf.Configuration");
       Class<?> fileSystemClass = Class.forName("org.apache.hadoop.fs.FileSystem");
@@ -170,7 +209,8 @@ public final class FileFetcher {
           .getMethod("copyToLocalFile", pathClass, pathClass)
           .invoke(fileSystem, srcPath, destPath);
     } catch (ReflectiveOperationException e) {
-      throw new IOException(String.format("Failed to fetch file from hdfs uri: %s", uri), e);
+      throw new IOException(
+          String.format("Failed to fetch file from hdfs uri: %s", SafeUri.redact(uri)), e);
     }
   }
 }

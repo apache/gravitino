@@ -93,7 +93,13 @@ public abstract class IcebergRESTServiceIT extends IcebergRESTServiceBaseIT {
   }
 
   @AfterAll
-  void cleanup() {
+  @Override
+  void stopIcebergTestEnv() throws Exception {
+    cleanup();
+    super.stopIcebergTestEnv();
+  }
+
+  private void cleanup() {
     purgeAllIcebergTestNamespaces();
   }
 

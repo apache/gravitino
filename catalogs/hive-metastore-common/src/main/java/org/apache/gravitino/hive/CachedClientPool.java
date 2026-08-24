@@ -37,6 +37,8 @@ import org.apache.gravitino.hive.client.HiveClient;
 import org.apache.gravitino.utils.ClientPool;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.immutables.value.Value;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Referred from Apache Iceberg's CachedClientPool implementation
@@ -49,6 +51,8 @@ import org.immutables.value.Value;
  * <p>A ClientPool that caches the underlying HiveClientPool instances.
  */
 public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntimeException> {
+  private static final Logger LOG = LoggerFactory.getLogger(CachedClientPool.class);
+
   private static final ClientPropertiesMetadata PROPERTIES_METADATA =
       new ClientPropertiesMetadata();
 
@@ -76,7 +80,11 @@ public class CachedClientPool implements ClientPool<HiveClient, GravitinoRuntime
     this.clientPoolCache =
         Caffeine.newBuilder()
             .expireAfterAccess(evictionInterval, TimeUnit.MILLISECONDS)
-            .removalListener((ignored, value, cause) -> ((HiveClientPool) value).close())
+            .removalListener(
+                (key, value, cause) -> {
+                  LOG.debug("Removing HiveClientPool from cache: key={}, cause={}", key, cause);
+                  ((HiveClientPool) value).close();
+                })
             .scheduler(Scheduler.forScheduledExecutorService(scheduler))
             .build();
   }
