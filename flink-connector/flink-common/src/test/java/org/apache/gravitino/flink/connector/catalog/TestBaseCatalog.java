@@ -33,20 +33,24 @@ import org.apache.flink.table.catalog.CatalogDatabase;
 import org.apache.flink.table.catalog.CatalogDatabaseImpl;
 import org.apache.flink.table.catalog.CatalogView;
 import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
+import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
+import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.rel.expressions.distributions.Distributions;
@@ -177,6 +181,40 @@ public class TestBaseCatalog {
     List<String> views = catalog.listViews("db");
 
     Assertions.assertEquals(ImmutableList.of("v1", "v2"), views);
+  }
+
+  @Test
+  public void testGetTableThrowsCatalogExceptionWhenForbidden() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    ForbiddenException forbiddenException = new ForbiddenException("denied");
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(tableCatalog.loadTable(Mockito.any())).thenThrow(forbiddenException);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    CatalogException catalogException =
+        Assertions.assertThrows(
+            CatalogException.class, () -> catalog.getTable(new ObjectPath("db", "tbl")));
+
+    Assertions.assertSame(forbiddenException, catalogException.getCause());
+  }
+
+  @Test
+  public void testTableExistsThrowsCatalogExceptionWhenForbidden() throws Exception {
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    ForbiddenException forbiddenException = new ForbiddenException("denied");
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+    Mockito.when(tableCatalog.tableExists(Mockito.any())).thenThrow(forbiddenException);
+    BaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog);
+
+    CatalogException catalogException =
+        Assertions.assertThrows(
+            CatalogException.class, () -> catalog.tableExists(new ObjectPath("db", "tbl")));
+
+    Assertions.assertSame(forbiddenException, catalogException.getCause());
   }
 
   @Test

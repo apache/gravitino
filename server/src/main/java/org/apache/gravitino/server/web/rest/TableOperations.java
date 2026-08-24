@@ -99,7 +99,7 @@ public class TableOperations {
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+                    AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.TABLE,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -167,6 +167,8 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      allowCheckExistence =
+          AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
       secondaryExpression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       secondaryExpressionCondition = ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES,
       accessMetadataType = MetadataObject.Type.TABLE)
