@@ -113,4 +113,22 @@ public class TestCatalogRegister {
     assertTrue(
         redacted.contains("\"gravitino.iceberg.rest-catalog.uri\"='http://irc-host:9001/iceberg'"));
   }
+
+  @Test
+  public void testRedactSecretsMasksJsonEmbeddedSecrets() {
+    String command =
+        "CREATE CATALOG c USING gravitino WITH ( "
+            + "\"__gravitino.dynamic.connector.catalog.config\"="
+            + "'{\"name\":\"hive_catalog\",\"properties\":"
+            + "{\"jdbc-password\":\"hunter2\",\"s3-secret-key\":\"abc123\",\"jdbc-user\":\"admin\"}}')";
+
+    String redacted = CatalogRegister.redactSecrets(command);
+
+    assertFalse(redacted.contains("hunter2"));
+    assertFalse(redacted.contains("abc123"));
+    assertTrue(redacted.contains("\"jdbc-password\":\"***\""));
+    assertTrue(redacted.contains("\"s3-secret-key\":\"***\""));
+    // Non-secret properties must survive redaction unchanged.
+    assertTrue(redacted.contains("\"jdbc-user\":\"admin\""));
+  }
 }

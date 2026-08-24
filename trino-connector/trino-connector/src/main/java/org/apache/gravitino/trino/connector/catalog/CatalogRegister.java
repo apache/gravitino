@@ -63,6 +63,14 @@ public class CatalogRegister {
           "\"([^\"]*(?:credential|token|secret|password)[^\"]*)\"\\s*=\\s*'([^']*)'",
           Pattern.CASE_INSENSITIVE);
 
+  // Matches "key":"value" style secret assignments inside the serialized GravitinoCatalog JSON
+  // that GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG carries (e.g. "jdbc-password":"..." or
+  // "s3-secret-key":"..."), which SECRET_PROPERTY_PATTERN's SQL-assignment shape does not match.
+  private static final Pattern SECRET_JSON_PROPERTY_PATTERN =
+      Pattern.compile(
+          "\"([^\"]*(?:credential|token|secret|password)[^\"]*)\"\\s*:\\s*\"([^\"]*)\"",
+          Pattern.CASE_INSENSITIVE);
+
   private Connection connection;
   private boolean isStarted = false;
   private String catalogStoreDirectory;
@@ -145,11 +153,26 @@ public class CatalogRegister {
 
   @VisibleForTesting
   static String redactSecrets(String createCatalogCommand) {
+    return redactJsonSecrets(redactSqlSecrets(createCatalogCommand));
+  }
+
+  private static String redactSqlSecrets(String createCatalogCommand) {
     Matcher matcher = SECRET_PROPERTY_PATTERN.matcher(createCatalogCommand);
     StringBuffer redacted = new StringBuffer();
     while (matcher.find()) {
       matcher.appendReplacement(
           redacted, Matcher.quoteReplacement("\"" + matcher.group(1) + "\"='***'"));
+    }
+    matcher.appendTail(redacted);
+    return redacted.toString();
+  }
+
+  private static String redactJsonSecrets(String createCatalogCommand) {
+    Matcher matcher = SECRET_JSON_PROPERTY_PATTERN.matcher(createCatalogCommand);
+    StringBuffer redacted = new StringBuffer();
+    while (matcher.find()) {
+      matcher.appendReplacement(
+          redacted, Matcher.quoteReplacement("\"" + matcher.group(1) + "\":\"***\""));
     }
     matcher.appendTail(redacted);
     return redacted.toString();

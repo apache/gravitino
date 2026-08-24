@@ -41,6 +41,7 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 import org.slf4j.Logger;
@@ -316,7 +317,12 @@ public class CatalogConnectorManager {
   private void reloadCatalog(GravitinoCatalog catalog) {
     String catalogFullName = getTrinoCatalogName(catalog);
     GravitinoCatalog oldCatalog = catalogConnectors.get(catalogFullName).getCatalog();
-    if (catalog.getLastModifiedTime() <= oldCatalog.getLastModifiedTime()) {
+    // The discovered Iceberg REST endpoint is embedded into the catalog independently of
+    // Gravitino's own lastModifiedTime, so it is checked as a separate reload trigger.
+    boolean icebergRestUriChanged =
+        IcebergConnectorAdapter.hasDiscoveredIcebergRestUriChanged(catalog, oldCatalog, config);
+    if (catalog.getLastModifiedTime() <= oldCatalog.getLastModifiedTime()
+        && !icebergRestUriChanged) {
       return;
     }
 
