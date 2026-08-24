@@ -23,8 +23,10 @@ import java.util.Map;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
-import org.apache.gravitino.policy.PolicySelector;
+import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyTagAssociation;
 
 /**
@@ -142,28 +144,33 @@ public interface TagOperations {
   }
 
   /**
-   * Adds or updates one policy association for a tag without a selector.
+   * Adds one policy association for a tag using {@link AllValuesSelector}. It matches by tag
+   * presence regardless of assignment values and does not replace an existing association.
    *
    * @param tagName The tag name.
    * @param policyName The policy name.
    * @return The resulting association.
+   * @throws PolicyAlreadyAssociatedException If the policy is already associated with the tag.
    * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
    */
-  default PolicyTagAssociation addPolicyForTag(String tagName, String policyName) {
-    throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
+  default PolicyTagAssociation addPolicyForTag(String tagName, String policyName)
+      throws PolicyAlreadyAssociatedException {
+    return addPolicyForTag(tagName, policyName, AllValuesSelector.get());
   }
 
   /**
-   * Adds or updates one policy association for a tag with a selector.
+   * Adds one policy association for a tag. It does not replace an existing association.
    *
    * @param tagName The tag name.
    * @param policyName The policy name.
-   * @param selector The policy selector.
+   * @param selector The non-null policy association selector.
    * @return The resulting association.
+   * @throws PolicyAlreadyAssociatedException If the policy is already associated with the tag.
    * @throws UnsupportedOperationException If adding policy-to-tag associations is not supported.
    */
   default PolicyTagAssociation addPolicyForTag(
-      String tagName, String policyName, PolicySelector selector) {
+      String tagName, String policyName, PolicyAssociationSelector selector)
+      throws PolicyAlreadyAssociatedException {
     throw new UnsupportedOperationException("Adding a policy for a tag is not supported");
   }
 

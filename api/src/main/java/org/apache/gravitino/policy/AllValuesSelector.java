@@ -18,23 +18,30 @@
  */
 package org.apache.gravitino.policy;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.apache.gravitino.annotation.Evolving;
 
-public class TestTagValuePolicySelector {
+/** A policy association selector that matches whenever the effective tag assignment exists. */
+@Evolving
+public final class AllValuesSelector implements PolicyAssociationSelector {
 
-  @Test
-  public void testTagValueSelector() {
-    TagValuePolicySelector selector = TagValuePolicySelector.of("finance");
+  /** The selector type for tag-presence matching regardless of assignment values. */
+  public static final String TYPE = "ALL_VALUES";
 
-    Assertions.assertEquals("TAG_VALUE", selector.type());
-    Assertions.assertEquals("finance", selector.value());
-    Assertions.assertEquals(selector, TagValuePolicySelector.of("finance"));
+  private static final AllValuesSelector INSTANCE = new AllValuesSelector();
+
+  private AllValuesSelector() {}
+
+  /**
+   * Returns the selector that matches by tag presence, regardless of assignment values.
+   *
+   * @return The all-values selector.
+   */
+  public static AllValuesSelector get() {
+    return INSTANCE;
   }
 
-  @Test
-  public void testRejectBlankSelectorValue() {
-    Assertions.assertThrows(IllegalArgumentException.class, () -> TagValuePolicySelector.of(" "));
-    Assertions.assertThrows(IllegalArgumentException.class, () -> TagValuePolicySelector.of(null));
+  @Override
+  public String type() {
+    return TYPE;
   }
 }

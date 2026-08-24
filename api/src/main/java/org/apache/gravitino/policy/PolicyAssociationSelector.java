@@ -20,9 +20,9 @@ package org.apache.gravitino.policy;
 
 import org.apache.gravitino.annotation.Evolving;
 
-/** A selector that restricts when a policy-to-tag association applies. */
+/** A selector attached to a policy-to-tag association that restricts when it applies. */
 @Evolving
-public interface PolicySelector {
+public interface PolicyAssociationSelector {
 
   /**
    * Returns the selector type identifier.

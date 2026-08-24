@@ -23,16 +23,16 @@ import java.util.Objects;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.annotation.Evolving;
 
-/** A policy selector that matches one exact tag assignment value. */
+/** A policy association selector that matches one exact tag assignment value. */
 @Evolving
-public final class TagValuePolicySelector implements PolicySelector {
+public final class TagValueSelector implements PolicyAssociationSelector {
 
   /** The selector type for exact tag assignment value matching. */
   public static final String TYPE = "TAG_VALUE";
 
   private final String value;
 
-  private TagValuePolicySelector(String value) {
+  private TagValueSelector(String value) {
     this.value = value;
   }
 
@@ -42,9 +42,9 @@ public final class TagValuePolicySelector implements PolicySelector {
    * @param value The tag assignment value to match.
    * @return The selector.
    */
-  public static TagValuePolicySelector of(String value) {
+  public static TagValueSelector of(String value) {
     Preconditions.checkArgument(StringUtils.isNotBlank(value), "Selector value cannot be blank");
-    return new TagValuePolicySelector(value);
+    return new TagValueSelector(value);
   }
 
   @Override
@@ -64,10 +64,10 @@ public final class TagValuePolicySelector implements PolicySelector {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof TagValuePolicySelector)) {
+    if (!(o instanceof TagValueSelector)) {
       return false;
     }
-    TagValuePolicySelector that = (TagValuePolicySelector) o;
+    TagValueSelector that = (TagValueSelector) o;
     return Objects.equals(value, that.value);
   }
 
@@ -78,6 +78,6 @@ public final class TagValuePolicySelector implements PolicySelector {
 
   @Override
   public String toString() {
-    return "TagValuePolicySelector{value='" + value + "'}";
+    return "TagValueSelector{value='" + value + "'}";
   }
 }

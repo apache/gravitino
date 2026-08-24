@@ -18,25 +18,16 @@
  */
 package org.apache.gravitino.policy;
 
-import org.apache.gravitino.annotation.Evolving;
-import org.apache.gravitino.tag.Tag;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-/** A policy-to-tag association and its required assignment selector. */
-@Evolving
-public interface PolicyTagAssociation {
+public class TestAllValuesSelector {
 
-  /**
-   * @return The associated policy.
-   */
-  Policy policy();
+  @Test
+  public void testAllValuesSelector() {
+    AllValuesSelector selector = AllValuesSelector.get();
 
-  /**
-   * @return The associated tag.
-   */
-  Tag tag();
-
-  /**
-   * @return The non-null selector for this association.
-   */
-  PolicyAssociationSelector selector();
+    Assertions.assertEquals("ALL_VALUES", selector.type());
+    Assertions.assertSame(selector, AllValuesSelector.get());
+  }
 }
