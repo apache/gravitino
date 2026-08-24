@@ -30,17 +30,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Gravitino config. */
 public class GravitinoConfig {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConfig.class);
 
   // Trino config keys
   /** The Trino discovery URI. */
@@ -79,6 +76,9 @@ public class GravitinoConfig {
   private static final Map<String, ConfigEntry> CONFIG_DEFINITIONS = new HashMap<>();
   private final Map<String, String> config;
   private final List<Pattern> skipCatalogPatternList;
+  // Iceberg REST server endpoints discovered from the Gravitino server, keyed by metalake. Written
+  // by the catalog connector manager's periodic poll and read on every Iceberg catalog load.
+  private final Map<String, String> discoveredIcebergRestUriByMetalake = new ConcurrentHashMap<>();
 
   // Gravitino config entity
   private static final ConfigEntry GRAVITINO_URI =
@@ -183,20 +183,13 @@ public class GravitinoConfig {
           "3600",
           false);
 
-  private static final ConfigEntry GRAVITINO_ICEBERG_REST_ENABLED =
-      new ConfigEntry(
-          "gravitino.iceberg.rest-enabled",
-          "When true, lakehouse-iceberg catalogs are loaded through the Gravitino Iceberg REST "
-              + "server instead of being translated into a Trino JDBC or Hive metastore Iceberg "
-              + "catalog. Requires gravitino.iceberg.rest-uri.",
-          "true",
-          false);
-
   private static final ConfigEntry GRAVITINO_ICEBERG_REST_URI =
       new ConfigEntry(
           "gravitino.iceberg.rest-uri",
-          "The endpoint of the Gravitino Iceberg REST server, for example "
-              + "http://localhost:9001/iceberg.",
+          "The endpoint of the Gravitino Iceberg REST server. Discovered automatically from the "
+              + "Gravitino server by default; set this only to override the discovered value, "
+              + "for example when the Iceberg REST server is not reachable at the address the "
+              + "Gravitino server itself reports.",
           "",
           false);
 
@@ -238,28 +231,6 @@ public class GravitinoConfig {
           "Config `gravitino.trino.skip-catalog-patterns` is invalid because it contains an illegal regular expression",
           e);
     }
-    warnOnMissingIcebergRestUri();
-  }
-
-  /**
-   * Warns at startup when the Iceberg REST routing is on but has no endpoint. Without this, the
-   * failure only surfaces once a lakehouse-iceberg catalog is loaded, and that error is swallowed
-   * by the catalog refresh loop, leaving the user with an unexplained missing catalog.
-   */
-  private void warnOnMissingIcebergRestUri() {
-    // Only the statically configured connector warns; the dynamic per-catalog ones would repeat it.
-    if (isDynamicConnector()
-        || !isIcebergRestEnabled()
-        || StringUtils.isNotBlank(getIcebergRestUri())) {
-      return;
-    }
-    LOG.warn(
-        "'{}' is enabled but '{}' is not set, so every lakehouse-iceberg catalog will fail to "
-            + "load. Set the Iceberg REST server endpoint, or set '{}=false' to load Iceberg "
-            + "catalogs through their catalog backend instead.",
-        GRAVITINO_ICEBERG_REST_ENABLED.key,
-        GRAVITINO_ICEBERG_REST_URI.key,
-        GRAVITINO_ICEBERG_REST_ENABLED.key);
   }
 
   /**
@@ -502,25 +473,40 @@ public class GravitinoConfig {
   }
 
   /**
-   * Returns whether lakehouse-iceberg catalogs are routed through the Gravitino Iceberg REST
-   * server.
+   * Sets the Iceberg REST server endpoint discovered from the Gravitino server for the given
+   * metalake. Called by the catalog connector manager's periodic metalake poll; ignored for a
+   * metalake where {@code gravitino.iceberg.rest-uri} is explicitly configured, which always takes
+   * precedence.
    *
-   * @return true if the Iceberg REST routing is enabled
+   * @param metalake the metalake the endpoint was discovered for
+   * @param uri the discovered endpoint, or {@code null} when the Iceberg REST server is not running
+   *     or does not serve this metalake
    */
-  public boolean isIcebergRestEnabled() {
-    return Boolean.parseBoolean(
-        config.getOrDefault(
-            GRAVITINO_ICEBERG_REST_ENABLED.key, GRAVITINO_ICEBERG_REST_ENABLED.defaultValue));
+  public void setDiscoveredIcebergRestUri(String metalake, String uri) {
+    if (StringUtils.isBlank(uri)) {
+      discoveredIcebergRestUriByMetalake.remove(metalake);
+    } else {
+      discoveredIcebergRestUriByMetalake.put(metalake, uri);
+    }
   }
 
   /**
-   * Retrieves the endpoint of the Gravitino Iceberg REST server.
+   * Retrieves the Iceberg REST server endpoint to route the given metalake's lakehouse-iceberg
+   * catalogs through. Prefers an explicitly configured {@code gravitino.iceberg.rest-uri};
+   * otherwise falls back to the endpoint discovered from the Gravitino server for this metalake, if
+   * any.
    *
-   * @return the Iceberg REST server endpoint, or an empty string if not configured
+   * @param metalake the metalake to resolve the endpoint for
+   * @return the Iceberg REST server endpoint, or an empty string when none is available
    */
-  public String getIcebergRestUri() {
-    return config.getOrDefault(
-        GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
+  public String getIcebergRestUri(String metalake) {
+    String configured =
+        config.getOrDefault(
+            GRAVITINO_ICEBERG_REST_URI.key, GRAVITINO_ICEBERG_REST_URI.defaultValue);
+    if (StringUtils.isNotBlank(configured)) {
+      return configured;
+    }
+    return discoveredIcebergRestUriByMetalake.getOrDefault(metalake, "");
   }
 
   /**

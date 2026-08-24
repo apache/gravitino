@@ -151,18 +151,21 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
    * @param catalog the Gravitino catalog to load
    * @param gravitinoConfig the connector configuration holding the Iceberg REST server endpoint
    * @return the Trino Iceberg connector config
-   * @throws TrinoException if {@code gravitino.iceberg.rest-uri} is not configured
+   * @throws TrinoException if no Iceberg REST server endpoint is configured or discovered for this
+   *     catalog's metalake
    */
   public Map<String, String> buildIcebergRestProperties(
       GravitinoCatalog catalog, GravitinoConfig gravitinoConfig) {
-    String restUri = gravitinoConfig.getIcebergRestUri();
+    String restUri = gravitinoConfig.getIcebergRestUri(catalog.getMetalake());
     if (StringUtils.isBlank(restUri)) {
+      // The caller only reaches this method once it has already confirmed a non-blank URI, so
+      // this is defensive: it can only fire if that URI disappeared between the two calls.
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
-          "Missing required config 'gravitino.iceberg.rest-uri'. Set it to the Gravitino Iceberg "
-              + "REST server endpoint, for example http://localhost:9001/iceberg, or set "
-              + "'gravitino.iceberg.rest-enabled=false' to load Iceberg catalogs through their "
-              + "catalog backend instead.");
+          "No Iceberg REST server endpoint is available for metalake '"
+              + catalog.getMetalake()
+              + "'. Set 'gravitino.iceberg.rest-uri' to override the address the Gravitino "
+              + "server reports.");
     }
 
     Map<String, String> config = new HashMap<>();
@@ -189,19 +192,6 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
     // The server echoes `prefix` back as a config default, so setting it here is belt-and-braces.
     config.put(TRINO_ICEBERG_REST_WAREHOUSE, catalog.getName());
     config.put(TRINO_ICEBERG_REST_PREFIX, catalog.getName());
-
-    if (!gravitinoConfig.singleMetalakeMode()) {
-      // The IRC serves exactly one metalake, and the prefix carries only the catalog name, so two
-      // metalakes holding a same-named catalog both resolve to whichever one the IRC was started
-      // with.
-      LOG.warn(
-          "Catalog '{}' in metalake '{}' is routed to the Iceberg REST server using the catalog "
-              + "name alone. In multi-metalake mode this is ambiguous: the Iceberg REST server "
-              + "serves a single metalake, so a same-named catalog in another metalake resolves to "
-              + "the same prefix.",
-          catalog.getName(),
-          catalog.getMetalake());
-    }
     return config;
   }
 

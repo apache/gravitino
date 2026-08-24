@@ -95,6 +95,16 @@ public class AuxiliaryServiceManager {
   }
 
   @VisibleForTesting
+  /**
+   * Returns whether the given auxiliary service was configured and registered.
+   *
+   * @param auxServiceName the auxiliary service's short name, e.g. {@code iceberg-rest}
+   * @return true if the service is registered
+   */
+  public boolean isAuxServiceRegistered(String auxServiceName) {
+    return auxServices.containsKey(auxServiceName);
+  }
+
   public IsolatedClassLoader getIsolatedClassLoader(List<String> classPaths) {
     return IsolatedClassLoader.buildClassLoader(classPaths);
   }

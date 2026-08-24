@@ -131,7 +131,6 @@ public class TrinoConnectorIT extends BaseIT {
         trinoConfDir,
         System.getenv("GRAVITINO_ROOT_DIR") + "/trino-connector/build/libs",
         getGravitinoServerPort(),
-        getIcebergRestServicePort(),
         metalakeName);
     Assertions.assertTrue(
         containerSuite.getTrinoContainer().checkSyncCatalogFromGravitino(5, catalogName),

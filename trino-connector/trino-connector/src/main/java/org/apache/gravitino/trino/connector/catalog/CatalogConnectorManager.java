@@ -184,6 +184,7 @@ public class CatalogConnectorManager {
         try {
           GravitinoMetalake metalake = metalakes.get(usedMetalake);
           LOG.debug("Load metalake: {}", usedMetalake);
+          refreshIcebergRestUri(usedMetalake);
           loadCatalogs(metalake);
         } catch (Exception e) {
           LOG.error("Load Metalake {} failed.", usedMetalake, e);
@@ -191,6 +192,23 @@ public class CatalogConnectorManager {
       }
     } catch (Exception e) {
       LOG.error("Error when loading metalake", e);
+    }
+  }
+
+  /**
+   * Asks the Gravitino server whether it has an Iceberg REST server running for this metalake, and
+   * caches the answer on the shared {@link GravitinoConfig} for {@code IcebergConnectorAdapter} to
+   * read on the next catalog load. Failures — including talking to a Gravitino server older than
+   * this endpoint — must not interrupt catalog loading, so they are swallowed here; Iceberg
+   * catalogs simply keep their last known routing decision until the next successful poll.
+   */
+  private void refreshIcebergRestUri(String metalakeName) {
+    try {
+      config.setDiscoveredIcebergRestUri(
+          metalakeName, gravitinoClient.icebergRestServiceUri(metalakeName).orElse(null));
+    } catch (Exception e) {
+      LOG.debug(
+          "Failed to query the Iceberg REST service endpoint for metalake {}.", metalakeName, e);
     }
   }
 

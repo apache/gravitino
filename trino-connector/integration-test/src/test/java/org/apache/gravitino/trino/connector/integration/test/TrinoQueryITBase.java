@@ -129,7 +129,6 @@ public class TrinoQueryITBase {
 
       trinoITContainers.launch(
           baseIT.getGravitinoServerPort(),
-          baseIT.getIcebergRestServicePort(),
           hiveRuntimeVersion,
           isTrinoConnectorTest,
           trinoWorkerNum,

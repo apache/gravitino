@@ -30,7 +30,6 @@ import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -685,16 +684,6 @@ public class BaseIT {
   public void enableIcebergAuxRestService(Map<String, String> icebergRestConfigs) {
     this.ignoreIcebergAuxRestService = false;
     this.customConfigs.putAll(icebergRestConfigs);
-  }
-
-  /**
-   * Returns the port the Iceberg REST auxiliary service listens on. Only valid once {@link
-   * #startIntegrationTest()} has run, since it reads the started server's config.
-   *
-   * @return the Iceberg REST service port
-   */
-  public int getIcebergRestServicePort() {
-    return URI.create(getIcebergRestServiceUri()).getPort();
   }
 
   protected String getIcebergRestServiceUri() {
