@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.doris.integration.test;
 
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -378,6 +380,29 @@ public class CatalogDorisIT extends BaseIT {
         null,
         Transforms.EMPTY_TRANSFORM,
         renamedTable);
+  }
+
+  @Test
+  void testCreateTableWithReplicationAllocation() {
+    NameIdentifier tableIdentifier =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("doris_replication_allocation"));
+    String replicationAllocation = "tag.location.default: 1";
+    Map<String, String> properties = ImmutableMap.of(REPLICATION_ALLOCATION, replicationAllocation);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        createDistribution(),
+        null);
+
+    Table loadedTable = tableCatalog.loadTable(tableIdentifier);
+    assertEquals(replicationAllocation, loadedTable.properties().get(REPLICATION_ALLOCATION));
+    assertFalse(loadedTable.properties().containsKey(REPLICATION_FACTOR));
   }
 
   @Test

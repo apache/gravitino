@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.catalog.doris;
 
+import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_ALLOCATION;
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 
 import java.util.Map;
@@ -33,6 +34,7 @@ public class TestDorisCatalog {
     DorisTablePropertiesMetadata dorisTablePropertiesMetadata = new DorisTablePropertiesMetadata();
     Map<String, PropertyEntry<?>> propertyEntryMap =
         dorisTablePropertiesMetadata.specificPropertyEntries();
+    Assertions.assertEquals(2, propertyEntryMap.size());
     Assertions.assertTrue(propertyEntryMap.containsKey(REPLICATION_FACTOR));
 
     PropertyEntry<?> propertyEntry = propertyEntryMap.get(REPLICATION_FACTOR);
@@ -41,5 +43,15 @@ public class TestDorisCatalog {
     Assertions.assertEquals(
         DorisTablePropertiesMetadata.DEFAULT_REPLICATION_FACTOR, propertyEntry.getDefaultValue());
     Assertions.assertFalse(propertyEntry.isHidden());
+
+    Assertions.assertTrue(propertyEntryMap.containsKey(REPLICATION_ALLOCATION));
+    PropertyEntry<?> replicationAllocation = propertyEntryMap.get(REPLICATION_ALLOCATION);
+    Assertions.assertEquals(REPLICATION_ALLOCATION, replicationAllocation.getName());
+    Assertions.assertFalse(replicationAllocation.isRequired());
+    Assertions.assertFalse(replicationAllocation.isImmutable());
+    Assertions.assertFalse(replicationAllocation.isReserved());
+    Assertions.assertFalse(replicationAllocation.isHidden());
+    Assertions.assertEquals(String.class, replicationAllocation.getJavaType());
+    Assertions.assertNull(replicationAllocation.getDefaultValue());
   }
 }
