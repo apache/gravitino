@@ -103,10 +103,10 @@ public class FilesetSecretsIT extends BaseIT {
                 ImmutableMap.of());
 
     Assertions.assertEquals("visible-value", fileset.properties().get("visible-key"));
-    Assertions.assertTrue(
-        fileset.properties().get("custom-secret").startsWith("gravitino-secret://"),
-        "create-time binding should persist as URN, got: "
-            + fileset.properties().get("custom-secret"));
+    // Default load properties omit secret-manager values; plaintext comes from getSecrets().
+    Assertions.assertFalse(
+        fileset.properties().containsKey("custom-secret"),
+        "secret bindings must not appear in default load properties");
 
     Map<String, String> secrets = fileset.supportsSecrets().getSecrets();
     Assertions.assertEquals("mem-plaintext", secrets.get("custom-secret"));

@@ -51,8 +51,7 @@ public class TestCatalogAuthorizationExpression {
 
   @Test
   public void testLoadCatalog() throws NoSuchMethodException, OgnlException {
-    Method method =
-        CatalogOperations.class.getMethod("loadCatalog", String.class, String.class, String.class);
+    Method method = CatalogOperations.class.getMethod("loadCatalog", String.class, String.class);
     AuthorizationExpression authorizationExpressionAnnotation =
         method.getAnnotation(AuthorizationExpression.class);
     String expression = authorizationExpressionAnnotation.expression();
