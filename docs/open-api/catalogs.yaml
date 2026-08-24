@@ -154,7 +154,7 @@ paths:
         - catalog
       summary: Get catalog
       operationId: loadCatalog
-      description: Returns the specified catalog information in the specified metalake
+      description: Returns the specified catalog information in the specified metalake.
       responses:
         "200":
           $ref: "#/components/responses/CatalogResponse"
@@ -257,8 +257,6 @@ paths:
           $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
-
-
 
 components:
   parameters:

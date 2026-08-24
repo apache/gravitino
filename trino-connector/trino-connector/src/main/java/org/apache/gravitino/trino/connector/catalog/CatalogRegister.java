@@ -22,19 +22,22 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYN
 import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.collect.ImmutableSet;
 import io.trino.jdbc.TrinoDriver;
 import io.trino.spi.TrinoException;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
@@ -53,11 +56,11 @@ public class CatalogRegister {
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
 
-  // Matches "some.key.credential"='value' style property assignments (as produced by
-  // GravitinoConfig.toCatalogConfig / GravitinoCatalog.toJson-embedded WITH(...) clauses) whose
-  // key looks like it carries a secret, e.g. gravitino.iceberg.rest-catalog.oauth2.credential.
-  // Values matching this are redacted before the CREATE CATALOG statement is logged, since it can
-  // otherwise leak IRC OAuth2 client secrets and similar into the log and Trino's query history.
+  private static final String SSL_VERIFICATION_FULL = "FULL";
+  private static final String SSL_VERIFICATION_CA = "CA";
+  private static final String SSL_VERIFICATION_NONE = "NONE";
+  private static final Set<String> SSL_VERIFICATION_MODES =
+      ImmutableSet.of(SSL_VERIFICATION_FULL, SSL_VERIFICATION_CA, SSL_VERIFICATION_NONE);
   private static final Pattern SECRET_PROPERTY_PATTERN =
       Pattern.compile(
           "\"([^\"]*(?:credential|token|secret|password)[^\"]*)\"\\s*=\\s*'([^']*)'",
@@ -94,17 +97,16 @@ public class CatalogRegister {
     this.config = config;
 
     TrinoDriver driver = new TrinoDriver();
-    DriverManager.registerDriver(driver);
-
-    Properties properties = new Properties();
-    properties.put("user", config.getTrinoUser());
-    properties.put("password", config.getTrinoPassword());
+    Properties properties = buildJdbcProperties(config);
+    String jdbcUri = config.getTrinoJdbcURI();
     try {
-      connection = driver.connect(config.getTrinoJdbcURI(), properties);
+      connection = driver.connect(jdbcUri, properties);
     } catch (SQLException e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
-          "Failed to initialize the Trino connection.",
+          String.format(
+              "Failed to initialize the Trino connection to %s (TLS %s).",
+              jdbcUri, config.isTrinoJdbcSslEnabled() ? "enabled" : "disabled"),
           e);
     }
 
@@ -118,8 +120,195 @@ public class CatalogRegister {
     }
   }
 
-  // Package-private (rather than private) so tests can exercise the embed-then-serialize wiring
-  // without a live Trino JDBC connection, which init() otherwise requires.
+  /**
+   * Builds the JDBC properties used by the internal connection to the Trino coordinator.
+   *
+   * <p>The properties derived from the dedicated {@code trino.jdbc.*} configurations are applied
+   * first, then the raw driver properties configured with the {@code trino.jdbc.properties.} prefix
+   * are applied on top of them, so that any driver property can be overridden.
+   *
+   * @param config the Gravitino configuration
+   * @return the JDBC properties
+   */
+  @VisibleForTesting
+  static Properties buildJdbcProperties(GravitinoConfig config) {
+    boolean sslEnabled = config.isTrinoJdbcSslEnabled();
+    String verification = config.getTrinoJdbcSslVerification();
+    String truststorePath = config.getTrinoJdbcSslTruststorePath();
+    String truststorePassword = config.getTrinoJdbcSslTruststorePassword();
+    String truststoreType = config.getTrinoJdbcSslTruststoreType();
+    String keystorePath = config.getTrinoJdbcSslKeystorePath();
+    String keystorePassword = config.getTrinoJdbcSslKeystorePassword();
+    String keystoreType = config.getTrinoJdbcSslKeystoreType();
+    String roles = config.getTrinoJdbcRoles();
+
+    validateSslConfig(
+        sslEnabled,
+        verification,
+        truststorePath,
+        truststorePassword,
+        truststoreType,
+        keystorePath,
+        keystorePassword,
+        keystoreType);
+
+    Properties properties = new Properties();
+    properties.put("user", config.getTrinoUser());
+    String password = config.getTrinoPassword();
+    if (StringUtils.isNotEmpty(password)) {
+      properties.put("password", password);
+    }
+
+    if (sslEnabled) {
+      properties.put("SSL", "true");
+      properties.put("SSLVerification", verification);
+      if (StringUtils.isNotBlank(truststorePath)) {
+        properties.put("SSLTrustStorePath", truststorePath);
+      }
+      if (StringUtils.isNotEmpty(truststorePassword)) {
+        properties.put("SSLTrustStorePassword", truststorePassword);
+      }
+      if (StringUtils.isNotBlank(truststoreType)) {
+        properties.put("SSLTrustStoreType", truststoreType);
+      }
+      if (StringUtils.isNotBlank(keystorePath)) {
+        properties.put("SSLKeyStorePath", keystorePath);
+      }
+      if (StringUtils.isNotEmpty(keystorePassword)) {
+        properties.put("SSLKeyStorePassword", keystorePassword);
+      }
+      if (StringUtils.isNotBlank(keystoreType)) {
+        properties.put("SSLKeyStoreType", keystoreType);
+      }
+    }
+
+    if (StringUtils.isNotBlank(roles)) {
+      properties.put("roles", roles);
+    }
+
+    Map<String, String> extraProperties = config.getTrinoJdbcExtraProperties();
+    if (!extraProperties.isEmpty()) {
+      // Log the names only, the values may contain credentials.
+      LOG.debug("Applying extra Trino JDBC properties: {}", extraProperties.keySet());
+      extraProperties.keySet().stream()
+          .filter(key -> key.startsWith("SSL") && properties.containsKey(key))
+          .forEach(
+              key ->
+                  LOG.warn(
+                      "Extra Trino JDBC property '{}' overrides the TLS setting derived from the "
+                          + "dedicated configuration and is applied without validation",
+                      key));
+      properties.putAll(extraProperties);
+    }
+    return properties;
+  }
+
+  private static void validateSslConfig(
+      boolean sslEnabled,
+      String verification,
+      String truststorePath,
+      String truststorePassword,
+      String truststoreType,
+      String keystorePath,
+      String keystorePassword,
+      String keystoreType) {
+    if (!SSL_VERIFICATION_MODES.contains(verification)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format(
+              "Invalid value for config 'trino.jdbc.ssl.verification': expected one of %s, got: %s",
+              SSL_VERIFICATION_MODES, verification));
+    }
+
+    if (!sslEnabled) {
+      if (!SSL_VERIFICATION_FULL.equals(verification)) {
+        throw new TrinoException(
+            GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+            "Config 'trino.jdbc.ssl.verification' requires TLS to be enabled either by an HTTPS "
+                + "'discovery.uri' or by 'trino.jdbc.ssl.enabled=true'");
+      }
+      checkRequiresSslEnabled("trino.jdbc.ssl.truststore.path", truststorePath);
+      checkRequiresSslEnabled("trino.jdbc.ssl.truststore.password", truststorePassword);
+      checkRequiresSslEnabled("trino.jdbc.ssl.truststore.type", truststoreType);
+      checkRequiresSslEnabled("trino.jdbc.ssl.keystore.path", keystorePath);
+      checkRequiresSslEnabled("trino.jdbc.ssl.keystore.password", keystorePassword);
+      checkRequiresSslEnabled("trino.jdbc.ssl.keystore.type", keystoreType);
+      return;
+    }
+
+    validateKeystoreConfig(verification, keystorePath, keystorePassword, keystoreType);
+
+    if (StringUtils.isBlank(truststorePath)) {
+      // The driver falls back to the default JVM truststore, which the password and the type of a
+      // truststore that was never configured have nothing to apply to.
+      checkRequires(
+          "trino.jdbc.ssl.truststore.password",
+          truststorePassword,
+          "trino.jdbc.ssl.truststore.path");
+      checkRequires(
+          "trino.jdbc.ssl.truststore.type", truststoreType, "trino.jdbc.ssl.truststore.path");
+      return;
+    }
+
+    if (SSL_VERIFICATION_NONE.equals(verification)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Config 'trino.jdbc.ssl.truststore.path' cannot be used with "
+              + "'trino.jdbc.ssl.verification' = NONE");
+    }
+    if (!Files.exists(Path.of(truststorePath))) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
+          String.format(
+              "The truststore file configured by 'trino.jdbc.ssl.truststore.path' does not exist: %s",
+              truststorePath));
+    }
+  }
+
+  private static void validateKeystoreConfig(
+      String verification, String keystorePath, String keystorePassword, String keystoreType) {
+    if (StringUtils.isBlank(keystorePath)) {
+      checkRequires(
+          "trino.jdbc.ssl.keystore.password", keystorePassword, "trino.jdbc.ssl.keystore.path");
+      checkRequires("trino.jdbc.ssl.keystore.type", keystoreType, "trino.jdbc.ssl.keystore.path");
+      return;
+    }
+    if (SSL_VERIFICATION_NONE.equals(verification)) {
+      // The driver rejects the keystore properties in this combination, so fail with a config
+      // error here rather than letting it surface as a connection failure.
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          "Config 'trino.jdbc.ssl.keystore.path' cannot be used with "
+              + "'trino.jdbc.ssl.verification' = NONE");
+    }
+    if (!Files.exists(Path.of(keystorePath))) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_MISSING_CONFIG,
+          String.format(
+              "The keystore file configured by 'trino.jdbc.ssl.keystore.path' does not exist: %s",
+              keystorePath));
+    }
+  }
+
+  private static void checkRequires(String key, String value, String requiredKey) {
+    if (StringUtils.isNotEmpty(value)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format("Config '%s' requires '%s' to be set", key, requiredKey));
+    }
+  }
+
+  private static void checkRequiresSslEnabled(String key, String value) {
+    if (StringUtils.isNotEmpty(value)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format(
+              "Config '%s' requires TLS to be enabled either by an HTTPS 'discovery.uri' or by "
+                  + "'trino.jdbc.ssl.enabled=true'",
+              key));
+    }
+  }
+
   @VisibleForTesting
   void setConfigForTesting(GravitinoConfig config) {
     this.config = config;
@@ -128,10 +317,6 @@ public class CatalogRegister {
   @VisibleForTesting
   String generateCreateCatalogCommand(String name, GravitinoCatalog gravitinoCatalog)
       throws Exception {
-    // This statement is replicated by Trino to every node in the cluster, coordinator and workers
-    // alike, so it is the only place a value the coordinator alone knows (like the Iceberg REST
-    // server endpoint it discovered) can reach every node that will build this catalog's internal
-    // connector config.
     GravitinoCatalog catalogToRegister =
         IcebergConnectorAdapter.embedDiscoveredIcebergRestUri(gravitinoCatalog, config);
     return String.format(

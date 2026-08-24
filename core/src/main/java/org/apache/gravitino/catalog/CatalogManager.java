@@ -99,6 +99,7 @@ import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.messaging.TopicCatalog;
 import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelCatalog;
@@ -1317,6 +1318,18 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   private BaseCatalog<?> createBaseCatalog(IsolatedClassLoader classLoader, CatalogEntity entity) {
+    BaseMetalake metalakeEntity;
+    try {
+      metalakeEntity =
+          store.get(
+              NameIdentifier.of(entity.namespace().levels()),
+              EntityType.METALAKE,
+              BaseMetalake.class);
+    } catch (IOException e) {
+      throw new RuntimeException(
+          String.format("Failed to load metalake for catalog %s", entity.nameIdentifier()), e);
+    }
+
     // Load Catalog class instance
     BaseCatalog<?> catalog = createCatalogInstance(classLoader, entity.getProvider());
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
@@ -1324,7 +1337,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     catalog
         .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
         .withCatalogEntity(entity);
-    catalog.initAuthorizationPluginInstance(classLoader);
+    catalog.initAuthorizationPluginInstance(classLoader, metalakeEntity.id());
     return catalog;
   }
 

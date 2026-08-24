@@ -219,7 +219,9 @@ public class TableAuthorizationIT extends BaseRestApiAuthorizationIT {
     NameIdentifier[] tablesListNormalUser = tableCatalogNormalUser.listTables(Namespace.of(SCHEMA));
     assertArrayEquals(
         new NameIdentifier[] {
-          NameIdentifier.of(SCHEMA, "table2"), NameIdentifier.of(SCHEMA, "table3")
+          NameIdentifier.of(SCHEMA, "table1"),
+          NameIdentifier.of(SCHEMA, "table2"),
+          NameIdentifier.of(SCHEMA, "table3")
         },
         tablesListNormalUser);
   }
