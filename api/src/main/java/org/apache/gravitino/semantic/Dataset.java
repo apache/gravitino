@@ -45,16 +45,12 @@ public final class Dataset {
   private Dataset(Builder builder) {
     this.name = builder.name;
     this.source = builder.source;
-    this.primaryKey = copyOrNull(builder.primaryKey);
+    this.primaryKey = SemanticModelDefinition.copyOrNull(builder.primaryKey);
     this.uniqueKeys = copyUniqueKeys(builder.uniqueKeys);
     this.description = builder.description;
     this.aiContext = builder.aiContext;
-    this.fields =
-        builder.fields == null ? null : Arrays.copyOf(builder.fields, builder.fields.length);
-    this.customExtensions =
-        builder.customExtensions == null
-            ? null
-            : Arrays.copyOf(builder.customExtensions, builder.customExtensions.length);
+    this.fields = SemanticModelDefinition.copyOrNull(builder.fields);
+    this.customExtensions = SemanticModelDefinition.copyOrNull(builder.customExtensions);
   }
 
   /**
@@ -91,7 +87,7 @@ public final class Dataset {
    */
   @Nullable
   public String[] primaryKey() {
-    return copyOrNull(primaryKey);
+    return SemanticModelDefinition.copyOrNull(primaryKey);
   }
 
   /**
@@ -131,7 +127,7 @@ public final class Dataset {
    */
   @Nullable
   public Field[] fields() {
-    return fields == null ? null : Arrays.copyOf(fields, fields.length);
+    return SemanticModelDefinition.copyOrNull(fields);
   }
 
   /**
@@ -141,9 +137,7 @@ public final class Dataset {
    */
   @Nullable
   public CustomExtension[] customExtensions() {
-    return customExtensions == null
-        ? null
-        : Arrays.copyOf(customExtensions, customExtensions.length);
+    return SemanticModelDefinition.copyOrNull(customExtensions);
   }
 
   /**
@@ -338,11 +332,6 @@ public final class Dataset {
       SemanticModelDefinition.validateNoNullElements("customExtensions", customExtensions);
       return new Dataset(this);
     }
-  }
-
-  @Nullable
-  private static String[] copyOrNull(@Nullable String[] values) {
-    return values == null ? null : Arrays.copyOf(values, values.length);
   }
 
   @Nullable

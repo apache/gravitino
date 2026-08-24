@@ -41,16 +41,9 @@ public final class SemanticModelDefinition {
   private SemanticModelDefinition(Builder builder) {
     this.aiContext = builder.aiContext;
     this.datasets = Arrays.copyOf(builder.datasets, builder.datasets.length);
-    this.relationships =
-        builder.relationships == null
-            ? null
-            : Arrays.copyOf(builder.relationships, builder.relationships.length);
-    this.metrics =
-        builder.metrics == null ? null : Arrays.copyOf(builder.metrics, builder.metrics.length);
-    this.customExtensions =
-        builder.customExtensions == null
-            ? null
-            : Arrays.copyOf(builder.customExtensions, builder.customExtensions.length);
+    this.relationships = copyOrNull(builder.relationships);
+    this.metrics = copyOrNull(builder.metrics);
+    this.customExtensions = copyOrNull(builder.customExtensions);
   }
 
   /**
@@ -88,7 +81,7 @@ public final class SemanticModelDefinition {
    */
   @Nullable
   public Relationship[] relationships() {
-    return relationships == null ? null : Arrays.copyOf(relationships, relationships.length);
+    return copyOrNull(relationships);
   }
 
   /**
@@ -98,7 +91,7 @@ public final class SemanticModelDefinition {
    */
   @Nullable
   public Metric[] metrics() {
-    return metrics == null ? null : Arrays.copyOf(metrics, metrics.length);
+    return copyOrNull(metrics);
   }
 
   /**
@@ -108,9 +101,7 @@ public final class SemanticModelDefinition {
    */
   @Nullable
   public CustomExtension[] customExtensions() {
-    return customExtensions == null
-        ? null
-        : Arrays.copyOf(customExtensions, customExtensions.length);
+    return copyOrNull(customExtensions);
   }
 
   /**
@@ -169,6 +160,11 @@ public final class SemanticModelDefinition {
         + ", customExtensions="
         + Arrays.toString(customExtensions)
         + '}';
+  }
+
+  @Nullable
+  static <T> T[] copyOrNull(@Nullable T[] values) {
+    return values == null ? null : Arrays.copyOf(values, values.length);
   }
 
   static void validateNoNullElements(String name, @Nullable Object[] values) {

@@ -46,10 +46,7 @@ public final class Metric {
     this.description = builder.description;
     this.datatype = builder.datatype;
     this.aiContext = builder.aiContext;
-    this.customExtensions =
-        builder.customExtensions == null
-            ? null
-            : Arrays.copyOf(builder.customExtensions, builder.customExtensions.length);
+    this.customExtensions = SemanticModelDefinition.copyOrNull(builder.customExtensions);
   }
 
   /**
@@ -116,9 +113,7 @@ public final class Metric {
    */
   @Nullable
   public CustomExtension[] customExtensions() {
-    return customExtensions == null
-        ? null
-        : Arrays.copyOf(customExtensions, customExtensions.length);
+    return SemanticModelDefinition.copyOrNull(customExtensions);
   }
 
   /**

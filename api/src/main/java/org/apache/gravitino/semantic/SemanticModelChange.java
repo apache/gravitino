@@ -26,8 +26,7 @@ import org.apache.gravitino.annotation.Evolving;
 
 /**
  * A change that can be applied to a Semantic Model through {@link
- * SemanticModelCatalog#alterSemanticModel(org.apache.gravitino.NameIdentifier,
- * SemanticModelChange...)}.
+ * SemanticModelCatalog#alterSemanticModel}.
  */
 @Evolving
 public interface SemanticModelChange {

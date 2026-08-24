@@ -47,10 +47,7 @@ public final class Relationship {
     this.fromColumns = Arrays.copyOf(builder.fromColumns, builder.fromColumns.length);
     this.toColumns = Arrays.copyOf(builder.toColumns, builder.toColumns.length);
     this.aiContext = builder.aiContext;
-    this.customExtensions =
-        builder.customExtensions == null
-            ? null
-            : Arrays.copyOf(builder.customExtensions, builder.customExtensions.length);
+    this.customExtensions = SemanticModelDefinition.copyOrNull(builder.customExtensions);
   }
 
   /**
@@ -124,9 +121,7 @@ public final class Relationship {
    */
   @Nullable
   public CustomExtension[] customExtensions() {
-    return customExtensions == null
-        ? null
-        : Arrays.copyOf(customExtensions, customExtensions.length);
+    return SemanticModelDefinition.copyOrNull(customExtensions);
   }
 
   /**

@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 public class TestSemanticModelSupportingTypes {
@@ -177,6 +178,31 @@ public class TestSemanticModelSupportingTypes {
             .build();
     assertEquals(equivalentContext, equivalentLongContext);
     assertEquals(equivalentContext.hashCode(), equivalentLongContext.hashCode());
+  }
+
+  @Test
+  public void testAIContextAdditionalPropertyBounds() {
+    Object maximumDepthValue = "value";
+    for (int depth = 0; depth < AIContextObject.MAX_ADDITIONAL_PROPERTY_NESTING_DEPTH; depth++) {
+      maximumDepthValue = Map.of("nested", maximumDepthValue);
+    }
+    AIContextObject.builder()
+        .withAdditionalProperties(Map.of("maximumDepth", maximumDepthValue))
+        .build();
+
+    Object excessiveDepthValue = Map.of("nested", maximumDepthValue);
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            AIContextObject.builder()
+                .withAdditionalProperties(Map.of("excessiveDepth", excessiveDepthValue))
+                .build());
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            AIContextObject.builder()
+                .withAdditionalProperties(Map.of("unsupportedNumber", new AtomicInteger(1)))
+                .build());
   }
 
   @Test
