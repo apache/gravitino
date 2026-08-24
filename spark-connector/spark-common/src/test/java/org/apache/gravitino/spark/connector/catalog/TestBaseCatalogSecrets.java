@@ -40,6 +40,7 @@ import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.connector.catalog.Table;
 import org.apache.spark.sql.connector.catalog.TableCatalog;
@@ -58,7 +59,7 @@ public class TestBaseCatalogSecrets {
   @BeforeAll
   void initCatalogManager() {
     gravitinoClient = mock(GravitinoClient.class);
-    GravitinoCatalogManager.create(() -> gravitinoClient);
+    GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> gravitinoClient);
   }
 
   @AfterAll
@@ -110,7 +111,9 @@ public class TestBaseCatalogSecrets {
     when(gravitinoCatalog.supportsSecrets()).thenReturn(supportsSecrets);
     when(supportsSecrets.getSecrets()).thenReturn(secrets);
     when(gravitinoClient.loadCatalog(any())).thenReturn(gravitinoCatalog);
-    GravitinoCatalogManager.get().getCatalogs().clear();
+    // Catalog info is cached; recreate the manager so each test loads the new mock.
+    GravitinoCatalogManager.get().close();
+    GravitinoCatalogManager.create(new SparkConf(false), "user", identity -> gravitinoClient);
     catalog = new CapturingCatalog(sparkCatalog);
   }
 
