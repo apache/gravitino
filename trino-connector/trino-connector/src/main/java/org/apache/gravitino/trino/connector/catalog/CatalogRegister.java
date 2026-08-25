@@ -416,7 +416,7 @@ public class CatalogRegister {
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, e.getMessage(), e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
-      LOG.error(message);
+      LOG.error(message, e);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
@@ -499,7 +499,7 @@ public class CatalogRegister {
       LOG.info("Unregister catalog {} successfully: {}", name, dropCatalogCommand);
     } catch (Exception e) {
       String message = String.format("Failed to unregister catalog %s", name);
-      LOG.error(message);
+      LOG.error(message, e);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
