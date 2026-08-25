@@ -159,6 +159,27 @@ public interface PolicyMetaMapper {
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "selectPolicyByPolicyId")
   PolicyPO selectPolicyByPolicyId(@Param("policyId") Long policyId);
 
+  /**
+   * Selects and share-locks an active policy by ID.
+   *
+   * @param policyId The policy ID.
+   * @return The locked policy, or null if it is not active.
+   */
+  @Results({
+    @Result(property = "policyId", column = "policy_id"),
+    @Result(property = "policyName", column = "policy_name"),
+    @Result(property = "policyType", column = "policy_type"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at")
+  })
+  @SelectProvider(
+      type = PolicyMetaSQLProviderFactory.class,
+      method = "selectPolicyByPolicyIdForShare")
+  PolicyPO selectPolicyByPolicyIdForShare(@Param("policyId") Long policyId);
+
   @Results({
     @Result(property = "policyId", column = "policy_id"),
     @Result(property = "policyName", column = "policy_name"),

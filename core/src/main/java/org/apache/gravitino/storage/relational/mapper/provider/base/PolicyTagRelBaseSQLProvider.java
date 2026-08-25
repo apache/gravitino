@@ -62,22 +62,47 @@ public class PolicyTagRelBaseSQLProvider {
   }
 
   /** Returns SQL for replacing a relation selector. */
-  public String updateSelector(@Param("relation") PolicyTagRelPO relation) {
+  public String updateSelector(
+      @Param("newRelation") PolicyTagRelPO newRelation,
+      @Param("oldRelation") PolicyTagRelPO oldRelation) {
     return "UPDATE "
         + POLICY_TAG_RELATION_TABLE_NAME
-        + " SET selector = #{relation.selector}, audit_info = #{relation.auditInfo},"
-        + " current_version = current_version + 1, last_version = last_version + 1"
-        + " WHERE policy_id = #{relation.policyId} AND tag_id = #{relation.tagId}"
-        + " AND deleted_at = 0";
+        + " SET selector = #{newRelation.selector}, audit_info = #{newRelation.auditInfo},"
+        + " current_version = #{newRelation.currentVersion},"
+        + " last_version = #{newRelation.lastVersion}"
+        + " WHERE policy_id = #{oldRelation.policyId} AND tag_id = #{oldRelation.tagId}"
+        + " AND current_version = #{oldRelation.currentVersion} AND deleted_at = 0";
   }
 
   /** Returns SQL for soft-deleting one relation. */
-  public String softDeleteByPair(@Param("policyId") Long policyId, @Param("tagId") Long tagId) {
+  public String softDeleteByPair(@Param("relation") PolicyTagRelPO relation) {
     return "UPDATE "
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
-        + " WHERE policy_id = #{policyId} AND tag_id = #{tagId} AND deleted_at = 0";
+        + ", tombstone_id = id"
+        + " WHERE policy_id = #{relation.policyId} AND tag_id = #{relation.tagId}"
+        + " AND current_version = #{relation.currentVersion} AND deleted_at = 0";
+  }
+
+  /** Returns SQL for soft-deleting relations by policy ID. */
+  public String softDeleteByPolicyId(@Param("policyId") Long policyId) {
+    return "UPDATE "
+        + POLICY_TAG_RELATION_TABLE_NAME
+        + " SET deleted_at = "
+        + deletedAtNowExpression()
+        + ", tombstone_id = id"
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
+  }
+
+  /** Returns SQL for soft-deleting relations by tag ID. */
+  public String softDeleteByTagId(@Param("tagId") Long tagId) {
+    return "UPDATE "
+        + POLICY_TAG_RELATION_TABLE_NAME
+        + " SET deleted_at = "
+        + deletedAtNowExpression()
+        + ", tombstone_id = id"
+        + " WHERE tag_id = #{tagId} AND deleted_at = 0";
   }
 
   /** Returns SQL for soft-deleting relations when a policy is deleted. */
@@ -87,6 +112,7 @@ public class PolicyTagRelBaseSQLProvider {
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
+        + ", tombstone_id = id"
         + " WHERE policy_id IN (SELECT pm.policy_id FROM "
         + PolicyMetaMapper.POLICY_META_TABLE_NAME
         + " pm WHERE pm.metalake_id IN (SELECT mm.metalake_id FROM "
@@ -103,6 +129,7 @@ public class PolicyTagRelBaseSQLProvider {
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
+        + ", tombstone_id = id"
         + " WHERE tag_id IN (SELECT tm.tag_id FROM "
         + TagMetaMapper.TAG_TABLE_NAME
         + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
@@ -118,6 +145,7 @@ public class PolicyTagRelBaseSQLProvider {
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
+        + ", tombstone_id = id"
         + " WHERE EXISTS (SELECT * FROM "
         + PolicyMetaMapper.POLICY_META_TABLE_NAME
         + " pm WHERE pm.metalake_id = #{metalakeId} AND pm.policy_id = "

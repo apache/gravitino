@@ -75,21 +75,41 @@ public interface PolicyTagRelMapper {
   /**
    * Replaces the selector on an active relation.
    *
-   * @param relation The relation carrying the replacement selector and audit information.
+   * @param newRelation The replacement selector, audit information, and next version.
+   * @param oldRelation The observed relation and version.
    * @return The number of updated rows.
    */
   @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "updateSelector")
-  int updateSelector(@Param("relation") PolicyTagRelPO relation);
+  int updateSelector(
+      @Param("newRelation") PolicyTagRelPO newRelation,
+      @Param("oldRelation") PolicyTagRelPO oldRelation);
 
   /**
    * Soft-deletes one active relation.
    *
-   * @param policyId The policy ID.
-   * @param tagId The tag ID.
+   * @param relation The observed relation and version.
    * @return The number of updated rows.
    */
   @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByPair")
-  int softDeleteByPair(@Param("policyId") Long policyId, @Param("tagId") Long tagId);
+  int softDeleteByPair(@Param("relation") PolicyTagRelPO relation);
+
+  /**
+   * Soft-deletes active relations for a policy ID.
+   *
+   * @param policyId The policy ID.
+   * @return The number of updated rows.
+   */
+  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByPolicyId")
+  int softDeleteByPolicyId(@Param("policyId") Long policyId);
+
+  /**
+   * Soft-deletes active relations for a tag ID.
+   *
+   * @param tagId The tag ID.
+   * @return The number of updated rows.
+   */
+  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByTagId")
+  int softDeleteByTagId(@Param("tagId") Long tagId);
 
   /**
    * Soft-deletes active relations for a policy.

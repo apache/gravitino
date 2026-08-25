@@ -44,6 +44,15 @@ public interface PolicyVersionMapper {
   Integer softDeletePolicyVersionByMetalakeAndPolicyName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);
 
+  /**
+   * Soft-deletes all versions of a policy.
+   *
+   * @param policyId The policy ID.
+   * @return The number of deleted versions.
+   */
+  @UpdateProvider(type = PolicyVersionSQLProviderFactory.class, method = "softDeleteByPolicyId")
+  Integer softDeleteByPolicyId(@Param("policyId") Long policyId);
+
   @UpdateProvider(
       type = PolicyVersionSQLProviderFactory.class,
       method = "deletePolicyVersionsByLegacyTimeline")

@@ -58,11 +58,11 @@ CREATE TABLE IF NOT EXISTS policy_tag_relation_meta (
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
+    tombstone_id BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (id),
-    UNIQUE (policy_id, tag_id, deleted_at)
+    UNIQUE (policy_id, tag_id, tombstone_id)
 );
 
-CREATE INDEX IF NOT EXISTS policy_tag_relation_meta_idx_policy_id ON policy_tag_relation_meta (policy_id);
 CREATE INDEX IF NOT EXISTS policy_tag_relation_meta_idx_tag_id ON policy_tag_relation_meta (tag_id);
 COMMENT ON TABLE policy_tag_relation_meta IS 'policy tag relation';
 COMMENT ON COLUMN policy_tag_relation_meta.id IS 'auto increment id';
@@ -73,3 +73,4 @@ COMMENT ON COLUMN policy_tag_relation_meta.audit_info IS 'policy tag relation au
 COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relation current version';
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
+COMMENT ON COLUMN policy_tag_relation_meta.tombstone_id IS 'unique discriminator for deleted policy tag relations';

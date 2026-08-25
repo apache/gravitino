@@ -100,6 +100,11 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().selectPolicyByPolicyId(policyId);
   }
 
+  /** Delegates a shared-lock policy query. */
+  public static String selectPolicyByPolicyIdForShare(@Param("policyId") Long policyId) {
+    return getProvider().selectPolicyByPolicyIdForShare(policyId);
+  }
+
   public static String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
     return getProvider().listPolicyPOsByPolicyIds(policyIds);
   }
@@ -111,5 +116,11 @@ public class PolicyMetaSQLProviderFactory {
 
   static class PolicyMetaMySQLProvider extends PolicyMetaBaseSQLProvider {}
 
-  static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {}
+  static class PolicyMetaH2Provider extends PolicyMetaBaseSQLProvider {
+    @Override
+    public String selectPolicyByPolicyIdForShare(Long policyId) {
+      // H2 has no shared row-lock syntax, so serialize relation writes that touch the same policy.
+      return selectPolicyByPolicyIdForUpdate(policyId);
+    }
+  }
 }

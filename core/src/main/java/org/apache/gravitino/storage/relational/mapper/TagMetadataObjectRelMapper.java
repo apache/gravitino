@@ -86,6 +86,15 @@ public interface TagMetadataObjectRelMapper {
   Integer softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
 
+  /**
+   * Soft-deletes all metadata-object relations for a tag.
+   *
+   * @param tagId The tag ID.
+   * @return The number of deleted relations.
+   */
+  @UpdateProvider(type = TagMetadataObjectRelSQLProviderFactory.class, method = "softDeleteByTagId")
+  Integer softDeleteByTagId(@Param("tagId") Long tagId);
+
   @UpdateProvider(
       type = TagMetadataObjectRelSQLProviderFactory.class,
       method = "softDeleteTagMetadataObjectRelsByMetalakeId")

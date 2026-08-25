@@ -25,6 +25,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -37,12 +39,17 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
+import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
+import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.PrincipalUtils;
@@ -115,13 +122,21 @@ public class PolicyTagRelService {
       RelationEdgeTarget[] targetsToAdd,
       RelationEdgeTarget[] targetsToRemove)
       throws IOException {
+    NameIdentifierUtil.checkTag(tagIdentifier);
+    String metalake = tagIdentifier.namespace().level(0);
+    RelationEdgeTarget[] targetsToAddOrEmpty = nullToEmpty(targetsToAdd);
+    RelationEdgeTarget[] targetsToRemoveOrEmpty = nullToEmpty(targetsToRemove);
+    validatePolicyTargets(metalake, targetsToAddOrEmpty);
+    validatePolicyTargets(metalake, targetsToRemoveOrEmpty);
+
     List<PolicyEntity> updatedPolicies = new ArrayList<>();
     try {
       SessionUtils.doMultipleWithCommit(
           () -> {
             try {
               updatedPolicies.addAll(
-                  updateRelationsWithoutCommit(tagIdentifier, targetsToAdd, targetsToRemove));
+                  updateRelationsWithoutCommit(
+                      tagIdentifier, targetsToAddOrEmpty, targetsToRemoveOrEmpty));
             } catch (IOException e) {
               throw new UncheckedIOException(e);
             }
@@ -135,27 +150,23 @@ public class PolicyTagRelService {
   /**
    * Soft-deletes all policy-to-tag relations for a deleted policy.
    *
-   * @param metalake The metalake name.
-   * @param policyName The deleted policy name.
+   * @param policyId The deleted policy ID.
    * @return The number of deleted relations.
    */
-  public int deleteRelationsForPolicy(String metalake, String policyName) {
+  public int deleteRelationsForPolicy(long policyId) {
     return SessionUtils.doWithCommitAndFetchResult(
-        PolicyTagRelMapper.class,
-        mapper -> mapper.softDeleteByMetalakeAndPolicyName(metalake, policyName));
+        PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId));
   }
 
   /**
    * Soft-deletes all policy-to-tag relations for a deleted tag.
    *
-   * @param metalake The metalake name.
-   * @param tagName The deleted tag name.
+   * @param tagId The deleted tag ID.
    * @return The number of deleted relations.
    */
-  public int deleteRelationsForTag(String metalake, String tagName) {
+  public int deleteRelationsForTag(long tagId) {
     return SessionUtils.doWithCommitAndFetchResult(
-        PolicyTagRelMapper.class,
-        mapper -> mapper.softDeleteByMetalakeAndTagName(metalake, tagName));
+        PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId));
   }
 
   /**
@@ -186,22 +197,30 @@ public class PolicyTagRelService {
       RelationEdgeTarget[] targetsToAdd,
       RelationEdgeTarget[] targetsToRemove)
       throws IOException {
-    long tagId = EntityIdService.getEntityId(tagIdentifier, Entity.EntityType.TAG);
     String metalake = tagIdentifier.namespace().level(0);
-    RelationEdgeTarget[] targetsToRemoveOrEmpty = nullToEmpty(targetsToRemove);
-    RelationEdgeTarget[] targetsToAddOrEmpty = nullToEmpty(targetsToAdd);
+    TagPO tagPO = lockTag(tagIdentifier);
+    long tagId = tagPO.getTagId();
+    Map<String, Long> policyIds =
+        resolveAndLockPolicyIds(metalake, tagPO.getMetalakeId(), targetsToAdd, targetsToRemove);
 
-    Map<String, Long> policyIdsToRemove = resolvePolicyIds(metalake, targetsToRemoveOrEmpty);
-    for (RelationEdgeTarget target : targetsToRemoveOrEmpty) {
-      long policyId = policyIdsToRemove.get(target.nameIdentifier().name());
-      SessionUtils.doWithoutCommit(
-          PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(policyId, tagId));
+    for (RelationEdgeTarget target : targetsToRemove) {
+      long policyId = policyIds.get(target.nameIdentifier().name());
+      PolicyTagRelPO existing =
+          SessionUtils.getWithoutCommit(
+              PolicyTagRelMapper.class, mapper -> mapper.getByPolicyIdAndTagId(policyId, tagId));
+      if (existing != null) {
+        int deleted =
+            SessionUtils.getWithoutCommit(
+                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(existing));
+        if (deleted != 1) {
+          throw relationConflict(tagIdentifier);
+        }
+      }
     }
 
-    Map<String, Long> policyIdsToAdd = resolvePolicyIds(metalake, targetsToAddOrEmpty);
-    for (RelationEdgeTarget target : targetsToAddOrEmpty) {
-      long policyId = policyIdsToAdd.get(target.nameIdentifier().name());
-      upsert(policyId, tagId, target.relationValue().orElse(null));
+    for (RelationEdgeTarget target : targetsToAdd) {
+      long policyId = policyIds.get(target.nameIdentifier().name());
+      upsert(policyId, tagId, target.relationValue().orElse(null), tagIdentifier);
     }
 
     return listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
@@ -269,7 +288,8 @@ public class PolicyTagRelService {
     return result;
   }
 
-  private static void upsert(long policyId, long tagId, String selector) throws IOException {
+  private static void upsert(
+      long policyId, long tagId, String selector, NameIdentifier tagIdentifier) throws IOException {
     PolicyTagRelPO existing =
         SessionUtils.getWithoutCommit(
             PolicyTagRelMapper.class, mapper -> mapper.getByPolicyIdAndTagId(policyId, tagId));
@@ -277,21 +297,26 @@ public class PolicyTagRelService {
       return;
     }
 
+    long nextVersion = existing == null ? 1L : existing.getCurrentVersion() + 1;
     PolicyTagRelPO relation =
         PolicyTagRelPO.builder()
             .withPolicyId(policyId)
             .withTagId(tagId)
             .withSelector(selector)
             .withAuditInfo(auditInfo(existing))
-            .withCurrentVersion(1L)
-            .withLastVersion(1L)
+            .withCurrentVersion(nextVersion)
+            .withLastVersion(nextVersion)
             .withDeletedAt(0L)
             .build();
     if (existing == null) {
       SessionUtils.doWithoutCommit(PolicyTagRelMapper.class, mapper -> mapper.insert(relation));
     } else {
-      SessionUtils.doWithoutCommit(
-          PolicyTagRelMapper.class, mapper -> mapper.updateSelector(relation));
+      int updated =
+          SessionUtils.getWithoutCommit(
+              PolicyTagRelMapper.class, mapper -> mapper.updateSelector(relation, existing));
+      if (updated != 1) {
+        throw relationConflict(tagIdentifier);
+      }
     }
   }
 
@@ -309,6 +334,12 @@ public class PolicyTagRelService {
     return JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
   }
 
+  private static OptimisticLockException relationConflict(NameIdentifier tagIdentifier) {
+    return new OptimisticLockException(
+        "A policy-to-tag relation for tag %s was modified concurrently; retry the operation",
+        tagIdentifier);
+  }
+
   private static void validatePolicyTarget(String metalake, RelationEdgeTarget target) {
     Preconditions.checkArgument(target != null, "Policy relation target cannot be null");
     Preconditions.checkArgument(
@@ -321,43 +352,98 @@ public class PolicyTagRelService {
         "Policy and tag must belong to the same metalake");
   }
 
-  private static Map<String, Long> resolvePolicyIds(String metalake, RelationEdgeTarget[] targets) {
-    if (targets.length == 0) {
+  private static void validatePolicyTargets(String metalake, RelationEdgeTarget[] targets) {
+    for (RelationEdgeTarget target : targets) {
+      validatePolicyTarget(metalake, target);
+    }
+  }
+
+  private static TagPO lockTag(NameIdentifier tagIdentifier) {
+    String metalake = tagIdentifier.namespace().level(0);
+    return SessionUtils.getWithoutCommit(
+        TagMetaMapper.class,
+        mapper -> {
+          TagPO observed = mapper.selectTagMetaByMetalakeAndName(metalake, tagIdentifier.name());
+          if (observed == null) {
+            throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
+          }
+          TagPO locked = mapper.selectTagByTagIdForUpdate(observed.getTagId());
+          if (locked == null
+              || !Objects.equals(locked.getTagName(), tagIdentifier.name())
+              || !Objects.equals(locked.getMetalakeId(), observed.getMetalakeId())) {
+            throw noSuchEntity(Entity.EntityType.TAG, tagIdentifier.name());
+          }
+          return locked;
+        });
+  }
+
+  private static Map<String, Long> resolveAndLockPolicyIds(
+      String metalake,
+      Long metalakeId,
+      RelationEdgeTarget[] targetsToAdd,
+      RelationEdgeTarget[] targetsToRemove) {
+    Set<String> policyNames = new LinkedHashSet<>();
+    Arrays.stream(targetsToAdd)
+        .map(target -> target.nameIdentifier().name())
+        .forEach(policyNames::add);
+    Arrays.stream(targetsToRemove)
+        .map(target -> target.nameIdentifier().name())
+        .forEach(policyNames::add);
+    if (policyNames.isEmpty()) {
       return Collections.emptyMap();
     }
 
-    Set<String> policyNames = new LinkedHashSet<>();
-    for (RelationEdgeTarget target : targets) {
-      validatePolicyTarget(metalake, target);
-      policyNames.add(target.nameIdentifier().name());
-    }
-    List<NameIdentifier> policyIdentifiers =
-        policyNames.stream()
-            .map(name -> NameIdentifierUtil.ofPolicy(metalake, name))
-            .collect(Collectors.toList());
-    Map<String, Long> policyIds =
-        PolicyMetaService.getInstance().batchGetPolicyByIdentifier(policyIdentifiers).stream()
-            .collect(Collectors.toMap(PolicyEntity::name, PolicyEntity::id));
+    List<PolicyPO> observedPolicies =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper ->
+                mapper.listPolicyPOsByMetalakeAndPolicyNames(
+                    metalake, new ArrayList<>(policyNames)));
+    Map<String, PolicyPO> observedByName =
+        observedPolicies.stream()
+            .collect(Collectors.toMap(PolicyPO::getPolicyName, policy -> policy));
 
     for (String policyName : policyNames) {
-      if (!policyIds.containsKey(policyName)) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.POLICY.name().toLowerCase(),
-            policyName);
+      if (!observedByName.containsKey(policyName)) {
+        throw noSuchEntity(Entity.EntityType.POLICY, policyName);
       }
     }
-    return policyIds;
+
+    List<PolicyPO> orderedPolicies =
+        observedPolicies.stream()
+            .sorted(Comparator.comparing(PolicyPO::getPolicyId))
+            .collect(Collectors.toList());
+    return SessionUtils.getWithoutCommit(
+        PolicyMetaMapper.class,
+        mapper -> {
+          Map<String, Long> result = new LinkedHashMap<>();
+          for (PolicyPO observed : orderedPolicies) {
+            PolicyPO locked = mapper.selectPolicyByPolicyIdForShare(observed.getPolicyId());
+            if (locked == null
+                || !Objects.equals(locked.getPolicyName(), observed.getPolicyName())
+                || !Objects.equals(locked.getMetalakeId(), metalakeId)) {
+              throw noSuchEntity(Entity.EntityType.POLICY, observed.getPolicyName());
+            }
+            result.put(locked.getPolicyName(), locked.getPolicyId());
+          }
+          return result;
+        });
+  }
+
+  private static NoSuchEntityException noSuchEntity(Entity.EntityType type, String name) {
+    return new NoSuchEntityException(
+        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, type.name().toLowerCase(), name);
   }
 
   private static void validateSameMetalake(List<NameIdentifier> identifiers) {
+    Preconditions.checkArgument(
+        identifiers.stream()
+            .allMatch(identifier -> identifier != null && identifier.namespace().length() > 0),
+        "All policy-to-tag relation anchors must have a metalake namespace");
     String metalake = identifiers.get(0).namespace().level(0);
     Preconditions.checkArgument(
         identifiers.stream()
-            .allMatch(
-                identifier ->
-                    identifier.namespace().length() > 0
-                        && metalake.equals(identifier.namespace().level(0))),
+            .allMatch(identifier -> metalake.equals(identifier.namespace().level(0))),
         "All policy-to-tag relation anchors must belong to the same metalake");
   }
 

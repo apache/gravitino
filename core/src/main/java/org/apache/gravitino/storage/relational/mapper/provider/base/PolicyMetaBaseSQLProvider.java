@@ -184,6 +184,16 @@ public class PolicyMetaBaseSQLProvider {
         + " AND pm.deleted_at = 0 ";
   }
 
+  /** Returns SQL that selects and locks an active policy by ID. */
+  public String selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId) {
+    return selectPolicyByPolicyId(policyId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects and share-locks an active policy by ID. */
+  public String selectPolicyByPolicyIdForShare(@Param("policyId") Long policyId) {
+    return selectPolicyByPolicyId(policyId) + " LOCK IN SHARE MODE";
+  }
+
   public String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
     return "<script>"
         + "SELECT pm.policy_id, pm.policy_name, pm.policy_type, pm.metalake_id,"

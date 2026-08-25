@@ -188,30 +188,48 @@ public class PolicyMetaService {
       baseMetricName = "deletePolicy")
   public boolean deletePolicy(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
+    PolicyPO[] deletedPolicy = new PolicyPO[1];
     int[] policyMetaDeletedCount = new int[] {0};
     int[] policyVersionDeletedCount = new int[] {0};
     int[] policyTagRelDeletedCount = new int[] {0};
 
-    // We should delete meta and version info
+    // Delete the endpoint first. Its UPDATE takes the exclusive row lock that relation writers
+    // share-lock before inserting, so a writer either commits before the cleanup below or observes
+    // the deleted policy after this transaction commits.
     SessionUtils.doMultipleWithCommit(
-        () ->
+        () -> {
+          PolicyPO observed =
+              SessionUtils.getWithoutCommit(
+                  PolicyMetaMapper.class,
+                  mapper -> mapper.selectPolicyMetaByMetalakeAndName(metalakeName, ident.name()));
+          if (observed == null) {
+            return;
+          }
+          policyMetaDeletedCount[0] =
+              SessionUtils.getWithoutCommit(
+                  PolicyMetaMapper.class,
+                  mapper ->
+                      mapper.softDeletePolicyByMetalakeAndPolicyName(metalakeName, ident.name()));
+          if (policyMetaDeletedCount[0] == 1) {
+            deletedPolicy[0] = observed;
+          }
+        },
+        () -> {
+          if (deletedPolicy[0] != null) {
             policyTagRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     PolicyTagRelMapper.class,
-                    mapper -> mapper.softDeleteByMetalakeAndPolicyName(metalakeName, ident.name())),
-        () ->
-            policyMetaDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    PolicyMetaMapper.class,
-                    mapper ->
-                        mapper.softDeletePolicyByMetalakeAndPolicyName(metalakeName, ident.name())),
-        () ->
+                    mapper -> mapper.softDeleteByPolicyId(deletedPolicy[0].getPolicyId()));
+          }
+        },
+        () -> {
+          if (deletedPolicy[0] != null) {
             policyVersionDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     PolicyVersionMapper.class,
-                    mapper ->
-                        mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
-                            metalakeName, ident.name())));
+                    mapper -> mapper.softDeleteByPolicyId(deletedPolicy[0].getPolicyId()));
+          }
+        });
     return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] + policyTagRelDeletedCount[0]
         > 0;
   }

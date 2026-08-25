@@ -73,14 +73,25 @@ public class PolicyTagRelSQLProviderFactory {
   }
 
   /** Delegates a selector update. */
-  public static String updateSelector(@Param("relation") PolicyTagRelPO relation) {
-    return getProvider().updateSelector(relation);
+  public static String updateSelector(
+      @Param("newRelation") PolicyTagRelPO newRelation,
+      @Param("oldRelation") PolicyTagRelPO oldRelation) {
+    return getProvider().updateSelector(newRelation, oldRelation);
   }
 
   /** Delegates a relation soft delete. */
-  public static String softDeleteByPair(
-      @Param("policyId") Long policyId, @Param("tagId") Long tagId) {
-    return getProvider().softDeleteByPair(policyId, tagId);
+  public static String softDeleteByPair(@Param("relation") PolicyTagRelPO relation) {
+    return getProvider().softDeleteByPair(relation);
+  }
+
+  /** Delegates policy-ID deletion cleanup. */
+  public static String softDeleteByPolicyId(@Param("policyId") Long policyId) {
+    return getProvider().softDeleteByPolicyId(policyId);
+  }
+
+  /** Delegates tag-ID deletion cleanup. */
+  public static String softDeleteByTagId(@Param("tagId") Long tagId) {
+    return getProvider().softDeleteByTagId(tagId);
   }
 
   /** Delegates policy deletion cleanup. */
