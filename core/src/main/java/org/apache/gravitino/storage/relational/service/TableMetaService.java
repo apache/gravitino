@@ -159,8 +159,7 @@ public class TableMetaService {
           () -> {
             // We need to delete the columns first if we want to overwrite the table.
             if (overwrite) {
-              TableColumnMetaService.getInstance()
-                  .deleteColumnsByTableId(persistedPO.get().getTableId());
+              TableColumnMetaService.getInstance().deleteColumnsByTableId(po.getTableId());
             }
           },
           () -> {
@@ -263,13 +262,10 @@ public class TableMetaService {
   public boolean deleteTable(NameIdentifier identifier) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
 
+    // Delete the table row first and only if it still has the version we read. A stale drop stops
+    // there, before it can remove columns, tags, policies, or any other related data.
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          // Delete the table row first and only if it still has the version we read. A stale drop
-          // stops here, before it can remove columns, tags, policies, or any other related data.
-          deleteTableWithVersion(identifier, tablePO);
-        },
-        () -> deleteTableDependents(tablePO));
+        () -> deleteTableWithVersion(identifier, tablePO), () -> deleteTableDependents(tablePO));
 
     return true;
   }
@@ -372,23 +368,11 @@ public class TableMetaService {
   }
 
   private TablePO tablePOWithPersistedVersions(TablePO incomingPO, TablePO persistedPO) {
-    return TablePO.builder()
-        .withTableId(incomingPO.getTableId())
-        .withTableName(incomingPO.getTableName())
-        .withMetalakeId(incomingPO.getMetalakeId())
-        .withCatalogId(incomingPO.getCatalogId())
-        .withSchemaId(incomingPO.getSchemaId())
-        .withAuditInfo(incomingPO.getAuditInfo())
+    // The upsert derives the version inside the database, so the row we are about to write to
+    // table_version_info must carry the versions the database ended up with, not the ones we sent.
+    return TablePO.builder(incomingPO)
         .withCurrentVersion(persistedPO.getCurrentVersion())
         .withLastVersion(persistedPO.getLastVersion())
-        .withDeletedAt(incomingPO.getDeletedAt())
-        .withFormat(incomingPO.getFormat())
-        .withProperties(incomingPO.getProperties())
-        .withPartitions(incomingPO.getPartitions())
-        .withSortOrders(incomingPO.getSortOrders())
-        .withDistribution(incomingPO.getDistribution())
-        .withIndexes(incomingPO.getIndexes())
-        .withComment(incomingPO.getComment())
         .build();
   }
 

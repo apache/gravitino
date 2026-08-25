@@ -59,6 +59,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -74,6 +75,7 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.junit.jupiter.api.function.Executable;
 
 public class TestTableMetaService extends TestJDBCBackend {
   private final String metalakeName = "metalake_for_table_test";
@@ -127,82 +129,22 @@ public class TestTableMetaService extends TestJDBCBackend {
             "table_racing_schema_delete",
             AUDIT_INFO);
 
-    CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
-    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
-    CountDownLatch tableInsertStarted = new CountDownLatch(1);
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    Future<Throwable> deleteResult =
-        executor.submit(
-            () -> {
-              try {
-                SessionUtils.doMultipleWithCommit(
-                    () -> {
-                      int deleted =
-                          SessionUtils.getWithoutCommit(
-                              SchemaMetaMapper.class,
-                              mapper ->
-                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
-                                      observedSchemaPO.getSchemaId(),
-                                      observedSchemaPO.getCurrentVersion()));
-                      Assertions.assertEquals(1, deleted);
-                      schemaDeleteLocked.countDown();
-                      try {
-                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
-                      } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException(e);
-                      }
-                    });
-                return null;
-              } catch (Throwable throwable) {
-                return throwable;
-              }
-            });
-    try {
-      assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
-      Future<Throwable> insertResult =
-          executor.submit(
-              () -> {
-                tableInsertStarted.countDown();
-                try {
-                  TableMetaService.getInstance().insertTable(table, false);
-                  return null;
-                } catch (Throwable throwable) {
-                  return throwable;
-                }
-              });
-      assertTrue(tableInsertStarted.await(30, TimeUnit.SECONDS));
-      assertThrows(TimeoutException.class, () -> insertResult.get(500, TimeUnit.MILLISECONDS));
+    Throwable insertFailure =
+        runWhileSchemaDeleteUncommitted(
+            observedSchemaPO, () -> TableMetaService.getInstance().insertTable(table, false));
 
-      allowDeleteCommit.countDown();
-      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
-      Assertions.assertInstanceOf(
-          NoSuchEntityException.class, insertResult.get(30, TimeUnit.SECONDS));
-      Assertions.assertTrue(
-          SessionUtils.getWithoutCommit(
-                  TableMetaMapper.class,
-                  mapper -> mapper.listTablePOsByTableIds(List.of(table.id())))
-              .isEmpty());
-    } finally {
-      allowDeleteCommit.countDown();
-      executor.shutdownNow();
-    }
+    Assertions.assertInstanceOf(NoSuchEntityException.class, insertFailure);
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(
+                TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(List.of(table.id())))
+            .isEmpty());
   }
 
   @TestTemplate
   public void testInsertRollsBackAllRowsWhenColumnWriteFails() throws IOException {
     createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
     Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
-    ColumnEntity column =
-        ColumnEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("column")
-            .withPosition(0)
-            .withDataType(Types.IntegerType.get())
-            .withNullable(true)
-            .withAutoIncrement(false)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
+    ColumnEntity column = column("column", Types.IntegerType.get());
     TableEntity invalidTable =
         TableEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -242,16 +184,7 @@ public class TestTableMetaService extends TestJDBCBackend {
   public void testOverwriteRollsBackExistingTableAndThenSucceeds() throws IOException {
     createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
     Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
-    ColumnEntity originalColumn =
-        ColumnEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("original_column")
-            .withPosition(0)
-            .withDataType(Types.IntegerType.get())
-            .withNullable(true)
-            .withAutoIncrement(false)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
+    ColumnEntity originalColumn = column("original_column", Types.IntegerType.get());
     TableEntity original =
         TableEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -263,16 +196,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .build();
     TableMetaService.getInstance().insertTable(original, false);
 
-    ColumnEntity replacementColumn =
-        ColumnEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("replacement_column")
-            .withPosition(0)
-            .withDataType(Types.StringType.get())
-            .withNullable(true)
-            .withAutoIncrement(false)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
+    ColumnEntity replacementColumn = column("replacement_column", Types.StringType.get());
     TableEntity invalidReplacement =
         TableEntity.builder()
             .withId(original.id())
@@ -635,31 +559,12 @@ public class TestTableMetaService extends TestJDBCBackend {
     NameIdentifier renamedIdentifier =
         NameIdentifier.of(table.namespace(), "table_alter_renamed_winner");
 
-    assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            TableMetaService.getInstance()
-                .updateTable(
-                    table.nameIdentifier(),
-                    entity -> {
-                      TableEntity current = (TableEntity) entity;
-                      updateTableUnchecked(
-                          table.nameIdentifier(),
-                          competing ->
-                              copyTable(
-                                  competing,
-                                  renamedIdentifier.name(),
-                                  competing.namespace(),
-                                  "renamed winner"));
-                      return copyTableWithComment(current, "stale update");
-                    }));
-
-    assertThrows(
-        NoSuchEntityException.class,
-        () -> TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()));
-    Assertions.assertEquals(
-        "renamed winner",
-        TableMetaService.getInstance().getTableByIdentifier(renamedIdentifier).comment());
+    assertStaleAlterReportsNoSuch(
+        table,
+        competing ->
+            copyTable(competing, renamedIdentifier.name(), competing.namespace(), "renamed winner"),
+        renamedIdentifier,
+        "renamed winner");
   }
 
   @TestTemplate
@@ -677,43 +582,17 @@ public class TestTableMetaService extends TestJDBCBackend {
     Namespace movedNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, newSchemaName);
     NameIdentifier movedIdentifier = NameIdentifier.of(movedNamespace, table.name());
 
-    assertThrows(
-        NoSuchEntityException.class,
-        () ->
-            TableMetaService.getInstance()
-                .updateTable(
-                    table.nameIdentifier(),
-                    entity -> {
-                      TableEntity current = (TableEntity) entity;
-                      updateTableUnchecked(
-                          table.nameIdentifier(),
-                          competing ->
-                              copyTable(
-                                  competing, competing.name(), movedNamespace, "moved winner"));
-                      return copyTableWithComment(current, "stale update");
-                    }));
-
-    assertThrows(
-        NoSuchEntityException.class,
-        () -> TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()));
-    Assertions.assertEquals(
-        "moved winner",
-        TableMetaService.getInstance().getTableByIdentifier(movedIdentifier).comment());
+    assertStaleAlterReportsNoSuch(
+        table,
+        competing -> copyTable(competing, competing.name(), movedNamespace, "moved winner"),
+        movedIdentifier,
+        "moved winner");
   }
 
   @TestTemplate
   public void testDeleteRejectsStaleVersion() throws IOException {
     createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
-    ColumnEntity column =
-        ColumnEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("column_that_must_survive")
-            .withPosition(0)
-            .withDataType(Types.IntegerType.get())
-            .withNullable(true)
-            .withAutoIncrement(false)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
+    ColumnEntity column = column("column_that_must_survive", Types.IntegerType.get());
     TableEntity table =
         TableEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -782,16 +661,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     backend.insert(table, false);
     TablePO initialPO = getTablePO(table.id());
 
-    ColumnEntity duplicateColumn =
-        ColumnEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("duplicate_id")
-            .withPosition(0)
-            .withDataType(Types.IntegerType.get())
-            .withNullable(true)
-            .withAutoIncrement(false)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
+    ColumnEntity duplicateColumn = column("duplicate_id", Types.IntegerType.get());
     // The duplicate column ID fails after the table and version rows are updated. The assertions
     // below verify that the outer transaction rolls both earlier writes back.
     assertThrows(
@@ -802,19 +672,8 @@ public class TestTableMetaService extends TestJDBCBackend {
                     table.nameIdentifier(),
                     entity -> {
                       TableEntity current = (TableEntity) entity;
-                      return TableEntity.builder()
-                          .withId(current.id())
-                          .withName(current.name())
-                          .withNamespace(current.namespace())
-                          .withColumns(List.of(duplicateColumn, duplicateColumn))
-                          .withProperties(current.properties())
-                          .withPartitioning(current.partitioning())
-                          .withSortOrders(current.sortOrders())
-                          .withDistribution(current.distribution())
-                          .withIndexes(current.indexes())
-                          .withComment("must roll back")
-                          .withAuditInfo(current.auditInfo())
-                          .build();
+                      return copyTableWithColumns(
+                          current, List.of(duplicateColumn, duplicateColumn), "must roll back");
                     }));
 
     TableEntity current =
@@ -849,73 +708,24 @@ public class TestTableMetaService extends TestJDBCBackend {
     SchemaPO observedTargetSchema =
         SessionUtils.getWithoutCommit(
             SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(targetSchema.id()));
-    CountDownLatch targetDeleteLocked = new CountDownLatch(1);
-    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
-    CountDownLatch moveStarted = new CountDownLatch(1);
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    Future<Throwable> deleteResult =
-        executor.submit(
-            () -> {
-              try {
-                SessionUtils.doMultipleWithCommit(
-                    () -> {
-                      int deleted =
-                          SessionUtils.getWithoutCommit(
-                              SchemaMetaMapper.class,
-                              mapper ->
-                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
-                                      observedTargetSchema.getSchemaId(),
-                                      observedTargetSchema.getCurrentVersion()));
-                      Assertions.assertEquals(1, deleted);
-                      targetDeleteLocked.countDown();
-                      try {
-                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
-                      } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new RuntimeException(e);
-                      }
-                    });
-                return null;
-              } catch (Throwable throwable) {
-                return throwable;
-              }
-            });
-    try {
-      assertTrue(targetDeleteLocked.await(30, TimeUnit.SECONDS));
-      Future<Throwable> moveResult =
-          executor.submit(
-              () -> {
-                moveStarted.countDown();
-                try {
-                  TableEntity movedTable =
-                      TableEntity.builder()
-                          .withId(table.id())
-                          .withName(table.name())
-                          .withNamespace(
-                              NamespaceUtil.ofTable(metalakeName, catalogName, targetSchemaName))
-                          .withColumns(table.columns())
-                          .withAuditInfo(table.auditInfo())
-                          .build();
-                  backend.update(
-                      table.nameIdentifier(), Entity.EntityType.TABLE, ignored -> movedTable);
-                  return null;
-                } catch (Throwable throwable) {
-                  return throwable;
-                }
-              });
-      assertTrue(moveStarted.await(30, TimeUnit.SECONDS));
-      // Resolving the target ID happens before the table transaction. The move must then wait on
-      // the target schema row instead of writing below a schema whose delete is about to commit.
-      assertThrows(TimeoutException.class, () -> moveResult.get(500, TimeUnit.MILLISECONDS));
+    TableEntity movedTable =
+        TableEntity.builder()
+            .withId(table.id())
+            .withName(table.name())
+            .withNamespace(NamespaceUtil.ofTable(metalakeName, catalogName, targetSchemaName))
+            .withColumns(table.columns())
+            .withAuditInfo(table.auditInfo())
+            .build();
+    // Resolving the target ID happens before the table transaction. The move must then wait on the
+    // target schema row instead of writing below a schema whose delete is about to commit.
+    Throwable moveFailure =
+        runWhileSchemaDeleteUncommitted(
+            observedTargetSchema,
+            () ->
+                backend.update(
+                    table.nameIdentifier(), Entity.EntityType.TABLE, ignored -> movedTable));
 
-      allowDeleteCommit.countDown();
-      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
-      Assertions.assertInstanceOf(
-          NoSuchEntityException.class, moveResult.get(30, TimeUnit.SECONDS));
-    } finally {
-      allowDeleteCommit.countDown();
-      executor.shutdownNow();
-    }
+    Assertions.assertInstanceOf(NoSuchEntityException.class, moveFailure);
 
     TableEntity unchanged =
         TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
@@ -998,16 +808,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     createAndInsertCatalog(metalakeName, catalogName);
     createAndInsertSchema(metalakeName, catalogName, schemaName);
 
-    ColumnEntity column =
-        ColumnEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withName("col1")
-            .withPosition(0)
-            .withDataType(Types.IntegerType.get())
-            .withNullable(true)
-            .withAutoIncrement(false)
-            .withAuditInfo(AUDIT_INFO)
-            .build();
+    ColumnEntity column = column("col1", Types.IntegerType.get());
     TableEntity table =
         TableEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
@@ -1063,17 +864,137 @@ public class TestTableMetaService extends TestJDBCBackend {
         TableMetaMapper.class, mapper -> mapper.listTablePOsByTableIds(List.of(tableId)).get(0));
   }
 
+  /**
+   * Holds an uncommitted delete of the given schema open, runs {@code victim} against it, and
+   * returns what the victim threw once the delete commits, or null if it succeeded.
+   *
+   * <p>The helper also asserts the part both callers care about: while the delete is in flight the
+   * victim must block on the schema row rather than slip past it.
+   */
+  private Throwable runWhileSchemaDeleteUncommitted(SchemaPO observedSchemaPO, Executable victim)
+      throws Exception {
+    CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch victimStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int deleted =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                      observedSchemaPO.getSchemaId(),
+                                      observedSchemaPO.getCurrentVersion()));
+                      Assertions.assertEquals(1, deleted);
+                      schemaDeleteLocked.countDown();
+                      try {
+                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+    try {
+      assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> victimResult =
+          executor.submit(
+              () -> {
+                victimStarted.countDown();
+                try {
+                  victim.execute();
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(victimStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> victimResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      return victimResult.get(30, TimeUnit.SECONDS);
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  /**
+   * Runs an alter that loses to a competing writer which renames or moves the table away, and
+   * asserts the loser is told the table is gone while the winner's change survives.
+   */
+  private void assertStaleAlterReportsNoSuch(
+      TableEntity table,
+      Function<TableEntity, TableEntity> competingUpdate,
+      NameIdentifier winnerIdentifier,
+      String winnerComment) {
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            TableMetaService.getInstance()
+                .updateTable(
+                    table.nameIdentifier(),
+                    entity -> {
+                      TableEntity current = (TableEntity) entity;
+                      updateTableUnchecked(table.nameIdentifier(), competingUpdate);
+                      return copyTableWithComment(current, "stale update");
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier()));
+    Assertions.assertEquals(
+        winnerComment,
+        TableMetaService.getInstance().getTableByIdentifier(winnerIdentifier).comment());
+  }
+
+  private ColumnEntity column(String name, Type dataType) {
+    return ColumnEntity.builder()
+        .withId(RandomIdGenerator.INSTANCE.nextId())
+        .withName(name)
+        .withPosition(0)
+        .withDataType(dataType)
+        .withNullable(true)
+        .withAutoIncrement(false)
+        .withAuditInfo(AUDIT_INFO)
+        .build();
+  }
+
   private TableEntity copyTableWithComment(TableEntity current, String comment) {
     return copyTable(current, current.name(), current.namespace(), comment);
   }
 
+  private TableEntity copyTableWithColumns(
+      TableEntity current, List<ColumnEntity> columns, String comment) {
+    return copyTable(current, current.name(), current.namespace(), comment, columns);
+  }
+
   private TableEntity copyTable(
       TableEntity current, String name, Namespace namespace, String comment) {
+    return copyTable(current, name, namespace, comment, current.columns());
+  }
+
+  private TableEntity copyTable(
+      TableEntity current,
+      String name,
+      Namespace namespace,
+      String comment,
+      List<ColumnEntity> columns) {
     return TableEntity.builder()
         .withId(current.id())
         .withName(name)
         .withNamespace(namespace)
-        .withColumns(current.columns())
+        .withColumns(columns)
         .withProperties(current.properties())
         .withPartitioning(current.partitioning())
         .withSortOrders(current.sortOrders())

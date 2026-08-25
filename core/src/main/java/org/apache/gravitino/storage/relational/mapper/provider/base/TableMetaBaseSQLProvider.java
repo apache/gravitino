@@ -181,6 +181,12 @@ public class TableMetaBaseSQLProvider {
   /**
    * Returns the active table metadata row and holds it exclusively for the current transaction.
    *
+   * <p>Unlike the metalake, catalog and schema providers, this cannot be written as {@code
+   * selectTableMetaById(id) + " FOR UPDATE"}: that select LEFT JOINs {@code table_version_info},
+   * and locking the nullable side of an outer join is rejected by PostgreSQL and locks the wrong
+   * rows on MySQL. The projection is therefore spelled out for {@code table_meta} alone, and the
+   * returned row carries only the identity and version columns its callers read.
+   *
    * @param tableId the table ID
    * @return the locking select SQL
    */

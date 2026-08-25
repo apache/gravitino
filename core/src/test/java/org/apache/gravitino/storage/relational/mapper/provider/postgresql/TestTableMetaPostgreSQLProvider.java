@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -25,14 +26,24 @@ class TestTableMetaPostgreSQLProvider {
 
   @Test
   void testOverwriteAdvancesStoredVersion() {
-    String sql = new TableMetaPostgreSQLProvider().insertTableMetaOnDuplicateKeyUpdate(null);
-    String updateClause = sql.substring(sql.indexOf(" ON CONFLICT"));
+    String updateClause = conflictClause();
 
+    // An overwrite must never write the initial version back, or a stale writer could still pass
+    // its own version check afterwards.
     Assertions.assertTrue(
-        updateClause.contains("current_version = table_meta.current_version + 1"));
-    Assertions.assertTrue(updateClause.contains("last_version = table_meta.current_version + 1"));
-    Assertions.assertFalse(updateClause.contains("current_version = #{tableMeta.currentVersion}"));
-    Assertions.assertFalse(updateClause.contains("last_version = #{tableMeta.lastVersion}"));
+        updateClause.contains(
+            "current_version = " + TableMetaMapper.TABLE_NAME + ".current_version + 1"),
+        () -> "current_version must advance in: " + updateClause);
+    Assertions.assertTrue(
+        updateClause.contains(
+            "last_version = " + TableMetaMapper.TABLE_NAME + ".current_version + 1"),
+        () -> "last_version must advance in: " + updateClause);
+
+    // PostgreSQL rejects a bare column name on this side of ON CONFLICT, because it could mean
+    // either the stored row or the rejected one. Both assignments must name the table.
+    Assertions.assertFalse(
+        updateClause.matches(".*[^.\\w]current_version\\s*\\+.*"),
+        () -> "Found an unqualified current_version reference in: " + updateClause);
   }
 
   @Test
@@ -41,5 +52,10 @@ class TestTableMetaPostgreSQLProvider {
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
+  }
+
+  private String conflictClause() {
+    String sql = new TableMetaPostgreSQLProvider().insertTableMetaOnDuplicateKeyUpdate(null);
+    return sql.substring(sql.indexOf(" ON CONFLICT"));
   }
 }
