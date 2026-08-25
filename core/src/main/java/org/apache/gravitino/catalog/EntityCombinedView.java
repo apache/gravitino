@@ -24,6 +24,7 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils.PropertyResponsePolicy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Column;
@@ -42,6 +43,9 @@ public final class EntityCombinedView implements View {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties = Collections.emptySet();
+
+  // Reserved+hidden system keys omitted from API responses (e.g. gravitino.identifier).
+  private Set<String> omittedProperties = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -69,6 +73,19 @@ public final class EntityCombinedView implements View {
 
   public EntityCombinedView withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
+    this.omittedProperties = Collections.emptySet();
+    return this;
+  }
+
+  /** Applies mask/omit policy for API property responses. */
+  public EntityCombinedView withHiddenProperties(PropertyResponsePolicy policy) {
+    if (policy == null) {
+      this.hiddenProperties = Collections.emptySet();
+      this.omittedProperties = Collections.emptySet();
+    } else {
+      this.hiddenProperties = policy.keysToMask();
+      this.omittedProperties = policy.keysToOmit();
+    }
     return this;
   }
 
@@ -108,7 +125,7 @@ public final class EntityCombinedView implements View {
     if (props == null) {
       return Collections.emptyMap();
     }
-    return HiddenPropertyMaskUtils.maskHiddenProperties(props, hiddenProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(props, hiddenProperties, omittedProperties);
   }
 
   @Override

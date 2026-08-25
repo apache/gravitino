@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils.PropertyResponsePolicy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.model.Model;
@@ -34,6 +35,9 @@ public final class EntityCombinedModel implements Model {
   private final ModelEntity modelEntity;
 
   private Set<String> hiddenProperties = Collections.emptySet();
+
+  // Reserved+hidden system keys omitted from API responses (e.g. gravitino.identifier).
+  private Set<String> omittedProperties = Collections.emptySet();
 
   private EntityCombinedModel(Model model, ModelEntity modelEntity) {
     this.model = model;
@@ -57,7 +61,20 @@ public final class EntityCombinedModel implements Model {
   }
 
   public EntityCombinedModel withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
+    this.omittedProperties = Collections.emptySet();
+    return this;
+  }
+
+  /** Applies mask/omit policy for API property responses. */
+  public EntityCombinedModel withHiddenProperties(PropertyResponsePolicy policy) {
+    if (policy == null) {
+      this.hiddenProperties = Collections.emptySet();
+      this.omittedProperties = Collections.emptySet();
+    } else {
+      this.hiddenProperties = policy.keysToMask();
+      this.omittedProperties = policy.keysToOmit();
+    }
     return this;
   }
 
@@ -75,7 +92,8 @@ public final class EntityCombinedModel implements Model {
   public Map<String, String> properties() {
     return model.properties() == null
         ? null
-        : HiddenPropertyMaskUtils.maskHiddenProperties(model.properties(), hiddenProperties);
+        : HiddenPropertyMaskUtils.maskHiddenProperties(
+            model.properties(), hiddenProperties, omittedProperties);
   }
 
   @Override

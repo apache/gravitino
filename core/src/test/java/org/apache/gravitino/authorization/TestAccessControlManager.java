@@ -768,11 +768,7 @@ public class TestAccessControlManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    if (testProps.containsKey(StringIdentifier.ID_KEY)) {
-      Assertions.assertEquals(
-          org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
-          testProps.get(StringIdentifier.ID_KEY));
-    }
+    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
   }
 
   @Test

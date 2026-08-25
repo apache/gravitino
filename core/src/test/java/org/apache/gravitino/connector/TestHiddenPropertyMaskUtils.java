@@ -82,7 +82,7 @@ public class TestHiddenPropertyMaskUtils {
   }
 
   @Test
-  void testMaskHiddenPropertiesKeepsReservedVisibleKeys() {
+  void testMaskHiddenPropertiesOmitsReservedHiddenKeys() {
     PropertiesMetadata metadata =
         new PropertiesMetadata() {
           @Override
@@ -113,11 +113,10 @@ public class TestHiddenPropertyMaskUtils {
 
     // reserved + not hidden → keep real value
     Assertions.assertEquals("10", masked.get("numFiles"));
-    // hidden credential → ******
+    // hidden credential (not reserved) → ******
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("jdbc-password"));
-    // reserved + hidden → still returned, but masked (no omit)
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("gravitino.identifier"));
+    // reserved + hidden → omitted from API response
+    Assertions.assertFalse(masked.containsKey("gravitino.identifier"));
     Assertions.assertEquals("v", masked.get("visible"));
   }
 }

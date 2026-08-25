@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils.PropertyResponsePolicy;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
@@ -39,6 +40,9 @@ public class EntityCombinedTopic implements Topic {
 
   // Property keys whose values are masked in API responses.
   private Set<String> hiddenProperties = Collections.emptySet();
+
+  // Reserved+hidden system keys omitted from API responses (e.g. gravitino.identifier).
+  private Set<String> omittedProperties = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -71,6 +75,19 @@ public class EntityCombinedTopic implements Topic {
 
   public EntityCombinedTopic withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
+    this.omittedProperties = Collections.emptySet();
+    return this;
+  }
+
+  /** Applies mask/omit policy for API property responses. */
+  public EntityCombinedTopic withHiddenProperties(PropertyResponsePolicy policy) {
+    if (policy == null) {
+      this.hiddenProperties = Collections.emptySet();
+      this.omittedProperties = Collections.emptySet();
+    } else {
+      this.hiddenProperties = policy.keysToMask();
+      this.omittedProperties = policy.keysToOmit();
+    }
     return this;
   }
 
@@ -91,7 +108,8 @@ public class EntityCombinedTopic implements Topic {
 
   @Override
   public Map<String, String> properties() {
-    return HiddenPropertyMaskUtils.maskHiddenProperties(topic.properties(), hiddenProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(
+        topic.properties(), hiddenProperties, omittedProperties);
   }
 
   @Override
