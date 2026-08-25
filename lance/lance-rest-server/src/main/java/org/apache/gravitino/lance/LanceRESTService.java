@@ -19,6 +19,7 @@
 package org.apache.gravitino.lance;
 
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
+import static org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService.METALAKE_BINDING;
 
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
@@ -35,7 +36,6 @@ import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
 import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
 import org.apache.gravitino.lance.service.authorization.LanceAuthorizationMetadataFilter;
 import org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService;
-import org.apache.gravitino.lance.service.authorization.LanceRESTServerContext;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -90,13 +90,9 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     // mode check.
     boolean enableAuthorization =
         auxMode && GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
-    LanceRESTServerContext authorizationContext =
-        LanceRESTServerContext.create(
-            enableAuthorization, auxMode, lanceConfig.get(LanceConfig.METALAKE_NAME));
-    boolean authorizationEnabled = authorizationContext.isAuthorizationEnabled();
-    if (authorizationEnabled) {
-      lanceNamespace.setMetadataFilter(
-          new LanceAuthorizationMetadataFilter(authorizationContext.metalakeName()));
+    String metalakeName = lanceConfig.get(LanceConfig.METALAKE_NAME);
+    if (enableAuthorization) {
+      lanceNamespace.setMetadataFilter(new LanceAuthorizationMetadataFilter(metalakeName));
     }
 
     ResourceConfig resourceConfig = new ResourceConfig();
@@ -106,7 +102,10 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            if (authorizationEnabled) {
+            if (enableAuthorization) {
+              // Pass the metalake through HK2 constructor injection so authorization code does not
+              // need mutable process-wide state.
+              bind(metalakeName).to(String.class).named(METALAKE_BINDING);
               bind(LanceRESTAuthInterceptionService.class)
                   .to(InterceptionService.class)
                   .in(Singleton.class);
@@ -144,7 +143,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
         lanceConfig.getNamespaceBackend(),
         auxMode ? "auxiliary" : "standalone",
-        authorizationEnabled ? "enabled" : "disabled");
+        enableAuthorization ? "enabled" : "disabled");
   }
 
   @Override

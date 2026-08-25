@@ -21,7 +21,6 @@ package org.apache.gravitino.lance.common.ops.gravitino;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.lance.common.ops.LanceMetadataFilter;
 import org.junit.jupiter.api.Assertions;
@@ -29,10 +28,7 @@ import org.junit.jupiter.api.Test;
 import org.lance.namespace.model.ListNamespacesResponse;
 import org.mockito.Mockito;
 
-/**
- * Verifies that listed namespaces are filtered before they are paginated, so an unauthorized entry
- * never consumes a slot of the returned page.
- */
+/** Verifies that unauthorized namespaces never consume a slot in the returned page. */
 class TestGravitinoLanceNamespaceListFiltering {
 
   private static final String DELIMITER = Pattern.quote("$");
@@ -47,12 +43,17 @@ class TestGravitinoLanceNamespaceListFiltering {
     Mockito.when(wrapper.isLakehouseCatalog(Mockito.any())).thenReturn(true);
     // "a_catalog" sorts first, so it would fill the single-entry page if it were filtered after
     // pagination.
-    Mockito.when(wrapper.metadataFilter()).thenReturn(allowOnly(CATALOG));
+    Mockito.doReturn(allowOnly(CATALOG)).when(wrapper).metadataFilter();
 
     ListNamespacesResponse response =
         new GravitinoLanceNameSpaceOperations(wrapper).listNamespaces("", DELIMITER, null, 1);
 
     Assertions.assertEquals(Set.of(CATALOG), response.getNamespaces());
+
+    Mockito.when(wrapper.metadataFilter()).thenReturn(LanceMetadataFilter.NOOP);
+    response =
+        new GravitinoLanceNameSpaceOperations(wrapper).listNamespaces("", DELIMITER, null, 10);
+    Assertions.assertEquals(Set.of("a_catalog", CATALOG), response.getNamespaces());
   }
 
   @Test
@@ -61,7 +62,7 @@ class TestGravitinoLanceNamespaceListFiltering {
     Catalog catalog = catalog(CATALOG);
     Mockito.when(wrapper.loadAndValidateLakehouseCatalog(CATALOG)).thenReturn(catalog);
     Mockito.when(wrapper.listSchemas(catalog)).thenReturn(new String[] {"a_schema", "b_schema"});
-    Mockito.when(wrapper.metadataFilter()).thenReturn(allowOnly("b_schema"));
+    Mockito.doReturn(allowOnly("b_schema")).when(wrapper).metadataFilter();
 
     ListNamespacesResponse response =
         new GravitinoLanceNameSpaceOperations(wrapper).listNamespaces(CATALOG, DELIMITER, null, 1);
@@ -70,18 +71,12 @@ class TestGravitinoLanceNamespaceListFiltering {
   }
 
   @Test
-  void testListingIsUnchangedWithoutFilter() {
-    GravitinoLanceNamespaceWrapper wrapper = Mockito.mock(GravitinoLanceNamespaceWrapper.class);
-    Catalog first = catalog("a_catalog");
-    Catalog second = catalog(CATALOG);
-    Mockito.when(wrapper.listCatalogsInfo()).thenReturn(new Catalog[] {first, second});
-    Mockito.when(wrapper.isLakehouseCatalog(Mockito.any())).thenReturn(true);
-    Mockito.when(wrapper.metadataFilter()).thenReturn(LanceMetadataFilter.NOOP);
+  void testNullFilterRestoresNoop() {
+    GravitinoLanceNamespaceWrapper wrapper = new GravitinoLanceNamespaceWrapper();
+    wrapper.setMetadataFilter(allowOnly(CATALOG));
+    wrapper.setMetadataFilter(null);
 
-    ListNamespacesResponse response =
-        new GravitinoLanceNameSpaceOperations(wrapper).listNamespaces("", DELIMITER, null, 10);
-
-    Assertions.assertEquals(Set.of("a_catalog", CATALOG), response.getNamespaces());
+    Assertions.assertSame(LanceMetadataFilter.NOOP, wrapper.metadataFilter());
   }
 
   private Catalog catalog(String name) {
@@ -91,20 +86,15 @@ class TestGravitinoLanceNamespaceListFiltering {
   }
 
   private LanceMetadataFilter allowOnly(String allowedName) {
-    return new LanceMetadataFilter() {
-      @Override
-      public List<String> filterCatalogs(List<String> catalogNames) {
-        return retain(catalogNames);
-      }
+    LanceMetadataFilter filter = Mockito.mock(LanceMetadataFilter.class);
+    Mockito.when(filter.filterCatalogs(Mockito.anyList()))
+        .thenAnswer(invocation -> retain(invocation.getArgument(0), allowedName));
+    Mockito.when(filter.filterSchemas(Mockito.anyString(), Mockito.anyList()))
+        .thenAnswer(invocation -> retain(invocation.getArgument(1), allowedName));
+    return filter;
+  }
 
-      @Override
-      public List<String> filterSchemas(String catalogName, List<String> schemaNames) {
-        return retain(schemaNames);
-      }
-
-      private List<String> retain(List<String> names) {
-        return names.stream().filter(allowedName::equals).collect(Collectors.toList());
-      }
-    };
+  private List<String> retain(List<String> names, String allowedName) {
+    return names.stream().filter(allowedName::equals).toList();
   }
 }

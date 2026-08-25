@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.lance.common.ops;
 
+import javax.annotation.Nullable;
 import org.apache.gravitino.lance.common.config.LanceConfig;
 
 public abstract class NamespaceWrapper {
@@ -74,7 +75,7 @@ public abstract class NamespaceWrapper {
    * @param metadataFilter the filter to apply, {@code null} restores {@link
    *     LanceMetadataFilter#NOOP}.
    */
-  public void setMetadataFilter(LanceMetadataFilter metadataFilter) {
+  public void setMetadataFilter(@Nullable LanceMetadataFilter metadataFilter) {
     this.metadataFilter = metadataFilter == null ? LanceMetadataFilter.NOOP : metadataFilter;
   }
 

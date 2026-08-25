@@ -23,7 +23,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-/** Marks the parameter carrying the delimiter that separates the Lance namespace ID levels. */
-@Target(ElementType.PARAMETER)
+/** Marks a Lance REST method that explicitly addresses the root namespace. */
+@Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface LanceNamespaceDelimiter {}
+public @interface LanceRootNamespace {}

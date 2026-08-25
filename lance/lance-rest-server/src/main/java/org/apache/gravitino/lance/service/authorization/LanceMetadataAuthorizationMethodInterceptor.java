@@ -20,220 +20,145 @@ package org.apache.gravitino.lance.service.authorization;
 
 import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 
-import com.google.common.annotations.VisibleForTesting;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.regex.Pattern;
-import org.aopalliance.intercept.MethodInterceptor;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.QueryParam;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
-import org.apache.gravitino.auth.ActiveRoles;
-import org.apache.gravitino.authorization.AuthorizationRequestContext;
-import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.common.ops.gravitino.ObjectIdentifier;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
-import org.apache.gravitino.lance.service.authorization.annotations.LanceAuthorizationExpression;
-import org.apache.gravitino.lance.service.authorization.annotations.LanceNamespaceDelimiter;
-import org.apache.gravitino.lance.service.authorization.annotations.LanceNamespaceId;
-import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
-import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
+import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor;
 import org.apache.gravitino.utils.NameIdentifierUtil;
-import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.namespace.errors.InvalidInputException;
+import org.lance.namespace.errors.LanceNamespaceException;
 import org.lance.namespace.errors.PermissionDeniedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-/**
- * Authorizes Lance REST metadata operations before they run.
- *
- * <p>The interceptor decodes the Lance namespace ID of the request, resolves it to the Gravitino
- * entities it addresses and evaluates the authorization expression declared by {@link
- * LanceAuthorizationExpression}. An unauthorized request is answered with a Lance error response
- * and never reaches the operation.
- */
-public class LanceMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
-
-  private static final Logger LOG =
-      LoggerFactory.getLogger(LanceMetadataAuthorizationMethodInterceptor.class);
+/** Resolves Lance namespace IDs and maps shared authorization failures to Lance REST responses. */
+public class LanceMetadataAuthorizationMethodInterceptor
+    extends BaseMetadataAuthorizationMethodInterceptor {
 
   private static final int SCHEMA_NAMESPACE_LEVELS = 2;
 
+  private final String metalakeName;
+
+  /**
+   * Creates an interceptor for the metalake exposed by this Lance REST service.
+   *
+   * @param metalakeName metalake exposed by the service
+   */
+  public LanceMetadataAuthorizationMethodInterceptor(String metalakeName) {
+    this.metalakeName = metalakeName;
+  }
+
   @Override
-  public Object invoke(MethodInvocation methodInvocation) throws Throwable {
-    Method method = methodInvocation.getMethod();
-    LanceAuthorizationExpression annotation =
-        method.getAnnotation(LanceAuthorizationExpression.class);
-    if (annotation == null || !LanceRESTServerContext.getInstance().isAuthorizationEnabled()) {
-      return methodInvocation.proceed();
+  protected AuthorizationTarget resolveAuthorizationTarget(
+      Method method, AuthorizationExpression annotation, Parameter[] parameters, Object[] args) {
+    Optional<String> namespaceId = pathArgument(parameters, args, "id");
+    boolean rootNamespace = method.isAnnotationPresent(LanceRootNamespace.class);
+    if (rootNamespace) {
+      if (namespaceId.isPresent()) {
+        throw new IllegalStateException(
+            "A Lance root operation must not declare a namespace ID target");
+      }
+      return new AuthorizationTarget(baseIdentifiers(), Entity.EntityType.METALAKE);
     }
 
-    Parameter[] parameters = method.getParameters();
-    Object[] args = methodInvocation.getArguments();
-    // A method without a namespace ID parameter, such as listing on the root, always addresses the
-    // root namespace.
-    String namespaceId = argumentAnnotatedWith(parameters, args, LanceNamespaceId.class).orElse("");
+    // An absent ID is a programming error, not the root namespace. Root operations must opt in
+    // explicitly so a forgotten annotation cannot silently weaken authorization.
+    String targetId =
+        namespaceId.orElseThrow(
+            () ->
+                new IllegalStateException(
+                    "An authorized Lance operation must declare @PathParam(\"id\") or "
+                        + "@LanceRootNamespace"));
     String delimiter =
-        argumentAnnotatedWith(parameters, args, LanceNamespaceDelimiter.class)
+        queryArgument(parameters, args, "delimiter")
             .orElse(NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT);
-
-    Optional<Object> denial;
-    try {
-      denial = authorize(annotation, method.getName(), namespaceId, delimiter);
-    } catch (Exception e) {
-      LOG.error(
-          "Failed to authorize Lance operation '{}' on namespace '{}'",
-          method.getName(),
-          namespaceId,
-          e);
-      return LanceExceptionMapper.toRESTResponse(namespaceId, e);
+    ObjectIdentifier identifier = ObjectIdentifier.of(targetId, Pattern.quote(delimiter));
+    if (identifier.levels() == 0 || identifier.levels() > SCHEMA_NAMESPACE_LEVELS) {
+      throw unsupportedIdentifier(targetId);
     }
 
-    return denial.isPresent() ? denial.get() : methodInvocation.proceed();
-  }
-
-  /**
-   * Authorizes a single request.
-   *
-   * @return the response to send back when the request is rejected, empty when it is authorized.
-   */
-  private Optional<Object> authorize(
-      LanceAuthorizationExpression annotation,
-      String operation,
-      String namespaceId,
-      String delimiter) {
-    ObjectIdentifier nsId = ObjectIdentifier.of(namespaceId, Pattern.quote(delimiter));
-    if (nsId.levels() > SCHEMA_NAMESPACE_LEVELS
-        || (nsId.levels() == 0 && !annotation.allowRootNamespace())) {
-      return Optional.of(
-          toResponse(
-              namespaceId,
-              new InvalidInputException(
-                  "Unsupported Lance namespace identifier: " + namespaceId, "", namespaceId)));
-    }
-
-    String metalakeName = LanceRESTServerContext.getInstance().metalakeName();
-    String currentUser = PrincipalUtils.getCurrentUserName();
-    AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
-    Optional<Object> denial =
-        checkUserAndActiveRoles(metalakeName, currentUser, namespaceId, requestContext);
-    if (denial.isPresent()) {
-      return denial;
-    }
-
-    // The root namespace holds no privileges of its own. Every valid user of the metalake may list
-    // it, and the catalogs it returns are filtered afterwards.
-    if (nsId.levels() == 0) {
-      return Optional.empty();
-    }
-
-    String catalogName = nsId.levelAtListPos(0);
-    Map<Entity.EntityType, NameIdentifier> nameIdentifiers = new HashMap<>();
-    nameIdentifiers.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalakeName));
-    nameIdentifiers.put(
+    Map<Entity.EntityType, NameIdentifier> identifiers = baseIdentifiers();
+    String catalogName = identifier.levelAtListPos(0);
+    identifiers.put(
         Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalogName));
-    String expression = annotation.catalogExpression();
-    if (nsId.levels() == SCHEMA_NAMESPACE_LEVELS) {
-      nameIdentifiers.put(
+    if (identifier.levels() == SCHEMA_NAMESPACE_LEVELS) {
+      identifiers.put(
           Entity.EntityType.SCHEMA,
-          NameIdentifierUtil.ofSchema(metalakeName, catalogName, nsId.levelAtListPos(1)));
-      expression = annotation.schemaExpression();
+          NameIdentifierUtil.ofSchema(metalakeName, catalogName, identifier.levelAtListPos(1)));
+      return new AuthorizationTarget(identifiers, Entity.EntityType.SCHEMA);
     }
-
-    if (evaluateExpression(expression, nameIdentifiers, requestContext)) {
-      return Optional.empty();
-    }
-
-    String message =
-        String.format(
-            "User '%s' is not authorized to perform operation '%s' on Lance namespace '%s'",
-            currentUser, operation, namespaceId);
-    LOG.info("{}, expression: {}", message, expression);
-    return Optional.of(
-        toResponse(namespaceId, new PermissionDeniedException(message, "", namespaceId)));
+    return new AuthorizationTarget(identifiers, Entity.EntityType.CATALOG);
   }
 
-  /**
-   * Evaluates one authorization expression against the entities the request addresses.
-   *
-   * @param expression the authorization expression to evaluate.
-   * @param nameIdentifiers the entities the request addresses.
-   * @param requestContext the context shared by the checks of this request.
-   * @return {@code true} when the caller is authorized.
-   */
-  @VisibleForTesting
-  boolean evaluateExpression(
-      String expression,
-      Map<Entity.EntityType, NameIdentifier> nameIdentifiers,
-      AuthorizationRequestContext requestContext) {
-    return new AuthorizationExpressionEvaluator(expression)
-        .evaluate(nameIdentifiers, requestContext);
+  @Override
+  protected boolean shouldSkipExpressionEvaluation(AuthorizationTarget target) {
+    // The root has no privilege-bearing Lance object. The shared pipeline still validates the
+    // caller, while the metadata filter removes catalogs that the caller may not see.
+    return target.entityType() == Entity.EntityType.METALAKE;
   }
 
-  /**
-   * Rejects a user that does not belong to the metalake, and a caller that declares active roles it
-   * does not hold.
-   */
-  private Optional<Object> checkUserAndActiveRoles(
-      String metalakeName,
-      String currentUser,
-      String namespaceId,
-      AuthorizationRequestContext requestContext) {
-    try {
-      AuthorizationUtils.checkCurrentUser(metalakeName, currentUser, requestContext);
-    } catch (org.apache.gravitino.exceptions.ForbiddenException e) {
-      LOG.info(
-          "User validation failed - user: '{}', metalake: '{}', reason: {}",
-          currentUser,
-          metalakeName,
-          e.getMessage());
-      return Optional.of(
-          toResponse(
-              namespaceId,
-              new PermissionDeniedException(e.getMessage(), getStackTrace(e), namespaceId)));
-    }
-
-    ActiveRoles activeRoles = requestContext.getActiveRoles();
-    if (activeRoles.mode() != ActiveRoles.Mode.NAMED) {
-      return Optional.empty();
-    }
-
-    Set<String> unheldRoles =
-        GravitinoAuthorizerProvider.getInstance()
-            .getGravitinoAuthorizer()
-            .findUnheldRoles(
-                PrincipalUtils.getCurrentPrincipal(),
-                metalakeName,
-                activeRoles.roleNames(),
-                requestContext);
-    if (unheldRoles.isEmpty()) {
-      return Optional.empty();
-    }
-
-    String message =
-        String.format(
-            "User '%s' cannot assume active role(s) that are not held: %s",
-            currentUser, unheldRoles);
-    LOG.info(message);
-    return Optional.of(
-        toResponse(namespaceId, new PermissionDeniedException(message, "", namespaceId)));
+  @Override
+  protected boolean isExceptionPropagate(Exception exception) {
+    return exception instanceof LanceNamespaceException;
   }
 
-  private Object toResponse(String namespaceId, Exception e) {
-    return LanceExceptionMapper.toRESTResponse(namespaceId, e);
+  @Override
+  protected Object toErrorResponse(MethodInvocation methodInvocation, Throwable throwable) {
+    String namespaceId =
+        pathArgument(
+                methodInvocation.getMethod().getParameters(), methodInvocation.getArguments(), "id")
+            .orElse("");
+    Exception exception;
+    if (throwable instanceof ForbiddenException) {
+      exception =
+          new PermissionDeniedException(
+              throwable.getMessage(), getStackTrace(throwable), namespaceId);
+    } else if (throwable instanceof Exception) {
+      exception = (Exception) throwable;
+    } else {
+      exception = new RuntimeException(throwable);
+    }
+    return LanceExceptionMapper.toRESTResponse(namespaceId, exception);
   }
 
-  private Optional<String> argumentAnnotatedWith(
-      Parameter[] parameters, Object[] args, Class<? extends Annotation> annotationType) {
+  private Map<Entity.EntityType, NameIdentifier> baseIdentifiers() {
+    Map<Entity.EntityType, NameIdentifier> identifiers = new HashMap<>();
+    identifiers.put(Entity.EntityType.METALAKE, NameIdentifierUtil.ofMetalake(metalakeName));
+    return identifiers;
+  }
+
+  private InvalidInputException unsupportedIdentifier(String namespaceId) {
+    return new InvalidInputException(
+        "Unsupported Lance namespace identifier: " + namespaceId, "", namespaceId);
+  }
+
+  private static Optional<String> pathArgument(Parameter[] parameters, Object[] args, String name) {
     for (int i = 0; i < parameters.length; i++) {
-      if (parameters[i].getAnnotation(annotationType) != null && args[i] != null) {
+      PathParam annotation = parameters[i].getAnnotation(PathParam.class);
+      if (args[i] != null && annotation != null && name.equals(annotation.value())) {
+        return Optional.of(String.valueOf(args[i]));
+      }
+    }
+    return Optional.empty();
+  }
+
+  private static Optional<String> queryArgument(
+      Parameter[] parameters, Object[] args, String name) {
+    for (int i = 0; i < parameters.length; i++) {
+      QueryParam annotation = parameters[i].getAnnotation(QueryParam.class);
+      if (args[i] != null && annotation != null && name.equals(annotation.value())) {
         return Optional.of(String.valueOf(args[i]));
       }
     }

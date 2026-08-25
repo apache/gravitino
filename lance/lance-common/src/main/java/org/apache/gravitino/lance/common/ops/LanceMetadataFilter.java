@@ -20,28 +20,11 @@ package org.apache.gravitino.lance.common.ops;
 
 import java.util.List;
 
-/**
- * Filters listed Lance metadata names down to the subset the current caller is allowed to see.
- *
- * <p>Listing is paginated inside the namespace operations, so unauthorized entries must be removed
- * before a page is cut. Implementations are supplied by the Lance REST server when authorization is
- * enabled; otherwise {@link #NOOP} keeps the listing untouched.
- */
+/** Filters Lance metadata before pagination; {@link #NOOP} keeps authorization-disabled lists. */
 public interface LanceMetadataFilter {
 
   /** A filter that returns every listed name unchanged. */
-  LanceMetadataFilter NOOP =
-      new LanceMetadataFilter() {
-        @Override
-        public List<String> filterCatalogs(List<String> catalogNames) {
-          return catalogNames;
-        }
-
-        @Override
-        public List<String> filterSchemas(String catalogName, List<String> schemaNames) {
-          return schemaNames;
-        }
-      };
+  LanceMetadataFilter NOOP = new LanceMetadataFilter() {};
 
   /**
    * Filters the catalogs listed for the root namespace.
@@ -49,7 +32,9 @@ public interface LanceMetadataFilter {
    * @param catalogNames the catalog names to filter.
    * @return the catalog names the current caller may see.
    */
-  List<String> filterCatalogs(List<String> catalogNames);
+  default List<String> filterCatalogs(List<String> catalogNames) {
+    return catalogNames;
+  }
 
   /**
    * Filters the schemas listed under a catalog.
@@ -58,5 +43,7 @@ public interface LanceMetadataFilter {
    * @param schemaNames the schema names to filter.
    * @return the schema names the current caller may see.
    */
-  List<String> filterSchemas(String catalogName, List<String> schemaNames);
+  default List<String> filterSchemas(String catalogName, List<String> schemaNames) {
+    return schemaNames;
+  }
 }

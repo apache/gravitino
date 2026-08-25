@@ -19,6 +19,8 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
+import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -36,11 +38,9 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
-import org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions;
-import org.apache.gravitino.lance.service.authorization.annotations.LanceAuthorizationExpression;
-import org.apache.gravitino.lance.service.authorization.annotations.LanceNamespaceDelimiter;
-import org.apache.gravitino.lance.service.authorization.annotations.LanceNamespaceId;
+import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.CreateNamespaceResponse;
 import org.lance.namespace.model.DescribeNamespaceResponse;
@@ -56,6 +56,14 @@ public class LanceNamespaceOperations {
 
   private static final String ROOT_NAMESPACE_ID = "";
 
+  // Catalog probes use normal catalog access. Schema probes additionally permit CREATE_SCHEMA,
+  // because clients commonly check existence immediately before creating a schema.
+  private static final String PROBE_NAMESPACE_AUTHORIZATION_EXPRESSION =
+      CAN_ACCESS_METADATA
+          + " || (entityType == 'SCHEMA' && ("
+          + PROBE_SCHEMA_AUTHORIZATION_EXPRESSION
+          + "))";
+
   private final NamespaceWrapper lanceNamespace;
 
   @Inject
@@ -67,13 +75,10 @@ public class LanceNamespaceOperations {
   @Path("/{id}/list")
   @Timed(name = "list-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespaces", absolute = true)
-  @LanceAuthorizationExpression(
-      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
-      schemaExpression = LanceAuthorizationExpressions.READ_SCHEMA_NAMESPACE)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
   public Response listNamespaces(
-      @LanceNamespaceId @PathParam("id") String namespaceId,
-      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
-          String delimiter,
+      @PathParam("id") String namespaceId,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     return listNamespacesInternal(namespaceId, delimiter, pageToken, limit);
@@ -83,13 +88,10 @@ public class LanceNamespaceOperations {
   @Path("/list")
   @Timed(name = "list-namespaces-root." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-namespaces-root", absolute = true)
-  @LanceAuthorizationExpression(
-      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
-      schemaExpression = LanceAuthorizationExpressions.READ_SCHEMA_NAMESPACE,
-      allowRootNamespace = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
+  @LanceRootNamespace
   public Response listNamespacesOnRoot(
-      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
-          String delimiter,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
       @QueryParam("page_token") String pageToken,
       @QueryParam("limit") Integer limit) {
     return listNamespacesInternal(ROOT_NAMESPACE_ID, delimiter, pageToken, limit);
@@ -112,13 +114,10 @@ public class LanceNamespaceOperations {
   @Path("/{id}/describe")
   @Timed(name = "describe-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "describe-namespaces", absolute = true)
-  @LanceAuthorizationExpression(
-      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
-      schemaExpression = LanceAuthorizationExpressions.READ_SCHEMA_NAMESPACE)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA)
   public Response describeNamespace(
-      @LanceNamespaceId @PathParam("id") String namespaceId,
-      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
-          String delimiter) {
+      @PathParam("id") String namespaceId,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       DescribeNamespaceResponse response =
           lanceNamespace.asNamespaceOps().describeNamespace(namespaceId, Pattern.quote(delimiter));
@@ -178,13 +177,10 @@ public class LanceNamespaceOperations {
   @Path("/{id}/exists")
   @Timed(name = "namespace-exists." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "namespace-exists", absolute = true)
-  @LanceAuthorizationExpression(
-      catalogExpression = LanceAuthorizationExpressions.READ_CATALOG_NAMESPACE,
-      schemaExpression = LanceAuthorizationExpressions.SCHEMA_NAMESPACE_EXISTS)
+  @AuthorizationExpression(expression = PROBE_NAMESPACE_AUTHORIZATION_EXPRESSION)
   public Response namespaceExists(
-      @LanceNamespaceId @PathParam("id") String namespaceId,
-      @LanceNamespaceDelimiter @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter")
-          String delimiter) {
+      @PathParam("id") String namespaceId,
+      @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter) {
     try {
       lanceNamespace.asNamespaceOps().namespaceExists(namespaceId, Pattern.quote(delimiter));
       return Response.ok().build();
