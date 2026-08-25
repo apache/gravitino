@@ -36,7 +36,7 @@ import java.util.Locale
 
 Locale.setDefault(Locale.US)
 
-abstract class DockerTestLock : BuildService<BuildServiceParameters.None>
+abstract class SharedTestEnvironmentLock : BuildService<BuildServiceParameters.None>
 
 plugins {
   `maven-publish`
@@ -65,9 +65,9 @@ plugins {
   alias(libs.plugins.errorprone)
 }
 
-val dockerTestLock = gradle.sharedServices.registerIfAbsent(
-  "dockerTestLock",
-  DockerTestLock::class
+val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
+  "sharedTestEnvironmentLock",
+  SharedTestEnvironmentLock::class
 ) {
   maxParallelUsages.set(1)
 }
@@ -1262,16 +1262,19 @@ gradle.projectsEvaluated {
     subprojectJarOutputDirs.map { it.get().asFile.toPath().toAbsolutePath().normalize() }
 
   allprojects {
-    if (rootProject.extra["dockerTest"] == true) {
-      // Docker tests share containers across modules, so keep only those test tasks serialized.
-      val hasDockerTests = fileTree("src/test") {
+    val runsIntegrationTestsOnly = rootProject.hasProperty("skipTests")
+    val hasDockerTests =
+      rootProject.extra["dockerTest"] == true && fileTree("src/test") {
         include("**/*.java", "**/*.kt")
       }.any { it.readText().contains("gravitino-docker-test") }
 
-      if (hasDockerTests) {
-        tasks.withType<Test>().configureEach {
-          usesService(dockerTestLock)
-        }
+    // Integration tests in different projects share the same Gravitino server, database,
+    // containers, and configuration files. Running them together lets one test stop or reset
+    // resources while another test is still using them. Normal builds keep independent unit tests
+    // parallel and serialize only projects that contain Docker-tagged tests.
+    if (runsIntegrationTestsOnly || hasDockerTests) {
+      tasks.withType<Test>().configureEach {
+        usesService(sharedTestEnvironmentLock)
       }
     }
 
