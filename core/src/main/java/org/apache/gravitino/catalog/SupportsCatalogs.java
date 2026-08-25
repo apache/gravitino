@@ -177,6 +177,15 @@ public interface SupportsCatalogs {
       throws Exception;
 
   /**
+   * Test the connection of an existing catalog using its stored configuration.
+   *
+   * @param ident The identifier of the existing catalog.
+   * @throws NoSuchCatalogException If the catalog does not exist.
+   * @throws Exception If the connection test fails.
+   */
+  void testConnection(NameIdentifier ident) throws Exception;
+
+  /**
    * Enable a catalog. If the catalog is already enabled, this method does nothing.
    *
    * @param ident The identifier of the catalog.

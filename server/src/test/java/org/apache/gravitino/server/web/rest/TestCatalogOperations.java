@@ -64,6 +64,8 @@ import org.apache.gravitino.dto.responses.EntityListResponse;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
@@ -340,6 +342,85 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse = resp1.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse.getType());
+
+    ConnectionFailedException legacyFailure =
+        new ConnectionFailedException(
+            new IllegalStateException("database connection detail"), "connection failed");
+    doThrow(legacyFailure).when(manager).testConnection(any(), any(), any(), any(), any());
+    Response failedResponse =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
+
+    ErrorResponse connectionError = failedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, connectionError.getCode());
+    Assertions.assertNotNull(connectionError.getStack());
+    Assertions.assertTrue(
+        String.join("\n", connectionError.getStack()).contains("database connection detail"));
+  }
+
+  @Test
+  public void testExistingCatalogConnection() {
+    doNothing().when(manager).testConnection(any(NameIdentifier.class));
+    Response response =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(0, response.readEntity(BaseResponse.class).getCode());
+
+    doThrow(new ConnectionFailedException("sanitized failure"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response failedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), failedResponse.getStatus());
+    ErrorResponse errorResponse = failedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.CONNECTION_FAILED_CODE, errorResponse.getCode());
+    Assertions.assertEquals("sanitized failure", errorResponse.getMessage());
+    Assertions.assertNull(errorResponse.getStack());
+
+    doThrow(new UnsupportedOperationException("unsupported"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response unsupportedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+    ErrorResponse unsupported = unsupportedResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, unsupported.getCode());
+    Assertions.assertNull(unsupported.getStack());
+
+    assertExistingCatalogConnectionError(
+        new IllegalArgumentException("invalid catalog configuration"),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertExistingCatalogConnectionError(
+        new NoSuchCatalogException("catalog does not exist"), ErrorConstants.NOT_FOUND_CODE);
+    assertExistingCatalogConnectionError(
+        new CatalogNotInUseException("catalog is not in use"), ErrorConstants.NOT_IN_USE_CODE);
+
+    doThrow(new RuntimeException("unexpected failure"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class));
+    Response internalErrorResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+    Assertions.assertEquals(
+        INTERNAL_SERVER_ERROR.getStatusCode(), internalErrorResponse.getStatus());
+    ErrorResponse internalError = internalErrorResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, internalError.getCode());
+    Assertions.assertEquals("unexpected failure", internalError.getMessage());
+    Assertions.assertNull(internalError.getStack());
   }
 
   @Test
@@ -605,6 +686,22 @@ public class TestCatalogOperations extends BaseOperationsTest {
             .build();
 
     return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
+  }
+
+  private void assertExistingCatalogConnectionError(RuntimeException exception, int expectedCode) {
+    doThrow(exception).when(manager).testConnection(any(NameIdentifier.class));
+    Response response =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(expectedCode, errorResponse.getCode());
+    Assertions.assertEquals(exception.getClass().getSimpleName(), errorResponse.getType());
+    Assertions.assertEquals(exception.getMessage(), errorResponse.getMessage());
+    Assertions.assertNull(errorResponse.getStack());
   }
 
   private static TestCatalog buildCatalog(String metalake, String catalogName) {

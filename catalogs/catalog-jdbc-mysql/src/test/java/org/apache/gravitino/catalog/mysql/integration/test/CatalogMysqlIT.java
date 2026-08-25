@@ -201,6 +201,36 @@ public class CatalogMysqlIT extends BaseIT {
     return loadCatalog;
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
+  @Test
+  void testExistingCatalogConnectionWithUnreachableEndpoint() throws SQLException {
+    String unreachableCatalogName = GravitinoITUtils.genRandomName("mysql_unreachable_catalog");
+    Map<String, String> catalogProperties = Maps.newHashMap();
+    catalogProperties.put(
+        JdbcConfig.JDBC_URL.getKey(), "jdbc:mysql://127.0.0.1:1/?useSSL=false&connectTimeout=1000");
+    catalogProperties.put(
+        JdbcConfig.JDBC_DRIVER.getKey(), MYSQL_CONTAINER.getDriverClassName(TEST_DB_NAME));
+    catalogProperties.put(JdbcConfig.USERNAME.getKey(), MYSQL_CONTAINER.getUsername());
+    catalogProperties.put(JdbcConfig.PASSWORD.getKey(), MYSQL_CONTAINER.getPassword());
+
+    metalake.createCatalog(
+        unreachableCatalogName,
+        Catalog.Type.RELATIONAL,
+        provider,
+        "unreachable MySQL catalog",
+        catalogProperties);
+    try {
+      assertThrows(
+          ConnectionFailedException.class, () -> metalake.testConnection(unreachableCatalogName));
+    } finally {
+      metalake.dropCatalog(unreachableCatalogName, true);
+    }
+  }
+
   private void createSchema(Catalog catalog, String schemaName) {
     Map<String, String> prop = Maps.newHashMap();
 
