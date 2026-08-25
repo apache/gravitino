@@ -504,10 +504,10 @@ public class SchemaMetaService {
   }
 
   /**
-   * Holds the parent schema row while a table, view, fileset, function, model, model version, or
-   * topic is written, so a child cannot be added below a schema that is going away. The lock is
-   * shared, so children of the same schema can still be written in parallel; dropping the schema
-   * takes the row exclusively and therefore waits for them.
+   * Holds the parent schema row while a table, view, fileset, function, model, model version,
+   * Semantic Model, or topic is written, so a child cannot be added below a schema that is going
+   * away. The lock is shared, so children of the same schema can still be written in parallel;
+   * dropping the schema takes the row exclusively and therefore waits for them.
    */
   void lockSchemaForEntityWrite(
       NameIdentifier entityIdentifier,
