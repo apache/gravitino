@@ -282,7 +282,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           }
 
           SchemaEntity updatedSchemaEntity =
-              operateOnEntity(
+              operateOnEntityAndPropagateConflict(
                   ident,
                   id ->
                       store.update(

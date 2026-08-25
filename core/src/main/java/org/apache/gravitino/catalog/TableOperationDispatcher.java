@@ -330,7 +330,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           }
 
           TableEntity updatedTableEntity =
-              operateOnEntity(
+              operateOnEntityAndPropagateConflict(
                   ident,
                   id ->
                       store.update(

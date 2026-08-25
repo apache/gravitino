@@ -274,7 +274,7 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
           long viewId = stringId != null ? stringId.id() : existing.id();
           ViewEntity updatedViewEntity =
-              operateOnEntity(
+              operateOnEntityAndPropagateConflict(
                   ident,
                   id ->
                       store.update(
