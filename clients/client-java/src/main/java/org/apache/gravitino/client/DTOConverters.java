@@ -55,9 +55,11 @@ import org.apache.gravitino.dto.requests.ModelUpdateRequest;
 import org.apache.gravitino.dto.requests.ModelVersionUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.SchemaUpdateRequest;
+import org.apache.gravitino.dto.requests.SemanticModelUpdateRequest;
 import org.apache.gravitino.dto.requests.TableUpdateRequest;
 import org.apache.gravitino.dto.requests.TagUpdateRequest;
 import org.apache.gravitino.dto.requests.TopicUpdateRequest;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.function.FunctionChange;
 import org.apache.gravitino.function.FunctionColumn;
@@ -74,6 +76,7 @@ import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.expressions.Expression;
+import org.apache.gravitino.semantic.SemanticModelChange;
 import org.apache.gravitino.tag.TagChange;
 
 class DTOConverters {
@@ -598,6 +601,40 @@ class DTOConverters {
     } else {
       throw new IllegalArgumentException(
           "Unknown function change type: " + change.getClass().getSimpleName());
+    }
+  }
+
+  static SemanticModelUpdateRequest toSemanticModelUpdateRequest(SemanticModelChange change) {
+    if (change == null) {
+      throw new IllegalArgumentException("Semantic Model change must not be null");
+    }
+
+    if (change instanceof SemanticModelChange.RenameSemanticModel) {
+      return new SemanticModelUpdateRequest.RenameSemanticModelRequest(
+          ((SemanticModelChange.RenameSemanticModel) change).getNewName());
+
+    } else if (change instanceof SemanticModelChange.UpdateComment) {
+      return new SemanticModelUpdateRequest.UpdateSemanticModelCommentRequest(
+          ((SemanticModelChange.UpdateComment) change).getNewComment());
+
+    } else if (change instanceof SemanticModelChange.SetProperty) {
+      SemanticModelChange.SetProperty setProperty = (SemanticModelChange.SetProperty) change;
+      return new SemanticModelUpdateRequest.SetSemanticModelPropertyRequest(
+          setProperty.getProperty(), setProperty.getValue());
+
+    } else if (change instanceof SemanticModelChange.RemoveProperty) {
+      return new SemanticModelUpdateRequest.RemoveSemanticModelPropertyRequest(
+          ((SemanticModelChange.RemoveProperty) change).getProperty());
+
+    } else if (change instanceof SemanticModelChange.ReplaceDefinition) {
+      SemanticModelChange.ReplaceDefinition replaceDefinition =
+          (SemanticModelChange.ReplaceDefinition) change;
+      return new SemanticModelUpdateRequest.ReplaceSemanticModelDefinitionRequest(
+          SemanticModelDefinitionDTO.fromDefinition(replaceDefinition.getDefinition()));
+
+    } else {
+      throw new IllegalArgumentException(
+          "Unknown Semantic Model change type: " + change.getClass().getSimpleName());
     }
   }
 
