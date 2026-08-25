@@ -154,6 +154,10 @@ public class TableMetaService {
                   mapper -> {
                     if (overwrite) {
                       TablePO storedPO = persistedPO.get();
+                      // Retire the version row this overwrite replaces. There is one only when the
+                      // upsert updated an existing table: the database then moved the version from
+                      // N to N + 1, so the row to retire is N. When the upsert inserted a brand new
+                      // table the version is still the initial one and no earlier row exists.
                       if (storedPO.getCurrentVersion() > POConverters.INIT_VERSION) {
                         mapper.softDeleteTableVersionByTableIdAndVersion(
                             storedPO.getTableId(), storedPO.getCurrentVersion() - 1);

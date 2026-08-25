@@ -228,9 +228,15 @@ public abstract class OperationDispatcher {
     try {
       ret = fn.apply(ident);
     } catch (OptimisticLockException e) {
-      // Managed operations do not use this best-effort helper, so their conflicts still reach the
-      // caller. Here the external catalog was already changed and remains the source of truth;
-      // failing the request would encourage a retry that could apply the external change twice.
+      // Only external entities reach this point, so swallowing the conflict is safe: alterTable,
+      // alterSchema and alterView return before calling this helper when the entity is managed,
+      // and no catalog reports managed storage for topics (KafkaCatalogCapability). A managed
+      // alter therefore hits the store directly and its conflict still reaches the caller.
+      //
+      // For an external entity the catalog was already changed and remains the source of truth.
+      // Failing the request would invite a retry that re-applies the external change, and some
+      // changes are not idempotent, so the stale Gravitino copy is the lesser problem: the next
+      // load imports the entity again.
       LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
     } catch (NoSuchEntityException e) {
       // Case 2: The table is created by Gravitino, but has no corresponding entity in Gravitino.
