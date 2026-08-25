@@ -121,21 +121,14 @@ public interface TagOperations {
   boolean deleteTag(String name);
 
   /**
-   * Lists policy names directly associated with a tag.
+   * Lists all direct policy associations for a tag.
+   *
+   * <p>The returned associations are not filtered by their selectors. A selector is evaluated
+   * against the effective tag assignment of a specific metadata object only when resolving policies
+   * for that object.
    *
    * @param tagName The tag name.
-   * @return The directly associated policy names.
-   * @throws UnsupportedOperationException If listing policy-to-tag associations is not supported.
-   */
-  default String[] listPoliciesForTag(String tagName) {
-    throw new UnsupportedOperationException("Listing policies for a tag is not supported");
-  }
-
-  /**
-   * Lists detailed policy associations for a tag.
-   *
-   * @param tagName The tag name.
-   * @return The policy associations including selectors.
+   * @return The direct policy associations, including their selectors.
    * @throws UnsupportedOperationException If listing policy-to-tag associations is not supported.
    */
   default PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName) {
