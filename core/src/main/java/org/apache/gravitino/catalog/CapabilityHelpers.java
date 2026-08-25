@@ -152,13 +152,7 @@ public class CapabilityHelpers {
       Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
-    if (identScope == Capability.Scope.TABLE
-        || identScope == Capability.Scope.VIEW
-        || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.MODEL
-        || identScope == Capability.Scope.FUNCTION
-        || identScope == Capability.Scope.SEMANTIC_MODEL) {
+    if (hasSchemaParent(identScope)) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCaseSensitiveOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
@@ -224,17 +218,27 @@ public class CapabilityHelpers {
       Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);
     String catalog = namespace.level(1);
-    if (identScope == Capability.Scope.TABLE
-        || identScope == Capability.Scope.VIEW
-        || identScope == Capability.Scope.FILESET
-        || identScope == Capability.Scope.TOPIC
-        || identScope == Capability.Scope.FUNCTION
-        || identScope == Capability.Scope.SEMANTIC_MODEL) {
+    if (hasSchemaParent(identScope)) {
       String schema = namespace.level(namespace.length() - 1);
       schema = applyCapabilitiesOnName(Capability.Scope.SCHEMA, schema, capabilities);
       return Namespace.of(metalake, catalog, schema);
     }
     return namespace;
+  }
+
+  private static boolean hasSchemaParent(Capability.Scope resourceScope) {
+    switch (resourceScope) {
+      case TABLE:
+      case VIEW:
+      case FILESET:
+      case TOPIC:
+      case MODEL:
+      case FUNCTION:
+      case SEMANTIC_MODEL:
+        return true;
+      default:
+        return false;
+    }
   }
 
   private static Index applyCapabilities(Index index, Capability capabilities) {

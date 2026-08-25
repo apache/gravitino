@@ -170,10 +170,6 @@ public class TestSemanticModelOperationDispatcher {
     assertThrows(
         IllegalArgumentException.class,
         () -> dispatcher.createSemanticModel(MODEL_IDENT, null, definition(), null));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> dispatcher.alterSemanticModel(MODEL_IDENT, new SemanticModelChange[0]));
-
     verify(catalogManager, never()).loadCatalog(CATALOG_IDENT);
   }
 

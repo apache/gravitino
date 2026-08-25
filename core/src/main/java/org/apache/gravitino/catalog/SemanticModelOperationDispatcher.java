@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
-import java.util.Arrays;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Catalog;
@@ -30,8 +29,6 @@ import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
-import org.apache.gravitino.lock.LockType;
-import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.semantic.SemanticModel;
 import org.apache.gravitino.semantic.SemanticModelChange;
@@ -50,7 +47,7 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
    * Creates a Semantic Model operation dispatcher.
    *
    * @param catalogManager The catalog manager.
-   * @param schemaDispatcher The internal schema dispatcher used for parent validation.
+   * @param schemaDispatcher The schema operation dispatcher used for parent validation.
    * @param store The EntityStore used for Semantic Model persistence.
    * @param idGenerator The stable entity ID generator.
    * @param secretManager The secret manager required by the operation dispatcher base class.
@@ -72,8 +69,7 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     checkRelationalCatalog(namespace);
     NameIdentifier schemaIdent = NameIdentifier.of(namespace.levels());
     schemaDispatcher.loadSchema(schemaIdent);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdent, LockType.READ, () -> managedOperations.listSemanticModels(namespace));
+    return managedOperations.listSemanticModels(namespace);
   }
 
   @Override
@@ -82,8 +78,7 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     if (!schemaDispatcher.schemaExists(schemaIdentifier(ident))) {
       throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
     }
-    return TreeLockUtils.doWithTreeLock(
-        ident, LockType.READ, () -> managedOperations.loadSemanticModel(ident));
+    return managedOperations.loadSemanticModel(ident);
   }
 
   @Override
@@ -99,30 +94,19 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     schemaDispatcher.loadSchema(schemaIdent);
-    return TreeLockUtils.doWithTreeLock(
-        schemaIdent,
-        LockType.WRITE,
-        () -> managedOperations.createSemanticModel(ident, comment, definition, properties));
+    return managedOperations.createSemanticModel(ident, comment, definition, properties);
   }
 
   @Override
   public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes)
       throws NoSuchSemanticModelException, SemanticModelAlreadyExistsException,
           IllegalSemanticModelException {
-    Preconditions.checkArgument(
-        changes != null && changes.length > 0, "At least one change is required");
     checkRelationalCatalog(ident.namespace());
     NameIdentifier schemaIdent = schemaIdentifier(ident);
     if (!schemaDispatcher.schemaExists(schemaIdent)) {
       throw new NoSuchSemanticModelException("Semantic Model %s does not exist", ident);
     }
-
-    boolean renaming =
-        Arrays.stream(changes)
-            .anyMatch(change -> change instanceof SemanticModelChange.RenameSemanticModel);
-    NameIdentifier lockIdent = renaming ? schemaIdent : ident;
-    return TreeLockUtils.doWithTreeLock(
-        lockIdent, LockType.WRITE, () -> managedOperations.alterSemanticModel(ident, changes));
+    return managedOperations.alterSemanticModel(ident, changes);
   }
 
   @Override
@@ -131,8 +115,7 @@ public class SemanticModelOperationDispatcher extends OperationDispatcher
     if (!schemaDispatcher.schemaExists(schemaIdentifier(ident))) {
       return false;
     }
-    return TreeLockUtils.doWithTreeLock(
-        ident, LockType.WRITE, () -> managedOperations.dropSemanticModel(ident));
+    return managedOperations.dropSemanticModel(ident);
   }
 
   private void checkRelationalCatalog(Namespace namespace) {

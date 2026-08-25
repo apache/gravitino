@@ -885,10 +885,11 @@ public class GravitinoEnv {
 
     // Semantic Model operation chain: SemanticModelNormalizeDispatcher ->
     // SemanticModelOperationDispatcher -> ManagedSemanticModelOperations.
-    // TODO: Add event and hook layers with Semantic Model server integration.
+    // TODO(#12595): Add Semantic Model event dispatching before server integration.
+    // TODO(#12594): Add Semantic Model ownership and privilege hooks.
     SemanticModelOperationDispatcher semanticModelOperationDispatcher =
         new SemanticModelOperationDispatcher(
-            catalogManager, internalSchemaDispatcher, entityStore, idGenerator, secretManager);
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
     this.semanticModelDispatcher =
         new SemanticModelNormalizeDispatcher(semanticModelOperationDispatcher, catalogManager);
 
