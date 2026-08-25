@@ -164,6 +164,14 @@ jobs:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           set -euo pipefail
+          # Ledger of every called suite. This layer only sees the reusable
+          # call result. An inner path-skip still reports success here; the
+          # reason lives in that suite's changes job.
+          echo "Required CI suite results:"
+          jq -r '
+            to_entries[]
+            | "\(.key)=\(.value.result)"
+          ' <<< "${RESULTS}"
           failures="$(
             jq -r '
               to_entries[]

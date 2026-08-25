@@ -150,6 +150,8 @@ def verify_parent():
         raise AssertionError("required_ci must run with if: always()")
     if '.value.result != "success"' not in required_ci:
         raise AssertionError("required_ci must fail on any non-success suite")
+    if "Required CI suite results:" not in required_ci:
+        raise AssertionError("required_ci must print every suite result")
 
     for job_id, workflow_name in SUITE_WORKFLOWS.items():
         call_pattern = re.compile(
@@ -263,6 +265,10 @@ def verify_coverage_comment_follows_parent():
     if 'workflows: ["build"]' in source:
         raise AssertionError(
             "coverage-comment.yml: standalone build is no longer the PR entry point"
+        )
+    if "ACTION=skip" not in source:
+        raise AssertionError(
+            "coverage-comment.yml: missing skip action when the artifact is absent"
         )
     parent = REQUIRED_CI_WORKFLOW.read_text(encoding="utf-8")
     if "name: Required CI" not in parent:

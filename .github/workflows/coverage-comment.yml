@@ -40,6 +40,13 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
+      - name: Skip when no coverage report
+        if: steps.download.outcome != 'success'
+        run: |
+          echo "ACTION=skip"
+          echo "REASON=no coverage-report artifact on the Required CI run"
+          echo "Build path-skipped, failed before upload, or this branch is not yet on the default-branch listener."
+
       - name: Post Coverage Comment
         if: steps.download.outcome == 'success'
         uses: actions/github-script@v7
