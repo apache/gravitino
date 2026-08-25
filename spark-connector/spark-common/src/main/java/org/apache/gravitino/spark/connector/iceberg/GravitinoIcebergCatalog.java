@@ -21,21 +21,29 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
+import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.procedures.SparkProcedures;
 import org.apache.iceberg.spark.source.HasIcebergCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchProcedureException;
@@ -72,13 +80,70 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       }
     }
     String catalogBackendName = IcebergPropertiesUtils.getCatalogBackendName(properties);
-    Map<String, String> all =
-        getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    CredentialPropertyUtils.applyIcebergCredentials(
-        CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
+    Optional<String> icebergRestUri = resolveIcebergRestUri(properties);
+    Map<String, String> all;
+    if (icebergRestUri.isPresent()) {
+      all = buildIcebergRestSparkCatalogProperties(name, options, properties, icebergRestUri.get());
+    } else {
+      all = getPropertiesConverter().toSparkCatalogProperties(options, properties);
+      CredentialPropertyUtils.applyIcebergCredentials(
+          CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
+    }
     TableCatalog icebergCatalog = new SparkCatalog();
     icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return icebergCatalog;
+  }
+
+  /**
+   * Resolves the Iceberg REST server endpoint to route this catalog through, if any. Only hive/jdbc
+   * backed catalogs are eligible; a catalog already configured with {@code catalog-backend=rest} or
+   * {@code custom} is left untouched.
+   */
+  private Optional<String> resolveIcebergRestUri(Map<String, String> properties) {
+    String backend = properties.get(IcebergConstants.CATALOG_BACKEND);
+    if (backend == null) {
+      return Optional.empty();
+    }
+    String normalizedBackend = backend.toLowerCase(Locale.ROOT);
+    boolean eligible =
+        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE.equals(normalizedBackend)
+            || IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC.equals(
+                normalizedBackend);
+    if (!eligible) {
+      return Optional.empty();
+    }
+
+    String manualUri =
+        SparkSession.active().conf().get(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI, null);
+    if (StringUtils.isNotBlank(manualUri)) {
+      return Optional.of(manualUri);
+    }
+    return GravitinoCatalogManager.get().getIcebergRestUri();
+  }
+
+  private Map<String, String> buildIcebergRestSparkCatalogProperties(
+      String gravitinoCatalogName,
+      CaseInsensitiveStringMap options,
+      Map<String, String> properties,
+      String restUri) {
+    IcebergPropertiesConverter converter = (IcebergPropertiesConverter) getPropertiesConverter();
+    Map<String, String> all =
+        new HashMap<>(
+            converter.buildIcebergRestProperties(
+                gravitinoCatalogName, restUri, properties, getIcebergRestClientConfig()));
+    if (options != null) {
+      all.putAll(options);
+    }
+    return all;
+  }
+
+  private Map<String, String> getIcebergRestClientConfig() {
+    return Stream.of(
+            SparkSession.active()
+                .sparkContext()
+                .conf()
+                .getAllWithPrefix(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_CONFIG_PREFIX))
+        .collect(Collectors.toMap(t -> t._1, t -> t._2, (oldVal, newVal) -> newVal));
   }
 
   @Override
