@@ -742,7 +742,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       } finally {
         wrapper.close();
       }
-    } catch (GravitinoRuntimeException e) {
+    } catch (GravitinoRuntimeException | UnsupportedOperationException e) {
       throw e;
     } catch (Exception e) {
       LOG.warn("Failed to test catalog creation {}", ident, e);
@@ -751,6 +751,38 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       }
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Test the connection of an existing catalog using its stored configuration.
+   *
+   * @param ident The identifier of the existing catalog.
+   */
+  @Override
+  public void testConnection(NameIdentifier ident) {
+    TreeLockUtils.doWithTreeLock(
+        ident,
+        LockType.READ,
+        () -> {
+          CatalogWrapper wrapper = loadCatalogAndWrap(ident);
+          wrapper.catalog().checkMetalakeAndCatalogInUse();
+          try {
+            wrapper.doWithCatalogOps(
+                c -> {
+                  c.testConnection(ident);
+                  return null;
+                });
+          } catch (UnsupportedOperationException e) {
+            throw e;
+          } catch (Exception e) {
+            LOG.warn("Failed to test existing catalog connection {}", ident, e);
+            if (e instanceof RuntimeException) {
+              throw (RuntimeException) e;
+            }
+            throw new RuntimeException(e);
+          }
+          return null;
+        });
   }
 
   @Override

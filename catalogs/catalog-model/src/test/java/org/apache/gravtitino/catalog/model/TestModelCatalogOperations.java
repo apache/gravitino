@@ -183,6 +183,13 @@ public class TestModelCatalogOperations {
   }
 
   @Test
+  public void testConnectionNotSupported() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.testConnection(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME)));
+  }
+
+  @Test
   public void testSchemaOperations() {
     String schemaName = randomSchemaName();
     NameIdentifier schemaIdent =

@@ -248,6 +248,15 @@ public class ErrorHandlers {
   }
 
   /**
+   * Creates an error handler specific to secret property operations.
+   *
+   * @return A Consumer representing the secret error handler.
+   */
+  public static Consumer<ErrorResponse> secretErrorHandler() {
+    return SecretErrorHandler.INSTANCE;
+  }
+
+  /**
    * Creates an error handler specific to Owner operations.
    *
    * @return A Consumer representing the Owner error handler.
@@ -561,6 +570,9 @@ public class ErrorHandlers {
 
         case ErrorConstants.CONNECTION_FAILED_CODE:
           throw new ConnectionFailedException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
 
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
@@ -1008,6 +1020,39 @@ public class ErrorHandlers {
   private static class CredentialErrorHandler extends RestErrorHandler {
 
     private static final CredentialErrorHandler INSTANCE = new CredentialErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else {
+            throw new NotFoundException(errorMessage);
+          }
+
+        case ErrorConstants.NOT_IN_USE_CODE:
+          throw new MetalakeNotInUseException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to secret property operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class SecretErrorHandler extends RestErrorHandler {
+
+    private static final SecretErrorHandler INSTANCE = new SecretErrorHandler();
 
     @Override
     public void accept(ErrorResponse errorResponse) {

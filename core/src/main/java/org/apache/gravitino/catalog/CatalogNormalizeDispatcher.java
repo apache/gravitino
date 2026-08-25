@@ -125,6 +125,12 @@ public class CatalogNormalizeDispatcher implements CatalogDispatcher {
   }
 
   @Override
+  public void testConnection(NameIdentifier ident) throws Exception {
+    validateCatalogName(ident.name());
+    dispatcher.testConnection(ident);
+  }
+
+  @Override
   public void enableCatalog(NameIdentifier ident) throws NoSuchCatalogException {
     dispatcher.enableCatalog(ident);
   }

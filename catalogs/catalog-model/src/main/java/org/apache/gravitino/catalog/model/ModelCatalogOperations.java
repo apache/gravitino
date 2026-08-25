@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
@@ -79,13 +78,9 @@ public class ModelCatalogOperations extends ManagedSchemaOperations
   public void close() throws IOException {}
 
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
-    // No-op for model catalog.
+  public void testConnection(NameIdentifier catalogIdent) {
+    throw new UnsupportedOperationException(
+        "Model catalogs do not define an external catalog-level connection probe");
   }
 
   @Override

@@ -82,6 +82,12 @@ public class ModelCatalogOperationsIT extends BaseIT {
   }
 
   @Test
+  void testExistingCatalogConnectionIsUnsupported() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> gravitinoMetalake.testConnection(catalogName));
+  }
+
+  @Test
   public void testRegisterAndGetModel() {
     String modelName = RandomNameUtils.genRandomName("model1");
     NameIdentifier modelIdent = NameIdentifier.of(schemaName, modelName);

@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from typing import Optional
 
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.model.model import Model
@@ -27,6 +28,7 @@ from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.model_dto import ModelDTO
+from gravitino.exceptions.base import UnsupportedOperationException
 from gravitino.namespace import Namespace
 from gravitino.utils import HTTPClient
 
@@ -94,3 +96,6 @@ class GenericModel(Model, SupportsTags):
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def supports_roles(self) -> SupportsRoles:
+        raise UnsupportedOperationException("Not supported yet.")

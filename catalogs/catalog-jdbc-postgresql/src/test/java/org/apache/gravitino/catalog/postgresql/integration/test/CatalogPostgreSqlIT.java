@@ -186,6 +186,11 @@ public class CatalogPostgreSqlIT extends BaseIT {
     return loadCatalog;
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
   private void createSchema(String schemaName) {
 
     Schema createdSchema =
