@@ -370,7 +370,8 @@ public class HadoopUserImpersonationIT extends BaseIT {
     Assertions.assertEquals(Fileset.Type.MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
     // historical size 2 (k1 + default-location-name) + masked gravitino.identifier
-    Assertions.assertEquals(3, fileset.properties().size(), () -> "properties=" + fileset.properties());
+    Assertions.assertEquals(
+        3, fileset.properties().size(), () -> "properties=" + fileset.properties());
     Assertions.assertEquals(
         HiddenPropertyMaskUtils.MASKED_VALUE, fileset.properties().get(StringIdentifier.ID_KEY));
     Assertions.assertTrue(
