@@ -231,9 +231,16 @@ public class TableMetaService {
             }
           },
           () -> {
-            // The table details live in table_version_info, while table_meta points to the current
-            // version. These two rows must move together. This step runs only after the table_meta
-            // CAS above succeeds, so a losing writer cannot overwrite the winner's version row.
+            // The table details live in table_version_info, keyed by (table_id, version), while
+            // table_meta only points at the current version. The two rows have to move together,
+            // and the upsert below has no version guard of its own: it overwrites whatever sits
+            // under that key.
+            //
+            // Say two writers both read version 5 and both want to write 6. Their version rows
+            // carry the same key, (table_id, 6), so whichever runs this statement second would
+            // silently replace the other's details. Ordering this step after the table_meta CAS is
+            // what prevents that: the loser matches no row up there, throws, and the transaction
+            // rolls back before reaching this statement. Only the winner ever writes version 6.
             SessionUtils.doWithoutCommit(
                 TableVersionMapper.class,
                 mapper -> {
