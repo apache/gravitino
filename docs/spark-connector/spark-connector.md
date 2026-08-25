@@ -41,6 +41,8 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.sql.gravitino.clientCacheMaxSize   | int    | `100`         | The maximum number of Gravitino clients cached, one per identity.                               | No       |
 | spark.sql.gravitino.clientCacheTtlSec    | long   | `3600`        | Evicts a cached Gravitino client this many seconds after it was last used.                      | No       |
 | spark.sql.gravitino.catalogCacheTtlSec   | long   | `300`         | Evicts a cached catalog this many seconds after it was loaded.                                  | No       |
+| spark.sql.gravitino.iceberg.rest-uri     | string | (none)        | Overrides the auto-discovered Gravitino Iceberg REST server endpoint. See [Iceberg catalog](spark-catalog-iceberg.md#routing-through-the-gravitino-iceberg-rest-server). | No       |
+| spark.sql.gravitino.iceberg.rest.        | string | (none)        | The configuration key prefix for the Iceberg REST client config (e.g. `rest.auth.type`), applied when a catalog is routed through the Gravitino Iceberg REST server. | No       |
 
 To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
 

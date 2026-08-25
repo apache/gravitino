@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionDefinitions;
@@ -82,6 +83,16 @@ public abstract class SparkEnvIT extends SparkUtilIT {
 
   protected boolean supportsFunction() {
     return true;
+  }
+
+  /**
+   * Whether the Iceberg REST auxiliary service should run with {@code dynamic-config-provider}
+   * (routing requests to whichever Gravitino catalog the request's {@code prefix} names) instead of
+   * the default single-catalog {@code static-config-provider}. Tests that verify the Spark
+   * connector's Iceberg REST auto-discovery/routing need this.
+   */
+  protected boolean useDynamicIcebergRestConfigProvider() {
+    return false;
   }
 
   /** Returns the Gravitino {@link Catalog} for the catalog under test. */
@@ -232,24 +243,36 @@ public abstract class SparkEnvIT extends SparkUtilIT {
   private void initIcebergRestServiceEnv() {
     super.ignoreIcebergAuxRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
-    icebergRestServiceConfigs.put(
-        "gravitino."
-            + icebergRestServiceName
-            + "."
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
-        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE);
-    icebergRestServiceConfigs.put(
-        "gravitino."
-            + icebergRestServiceName
-            + "."
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
-        hiveMetastoreUri);
-    icebergRestServiceConfigs.put(
-        "gravitino."
-            + icebergRestServiceName
-            + "."
-            + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
-        warehouse);
+    if (useDynamicIcebergRestConfigProvider()) {
+      icebergRestServiceConfigs.put(
+          "gravitino."
+              + icebergRestServiceName
+              + "."
+              + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
+          IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME);
+      icebergRestServiceConfigs.put(
+          "gravitino." + icebergRestServiceName + "." + IcebergConstants.GRAVITINO_METALAKE,
+          metalakeName);
+    } else {
+      icebergRestServiceConfigs.put(
+          "gravitino."
+              + icebergRestServiceName
+              + "."
+              + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+          IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_HIVE);
+      icebergRestServiceConfigs.put(
+          "gravitino."
+              + icebergRestServiceName
+              + "."
+              + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_URI,
+          hiveMetastoreUri);
+      icebergRestServiceConfigs.put(
+          "gravitino."
+              + icebergRestServiceName
+              + "."
+              + IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+          warehouse);
+    }
     registerCustomConfigs(icebergRestServiceConfigs);
   }
 
