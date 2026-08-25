@@ -80,6 +80,12 @@ public interface TagMetadataObjectRelMapper {
       @Param("metadataObjectType") String metadataObjectType,
       @Param("tagRels") List<TagMetadataObjectRelPO> tagRelPOs);
 
+  @UpdateProvider(
+      type = TagMetadataObjectRelSQLProviderFactory.class,
+      method = "softDeleteTagMetadataObjectRelsByMetalakeAndTagName")
+  Integer softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
+      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
+
   /**
    * Soft-deletes all metadata-object relations for a tag.
    *

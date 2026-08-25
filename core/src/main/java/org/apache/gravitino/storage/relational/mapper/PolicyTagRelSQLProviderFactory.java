@@ -72,13 +72,6 @@ public class PolicyTagRelSQLProviderFactory {
     return getProvider().insert(relation);
   }
 
-  /** Delegates a selector update. */
-  public static String updateSelector(
-      @Param("newRelation") PolicyTagRelPO newRelation,
-      @Param("oldRelation") PolicyTagRelPO oldRelation) {
-    return getProvider().updateSelector(newRelation, oldRelation);
-  }
-
   /** Delegates a relation soft delete. */
   public static String softDeleteByPair(@Param("relation") PolicyTagRelPO relation) {
     return getProvider().softDeleteByPair(relation);

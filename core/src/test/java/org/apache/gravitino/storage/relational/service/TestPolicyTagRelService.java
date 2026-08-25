@@ -44,8 +44,6 @@ import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.json.JsonUtils;
-import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
@@ -71,7 +69,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   private static final String RISK_SELECTOR = "{\"type\":\"TAG_VALUE\",\"value\":\"risk\"}";
 
   @TestTemplate
-  public void testSelectorUpsertBidirectionalReadAndIdempotentDelete() throws IOException {
+  public void testSelectorCreateReplaceBidirectionalReadAndIdempotentDelete() throws IOException {
     createAndInsertMakeLake(METALAKE);
     TagEntity tag =
         TagEntity.builder()
@@ -130,6 +128,21 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
             Entity.EntityType.TAG,
             new RelationEdgeTarget[] {riskTarget},
             new RelationEdgeTarget[0]));
+    byTag =
+        backend.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Collections.singletonList(tag.nameIdentifier()),
+            Entity.EntityType.TAG);
+    Assertions.assertEquals(1, byTag.size());
+    Assertions.assertEquals(FINANCE_SELECTOR, byTag.get(0).relationValue().orElse(null));
+
+    backend.updateEntityRelations(
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            tag.nameIdentifier(),
+            Entity.EntityType.TAG,
+            new RelationEdgeTarget[] {riskTarget},
+            new RelationEdgeTarget[] {financeTarget}));
     List<RelationalEntity<?>> byPolicy =
         backend.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -297,48 +310,17 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testConcurrentSelectorUpdatesAdvanceVersionAndAudit() throws Exception {
-    createAndInsertMakeLake(METALAKE);
-    RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
-    backend.updateEntityRelations(relationUpdate(endpoints, null, true));
-
-    runConcurrently(
-        () -> updateRelationsUnchecked(relationUpdate(endpoints, FINANCE_SELECTOR, true)),
-        () -> updateRelationsUnchecked(relationUpdate(endpoints, RISK_SELECTOR, true)));
-
-    PolicyTagRelPO relation = getRelation(endpoints);
-    Assertions.assertNotNull(relation);
-    Assertions.assertEquals(3L, relation.getCurrentVersion());
-    Assertions.assertEquals(3L, relation.getLastVersion());
-    Assertions.assertTrue(Set.of(FINANCE_SELECTOR, RISK_SELECTOR).contains(relation.getSelector()));
-    AuditInfo auditInfo =
-        JsonUtils.anyFieldMapper().readValue(relation.getAuditInfo(), AuditInfo.class);
-    Assertions.assertNotNull(auditInfo.creator());
-    Assertions.assertNotNull(auditInfo.createTime());
-    Assertions.assertNotNull(auditInfo.lastModifier());
-    Assertions.assertNotNull(auditInfo.lastModifiedTime());
-  }
-
-  @TestTemplate
-  public void testStaleRelationUpdatesAffectNoRows() throws Exception {
+  public void testStaleRelationDeleteAffectsNoRows() throws Exception {
     createAndInsertMakeLake(METALAKE);
     RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
     backend.updateEntityRelations(relationUpdate(endpoints, null, true));
     PolicyTagRelPO observed = getRelation(endpoints);
-    PolicyTagRelPO replacement = copyWithSelectorAndVersion(observed, FINANCE_SELECTOR, 2L);
+    PolicyTagRelPO replacement = copyWithVersion(observed, 2L);
 
     Assertions.assertEquals(
-        Integer.valueOf(1),
-        SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.updateSelector(replacement, observed)));
-    Assertions.assertEquals(
         Integer.valueOf(0),
         SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.updateSelector(replacement, observed)));
-    Assertions.assertEquals(
-        Integer.valueOf(0),
-        SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(observed)));
+            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(replacement)));
 
     PolicyTagRelPO current = getRelation(endpoints);
     Assertions.assertEquals(
@@ -348,7 +330,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteReAddDeleteUsesUniqueTombstones() throws Exception {
+  public void testDeleteReAddDeleteRetainsHistory() throws Exception {
     createAndInsertMakeLake(METALAKE);
     RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
     backend.updateEntityRelations(relationUpdate(endpoints, null, true));
@@ -364,11 +346,6 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
             + " AND deleted_at > 0";
     Assertions.assertEquals(
         2L, queryForLong("SELECT COUNT(*) FROM policy_tag_relation_meta WHERE " + pairPredicate));
-    Assertions.assertEquals(
-        2L,
-        queryForLong(
-            "SELECT COUNT(DISTINCT tombstone_id) FROM policy_tag_relation_meta WHERE "
-                + pairPredicate));
   }
 
   @TestTemplate
@@ -487,12 +464,11 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
         mapper -> mapper.getByPolicyIdAndTagId(endpoints.policy.id(), endpoints.tag.id()));
   }
 
-  private PolicyTagRelPO copyWithSelectorAndVersion(
-      PolicyTagRelPO relation, String selector, long version) {
+  private PolicyTagRelPO copyWithVersion(PolicyTagRelPO relation, long version) {
     return PolicyTagRelPO.builder()
         .withPolicyId(relation.getPolicyId())
         .withTagId(relation.getTagId())
-        .withSelector(selector)
+        .withSelector(relation.getSelector())
         .withAuditInfo(relation.getAuditInfo())
         .withCurrentVersion(version)
         .withLastVersion(version)

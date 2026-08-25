@@ -38,6 +38,12 @@ public interface PolicyVersionMapper {
   @InsertProvider(type = PolicyVersionSQLProviderFactory.class, method = "insertPolicyVersion")
   void insertPolicyVersion(@Param("policyVersion") PolicyVersionPO policyVersionPO);
 
+  @UpdateProvider(
+      type = PolicyVersionSQLProviderFactory.class,
+      method = "softDeletePolicyVersionByMetalakeAndPolicyName")
+  Integer softDeletePolicyVersionByMetalakeAndPolicyName(
+      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);
+
   /**
    * Soft-deletes all versions of a policy.
    *

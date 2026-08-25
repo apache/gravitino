@@ -56,6 +56,20 @@ public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRel
   }
 
   @Override
+  public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
+      String metalakeName, String tagName) {
+    return "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " te SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
+        + TagMetaMapper.TAG_TABLE_NAME
+        + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
+        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0) AND te.deleted_at = 0";
+  }
+
+  @Override
   public String softDeleteByTagId(Long tagId) {
     return "UPDATE "
         + TAG_METADATA_OBJECT_RELATION_TABLE_NAME

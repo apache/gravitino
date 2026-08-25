@@ -175,7 +175,7 @@ public class PolicyTagRelService {
 
     for (RelationEdgeTarget target : targetsToAdd) {
       long policyId = policyIds.get(target.nameIdentifier().name());
-      upsert(policyId, tagId, target.relationValue().orElse(null), tagIdentifier);
+      insertIfAbsent(policyId, tagId, target.relationValue().orElse(null));
     }
 
     return listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
@@ -243,49 +243,32 @@ public class PolicyTagRelService {
     return result;
   }
 
-  private static void upsert(
-      long policyId, long tagId, String selector, NameIdentifier tagIdentifier) throws IOException {
+  private static void insertIfAbsent(long policyId, long tagId, String selector)
+      throws IOException {
     PolicyTagRelPO existing =
         SessionUtils.getWithoutCommit(
             PolicyTagRelMapper.class, mapper -> mapper.getByPolicyIdAndTagId(policyId, tagId));
-    if (existing != null && Objects.equals(existing.getSelector(), selector)) {
+    if (existing != null) {
       return;
     }
 
-    long nextVersion = existing == null ? 1L : existing.getCurrentVersion() + 1;
     PolicyTagRelPO relation =
         PolicyTagRelPO.builder()
             .withPolicyId(policyId)
             .withTagId(tagId)
             .withSelector(selector)
-            .withAuditInfo(auditInfo(existing))
-            .withCurrentVersion(nextVersion)
-            .withLastVersion(nextVersion)
+            .withAuditInfo(auditInfo())
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
-    if (existing == null) {
-      SessionUtils.doWithoutCommit(PolicyTagRelMapper.class, mapper -> mapper.insert(relation));
-    } else {
-      int updated =
-          SessionUtils.getWithoutCommit(
-              PolicyTagRelMapper.class, mapper -> mapper.updateSelector(relation, existing));
-      if (updated != 1) {
-        throw relationConflict(tagIdentifier);
-      }
-    }
+    SessionUtils.doWithoutCommit(PolicyTagRelMapper.class, mapper -> mapper.insert(relation));
   }
 
-  private static String auditInfo(PolicyTagRelPO existing) throws IOException {
+  private static String auditInfo() throws IOException {
     String principal = PrincipalUtils.getCurrentPrincipal().getName();
     Instant now = Instant.now();
-    AuditInfo auditInfo;
-    if (existing == null) {
-      auditInfo = AuditInfo.builder().withCreator(principal).withCreateTime(now).build();
-    } else {
-      auditInfo = JsonUtils.anyFieldMapper().readValue(existing.getAuditInfo(), AuditInfo.class);
-      auditInfo.merge(
-          AuditInfo.builder().withLastModifier(principal).withLastModifiedTime(now).build(), false);
-    }
+    AuditInfo auditInfo = AuditInfo.builder().withCreator(principal).withCreateTime(now).build();
     return JsonUtils.anyFieldMapper().writeValueAsString(auditInfo);
   }
 

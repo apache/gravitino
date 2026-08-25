@@ -61,26 +61,12 @@ public class PolicyTagRelBaseSQLProvider {
         + " #{relation.deletedAt})";
   }
 
-  /** Returns SQL for replacing a relation selector. */
-  public String updateSelector(
-      @Param("newRelation") PolicyTagRelPO newRelation,
-      @Param("oldRelation") PolicyTagRelPO oldRelation) {
-    return "UPDATE "
-        + POLICY_TAG_RELATION_TABLE_NAME
-        + " SET selector = #{newRelation.selector}, audit_info = #{newRelation.auditInfo},"
-        + " current_version = #{newRelation.currentVersion},"
-        + " last_version = #{newRelation.lastVersion}"
-        + " WHERE policy_id = #{oldRelation.policyId} AND tag_id = #{oldRelation.tagId}"
-        + " AND current_version = #{oldRelation.currentVersion} AND deleted_at = 0";
-  }
-
   /** Returns SQL for soft-deleting one relation. */
   public String softDeleteByPair(@Param("relation") PolicyTagRelPO relation) {
     return "UPDATE "
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
-        + ", tombstone_id = id"
         + " WHERE policy_id = #{relation.policyId} AND tag_id = #{relation.tagId}"
         + " AND current_version = #{relation.currentVersion} AND deleted_at = 0";
   }
@@ -91,7 +77,6 @@ public class PolicyTagRelBaseSQLProvider {
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
-        + ", tombstone_id = id"
         + " WHERE policy_id = #{policyId} AND deleted_at = 0";
   }
 
@@ -101,7 +86,6 @@ public class PolicyTagRelBaseSQLProvider {
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
-        + ", tombstone_id = id"
         + " WHERE tag_id = #{tagId} AND deleted_at = 0";
   }
 
@@ -111,7 +95,6 @@ public class PolicyTagRelBaseSQLProvider {
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
-        + ", tombstone_id = id"
         + " WHERE EXISTS (SELECT * FROM "
         + PolicyMetaMapper.POLICY_META_TABLE_NAME
         + " pm WHERE pm.metalake_id = #{metalakeId} AND pm.policy_id = "

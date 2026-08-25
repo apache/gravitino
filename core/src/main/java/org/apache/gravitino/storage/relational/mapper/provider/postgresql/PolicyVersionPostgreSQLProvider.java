@@ -18,12 +18,29 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.POLICY_META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyVersionBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 
 public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvider {
+  @Override
+  public String softDeletePolicyVersionByMetalakeAndPolicyName(
+      String metalakeName, String policyName) {
+    return "UPDATE "
+        + POLICY_VERSION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE metalake_id = (SELECT metalake_id FROM "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
+        + " AND policy_id = (SELECT policy_id FROM "
+        + POLICY_META_TABLE_NAME
+        + " pm WHERE pm.policy_name = #{policyName} AND pm.deleted_at = 0)"
+        + " AND deleted_at = 0";
+  }
+
   @Override
   public String softDeleteByPolicyId(Long policyId) {
     return "UPDATE "

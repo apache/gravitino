@@ -73,18 +73,6 @@ public interface PolicyTagRelMapper {
   void insert(@Param("relation") PolicyTagRelPO relation);
 
   /**
-   * Replaces the selector on an active relation.
-   *
-   * @param newRelation The replacement selector, audit information, and next version.
-   * @param oldRelation The observed relation and version.
-   * @return The number of updated rows.
-   */
-  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "updateSelector")
-  int updateSelector(
-      @Param("newRelation") PolicyTagRelPO newRelation,
-      @Param("oldRelation") PolicyTagRelPO oldRelation);
-
-  /**
    * Soft-deletes one active relation.
    *
    * @param relation The observed relation and version.
