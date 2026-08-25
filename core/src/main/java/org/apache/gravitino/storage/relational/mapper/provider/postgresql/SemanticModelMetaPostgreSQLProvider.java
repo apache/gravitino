@@ -20,11 +20,12 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper.TABLE_NAME;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.ibatis.annotations.Param;
 
-/** Provides PostgreSQL SQL for Semantic Model create and load operations. */
+/** Provides PostgreSQL SQL for Semantic Model identity metadata. */
 public class SemanticModelMetaPostgreSQLProvider extends SemanticModelMetaBaseSQLProvider {
 
   @Override
@@ -44,5 +45,52 @@ public class SemanticModelMetaPostgreSQLProvider extends SemanticModelMetaBaseSQ
         + ".current_version + 1,"
         + " audit_info = #{semanticModelMeta.auditInfo},"
         + " deleted_at = #{semanticModelMeta.deletedAt}";
+  }
+
+  @Override
+  public String softDeleteSemanticModelMetasBySemanticModelId(
+      @Param("semanticModelId") Long semanticModelId,
+      @Param("currentVersion") Integer currentVersion) {
+    return softDeleteBy(
+        "semantic_model_id = #{semanticModelId} AND current_version = #{currentVersion}");
+  }
+
+  @Override
+  public String softDeleteSemanticModelMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
+    return softDeleteBy("metalake_id = #{metalakeId}");
+  }
+
+  @Override
+  public String softDeleteSemanticModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    return softDeleteBy("catalog_id = #{catalogId}");
+  }
+
+  @Override
+  public String softDeleteSemanticModelMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}</foreach>) AND deleted_at = 0</script>";
+  }
+
+  @Override
+  public String deleteSemanticModelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return "DELETE FROM "
+        + TABLE_NAME
+        + " WHERE semantic_model_id IN (SELECT semantic_model_id FROM "
+        + TABLE_NAME
+        + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
+  }
+
+  private String softDeleteBy(String condition) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE "
+        + condition
+        + " AND deleted_at = 0";
   }
 }

@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.storage.relational.service;
 
+import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -26,7 +28,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 
-/** Provides relational persistent-object operations required to create and load Semantic Models. */
+/** Provides relational persistent-object operations for Semantic Models. */
 public class SemanticModelPOStorageOps
     extends BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> {
 
@@ -41,6 +43,12 @@ public class SemanticModelPOStorageOps
     } else {
       mapper.insertSemanticModelMeta(semanticModelPO);
     }
+  }
+
+  @Override
+  public Integer updatePO(
+      SemanticModelMetaMapper mapper, SemanticModelPO newPO, SemanticModelPO oldPO) {
+    return mapper.updateSemanticModelMeta(newPO, oldPO);
   }
 
   @Override
@@ -72,6 +80,38 @@ public class SemanticModelPOStorageOps
       return null;
     }
     return po;
+  }
+
+  @Override
+  public List<SemanticModelPO> listPOs(SemanticModelMetaMapper mapper, Long parentId) {
+    return mapper.listSemanticModelPOsBySchemaId(parentId);
+  }
+
+  @Override
+  public List<SemanticModelPO> listPOs(
+      SemanticModelMetaMapper mapper, List<Long> semanticModelIds) {
+    return mapper.listSemanticModelPOsBySemanticModelIds(semanticModelIds);
+  }
+
+  @Override
+  public List<SemanticModelPO> listPOsByNSFullName(
+      SemanticModelMetaMapper mapper, Namespace namespace) {
+    List<SemanticModelPO> pos =
+        mapper.listSemanticModelPOsByFullQualifiedName(
+            namespace.level(0), namespace.level(1), namespace.level(2));
+    if (pos.isEmpty()) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.CATALOG.name().toLowerCase(Locale.ROOT),
+          namespace.level(1));
+    }
+    if (pos.get(0).getSchemaId() == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.SCHEMA.name().toLowerCase(Locale.ROOT),
+          namespace.level(2));
+    }
+    return pos.stream().filter(po -> po.getSemanticModelId() != null).collect(Collectors.toList());
   }
 
   @Override

@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
 import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelMetaBaseSQLProvider;
@@ -27,7 +28,7 @@ import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.ibatis.annotations.Param;
 
-/** Selects database-specific SQL providers for Semantic Model create and load operations. */
+/** Selects database-specific SQL providers for Semantic Model identity metadata. */
 public class SemanticModelMetaSQLProviderFactory {
 
   private static final Map<JDBCBackendType, SemanticModelMetaBaseSQLProvider>
@@ -51,10 +52,30 @@ public class SemanticModelMetaSQLProviderFactory {
 
   static class SemanticModelMetaH2Provider extends SemanticModelMetaBaseSQLProvider {}
 
+  /** Provides SQL for listing Semantic Models by schema ID. */
+  public static String listSemanticModelPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().listSemanticModelPOsBySchemaId(schemaId);
+  }
+
+  /** Provides SQL for listing Semantic Models by fully qualified schema name. */
+  public static String listSemanticModelPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider()
+        .listSemanticModelPOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
   /** Provides SQL for selecting a Semantic Model ID by schema ID and name. */
   public static String selectSemanticModelIdBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName) {
     return getProvider().selectSemanticModelIdBySchemaIdAndName(schemaId, semanticModelName);
+  }
+
+  /** Provides SQL for listing Semantic Models by stable IDs. */
+  public static String listSemanticModelPOsBySemanticModelIds(
+      @Param("semanticModelIds") List<Long> semanticModelIds) {
+    return getProvider().listSemanticModelPOsBySemanticModelIds(semanticModelIds);
   }
 
   /** Provides SQL for selecting a Semantic Model by schema ID and name. */
@@ -109,5 +130,36 @@ public class SemanticModelMetaSQLProviderFactory {
       @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
       @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO) {
     return getProvider().updateSemanticModelMeta(newSemanticModelPO, oldSemanticModelPO);
+  }
+
+  /** Provides SQL for soft-deleting a Semantic Model identity by stable ID and current version. */
+  public static String softDeleteSemanticModelMetasBySemanticModelId(
+      @Param("semanticModelId") Long semanticModelId,
+      @Param("currentVersion") Integer currentVersion) {
+    return getProvider()
+        .softDeleteSemanticModelMetasBySemanticModelId(semanticModelId, currentVersion);
+  }
+
+  /** Provides SQL for soft-deleting Semantic Model identities by metalake ID. */
+  public static String softDeleteSemanticModelMetasByMetalakeId(
+      @Param("metalakeId") Long metalakeId) {
+    return getProvider().softDeleteSemanticModelMetasByMetalakeId(metalakeId);
+  }
+
+  /** Provides SQL for soft-deleting Semantic Model identities by catalog ID. */
+  public static String softDeleteSemanticModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteSemanticModelMetasByCatalogId(catalogId);
+  }
+
+  /** Provides SQL for soft-deleting Semantic Model identities by schema IDs. */
+  public static String softDeleteSemanticModelMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteSemanticModelMetasBySchemaIds(schemaIds);
+  }
+
+  /** Provides SQL for permanently deleting old Semantic Model identities. */
+  public static String deleteSemanticModelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return getProvider().deleteSemanticModelMetasByLegacyTimeline(legacyTimeline, limit);
   }
 }
