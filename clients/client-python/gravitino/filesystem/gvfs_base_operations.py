@@ -495,21 +495,32 @@ class BaseGVFSOperations(ABC):
 
     def _merge_fileset_properties(
         self,
-        catalog: FilesetCatalog,
-        schema: Schema,
-        fileset: Fileset,
+        fileset_ident: NameIdentifier,
         actual_location: str,
     ) -> Dict[str, str]:
-        """Merge properties from catalog, schema, fileset, options, and user-defined configs.
-        :param catalog: The fileset catalog
-        :param schema: The schema
-        :param fileset: The fileset
+        """Merge properties from catalog, schema, fileset, options, and configs.
+
+        Combines default load*.properties() with get_secrets() so every secret URN
+        (including keys that may also appear in credential vending) becomes plaintext
+        for FS access. Typed credentials remain available via get_credentials.
+
+        :param fileset_ident: The fileset identifier
         :param actual_location: The actual storage location
         :return: Merged properties dictionary
         """
+        catalog_name = fileset_ident.namespace().level(1)
+        schema_name = fileset_ident.namespace().level(2)
+        catalog = self._get_gravitino_client().load_catalog(catalog_name)
+        schema = catalog.as_schemas().load_schema(schema_name)
+        fileset = catalog.as_fileset_catalog().load_fileset(
+            NameIdentifier.of(schema_name, fileset_ident.name())
+        )
         fileset_props = dict(catalog.properties() or {})
+        fileset_props.update(catalog.get_secrets())
         fileset_props.update(schema.properties() or {})
+        fileset_props.update(schema.get_secrets())
         fileset_props.update(fileset.properties() or {})
+        fileset_props.update(fileset.get_secrets())
         if self._options:
             fileset_props.update(self._options)
         # Get user-defined configurations for the actual location
@@ -530,13 +541,6 @@ class BaseGVFSOperations(ABC):
         :param location_name: The location name, None means the default location
         :return: The actual filesystem
         """
-        catalog_ident: NameIdentifier = NameIdentifier.of(
-            self._metalake, fileset_ident.namespace().level(1)
-        )
-        catalog = self._get_fileset_catalog(catalog_ident)
-        schema = self._get_fileset_schema(
-            NameIdentifier.parse(str(fileset_ident.namespace()))
-        )
         fileset = self._get_fileset(fileset_ident)
 
         # Determine target location name
@@ -553,9 +557,7 @@ class BaseGVFSOperations(ABC):
                 f"Cannot find the location: {target_location_name} in fileset: {fileset_ident}"
             )
 
-        fileset_props = self._merge_fileset_properties(
-            catalog, schema, fileset, actual_location
-        )
+        fileset_props = self._merge_fileset_properties(fileset_ident, actual_location)
 
         # Set caller context for credential vending
         if location_name:

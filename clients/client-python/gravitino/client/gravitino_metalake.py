@@ -23,6 +23,7 @@ from gravitino.api.authorization.owner import Owner
 from gravitino.api.authorization.privileges import Privilege
 from gravitino.api.authorization.role import Role
 from gravitino.api.authorization.securable_objects import SecurableObject
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.authorization.user import User
 from gravitino.api.catalog import Catalog
 from gravitino.api.catalog_change import CatalogChange
@@ -31,11 +32,15 @@ from gravitino.api.job.job_template import JobTemplate
 from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
+from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
 from gravitino.client.generic_job_handle import GenericJobHandle
 from gravitino.client.generic_tag import GenericTag
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
+)
 from gravitino.dto.metalake_dto import MetalakeDTO
 from gravitino.dto.requests.catalog_create_request import CatalogCreateRequest
 from gravitino.dto.requests.catalog_set_request import CatalogSetRequest
@@ -108,8 +113,9 @@ logger = logging.getLogger(__name__)
 class GravitinoMetalake(
     MetalakeDTO,
     SupportsJobs,
+    SupportsRoles,
     TagOperations,
-):
+):  # pylint: disable=too-many-ancestors
     """
     Gravitino Metalake is the top-level metadata repository for users. It contains a list of catalogs
     as sub-level metadata collections. With GravitinoMetalake, users can list, create, load,
@@ -151,6 +157,12 @@ class GravitinoMetalake(
             _audit=metalake.audit_info(),
         )
         self.rest_client = client
+        metalake_object = MetadataObjects.of(
+            [self.name()], MetadataObject.Type.METALAKE
+        )
+        self._metadata_object_role_operations = MetadataObjectRoleOperations(
+            self.name(), metalake_object, client
+        )
 
     def list_catalogs(self) -> List[str]:
         """List all the catalogs under this metalake.
@@ -1037,6 +1049,9 @@ class GravitinoMetalake(
     # Role operations
     #####################
 
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
     def create_role(
         self,
         role_name: str,
@@ -1135,6 +1150,9 @@ class GravitinoMetalake(
         resp = RoleNamesListResponse.from_json(response.body, infer_missing=True)
         resp.validate()
         return resp.names()
+
+    def list_binding_role_names(self) -> List[str]:
+        return self._metadata_object_role_operations.list_binding_role_names()
 
     def grant_roles_to_user(self, role_names: List[str], user_name: str) -> User:
         """Grant roles to a user.
