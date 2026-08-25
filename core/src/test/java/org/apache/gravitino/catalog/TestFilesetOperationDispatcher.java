@@ -348,7 +348,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       Fileset fileset =
           filesets.createMultipleLocationFileset(
               ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
-      Assertions.assertFalse(fileset.properties().containsKey("k2"));
+      Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, fileset.properties().get("k2"));
 
       Fileset stored =
           catalogManager

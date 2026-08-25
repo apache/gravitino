@@ -72,4 +72,52 @@ public class TestHiddenPropertyMaskUtils {
     HiddenPropertyMaskUtils.validateNoMaskedPlaceholders(
         ImmutableMap.of("jdbc-password", "secret", "comment", "new"));
   }
+
+  @Test
+  void testMaskHiddenPropertiesReturnsMutableEmptyMap() {
+    Map<String, String> masked =
+        HiddenPropertyMaskUtils.maskHiddenProperties(Map.of(), ImmutableSet.of());
+    masked.put("in-use", "true");
+    Assertions.assertEquals("true", masked.get("in-use"));
+  }
+
+  @Test
+  void testMaskHiddenPropertiesKeepsReservedVisibleKeys() {
+    PropertiesMetadata metadata =
+        new PropertiesMetadata() {
+          @Override
+          public Map<String, PropertyEntry<?>> propertyEntries() {
+            return ImmutableMap.of(
+                "numFiles",
+                PropertyEntry.stringReservedPropertyEntry("numFiles", "number of files", false),
+                "jdbc-password",
+                PropertyEntry.stringOptionalPropertyEntry(
+                    "jdbc-password", "password", false, null, true),
+                "gravitino.identifier",
+                PropertyEntry.stringReservedPropertyEntry(
+                    "gravitino.identifier", "system id", true));
+          }
+        };
+
+    Map<String, String> properties =
+        ImmutableMap.of(
+            "numFiles",
+            "10",
+            "jdbc-password",
+            "secret",
+            "gravitino.identifier",
+            "uid-1",
+            "visible",
+            "v");
+    Map<String, String> masked = HiddenPropertyMaskUtils.maskHiddenProperties(properties, metadata);
+
+    // reserved + not hidden → keep real value
+    Assertions.assertEquals("10", masked.get("numFiles"));
+    // hidden credential → ******
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("jdbc-password"));
+    // reserved + hidden → still returned, but masked (no omit)
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get("gravitino.identifier"));
+    Assertions.assertEquals("v", masked.get("visible"));
+  }
 }

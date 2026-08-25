@@ -25,10 +25,23 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 
-/** Masks hidden entity properties for API responses and rejects masked values on write. */
+/**
+ * Read/write helpers for sensitive entity properties.
+ *
+ * <p><b>Read (API response)</b>: keep every property key. Replace values with {@link #MASKED_VALUE}
+ * when the key is metadata-{@code hidden} (including credential keys such as {@code jdbc-password}
+ * / S3 secrets) or the value is a secret-manager URN. Other properties, including
+ * reserved-but-visible ones (for example {@code numFiles}, {@code creator}), are returned as-is.
+ * Reserved only controls whether users may write the property; it does not remove keys from the
+ * response.
+ *
+ * <p><b>Write (create / alter)</b>: reject any value equal to {@link #MASKED_VALUE} so the
+ * placeholder is never persisted. Reserved / immutable rejection remains in {@code
+ * PropertiesMetadataHelpers}.
+ */
 public final class HiddenPropertyMaskUtils {
 
-  /** Placeholder returned instead of hidden credential and other sensitive property values. */
+  /** Placeholder returned instead of hidden / credential / secret property values. */
   public static final String MASKED_VALUE = "******";
 
   private HiddenPropertyMaskUtils() {}
@@ -58,49 +71,53 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
-   * Returns a copy of {@code properties} with values for {@code hiddenPropertyNames} replaced by
-   * {@link #MASKED_VALUE}. Entries with null keys or values are omitted.
+   * Returns a mutable copy of {@code properties} with values for {@code keysToMask} replaced by
+   * {@link #MASKED_VALUE}. Entries with null keys or values are dropped.
+   *
+   * <p>The returned map is always mutable so callers can add defaults such as {@code in-use}.
    */
   public static Map<String, String> maskHiddenProperties(
-      Map<String, String> properties, Set<String> hiddenPropertyNames) {
+      Map<String, String> properties, Set<String> keysToMask) {
     if (properties == null || properties.isEmpty()) {
-      return properties == null ? Map.of() : Map.copyOf(properties);
+      return new HashMap<>();
     }
-    Set<String> hidden = hiddenPropertyNames == null ? Collections.emptySet() : hiddenPropertyNames;
-    Map<String, String> masked = new HashMap<>(properties.size());
+    Set<String> mask = keysToMask == null ? Collections.emptySet() : keysToMask;
+    Map<String, String> result = new HashMap<>(properties.size());
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
       if (key == null || value == null) {
         continue;
       }
-      masked.put(key, hidden.contains(key) ? MASKED_VALUE : value);
+      result.put(key, mask.contains(key) ? MASKED_VALUE : value);
     }
-    return masked;
+    return result;
   }
 
   /**
-   * Returns a copy of {@code properties} with values for metadata-hidden keys replaced by {@link
-   * #MASKED_VALUE}. Entries with null keys or values are omitted.
+   * Returns a mutable API-response copy of {@code properties}.
+   *
+   * <p>Values are replaced with {@link #MASKED_VALUE} when {@link
+   * PropertiesMetadata#isHiddenProperty(String)} is true (credential and other sensitive keys) or
+   * {@link SecretPropertyUtils#isSecretProperty(String, String)} is true. Reserved keys are not
+   * removed.
    */
   public static Map<String, String> maskHiddenProperties(
       Map<String, String> properties, PropertiesMetadata metadata) {
     if (properties == null || properties.isEmpty()) {
-      return properties == null ? Map.of() : Map.copyOf(properties);
+      return new HashMap<>();
     }
-    Map<String, String> masked = new HashMap<>(properties.size());
+    Map<String, String> result = new HashMap<>(properties.size());
     for (Map.Entry<String, String> entry : properties.entrySet()) {
       String key = entry.getKey();
       String value = entry.getValue();
       if (key == null || value == null) {
         continue;
       }
-      masked.put(
-          key,
-          metadata.isHiddenProperty(key) || SecretPropertyUtils.isSecretProperty(key, value)
-              ? MASKED_VALUE
-              : value);
+      boolean shouldMask =
+          metadata.isHiddenProperty(key) || SecretPropertyUtils.isSecretProperty(key, value);
+      result.put(key, shouldMask ? MASKED_VALUE : value);
     }
-    return masked;
+    return result;
   }
 }

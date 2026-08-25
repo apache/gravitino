@@ -478,9 +478,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (!shouldBackfillCredential()) {
       return properties;
     }
+    // Backfill may reintroduce raw credential values; mask them again for the API response.
     Map<String, String> result = Maps.newHashMap(properties);
     result.putAll(propertiesWithCredentialProviders());
-    return result;
+    return HiddenPropertyMaskUtils.maskHiddenProperties(result, catalogPropertiesMetadata());
   }
 
   /**

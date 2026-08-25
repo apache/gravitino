@@ -1540,7 +1540,10 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        testProps.get(ID_KEY),
+        "`gravitino.identifier` should be returned as a masked placeholder");
   }
 
   @Test
