@@ -33,6 +33,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
 import java.net.SocketTimeoutException;
+import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -46,6 +47,7 @@ import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.rest.RESTRequest;
 import org.apache.gravitino.rest.RESTResponse;
 import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.core5.http.HttpHeaders;
 import org.apache.hc.core5.http.Method;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -111,6 +113,71 @@ public class TestHTTPClient {
   @Test
   public void testGetFailure() throws Exception {
     testHttpMethodOnFailure(Method.GET, false, true);
+  }
+
+  @Test
+  public void testRawRequestAndResponseBodies() throws Exception {
+    String importPath = "raw_import";
+    String yaml = "version: 0.2.0.dev0\nname: sales\n";
+    Item responseBody = new Item(1L, "imported");
+    ErrorHandler onError = mock(ErrorHandler.class);
+    doThrow(new RuntimeException("Failure response")).when(onError).accept(any());
+
+    mockServer
+        .when(
+            request("/" + importPath)
+                .withMethod(Method.POST.name())
+                .withHeader(HttpHeaders.CONTENT_TYPE, "application/yaml")
+                .withBody(yaml.getBytes(StandardCharsets.UTF_8)))
+        .respond(response().withStatusCode(200).withBody(MAPPER.writeValueAsString(responseBody)));
+
+    Item imported =
+        restClient.postRaw(
+            importPath, yaml, "application/yaml", Item.class, Collections.emptyMap(), onError);
+    Assertions.assertEquals(responseBody, imported);
+
+    String exportPath = "raw_export";
+    String exported = "version: 0.2.0.dev0\nname: exported\n";
+    mockServer
+        .when(
+            request("/" + exportPath)
+                .withMethod(Method.GET.name())
+                .withQueryStringParameter("format", "yaml")
+                .withHeader(HttpHeaders.ACCEPT, "application/yaml"))
+        .respond(
+            response()
+                .withStatusCode(200)
+                .withHeader(HttpHeaders.CONTENT_TYPE, "application/yaml")
+                .withBody(exported));
+
+    String actual =
+        restClient.getRaw(
+            exportPath,
+            Collections.singletonMap("format", "yaml"),
+            Collections.singletonMap(HttpHeaders.ACCEPT, "application/yaml"),
+            onError);
+    Assertions.assertEquals(exported, actual);
+    verify(onError, never()).accept(any());
+  }
+
+  @Test
+  public void testRawPostRejectsInvalidBodyMetadata() {
+    ErrorHandler onError = mock(ErrorHandler.class);
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            restClient.postRaw(
+                "raw_import",
+                null,
+                "application/yaml",
+                Item.class,
+                Collections.emptyMap(),
+                onError));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            restClient.postRaw(
+                "raw_import", "document", " ", Item.class, Collections.emptyMap(), onError));
   }
 
   @Test
