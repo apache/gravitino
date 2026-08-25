@@ -478,10 +478,11 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (!shouldBackfillCredential()) {
       return properties;
     }
-    // Backfill may reintroduce raw credential values; mask them again for the API response.
+    // Escape hatch for legacy connectors: intentionally return plaintext credentials when
+    // gravitino.catalog.credential.backfillToProperties=true. Do not remask here.
     Map<String, String> result = Maps.newHashMap(properties);
     result.putAll(propertiesWithCredentialProviders());
-    return HiddenPropertyMaskUtils.maskHiddenProperties(result, catalogPropertiesMetadata());
+    return result;
   }
 
   /**
