@@ -368,9 +368,9 @@ public class FilesetCatalogIT extends BaseIT {
         storageLocation(filesetName2),
         fileset2.storageLocations().get(LOCATION_NAME_UNKNOWN),
         "storage location should be created");
+    assertFilesetPropertiesSize(fileset2.properties(), 1);
     Assertions.assertEquals(
-        ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, LOCATION_NAME_UNKNOWN),
-        fileset2.properties());
+        LOCATION_NAME_UNKNOWN, fileset2.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
     // create fileset with placeholder in storage location
     String filesetName4 = "test_create_fileset_with_placeholder";
