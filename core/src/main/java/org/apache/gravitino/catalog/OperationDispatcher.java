@@ -23,6 +23,8 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import com.google.common.collect.Maps;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -30,8 +32,6 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils.PropertyResponsePolicy;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -41,6 +41,7 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.utils.ThrowableFunction;
 import org.slf4j.Logger;
@@ -138,11 +139,7 @@ public abstract class OperationDispatcher {
     }
   }
 
-  /**
-   * Resolves which property keys should be masked vs omitted in API responses for the given entity
-   * properties.
-   */
-  protected PropertyResponsePolicy getHiddenPropertyNames(
+  protected Set<String> getHiddenPropertyNames(
       NameIdentifier catalogIdent,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
       Map<String, String> properties) {
@@ -150,9 +147,16 @@ public abstract class OperationDispatcher {
         catalogIdent,
         c ->
             c.doWithPropertiesMeta(
-                p ->
-                    HiddenPropertyMaskUtils.buildPropertyResponsePolicy(
-                        properties, provider.apply(p))),
+                p -> {
+                  PropertiesMetadata propertiesMetadata = provider.apply(p);
+                  return properties.entrySet().stream()
+                      .filter(
+                          e ->
+                              propertiesMetadata.isHiddenProperty(e.getKey())
+                                  || SecretPropertyUtils.isSecretProperty(e.getKey(), e.getValue()))
+                      .map(Map.Entry::getKey)
+                      .collect(Collectors.toSet());
+                }),
         IllegalArgumentException.class);
   }
 

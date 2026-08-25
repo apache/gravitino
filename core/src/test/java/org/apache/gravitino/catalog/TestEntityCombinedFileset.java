@@ -23,7 +23,6 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
@@ -99,7 +98,7 @@ public class TestEntityCombinedFileset {
     Mockito.when(fileset.properties()).thenReturn(properties);
 
     EntityCombinedFileset entityCombinedFileset =
-        EntityCombinedFileset.of(fileset).withHiddenProperties((Set<String>) null);
+        EntityCombinedFileset.of(fileset).withHiddenProperties(null);
 
     // Should not throw NPE and should return all properties
     Assertions.assertEquals(properties, entityCombinedFileset.properties());

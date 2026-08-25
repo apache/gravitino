@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils.PropertyResponsePolicy;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -36,9 +35,6 @@ public final class EntityCombinedFileset implements Fileset {
 
   // Sets of properties that should be hidden from the user.
   private Set<String> hiddenProperties = Collections.emptySet();
-
-  // Reserved+hidden system keys omitted from API responses (e.g. gravitino.identifier).
-  private Set<String> omittedProperties = Collections.emptySet();
 
   private EntityCombinedFileset(Fileset fileset, FilesetEntity filesetEntity) {
     this.fileset = fileset;
@@ -63,19 +59,6 @@ public final class EntityCombinedFileset implements Fileset {
 
   public EntityCombinedFileset withHiddenProperties(Set<String> hiddenProperties) {
     this.hiddenProperties = hiddenProperties != null ? hiddenProperties : Collections.emptySet();
-    this.omittedProperties = Collections.emptySet();
-    return this;
-  }
-
-  /** Applies mask/omit policy for API property responses. */
-  public EntityCombinedFileset withHiddenProperties(PropertyResponsePolicy policy) {
-    if (policy == null) {
-      this.hiddenProperties = Collections.emptySet();
-      this.omittedProperties = Collections.emptySet();
-    } else {
-      this.hiddenProperties = policy.keysToMask();
-      this.omittedProperties = policy.keysToOmit();
-    }
     return this;
   }
 
@@ -101,8 +84,7 @@ public final class EntityCombinedFileset implements Fileset {
 
   @Override
   public Map<String, String> properties() {
-    return HiddenPropertyMaskUtils.maskHiddenProperties(
-        fileset.properties(), hiddenProperties, omittedProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(fileset.properties(), hiddenProperties);
   }
 
   @Override

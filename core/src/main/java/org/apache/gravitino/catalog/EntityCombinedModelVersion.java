@@ -23,7 +23,6 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils.PropertyResponsePolicy;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.model.ModelVersion;
@@ -35,9 +34,6 @@ public final class EntityCombinedModelVersion implements ModelVersion {
   private final ModelVersionEntity modelVersionEntity;
 
   private Set<String> hiddenProperties = Collections.emptySet();
-
-  // Reserved+hidden system keys omitted from API responses (e.g. gravitino.identifier).
-  private Set<String> omittedProperties = Collections.emptySet();
 
   private EntityCombinedModelVersion(
       ModelVersion modelVersion, ModelVersionEntity modelVersionEntity) {
@@ -55,20 +51,7 @@ public final class EntityCombinedModelVersion implements ModelVersion {
   }
 
   public EntityCombinedModelVersion withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
-    this.omittedProperties = Collections.emptySet();
-    return this;
-  }
-
-  /** Applies mask/omit policy for API property responses. */
-  public EntityCombinedModelVersion withHiddenProperties(PropertyResponsePolicy policy) {
-    if (policy == null) {
-      this.hiddenProperties = Collections.emptySet();
-      this.omittedProperties = Collections.emptySet();
-    } else {
-      this.hiddenProperties = policy.keysToMask();
-      this.omittedProperties = policy.keysToOmit();
-    }
+    this.hiddenProperties = hiddenProperties;
     return this;
   }
 
@@ -86,8 +69,7 @@ public final class EntityCombinedModelVersion implements ModelVersion {
   public Map<String, String> properties() {
     return modelVersion.properties() == null
         ? null
-        : HiddenPropertyMaskUtils.maskHiddenProperties(
-            modelVersion.properties(), hiddenProperties, omittedProperties);
+        : HiddenPropertyMaskUtils.maskHiddenProperties(modelVersion.properties(), hiddenProperties);
   }
 
   @Override
