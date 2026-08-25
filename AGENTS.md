@@ -55,6 +55,11 @@
 - `catalogs/`: Catalog implementations (Hive, Iceberg, MySQL, etc.).
 - `clients/`: Java/Python clients.
 
+## Design documents
+- **Entry point**: `design-docs/README.md`.
+- **Structure**: follow `.claude/skills/gravitino-design-doc/SKILL.md`.
+- **Formatting**: follow `design-docs/markdown-formatting.md`. Run `./gradlew markdownlint` before a design-doc PR. Do not invent extra house style.
+
 ## Build Commands
 - **Build**: `./gradlew build -PskipDockerTests=false`
 - **Format**: `./gradlew spotlessApply`

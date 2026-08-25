@@ -30,6 +30,7 @@
   - Use `TestXxx` prefix for test classes (e.g., `TestMetalake`).
 - **Dependencies**: Do NOT add new dependencies without explicit user request.
 - **Documentation**: JavaDoc is required for all public APIs.
+- **Design documents**: Structure from `.claude/skills/gravitino-design-doc/SKILL.md`. Formatting from `design-docs/markdown-formatting.md`. Start at `design-docs/README.md`. Run `./gradlew markdownlint`.
 
 ## Language Specifics
 - **Java**:

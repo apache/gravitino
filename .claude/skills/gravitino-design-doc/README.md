@@ -19,6 +19,11 @@
 
 An agent skill that enforces consistent structure and content quality for Apache Gravitino design documents.
 
+This skill owns **section structure**. Markdown formatting is
+[design-docs/markdown-formatting.md](../../../design-docs/markdown-formatting.md).
+Run `./gradlew markdownlint` before opening a design-doc PR. The human and agent
+entry point is [design-docs/README.md](../../../design-docs/README.md).
+
 ## What it does
 
 When writing or reviewing a design doc, the skill ensures the document covers all required sections in the correct order:
