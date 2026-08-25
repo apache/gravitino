@@ -221,44 +221,16 @@ public abstract class OperationDispatcher {
    * <p>Every failure is logged and reported as a null result, because the external catalog is the
    * source of truth on these paths: a load that imports or repairs the Gravitino copy must still
    * return the entity it read, and the next load repairs what this one could not write.
-   *
-   * <p>Use {@link #operateOnEntityAndPropagateConflict} instead where the store write is the
-   * operation the caller asked for.
    */
   protected <R extends HasIdentifier> R operateOnEntity(
       NameIdentifier ident, ThrowableFunction<NameIdentifier, R> fn, String opName, long id) {
-    return operateOnEntity(ident, fn, opName, id, false /* propagateConflict */);
-  }
-
-  /**
-   * Same as {@link #operateOnEntity}, except that an {@link OptimisticLockException} reaches the
-   * caller instead of being swallowed.
-   *
-   * <p>Use this only where the store write is the operation the user asked for. Reporting success
-   * after losing a version race would tell the user their alter was applied while Gravitino kept
-   * the older metadata, so the conflict has to travel back as a conflict.
-   */
-  protected <R extends HasIdentifier> R operateOnEntityAndPropagateConflict(
-      NameIdentifier ident, ThrowableFunction<NameIdentifier, R> fn, String opName, long id) {
-    return operateOnEntity(ident, fn, opName, id, true /* propagateConflict */);
-  }
-
-  private <R extends HasIdentifier> R operateOnEntity(
-      NameIdentifier ident,
-      ThrowableFunction<NameIdentifier, R> fn,
-      String opName,
-      long id,
-      boolean propagateConflict) {
     R ret = null;
     try {
       ret = fn.apply(ident);
     } catch (OptimisticLockException e) {
-      // A version conflict is actionable, so the alter paths let it through. The load and import
-      // paths keep swallowing it: another writer already moved the entity forward, and the next
-      // load picks that up.
-      if (propagateConflict) {
-        throw e;
-      }
+      // Managed operations do not use this best-effort helper, so their conflicts still reach the
+      // caller. Here the external catalog was already changed and remains the source of truth;
+      // failing the request would encourage a retry that could apply the external change twice.
       LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
     } catch (NoSuchEntityException e) {
       // Case 2: The table is created by Gravitino, but has no corresponding entity in Gravitino.

@@ -133,12 +133,19 @@ public class TableMetaService {
                   mapper -> {
                     ops.insertPO(mapper, po, overwrite);
                     if (overwrite) {
-                      TablePO storedPO = mapper.selectTableMetaByIdForUpdate(po.getTableId());
+                      // MySQL may resolve the upsert through the active (schema_id, table_name,
+                      // deleted_at) key rather than table_id. In that case it preserves the
+                      // winner's ID. The upsert already holds that row until commit, so read the
+                      // database-derived identity and version back through the same natural key.
+                      TablePO storedPO =
+                          mapper.selectTableMetaBySchemaIdAndName(
+                              po.getSchemaId(), po.getTableName());
                       Preconditions.checkState(
                           storedPO != null,
-                          "The overwritten table with id %s does not exist",
-                          po.getTableId());
-                      persistedPO.set(tablePOWithPersistedVersions(po, storedPO));
+                          "The overwritten table %s in schema %s does not exist",
+                          po.getTableName(),
+                          po.getSchemaId());
+                      persistedPO.set(tablePOWithPersistedIdentityAndVersions(po, storedPO));
                     }
                   }),
           () ->
@@ -159,7 +166,8 @@ public class TableMetaService {
           () -> {
             // We need to delete the columns first if we want to overwrite the table.
             if (overwrite) {
-              TableColumnMetaService.getInstance().deleteColumnsByTableId(po.getTableId());
+              TableColumnMetaService.getInstance()
+                  .deleteColumnsByTableId(persistedPO.get().getTableId());
             }
           },
           () -> {
@@ -374,10 +382,11 @@ public class TableMetaService {
     builder.withSchemaId(namespacedEntityId.entityId());
   }
 
-  private TablePO tablePOWithPersistedVersions(TablePO incomingPO, TablePO persistedPO) {
-    // The upsert derives the version inside the database, so the row we are about to write to
-    // table_version_info must carry the versions the database ended up with, not the ones we sent.
+  private TablePO tablePOWithPersistedIdentityAndVersions(TablePO incomingPO, TablePO persistedPO) {
+    // The upsert derives the version inside the database and may preserve an existing table ID, so
+    // its dependent rows must carry the identity and versions the database ended up with.
     return TablePO.builder(incomingPO)
+        .withTableId(persistedPO.getTableId())
         .withCurrentVersion(persistedPO.getCurrentVersion())
         .withLastVersion(persistedPO.getLastVersion())
         .build();

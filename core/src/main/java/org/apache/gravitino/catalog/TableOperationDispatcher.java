@@ -51,6 +51,7 @@ import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
@@ -330,7 +331,7 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           }
 
           TableEntity updatedTableEntity =
-              operateOnEntityAndPropagateConflict(
+              operateOnEntity(
                   ident,
                   id ->
                       store.update(
@@ -416,6 +417,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           if (droppedFromCatalog) {
             try {
               store.delete(ident, TABLE);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (NoSuchEntityException e) {
               LOG.warn("The table to be dropped does not exist in the store: {}", ident, e);
             } catch (Exception e) {
@@ -470,6 +473,8 @@ public class TableOperationDispatcher extends OperationDispatcher implements Tab
           if (droppedFromCatalog) {
             try {
               store.delete(ident, TABLE);
+            } catch (OptimisticLockException e) {
+              throw e;
             } catch (NoSuchEntityException e) {
               LOG.warn("The table to be purged does not exist in the store: {}", ident, e);
             } catch (Exception e) {

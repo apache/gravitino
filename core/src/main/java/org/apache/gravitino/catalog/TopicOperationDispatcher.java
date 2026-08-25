@@ -182,7 +182,7 @@ public class TopicOperationDispatcher extends OperationDispatcher implements Top
                   IllegalArgumentException.class);
 
           TopicEntity updatedTopicEntity =
-              operateOnEntityAndPropagateConflict(
+              operateOnEntity(
                   ident,
                   id ->
                       store.update(

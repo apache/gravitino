@@ -74,6 +74,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.function.Executable;
 
@@ -264,6 +265,46 @@ public class TestTableMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         beforeOverwrite.getCurrentVersion() + 1, afterOverwrite.getCurrentVersion());
     Assertions.assertEquals(afterOverwrite.getCurrentVersion(), afterOverwrite.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testNaturalKeyOverwriteUsesPersistedTableId() throws IOException {
+    // PostgreSQL's upsert targets table_id and rejects a different ID on the natural key before
+    // readback. This regression covers MySQL/H2 ON DUPLICATE KEY, which can choose either key.
+    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
+    createParentEntities(metalakeName, catalogName, schemaName, AUDIT_INFO);
+    Namespace tableNamespace = NamespaceUtil.ofTable(metalakeName, catalogName, schemaName);
+    TableEntity original =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("table_natural_key_overwrite")
+            .withNamespace(tableNamespace)
+            .withColumns(List.of(column("original_column", Types.IntegerType.get())))
+            .withComment("original")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TableMetaService.getInstance().insertTable(original, false);
+    TablePO beforeOverwrite = getTablePO(original.id());
+    TableEntity replacement =
+        TableEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(original.name())
+            .withNamespace(tableNamespace)
+            .withColumns(List.of(column("replacement_column", Types.StringType.get())))
+            .withComment("replacement")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    TableMetaService.getInstance().insertTable(replacement, true);
+
+    TableEntity stored =
+        TableMetaService.getInstance().getTableByIdentifier(original.nameIdentifier());
+    TablePO afterOverwrite = getTablePO(original.id());
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertEquals("replacement", stored.comment());
+    Assertions.assertEquals("replacement_column", stored.columns().get(0).name());
+    Assertions.assertEquals(
+        beforeOverwrite.getCurrentVersion() + 1, afterOverwrite.getCurrentVersion());
   }
 
   @TestTemplate
