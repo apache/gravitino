@@ -42,12 +42,9 @@ on:
 
 concurrency:
   group: required-ci-${{ github.event.pull_request.number || github.ref }}
-  # A run, once started, completes. cancel-in-progress would cancel a
-  # Required CI run mid-flight when multiple pull_request events fire for
-  # the same PR (opened/synchronize/labeled), leaving a failed Required CI
-  # check and blocking the PR. Let each run finish so the aggregate reports a
-  # stable result.
-  cancel-in-progress: false
+  # Cancel the superseded PR run. Children already cancel in-progress; the
+  # parent must too or a second push waits out a full stale 14-suite run.
+  cancel-in-progress: true
 
 jobs:
   build:

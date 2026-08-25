@@ -13,7 +13,7 @@ on:
     branches: [ "main", "branch-*" ]
 
 concurrency:
-  group: ${{ inputs.required_ci && 'required-maintenance' || 'standalone' }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ inputs.required_ci && 'required-maintenance' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

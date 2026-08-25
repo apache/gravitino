@@ -14,8 +14,30 @@ on:
       - 'web/web/**'
       - '.github/workflows/web-ui-tests.yml'
 
+concurrency:
+  group: ${{ inputs.required_ci && 'required-web-ui' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Disable Git automatic maintenance
+        run: git config --local maintenance.auto false
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d
+        id: filter
+        with:
+          filters: |
+            source_changes:
+              - 'web/web/**'
+              - '.github/workflows/web-ui-tests.yml'
+    outputs:
+      source_changes: ${{ steps.filter.outputs.source_changes }}
+
   test:
+    needs: changes
+    if: needs.changes.outputs.source_changes == 'true'
     runs-on: ubuntu-latest
     
     steps:

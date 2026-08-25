@@ -26,6 +26,9 @@ sources and asserts the contract this PR relies on:
 - Required CI is a static always() aggregate that fails on any non-success
 - conflict-marker-check stays standalone and is not part of the aggregate
 - required-mode concurrency keys are unique per suite
+- standalone (push) keys use github.workflow, not a shared 'standalone' literal
+- the parent cancels superseded PR runs
+- web-ui path-filters inside the called workflow
 """
 
 import re
@@ -68,6 +71,7 @@ REQUIRED_CONCURRENCY_KEYS = {
     "mcp": "required-mcp",
     "maintenance": "required-maintenance",
     "contrib_catalog": "required-contrib-catalog",
+    "web_ui": "required-web-ui",
 }
 
 WORKFLOW_DISPATCH_SUITES = {
@@ -128,8 +132,10 @@ def verify_parent():
     source = REQUIRED_CI_WORKFLOW.read_text(encoding="utf-8")
     if "types: [opened, synchronize, reopened]" not in source:
         raise AssertionError("required-ci.yml: missing always-on pull_request types")
-    if "cancel-in-progress: false" not in source:
-        raise AssertionError("required-ci.yml: parent must not cancel in-progress runs")
+    if "cancel-in-progress: true" not in source:
+        raise AssertionError("required-ci.yml: parent must cancel superseded PR runs")
+    if "cancel-in-progress: false" in source:
+        raise AssertionError("required-ci.yml: parent must not serialize stale PR runs")
     for forbidden in ("run-ci", "graphite-merge-queue", "gtmq_", "CI not requested"):
         if forbidden in source:
             raise AssertionError(
@@ -194,18 +200,30 @@ def verify_suites():
         )
 
         if job_id == "web_ui":
-            if "'web/web/**'" not in source and "web/web/**" not in source:
-                raise AssertionError("web-ui-tests.yml: missing push path filter")
-            continue
+            if "dorny/paths-filter@" not in source:
+                raise AssertionError("web-ui-tests.yml: missing internal path filter")
+            if "web/web/**" not in source:
+                raise AssertionError("web-ui-tests.yml: missing web/web/** filter")
+            if "needs.changes.outputs.source_changes == 'true'" not in source:
+                raise AssertionError("web-ui-tests.yml: test job must skip when paths miss")
 
         expected_key = REQUIRED_CONCURRENCY_KEYS[job_id]
         group = re.search(r"(?m)^  group: (.+)$", source)
         if not group:
             raise AssertionError(f"{workflow_name}: missing concurrency group")
-        if expected_key not in group.group(1):
+        group_expr = group.group(1)
+        if expected_key not in group_expr:
             raise AssertionError(
                 f"{workflow_name}: missing unique required concurrency key "
                 f"{expected_key!r}"
+            )
+        if "'standalone'" in group_expr or '"standalone"' in group_expr:
+            raise AssertionError(
+                f"{workflow_name}: shared standalone concurrency key still present"
+            )
+        if "github.workflow" not in group_expr:
+            raise AssertionError(
+                f"{workflow_name}: standalone concurrency must use github.workflow"
             )
         required_keys.append(expected_key)
         if not re.search(r"(?m)^  cancel-in-progress: true$", source):
