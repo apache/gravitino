@@ -43,10 +43,14 @@ For each section, the skill checks content quality — not just presence. For ex
 
 ## Installation
 
-Copy `SKILL.md` into your agent's skill/instruction directory according to the agent's documentation. For example, with Claude Code:
+Copy the skill directory into your agent's skill folder. For Claude Code:
 
 ```bash
+# Global — available in all projects
 cp -r agent-skills/gravitino-design-doc ~/.claude/skills/
+
+# Project-local — available only inside this repo
+cp -r agent-skills/gravitino-design-doc .claude/skills/
 ```
 
 ## Usage

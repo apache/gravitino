@@ -22,10 +22,10 @@
 This directory holds Gravitino design documents. Structure and formatting are
 separate: write the argument first, then match the Markdown standard.
 
-| Need                                            | Follow                                                                        | Check                    |
-| ----------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------ |
-| Section structure (Background, Goals, Proposal) | [gravitino-design-doc skill](../.claude/skills/gravitino-design-doc/SKILL.md) | Skill quality checklist  |
-| Markdown formatting (tables, line length)       | [Markdown formatting](markdown-formatting.md)                                 | `./gradlew markdownlint` |
+| Need                                            | Follow                                                                           | Check                    |
+| ----------------------------------------------- | -------------------------------------------------------------------------------- | ------------------------ |
+| Section structure (Background, Goals, Proposal) | [gravitino-design-doc skill](../agent-skills/gravitino-design-doc/SKILL.md)      | Skill quality checklist  |
+| Markdown formatting (tables, line length)       | [Markdown formatting](markdown-formatting.md)                                    | `./gradlew markdownlint` |
 
 ## People
 
@@ -37,7 +37,7 @@ separate: write the argument first, then match the Markdown standard.
 
 When writing or reviewing a design document:
 
-1. Load `.claude/skills/gravitino-design-doc/SKILL.md` for section structure.
+1. Load `agent-skills/gravitino-design-doc/SKILL.md` for section structure.
 2. Follow `design-docs/markdown-formatting.md`. Do not invent extra house style.
 3. Run `./gradlew markdownlint`.
 

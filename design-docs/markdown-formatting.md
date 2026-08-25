@@ -22,7 +22,7 @@
 This is the formatting standard for `design-docs/`. It is not a second design-doc
 template. For section structure (Background, Goals, Proposal, and so on), start
 at [README.md](README.md) or the
-[gravitino-design-doc skill](../.claude/skills/gravitino-design-doc/SKILL.md).
+[gravitino-design-doc skill](../agent-skills/gravitino-design-doc/SKILL.md).
 
 The machine config is `.rumdl.toml`. That file starts from markdownlint defaults
 and records only the overrides below.
