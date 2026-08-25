@@ -29,6 +29,7 @@ sources and asserts the contract this PR relies on:
 - standalone (push) keys use github.workflow, not a shared 'standalone' literal
 - the parent cancels superseded PR runs
 - web-ui path-filters inside the called workflow
+- coverage-comment listens for the Required CI parent, not a standalone build run
 """
 
 import re
@@ -39,6 +40,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW_DIR = REPO_ROOT / ".github" / "workflows"
 REQUIRED_CI_WORKFLOW = WORKFLOW_DIR / "required-ci.yml"
 CONFLICT_MARKER_WORKFLOW = WORKFLOW_DIR / "conflict-marker-check.yml"
+COVERAGE_COMMENT_WORKFLOW = WORKFLOW_DIR / "coverage-comment.yml"
 
 SUITE_WORKFLOWS = {
     "build": "build.yml",
@@ -251,12 +253,32 @@ def verify_conflict_marker_standalone():
     print("Verified standalone conflict-marker-check")
 
 
+def verify_coverage_comment_follows_parent():
+    """Verify the coverage sidecar waits for Required CI, not standalone build."""
+    source = COVERAGE_COMMENT_WORKFLOW.read_text(encoding="utf-8")
+    if 'workflows: ["Required CI"]' not in source:
+        raise AssertionError(
+            "coverage-comment.yml: must listen for the Required CI parent run"
+        )
+    if 'workflows: ["build"]' in source:
+        raise AssertionError(
+            "coverage-comment.yml: standalone build is no longer the PR entry point"
+        )
+    parent = REQUIRED_CI_WORKFLOW.read_text(encoding="utf-8")
+    if "name: Required CI" not in parent:
+        raise AssertionError(
+            "required-ci.yml: workflow name must stay Required CI for coverage-comment"
+        )
+    print("Verified coverage-comment listens for Required CI")
+
+
 def main():
     """Run the Required CI source contract checks."""
     simulate_aggregate()
     verify_parent()
     verify_suites()
     verify_conflict_marker_standalone()
+    verify_coverage_comment_follows_parent()
     print("Required CI contract check passed without starting CI")
 
 

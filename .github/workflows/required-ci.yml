@@ -30,6 +30,9 @@
 # -> enable the `main` ruleset requiring `Required CI` (and the standalone
 # `conflict-marker-check`). Fully reversible: delete this file and restore the
 # children's `pull_request:` trigger.
+#
+# The workflow `name` is a contract: coverage-comment.yml's workflow_run
+# listener matches `Required CI`. Do not rename it without updating that file.
 name: Required CI
 
 on:

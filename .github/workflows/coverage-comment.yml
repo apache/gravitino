@@ -1,19 +1,35 @@
 name: Coverage Comment
 
+# Sidecar that posts the Jacoco coverage comment. It must stay a separate
+# workflow: a pull_request from a fork gets a read-only GITHUB_TOKEN, so the
+# Required CI / build run cannot comment. workflow_run runs on the base repo
+# with write permission and does not check out PR code.
+#
+# Listen for the PR entry point, not `build`. After Required CI aggregation,
+# build.yml is only workflow_call on PRs; GitHub does not emit workflow_run
+# for a called workflow. Artifacts uploaded inside that call belong to the
+# caller run, so download uses this workflow_run.id (the Required CI run).
+#
+# The workflow name below must match required-ci.yml `name: Required CI`.
+# workflow_run workflows are loaded from the default branch, so this retarget
+# takes effect after merge; this PR itself still uses main's old listener.
 on:
   workflow_run:
-    workflows: ["build"]
+    workflows: ["Required CI"]
     types: [completed]
 
 permissions:
+  actions: read
   pull-requests: write
 
 jobs:
   comment:
     runs-on: ubuntu-latest
-    if: >
-      github.event.workflow_run.event == 'pull_request' &&
-      github.event.workflow_run.conclusion == 'success'
+    # Any completed PR run of Required CI. Do not require conclusion ==
+    # success: a red sibling suite (spark, etc.) must not hide a coverage
+    # report that build already uploaded. If build skipped or failed before
+    # upload, the download step fails and we post nothing.
+    if: github.event.workflow_run.event == 'pull_request'
     steps:
       - name: Download Coverage Report
         id: download
