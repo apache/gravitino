@@ -67,15 +67,20 @@ class IntegrationTestEnv(unittest.TestCase):
     gravitino_startup_script = None
     gravitino_admin_client: GravitinoAdminClient = None
 
-    # Hidden reserved properties are returned as this placeholder in API responses.
+    # Hidden/secret property values are returned as this placeholder in API responses.
     MASKED_PROPERTY_VALUE = "******"
     GRAVITINO_IDENTIFIER_KEY = "gravitino.identifier"
 
     def assert_properties_equal(self, expected, actual, msg=None):
-        """Assert entity properties, expecting masked gravitino.identifier when present."""
+        """Assert entity properties.
+
+        Hidden/reserved-hidden keys (e.g. gravitino.identifier, comment) are returned as
+        MASKED_PROPERTY_VALUE; add any such keys present in actual into the expected map.
+        """
         expected_full = dict(expected)
-        if self.GRAVITINO_IDENTIFIER_KEY in actual:
-            expected_full[self.GRAVITINO_IDENTIFIER_KEY] = self.MASKED_PROPERTY_VALUE
+        for key, value in actual.items():
+            if value == self.MASKED_PROPERTY_VALUE and key not in expected_full:
+                expected_full[key] = self.MASKED_PROPERTY_VALUE
         self.assertEqual(expected_full, actual, msg)
 
     @staticmethod

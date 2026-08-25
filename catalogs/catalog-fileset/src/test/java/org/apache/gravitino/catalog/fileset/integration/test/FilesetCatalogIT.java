@@ -40,11 +40,13 @@ import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
@@ -338,7 +340,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
     Assertions.assertEquals(storageLocation, fileset.storageLocations().get(LOCATION_NAME_UNKNOWN));
-    Assertions.assertEquals(2, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 2);
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertEquals(
         LOCATION_NAME_UNKNOWN, fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
@@ -385,7 +387,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(expectedStorageLocation4, fileset4.storageLocation());
     Assertions.assertEquals(
         expectedStorageLocation4, fileset4.storageLocations().get(LOCATION_NAME_UNKNOWN));
-    Assertions.assertEquals(1, fileset4.properties().size(), "properties should be empty");
+    assertFilesetPropertiesSize(fileset4.properties(), 1);
     Assertions.assertEquals(
         LOCATION_NAME_UNKNOWN, fileset4.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
@@ -414,7 +416,7 @@ public class FilesetCatalogIT extends BaseIT {
           }
         };
     Assertions.assertEquals(expectedStorageLocations, fileset.storageLocations());
-    Assertions.assertEquals(1, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 1);
     Assertions.assertEquals("location1", fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
     assertFilesetExists(filesetName5);
@@ -423,7 +425,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals("comment", fileset.comment());
     Assertions.assertEquals(MANAGED, fileset.type());
     Assertions.assertEquals(expectedStorageLocations, fileset.storageLocations());
-    Assertions.assertEquals(1, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 1);
     Assertions.assertEquals("location1", fileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
 
     // create fileset with null multiple locations
@@ -517,7 +519,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals("这是中文comment", fileset.comment());
     Assertions.assertEquals(MANAGED, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
-    Assertions.assertEquals(4, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 4);
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertEquals("中文测试test", fileset.properties().get("test"));
     Assertions.assertEquals("test1", fileset.properties().get("中文key"));
@@ -544,7 +546,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals("comment", fileset.comment());
     Assertions.assertEquals(Fileset.Type.EXTERNAL, fileset.type());
     Assertions.assertEquals(storageLocation, fileset.storageLocation());
-    Assertions.assertEquals(2, fileset.properties().size());
+    assertFilesetPropertiesSize(fileset.properties(), 2);
     Assertions.assertEquals("v1", fileset.properties().get("k1"));
     Assertions.assertTrue(
         fileSystem.exists(new Path(storageLocation)), "storage location should be created");
@@ -930,7 +932,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be change");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v1", newFileset.properties().get("k1"), "properties should not be change");
     Assertions.assertEquals(
@@ -962,7 +964,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be change");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v1", newFileset.properties().get("k1"), "properties should not be change");
     Assertions.assertEquals(
@@ -992,7 +994,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be change");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v2", newFileset.properties().get("k1"), "properties should be updated");
     Assertions.assertEquals(
@@ -1022,7 +1024,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be change");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be change");
-    Assertions.assertEquals(1, newFileset.properties().size(), "properties should be removed");
+    assertFilesetPropertiesSize(newFileset.properties(), 1);
     Assertions.assertEquals(
         LOCATION_NAME_UNKNOWN, newFileset.properties().get(PROPERTY_DEFAULT_LOCATION_NAME));
   }
@@ -1050,7 +1052,7 @@ public class FilesetCatalogIT extends BaseIT {
     Assertions.assertEquals(MANAGED, newFileset.type(), "type should not be changed");
     Assertions.assertEquals(
         storageLocation, newFileset.storageLocation(), "storage location should not be changed");
-    Assertions.assertEquals(2, newFileset.properties().size(), "properties should not be changed");
+    assertFilesetPropertiesSize(newFileset.properties(), 2);
     Assertions.assertEquals(
         "v1", newFileset.properties().get("k1"), "properties should not be changed");
     Assertions.assertEquals(
@@ -1363,5 +1365,17 @@ public class FilesetCatalogIT extends BaseIT {
 
   private String storageLocation(String filesetName) {
     return defaultBaseLocation() + "/" + filesetName;
+  }
+
+  /**
+   * Historical size asserts excluded gravitino.identifier (previously omitted). It is now returned
+   * as a masked placeholder, so expected size is historical + 1.
+   */
+  private static void assertFilesetPropertiesSize(
+      Map<String, String> properties, int expectedSizeWithoutIdentifier) {
+    Assertions.assertEquals(
+        expectedSizeWithoutIdentifier + 1, properties.size(), () -> "properties=" + properties);
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, properties.get(StringIdentifier.ID_KEY));
   }
 }
