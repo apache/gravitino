@@ -22,34 +22,73 @@ package org.apache.gravitino.server.web.filter;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
-import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.authorization.AuthorizationUtils;
-import org.apache.gravitino.iceberg.service.IcebergExceptionMapper;
+import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.server.authorization.GravitinoAuthorizerProvider;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.iceberg.exceptions.ForbiddenException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Through dynamic proxy, obtain the annotations on the method and parameter list to perform
- * metadata authorization.
+ * Runs the metadata authorization steps shared by REST protocols.
+ *
+ * <p>Protocol implementations only resolve request parameters into an {@link AuthorizationTarget}
+ * and map failures to their response format. This class consistently validates the user and active
+ * roles, runs any request-specific handler, and evaluates the standard authorization expression.
  */
 @SuppressWarnings("FormatStringAnnotation")
 public abstract class BaseMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseMetadataAuthorizationMethodInterceptor.class);
+
+  /** The metadata identifiers and entity type resolved from one protocol request. */
+  protected static class AuthorizationTarget {
+    private final Map<Entity.EntityType, NameIdentifier> nameIdentifiers;
+    private final Entity.EntityType entityType;
+
+    /**
+     * Creates an authorization target.
+     *
+     * @param nameIdentifiers identifiers needed by the authorization expression
+     * @param entityType the entity type directly addressed by this request
+     */
+    public AuthorizationTarget(
+        Map<Entity.EntityType, NameIdentifier> nameIdentifiers, Entity.EntityType entityType) {
+      this.nameIdentifiers = Objects.requireNonNull(nameIdentifiers, "nameIdentifiers");
+      this.entityType = Objects.requireNonNull(entityType, "entityType");
+    }
+
+    /**
+     * Returns the identifiers needed by the authorization expression. The map remains mutable so a
+     * request-specific handler can add an identifier found in a request body.
+     *
+     * @return the identifiers keyed by entity type
+     */
+    public Map<Entity.EntityType, NameIdentifier> nameIdentifiers() {
+      return nameIdentifiers;
+    }
+
+    /**
+     * Returns the entity type directly addressed by this request.
+     *
+     * @return the target entity type
+     */
+    public Entity.EntityType entityType() {
+      return entityType;
+    }
+  }
 
   /**
    * Handler for request-specific authorization processing that cannot be handled by standard
@@ -67,10 +106,9 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
      * </ul>
      *
      * @param nameIdentifierMap Name identifier map (can be modified to add identifiers)
-     * @throws ForbiddenException if authorization or validation fails
+     * @throws Exception if authorization or validation fails
      */
-    void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap)
-        throws ForbiddenException;
+    void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) throws Exception;
 
     /**
      * Whether this handler has completed full authorization. Called after {@link #process} to
@@ -82,8 +120,27 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
     boolean authorizationCompleted();
   }
 
-  protected abstract Map<Entity.EntityType, NameIdentifier> extractNameIdentifierFromParameters(
-      Parameter[] parameters, Object[] args);
+  /**
+   * Resolves the metadata identifiers and the directly addressed entity type from a protocol
+   * request. The entity type is kept separately because some protocols encode catalog and schema
+   * requests in the same path parameter.
+   *
+   * @param annotation authorization annotation on the invoked method
+   * @param parameters invoked method parameters
+   * @param args invoked method arguments
+   * @return the resolved authorization target
+   */
+  protected abstract AuthorizationTarget resolveAuthorizationTarget(
+      AuthorizationExpression annotation, Parameter[] parameters, Object[] args);
+
+  /**
+   * Maps an authorization or operation failure to the response format required by a protocol.
+   *
+   * @param methodInvocation invoked method, including protocol-specific request arguments
+   * @param throwable failure to map
+   * @return the protocol response
+   */
+  protected abstract Object toErrorResponse(MethodInvocation methodInvocation, Throwable throwable);
 
   /**
    * Create an authorization handler for this request, if special handling is needed beyond standard
@@ -103,13 +160,23 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
     return Optional.empty();
   }
 
-  protected boolean isExceptionPropagate(Exception e) {
+  /**
+   * Returns whether an exception should be returned as a protocol error without being wrapped as an
+   * internal authorization failure.
+   *
+   * @param exception exception raised while authorizing the request
+   * @return {@code true} to preserve the original exception
+   */
+  protected boolean isExceptionPropagate(Exception exception) {
     return false;
   }
 
   /**
-   * Hook for subclasses to skip standard authorization before user validation and expression
-   * evaluation.
+   * Returns whether the complete local authorization pipeline should be skipped. This is intended
+   * for a protocol proxy whose downstream Gravitino server authorizes the same request.
+   *
+   * @param nameIdentifierMap identifiers resolved from the request
+   * @return {@code true} to skip user validation, handlers, and expression evaluation
    */
   protected boolean shouldSkipAuthorization(
       Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
@@ -117,12 +184,23 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
   }
 
   /**
-   * Determine whether authorization is required and the rules via the authorization annotation ,
-   * and obtain the metadata ID that requires authorization via the authorization annotation.
+   * Hook for requests that must validate the current user and active roles but do not have a
+   * metadata object on which to evaluate an expression. A protocol root-list request is a typical
+   * example: its returned children are filtered separately.
    *
-   * @param methodInvocation methodInvocation with the Method object
-   * @return the return result of the original method.
-   * @throws Throwable throw an exception when authorization fails.
+   * @param target resolved authorization target
+   * @return {@code true} to skip only expression evaluation
+   */
+  protected boolean shouldSkipExpressionEvaluation(AuthorizationTarget target) {
+    return false;
+  }
+
+  /**
+   * Authorizes an annotated method invocation and maps all failures through the protocol hook.
+   *
+   * @param methodInvocation method invocation to authorize
+   * @return the mapped error response, or the result of the invoked method
+   * @throws Throwable if the invocation infrastructure itself cannot run
    */
   @Override
   public Object invoke(MethodInvocation methodInvocation) throws Throwable {
@@ -134,37 +212,42 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
       if (expressionAnnotation != null) {
         String expression = expressionAnnotation.expression();
         Object[] args = methodInvocation.getArguments();
-        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
-            extractNameIdentifierFromParameters(parameters, args);
+        AuthorizationTarget target =
+            resolveAuthorizationTarget(expressionAnnotation, parameters, args);
+        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = target.nameIdentifiers();
         boolean skipStandardCheck = shouldSkipAuthorization(nameIdentifierMap);
 
-        // Check if current user exists in the metalake.
         NameIdentifier metalakeIdent = nameIdentifierMap.get(Entity.EntityType.METALAKE);
         AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
 
         if (!skipStandardCheck && metalakeIdent != null) {
           String currentUser = PrincipalUtils.getCurrentUserName();
+          // Reuse this request context so user, role, and privilege checks see exactly the same
+          // active-role selection and can share cached authorization results.
           try {
-            AuthorizationUtils.checkCurrentUser(metalakeIdent.name(), currentUser);
-          } catch (org.apache.gravitino.exceptions.ForbiddenException ex) {
+            AuthorizationUtils.checkCurrentUser(
+                metalakeIdent.name(), currentUser, authorizationRequestContext);
+          } catch (ForbiddenException exception) {
             LOG.info(
                 "User validation failed - User: '{}', Metalake: '{}', Reason: {}",
                 currentUser,
                 metalakeIdent.name(),
-                ex.getMessage());
-            return IcebergExceptionMapper.toRESTResponse(ex);
-          } catch (Exception ex) {
+                exception.getMessage());
+            throw exception;
+          } catch (Exception exception) {
+            // User lookup failures are different from a missing user. Preserve the existing
+            // protocol behavior by returning an internal error instead of a 403 denial.
             LOG.error(
                 "Unexpected error during user validation - User: '{}', Metalake: '{}'",
                 currentUser,
                 metalakeIdent.name(),
-                ex);
-            return IcebergExceptionMapper.toRESTResponse(
-                new RuntimeException("Failed to validate user", ex));
+                exception);
+            return toErrorResponse(
+                methodInvocation, new RuntimeException("Failed to validate user", exception));
           }
 
-          // Role assumption: reject a NAMED declaration that names roles the caller does not hold
-          // (403); ALL/NONE need no membership check.
+          // ALL and NONE already describe a complete role selection. NAMED is different: every
+          // requested role must be checked so a caller cannot assume somebody else's role.
           ActiveRoles activeRoles = authorizationRequestContext.getActiveRoles();
           if (activeRoles.mode() == ActiveRoles.Mode.NAMED) {
             Set<String> unheldRoles =
@@ -181,12 +264,11 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
                       "User '%s' cannot assume active role(s) that are not held: %s",
                       currentUser, unheldRoles);
               LOG.info(message);
-              return IcebergExceptionMapper.toRESTResponse(new ForbiddenException(message));
+              throw new ForbiddenException(message);
             }
           }
         }
 
-        // Process custom authorization if handler exists
         Optional<AuthorizationHandler> handler =
             createAuthorizationHandler(method, parameters, args);
 
@@ -196,18 +278,18 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
           skipStandardCheck = authzHandler.authorizationCompleted();
         }
 
-        // Perform standard authorization check if custom handler didn't complete it
-        if (!skipStandardCheck) {
+        if (!skipStandardCheck && !shouldSkipExpressionEvaluation(target)) {
           Map<String, Object> pathParams = Utils.extractPathParamsFromParameters(parameters, args);
           AuthorizationExpressionEvaluator authorizationExpressionEvaluator =
               new AuthorizationExpressionEvaluator(expression);
           boolean authorizeResult =
               authorizationExpressionEvaluator.evaluate(
-                  nameIdentifierMap, pathParams, authorizationRequestContext, Optional.empty());
+                  nameIdentifierMap,
+                  pathParams,
+                  authorizationRequestContext,
+                  Optional.of(target.entityType().name()));
           if (!authorizeResult) {
-            MetadataObject.Type type = expressionAnnotation.accessMetadataType();
-            NameIdentifier accessMetadataName =
-                nameIdentifierMap.get(Entity.EntityType.valueOf(type.name()));
+            NameIdentifier accessMetadataName = nameIdentifierMap.get(target.entityType());
             String currentUser = PrincipalUtils.getCurrentUserName();
             String methodName = method.getName();
             String notAuthzMessage =
@@ -215,13 +297,13 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
                     "User '%s' is not authorized to perform operation '%s' on metadata '%s' with expression '%s'",
                     currentUser, methodName, accessMetadataName, expression);
             LOG.info(notAuthzMessage);
-            return IcebergExceptionMapper.toRESTResponse(new ForbiddenException(notAuthzMessage));
+            throw new ForbiddenException(notAuthzMessage);
           }
         }
       }
     } catch (Exception ex) {
-      if (isExceptionPropagate(ex)) {
-        return IcebergExceptionMapper.toRESTResponse(ex);
+      if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {
+        return toErrorResponse(methodInvocation, ex);
       }
       String currentUser = PrincipalUtils.getCurrentUserName();
       String methodName = methodInvocation.getMethod().getName();
@@ -231,12 +313,12 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
               "Authorization failed due to system internal error, User: '%s', Operation: '%s'",
               currentUser, methodName);
       LOG.info(errorMessage, ex);
-      return IcebergExceptionMapper.toRESTResponse(new RuntimeException(errorMessage, ex));
+      return toErrorResponse(methodInvocation, new RuntimeException(errorMessage, ex));
     }
     try {
       return methodInvocation.proceed();
     } catch (Throwable e) {
-      return IcebergExceptionMapper.toRESTResponse(e);
+      return toErrorResponse(methodInvocation, e);
     }
   }
 }
