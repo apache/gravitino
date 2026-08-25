@@ -1420,18 +1420,19 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testResolveProbeLocationRejectsPlaceholderInAuthority() throws IOException {
+  public void testResolveProbeLocationReportsUnresolvedPlaceholderInAuthority() throws IOException {
     try (FilesetCatalogOperations catalogOperations =
         new FilesetCatalogOperations(store, secretManager)) {
-      IllegalArgumentException exception =
+      UnsupportedOperationException exception =
           Assertions.assertThrows(
-              IllegalArgumentException.class,
+              UnsupportedOperationException.class,
               () ->
                   catalogOperations.resolveProbeLocation(
                       "s3a://bucket{{schema}}", NameIdentifier.of("metalake", "catalog")));
 
       Assertions.assertEquals(
-          "Fileset catalog location has no concrete parent that can be tested",
+          "probe unsupported: unresolved placeholder {{schema}} in s3a://bucket{{schema}}; no "
+              + "filesystem path was tested",
           exception.getMessage());
     }
   }
@@ -1526,12 +1527,11 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testTestConnectionUsesStaticParentForPlaceholder() throws IOException {
+  public void testTestConnectionResolvesCatalogPlaceholder() throws IOException {
     File catalogLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "placeholder/catalog");
     FileUtils.forceMkdir(catalogLocation);
     String location =
-        new File(UNFORMALIZED_TEST_ROOT_PATH, "placeholder").toURI().toString()
-            + "{{catalog}}/{{schema}}";
+        new File(UNFORMALIZED_TEST_ROOT_PATH, "placeholder").toURI().toString() + "{{catalog}}";
 
     try (FilesetCatalogOperations catalogOperations =
         new FilesetCatalogOperations(store, secretManager)) {
@@ -1545,13 +1545,66 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testTestConnectionReportsUnresolvedPlaceholderWithoutProbingStaticParent()
+      throws IOException {
+    String location =
+        new File(UNFORMALIZED_TEST_ROOT_PATH, "placeholder").toURI().toString()
+            + "{{catalog}}/{{schema}}";
+    String resolvedLocation = location.replace("{{catalog}}", "catalog");
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, location),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains(
+                  "location (probe unsupported: unresolved placeholder {{schema}} in "
+                      + resolvedLocation
+                      + "; no filesystem path was tested)"));
+    }
+  }
+
+  @Test
   public void testTestConnectionAggregatesLocationFailures() throws IOException {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "primary",
+            "unsupported://primary/{{catalog}}",
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
+            "unsupported://archive/{{catalog}}");
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location-primary (probe unsupported)"));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location-archive (probe unsupported)"));
+      Assertions.assertFalse(exception.getMessage().contains("unsupported://"));
+    }
+  }
+
+  @Test
+  public void testTestConnectionAllowsMissingCatalogLocations() throws IOException {
     String missingBase =
         new File(UNFORMALIZED_TEST_ROOT_PATH, "missing-" + UUID.randomUUID()).toURI().toString();
     Map<String, String> properties =
         ImmutableMap.of(
-            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "primary",
-            missingBase + "/primary",
+            LOCATION,
+            missingBase + "/default",
             PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
             missingBase + "/archive");
 
@@ -1559,26 +1612,20 @@ public class TestFilesetCatalogOperations {
         new FilesetCatalogOperations(store, secretManager)) {
       catalogOperations.initialize(
           properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
-      ConnectionFailedException exception =
-          Assertions.assertThrows(
-              ConnectionFailedException.class,
-              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
-      Assertions.assertTrue(exception.getMessage().contains("location-primary"));
-      Assertions.assertTrue(exception.getMessage().contains("location-archive"));
-      Assertions.assertFalse(exception.getMessage().contains(missingBase));
+      Assertions.assertDoesNotThrow(
+          () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
     }
   }
 
   @Test
   public void testTestConnectionAggregatesLocationResolutionAndProbeFailures() throws IOException {
-    String missingLocation =
-        new File(UNFORMALIZED_TEST_ROOT_PATH, "missing-" + UUID.randomUUID()).toURI().toString();
+    String unsupportedLocation = "unsupported://archive/{{catalog}}";
     Map<String, String> properties =
         ImmutableMap.of(
             PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "primary",
             "{{schema}}",
             PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
-            missingLocation);
+            unsupportedLocation);
 
     try (FilesetCatalogOperations catalogOperations =
         new FilesetCatalogOperations(store, secretManager)) {
@@ -1589,10 +1636,14 @@ public class TestFilesetCatalogOperations {
               ConnectionFailedException.class,
               () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
       Assertions.assertTrue(
-          exception.getMessage().contains("location-primary (invalid location configuration)"));
+          exception
+              .getMessage()
+              .contains(
+                  "location-primary (probe unsupported: unresolved placeholder {{schema}} in "
+                      + "{{schema}}; no filesystem path was tested)"));
       Assertions.assertTrue(
-          exception.getMessage().contains("location-archive (location not found)"));
-      Assertions.assertFalse(exception.getMessage().contains(missingLocation));
+          exception.getMessage().contains("location-archive (probe unsupported)"));
+      Assertions.assertFalse(exception.getMessage().contains(unsupportedLocation));
     }
   }
 

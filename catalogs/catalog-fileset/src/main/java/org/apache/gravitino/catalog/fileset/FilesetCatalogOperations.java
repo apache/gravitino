@@ -37,6 +37,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -131,8 +133,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   private static final String SCHEMA_DOES_NOT_EXIST_MSG = "Schema %s does not exist";
   private static final String FILESET_DOES_NOT_EXIST_MSG = "Fileset %s does not exist";
   private static final String SLASH = "/";
-  private static final String SCHEME_DELIMITER = "://";
   private static final String CATALOG_PLACEHOLDER = "{{catalog}}";
+  private static final String PROBE_UNSUPPORTED = "probe unsupported";
+  private static final String PROBE_UNSUPPORTED_DETAIL_PREFIX = PROBE_UNSUPPORTED + ":";
 
   // location placeholder pattern format: {{placeholder}}
   private static final Pattern LOCATION_PLACEHOLDER_PATTERN = Pattern.compile("\\{\\{(.*?)\\}\\}");
@@ -999,14 +1002,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             probeLocation(path);
           } catch (Exception e) {
             String displayName = displayLocationName(locationName);
-            String category = failureCategory(e);
+            String failure = failureDescription(e);
             LOG.warn(
                 "Fileset catalog connection probe failed for catalog {} at {} ({})",
                 catalogIdent,
                 displayName,
-                category,
+                failure,
                 e);
-            failures.add(displayName + " (" + category + ")");
+            failures.add(displayName + " (" + failure + ")");
           }
         });
 
@@ -1495,27 +1498,34 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   Path resolveProbeLocation(String location, NameIdentifier catalogIdent) {
     String resolved = location.replace(CATALOG_PLACEHOLDER, catalogIdent.name());
     Matcher matcher = LOCATION_PLACEHOLDER_PATTERN.matcher(resolved);
-    if (matcher.find()) {
-      String staticPrefix = resolved.substring(0, matcher.start());
-      int lastSeparator = staticPrefix.lastIndexOf(SLASH);
-      int schemeDelimiter = staticPrefix.indexOf(SCHEME_DELIMITER);
-      if (lastSeparator < 0
-          || (schemeDelimiter >= 0
-              && lastSeparator < schemeDelimiter + SCHEME_DELIMITER.length())) {
-        throw new IllegalArgumentException(
-            "Fileset catalog location has no concrete parent that can be tested");
-      }
-      resolved = staticPrefix.substring(0, lastSeparator + 1);
+    List<String> unresolvedPlaceholders = new ArrayList<>();
+    while (matcher.find()) {
+      unresolvedPlaceholders.add(matcher.group());
+    }
+    if (!unresolvedPlaceholders.isEmpty()) {
+      String placeholderLabel =
+          unresolvedPlaceholders.size() == 1
+              ? "unresolved placeholder "
+              : "unresolved placeholders ";
+      throw new ProbeUnsupportedException(
+          PROBE_UNSUPPORTED_DETAIL_PREFIX
+              + " "
+              + placeholderLabel
+              + String.join(", ", unresolvedPlaceholders)
+              + " in "
+              + resolved
+              + "; no filesystem path was tested");
+    }
+
+    if (StringUtils.isBlank(resolved)) {
+      throw new InvalidProbeLocationException(
+          "Fileset catalog location has no valid concrete target that can be tested");
     }
 
     try {
-      if (StringUtils.isBlank(resolved) || containsPlaceholder(resolved)) {
-        throw new IllegalArgumentException(
-            "Fileset catalog location has no valid concrete target that can be tested");
-      }
       return new Path(resolved);
     } catch (IllegalArgumentException e) {
-      throw new IllegalArgumentException(
+      throw new InvalidProbeLocationException(
           "Fileset catalog location has no valid concrete target that can be tested", e);
     }
   }
@@ -1554,13 +1564,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 createFileSystem(path, probeConf, scheme, fileSystemProvider)) {
               Path qualifiedPath =
                   path.makeQualified(fileSystem.getUri(), fileSystem.getWorkingDirectory());
-              RemoteIterator<FileStatus> iterator = fileSystem.listStatusIterator(qualifiedPath);
-              if (iterator.hasNext()) {
-                FileStatus first = iterator.next();
-                if (first.isFile() && first.getPath().equals(qualifiedPath)) {
-                  throw new IllegalArgumentException(
-                      "Fileset catalog location must be a directory");
+              try {
+                RemoteIterator<FileStatus> iterator = fileSystem.listStatusIterator(qualifiedPath);
+                if (iterator.hasNext()) {
+                  FileStatus first = iterator.next();
+                  if (first.isFile() && first.getPath().equals(qualifiedPath)) {
+                    throw new ProbeLocationNotDirectoryException(
+                        "Fileset catalog location must be a directory");
+                  }
                 }
+              } catch (FileNotFoundException ignored) {
+                // A catalog location may be created later by schema or fileset operations.
               }
               return null;
             }
@@ -1664,17 +1678,27 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     return LOCATION_NAME_UNKNOWN.equals(locationName) ? "location" : "location-" + locationName;
   }
 
+  private String failureDescription(Throwable throwable) {
+    Throwable current = throwable;
+    while (current != null) {
+      if (current instanceof ProbeUnsupportedException) {
+        return current.getMessage();
+      }
+      current = current.getCause();
+    }
+    return failureCategory(throwable);
+  }
+
   private String failureCategory(Throwable throwable) {
     Throwable current = throwable;
     while (current != null) {
-      String simpleName = current.getClass().getSimpleName().toLowerCase();
-      String message = Optional.ofNullable(current.getMessage()).orElse("").toLowerCase();
-      if (message.contains("must be a directory")) {
+      String simpleName = current.getClass().getSimpleName().toLowerCase(Locale.ROOT);
+      String message =
+          Optional.ofNullable(current.getMessage()).orElse("").toLowerCase(Locale.ROOT);
+      if (current instanceof ProbeLocationNotDirectoryException) {
         return "location is not a directory";
       }
-      if (current instanceof IllegalArgumentException
-          && (message.contains("no concrete parent")
-              || message.contains("no valid concrete target"))) {
+      if (current instanceof InvalidProbeLocationException) {
         return "invalid location configuration";
       }
       if (current instanceof TimeoutException || message.contains("timed out")) {
@@ -1693,7 +1717,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         return "credential generation failed";
       }
       if (current instanceof UnsupportedOperationException) {
-        return "probe unsupported";
+        return PROBE_UNSUPPORTED;
       }
       current = current.getCause();
     }
@@ -1871,5 +1895,30 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         targetLocationName,
         fileset.name());
     return targetLocation;
+  }
+
+  private static final class InvalidProbeLocationException extends IllegalArgumentException {
+
+    private InvalidProbeLocationException(String message) {
+      super(message);
+    }
+
+    private InvalidProbeLocationException(String message, Throwable cause) {
+      super(message, cause);
+    }
+  }
+
+  private static final class ProbeLocationNotDirectoryException extends IllegalArgumentException {
+
+    private ProbeLocationNotDirectoryException(String message) {
+      super(message);
+    }
+  }
+
+  private static final class ProbeUnsupportedException extends UnsupportedOperationException {
+
+    private ProbeUnsupportedException(String message) {
+      super(message);
+    }
   }
 }
