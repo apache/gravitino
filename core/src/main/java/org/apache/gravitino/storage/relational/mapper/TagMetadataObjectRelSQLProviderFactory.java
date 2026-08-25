@@ -102,11 +102,6 @@ public class TagMetadataObjectRelSQLProviderFactory {
             metadataObjectId, metadataObjectType, tagRelPOs);
   }
 
-  public static String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
-    return getProvider().softDeleteTagMetadataObjectRelsByMetalakeAndTagName(metalakeName, tagName);
-  }
-
   /** Delegates metadata-object relation deletion by tag ID. */
   public static String softDeleteByTagId(@Param("tagId") Long tagId) {
     return getProvider().softDeleteByTagId(tagId);

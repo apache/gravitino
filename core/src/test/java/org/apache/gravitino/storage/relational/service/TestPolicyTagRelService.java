@@ -383,13 +383,13 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     executeUpdate("UPDATE policy_tag_relation_meta SET deleted_at = 100 WHERE deleted_at > 0");
 
     Assertions.assertEquals(
-        0, PolicyTagRelService.getInstance().deleteRelationsByLegacyTimeline(100L, 10));
+        0, PolicyMetaService.getInstance().deletePolicyAndVersionMetasByLegacyTimeline(100L, 10));
     Assertions.assertEquals(
-        1, PolicyTagRelService.getInstance().deleteRelationsByLegacyTimeline(101L, 1));
+        1, PolicyMetaService.getInstance().deletePolicyAndVersionMetasByLegacyTimeline(101L, 1));
     Assertions.assertEquals(
         1L, queryForLong("SELECT COUNT(*) FROM policy_tag_relation_meta WHERE deleted_at > 0"));
     Assertions.assertEquals(
-        1, PolicyTagRelService.getInstance().deleteRelationsByLegacyTimeline(101L, 10));
+        1, PolicyMetaService.getInstance().deletePolicyAndVersionMetasByLegacyTimeline(101L, 10));
   }
 
   @TestTemplate

@@ -176,20 +176,6 @@ public class TagMetadataObjectRelBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
-    return "UPDATE "
-        + TagMetadataObjectRelMapper.TAG_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " te SET te.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE te.tag_id IN (SELECT tm.tag_id FROM "
-        + TagMetaMapper.TAG_TABLE_NAME
-        + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0) AND te.deleted_at = 0";
-  }
-
   /** Returns SQL for soft-deleting metadata-object relations by tag ID. */
   public String softDeleteByTagId(@Param("tagId") Long tagId) {
     return "UPDATE "

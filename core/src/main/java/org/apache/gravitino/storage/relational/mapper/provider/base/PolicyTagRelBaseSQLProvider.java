@@ -105,40 +105,6 @@ public class PolicyTagRelBaseSQLProvider {
         + " WHERE tag_id = #{tagId} AND deleted_at = 0";
   }
 
-  /** Returns SQL for soft-deleting relations when a policy is deleted. */
-  public String softDeleteByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
-    return "UPDATE "
-        + POLICY_TAG_RELATION_TABLE_NAME
-        + " SET deleted_at = "
-        + deletedAtNowExpression()
-        + ", tombstone_id = id"
-        + " WHERE policy_id IN (SELECT pm.policy_id FROM "
-        + PolicyMetaMapper.POLICY_META_TABLE_NAME
-        + " pm WHERE pm.metalake_id IN (SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND pm.policy_name = #{policyName} AND pm.deleted_at = 0)"
-        + " AND deleted_at = 0";
-  }
-
-  /** Returns SQL for soft-deleting relations when a tag is deleted. */
-  public String softDeleteByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
-    return "UPDATE "
-        + POLICY_TAG_RELATION_TABLE_NAME
-        + " SET deleted_at = "
-        + deletedAtNowExpression()
-        + ", tombstone_id = id"
-        + " WHERE tag_id IN (SELECT tm.tag_id FROM "
-        + TagMetaMapper.TAG_TABLE_NAME
-        + " tm WHERE tm.metalake_id IN (SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0)"
-        + " AND deleted_at = 0";
-  }
-
   /** Returns SQL for soft-deleting relations when a metalake is deleted. */
   public String softDeleteByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "

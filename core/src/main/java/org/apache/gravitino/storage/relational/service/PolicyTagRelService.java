@@ -147,51 +147,6 @@ public class PolicyTagRelService {
     return updatedPolicies;
   }
 
-  /**
-   * Soft-deletes all policy-to-tag relations for a deleted policy.
-   *
-   * @param policyId The deleted policy ID.
-   * @return The number of deleted relations.
-   */
-  public int deleteRelationsForPolicy(long policyId) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId));
-  }
-
-  /**
-   * Soft-deletes all policy-to-tag relations for a deleted tag.
-   *
-   * @param tagId The deleted tag ID.
-   * @return The number of deleted relations.
-   */
-  public int deleteRelationsForTag(long tagId) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId));
-  }
-
-  /**
-   * Soft-deletes all policy-to-tag relations for a deleted metalake.
-   *
-   * @param metalakeId The deleted metalake ID.
-   * @return The number of deleted relations.
-   */
-  public int deleteRelationsForMetalake(long metalakeId) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId));
-  }
-
-  /**
-   * Physically deletes expired policy-to-tag relation rows.
-   *
-   * @param legacyTimeline The exclusive deletion timestamp upper bound.
-   * @param limit The maximum number of rows to delete.
-   * @return The number of deleted relations.
-   */
-  public int deleteRelationsByLegacyTimeline(long legacyTimeline, int limit) {
-    return SessionUtils.doWithCommitAndFetchResult(
-        PolicyTagRelMapper.class, mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit));
-  }
-
   private List<PolicyEntity> updateRelationsWithoutCommit(
       NameIdentifier tagIdentifier,
       RelationEdgeTarget[] targetsToAdd,
