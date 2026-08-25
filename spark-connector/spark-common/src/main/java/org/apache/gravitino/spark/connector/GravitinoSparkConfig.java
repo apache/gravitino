@@ -36,6 +36,11 @@ public class GravitinoSparkConfig {
   // lakehouse-iceberg catalogs are routed through; takes precedence over auto-discovery.
   public static final String GRAVITINO_ICEBERG_REST_URI = GRAVITINO_PREFIX + "iceberg.rest-uri";
 
+  // Reuses the Gravitino OAuth2 client configuration for automatically routed Iceberg REST
+  // catalogs. Iceberg obtains and refreshes its own access token with the same client identity.
+  public static final String GRAVITINO_ICEBERG_REUSE_OAUTH2 =
+      GRAVITINO_PREFIX + "iceberg.reuseOAuth2";
+
   // Pass-through prefix for the Iceberg REST client config (e.g. rest.auth.type,
   // rest.auth.basic.username), applied when a catalog is routed through the Iceberg REST server.
   public static final String GRAVITINO_ICEBERG_REST_CONFIG_PREFIX =

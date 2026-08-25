@@ -43,6 +43,7 @@ import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.procedures.SparkProcedures;
 import org.apache.iceberg.spark.source.HasIcebergCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
+import org.apache.spark.SparkConf;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
@@ -83,7 +84,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     Optional<String> icebergRestUri = resolveIcebergRestUri(properties);
     Map<String, String> all;
     if (icebergRestUri.isPresent()) {
-      all = buildIcebergRestSparkCatalogProperties(name, options, properties, icebergRestUri.get());
+      all = buildAutoRoutedIcebergRestProperties(name, options, properties, icebergRestUri.get());
     } else {
       all = getPropertiesConverter().toSparkCatalogProperties(options, properties);
       CredentialPropertyUtils.applyIcebergCredentials(
@@ -121,7 +122,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     return GravitinoCatalogManager.get().getIcebergRestUri();
   }
 
-  private Map<String, String> buildIcebergRestSparkCatalogProperties(
+  private Map<String, String> buildAutoRoutedIcebergRestProperties(
       String gravitinoCatalogName,
       CaseInsensitiveStringMap options,
       Map<String, String> properties,
@@ -130,20 +131,21 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     Map<String, String> all =
         new HashMap<>(
             converter.buildIcebergRestProperties(
-                gravitinoCatalogName, restUri, properties, getIcebergRestClientConfig()));
+                gravitinoCatalogName, restUri, properties, getAutoRoutedIcebergRestClientConfig()));
     if (options != null) {
       all.putAll(options);
     }
     return all;
   }
 
-  private Map<String, String> getIcebergRestClientConfig() {
-    return Stream.of(
-            SparkSession.active()
-                .sparkContext()
-                .conf()
-                .getAllWithPrefix(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_CONFIG_PREFIX))
-        .collect(Collectors.toMap(t -> t._1, t -> t._2, (oldVal, newVal) -> newVal));
+  private Map<String, String> getAutoRoutedIcebergRestClientConfig() {
+    SparkConf sparkConf = SparkSession.active().sparkContext().conf();
+    Map<String, String> explicitRestConfig =
+        Stream.of(
+                sparkConf.getAllWithPrefix(
+                    GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_CONFIG_PREFIX))
+            .collect(Collectors.toMap(t -> t._1, t -> t._2, (oldVal, newVal) -> newVal));
+    return IcebergRestOAuthConfig.resolve(sparkConf, explicitRestConfig);
   }
 
   @Override
