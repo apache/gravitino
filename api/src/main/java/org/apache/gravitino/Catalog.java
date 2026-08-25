@@ -31,6 +31,7 @@ import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SemanticModelCatalog;
 import org.apache.gravitino.tag.SupportsTags;
 
 /**
@@ -254,6 +255,15 @@ public interface Catalog extends Auditable {
    */
   default ViewCatalog asViewCatalog() throws UnsupportedOperationException {
     throw new UnsupportedOperationException("Catalog does not support view operations");
+  }
+
+  /**
+   * @return the {@link SemanticModelCatalog} if the catalog supports Semantic Model operations.
+   * @throws UnsupportedOperationException if the catalog does not support Semantic Model
+   *     operations.
+   */
+  default SemanticModelCatalog asSemanticModelCatalog() throws UnsupportedOperationException {
+    throw new UnsupportedOperationException("Catalog does not support Semantic Model operations");
   }
 
   /**
