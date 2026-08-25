@@ -158,10 +158,10 @@ public class JobOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       JobTemplateRegisterRequest request) {
+    String jobTemplateName =
+        request == null || request.getJobTemplate() == null ? "" : request.getJobTemplate().name();
     LOG.info(
-        "Received request to register job template {} in metalake: {}",
-        request.getJobTemplate().name(),
-        metalake);
+        "Received request to register job template {} in metalake: {}", jobTemplateName, metalake);
 
     try {
       return Utils.doAs(
@@ -181,7 +181,7 @@ public class JobOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleJobTemplateException(
-          OperationType.REGISTER, request.getJobTemplate().name(), metalake, e);
+          OperationType.REGISTER, jobTemplateName, metalake, e);
     }
   }
 
