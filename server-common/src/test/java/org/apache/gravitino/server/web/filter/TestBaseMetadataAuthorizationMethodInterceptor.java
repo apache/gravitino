@@ -106,6 +106,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     assertEquals("authorized", interceptor.invoke(invocation));
+    assertEquals("canAccessMetadata", interceptor.resolvedMethod.getName());
     verify(invocation).proceed();
     authorizationUtils.verify(
         () ->
@@ -307,6 +308,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   private static class TestInterceptor extends BaseMetadataAuthorizationMethodInterceptor {
     private final Entity.EntityType targetType;
     private Optional<AuthorizationHandler> handler = Optional.empty();
+    private Method resolvedMethod;
     private RuntimeException resolutionFailure;
     private boolean includeMetalake = true;
     private boolean skipAuthorization;
@@ -318,7 +320,8 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
 
     @Override
     protected AuthorizationTarget resolveAuthorizationTarget(
-        AuthorizationExpression annotation, Parameter[] parameters, Object[] args) {
+        Method method, AuthorizationExpression annotation, Parameter[] parameters, Object[] args) {
+      resolvedMethod = method;
       if (resolutionFailure != null) {
         throw resolutionFailure;
       }

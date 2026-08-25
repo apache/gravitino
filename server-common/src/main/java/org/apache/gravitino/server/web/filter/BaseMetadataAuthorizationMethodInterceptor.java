@@ -125,13 +125,14 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
    * request. The entity type is kept separately because some protocols encode catalog and schema
    * requests in the same path parameter.
    *
+   * @param method invoked protocol method
    * @param annotation authorization annotation on the invoked method
    * @param parameters invoked method parameters
    * @param args invoked method arguments
    * @return the resolved authorization target
    */
   protected abstract AuthorizationTarget resolveAuthorizationTarget(
-      AuthorizationExpression annotation, Parameter[] parameters, Object[] args);
+      Method method, AuthorizationExpression annotation, Parameter[] parameters, Object[] args);
 
   /**
    * Maps an authorization or operation failure to the response format required by a protocol.
@@ -213,7 +214,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
         String expression = expressionAnnotation.expression();
         Object[] args = methodInvocation.getArguments();
         AuthorizationTarget target =
-            resolveAuthorizationTarget(expressionAnnotation, parameters, args);
+            resolveAuthorizationTarget(method, expressionAnnotation, parameters, args);
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = target.nameIdentifiers();
         boolean skipStandardCheck = shouldSkipAuthorization(nameIdentifierMap);
 

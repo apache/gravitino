@@ -53,7 +53,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
 
   @Override
   protected AuthorizationTarget resolveAuthorizationTarget(
-      AuthorizationExpression annotation, Parameter[] parameters, Object[] args) {
+      Method method, AuthorizationExpression annotation, Parameter[] parameters, Object[] args) {
     Map<Entity.EntityType, NameIdentifier> nameIdentifierMap =
         extractNameIdentifierFromParameters(parameters, args);
     return new AuthorizationTarget(
