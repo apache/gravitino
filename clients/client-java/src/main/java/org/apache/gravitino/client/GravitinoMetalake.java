@@ -429,6 +429,26 @@ public class GravitinoMetalake extends MetalakeDTO
   }
 
   @Override
+  public void testConnection(String catalogName) throws Exception {
+    ErrorResponse resp =
+        restClient.post(
+            String.format(
+                API_METALAKES_CATALOGS_PATH + "/testConnection",
+                RESTUtils.encodeString(this.name()),
+                RESTUtils.encodeString(catalogName)),
+            null,
+            ErrorResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.catalogErrorHandler());
+
+    if (resp.getCode() == 0) {
+      return;
+    }
+
+    ErrorHandlers.catalogErrorHandler().accept(resp);
+  }
+
+  @Override
   public SupportsRoles supportsRoles() {
     return this;
   }

@@ -18,15 +18,14 @@
  */
 package org.apache.gravitino.catalog.jdbc;
 
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.HashMap;
+import java.util.List;
 import javax.sql.DataSource;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.catalog.jdbc.converter.JdbcExceptionConverter;
@@ -37,6 +36,7 @@ import org.apache.gravitino.catalog.jdbc.converter.SqliteTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.SqliteTableOperations;
 import org.apache.gravitino.catalog.jdbc.utils.DataSourceUtils;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -44,23 +44,28 @@ import org.junit.jupiter.api.Test;
 public class TestJdbcCatalogOperations {
 
   @Test
-  public void testTestConnection() {
+  public void testExistingCatalogConnectionFailure() {
+    SQLException cause = new SQLException("connection refused");
+    SqliteDatabaseOperations databaseOperations =
+        new SqliteDatabaseOperations("/unused") {
+          @Override
+          public List<String> listDatabases() {
+            throw new GravitinoRuntimeException(cause, cause.getMessage());
+          }
+        };
+
     try (JdbcCatalogOperations catalogOperations =
         new JdbcCatalogOperations(
             new SqliteExceptionConverter(),
             new SqliteTypeConverter(),
-            new SqliteDatabaseOperations("/illegal/path"),
+            databaseOperations,
             new SqliteTableOperations(),
             new SqliteColumnDefaultValueConverter())) {
-      Assertions.assertThrows(
-          GravitinoRuntimeException.class,
-          () ->
-              catalogOperations.testConnection(
-                  NameIdentifier.of("metalake", "catalog"),
-                  Catalog.Type.RELATIONAL,
-                  "sqlite",
-                  "comment",
-                  ImmutableMap.of()));
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertSame(cause, exception.getCause());
     }
   }
 
