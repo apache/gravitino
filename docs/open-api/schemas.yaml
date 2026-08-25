@@ -79,7 +79,7 @@ paths:
         - schema
       summary: Get schema
       operationId: loadSchema
-      description: Returns the specified schema in the specified catalog and metalake
+      description: Returns the specified schema in the specified catalog and metalake.
       responses:
         "200":
           $ref: "#/components/responses/SchemaResponse"

@@ -111,7 +111,10 @@ public class AuthorizationUtils {
           Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
   private static final Set<Privilege.Name> TABLE_PRIVILEGES =
       Sets.immutableEnumSet(
-          Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
+          Privilege.Name.CREATE_TABLE,
+          Privilege.Name.MODIFY_TABLE,
+          Privilege.Name.SELECT_TABLE,
+          Privilege.Name.PROBE_TABLE_LIKE);
   private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);

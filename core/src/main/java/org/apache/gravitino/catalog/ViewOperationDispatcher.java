@@ -29,6 +29,7 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -39,6 +40,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.capability.Capability;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
@@ -209,11 +211,15 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
    * @return The altered {@link View} object after applying the changes.
    * @throws NoSuchViewException If the view to alter does not exist.
    * @throws IllegalArgumentException If an unsupported or invalid change is specified.
+   * @throws GravitinoRuntimeException If a rename succeeds in the external catalog but Gravitino
+   *     cannot update the stored view registration consistently.
    */
   @Override
   public View alterView(NameIdentifier ident, ViewChange... changes)
       throws NoSuchViewException, IllegalArgumentException {
     validateAlterProperties(ident, HasPropertyMetadata::tablePropertiesMetadata, changes);
+    boolean isRenameView =
+        Arrays.stream(changes).anyMatch(change -> change instanceof ViewChange.RenameView);
     NameIdentifier lockIdent = ident;
     for (ViewChange change : changes) {
       if (change instanceof ViewChange.RenameView) {
@@ -228,6 +234,9 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
         nameIdentifierForLock.equals(ident) ? LockType.READ : LockType.WRITE,
         () -> {
           NameIdentifier catalogIdent = getCatalogIdentifier(ident);
+          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
+          Optional<ViewEntity> viewEntityBeforeRename =
+              isRenameView && !isManagedView ? getViewEntityBeforeRename(ident) : Optional.empty();
           View alteredView =
               doWithCatalog(
                   catalogIdent,
@@ -237,7 +246,6 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                   NoSuchViewException.class,
                   IllegalArgumentException.class);
 
-          boolean isManagedView = isManagedEntity(catalogIdent, Capability.Scope.VIEW);
           if (isManagedView) {
             return EntityCombinedView.of(alteredView)
                 .withHiddenProperties(
@@ -249,9 +257,11 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
 
           StringIdentifier stringId = getStringIdFromProperties(alteredView.properties());
           // Case 1: The view is not created by Gravitino and this view is never imported.
-          ViewEntity existing = null;
+          ViewEntity existing = viewEntityBeforeRename.orElse(null);
           if (stringId == null) {
-            existing = getEntity(ident, VIEW, ViewEntity.class);
+            if (existing == null) {
+              existing = getEntity(ident, VIEW, ViewEntity.class);
+            }
             if (existing == null) {
               return EntityCombinedView.of(alteredView)
                   .withHiddenProperties(
@@ -274,6 +284,16 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                           viewEntity -> applyChangesToEntity(viewEntity, alteredView, changes)),
                   "UPDATE",
                   viewId);
+
+          // operateOnEntity returns null if the store update fails or if the returned entity ID
+          // does not match the ID from the external catalog.
+          if (isRenameView && updatedViewEntity == null) {
+            NameIdentifier newIdent = NameIdentifier.of(ident.namespace(), alteredView.name());
+            throw new GravitinoRuntimeException(
+                "View %s was renamed to %s in the external catalog, but its registration in "
+                    + "Gravitino could not be updated consistently",
+                ident, newIdent);
+          }
 
           return EntityCombinedView.of(alteredView, updatedViewEntity)
               .withHiddenProperties(
@@ -311,20 +331,18 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
             return droppedFromCatalog;
           }
 
-          // For unmanaged view, it could happen that the view:
-          // 1. Is not found in the catalog (dropped directly from underlying sources)
-          // 2. Is found in the catalog but not in the store (not managed by Gravitino)
-          // 3. Is found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the view from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, VIEW);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result is ambiguous: the external view may have been renamed or dropped out of
+          // band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+          // registration that requires separate cleanup.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, VIEW);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The view to be dropped does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
           // Run unconditionally: an out-of-band drop may have left orphaned schema entities. The
           // cleanup is best-effort and stops as soon as a schema still exists.
@@ -428,6 +446,17 @@ public class ViewOperationDispatcher extends OperationDispatcher implements View
                 catalogIdent,
                 HasPropertyMetadata::tablePropertiesMetadata,
                 catalogView.properties()));
+  }
+
+  private Optional<ViewEntity> getViewEntityBeforeRename(NameIdentifier ident) {
+    try {
+      return Optional.of(store.get(ident, VIEW, ViewEntity.class));
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    } catch (Exception e) {
+      throw new GravitinoRuntimeException(
+          e, "Failed to read the stored registration for view %s before renaming it", ident);
+    }
   }
 
   private EntityCombinedView internalLoadView(NameIdentifier ident) throws NoSuchViewException {
