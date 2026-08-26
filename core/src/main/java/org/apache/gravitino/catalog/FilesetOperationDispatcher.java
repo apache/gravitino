@@ -385,7 +385,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
    */
   private Pair<FilesetChange[], List<SecretMaterial>> prepareFilesetSecretChanges(
       @Nullable Map<String, String> currentProperties, long entityId, FilesetChange... changes) {
-    Map<String, String> working =
+    Map<String, String> properties =
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
     List<FilesetChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
@@ -395,23 +395,23 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
           FilesetChange.SetSecretBinding c = (FilesetChange.SetSecretBinding) change;
           String urn =
               secretManager.alterSetSecretBinding(
-                  working, "fileset", entityId, c.getProperty(), c.getBinding(), written);
+                  properties, "fileset", entityId, c.getProperty(), c.getBinding(), written);
           out.add(FilesetChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof FilesetChange.SetSecretReference) {
           FilesetChange.SetSecretReference c = (FilesetChange.SetSecretReference) change;
           String urn =
               secretManager.alterSetSecretReference(
-                  working, "fileset", entityId, c.getProperty(), c.getReference());
+                  properties, "fileset", entityId, c.getProperty(), c.getReference());
           out.add(FilesetChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof FilesetChange.SetProperty) {
           FilesetChange.SetProperty c = (FilesetChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  working, "fileset", entityId, c.getProperty(), c.getValue());
+                  properties, "fileset", entityId, c.getProperty(), c.getValue());
           out.add(FilesetChange.setProperty(c.getProperty(), value));
         } else if (change instanceof FilesetChange.RemoveProperty) {
           FilesetChange.RemoveProperty c = (FilesetChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(working, "fileset", entityId, c.getProperty());
+          secretManager.alterRemoveProperty(properties, "fileset", entityId, c.getProperty());
           out.add(change);
         } else {
           out.add(change);
