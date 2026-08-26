@@ -178,13 +178,10 @@ public class GravitinoConnectorPluginManager {
 
   private void loadPluginWithUrls(List<URL> urls, String pluginName) {
     try {
-      Constructor<?> constructor =
-          pluginLoaderClass.getConstructor(String.class, List.class, ClassLoader.class, List.class);
       // The classloader name will use to serialize the Handle object
       String classLoaderName = PLUGIN_NAME_PREFIX + pluginName;
       // Load Trino SPI package and other dependencies refer to io.trino.server.PluginClassLoader
-      Object pluginClassLoader =
-          constructor.newInstance(classLoaderName, urls, appClassloader, PARENT_FIRST_PACKAGES);
+      Object pluginClassLoader = newPluginClassLoader(classLoaderName, urls, PARENT_FIRST_PACKAGES);
 
       ServiceLoader<Plugin> serviceLoader =
           ServiceLoader.load(Plugin.class, (ClassLoader) pluginClassLoader);
@@ -204,6 +201,28 @@ public class GravitinoConnectorPluginManager {
     } catch (Exception e) {
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Failed to load Plugin " + pluginName, e);
+    }
+  }
+
+  /**
+   * Instantiates a Trino {@code PluginClassLoader} across supported Trino versions. Trino 435-481
+   * expose {@code PluginClassLoader(String, List<URL>, ClassLoader, List<String> spiPackages)};
+   * Trino 482 added a second package-category list, {@code PluginClassLoader(String, List<URL>,
+   * ClassLoader, List<String> spiPackages, List<String> spiModules)}. The two constructors are
+   * probed in order so the shared source works against every Trino runtime; on Trino 482+ the
+   * second list is empty, matching the earlier single-list behavior.
+   */
+  private Object newPluginClassLoader(
+      String classLoaderName, List<URL> urls, List<String> spiPackages) throws Exception {
+    try {
+      Constructor<?> constructor =
+          pluginLoaderClass.getConstructor(String.class, List.class, ClassLoader.class, List.class);
+      return constructor.newInstance(classLoaderName, urls, appClassloader, spiPackages);
+    } catch (NoSuchMethodException ignored) {
+      Constructor<?> constructor =
+          pluginLoaderClass.getConstructor(
+              String.class, List.class, ClassLoader.class, List.class, List.class);
+      return constructor.newInstance(classLoaderName, urls, appClassloader, spiPackages, List.of());
     }
   }
 

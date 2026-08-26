@@ -47,8 +47,8 @@ import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.type.StandardTypes;
 import io.trino.spi.type.Type;
+import io.trino.spi.type.TypeId;
 import io.trino.spi.type.TypeManager;
-import io.trino.spi.type.TypeSignature;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.util.Collections;
@@ -82,7 +82,10 @@ public class JsonCodec {
       ClassLoader appClassLoader =
           GravitinoConnectorPluginManager.instance(classLoader).getAppClassloader();
       TypeManager typeManager = createTypeManager(appClassLoader);
-      return typeManager.getType(new TypeSignature(StandardTypes.JSON));
+      // Resolve the JSON type via TypeId, which is available across all supported Trino versions.
+      // Trino 482 removed io.trino.spi.type.TypeSignature and the getType(TypeSignature) overload,
+      // so the previous TypeSignature-based lookup no longer compiles.
+      return typeManager.getType(TypeId.of(StandardTypes.JSON));
     } catch (Exception e) {
       throw new TrinoException(GRAVITINO_RUNTIME_ERROR, "Failed to build JsonType", e);
     }
@@ -345,9 +348,10 @@ public class JsonCodec {
 
       // Type serialization for plugin classes
       module.addDeserializer(Type.class, new TypeDeserializer(typeManager));
-      module.addDeserializer(
-          TypeSignature.class,
-          new TypeSignatureDeserializer(typeManager.getClass().getClassLoader()));
+      // Trino 482 removed io.trino.spi.type.TypeSignature; only register its deserializer on the
+      // versions that still expose the class, resolved reflectively so the shared source compiles
+      // against every supported Trino SPI.
+      registerTypeSignatureDeserializer(module, typeManager.getClass().getClassLoader());
 
       // Block serialization for plugin classes
       BlockEncodingSerde blockEncodingSerde = createBlockEncodingSerde(typeManager);
@@ -359,6 +363,20 @@ public class JsonCodec {
     } catch (Exception e) {
       throw new RuntimeException("Failed to create JsonMapper:" + e.getMessage(), e);
     }
+  }
+
+  @SuppressWarnings({"unchecked", "rawtypes"})
+  private static void registerTypeSignatureDeserializer(
+      SimpleModule module, ClassLoader classLoader) {
+    Class<?> typeSignatureClass;
+    try {
+      typeSignatureClass = classLoader.loadClass("io.trino.spi.type.TypeSignature");
+    } catch (ClassNotFoundException e) {
+      // Trino 482+ no longer exposes TypeSignature, so there is nothing to deserialize.
+      LOG.debug("TypeSignature not present on the Trino SPI; skipping its deserializer");
+      return;
+    }
+    module.addDeserializer((Class) typeSignatureClass, new TypeSignatureDeserializer(classLoader));
   }
 
   /**

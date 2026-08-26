@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector;
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
 
 import io.trino.spi.TrinoException;
+import io.trino.spi.connector.ColumnHandle;
 import io.trino.spi.connector.ConnectorSession;
 import io.trino.spi.connector.ConnectorSplitManager;
 import io.trino.spi.connector.ConnectorSplitSource;
@@ -28,8 +29,20 @@ import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.Constraint;
 import io.trino.spi.connector.DynamicFilter;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
-/** This class delegates the retrieval of split data sources to optimize query performance. */
+/**
+ * This class delegates the retrieval of split data sources to optimize query performance.
+ *
+ * <p>Trino 482 changed {@code ConnectorSplitManager.getSplits} to take a {@code Set<ColumnHandle>}
+ * of dynamic-filter columns instead of a {@code DynamicFilter}. Both variants are declared here so
+ * the shared source compiles against every supported Trino SPI; Trino 435-481 dispatch to the
+ * {@code DynamicFilter} variant and Trino 482+ dispatch to the {@code Set<ColumnHandle>} variant.
+ * The outbound calls are made reflectively because each internal overload only exists on its own
+ * range of Trino versions.
+ */
 public class GravitinoSplitManager implements ConnectorSplitManager {
   private final ConnectorSplitManager internalSplitManager;
 
@@ -42,7 +55,8 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
     this.internalSplitManager = internalSplitManager;
   }
 
-  @Override
+  // Not annotated @Override: this DynamicFilter variant is the SPI method up to Trino 481 but was
+  // replaced by the Set<ColumnHandle> variant in Trino 482. Kept for Trino 435-481; dead on 482+.
   public ConnectorSplitSource getSplits(
       ConnectorTransactionHandle transaction,
       ConnectorSession session,
@@ -50,12 +64,53 @@ public class GravitinoSplitManager implements ConnectorSplitManager {
       DynamicFilter dynamicFilter,
       Constraint constraint) {
     ConnectorSplitSource splits =
-        internalSplitManager.getSplits(
-            GravitinoHandle.unWrap(transaction),
-            session,
-            GravitinoHandle.unWrap(connectorTableHandle),
-            new GravitinoDynamicFilter(dynamicFilter),
-            new GravitinoConstraint(constraint));
+        (ConnectorSplitSource)
+            SpiVersionCompat.invoke(
+                internalSplitManager,
+                "getSplits",
+                new Class<?>[] {
+                  ConnectorTransactionHandle.class,
+                  ConnectorSession.class,
+                  ConnectorTableHandle.class,
+                  DynamicFilter.class,
+                  Constraint.class
+                },
+                GravitinoHandle.unWrap(transaction),
+                session,
+                GravitinoHandle.unWrap(connectorTableHandle),
+                new GravitinoDynamicFilter(dynamicFilter),
+                new GravitinoConstraint(constraint));
+    return createSplitSource(splits);
+  }
+
+  // Not annotated @Override: this Set<ColumnHandle> variant is the SPI method from Trino 482
+  // onward;
+  // on Trino 435-481 it is an inert extra method (the DynamicFilter variant above is used instead).
+  public ConnectorSplitSource getSplits(
+      ConnectorTransactionHandle transaction,
+      ConnectorSession session,
+      ConnectorTableHandle connectorTableHandle,
+      Set<ColumnHandle> dynamicFilterColumns,
+      Constraint constraint) {
+    Set<ColumnHandle> unwrappedColumns =
+        dynamicFilterColumns.stream().map(GravitinoHandle::unWrap).collect(Collectors.toSet());
+    ConnectorSplitSource splits =
+        (ConnectorSplitSource)
+            SpiVersionCompat.invoke(
+                internalSplitManager,
+                "getSplits",
+                new Class<?>[] {
+                  ConnectorTransactionHandle.class,
+                  ConnectorSession.class,
+                  ConnectorTableHandle.class,
+                  Set.class,
+                  Constraint.class
+                },
+                GravitinoHandle.unWrap(transaction),
+                session,
+                GravitinoHandle.unWrap(connectorTableHandle),
+                unwrappedColumns,
+                new GravitinoConstraint(constraint));
     return createSplitSource(splits);
   }
 

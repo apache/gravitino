@@ -43,6 +43,18 @@ jobs:
       - name: Free up disk space
         run: dev/ci/util_free_space.sh
 
+      - name: Test Trino 483
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=483 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-482-483/build/libs
+
+      - name: Test Trino 482
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=482 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-482-483/build/libs
+
       - name: Test Trino 481
         run: |
           trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
