@@ -1263,9 +1263,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
   private static void assertPropertiesEqual(
       Map<String, String> expectedUserProps, Map<String, String> actual) {
     Map<String, String> expected = Maps.newHashMap(expectedUserProps);
-    if (actual.containsKey(StringIdentifier.ID_KEY)) {
-      expected.put(StringIdentifier.ID_KEY, HiddenPropertyMaskUtils.MASKED_VALUE);
-    }
+    expected.put(StringIdentifier.ID_KEY, HiddenPropertyMaskUtils.MASKED_VALUE);
     Assertions.assertEquals(expected, actual);
   }
 

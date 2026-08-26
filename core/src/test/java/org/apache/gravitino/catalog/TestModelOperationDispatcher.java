@@ -92,10 +92,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(modelName, registeredModel.name());
     Assertions.assertEquals("comment", registeredModel.comment());
     props.forEach((k, v) -> Assertions.assertEquals(v, registeredModel.properties().get(k)));
-    if (registeredModel.properties().containsKey(ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, registeredModel.properties().get(ID_KEY));
-    }
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, registeredModel.properties().get(ID_KEY));
 
     // Test register model with illegal property
     Map<String, String> illegalProps = ImmutableMap.of("k1", "v1", ID_KEY, "test");
@@ -175,10 +173,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
     Assertions.assertEquals("comment", linkedModelVersion.comment());
     props.forEach((k, v) -> Assertions.assertEquals(v, linkedModelVersion.properties().get(k)));
-    if (linkedModelVersion.properties().containsKey(ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, linkedModelVersion.properties().get(ID_KEY));
-    }
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, linkedModelVersion.properties().get(ID_KEY));
 
     // Test get model version with alias
     ModelVersion linkedModelVersionWithAlias =
@@ -186,11 +182,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals(0, linkedModelVersionWithAlias.version());
     Assertions.assertEquals(uris, linkedModelVersion.uris());
     Assertions.assertArrayEquals(aliases, linkedModelVersionWithAlias.aliases());
-    if (linkedModelVersionWithAlias.properties().containsKey(ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE,
-          linkedModelVersionWithAlias.properties().get(ID_KEY));
-    }
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, linkedModelVersionWithAlias.properties().get(ID_KEY));
 
     ModelVersion linkedModelVersionWithAlias2 =
         modelOperationDispatcher.getModelVersion(modelIdent, "alias2");
@@ -327,10 +320,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertArrayEquals(aliases, linkedModelVersion.aliases());
     Assertions.assertEquals("comment", linkedModelVersion.comment());
     props.forEach((k, v) -> Assertions.assertEquals(v, linkedModelVersion.properties().get(k)));
-    if (linkedModelVersion.properties().containsKey(ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, linkedModelVersion.properties().get(ID_KEY));
-    }
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, linkedModelVersion.properties().get(ID_KEY));
 
     // get uri with uri name
     Assertions.assertEquals("u1", modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n1"));
@@ -405,10 +396,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("comment", version1.comment());
     versionPropsWithoutDefaultUriName.forEach(
         (k, v) -> Assertions.assertEquals(v, version1.properties().get(k)));
-    if (version1.properties().containsKey(ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, version1.properties().get(ID_KEY));
-    }
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, version1.properties().get(ID_KEY));
 
     // get uri with uri name
     Assertions.assertEquals("u1", modelOperationDispatcher.getModelVersionUri(modelIdent, 0, "n1"));
@@ -442,10 +431,8 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("comment", version2.comment());
     versionPropsWithDefaultUriName.forEach(
         (k, v) -> Assertions.assertEquals(v, version2.properties().get(k)));
-    if (version2.properties().containsKey(ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, version2.properties().get(ID_KEY));
-    }
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, version2.properties().get(ID_KEY));
 
     // get uri with uri name
     Assertions.assertEquals("u1", modelOperationDispatcher.getModelVersionUri(modelIdent, 1, "n1"));
@@ -1315,8 +1302,6 @@ public class TestModelOperationDispatcher extends TestOperationDispatcher {
   private static void assertPropertiesContain(
       Map<String, String> expectedUserProps, Map<String, String> actual) {
     expectedUserProps.forEach((k, v) -> Assertions.assertEquals(v, actual.get(k)));
-    if (actual.containsKey(ID_KEY)) {
-      Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, actual.get(ID_KEY));
-    }
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, actual.get(ID_KEY));
   }
 }

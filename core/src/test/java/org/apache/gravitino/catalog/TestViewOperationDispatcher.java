@@ -491,10 +491,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         "comment",
         "gravitino.identifier");
 
-    if (created.properties().containsKey(ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, created.properties().get(ID_KEY));
-    }
+    Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, created.properties().get(ID_KEY));
   }
 
   @Test
