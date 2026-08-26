@@ -148,6 +148,46 @@ Gravitino catalog property names with the prefix `spark.bypass.` are passed to S
 Iceberg catalog property `cache-enabled` is setting to `false` internally and not allowed to change.
 :::
 
+## Routing Through the Gravitino Iceberg REST Server
+
+If the Gravitino server exposes an [Iceberg REST catalog](../iceberg-rest-service.md) (IRC) endpoint for the
+current metalake, the Spark connector automatically routes `hive` and `jdbc` backed Iceberg catalogs through
+that endpoint instead of talking to the Hive metastore or JDBC database directly. This has no effect on
+catalogs whose `catalog-backend` is already `rest` or `custom`.
+
+Routing through the IRC server is the only way to receive short-lived, per-table **vended credentials**
+instead of the static, long-lived secrets (JDBC password, S3/OSS access keys) that would otherwise be
+placed in the Spark Iceberg connector configuration. See [Credential vending](../security/credential-vending.md)
+for how to enable credential vending on the Gravitino server.
+
+The endpoint is discovered once, when a catalog is first initialized in a Spark session; it is not
+re-checked afterward. If the server does not expose a discoverable endpoint (for example, the `iceberg-rest`
+auxiliary service is disabled, or not configured with `catalog-config-provider=dynamic-config-provider`), the
+catalog falls back to the existing hive/jdbc translation described above.
+
+To force a specific endpoint instead of relying on auto-discovery, set:
+
+```properties
+spark.sql.gravitino.iceberg.rest-uri    http://<gravitino-host>:9001/iceberg
+```
+
+If Gravitino requires authentication on the IRC endpoint, pass the Iceberg REST client's own auth
+properties using the `spark.sql.gravitino.iceberg.rest.` prefix. For example, for Basic authentication:
+
+```properties
+spark.sql.gravitino.iceberg.rest.rest.auth.type            basic
+spark.sql.gravitino.iceberg.rest.rest.auth.basic.username  <username>
+spark.sql.gravitino.iceberg.rest.rest.auth.basic.password  <password>
+```
+
+See [Connect Spark to Iceberg REST](../iceberg-rest-engine/spark.md) for the full set of supported
+`rest.auth.*` properties and how to configure them when connecting directly to the IRC endpoint.
+
+Because vended credentials are only consumed by Iceberg's native `FileIO` implementations, make sure the
+warehouse storage jars listed under [Storage](#storage) below are on the Spark classpath; the connector
+derives `io-impl` automatically from the warehouse location's scheme (`s3`/`s3a`/`s3n`, `gs`,
+`abfs`/`abfss`/`wasb`/`wasbs`) unless `io-impl` is already set explicitly on the catalog.
+
 ## Storage
 
 Spark connector could convert storage properties in the Gravitino catalog to Spark Iceberg connector automatically, No extra configuration is needed for `S3`, `ADLS`, `OSS`, `GCS`.

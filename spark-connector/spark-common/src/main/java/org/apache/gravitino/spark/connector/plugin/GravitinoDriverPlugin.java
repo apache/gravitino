@@ -112,6 +112,7 @@ public class GravitinoDriverPlugin implements DriverPlugin {
 
     this.catalogManager =
         GravitinoCatalogManager.create(
+            metalake,
             () ->
                 createGravitinoClient(
                     gravitinoUri, metalake, conf, sc.sparkUser(), gravitinoClientConfig));

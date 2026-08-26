@@ -66,7 +66,7 @@ public class TestGravitinoGlueCatalog {
     // GravitinoGlueCatalog extends BaseCatalog which calls GravitinoCatalogManager.get()
     // in its constructor, so we must initialize the manager first.
     GravitinoClient mockClient = mock(GravitinoClient.class);
-    GravitinoCatalogManager.create(() -> mockClient);
+    GravitinoCatalogManager.create("test_metalake", () -> mockClient);
   }
 
   @AfterAll
