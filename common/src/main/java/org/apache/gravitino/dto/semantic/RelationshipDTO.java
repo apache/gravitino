@@ -22,7 +22,6 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -35,8 +34,6 @@ import org.apache.gravitino.semantic.Relationship;
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class RelationshipDTO {
 
@@ -49,19 +46,68 @@ public class RelationshipDTO {
   @JsonProperty("to")
   private String to;
 
-  @JsonProperty("from_columns")
+  @JsonProperty("fromColumns")
+  @Getter(AccessLevel.NONE)
   private String[] fromColumns;
 
-  @JsonProperty("to_columns")
+  @JsonProperty("toColumns")
+  @Getter(AccessLevel.NONE)
   private String[] toColumns;
 
   @Nullable
-  @JsonProperty("ai_context")
+  @JsonProperty("aiContext")
   private AIContextDTO aiContext;
 
   @Nullable
-  @JsonProperty("custom_extensions")
+  @JsonProperty("customExtensions")
+  @Getter(AccessLevel.NONE)
   private CustomExtensionDTO[] customExtensions;
+
+  @Builder(setterPrefix = "with")
+  private RelationshipDTO(
+      String name,
+      String from,
+      String to,
+      String[] fromColumns,
+      String[] toColumns,
+      @Nullable AIContextDTO aiContext,
+      @Nullable CustomExtensionDTO[] customExtensions) {
+    this.name = name;
+    this.from = from;
+    this.to = to;
+    this.fromColumns = SemanticDTOUtils.copyArray(fromColumns);
+    this.toColumns = SemanticDTOUtils.copyArray(toColumns);
+    this.aiContext = aiContext;
+    this.customExtensions = SemanticDTOUtils.copyArray(customExtensions);
+  }
+
+  /**
+   * Returns the source columns.
+   *
+   * @return A defensive copy of the source columns.
+   */
+  public String[] getFromColumns() {
+    return SemanticDTOUtils.copyArray(fromColumns);
+  }
+
+  /**
+   * Returns the target columns.
+   *
+   * @return A defensive copy of the target columns.
+   */
+  public String[] getToColumns() {
+    return SemanticDTOUtils.copyArray(toColumns);
+  }
+
+  /**
+   * Returns the custom extensions associated with the relationship.
+   *
+   * @return A defensive copy of the custom extensions, or {@code null} when not provided.
+   */
+  @Nullable
+  public CustomExtensionDTO[] getCustomExtensions() {
+    return SemanticDTOUtils.copyArray(customExtensions);
+  }
 
   /**
    * Creates a relationship DTO from an API model.
@@ -77,7 +123,7 @@ public class RelationshipDTO {
         .withTo(relationship.to())
         .withFromColumns(relationship.fromColumns())
         .withToColumns(relationship.toColumns())
-        .withAIContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
+        .withAiContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
         .withCustomExtensions(
             SemanticDTOUtils.convertArray(
                 relationship.customExtensions(),
@@ -115,7 +161,7 @@ public class RelationshipDTO {
      * @param aiContext The AI context DTO.
      * @return This builder.
      */
-    public RelationshipDTOBuilder withAIContext(@Nullable AIContextDTO aiContext) {
+    public RelationshipDTOBuilder withAiContext(@Nullable AIContextDTO aiContext) {
       this.aiContext = aiContext;
       return this;
     }

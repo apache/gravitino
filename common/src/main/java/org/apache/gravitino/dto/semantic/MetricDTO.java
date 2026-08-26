@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -38,8 +37,6 @@ import org.apache.gravitino.semantic.Metric;
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class MetricDTO {
 
@@ -60,12 +57,39 @@ public class MetricDTO {
   private DataType datatype;
 
   @Nullable
-  @JsonProperty("ai_context")
+  @JsonProperty("aiContext")
   private AIContextDTO aiContext;
 
   @Nullable
-  @JsonProperty("custom_extensions")
+  @JsonProperty("customExtensions")
+  @Getter(AccessLevel.NONE)
   private CustomExtensionDTO[] customExtensions;
+
+  @Builder(setterPrefix = "with")
+  private MetricDTO(
+      String name,
+      ExpressionDTO expression,
+      @Nullable String description,
+      @Nullable DataType datatype,
+      @Nullable AIContextDTO aiContext,
+      @Nullable CustomExtensionDTO[] customExtensions) {
+    this.name = name;
+    this.expression = expression;
+    this.description = description;
+    this.datatype = datatype;
+    this.aiContext = aiContext;
+    this.customExtensions = SemanticDTOUtils.copyArray(customExtensions);
+  }
+
+  /**
+   * Returns the custom extensions associated with the metric.
+   *
+   * @return A defensive copy of the custom extensions, or {@code null} when not provided.
+   */
+  @Nullable
+  public CustomExtensionDTO[] getCustomExtensions() {
+    return SemanticDTOUtils.copyArray(customExtensions);
+  }
 
   /**
    * Creates a metric DTO from an API model.
@@ -80,7 +104,7 @@ public class MetricDTO {
         .withExpression(ExpressionDTO.fromExpression(metric.expression()))
         .withDescription(metric.description())
         .withDatatype(metric.datatype())
-        .withAIContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
+        .withAiContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
         .withCustomExtensions(
             SemanticDTOUtils.convertArray(
                 metric.customExtensions(),
@@ -117,7 +141,7 @@ public class MetricDTO {
      * @param aiContext The AI context DTO.
      * @return This builder.
      */
-    public MetricDTOBuilder withAIContext(@Nullable AIContextDTO aiContext) {
+    public MetricDTOBuilder withAiContext(@Nullable AIContextDTO aiContext) {
       this.aiContext = aiContext;
       return this;
     }

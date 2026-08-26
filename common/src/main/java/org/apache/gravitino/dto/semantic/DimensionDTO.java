@@ -39,7 +39,7 @@ import org.apache.gravitino.semantic.Dimension;
 public class DimensionDTO {
 
   @Nullable
-  @JsonProperty("is_time")
+  @JsonProperty("isTime")
   private Boolean isTime;
 
   /**

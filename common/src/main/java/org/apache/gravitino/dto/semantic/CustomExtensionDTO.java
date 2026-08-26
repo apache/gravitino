@@ -37,7 +37,7 @@ import org.apache.gravitino.semantic.CustomExtension;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class CustomExtensionDTO {
 
-  @JsonProperty("vendor_name")
+  @JsonProperty("vendorName")
   private String vendorName;
 
   @JsonProperty("data")

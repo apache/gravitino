@@ -37,7 +37,6 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -48,8 +47,6 @@ import org.apache.gravitino.semantic.AIContextObject;
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({"instructions", "synonyms", "examples"})
 @JsonDeserialize(using = AIContextObjectDTO.Deserializer.class)
@@ -61,16 +58,57 @@ public class AIContextObjectDTO {
 
   @Nullable
   @JsonProperty("synonyms")
+  @Getter(AccessLevel.NONE)
   private String[] synonyms;
 
   @Nullable
   @JsonProperty("examples")
+  @Getter(AccessLevel.NONE)
   private String[] examples;
 
   @JsonIgnore
   @Getter(AccessLevel.NONE)
-  @Builder.Default
   private Map<String, Object> additionalProperties = new LinkedHashMap<>();
+
+  @Builder(setterPrefix = "with")
+  private AIContextObjectDTO(
+      @Nullable String instructions,
+      @Nullable String[] synonyms,
+      @Nullable String[] examples,
+      @Nullable Map<String, Object> additionalProperties) {
+    AIContextObject normalized =
+        AIContextObject.builder()
+            .withInstructions(instructions)
+            .withSynonyms(synonyms)
+            .withExamples(examples)
+            .withAdditionalProperties(
+                additionalProperties == null ? Collections.emptyMap() : additionalProperties)
+            .build();
+    this.instructions = normalized.instructions();
+    this.synonyms = normalized.synonyms();
+    this.examples = normalized.examples();
+    this.additionalProperties = normalized.additionalProperties();
+  }
+
+  /**
+   * Returns alternative names and terms.
+   *
+   * @return A defensive copy of the synonyms, or {@code null} when not provided.
+   */
+  @Nullable
+  public String[] getSynonyms() {
+    return SemanticDTOUtils.copyArray(synonyms);
+  }
+
+  /**
+   * Returns sample questions or use cases.
+   *
+   * @return A defensive copy of the examples, or {@code null} when not provided.
+   */
+  @Nullable
+  public String[] getExamples() {
+    return SemanticDTOUtils.copyArray(examples);
+  }
 
   /**
    * Creates a structured AI context DTO from an API model.
@@ -105,7 +143,9 @@ public class AIContextObjectDTO {
   /**
    * Returns unknown AI-context properties in their input order.
    *
-   * @return The additional properties.
+   * <p>The returned map and all nested maps and lists are unmodifiable.
+   *
+   * @return The deeply immutable additional properties.
    */
   @JsonAnyGetter
   public Map<String, Object> getAdditionalProperties() {
@@ -119,7 +159,8 @@ public class AIContextObjectDTO {
     public AIContextObjectDTO deserialize(JsonParser parser, DeserializationContext context)
         throws IOException {
       if (!parser.hasToken(JsonToken.START_OBJECT)) {
-        throw JsonMappingException.from(parser, "Structured AI context must be an object");
+        throw JsonMappingException.from(
+            parser, "Structured AI context must be an object, but found " + parser.currentToken());
       }
 
       String instructions = null;
@@ -128,22 +169,23 @@ public class AIContextObjectDTO {
       Map<String, Object> additionalProperties = new LinkedHashMap<>();
       while (parser.nextToken() != JsonToken.END_OBJECT) {
         if (!parser.hasToken(JsonToken.FIELD_NAME)) {
-          throw JsonMappingException.from(parser, "Expected an AI context property name");
+          throw JsonMappingException.from(
+              parser, "Expected an AI context property name, but found " + parser.currentToken());
         }
         String name = parser.currentName();
         JsonToken valueToken = parser.nextToken();
         switch (name) {
           case "instructions":
-            instructions = readString(parser, valueToken, name);
+            instructions = readNullableString(parser, valueToken, name);
             break;
           case "synonyms":
-            synonyms = readStringArray(parser, valueToken, name);
+            synonyms = readNullableStringArray(parser, valueToken, name);
             break;
           case "examples":
-            examples = readStringArray(parser, valueToken, name);
+            examples = readNullableStringArray(parser, valueToken, name);
             break;
           default:
-            additionalProperties.put(name, readJsonValue(parser, valueToken));
+            additionalProperties.put(name, SemanticDTOUtils.readJsonValue(parser, valueToken));
         }
       }
 
@@ -155,68 +197,37 @@ public class AIContextObjectDTO {
           .build();
     }
 
-    private static String readString(JsonParser parser, JsonToken token, String name)
+    @Nullable
+    private static String readNullableString(JsonParser parser, JsonToken token, String name)
         throws IOException {
-      if (token != JsonToken.VALUE_STRING) {
-        throw JsonMappingException.from(parser, name + " must be a string");
+      if (token == JsonToken.VALUE_NULL) {
+        return null;
       }
-      return parser.getText();
+      return readRequiredString(parser, token, name);
     }
 
-    private static String[] readStringArray(JsonParser parser, JsonToken token, String name)
+    @Nullable
+    private static String[] readNullableStringArray(JsonParser parser, JsonToken token, String name)
         throws IOException {
+      if (token == JsonToken.VALUE_NULL) {
+        return null;
+      }
       if (token != JsonToken.START_ARRAY) {
         throw JsonMappingException.from(parser, name + " must be an array of strings");
       }
       List<String> values = new ArrayList<>();
       while (parser.nextToken() != JsonToken.END_ARRAY) {
-        values.add(readString(parser, parser.currentToken(), name));
+        values.add(readRequiredString(parser, parser.currentToken(), name));
       }
       return values.toArray(new String[0]);
     }
 
-    @Nullable
-    private static Object readJsonValue(JsonParser parser, JsonToken token) throws IOException {
-      switch (token) {
-        case VALUE_NULL:
-          return null;
-        case VALUE_STRING:
-          return parser.getText();
-        case VALUE_TRUE:
-          return Boolean.TRUE;
-        case VALUE_FALSE:
-          return Boolean.FALSE;
-        case VALUE_NUMBER_INT:
-          return parser.getBigIntegerValue();
-        case VALUE_NUMBER_FLOAT:
-          return parser.getDecimalValue();
-        case START_OBJECT:
-          return readJsonObject(parser);
-        case START_ARRAY:
-          return readJsonArray(parser);
-        default:
-          throw JsonMappingException.from(parser, "Unsupported AI context JSON token: " + token);
+    private static String readRequiredString(JsonParser parser, JsonToken token, String name)
+        throws IOException {
+      if (token != JsonToken.VALUE_STRING) {
+        throw JsonMappingException.from(parser, name + " must be a string");
       }
-    }
-
-    private static Map<String, Object> readJsonObject(JsonParser parser) throws IOException {
-      Map<String, Object> values = new LinkedHashMap<>();
-      while (parser.nextToken() != JsonToken.END_OBJECT) {
-        if (!parser.hasToken(JsonToken.FIELD_NAME)) {
-          throw JsonMappingException.from(parser, "Expected an AI context object property name");
-        }
-        String name = parser.currentName();
-        values.put(name, readJsonValue(parser, parser.nextToken()));
-      }
-      return values;
-    }
-
-    private static List<Object> readJsonArray(JsonParser parser) throws IOException {
-      List<Object> values = new ArrayList<>();
-      while (parser.nextToken() != JsonToken.END_ARRAY) {
-        values.add(readJsonValue(parser, parser.currentToken()));
-      }
-      return values;
+      return parser.getText();
     }
   }
 }

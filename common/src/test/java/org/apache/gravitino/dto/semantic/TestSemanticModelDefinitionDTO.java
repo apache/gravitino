@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -35,6 +36,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.semantic.AIContext;
@@ -67,25 +69,40 @@ public class TestSemanticModelDefinitionDTO {
     JsonNode dataset = root.path("datasets").get(0);
     JsonNode field = dataset.path("fields").get(0);
     JsonNode relationship = root.path("relationships").get(0);
+    JsonNode metric = root.path("metrics").get(0);
 
-    assertTrue(root.has("ai_context"));
-    assertTrue(root.has("custom_extensions"));
-    assertFalse(root.has("aiContext"));
-    assertFalse(json.contains("customExtensions"));
+    assertTrue(root.has("aiContext"));
+    assertTrue(root.has("customExtensions"));
+    assertFalse(root.has("ai_context"));
+    assertFalse(root.has("custom_extensions"));
     assertEquals(List.of("sales", "mart"), stringValues(dataset.path("source").path("namespace")));
     assertEquals("orders", dataset.path("source").path("name").textValue());
-    assertTrue(dataset.has("primary_key"));
-    assertTrue(dataset.has("unique_keys"));
-    assertTrue(dataset.has("ai_context"));
+    assertTrue(dataset.has("primaryKey"));
+    assertTrue(dataset.has("uniqueKeys"));
+    assertTrue(dataset.has("aiContext"));
+    assertTrue(dataset.has("customExtensions"));
+    assertFalse(dataset.has("primary_key"));
+    assertFalse(dataset.has("unique_keys"));
+    assertFalse(dataset.has("ai_context"));
+    assertFalse(dataset.has("custom_extensions"));
     assertEquals("DateTimeTz", field.path("datatype").textValue());
-    assertTrue(field.path("dimension").path("is_time").booleanValue());
+    assertTrue(field.path("dimension").path("isTime").booleanValue());
+    assertFalse(field.path("dimension").has("is_time"));
+    assertTrue(field.has("customExtensions"));
+    assertFalse(field.has("custom_extensions"));
     assertEquals(
         "ANSI_SQL", field.path("expression").path("dialects").get(0).path("dialect").textValue());
-    assertTrue(relationship.has("from_columns"));
-    assertTrue(relationship.has("to_columns"));
-    assertEquals("example", root.path("custom_extensions").get(0).path("vendor_name").textValue());
+    assertTrue(relationship.has("fromColumns"));
+    assertTrue(relationship.has("toColumns"));
+    assertTrue(relationship.has("customExtensions"));
+    assertFalse(relationship.has("from_columns"));
+    assertFalse(relationship.has("to_columns"));
+    assertFalse(relationship.has("custom_extensions"));
+    assertTrue(metric.has("customExtensions"));
+    assertFalse(metric.has("custom_extensions"));
+    assertEquals("example", root.path("customExtensions").get(0).path("vendorName").textValue());
 
-    JsonNode aiContext = root.path("ai_context");
+    JsonNode aiContext = root.path("aiContext");
     assertEquals(
         List.of(
             "instructions", "synonyms", "examples", "priority", "semantic_hints", "nullable_hint"),
@@ -134,20 +151,60 @@ public class TestSemanticModelDefinitionDTO {
             .get("alpha"));
 
     AIContextDTO converted = AIContextDTO.fromAIContext(objectContext.toAIContext());
+    String convertedJson = objectMapper.writeValueAsString(converted);
+    AIContextDTO roundTripped = objectMapper.readValue(convertedJson, AIContextDTO.class);
     assertEquals(
         List.of("first_unknown", "second_unknown", "precise"),
         new ArrayList<>(converted.getObject().getAdditionalProperties().keySet()));
     assertEquals(
         List.of("instructions", "synonyms", "first_unknown", "second_unknown", "precise"),
-        fieldNames(objectMapper.readTree(objectMapper.writeValueAsString(converted))));
+        fieldNames(objectMapper.readTree(convertedJson)));
     assertEquals(
         objectContext.getObject().getAdditionalProperties(),
         converted.getObject().getAdditionalProperties());
-    assertTrue(
-        objectMapper.writeValueAsString(converted).contains("0.123456789012345678901234567890"));
+    assertEquals(
+        new BigDecimal("0.123456789012345678901234567890"),
+        roundTripped.getObject().getAdditionalProperties().get("precise"));
 
     assertThrows(
         JsonProcessingException.class, () -> objectMapper.readValue("42", AIContextDTO.class));
+  }
+
+  @Test
+  public void testAIContextObjectExplicitNullHandling() throws JsonProcessingException {
+    AIContextDTO explicitNull =
+        objectMapper.readValue(
+            "{\"instructions\":null,\"synonyms\":null,\"examples\":null,\"unknown\":null}",
+            AIContextDTO.class);
+
+    assertNull(explicitNull.getObject().getInstructions());
+    assertNull(explicitNull.getObject().getSynonyms());
+    assertNull(explicitNull.getObject().getExamples());
+    assertTrue(explicitNull.getObject().getAdditionalProperties().containsKey("unknown"));
+    assertNull(explicitNull.getObject().getAdditionalProperties().get("unknown"));
+
+    JsonNode serialized = objectMapper.readTree(objectMapper.writeValueAsString(explicitNull));
+    assertFalse(serialized.has("instructions"));
+    assertFalse(serialized.has("synonyms"));
+    assertFalse(serialized.has("examples"));
+    assertTrue(serialized.path("unknown").isNull());
+
+    AIContextDTO emptyArrays =
+        objectMapper.readValue("{\"synonyms\":[],\"examples\":[]}", AIContextDTO.class);
+    assertArrayEquals(new String[0], emptyArrays.getObject().getSynonyms());
+    assertArrayEquals(new String[0], emptyArrays.getObject().getExamples());
+
+    JsonMappingException nullElement =
+        assertThrows(
+            JsonMappingException.class,
+            () -> objectMapper.readValue("{\"synonyms\":[null]}", AIContextDTO.class));
+    assertEquals("synonyms must be a string", nullElement.getOriginalMessage());
+
+    JsonMappingException invalidInstructions =
+        assertThrows(
+            JsonMappingException.class,
+            () -> objectMapper.readValue("{\"instructions\":42}", AIContextDTO.class));
+    assertEquals("instructions must be a string", invalidInstructions.getOriginalMessage());
   }
 
   @Test
@@ -160,10 +217,11 @@ public class TestSemanticModelDefinitionDTO {
     SemanticModelDefinition absentDefinition =
         SemanticModelDefinition.builder().withDatasets(new Dataset[] {absentDataset}).build();
     SemanticModelDefinitionDTO absent = SemanticModelDefinitionDTO.fromDefinition(absentDefinition);
-    String absentJson = objectMapper.writeValueAsString(absent);
+    JsonNode absentJson = objectMapper.readTree(objectMapper.writeValueAsString(absent));
+    JsonNode absentDatasetJson = absentJson.path("datasets").get(0);
 
-    assertFalse(absentJson.contains("fields"));
-    assertFalse(absentJson.contains("relationships"));
+    assertFalse(absentDatasetJson.has("fields"));
+    assertFalse(absentJson.has("relationships"));
     assertEquals(absentDefinition, absent.toDefinition());
 
     Dataset emptyDataset =
@@ -233,6 +291,133 @@ public class TestSemanticModelDefinitionDTO {
 
     assertThrows(
         JsonProcessingException.class, () -> objectMapper.readValue(dataset, DatasetDTO.class));
+  }
+
+  @Test
+  public void testAIContextObjectDTOIsDeeplyImmutable() {
+    String[] synonyms = {"sales"};
+    String[] examples = {"Revenue by month"};
+    List<Object> hints = new ArrayList<>();
+    hints.add("certified");
+    Map<String, Object> nested = new LinkedHashMap<>();
+    nested.put("hints", hints);
+    Map<String, Object> additionalProperties = new LinkedHashMap<>();
+    additionalProperties.put("semantic", nested);
+
+    AIContextObjectDTO dto =
+        AIContextObjectDTO.builder()
+            .withSynonyms(synonyms)
+            .withExamples(examples)
+            .withAdditionalProperties(additionalProperties)
+            .build();
+    int originalHashCode = dto.hashCode();
+
+    synonyms[0] = "changed";
+    examples[0] = "changed";
+    hints.add("changed");
+    nested.put("changed", true);
+    additionalProperties.put("changed", true);
+
+    assertArrayEquals(new String[] {"sales"}, dto.getSynonyms());
+    assertArrayEquals(new String[] {"Revenue by month"}, dto.getExamples());
+    Map<?, ?> immutableNested = (Map<?, ?>) dto.getAdditionalProperties().get("semantic");
+    List<?> immutableHints = (List<?>) immutableNested.get("hints");
+    assertEquals(List.of("certified"), immutableHints);
+    assertEquals(originalHashCode, dto.hashCode());
+
+    dto.getSynonyms()[0] = "changed";
+    dto.getExamples()[0] = "changed";
+    assertArrayEquals(new String[] {"sales"}, dto.getSynonyms());
+    assertArrayEquals(new String[] {"Revenue by month"}, dto.getExamples());
+    assertThrows(UnsupportedOperationException.class, () -> dto.getAdditionalProperties().clear());
+    assertThrows(UnsupportedOperationException.class, immutableNested::clear);
+    assertThrows(UnsupportedOperationException.class, immutableHints::clear);
+    assertEquals(originalHashCode, dto.hashCode());
+  }
+
+  @Test
+  public void testSemanticDTOArraysAreDefensivelyCopied() {
+    DialectExpressionDTO dialect =
+        DialectExpressionDTO.builder().withDialect("ANSI_SQL").withExpression("value").build();
+    DialectExpressionDTO[] dialects = {dialect};
+    ExpressionDTO expression = ExpressionDTO.builder().withDialects(dialects).build();
+
+    CustomExtensionDTO extension =
+        CustomExtensionDTO.builder().withVendorName("example").withData("{}").build();
+    CustomExtensionDTO[] fieldExtensions = {extension};
+    FieldDTO field =
+        FieldDTO.builder()
+            .withName("id")
+            .withExpression(expression)
+            .withCustomExtensions(fieldExtensions)
+            .build();
+
+    CustomExtensionDTO[] metricExtensions = {extension};
+    MetricDTO metric =
+        MetricDTO.builder()
+            .withName("count")
+            .withExpression(expression)
+            .withCustomExtensions(metricExtensions)
+            .build();
+
+    String[] fromColumns = {"customer_id"};
+    String[] toColumns = {"id"};
+    CustomExtensionDTO[] relationshipExtensions = {extension};
+    RelationshipDTO relationship =
+        RelationshipDTO.builder()
+            .withName("orders_to_customers")
+            .withFrom("orders")
+            .withTo("customers")
+            .withFromColumns(fromColumns)
+            .withToColumns(toColumns)
+            .withCustomExtensions(relationshipExtensions)
+            .build();
+
+    String[] primaryKey = {"id"};
+    String[][] uniqueKeys = {{"external_id", "source"}};
+    FieldDTO[] fields = {field};
+    CustomExtensionDTO[] datasetExtensions = {extension};
+    DatasetDTO dataset =
+        DatasetDTO.builder()
+            .withName("orders")
+            .withSource(NameIdentifier.of("sales", "orders"))
+            .withPrimaryKey(primaryKey)
+            .withUniqueKeys(uniqueKeys)
+            .withFields(fields)
+            .withCustomExtensions(datasetExtensions)
+            .build();
+
+    DatasetDTO[] datasets = {dataset};
+    RelationshipDTO[] relationships = {relationship};
+    MetricDTO[] metrics = {metric};
+    CustomExtensionDTO[] definitionExtensions = {extension};
+    SemanticModelDefinitionDTO definition =
+        SemanticModelDefinitionDTO.builder()
+            .withDatasets(datasets)
+            .withRelationships(relationships)
+            .withMetrics(metrics)
+            .withCustomExtensions(definitionExtensions)
+            .build();
+
+    assertDefensiveCopy(dialects, expression::getDialects);
+    assertDefensiveCopy(fieldExtensions, field::getCustomExtensions);
+    assertDefensiveCopy(metricExtensions, metric::getCustomExtensions);
+    assertDefensiveCopy(fromColumns, relationship::getFromColumns);
+    assertDefensiveCopy(toColumns, relationship::getToColumns);
+    assertDefensiveCopy(relationshipExtensions, relationship::getCustomExtensions);
+    assertDefensiveCopy(primaryKey, dataset::getPrimaryKey);
+    assertDefensiveCopy(fields, dataset::getFields);
+    assertDefensiveCopy(datasetExtensions, dataset::getCustomExtensions);
+    assertDefensiveCopy(datasets, definition::getDatasets);
+    assertDefensiveCopy(relationships, definition::getRelationships);
+    assertDefensiveCopy(metrics, definition::getMetrics);
+    assertDefensiveCopy(definitionExtensions, definition::getCustomExtensions);
+
+    uniqueKeys[0][0] = "changed";
+    assertArrayEquals(new String[] {"external_id", "source"}, dataset.getUniqueKeys()[0]);
+    String[][] returnedUniqueKeys = dataset.getUniqueKeys();
+    returnedUniqueKeys[0][0] = "changed";
+    assertArrayEquals(new String[] {"external_id", "source"}, dataset.getUniqueKeys()[0]);
   }
 
   private static SemanticModelDefinition definition() {
@@ -333,6 +518,16 @@ public class TestSemanticModelDefinitionDTO {
                   .build()
             })
         .build();
+  }
+
+  private static <T> void assertDefensiveCopy(T[] source, Supplier<T[]> getter) {
+    T expected = source[0];
+    source[0] = null;
+    assertEquals(expected, getter.get()[0]);
+
+    T[] returned = getter.get();
+    returned[0] = null;
+    assertEquals(expected, getter.get()[0]);
   }
 
   private static List<String> fieldNames(JsonNode object) {

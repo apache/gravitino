@@ -23,7 +23,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -39,30 +38,85 @@ import org.apache.gravitino.semantic.SemanticModelDefinition;
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
 @JsonInclude(JsonInclude.Include.NON_NULL)
-@JsonPropertyOrder({"ai_context", "datasets", "relationships", "metrics", "custom_extensions"})
+@JsonPropertyOrder({"aiContext", "datasets", "relationships", "metrics", "customExtensions"})
 public class SemanticModelDefinitionDTO {
 
   @Nullable
-  @JsonProperty("ai_context")
+  @JsonProperty("aiContext")
   private AIContextDTO aiContext;
 
   @JsonProperty("datasets")
+  @Getter(AccessLevel.NONE)
   private DatasetDTO[] datasets;
 
   @Nullable
   @JsonProperty("relationships")
+  @Getter(AccessLevel.NONE)
   private RelationshipDTO[] relationships;
 
   @Nullable
   @JsonProperty("metrics")
+  @Getter(AccessLevel.NONE)
   private MetricDTO[] metrics;
 
   @Nullable
-  @JsonProperty("custom_extensions")
+  @JsonProperty("customExtensions")
+  @Getter(AccessLevel.NONE)
   private CustomExtensionDTO[] customExtensions;
+
+  @Builder(setterPrefix = "with")
+  private SemanticModelDefinitionDTO(
+      @Nullable AIContextDTO aiContext,
+      DatasetDTO[] datasets,
+      @Nullable RelationshipDTO[] relationships,
+      @Nullable MetricDTO[] metrics,
+      @Nullable CustomExtensionDTO[] customExtensions) {
+    this.aiContext = aiContext;
+    this.datasets = SemanticDTOUtils.copyArray(datasets);
+    this.relationships = SemanticDTOUtils.copyArray(relationships);
+    this.metrics = SemanticDTOUtils.copyArray(metrics);
+    this.customExtensions = SemanticDTOUtils.copyArray(customExtensions);
+  }
+
+  /**
+   * Returns the datasets in this definition.
+   *
+   * @return A defensive copy of the datasets.
+   */
+  public DatasetDTO[] getDatasets() {
+    return SemanticDTOUtils.copyArray(datasets);
+  }
+
+  /**
+   * Returns the relationships in this definition.
+   *
+   * @return A defensive copy of the relationships, or {@code null} when not provided.
+   */
+  @Nullable
+  public RelationshipDTO[] getRelationships() {
+    return SemanticDTOUtils.copyArray(relationships);
+  }
+
+  /**
+   * Returns the metrics in this definition.
+   *
+   * @return A defensive copy of the metrics, or {@code null} when not provided.
+   */
+  @Nullable
+  public MetricDTO[] getMetrics() {
+    return SemanticDTOUtils.copyArray(metrics);
+  }
+
+  /**
+   * Returns the custom extensions associated with this definition.
+   *
+   * @return A defensive copy of the custom extensions, or {@code null} when not provided.
+   */
+  @Nullable
+  public CustomExtensionDTO[] getCustomExtensions() {
+    return SemanticDTOUtils.copyArray(customExtensions);
+  }
 
   /**
    * Creates a persistence DTO from an API Semantic Model definition.
@@ -73,7 +127,7 @@ public class SemanticModelDefinitionDTO {
   public static SemanticModelDefinitionDTO fromDefinition(SemanticModelDefinition definition) {
     AIContext sourceAIContext = definition.aiContext();
     return builder()
-        .withAIContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
+        .withAiContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
         .withDatasets(
             SemanticDTOUtils.convertArray(
                 definition.datasets(), DatasetDTO::fromDataset, DatasetDTO[]::new))
@@ -127,7 +181,7 @@ public class SemanticModelDefinitionDTO {
      * @param aiContext The AI context DTO.
      * @return This builder.
      */
-    public SemanticModelDefinitionDTOBuilder withAIContext(@Nullable AIContextDTO aiContext) {
+    public SemanticModelDefinitionDTOBuilder withAiContext(@Nullable AIContextDTO aiContext) {
       this.aiContext = aiContext;
       return this;
     }

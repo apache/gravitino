@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -40,8 +39,6 @@ import org.apache.gravitino.semantic.Field;
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class DatasetDTO {
 
@@ -54,11 +51,13 @@ public class DatasetDTO {
   private NameIdentifier source;
 
   @Nullable
-  @JsonProperty("primary_key")
+  @JsonProperty("primaryKey")
+  @Getter(AccessLevel.NONE)
   private String[] primaryKey;
 
   @Nullable
-  @JsonProperty("unique_keys")
+  @JsonProperty("uniqueKeys")
+  @Getter(AccessLevel.NONE)
   private String[][] uniqueKeys;
 
   @Nullable
@@ -66,16 +65,78 @@ public class DatasetDTO {
   private String description;
 
   @Nullable
-  @JsonProperty("ai_context")
+  @JsonProperty("aiContext")
   private AIContextDTO aiContext;
 
   @Nullable
   @JsonProperty("fields")
+  @Getter(AccessLevel.NONE)
   private FieldDTO[] fields;
 
   @Nullable
-  @JsonProperty("custom_extensions")
+  @JsonProperty("customExtensions")
+  @Getter(AccessLevel.NONE)
   private CustomExtensionDTO[] customExtensions;
+
+  @Builder(setterPrefix = "with")
+  private DatasetDTO(
+      String name,
+      NameIdentifier source,
+      @Nullable String[] primaryKey,
+      @Nullable String[][] uniqueKeys,
+      @Nullable String description,
+      @Nullable AIContextDTO aiContext,
+      @Nullable FieldDTO[] fields,
+      @Nullable CustomExtensionDTO[] customExtensions) {
+    this.name = name;
+    this.source = source;
+    this.primaryKey = SemanticDTOUtils.copyArray(primaryKey);
+    this.uniqueKeys = SemanticDTOUtils.copy2DArray(uniqueKeys);
+    this.description = description;
+    this.aiContext = aiContext;
+    this.fields = SemanticDTOUtils.copyArray(fields);
+    this.customExtensions = SemanticDTOUtils.copyArray(customExtensions);
+  }
+
+  /**
+   * Returns the primary key columns.
+   *
+   * @return A defensive copy of the primary key columns, or {@code null} when not provided.
+   */
+  @Nullable
+  public String[] getPrimaryKey() {
+    return SemanticDTOUtils.copyArray(primaryKey);
+  }
+
+  /**
+   * Returns the unique key definitions.
+   *
+   * @return A deep defensive copy of the unique keys, or {@code null} when not provided.
+   */
+  @Nullable
+  public String[][] getUniqueKeys() {
+    return SemanticDTOUtils.copy2DArray(uniqueKeys);
+  }
+
+  /**
+   * Returns the fields defined by the dataset.
+   *
+   * @return A defensive copy of the fields, or {@code null} when not provided.
+   */
+  @Nullable
+  public FieldDTO[] getFields() {
+    return SemanticDTOUtils.copyArray(fields);
+  }
+
+  /**
+   * Returns the custom extensions associated with the dataset.
+   *
+   * @return A defensive copy of the custom extensions, or {@code null} when not provided.
+   */
+  @Nullable
+  public CustomExtensionDTO[] getCustomExtensions() {
+    return SemanticDTOUtils.copyArray(customExtensions);
+  }
 
   /**
    * Creates a dataset DTO from an API model.
@@ -91,7 +152,7 @@ public class DatasetDTO {
         .withPrimaryKey(dataset.primaryKey())
         .withUniqueKeys(dataset.uniqueKeys())
         .withDescription(dataset.description())
-        .withAIContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
+        .withAiContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
         .withFields(
             SemanticDTOUtils.convertArray(dataset.fields(), FieldDTO::fromField, FieldDTO[]::new))
         .withCustomExtensions(
@@ -134,7 +195,7 @@ public class DatasetDTO {
      * @param aiContext The AI context DTO.
      * @return This builder.
      */
-    public DatasetDTOBuilder withAIContext(@Nullable AIContextDTO aiContext) {
+    public DatasetDTOBuilder withAiContext(@Nullable AIContextDTO aiContext) {
       this.aiContext = aiContext;
       return this;
     }

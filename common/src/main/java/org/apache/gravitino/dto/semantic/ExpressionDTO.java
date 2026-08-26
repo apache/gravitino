@@ -21,7 +21,6 @@ package org.apache.gravitino.dto.semantic;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -33,13 +32,26 @@ import org.apache.gravitino.semantic.Expression;
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ExpressionDTO {
 
   @JsonProperty("dialects")
+  @Getter(AccessLevel.NONE)
   private DialectExpressionDTO[] dialects;
+
+  @Builder(setterPrefix = "with")
+  private ExpressionDTO(DialectExpressionDTO[] dialects) {
+    this.dialects = SemanticDTOUtils.copyArray(dialects);
+  }
+
+  /**
+   * Returns the ordered dialect-specific expressions.
+   *
+   * @return A defensive copy of the dialect expressions.
+   */
+  public DialectExpressionDTO[] getDialects() {
+    return SemanticDTOUtils.copyArray(dialects);
+  }
 
   /**
    * Creates an expression DTO from an API model.

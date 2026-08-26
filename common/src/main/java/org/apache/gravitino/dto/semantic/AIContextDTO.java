@@ -31,6 +31,7 @@ import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import javax.annotation.Nullable;
+import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.apache.gravitino.semantic.AIContext;
@@ -45,18 +46,13 @@ public class AIContextDTO {
   @Nullable private final String text;
   @Nullable private final AIContextObjectDTO object;
 
+  @Builder(setterPrefix = "with")
   private AIContextDTO(@Nullable String text, @Nullable AIContextObjectDTO object) {
+    Preconditions.checkArgument(
+        (text == null) != (object == null),
+        "AI context must contain exactly one of text or object");
     this.text = text;
     this.object = object;
-  }
-
-  /**
-   * Creates a builder for an AI context DTO.
-   *
-   * @return A new builder.
-   */
-  public static Builder builder() {
-    return new Builder();
   }
 
   /**
@@ -83,49 +79,6 @@ public class AIContextDTO {
     }
     Preconditions.checkArgument(object != null, "AI context object must not be null");
     return AIContext.of(object.toAIContextObject());
-  }
-
-  /** Builder for {@link AIContextDTO}. */
-  public static final class Builder {
-
-    @Nullable private String text;
-    @Nullable private AIContextObjectDTO object;
-
-    private Builder() {}
-
-    /**
-     * Sets the string variant.
-     *
-     * @param text The string AI context.
-     * @return This builder.
-     */
-    public Builder withText(@Nullable String text) {
-      this.text = text;
-      return this;
-    }
-
-    /**
-     * Sets the object variant.
-     *
-     * @param object The structured AI context.
-     * @return This builder.
-     */
-    public Builder withObject(@Nullable AIContextObjectDTO object) {
-      this.object = object;
-      return this;
-    }
-
-    /**
-     * Builds an AI context DTO.
-     *
-     * @return The AI context DTO.
-     */
-    public AIContextDTO build() {
-      Preconditions.checkArgument(
-          (text == null) != (object == null),
-          "AI context must contain exactly one of text or object");
-      return new AIContextDTO(text, object);
-    }
   }
 
   /** Serializes the AI context union as its contained string or object. */

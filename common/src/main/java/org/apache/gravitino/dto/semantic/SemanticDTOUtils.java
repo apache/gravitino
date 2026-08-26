@@ -27,14 +27,38 @@ import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.semantic.DataType;
 
 final class SemanticDTOUtils {
 
   private SemanticDTOUtils() {}
+
+  @Nullable
+  static <T> T[] copyArray(@Nullable T[] values) {
+    return values == null ? null : Arrays.copyOf(values, values.length);
+  }
+
+  @Nullable
+  static <T> T[][] copy2DArray(@Nullable T[][] values) {
+    if (values == null) {
+      return null;
+    }
+
+    T[][] copied = Arrays.copyOf(values, values.length);
+    for (int index = 0; index < values.length; index++) {
+      copied[index] = copyArray(values[index]);
+    }
+    return copied;
+  }
 
   @Nullable
   static <S, T> T[] convertArray(
@@ -48,6 +72,30 @@ final class SemanticDTOUtils {
       converted[index] = values[index] == null ? null : converter.apply(values[index]);
     }
     return converted;
+  }
+
+  @Nullable
+  static Object readJsonValue(JsonParser parser, JsonToken token) throws IOException {
+    switch (token) {
+      case VALUE_NULL:
+        return null;
+      case VALUE_STRING:
+        return parser.getText();
+      case VALUE_TRUE:
+        return Boolean.TRUE;
+      case VALUE_FALSE:
+        return Boolean.FALSE;
+      case VALUE_NUMBER_INT:
+        return parser.getBigIntegerValue();
+      case VALUE_NUMBER_FLOAT:
+        return parser.getDecimalValue();
+      case START_OBJECT:
+        return readJsonObject(parser);
+      case START_ARRAY:
+        return readJsonArray(parser);
+      default:
+        throw JsonMappingException.from(parser, "Unsupported JSON token: " + token);
+    }
   }
 
   static final class DataTypeSerializer extends JsonSerializer<DataType> {
@@ -87,9 +135,35 @@ final class SemanticDTOUtils {
         case "Opaque":
           return DataType.OPAQUE;
         default:
-          throw JsonMappingException.from(parser, "Unknown Semantic Model data type: " + value);
+          throw JsonMappingException.from(
+              parser,
+              "Unknown Semantic Model data type: "
+                  + value
+                  + ". Supported values: "
+                  + supportedDataTypeNames());
       }
     }
+  }
+
+  private static Map<String, Object> readJsonObject(JsonParser parser) throws IOException {
+    Map<String, Object> values = new LinkedHashMap<>();
+    while (parser.nextToken() != JsonToken.END_OBJECT) {
+      if (!parser.hasToken(JsonToken.FIELD_NAME)) {
+        throw JsonMappingException.from(
+            parser, "Expected a JSON object property name, but found " + parser.currentToken());
+      }
+      String name = parser.currentName();
+      values.put(name, readJsonValue(parser, parser.nextToken()));
+    }
+    return values;
+  }
+
+  private static List<Object> readJsonArray(JsonParser parser) throws IOException {
+    List<Object> values = new ArrayList<>();
+    while (parser.nextToken() != JsonToken.END_ARRAY) {
+      values.add(readJsonValue(parser, parser.currentToken()));
+    }
+    return values;
   }
 
   private static String requireString(JsonParser parser, String type) throws IOException {
@@ -125,5 +199,11 @@ final class SemanticDTOUtils {
       default:
         throw new IllegalArgumentException("Unsupported Semantic Model data type: " + dataType);
     }
+  }
+
+  private static String supportedDataTypeNames() {
+    return Arrays.stream(DataType.values())
+        .map(SemanticDTOUtils::dataTypeName)
+        .collect(Collectors.joining(", "));
   }
 }

@@ -24,7 +24,6 @@ import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import javax.annotation.Nullable;
 import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -39,8 +38,6 @@ import org.apache.gravitino.semantic.Field;
 @Getter
 @EqualsAndHashCode
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
-@AllArgsConstructor(access = AccessLevel.PRIVATE)
-@Builder(setterPrefix = "with")
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class FieldDTO {
 
@@ -69,12 +66,43 @@ public class FieldDTO {
   private DataType datatype;
 
   @Nullable
-  @JsonProperty("ai_context")
+  @JsonProperty("aiContext")
   private AIContextDTO aiContext;
 
   @Nullable
-  @JsonProperty("custom_extensions")
+  @JsonProperty("customExtensions")
+  @Getter(AccessLevel.NONE)
   private CustomExtensionDTO[] customExtensions;
+
+  @Builder(setterPrefix = "with")
+  private FieldDTO(
+      String name,
+      ExpressionDTO expression,
+      @Nullable DimensionDTO dimension,
+      @Nullable String label,
+      @Nullable String description,
+      @Nullable DataType datatype,
+      @Nullable AIContextDTO aiContext,
+      @Nullable CustomExtensionDTO[] customExtensions) {
+    this.name = name;
+    this.expression = expression;
+    this.dimension = dimension;
+    this.label = label;
+    this.description = description;
+    this.datatype = datatype;
+    this.aiContext = aiContext;
+    this.customExtensions = SemanticDTOUtils.copyArray(customExtensions);
+  }
+
+  /**
+   * Returns the custom extensions associated with the field.
+   *
+   * @return A defensive copy of the custom extensions, or {@code null} when not provided.
+   */
+  @Nullable
+  public CustomExtensionDTO[] getCustomExtensions() {
+    return SemanticDTOUtils.copyArray(customExtensions);
+  }
 
   /**
    * Creates a field DTO from an API model.
@@ -92,7 +120,7 @@ public class FieldDTO {
         .withLabel(field.label())
         .withDescription(field.description())
         .withDatatype(field.datatype())
-        .withAIContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
+        .withAiContext(sourceAIContext == null ? null : AIContextDTO.fromAIContext(sourceAIContext))
         .withCustomExtensions(
             SemanticDTOUtils.convertArray(
                 field.customExtensions(),
@@ -131,7 +159,7 @@ public class FieldDTO {
      * @param aiContext The AI context DTO.
      * @return This builder.
      */
-    public FieldDTOBuilder withAIContext(@Nullable AIContextDTO aiContext) {
+    public FieldDTOBuilder withAiContext(@Nullable AIContextDTO aiContext) {
       this.aiContext = aiContext;
       return this;
     }
