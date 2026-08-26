@@ -27,6 +27,12 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -56,6 +62,8 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -203,7 +211,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withColumns(List.of(column1))
             .withAuditInfo(AUDIT_INFO)
             .build();
-    TableMetaService.getInstance().insertTable(createdTable, false);
+    backend.insert(createdTable, false);
 
     // test update table without changing schema name
     long maxIdBeforeRename = maxEntityChangeId();
@@ -216,7 +224,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withAuditInfo(AUDIT_INFO)
             .build();
     Function<TableEntity, TableEntity> updater = oldTable -> updatedTable;
-    TableMetaService.getInstance().updateTable(createdTable.nameIdentifier(), updater);
+    backend.update(createdTable.nameIdentifier(), Entity.EntityType.TABLE, updater);
 
     TableEntity retrievedTable =
         TableMetaService.getInstance().getTableByIdentifier(updatedTable.nameIdentifier());
@@ -254,9 +262,7 @@ public class TestTableMetaService extends TestJDBCBackend {
     Exception e =
         Assertions.assertThrows(
             NoSuchEntityException.class,
-            () ->
-                TableMetaService.getInstance()
-                    .updateTable(updatedTable.nameIdentifier(), updater2));
+            () -> backend.update(updatedTable.nameIdentifier(), Entity.EntityType.TABLE, updater2));
     Assertions.assertTrue(e.getMessage().contains(newSchemaName));
 
     // test update table with changing schema name to an existing schema
@@ -277,8 +283,7 @@ public class TestTableMetaService extends TestJDBCBackend {
             .withColumns(updatedTable.columns())
             .withAuditInfo(AUDIT_INFO)
             .build();
-    TableMetaService.getInstance()
-        .updateTable(updatedTable.nameIdentifier(), oldTable -> movedTable);
+    backend.update(updatedTable.nameIdentifier(), Entity.EntityType.TABLE, oldTable -> movedTable);
     Assertions.assertTrue(
         listEntityChanges(maxIdBeforeSchemaMove).stream()
             .anyMatch(
@@ -293,7 +298,7 @@ public class TestTableMetaService extends TestJDBCBackend {
                                     .toString())
                         && record.getOperateType() == OperateType.ALTER));
 
-    TableMetaService.getInstance().updateTable(movedTable.nameIdentifier(), updater2);
+    backend.update(movedTable.nameIdentifier(), Entity.EntityType.TABLE, updater2);
 
     TableEntity retrievedTable2 =
         TableMetaService.getInstance().getTableByIdentifier(updatedTable2.nameIdentifier());
@@ -305,7 +310,7 @@ public class TestTableMetaService extends TestJDBCBackend {
 
     long maxIdBeforeDelete = maxEntityChangeId();
     Assertions.assertTrue(
-        TableMetaService.getInstance().deleteTable(updatedTable2.nameIdentifier()));
+        backend.delete(updatedTable2.nameIdentifier(), Entity.EntityType.TABLE, false));
     Assertions.assertTrue(
         listEntityChanges(maxIdBeforeDelete).stream()
             .anyMatch(
@@ -319,6 +324,106 @@ public class TestTableMetaService extends TestJDBCBackend {
                                         metalakeName, catalogName, newSchemaName, "table3")
                                     .toString())
                         && record.getOperateType() == OperateType.DROP));
+  }
+
+  @TestTemplate
+  public void testMoveTableWaitsForConcurrentTargetSchemaDelete() throws Exception {
+    String sourceSchemaName = "source_schema";
+    String targetSchemaName = "target_schema";
+    createParentEntities(metalakeName, catalogName, sourceSchemaName, AUDIT_INFO);
+    SchemaEntity targetSchema =
+        createSchemaEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofSchema(metalakeName, catalogName),
+            targetSchemaName,
+            AUDIT_INFO);
+    backend.insert(targetSchema, false);
+    TableEntity table =
+        createTableEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofTable(metalakeName, catalogName, sourceSchemaName),
+            "moving_table",
+            AUDIT_INFO);
+    backend.insert(table, false);
+
+    SchemaPO observedTargetSchema =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(targetSchema.id()));
+    CountDownLatch targetDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch moveStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int deleted =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                      observedTargetSchema.getSchemaId(),
+                                      observedTargetSchema.getCurrentVersion()));
+                      Assertions.assertEquals(1, deleted);
+                      targetDeleteLocked.countDown();
+                      try {
+                        assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+    try {
+      assertTrue(targetDeleteLocked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> moveResult =
+          executor.submit(
+              () -> {
+                moveStarted.countDown();
+                try {
+                  TableEntity movedTable =
+                      TableEntity.builder()
+                          .withId(table.id())
+                          .withName(table.name())
+                          .withNamespace(
+                              NamespaceUtil.ofTable(metalakeName, catalogName, targetSchemaName))
+                          .withColumns(table.columns())
+                          .withAuditInfo(table.auditInfo())
+                          .build();
+                  backend.update(
+                      table.nameIdentifier(), Entity.EntityType.TABLE, ignored -> movedTable);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(moveStarted.await(30, TimeUnit.SECONDS));
+      // Resolving the target ID happens before the table transaction. The move must then wait on
+      // the target schema row instead of writing below a schema whose delete is about to commit.
+      assertThrows(TimeoutException.class, () -> moveResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(
+          NoSuchEntityException.class, moveResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    TableEntity unchanged =
+        TableMetaService.getInstance().getTableByIdentifier(table.nameIdentifier());
+    Assertions.assertEquals(table.namespace(), unchanged.namespace());
+    assertFalse(
+        backend.exists(
+            NameIdentifier.of(metalakeName, catalogName, targetSchemaName, table.name()),
+            Entity.EntityType.TABLE));
   }
 
   @TestTemplate

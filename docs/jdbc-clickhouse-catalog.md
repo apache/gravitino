@@ -107,7 +107,7 @@ Catalog catalog =
 </TabItem>
 </Tabs>
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for other catalog operations.
+See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for other catalog operations.
 
 ## Schema
 
@@ -161,7 +161,7 @@ Schema schema = catalog.asTableCatalog()
 </TabItem>
 </Tabs>
 
-See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more schema operations.
+See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more schema operations.
 
 ## Table
 
@@ -199,7 +199,7 @@ See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-us
 | `BOOLEAN`           | `Bool`                                 |
 | `UUID`              | `UUID`                                 |
 
-Other ClickHouse types are exposed as [External Type](./manage-relational-metadata-using-gravitino.md#external-type).
+Other ClickHouse types are exposed as [External Type](./tables-and-views.md#external-type).
 
 ### Table Properties
 

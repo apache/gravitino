@@ -137,7 +137,18 @@ public class TestIdpUserGroupManager {
   public void testAddGroup() throws IOException {
     IdpGroup group = manager.addGroup("testAddGroup");
     Assertions.assertEquals("testAddGroup", group.name());
+    Assertions.assertEquals("", group.comment());
     Assertions.assertTrue(group.usernames().isEmpty());
+
+    IdpGroup commented = manager.addGroup("testAddGroupComment", "on-call rotation");
+    Assertions.assertEquals("on-call rotation", commented.comment());
+    Assertions.assertEquals("on-call rotation", manager.getGroup("testAddGroupComment").comment());
+
+    Assertions.assertDoesNotThrow(
+        () -> manager.addGroup("testAddGroupMaxComment", "a".repeat(1024)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.addGroup("testAddGroupTooLongComment", "a".repeat(1025)));
 
     Assertions.assertThrows(AlreadyExistsException.class, () -> manager.addGroup("testAddGroup"));
   }

@@ -23,27 +23,29 @@ import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 
 /**
- * The interface for supporting getting or associating policies with a metadata object. This
- * interface will be mixed with metadata objects to provide policy operations.
+ * Interface for policy operations on a metadata object.
+ *
+ * <p>The lookup methods return policies derived from the object's effective tag assignments and
+ * matching policy-to-tag associations.
  */
 @Evolving
 public interface SupportsPolicies {
   /**
-   * @return List all the policy names for the specific object.
+   * @return The names of the policies that apply to the metadata object.
    */
   String[] listPolicies();
 
   /**
-   * @return List all the policies with details for the specific object.
+   * @return The policies that apply to the metadata object.
    */
   Policy[] listPolicyInfos();
 
   /**
-   * Get a policy by its name for the specific object.
+   * Get an applicable policy by its name for the metadata object.
    *
    * @param name The name of the policy.
    * @return The policy.
-   * @throws NoSuchPolicyException If the policy does not associate with the object.
+   * @throws NoSuchPolicyException If the policy does not apply to the object.
    */
   Policy getPolicy(String name) throws NoSuchPolicyException;
 

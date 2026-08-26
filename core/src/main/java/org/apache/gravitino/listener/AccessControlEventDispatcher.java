@@ -21,17 +21,21 @@ package org.apache.gravitino.listener;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.GroupChange;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.authorization.UserChange;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -210,6 +214,26 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+  public List<BulkItemResult<User>> addUsers(String metalake, List<UserAdd> users)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    users.forEach(
+        user -> eventBus.dispatchEvent(new AddUserPreEvent(initiator, metalake, user.name())));
+
+    try {
+      List<BulkItemResult<User>> results = dispatcher.addUsers(metalake, users);
+      results.forEach(result -> dispatchAddUserResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      users.forEach(
+          user ->
+              eventBus.dispatchEvent(new AddUserFailureEvent(initiator, metalake, e, user.name())));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -221,6 +245,26 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
       return isExists;
     } catch (Exception e) {
       eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public List<BulkItemResult<String>> removeUsers(
+      String metalake, List<String> users, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    users.forEach(
+        user -> eventBus.dispatchEvent(new RemoveUserPreEvent(initiator, metalake, user)));
+
+    try {
+      List<BulkItemResult<String>> results = dispatcher.removeUsers(metalake, users, metalakeOwner);
+      results.forEach(result -> dispatchRemoveUserResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      users.forEach(
+          user -> eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user)));
       throw e;
     }
   }
@@ -898,6 +942,27 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
           new OverridePrivilegesFailureEvent(
               initiator, metalake, e, role, securableObjectsToOverride));
       throw e;
+    }
+  }
+
+  private void dispatchAddUserResultEvent(
+      String initiator, String metalake, BulkItemResult<User> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(
+          new AddUserEvent(initiator, metalake, new UserInfo(result.value().get())));
+    } else {
+      eventBus.dispatchEvent(
+          new AddUserFailureEvent(initiator, metalake, result.error().get(), result.name()));
+    }
+  }
+
+  private void dispatchRemoveUserResultEvent(
+      String initiator, String metalake, BulkItemResult<String> result) {
+    if (result.succeeded()) {
+      eventBus.dispatchEvent(new RemoveUserEvent(initiator, metalake, result.name(), true));
+    } else {
+      eventBus.dispatchEvent(
+          new RemoveUserFailureEvent(initiator, metalake, result.error().get(), result.name()));
     }
   }
 }

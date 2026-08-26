@@ -123,10 +123,29 @@ class TestExtractPrincipal(unittest.TestCase):
             audit._extract_principal("Basic not-valid-base64!!"), "anonymous"
         )
 
-    def test_unknown_scheme_returns_anonymous(self):
+    def test_other_scheme_falls_back_to_scheme_prefix(self):
+        """A non-Basic scheme stays attributable via '<scheme>:<first-8>'."""
         self.assertEqual(
-            audit._extract_principal("Negotiate abc123"), "anonymous"
+            audit._extract_principal("Negotiate abc123"), "negotiate:abc123"
         )
+
+    def test_custom_scheme_with_multi_word_credential(self):
+        """A credential containing spaces is not treated as unparsable."""
+        self.assertEqual(
+            audit._extract_principal("Custom-Scheme key=abcdefghij, sig=xy"),
+            "custom-scheme:key=abcd",
+        )
+
+    def test_extra_space_between_scheme_and_credential(self):
+        """Repeated separators do not break Basic decoding."""
+        self.assertEqual(
+            audit._extract_principal("Basic   YWxpY2U6ZHVtbXk="), "alice"
+        )
+
+    def test_scheme_without_credential_returns_anonymous(self):
+        """A scheme with no credential has no identity to report."""
+        self.assertEqual(audit._extract_principal("Bearer"), "anonymous")
+        self.assertEqual(audit._extract_principal("Bearer   "), "anonymous")
 
 
 class TestAuditMiddlewareIntegration(unittest.TestCase):

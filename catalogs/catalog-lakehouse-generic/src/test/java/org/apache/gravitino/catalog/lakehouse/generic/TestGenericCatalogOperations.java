@@ -20,8 +20,6 @@ package org.apache.gravitino.catalog.lakehouse.generic;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
-import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION;
-import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
@@ -110,8 +108,6 @@ public class TestGenericCatalogOperations {
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
-    when(config.get(ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES)).thenReturn(10);
-    when(config.get(ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION)).thenReturn("SKIP");
     when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     Mockito.when(config.get(Configs.CACHE_ENABLED)).thenReturn(false);
@@ -154,6 +150,13 @@ public class TestGenericCatalogOperations {
     ops.close();
     store.close();
     FileUtils.deleteDirectory(new File(STORE_PATH));
+  }
+
+  @Test
+  public void testConnectionNotSupported() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ops.testConnection(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME)));
   }
 
   @Test

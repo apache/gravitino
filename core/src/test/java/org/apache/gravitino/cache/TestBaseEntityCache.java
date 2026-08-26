@@ -47,19 +47,12 @@ public class TestBaseEntityCache {
           Entity.EntityType.CATALOG,
           Entity.EntityType.SCHEMA,
           Entity.EntityType.TABLE,
-          Entity.EntityType.VIEW,
-          Entity.EntityType.COLUMN,
-          Entity.EntityType.FILESET,
           Entity.EntityType.TOPIC,
+          Entity.EntityType.VIEW,
+          Entity.EntityType.FILESET,
           Entity.EntityType.TAG,
-          Entity.EntityType.MODEL,
-          Entity.EntityType.MODEL_VERSION,
           Entity.EntityType.POLICY,
-          Entity.EntityType.TABLE_STATISTIC,
-          Entity.EntityType.JOB_TEMPLATE,
-          Entity.EntityType.JOB,
-          Entity.EntityType.AUDIT,
-          Entity.EntityType.FUNCTION);
+          Entity.EntityType.JOB);
 
   private RecordingCache cache;
 

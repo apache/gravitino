@@ -19,8 +19,14 @@
 
 package org.apache.gravitino.server.web;
 
+import static org.junit.jupiter.api.Assertions.fail;
+
+import java.io.InputStream;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.Objects;
+import javax.net.ssl.SSLHandshakeException;
 import javax.servlet.http.HttpServlet;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.rest.RESTUtils;
@@ -62,11 +68,46 @@ public final class TestTlsServerUtils {
     return port;
   }
 
+  public static int startHttpServer(JettyServer server, HttpServlet servlet, String servletPath)
+      throws Exception {
+
+    int port = RESTUtils.findAvailablePort(6000, 7000);
+
+    Config config = new Config(false) {};
+    config.set(JettyServerConfig.WEBSERVER_HTTP_PORT, port);
+
+    server.initialize(JettyServerConfig.fromConfig(config), "test", false);
+    server.start();
+    server.addServlet(servlet, servletPath);
+
+    return port;
+  }
+
   public static Path testResource(String filename) throws Exception {
-    return Path.of(
-        Objects.requireNonNull(
-                TestTlsServerUtils.class.getResource("/tls/" + filename),
-                "Missing TLS test resource: " + filename)
-            .toURI());
+    try (InputStream inputStream =
+        TestTlsServerUtils.class.getResourceAsStream("/tls/" + filename)) {
+
+      Objects.requireNonNull(inputStream, "Missing TLS test resource: " + filename);
+
+      Path tempFile = Files.createTempFile("gravitino-tls-", "-" + filename);
+      Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+      tempFile.toFile().deleteOnExit();
+
+      return tempFile;
+    }
+  }
+
+  public static void assertHandshakeFailure(Throwable throwable) {
+    Throwable current = throwable;
+
+    while (current != null) {
+      if (current instanceof SSLHandshakeException) {
+        return;
+      }
+
+      current = current.getCause();
+    }
+
+    fail("Expected an SSL handshake failure, but received: " + throwable, throwable);
   }
 }

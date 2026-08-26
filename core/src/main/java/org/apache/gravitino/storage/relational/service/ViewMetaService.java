@@ -38,14 +38,12 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.ViewPO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -108,6 +106,15 @@ public class ViewMetaService {
       ViewPO po = initializeViewPO(viewEntity, builder);
 
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the view cannot be
+          // written below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      viewEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
@@ -145,14 +152,6 @@ public class ViewMetaService {
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
-      String metalakeName = ident.namespace().level(0);
-      String catalogName = ident.namespace().level(1);
-      String schemaName = ident.namespace().level(2);
-      String oldFullName =
-          NameIdentifierUtil.ofView(metalakeName, catalogName, schemaName, oldViewPO.getViewName())
-              .toString();
-      boolean isRenamed = !Objects.equals(oldViewPO.getViewName(), newViewPO.getViewName());
-
       SessionUtils.doMultipleWithCommit(
           () ->
               SessionUtils.doWithoutCommit(
@@ -164,18 +163,6 @@ public class ViewMetaService {
                     ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO)));
             if (updateResult.get() == 0) {
               throw new RuntimeException("Failed to update the entity: " + ident);
-            }
-          },
-          () -> {
-            if (isRenamed && updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.VIEW.name(),
-                          oldFullName,
-                          OperateType.ALTER));
             }
           });
       return newEntity;
@@ -194,13 +181,7 @@ public class ViewMetaService {
       baseMetricName = "deleteViewByIdentifier")
   public boolean deleteView(NameIdentifier ident) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
-    String metalakeName = ident.namespace().level(0);
-    String catalogName = ident.namespace().level(1);
-    String schemaName = ident.namespace().level(2);
-    String viewFullName =
-        NameIdentifierUtil.ofView(metalakeName, catalogName, schemaName, viewPO.getViewName())
-            .toString();
-    return deleteView(viewPO.getViewId(), metalakeName, viewFullName);
+    return deleteView(viewPO.getViewId());
   }
 
   @Monitored(
@@ -224,7 +205,7 @@ public class ViewMetaService {
     return ops;
   }
 
-  private boolean deleteView(Long viewId, String metalakeName, String viewFullName) {
+  private boolean deleteView(Long viewId) {
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -251,18 +232,6 @@ public class ViewMetaService {
                 mapper ->
                     mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
                         viewId, MetadataObject.Type.VIEW.name()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.VIEW.name(),
-                        viewFullName,
-                        OperateType.DROP));
           }
         });
     return deleteResult.get() > 0;

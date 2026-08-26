@@ -1,63 +1,61 @@
 ---
 title: "Fileset Catalog with OSS"
 slug: "/fileset-catalog-with-oss"
-date: 2025-01-03
 keyword: "Fileset catalog OSS"
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-This document explains how to configure a Fileset catalog with Aliyun OSS (Object Storage Service) in Gravitino.
+This page shows how to store fileset data in Alibaba Cloud OSS while Gravitino manages the metadata,
+and how to read and write that data through the Gravitino Virtual File System (GVFS).
+
+Everything on this page is specific to Alibaba Cloud OSS. The fileset model itself, the properties shared by
+every storage backend, and the way properties are inherited from catalog to schema to fileset are
+described in [Fileset Catalog](./fileset-catalog.md).
+
+The examples run in order and use the same names throughout: metalake `metalake`, catalog
+`oss_catalog`, schema `oss_schema`, fileset `example_fileset`, and `http://localhost:8090` as the
+server URL. Replace them with your own values.
 
 ## Prerequisites
 
-To set up a Fileset catalog with OSS, follow these steps:
-
 1. Download the [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle) file.
-2. Place the downloaded file into the Gravitino Fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
-3. Start the Gravitino server by running the following command:
+2. Place it in the fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
+3. Start the Gravitino server:
 
 ```bash
-$ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
+${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Fileset catalog with OSS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
+The catalog automatically loads the Alibaba Cloud OSS filesystem provider once the bundle jar is on the
+classpath. The deprecated `filesystem-providers` and `default-filesystem-provider` catalog
+properties do not need to be set.
 
-## OSS Catalog Configuration
+## Alibaba Cloud OSS Properties
 
-### OSS Fileset Catalog Configuration
+These properties are needed in addition to the shared
+[catalog properties](./fileset-catalog.md#catalog-properties). The same values are also needed by
+the GVFS clients, so they are listed together here — note that the Python client spells them with
+underscores while the catalog and the Java client use hyphens.
 
-In addition to the basic configurations mentioned in [Fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with OSS:
+| Catalog and Java client | Python client           | Description                                                                                                                                                                                                                                                                                                | Required |
+|-------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `oss-endpoint`          | `oss_endpoint`          | Endpoint of the Aliyun OSS service.                                                                                                                                                                                                                                                                        | Yes      |
+| `oss-access-key-id`     | `oss_access_key_id`     | Access key of the Aliyun OSS service.                                                                                                                                                                                                                                                                      | Yes      |
+| `oss-secret-access-key` | `oss_secret_access_key` | Secret key of the Aliyun OSS service.                                                                                                                                                                                                                                                                      | Yes      |
+| `credential-providers`  | (n/a)                   | The credential provider types, separated by comma. Possible values are `oss-token`, `oss-secret-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#oss) for the extra properties each provider takes. | No       |
 
-| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Default value   | Required |
-|-------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|
-| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `oss` if it's a OSS fileset, or a comma separated string that contains `oss` like `oss,gs,s3` to support multiple kinds of fileset including `oss`.                                                                                                                                                                                                                                                                                                 | (none)          | Yes      |
-| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for OSS, if we set this value, we can omit the prefix 'oss://' in the location.                                                                                                                                                                                                                                                                  | `builtin-local` | No       |
-| `oss-endpoint`                | The endpoint of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | (none)          | Yes      |
-| `oss-access-key-id`           | The access key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | (none)          | Yes      |
-| `oss-secret-access-key`       | The secret key of the Aliyun OSS.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            | (none)          | Yes      |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `oss-token`, `oss-secret-key`. As the default authentication type is using AKSK as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like AKSK to access OSS by GVFS. Once it's set, more configuration items are needed to make it works, see [oss-credential-vending](security/credential-vending.md#oss-credentials) | (none)          | No       |
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
-:::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-aliyun-bundle`).
-:::
-
-### Schema Configuration
-
-To create a schema, refer to [Schema configurations](./fileset-catalog.md#schema-properties).
-
-### Fileset Configuration
-
-For instructions on how to create a fileset, refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
+A fileset catalog stores its data under `location`, which for Alibaba Cloud OSS looks like
+`oss://bucket/root`.
 
 ## Create the Catalog, Schema, and Fileset
 
-This section will show you how to use the Fileset catalog with OSS in Gravitino, including detailed examples.
-
-### Step 1: Create a Fileset Catalog with OSS
-
-First, you need to create a Fileset catalog for OSS. The following examples demonstrate how to create a Fileset catalog with OSS:
+### Step 1: Create the catalog
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -65,14 +63,14 @@ First, you need to create a Fileset catalog for OSS. The following examples demo
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_catalog",
+  "name": "oss_catalog",
   "type": "FILESET",
-  "comment": "This is a OSS fileset catalog",
+  "comment": "A fileset catalog backed by Alibaba Cloud OSS",
   "properties": {
     "location": "oss://bucket/root",
+    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
     "oss-access-key-id": "access_key",
-    "oss-secret-access-key": "secret_key",
-    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
+    "oss-secret-access-key": "secret_key"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -86,46 +84,44 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Map<String, String> ossProperties = ImmutableMap.<String, String>builder()
+Map<String, String> catalogProperties = ImmutableMap.<String, String>builder()
     .put("location", "oss://bucket/root")
+    .put("oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
     .put("oss-access-key-id", "access_key")
     .put("oss-secret-access-key", "secret_key")
-    .put("oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
     .build();
 
-Catalog ossCatalog = gravitinoClient.createCatalog("test_catalog",
-    Type.FILESET,
-    "This is a OSS fileset catalog",
-    ossProperties);
-// ...
-
+Catalog catalog = gravitinoClient.createCatalog("oss_catalog",
+    Catalog.Type.FILESET,
+    "A fileset catalog backed by Alibaba Cloud OSS",
+    catalogProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-oss_properties = {
+gravitino_client: GravitinoClient = GravitinoClient(
+    uri="http://localhost:8090", metalake_name="metalake")
+
+catalog_properties = {
     "location": "oss://bucket/root",
-    "oss-access-key-id": "access_key"
+    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "oss-access-key-id": "access_key",
     "oss-secret-access-key": "secret_key",
-    "oss-endpoint": "ossProperties"
 }
 
-oss_catalog = gravitino_client.create_catalog(name="test_catalog",
-                                              catalog_type=Catalog.Type.FILESET,
-                                              provider=None,
-                                              comment="This is a OSS fileset catalog",
-                                              properties=oss_properties)
+catalog = gravitino_client.create_catalog(name="oss_catalog",
+                                          catalog_type=Catalog.Type.FILESET,
+                                          provider=None,
+                                          comment="A fileset catalog backed by Alibaba Cloud OSS",
+                                          properties=catalog_properties)
 ```
 
 </TabItem>
 </Tabs>
 
-### Step 2: Create a Schema
-
-Once the Fileset catalog with OSS is created, you can create a schema inside that catalog. Below are examples of how to do this:
+### Step 2: Create the schema
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -133,50 +129,44 @@ Once the Fileset catalog with OSS is created, you can create a schema inside tha
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_schema",
-  "comment": "This is a OSS schema",
+  "name": "oss_schema",
+  "comment": "A schema in the Alibaba Cloud OSS fileset catalog",
   "properties": {
     "location": "oss://bucket/root/schema"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
+}' http://localhost:8090/api/metalakes/metalake/catalogs/oss_catalog/schemas
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
-
+Catalog catalog = gravitinoClient.loadCatalog("oss_catalog");
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
     .put("location", "oss://bucket/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema("test_schema",
-    "This is a OSS schema",
-    schemaProperties
-);
-// ...
+
+Schema schema = supportsSchemas.createSchema("oss_schema",
+    "A schema in the Alibaba Cloud OSS fileset catalog",
+    schemaProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
-catalog.as_schemas().create_schema(name="test_schema",
-                                   comment="This is a OSS schema",
+catalog: Catalog = gravitino_client.load_catalog(name="oss_catalog")
+catalog.as_schemas().create_schema(name="oss_schema",
+                                   comment="A schema in the Alibaba Cloud OSS fileset catalog",
                                    properties={"location": "oss://bucket/root/schema"})
 ```
 
 </TabItem>
 </Tabs>
 
-
-### Step 3: Create a Fileset
-
-Now that the schema is created, you can create a fileset inside it. Here’s how:
+### Step 3: Create the fileset
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -191,346 +181,368 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+}' http://localhost:8090/api/metalakes/metalake/catalogs/oss_catalog/schemas/oss_schema/filesets
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("metalake")
-    .build();
-
-Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
+Catalog catalog = gravitinoClient.loadCatalog("oss_catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
-Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
-        .put("k1", "v1")
-        .build();
+Map<String, String> filesetProperties = ImmutableMap.<String, String>builder()
+    .put("k1", "v1")
+    .build();
 
 filesetCatalog.createFileset(
-    NameIdentifier.of("test_schema", "example_fileset"),
+    NameIdentifier.of("oss_schema", "example_fileset"),
     "This is an example fileset",
     Fileset.Type.MANAGED,
     "oss://bucket/root/schema/example_fileset",
-    propertiesMap,
-);
+    filesetProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-
-catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
-catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
-                                            type=Fileset.Type.MANAGED,
-                                            comment="This is an example fileset",
-                                            storage_location="oss://bucket/root/schema/example_fileset",
-                                            properties={"k1": "v1"})
+catalog: Catalog = gravitino_client.load_catalog(name="oss_catalog")
+catalog.as_fileset_catalog().create_fileset(
+    ident=NameIdentifier.of("oss_schema", "example_fileset"),
+    type=Fileset.Type.MANAGED,
+    comment="This is an example fileset",
+    storage_location="oss://bucket/root/schema/example_fileset",
+    properties={"k1": "v1"})
 ```
 
 </TabItem>
 </Tabs>
 
-## Access a Fileset with OSS
+The fileset is now addressable as
+`gvfs://fileset/oss_catalog/oss_schema/example_fileset` from any GVFS client.
 
-### Access the Fileset with the GVFS Java Client
+## Access the Fileset
 
-To access fileset with OSS using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+### Java client jars
 
-| Configuration item      | Description                       | Default value | Required |
-|-------------------------|-----------------------------------|---------------|----------|
-| `oss-endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      |
-| `oss-access-key-id`     | The access key of the Aliyun OSS. | (none)        | Yes      |
-| `oss-secret-access-key` | The secret key of the Aliyun OSS. | (none)        | Yes      |
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Alibaba Cloud OSS filesystem implementation. Only the latter differs by
+environment:
+
+| Environment            | Jar providing the Alibaba Cloud OSS filesystem                                                                                                                                                        |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-aliyun-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle), a fat jar bundling the Alibaba Cloud OSS filesystem implementation and its dependencies |
+| Hadoop already present | `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                                           |
+
+The artifacts in full:
+
+- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle):
+  a "fat" jar that includes the `gravitino-aliyun` functionality together with every dependency it needs,
+  such as `hadoop-aliyun` and `aliyun-sdk-oss`. Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-aliyun` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
+- `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`: the
+  standard Hadoop dependencies for Alibaba Cloud OSS access, shipped with Hadoop under
+  `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself when running inside an existing
+  Hadoop environment.
+- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun):
+  a "thin" jar carrying only the Aliyun integration code. It is already contained in both jars
+  above, so it is not needed as a direct dependency unless you prefer to manage all Hadoop and
+  Aliyun dependencies yourself.
+
+```xml
+<!-- No Hadoop environment -->
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-aliyun-bundle</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+```
+
+```xml
+<!-- Existing Hadoop environment -->
+<dependency>
+  <groupId>org.apache.hadoop</groupId>
+  <artifactId>hadoop-common</artifactId>
+  <version>${HADOOP_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.hadoop</groupId>
+  <artifactId>hadoop-aliyun</artifactId>
+  <version>${HADOOP_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+```
 
 :::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
+The thin `gravitino-aliyun` jar is not needed. Its functionality is already included in both
+`gravitino-aliyun-bundle` and `gravitino-filesystem-hadoop3-runtime`.
 :::
+
+### GVFS Java client
+
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), set the Alibaba Cloud OSS
+properties from the table above.
 
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
-conf.set("fs.gravitino.client.metalake", "test_metalake");
-conf.set("oss-endpoint", "http://localhost:8090");
-conf.set("oss-access-key-id", "minio");
-conf.set("oss-secret-access-key", "minio123"); 
-Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
+conf.set("fs.gravitino.client.metalake", "metalake");
+conf.set("oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com");
+conf.set("oss-access-key-id", "access_key");
+conf.set("oss-secret-access-key", "secret_key");
+
+Path filesetPath = new Path("gvfs://fileset/oss_catalog/oss_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
-...
 ```
 
-Similar to Spark configurations, you need to add OSS (bundle) jars to the classpath according to your environment.
-If your wants to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
+### Apache Spark
 
-```xml
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-common</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-aliyun</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-```
-
-:::note
-The `gravitino-aliyun` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
-:::
-
-Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
-
-```xml
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-aliyun-bundle</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-```
-
-### Access the Fileset with Spark
-
-The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
-
-Before running the following code, you need to install required packages:
+The example below uses PySpark 3.5.0 in an environment that already has Hadoop 3.3.4.
 
 ```bash
 pip install pyspark==3.5.0
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
-Then you can run the following code:
 
 ```python
-from pyspark.sql import SparkSession
 import os
+from pyspark.sql import SparkSession
 
-gravitino_url = "http://localhost:8090"
-metalake_name = "test"
-
-catalog_name = "your_oss_catalog"
-schema_name = "your_oss_schema"
-fileset_name = "your_oss_fileset"
-
-# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
+# On JDK 17, also add:
+#   --conf "spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+#   --conf "spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    "--jars "
-    "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,"
-    "/path/to/aliyun-sdk-oss-3.13.0.jar,"
+    "--jars /path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar,"
     "/path/to/hadoop-aliyun-3.3.4.jar,"
-    "/path/to/jdom2-2.0.6 "
+    "/path/to/aliyun-sdk-oss-3.13.0.jar,"
+    "/path/to/jdom2-2.0.6.jar "
     "--master local[1] pyspark-shell"
 )
-spark = SparkSession.builder
-    .appName("oss_fileset_test")
+
+spark = (SparkSession.builder
+    .appName("oss_fileset")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
-    .config("spark.hadoop.fs.gravitino.server.uri", "${_URL}")
-    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-    .config("spark.hadoop.oss-access-key-id", os.environ["OSS_ACCESS_KEY_ID"])
-    .config("spark.hadoop.oss-secret-access-key", os.environ["OSS_SECRET_ACCESS_KEY"])
+    .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
     .config("spark.hadoop.oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
+    .config("spark.hadoop.oss-access-key-id", "access_key")
+    .config("spark.hadoop.oss-secret-access-key", "secret_key")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
-    .getOrCreate()
+    .getOrCreate())
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
-columns = ["Name", "Age"]
-spark_df = spark.createDataFrame(data, schema=columns)
-gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
+spark_df = spark.createDataFrame(data, schema=["Name", "Age"])
+gvfs_path = "gvfs://fileset/oss_catalog/oss_schema/example_fileset/people"
 
-spark_df.coalesce(1).write
-    .mode("overwrite")
-    .option("header", "true")
-    .csv(gvfs_path)
+spark_df.coalesce(1).write.mode("overwrite").option("header", "true").csv(gvfs_path)
 ```
 
-If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
+If Spark runs without a Hadoop environment, only the jar list changes:
 
 ```python
-## Replace the following code snippet with the above code snippet with the same environment variables
-
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-aliyun-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar, --master local[1] pyspark-shell"
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    "--jars /path/to/gravitino-aliyun-bundle-${gravitino-version}.jar,"
+    "/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar "
+    "--master local[1] pyspark-shell"
+)
 ```
 
-- [`gravitino-aliyun-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun-bundle): A "fat" JAR that includes `gravitino-aliyun` functionality and all necessary dependencies like `hadoop-aliyun` (3.3.1) and `aliyun-sdk-oss`. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
-- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-aliyun`. It is required for accessing Gravitino filesets.
-- `hadoop-aliyun-3.3.4.jar`, `jdom2-2.0.6.jar`, and `aliyun-sdk-oss-3.13.0.jar`: Standard Hadoop dependencies for OSS access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
-- [`gravitino-aliyun-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-aliyun): A "thin" JAR that only provides the Aliyun integration code. Its functionality is already included in the `gravitino-aliyun-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and Aliyun dependencies manually.
-
-Please choose the correct jar according to your environment.
-
 :::note
-In some Spark versions, a Hadoop environment is needed by the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
+Some Spark versions need a Hadoop environment in the driver and do not pick up filesystem
+implementations passed with `--jars`. If that happens, add the jars to the Spark classpath directly.
 :::
 
-### Access a Fileset Using the Hadoop Fs Command
+### Hadoop fs command
 
-The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
-
-1. Adding the following contents to the `${HADOOP_HOME}/etc/hadoop/core-site.xml` file:
+1. Add the following to `${HADOOP_HOME}/etc/hadoop/core-site.xml`:
 
 ```xml
-  <property>
-    <name>fs.AbstractFileSystem.gvfs.impl</name>
-    <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
-  </property>
-
-  <property>
-    <name>fs.gvfs.impl</name>
-    <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
-  </property>
-
-  <property>
-    <name>fs.gravitino.server.uri</name>
-    <value>http://localhost:8090</value>
-  </property>
-
-  <property>
-    <name>fs.gravitino.client.metalake</name>
-    <value>test</value>
-  </property>
-
-  <property>
-    <name>oss-endpoint</name>
-    <value>http://oss-cn-hangzhou.aliyuncs.com</value>
-  </property>
-
-  <property>
-    <name>oss-access-key-id</name>
-    <value>access-key</value>
-  </property>
-  
-  <property>
+<property>
+  <name>fs.AbstractFileSystem.gvfs.impl</name>
+  <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
+</property>
+<property>
+  <name>fs.gvfs.impl</name>
+  <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
+</property>
+<property>
+  <name>fs.gravitino.server.uri</name>
+  <value>http://localhost:8090</value>
+</property>
+<property>
+  <name>fs.gravitino.client.metalake</name>
+  <value>metalake</value>
+</property>
+<property>
+  <name>oss-endpoint</name>
+  <value>http://oss-cn-hangzhou.aliyuncs.com</value>
+</property>
+<property>
+  <name>oss-access-key-id</name>
+  <value>access_key</value>
+</property>
+<property>
   <name>oss-secret-access-key</name>
-    <value>secret-key</value>
-  </property>
+  <value>secret_key</value>
+</property>
 ```
 
-2. Add the necessary jars to the Hadoop classpath.
+2. Add these jars to the Hadoop classpath:
 
-For OSS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-aliyun-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to Hadoop classpath. 
+   - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
+   - `hadoop-aliyun-${hadoop-version}.jar`, `aliyun-sdk-oss-3.13.0.jar` and `jdom2-2.0.6.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
 
-3. Run the following command to access the fileset:
+3. Access the fileset:
 
 ```shell
-./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/oss_catalog/oss_schema/oss_fileset
-./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/oss_catalog/schema/oss_fileset
+${HADOOP_HOME}/bin/hadoop fs -ls gvfs://fileset/oss_catalog/oss_schema/example_fileset
+${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/oss_catalog/oss_schema/example_fileset
 ```
 
-### Access the Fileset with the GVFS Python Client
-
-To access fileset with OSS using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
-
-| Configuration item      | Description                       | Default value | Required |
-|-------------------------|-----------------------------------|---------------|----------|
-| `oss_endpoint`          | The endpoint of the Aliyun OSS.   | (none)        | Yes      |
-| `oss_access_key_id`     | The access key of the Aliyun OSS. | (none)        | Yes      |
-| `oss_secret_access_key` | The secret key of the Aliyun OSS. | (none)        | Yes      |
-
-:::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
-:::
-
-Please install the `gravitino` package before running the following code:
+### GVFS Python client
 
 ```bash
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Alibaba Cloud OSS
+properties in `options`, spelled with underscores.
+
 ```python
 from gravitino import gvfs
+
 options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "oss_endpoint": "http://localhost:8090",
-    "oss_access_key_id": "minio",
-    "oss_secret_access_key": "minio123"
+    "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
+    "oss_access_key_id": "access_key",
+    "oss_secret_access_key": "secret_key",
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
 
-fs.ls("gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/")
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
+                                     metalake_name="metalake",
+                                     options=options)
+fs.ls("gvfs://fileset/oss_catalog/oss_schema/example_fileset/")
 ```
 
+### pandas
 
-### Access the Fileset with Pandas
-
-The following are examples of how to use the pandas library to access the OSS fileset
+pandas reaches the same paths through `storage_options`. Use the `fs` instance from the preceding
+GVFS example to discover the generated Spark part file.
 
 ```python
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://mini.io:9000", 
-    "metalake_name": "test",
+    "server_uri": "http://localhost:8090",
+    "metalake_name": "metalake",
     "options": {
+        "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
         "oss_access_key_id": "access_key",
         "oss_secret_access_key": "secret_key",
-        "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com"
     }
 }
-ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}/people/part-00000-51d366e2-d5eb-448d-9109-32a96c8a14dc-c000.csv",
-                 storage_options=storage_options)
+
+csv_path = next(
+    f"gvfs://{path}"
+    for path in fs.ls(
+        "gvfs://fileset/oss_catalog/oss_schema/example_fileset/people",
+        detail=False,
+    )
+    if (
+        path.rsplit("/", 1)[-1].startswith("part-")
+        and path.endswith(".csv")
+    )
+)
+ds = pd.read_csv(csv_path, storage_options=storage_options)
 ds.head()
 ```
-For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
 
-## Fileset with Credential Vending
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
 
-Gravitino supports credential vending for OSS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access OSS fileset without providing authentication information like `oss-access-key-id` and `oss-secret-access-key` in the properties.
+## Credential Vending
 
-### Create an OSS Fileset Catalog with Credential Vending
+With credential vending the catalog holds the Alibaba Cloud OSS credentials and the Gravitino server hands
+out a credential per request, so clients never hold cloud keys of their own. See
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[OSS credentials](./security/credential-vending.md#oss) for the properties
+each provider takes.
 
-Apart from configuration method in [create-oss-fileset-catalog](#oss-fileset-catalog-configuration),
-properties needed by [oss-credential](./security/credential-vending.md#oss-credentials)
-should also be set to enable credential vending for OSS fileset. Take `oss-token` credential provider for example:
+The supported providers are `oss-token`, which vends a short-lived STS token, and
+`oss-secret-key`, which vends the static access key configured on the catalog. The example below uses
+`oss-token`.
+
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "oss-catalog-with-token",
+  "name": "oss_catalog_with_vending",
   "type": "FILESET",
-  "comment": "This is a OSS fileset catalog",
+  "comment": "A fileset catalog backed by Alibaba Cloud OSS with credential vending",
   "properties": {
     "location": "oss://bucket/root",
+    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
     "oss-access-key-id": "access_key",
     "oss-secret-access-key": "secret_key",
-    "oss-endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
     "credential-providers": "oss-token",
-    "oss-region":"oss-cn-hangzhou",
-    "oss-role-arn":"The ARN of the role to access the OSS data"
+    "oss-region": "oss-cn-hangzhou",
+    "oss-role-arn": "The ARN of the role that grants access to the OSS data"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### Access an OSS Fileset with Credential Vending
+Create the schema and fileset in the credential-vending catalog:
 
-When the catalog is configured with credentials and client-side credential vending is enabled,
-you can access OSS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "oss_schema",
+  "comment": "A schema in the Alibaba Cloud OSS credential-vending catalog",
+  "properties": {
+    "location": "oss://bucket/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/oss_catalog_with_vending/schemas
 
-GVFS Java client:
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "oss://bucket/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/oss_catalog_with_vending/schemas/oss_schema/filesets
+```
+
+The `oss-token` provider needs two more catalog properties.
+
+| Property Name  | Description                                         |
+|----------------|-----------------------------------------------------|
+| `oss-region`   | Region of the bucket, for example `oss-cn-hangzhou` |
+| `oss-role-arn` | ARN of the role that grants access to the data      |
+
+### Access without local credentials
+
+Enable vending on the client and drop the credential properties.
 
 ```java
 Configuration conf = new Configuration();
@@ -538,29 +550,34 @@ conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
-conf.set("fs.gravitino.client.metalake", "test_metalake");
-// No need to set oss-access-key-id and oss-secret-access-key
-Path filesetPath = new Path("gvfs://fileset/oss_test_catalog/test_schema/test_fileset/new_dir");
+conf.set("fs.gravitino.client.metalake", "metalake");
+// No need to set oss-access-key-id or oss-secret-access-key
+
+Path filesetPath = new Path(
+    "gvfs://fileset/oss_catalog_with_vending/oss_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
-...
 ```
 
-Spark:
-
 ```python
-spark = SparkSession.builder
-    .appName("oss_fileset_test")
+spark = (SparkSession.builder
+    .appName("oss_fileset")
     .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-    # No need to set oss-access-key-id and oss-secret-access-key
-    .config("spark.driver.memory", "2g")
-    .config("spark.driver.port", "2048")
-    .getOrCreate()
+    .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    # No need to set oss-access-key-id or oss-secret-access-key
+    .getOrCreate())
 ```
 
-Python client and Hadoop command are similar to the above examples.
-
+```python
+options = {
+    "auth_type": "simple",
+    "enable_credential_vending": True,
+    # No need to set oss-access-key-id or oss-secret-access-key
+}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
+                                     metalake_name="metalake",
+                                     options=options)
+```

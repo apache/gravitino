@@ -254,10 +254,10 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `oss-access-key-id`, and `oss-secret-access-key` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as credential-vending keys are hidden from the default load catalog response. Retrieve secret-manager-backed properties (including keys that overlap with credential vending) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) remains available for typed credential delivery.
 :::
 
 ## Schema
@@ -273,7 +273,7 @@ You could put properties except `comment`.
 
 ### Schema Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ### Hierarchical schema
 
@@ -450,7 +450,7 @@ represent an Iceberg `unknown` column in Gravitino.
 
 :::info
 Apache Iceberg doesn't support Gravitino `Varchar` `Fixedchar` `Byte` `Short` `Union` type.
-Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./manage-relational-metadata-using-gravitino.md#external-type)** that represents an unresolvable data type.
+Meanwhile, the data types other than listed above are mapped to Gravitino **[External Type](./tables-and-views.md#external-type)** that represents an unresolvable data type.
 :::
 
 ### Table Properties

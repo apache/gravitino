@@ -39,6 +39,12 @@ public class NoOpsCache extends BaseEntityCache {
 
   /** {@inheritDoc} */
   @Override
+  public Coherence coherence() {
+    return Coherence.NONE;
+  }
+
+  /** {@inheritDoc} */
+  @Override
   protected void invalidateExpiredItem(EntityCacheKey key) {
     // do nothing
   }

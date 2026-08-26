@@ -16,30 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.encryption.kms;
+package org.apache.gravitino.policy;
 
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.apache.gravitino.annotation.Evolving;
 
-/** Common contract for KMS client factories. */
-public abstract class TestKmsClientFactoryContract {
-
-  /**
-   * Returns the factory under test.
-   *
-   * @return the factory
-   */
-  protected abstract KmsClientFactory factory();
+/** A selector attached to a policy-to-tag association that restricts when it applies. */
+@Evolving
+public interface PolicyAssociationSelector {
 
   /**
-   * Returns the API expected from the factory.
+   * Returns the selector type identifier.
    *
-   * @return the expected API identifier
+   * @return The selector type.
    */
-  protected abstract String expectedApi();
-
-  @Test
-  void testReportsExpectedApi() {
-    Assertions.assertEquals(expectedApi(), factory().api());
-  }
+  String type();
 }

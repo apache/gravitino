@@ -37,11 +37,13 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.DefaultOAuth2TokenProvider;
 import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.client.GravitinoClient.ClientBuilder;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -99,6 +101,47 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
       return Optional.empty();
     }
     return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
+  }
+
+  private static Map<String, String> resolveProps(Catalog catalog) {
+    Preconditions.checkArgument(
+        "lakehouse-iceberg".equals(catalog.provider()),
+        String.format("Catalog %s is not an Iceberg catalog", catalog.name()));
+
+    // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets,
+    // then JdbcCredential overlays so credentials win.
+    if (catalog instanceof BaseCatalog) {
+      return new HashMap<>(
+          GravitinoEnv.getInstance()
+              .secretManager()
+              .toPlaintextProperties(
+                  ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
+    }
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    try {
+      SupportsSecrets supportsSecrets = catalog.supportsSecrets();
+      if (supportsSecrets != null) {
+        Map<String, String> secrets = supportsSecrets.getSecrets();
+        if (secrets != null) {
+          props.putAll(secrets);
+        }
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // Catalog does not support secret property operations.
+    }
+    if (catalog instanceof SupportsCredentials) {
+      Arrays.stream(((SupportsCredentials) catalog).getCredentials())
+          .filter(c -> c instanceof JdbcCredential)
+          .map(c -> (JdbcCredential) c)
+          .findFirst()
+          .ifPresent(
+              jdbc -> {
+                props.put(IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
+                props.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
+              });
+    }
+    return props;
   }
 
   /**
@@ -234,25 +277,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     default Map<String, String> loadCatalogProperties(String catalogName)
         throws NoSuchCatalogException {
       Catalog catalog = loadCatalog(catalogName);
-      Preconditions.checkArgument(
-          "lakehouse-iceberg".equals(catalog.provider()),
-          String.format("Catalog %s is not an Iceberg catalog", catalogName));
-
-      Map<String, String> catalogProperties = new HashMap<>(catalog.properties());
-      if (catalog instanceof SupportsCredentials) {
-        Arrays.stream(((SupportsCredentials) catalog).getCredentials())
-            .filter(c -> c instanceof JdbcCredential)
-            .map(c -> (JdbcCredential) c)
-            .findFirst()
-            .ifPresent(
-                jdbc -> {
-                  catalogProperties.putIfAbsent(
-                      IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
-                  catalogProperties.putIfAbsent(
-                      IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
-                });
-      }
-      return catalogProperties;
+      return resolveProps(catalog);
     }
 
     @Override
@@ -302,12 +327,9 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
       return catalogManager.doWithCatalog(
           catalogIdent,
           catalog -> {
-            Preconditions.checkArgument(
-                "lakehouse-iceberg".equals(catalog.provider()),
-                String.format("Catalog %s is not an Iceberg catalog", catalogName));
             // Auxiliary mode needs raw properties, including hidden credentials. Copy them while
             // the lease is held so no live BaseCatalog escapes into the caller.
-            return new HashMap<>(catalog.propertiesWithCredentialProviders());
+            return resolveProps(catalog);
           });
     }
   }
@@ -330,7 +352,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-      return getGravitinoClient().loadMetalake(metalake).loadCatalog(catalogName);
+      return getGravitinoClient().loadCatalog(catalogName);
     }
 
     @Override

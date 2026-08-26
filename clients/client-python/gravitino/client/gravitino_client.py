@@ -120,6 +120,10 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
     def disable_catalog(self, name: str):
         return self.get_metalake().disable_catalog(name)
 
+    def test_connection(self, name: str) -> None:
+        """Test an existing catalog connection using its stored configuration."""
+        self.get_metalake().test_connection(name)
+
     def list_job_templates(self) -> List[JobTemplate]:
         """Lists all job templates in the current metalake.
 
@@ -287,7 +291,7 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
         """
         return self.get_metalake().get_tag(tag_name)
 
-    def create_tag(self, tag_name, comment, properties) -> Tag:
+    def create_tag(self, tag_name, comment, properties, allowed_values=None) -> Tag:
         """
         Create a new tag under a metalake.
 
@@ -299,11 +303,14 @@ class GravitinoClient(GravitinoClientBase, SupportsJobs, TagOperations):
             tag_name (str): The name of the tag.
             comment (str): The comment of the tag.
             properties (dict[str, str]): The properties of the tag.
+            allowed_values (list[str] | None): The allowed assignment values.
 
         Returns:
             Tag: The tag information.
         """
-        return self.get_metalake().create_tag(tag_name, comment, properties)
+        return self.get_metalake().create_tag(
+            tag_name, comment, properties, allowed_values
+        )
 
     def alter_tag(self, tag_name, *changes) -> Tag:
         """

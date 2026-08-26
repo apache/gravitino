@@ -28,6 +28,7 @@ import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.authorization.OwnerEventManager;
 import org.apache.gravitino.authorization.OwnerManager;
 import org.apache.gravitino.auxiliary.AuxiliaryServiceManager;
+import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogNormalizeDispatcher;
@@ -99,6 +100,7 @@ import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
@@ -157,6 +159,8 @@ public class GravitinoEnv {
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
 
+  private SecretPropertyOperationDispatcher secretPropertyOperationDispatcher;
+
   private KmsClientRegistry kmsClientRegistry;
 
   private SecretManager secretManager;
@@ -185,6 +189,7 @@ public class GravitinoEnv {
   private EventBus eventBus;
   private OwnerDispatcher ownerDispatcher;
   private OwnerDispatcher internalOwnerDispatcher;
+  private BulkManager bulkManager;
   private FutureGrantManager futureGrantManager;
   private GravitinoAuthorizer gravitinoAuthorizer;
   private StatisticDispatcher statisticDispatcher;
@@ -426,6 +431,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the {@link SecretPropertyOperationDispatcher} associated with the Gravitino environment.
+   *
+   * @return The {@link SecretPropertyOperationDispatcher} instance.
+   */
+  public SecretPropertyOperationDispatcher secretPropertyOperationDispatcher() {
+    return secretPropertyOperationDispatcher;
+  }
+
+  /**
    * Get the metadata-only KMS client registry associated with the Gravitino environment.
    *
    * <p>The environment owns this registry. Callers may inject it into dependent components but must
@@ -524,6 +538,15 @@ public class GravitinoEnv {
    */
   public AccessControlDispatcher internalAccessControlDispatcher() {
     return internalAccessControlDispatcher;
+  }
+
+  /**
+   * Get the BulkManager associated with the Gravitino environment.
+   *
+   * @return The BulkManager instance.
+   */
+  public BulkManager bulkManager() {
+    return bulkManager;
   }
 
   /**
@@ -745,6 +768,10 @@ public class GravitinoEnv {
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
+    this.secretPropertyOperationDispatcher =
+        new SecretPropertyOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager);
+
     SchemaOperationDispatcher schemaOperationDispatcher =
         new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
     this.internalSchemaDispatcher = schemaOperationDispatcher;
@@ -858,12 +885,14 @@ public class GravitinoEnv {
       OwnerDispatcher ownerManager = new OwnerManager(entityStore);
       this.internalOwnerDispatcher = ownerManager;
       this.ownerDispatcher = new OwnerEventManager(eventBus, ownerManager);
+      this.bulkManager = new BulkManager(config);
       this.futureGrantManager = new FutureGrantManager(entityStore, ownerManager);
     } else {
       this.accessControlDispatcher = null;
       this.internalAccessControlDispatcher = null;
       this.ownerDispatcher = null;
       this.internalOwnerDispatcher = null;
+      this.bulkManager = null;
       this.futureGrantManager = null;
     }
 

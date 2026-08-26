@@ -106,6 +106,12 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
         break;
 
       case 2:
+        // A schema has no child namespaces, only tables, so the result is always empty. The
+        // identifier still has to be validated, otherwise a nonexistent path would be reported
+        // as an existing but empty namespace.
+        Catalog schemaCatalog =
+            namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
+        validateSchemaExists(schemaCatalog, nsId.levelAtListPos(1));
         namespaces = Lists.newArrayList();
         break;
 
@@ -136,12 +142,13 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     switch (nsId.levels()) {
       case 1:
-        Optional.ofNullable(catalog.properties()).ifPresent(properties::putAll);
+        Optional.ofNullable(namespaceWrapper.propsWithSecrets(catalog))
+            .ifPresent(properties::putAll);
         break;
       case 2:
         String schemaName = nsId.levelAtListPos(1);
-        Schema schema = namespaceWrapper.loadSchema(catalog, schemaName);
-        Optional.ofNullable(schema.properties()).ifPresent(properties::putAll);
+        Optional.ofNullable(namespaceWrapper.schemaPropsWithSecrets(catalog, schemaName))
+            .ifPresent(properties::putAll);
         break;
       default:
         throw new IllegalArgumentException(
@@ -215,11 +222,14 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
 
     Catalog catalog = namespaceWrapper.loadAndValidateLakehouseCatalog(nsId.levelAtListPos(0));
     if (nsId.levels() == 2) {
-      String schemaName = nsId.levelAtListPos(1);
-      if (!namespaceWrapper.schemaExists(catalog, schemaName)) {
-        throw new NamespaceNotFoundException(
-            "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
-      }
+      validateSchemaExists(catalog, nsId.levelAtListPos(1));
+    }
+  }
+
+  private void validateSchemaExists(Catalog catalog, String schemaName) {
+    if (!namespaceWrapper.schemaExists(catalog, schemaName)) {
+      throw new NamespaceNotFoundException(
+          "Schema not found: " + schemaName, CommonUtil.formatCurrentStackTrace(), schemaName);
     }
   }
 

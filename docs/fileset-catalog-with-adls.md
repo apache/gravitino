@@ -1,62 +1,65 @@
 ---
 title: "Fileset Catalog with ADLS"
 slug: "/fileset-catalog-with-adls"
-date: 2025-01-03
-keyword: "Fileset catalog ADLS"
+keyword: "Fileset catalog ADLS Azure Blob Storage"
 license: "This software is licensed under the Apache License version 2."
 ---
 
 ## Introduction
 
-This document describes how to configure a Fileset catalog with ADLS (aka. Azure Blob Storage (ABS), or Azure Data Lake Storage (v2)).
+This page shows how to store fileset data in Azure Data Lake Storage while Gravitino manages the metadata,
+and how to read and write that data through the Gravitino Virtual File System (GVFS).
+
+Everything on this page is specific to Azure Data Lake Storage. The fileset model itself, the properties shared by
+every storage backend, and the way properties are inherited from catalog to schema to fileset are
+described in [Fileset Catalog](./fileset-catalog.md).
+
+The examples run in order and use the same names throughout: metalake `metalake`, catalog
+`adls_catalog`, schema `adls_schema`, fileset `example_fileset`, and `http://localhost:8090` as the
+server URL. Replace them with your own values.
 
 ## Prerequisites
 
-To set up a Fileset catalog with ADLS, follow these steps:
-
 1. Download the [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle) file.
-2. Place the downloaded file into the Gravitino Fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
-3. Start the Gravitino server by running the following command:
+2. Place it in the fileset catalog classpath at `${GRAVITINO_HOME}/catalogs/fileset/libs/`.
+3. Start the Gravitino server:
 
 ```bash
-$ ${GRAVITINO_HOME}/bin/gravitino-server.sh start
+${GRAVITINO_HOME}/bin/gravitino-server.sh start
 ```
 
-Once the server is up and running, you can proceed to configure the Fileset catalog with ADLS. In the rest of this document we will use `http://localhost:8090` as the Gravitino server URL, replace with your actual server URL.
+The catalog automatically loads the Azure Data Lake Storage filesystem provider once the bundle jar is on the
+classpath. The deprecated `filesystem-providers` and `default-filesystem-provider` catalog
+properties do not need to be set.
 
-## ADLS Catalog Configuration
+## Azure Data Lake Storage Properties
 
-### ADLS Fileset Catalog Configuration
+These properties are needed in addition to the shared
+[catalog properties](./fileset-catalog.md#catalog-properties). The same values are also needed by
+the GVFS clients, so they are listed together here — note that the Python client spells them with
+underscores while the catalog and the Java client use hyphens.
 
-Apart from configurations mentioned in [fileset-catalog-catalog-configuration](./fileset-catalog.md#catalog-properties), the following properties are required to configure a Fileset catalog with ADLS:
-
-| Configuration item            | Description                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Default value   | Required |
-|-------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------|
-| `filesystem-providers`        | (deprecated) The file system providers to add. Set it to `abs` if it's a Azure Blob Storage fileset, or a comma separated string that contains `abs` like `oss,abs,s3` to support multiple kinds of fileset including `abs`.                                                                                                                                                                                                                                                                                                                                    | (none)          | Yes      |
-| `default-filesystem-provider` | (deprecated) The name default filesystem providers of this Fileset catalog if users do not specify the scheme in the URI. Default value is `builtin-local`, for Azure Blob Storage, if we set this value, we can omit the prefix 'abfss://' in the location.                                                                                                                                                                                                                                                                                                    | `builtin-local` | No       |
-| `azure-storage-account-name ` | The account name of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | (none)          | Yes      |
-| `azure-storage-account-key`   | The account key of Azure Blob Storage.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | (none)          | Yes      |
-| `credential-providers`        | The credential provider types, separated by comma, possible value can be `adls-token`, `azure-account-key`. As the default authentication type is using account name and account key as the above, this configuration can enable credential vending provided by Gravitino server and client will no longer need to provide authentication information like account_name/account_key to access ADLS by GVFS. Once it's set, more configuration items are needed to make it works, see [adls-credential-vending](security/credential-vending.md#adls-credentials) | (none)          | No       |
+| Catalog and Java client      | Python client                | Description                                                                                                                                                                                                                                                                                                     | Required |
+|------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `azure-storage-account-name` | `azure_storage_account_name` | Account name of the Azure Blob Storage.                                                                                                                                                                                                                                                                         | Yes      |
+| `azure-storage-account-key`  | `azure_storage_account_key`  | Account key of the Azure Blob Storage.                                                                                                                                                                                                                                                                          | Yes      |
+| `credential-providers`       | (n/a)                        | The credential provider types, separated by comma. Possible values are `adls-token`, `azure-account-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#adls) for the extra properties each provider takes. | No       |
 
 :::note
-`default-filesystem-provider` and `filesystem-providers` are deprecated. The fileset catalog automatically loads filesystem providers on the classpath, including buildin filesystem provider and cloud providers when the corresponding bundle jar is present (for example, `gravitino-azure-bundle`).
+Azure Data Lake Storage is also known as Azure Blob Storage (ABS). The location uses the `abfss://`
+scheme.
 :::
 
-### Schema Configuration
+Schema and fileset properties are documented on the shared page: see
+[schema properties](./fileset-catalog.md#schema-properties) and
+[fileset properties](./fileset-catalog.md#fileset-properties).
 
-Refer to [Schema configurations](./fileset-catalog.md#schema-properties) for more details.
-
-### Fileset Configuration
-
-Refer to [Fileset configurations](./fileset-catalog.md#fileset-properties) for more details.
+A fileset catalog stores its data under `location`, which for Azure Data Lake Storage looks like
+`abfss://container@account-name.dfs.core.windows.net/root`.
 
 ## Create the Catalog, Schema, and Fileset
 
-This section demonstrates how to create the Fileset catalog with ADLS in Gravitino, with a complete example.
-
-### Step 1: Create a Fileset Catalog with ADLS
-
-First, you need to create a Fileset catalog with ADLS. The following example shows how to create a Fileset catalog with ADLS:
+### Step 1: Create the catalog
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -64,13 +67,13 @@ First, you need to create a Fileset catalog with ADLS. The following example sho
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "example_catalog",
+  "name": "adls_catalog",
   "type": "FILESET",
-  "comment": "This is a ADLS fileset catalog",
+  "comment": "A fileset catalog backed by Azure Data Lake Storage",
   "properties": {
-    "location": "abfss://container@account-name.dfs.core.windows.net/path",
-    "azure-storage-account-name": "The account name of the Azure Blob Storage",
-    "azure-storage-account-key": "The account key of the Azure Blob Storage"
+    "location": "abfss://container@account-name.dfs.core.windows.net/root",
+    "azure-storage-account-name": "account_name",
+    "azure-storage-account-key": "account_key"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
@@ -84,44 +87,42 @@ GravitinoClient gravitinoClient = GravitinoClient
     .withMetalake("metalake")
     .build();
 
-Map<String, String> adlsProperties = ImmutableMap.<String, String>builder()
-    .put("location", "abfss://container@account-name.dfs.core.windows.net/path")
-    .put("azure-storage-account-name", "azure storage account name")
-    .put("azure-storage-account-key", "azure storage account key")
+Map<String, String> catalogProperties = ImmutableMap.<String, String>builder()
+    .put("location", "abfss://container@account-name.dfs.core.windows.net/root")
+    .put("azure-storage-account-name", "account_name")
+    .put("azure-storage-account-key", "account_key")
     .build();
 
-Catalog adlsCatalog = gravitinoClient.createCatalog("example_catalog",
-    Type.FILESET,
-    "This is a ADLS fileset catalog",
-    adlsProperties);
-// ...
-
+Catalog catalog = gravitinoClient.createCatalog("adls_catalog",
+    Catalog.Type.FILESET,
+    "A fileset catalog backed by Azure Data Lake Storage",
+    catalogProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-adls_properties = {
-    "location": "abfss://container@account-name.dfs.core.windows.net/path",
-    "azure-storage-account-name": "azure storage account name",
-    "azure-storage-account-key": "azure storage account key"
+gravitino_client: GravitinoClient = GravitinoClient(
+    uri="http://localhost:8090", metalake_name="metalake")
+
+catalog_properties = {
+    "location": "abfss://container@account-name.dfs.core.windows.net/root",
+    "azure-storage-account-name": "account_name",
+    "azure-storage-account-key": "account_key",
 }
 
-adls_properties = gravitino_client.create_catalog(name="example_catalog",
-                                                  catalog_type=Catalog.Type.FILESET,
-                                                  provider=None,
-                                                  comment="This is a ADLS fileset catalog",
-                                                  properties=adls_properties)
+catalog = gravitino_client.create_catalog(name="adls_catalog",
+                                          catalog_type=Catalog.Type.FILESET,
+                                          provider=None,
+                                          comment="A fileset catalog backed by Azure Data Lake Storage",
+                                          properties=catalog_properties)
 ```
 
 </TabItem>
 </Tabs>
 
-### Step 2: Create a Schema
-
-Once the catalog is created, you can create a schema. The following example shows how to create a schema:
+### Step 2: Create the schema
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -129,49 +130,44 @@ Once the catalog is created, you can create a schema. The following example show
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "test_schema",
-  "comment": "This is a ADLS schema",
+  "name": "adls_schema",
+  "comment": "A schema in the Azure Data Lake Storage fileset catalog",
   "properties": {
-    "location": "abfss://container@account-name.dfs.core.windows.net/path"
+    "location": "abfss://container@account-name.dfs.core.windows.net/root/schema"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas
+}' http://localhost:8090/api/metalakes/metalake/catalogs/adls_catalog/schemas
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
-
+Catalog catalog = gravitinoClient.loadCatalog("adls_catalog");
 SupportsSchemas supportsSchemas = catalog.asSchemas();
 
 Map<String, String> schemaProperties = ImmutableMap.<String, String>builder()
-    .put("location", "abfss://container@account-name.dfs.core.windows.net/path")
+    .put("location", "abfss://container@account-name.dfs.core.windows.net/root/schema")
     .build();
-Schema schema = supportsSchemas.createSchema("test_schema",
-    "This is a ADLS schema",
-    schemaProperties
-);
-// ...
+
+Schema schema = supportsSchemas.createSchema("adls_schema",
+    "A schema in the Azure Data Lake Storage fileset catalog",
+    schemaProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
-catalog.as_schemas().create_schema(name="test_schema",
-                                   comment="This is a ADLS schema",
-                                   properties={"location": "abfss://container@account-name.dfs.core.windows.net/path"})
+catalog: Catalog = gravitino_client.load_catalog(name="adls_catalog")
+catalog.as_schemas().create_schema(name="adls_schema",
+                                   comment="A schema in the Azure Data Lake Storage fileset catalog",
+                                   properties={"location": "abfss://container@account-name.dfs.core.windows.net/root/schema"})
 ```
 
 </TabItem>
 </Tabs>
 
-### Step 3: Create a Fileset
-
-After creating the schema, you can create a fileset. The following example shows how to create a fileset:
+### Step 3: Create the fileset
 
 <Tabs groupId="language" queryString>
 <TabItem value="shell" label="Shell">
@@ -182,346 +178,365 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
   "name": "example_fileset",
   "comment": "This is an example fileset",
   "type": "MANAGED",
-  "storageLocation": "abfss://container@account-name.dfs.core.windows.net/path/example_fileset",
+  "storageLocation": "abfss://container@account-name.dfs.core.windows.net/root/schema/example_fileset",
   "properties": {
     "k1": "v1"
   }
-}' http://localhost:8090/api/metalakes/metalake/catalogs/test_catalog/schemas/test_schema/filesets
+}' http://localhost:8090/api/metalakes/metalake/catalogs/adls_catalog/schemas/adls_schema/filesets
 ```
 
 </TabItem>
 <TabItem value="java" label="Java">
 
 ```java
-GravitinoClient gravitinoClient = GravitinoClient
-    .builder("http://localhost:8090")
-    .withMetalake("metalake")
-    .build();
-
-Catalog catalog = gravitinoClient.loadCatalog("test_catalog");
+Catalog catalog = gravitinoClient.loadCatalog("adls_catalog");
 FilesetCatalog filesetCatalog = catalog.asFilesetCatalog();
 
-Map<String, String> propertiesMap = ImmutableMap.<String, String>builder()
-        .put("k1", "v1")
-        .build();
+Map<String, String> filesetProperties = ImmutableMap.<String, String>builder()
+    .put("k1", "v1")
+    .build();
 
 filesetCatalog.createFileset(
-    NameIdentifier.of("test_schema", "example_fileset"),
+    NameIdentifier.of("adls_schema", "example_fileset"),
     "This is an example fileset",
     Fileset.Type.MANAGED,
-    "abfss://container@account-name.dfs.core.windows.net/path/example_fileset",
-    propertiesMap,
-);
+    "abfss://container@account-name.dfs.core.windows.net/root/schema/example_fileset",
+    filesetProperties);
 ```
 
 </TabItem>
 <TabItem value="python" label="Python">
 
 ```python
-gravitino_client: GravitinoClient = GravitinoClient(uri="http://localhost:8090", metalake_name="metalake")
-
-catalog: Catalog = gravitino_client.load_catalog(name="test_catalog")
-catalog.as_fileset_catalog().create_fileset(ident=NameIdentifier.of("test_schema", "example_fileset"),
-                                            type=Fileset.Type.MANAGED,
-                                            comment="This is an example fileset",
-                                            storage_location="abfss://container@account-name.dfs.core.windows.net/path/example_fileset",
-                                            properties={"k1": "v1"})
+catalog: Catalog = gravitino_client.load_catalog(name="adls_catalog")
+catalog.as_fileset_catalog().create_fileset(
+    ident=NameIdentifier.of("adls_schema", "example_fileset"),
+    type=Fileset.Type.MANAGED,
+    comment="This is an example fileset",
+    storage_location="abfss://container@account-name.dfs.core.windows.net/root/schema/example_fileset",
+    properties={"k1": "v1"})
 ```
 
 </TabItem>
 </Tabs>
 
-## Access a Fileset with ADLS
+The fileset is now addressable as
+`gvfs://fileset/adls_catalog/adls_schema/example_fileset` from any GVFS client.
 
-### Access the Fileset with the GVFS Java Client
+## Access the Fileset
 
-To access fileset with Azure Blob Storage(ADLS) using the GVFS Java client, based on the [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
+### Java client jars
 
-| Configuration item           | Description                             | Default value | Required |
-|------------------------------|-----------------------------------------|---------------|----------|
-| `azure-storage-account-name` | The account name of Azure Blob Storage. | (none)        | Yes      |
-| `azure-storage-account-key`  | The account key of Azure Blob Storage.  | (none)        | Yes      |
+Every Java or Hadoop-based client needs `gravitino-filesystem-hadoop3-runtime`, which is published
+on Maven Central, plus the Azure Data Lake Storage filesystem implementation. Only the latter
+differs by environment:
+
+| Environment            | Jar providing the Azure Data Lake Storage filesystem                                                                                                                                                      |
+|------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| No Hadoop installed    | [`gravitino-azure-bundle`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle), a fat jar bundling the Azure Data Lake Storage filesystem implementation and its dependencies |
+| Hadoop already present | `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`                                  |
+
+The artifacts in full:
+
+- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle):
+  a "fat" jar that includes the `gravitino-azure` functionality together with every dependency it needs,
+  such as `hadoop-azure` and the packages it needs to reach ADLS. Use it when the environment has no pre-existing Hadoop setup.
+- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime):
+  a "fat" jar that bundles the Gravitino virtual filesystem client and already includes the
+  `gravitino-azure` functionality. Java and Hadoop-based clients require it to access Gravitino
+  filesets.
+- `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and
+  `wildfly-openssl-1.0.7.Final.jar`: the standard Hadoop dependencies for Azure Data Lake Storage
+  access, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`. Supply them yourself
+  when running inside an existing Hadoop environment.
+- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure):
+  a "thin" jar carrying only the Azure integration code. It is already contained in both jars above,
+  so it is not needed as a direct dependency unless you prefer to manage all Hadoop and Azure
+  dependencies yourself.
+
+```xml
+<!-- No Hadoop environment -->
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-azure-bundle</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+```
+
+```xml
+<!-- Existing Hadoop environment -->
+<dependency>
+  <groupId>org.apache.hadoop</groupId>
+  <artifactId>hadoop-common</artifactId>
+  <version>${HADOOP_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.hadoop</groupId>
+  <artifactId>hadoop-azure</artifactId>
+  <version>${HADOOP_VERSION}</version>
+</dependency>
+<dependency>
+  <groupId>org.apache.gravitino</groupId>
+  <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
+  <version>${GRAVITINO_VERSION}</version>
+</dependency>
+```
 
 :::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted. More details can be found in [Fileset with credential vending](#fileset-with-credential-vending).
+The thin `gravitino-azure` jar is not needed. Its functionality is already included in both
+`gravitino-azure-bundle` and `gravitino-filesystem-hadoop3-runtime`.
 :::
+
+### GVFS Java client
+
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), set the Azure Data Lake Storage
+properties from the table above.
 
 ```java
 Configuration conf = new Configuration();
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
-conf.set("fs.gravitino.client.metalake", "test_metalake");
-conf.set("azure-storage-account-name", "account_name_of_adls");
-conf.set("azure-storage-account-key", "account_key_of_adls");
-Path filesetPath = new Path("gvfs://fileset/test_catalog/test_schema/test_fileset/new_dir");
+conf.set("fs.gravitino.client.metalake", "metalake");
+conf.set("azure-storage-account-name", "account_name");
+conf.set("azure-storage-account-key", "account_key");
+
+Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
-...
 ```
 
-Similar to Spark configurations, you need to add ADLS (bundle) jars to the classpath according to your environment.
+### Apache Spark
 
-If you want to custom your hadoop version or there is already a hadoop version in your project, you can add the following dependencies to your `pom.xml`:
-
-```xml
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-common</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.hadoop</groupId>
-    <artifactId>hadoop-azure</artifactId>
-    <version>${HADOOP_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-```
-
-:::note
-The `gravitino-azure` JAR is no longer required, as it is now included in the `gravitino-filesystem-hadoop3-runtime` JAR.
-:::
-
-Or use the bundle jar with Hadoop environment if there is no Hadoop environment:
-
-```xml
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-azure-bundle</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-
-  <dependency>
-    <groupId>org.apache.gravitino</groupId>
-    <artifactId>gravitino-filesystem-hadoop3-runtime</artifactId>
-    <version>${GRAVITINO_VERSION}</version>
-  </dependency>
-```
-
-### Access the Fileset with Spark
-
-The following code snippet shows how to use **PySpark 3.5.0 with Hadoop environment(Hadoop 3.3.4)** to access the fileset:
-
-Before running the following code, you need to install required packages:
+The example below uses PySpark 3.5.0 in an environment that already has Hadoop 3.3.4.
 
 ```bash
 pip install pyspark==3.5.0
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
-Then you can run the following code:
 
 ```python
-from pyspark.sql import SparkSession
 import os
+from pyspark.sql import SparkSession
 
-gravitino_url = "http://localhost:8090"
-metalake_name = "test"
+# On JDK 17, also add:
+#   --conf "spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+#   --conf "spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"
+os.environ["PYSPARK_SUBMIT_ARGS"] = (
+    "--jars /path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar,"
+    "/path/to/hadoop-azure-3.3.4.jar,"
+    "/path/to/azure-storage-7.0.1.jar,"
+    "/path/to/wildfly-openssl-1.0.7.Final.jar "
+    "--master local[1] pyspark-shell"
+)
 
-catalog_name = "your_adls_catalog"
-schema_name = "your_adls_schema"
-fileset_name = "your_adls_fileset"
-# JDK8 as follows, JDK17 will be slightly different, you need to add '--conf \"spark.driver.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\" --conf \"spark.executor.extraJavaOptions=--add-opens=java.base/sun.nio.ch=ALL-UNNAMED\"' to the submit args.
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar,/path/to/hadoop-azure-3.3.4.jar,/path/to/azure-storage-7.0.1.jar,/path/to/wildfly-openssl-1.0.7.Final.jar --master local[1] pyspark-shell"
-spark = SparkSession.builder
-    .appName("adls_fileset_test")
+spark = (SparkSession.builder
+    .appName("adls_fileset")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-    .config("spark.hadoop.azure-storage-account-name", "azure_account_name")
-    .config("spark.hadoop.azure-storage-account-key", "azure_account_key")
-    .config("spark.hadoop.fs.azure.skipUserGroupMetadataDuringInitialization", "true")
+    .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    .config("spark.hadoop.azure-storage-account-name", "account_name")
+    .config("spark.hadoop.azure-storage-account-key", "account_key")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
-    .getOrCreate()
+    .getOrCreate())
 
 data = [("Alice", 25), ("Bob", 30), ("Cathy", 45)]
-columns = ["Name", "Age"]
-spark_df = spark.createDataFrame(data, schema=columns)
-gvfs_path = f"gvfs://fileset/{catalog_name}/{schema_name}/{fileset_name}/people"
+spark_df = spark.createDataFrame(data, schema=["Name", "Age"])
+gvfs_path = "gvfs://fileset/adls_catalog/adls_schema/example_fileset/people"
 
-spark_df.coalesce(1).write
-    .mode("overwrite")
-    .option("header", "true")
-    .csv(gvfs_path)
+spark_df.coalesce(1).write.mode("overwrite").option("header", "true").csv(gvfs_path)
 ```
 
-If your Spark **without Hadoop environment**, you can use the following code snippet to access the fileset:
+If Spark runs without a Hadoop environment, only the jar list changes:
 
 ```python
-## Replace the following code snippet with the above code snippet with the same environment variables
-
-os.environ["PYSPARK_SUBMIT_ARGS"] = "--jars /path/to/gravitino-azure-bundle-{gravitino-version}.jar,/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar --master local[1] pyspark-shell"
-```
-If Spark can't start with the above configuration (no Hadoop environment available and use bundle jar), you can try to set the jars to the classpath directly:
-
-```python
-jars_path = (
-    "/path/to/gravitino-azure-bundle-{gravitino-version}.jar:"
-    "/path/to/gravitino-filesystem-hadoop3-runtime-{gravitino-version}.jar"
-)
-
 os.environ["PYSPARK_SUBMIT_ARGS"] = (
-    f'--conf "spark.driver.extraClassPath={jars_path}" '
-    f'--conf "spark.executor.extraClassPath={jars_path}" '
-    '--master local[1] pyspark-shell'
+    "--jars /path/to/gravitino-azure-bundle-${gravitino-version}.jar,"
+    "/path/to/gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar "
+    "--master local[1] pyspark-shell"
 )
 ```
-
-- [`gravitino-azure-bundle-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure-bundle): A "fat" JAR that includes `gravitino-azure` functionality and all necessary dependencies like `hadoop-azure` (3.3.1) and other packages needed to access ADLS. Use this if your Spark environment doesn't have a pre-existing Hadoop setup.
-- [`gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-filesystem-hadoop3-runtime): A "fat" JAR that bundles Gravitino's virtual filesystem client and includes the functionality of `gravitino-azure`. It is required for accessing Gravitino filesets.
-- `hadoop-azure-3.3.4.jar`, `azure-storage-7.0.1.jar`, and `wildfly-openssl-1.0.7.Final.jar`: Standard Hadoop dependencies for ADLS access. If you are running in an existing Hadoop environment, you need to provide these JARs. They are typically located in the `${HADOOP_HOME}/share/hadoop/tools/lib` directory.
-- [`gravitino-azure-${gravitino-version}.jar`](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-azure): A "thin" JAR that only provides the Azure integration code. Its functionality is already included in the `gravitino-azure-bundle` and `gravitino-filesystem-hadoop3-runtime` JARs, so you do not need to add it as a direct dependency unless you want to manage all Hadoop and Azure dependencies manually.
-
-Please choose the correct jar according to your environment.
 
 :::note
-In some Spark versions, a Hadoop environment is necessary for the driver, adding the bundle jars with '--jars' may not work. If this is the case, you should add the jars to the spark CLASSPATH directly.
+Some Spark versions need a Hadoop environment in the driver and do not pick up filesystem
+implementations passed with `--jars`. If that happens, add the jars to the Spark classpath directly.
 :::
 
-### Access a Fileset Using the Hadoop Fs Command
+### Hadoop fs command
 
-The following are examples of how to use the `hadoop fs` command to access the fileset in Hadoop 3.1.3:
-
-1. Adding the following contents to the `${HADOOP_HOME}/etc/hadoop/core-site.xml` file:
+1. Add the following to `${HADOOP_HOME}/etc/hadoop/core-site.xml`:
 
 ```xml
-  <property>
-    <name>fs.AbstractFileSystem.gvfs.impl</name>
-    <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
-  </property>
-
-  <property>
-    <name>fs.gvfs.impl</name>
-    <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
-  </property>
-
-  <property>
-    <name>fs.gravitino.server.uri</name>
-    <value>http://localhost:8090</value>
-  </property>
-
-  <property>
-    <name>fs.gravitino.client.metalake</name>
-    <value>test</value>
-  </property>
-
-  <property>
-    <name>azure-storage-account-name</name>
-    <value>account_name</value>
-  </property>
-  <property>
-    <name>azure-storage-account-key</name>
-    <value>account_key</value>
-  </property>
+<property>
+  <name>fs.AbstractFileSystem.gvfs.impl</name>
+  <value>org.apache.gravitino.filesystem.hadoop.Gvfs</value>
+</property>
+<property>
+  <name>fs.gvfs.impl</name>
+  <value>org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem</value>
+</property>
+<property>
+  <name>fs.gravitino.server.uri</name>
+  <value>http://localhost:8090</value>
+</property>
+<property>
+  <name>fs.gravitino.client.metalake</name>
+  <value>metalake</value>
+</property>
+<property>
+  <name>azure-storage-account-name</name>
+  <value>account_name</value>
+</property>
+<property>
+  <name>azure-storage-account-key</name>
+  <value>account_key</value>
+</property>
 ```
 
-2. Add the necessary jars to the Hadoop classpath.
+2. Add these jars to the Hadoop classpath:
 
-For ADLS, you need to add `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar` and `hadoop-azure-${hadoop-version}.jar` located at `${HADOOP_HOME}/share/hadoop/tools/lib/` to the Hadoop classpath. 
+   - `gravitino-filesystem-hadoop3-runtime-${gravitino-version}.jar`, from Maven Central.
+   - `hadoop-azure-${hadoop-version}.jar`, `azure-storage-7.0.1.jar` and `wildfly-openssl-1.0.7.Final.jar`, shipped with Hadoop under `${HADOOP_HOME}/share/hadoop/tools/lib`.
 
-3. Run the following command to access the fileset:
+3. Access the fileset:
 
 ```shell
-./${HADOOP_HOME}/bin/hadoop dfs -ls gvfs://fileset/adls_catalog/adls_schema/adls_fileset
-./${HADOOP_HOME}/bin/hadoop dfs -put /path/to/local/file gvfs://fileset/adls_catalog/adls_schema/adls_fileset
+${HADOOP_HOME}/bin/hadoop fs -ls gvfs://fileset/adls_catalog/adls_schema/example_fileset
+${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/adls_catalog/adls_schema/example_fileset
 ```
 
-### Access the Fileset with the GVFS Python Client
-
-To access fileset with Azure Blob storage (ADLS) using the GVFS Python client, apart from [basic GVFS configurations](./how-to-use-gvfs.md#configuration-1), you need to add the following configurations:
-
-| Configuration item           | Description                            | Default value | Required |
-|------------------------------|----------------------------------------|---------------|----------|
-| `azure_storage_account_name` | The account name of Azure Blob Storage | (none)        | Yes      |
-| `azure_storage_account_key`  | The account key of Azure Blob Storage  | (none)        | Yes      |
-
-:::note
-If the catalog has enabled [credential vending](security/credential-vending.md), the properties above can be omitted.
-:::
-
-Please install the `gravitino` package before running the following code:
+### GVFS Python client
 
 ```bash
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Azure Data Lake Storage
+properties in `options`, spelled with underscores.
+
 ```python
 from gravitino import gvfs
+
 options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "azure_storage_account_name": "azure_account_name",
-    "azure_storage_account_key": "azure_account_key"
+    "azure_storage_account_name": "account_name",
+    "azure_storage_account_key": "account_key",
 }
-fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090", metalake_name="test_metalake", options=options)
-fs.ls("gvfs://fileset/{adls_catalog}/{adls_schema}/{adls_fileset}/")
+
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
+                                     metalake_name="metalake",
+                                     options=options)
+fs.ls("gvfs://fileset/adls_catalog/adls_schema/example_fileset/")
 ```
 
+### pandas
 
-### Access the Fileset with Pandas
-
-The following are examples of how to use the pandas library to access the ADLS fileset
+pandas reaches the same paths through `storage_options`. Use the `fs` instance from the preceding
+GVFS example to discover the generated Spark part file.
 
 ```python
 import pandas as pd
 
 storage_options = {
-    "server_uri": "http://localhost:8090", 
-    "metalake_name": "test",
+    "server_uri": "http://localhost:8090",
+    "metalake_name": "metalake",
     "options": {
-        "azure_storage_account_name": "azure_account_name",
-        "azure_storage_account_key": "azure_account_key"
+        "azure_storage_account_name": "account_name",
+        "azure_storage_account_key": "account_key",
     }
 }
-ds = pd.read_csv(f"gvfs://fileset/${catalog_name}/${schema_name}/${fileset_name}/people/part-00000-51d366e2-d5eb-448d-9109-32a96c8a14dc-c000.csv",
-                 storage_options=storage_options)
+
+csv_path = next(
+    f"gvfs://{path}"
+    for path in fs.ls(
+        "gvfs://fileset/adls_catalog/adls_schema/example_fileset/people",
+        detail=False,
+    )
+    if (
+        path.rsplit("/", 1)[-1].startswith("part-")
+        and path.endswith(".csv")
+    )
+)
+ds = pd.read_csv(csv_path, storage_options=storage_options)
 ds.head()
 ```
 
-For other use cases, refer to the [Gravitino Virtual File System](./how-to-use-gvfs.md) document.
+For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md).
 
-## Fileset with Credential Vending
+## Credential Vending
 
-Gravitino supports credential vending for ADLS fileset. If the catalog has been [configured with credential](./security/credential-vending.md), you can access ADLS fileset without providing authentication information like `azure-storage-account-name` and `azure-storage-account-key` in the properties.
+With credential vending the catalog holds the Azure Data Lake Storage credentials and the Gravitino server hands
+out a credential per request, so clients never hold cloud keys of their own. See
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[ADLS credentials](./security/credential-vending.md#adls) for the properties
+each provider takes.
 
-### Create an ADLS Fileset Catalog with Credential Vending
+The supported providers are `adls-token`, which vends a short-lived token, and
+`azure-account-key`, which vends the static account key configured on the catalog. The example below
+uses `adls-token`.
 
-Apart from configuration method in [create-adls-fileset-catalog](#adls-fileset-catalog-configuration),
-properties needed by [adls-credential](./security/credential-vending.md#adls-credentials) should
-also be set to enable credential vending for ADLS fileset. Take `adls-token` credential provider for example:
+### Configure the catalog, schema, and fileset
 
 ```shell
 curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 -H "Content-Type: application/json" -d '{
-  "name": "adls-catalog-with-token",
+  "name": "adls_catalog_with_vending",
   "type": "FILESET",
-  "comment": "This is a ADLS fileset catalog",
+  "comment": "A fileset catalog backed by Azure Data Lake Storage with credential vending",
   "properties": {
-    "location": "abfss://container@account-name.dfs.core.windows.net/path",
-    "azure-storage-account-name": "The account name of the Azure Blob Storage",
-    "azure-storage-account-key": "The account key of the Azure Blob Storage",
+    "location": "abfss://container@account-name.dfs.core.windows.net/root",
+    "azure-storage-account-name": "account_name",
+    "azure-storage-account-key": "account_key",
     "credential-providers": "adls-token",
-    "azure-tenant-id":"The Azure tenant id",
-    "azure-client-id":"The Azure client id",
-    "azure-client-secret":"The Azure client secret key"
+    "azure-tenant-id": "The Azure tenant id",
+    "azure-client-id": "The Azure client id",
+    "azure-client-secret": "The Azure client secret key"
   }
 }' http://localhost:8090/api/metalakes/metalake/catalogs
 ```
 
-### Access an ADLS Fileset with Credential Vending
+Create the schema and fileset in the credential-vending catalog:
 
-When the catalog is configured with credentials and client-side credential vending is enabled, 
-you can access ADLS filesets directly using the GVFS Java/Python client or Spark without providing authentication details.
+```shell
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "adls_schema",
+  "comment": "A schema in the Azure Data Lake Storage credential-vending catalog",
+  "properties": {
+    "location": "abfss://container@account-name.dfs.core.windows.net/root/schema"
+  }
+}' http://localhost:8090/api/metalakes/metalake/catalogs/adls_catalog_with_vending/schemas
 
-GVFS Java client:
+curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
+-H "Content-Type: application/json" -d '{
+  "name": "example_fileset",
+  "comment": "This is an example fileset",
+  "type": "MANAGED",
+  "storageLocation": "abfss://container@account-name.dfs.core.windows.net/root/schema/example_fileset",
+  "properties": {}
+}' http://localhost:8090/api/metalakes/metalake/catalogs/adls_catalog_with_vending/schemas/adls_schema/filesets
+```
+
+The `adls-token` provider needs three more catalog properties.
+
+| Property Name         | Description             |
+|-----------------------|-------------------------|
+| `azure-tenant-id`     | Azure tenant id         |
+| `azure-client-id`     | Azure client id         |
+| `azure-client-secret` | Azure client secret key |
+
+### Access without local credentials
+
+Enable vending on the client and drop the credential properties.
 
 ```java
 Configuration conf = new Configuration();
@@ -529,28 +544,34 @@ conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
-conf.set("fs.gravitino.client.metalake", "test_metalake");
-// No need to set azure-storage-account-name and azure-storage-account-name
-Path filesetPath = new Path("gvfs://fileset/adls_test_catalog/test_schema/test_fileset/new_dir");
+conf.set("fs.gravitino.client.metalake", "metalake");
+// No need to set azure-storage-account-name or azure-storage-account-key
+
+Path filesetPath = new Path(
+    "gvfs://fileset/adls_catalog_with_vending/adls_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
 fs.mkdirs(filesetPath);
-...
 ```
 
-Spark:
-
 ```python
-spark = SparkSession.builder
-    .appName("adls_fileset_test")
+spark = (SparkSession.builder
+    .appName("adls_fileset")
     .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
-    .config("spark.hadoop.fs.gravitino.client.metalake", "test")
-    # No need to set azure-storage-account-name and azure-storage-account-name
-    .config("spark.driver.memory", "2g")
-    .config("spark.driver.port", "2048")
-    .getOrCreate()
+    .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    # No need to set azure-storage-account-name or azure-storage-account-key
+    .getOrCreate())
 ```
 
-Python client and Hadoop command are similar to the above examples.
+```python
+options = {
+    "auth_type": "simple",
+    "enable_credential_vending": True,
+    # No need to set azure-storage-account-name or azure-storage-account-key
+}
+fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
+                                     metalake_name="metalake",
+                                     options=options)
+```

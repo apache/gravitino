@@ -20,8 +20,10 @@ from enum import Enum
 from typing import Dict, Optional
 
 from gravitino.api.auditable import Auditable
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
+from gravitino.exceptions.base import UnsupportedOperationException
 
 
 class Catalog(Auditable):
@@ -224,6 +226,13 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support tag operations")
 
+    def supports_roles(self) -> SupportsRoles:
+        """Return role operations supported by this catalog.
 
-class UnsupportedOperationException(Exception):
-    pass
+        Returns:
+            SupportsRoles: The role operations supported by this catalog.
+
+        Raises:
+            UnsupportedOperationException: If this catalog does not support role operations.
+        """
+        raise UnsupportedOperationException("Catalog does not support role operations")

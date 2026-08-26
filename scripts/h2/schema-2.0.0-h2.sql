@@ -269,6 +269,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
 CREATE TABLE IF NOT EXISTS `idp_group_meta` (
     `group_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp group id',
     `group_name` VARCHAR(128) NOT NULL COMMENT 'idp group name',
+    `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp group last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp group deleted at',
@@ -468,6 +469,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
     `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
     `job_execution_id` varchar(256) NOT NULL COMMENT 'job execution id',
     `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
+    `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at',
     `job_finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job finished at',
     `audit_info` CLOB NOT NULL COMMENT 'job run audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run current version',
@@ -567,6 +569,42 @@ CREATE TABLE IF NOT EXISTS `view_version_info` (
     KEY `idx_vvsid` (`schema_id`)
 ) ENGINE=InnoDB;
 
+CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
+    `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `audit_info` CLOB NOT NULL COMMENT 'semantic model identity audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'semantic model deleted at',
+    PRIMARY KEY (`semantic_model_id`),
+    UNIQUE KEY `uk_sid_smn_del` (`schema_id`, `semantic_model_name`, `deleted_at`),
+    KEY `idx_smm_mid` (`metalake_id`),
+    KEY `idx_smm_cid` (`catalog_id`)
+) ENGINE=InnoDB COMMENT 'semantic model metadata';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
+    `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
+    `semantic_model_comment` CLOB DEFAULT NULL COMMENT 'semantic model comment snapshot',
+    `semantic_model_definition` CLOB NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `properties` CLOB DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
+    `audit_info` CLOB NOT NULL COMMENT 'semantic model version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_smid_ver_del` (`semantic_model_id`, `version`, `deleted_at`),
+    KEY `idx_smvi_mid` (`metalake_id`),
+    KEY `idx_smvi_cid` (`catalog_id`),
+    KEY `idx_smvi_sid` (`schema_id`)
+) ENGINE=InnoDB COMMENT 'semantic model version information';
+
 -- This schema extends version 1.1.0 with partition statistics storage support
 -- The partition_statistic_meta table stores partition-level statistics for tables
 
@@ -614,7 +652,7 @@ CREATE TABLE IF NOT EXISTS `entity_change_log` (
   `id`            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
   `metalake_name` VARCHAR(128)    NOT NULL COMMENT 'metalake name',
   `entity_type`   VARCHAR(32)     NOT NULL COMMENT 'METALAKE | CATALOG | SCHEMA | TABLE | FILESET | TOPIC | MODEL | VIEW',
-  `entity_full_name` VARCHAR(512) NOT NULL COMMENT 'Dot-separated full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.',
+  `entity_full_name` VARCHAR(512) NOT NULL COMMENT 'Encoded full name of the affected entity. For ALTER, stores the old name. For DROP, stores the entity name.',
   `operate_type`  TINYINT UNSIGNED NOT NULL COMMENT 'Operate type code: 1=ALTER, 2=DROP, 3=INSERT. Codes are stable and never re-used.',
   `created_at`    BIGINT          NOT NULL COMMENT 'timestamp of the change in millis',
   PRIMARY KEY (`id`),

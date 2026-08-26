@@ -18,12 +18,14 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.storage.relational.EntityChangeLogListener;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.po.cache.EntityChangeRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,12 +36,27 @@ import org.slf4j.LoggerFactory;
  * <p>This listener is called <em>synchronously</em> in the poller thread. Implementations must not
  * block or perform expensive I/O; only fast, in-memory cache invalidations are permitted.
  *
- * <p>This listener never propagates a failure to the poller, so the poller never retries a batch
- * for it. That is deliberate: local-mutation de-duplication ({@link
- * CatalogManager#consumeLocalMutation}) is single-shot, so re-delivering an already-applied batch
- * would invalidate a catalog this process mutated itself and close its still-in-use {@code
- * IsolatedClassLoader}. Dropping an invalidation is the cheaper failure: the catalog cache expires
- * on access, so staleness is bounded by {@code gravitino.catalog.cache.evictionIntervalMs}.
+ * <p>The poller hands each batch to a listener only once, so a listener has to clean up after
+ * itself when it fails. This one does what {@code EntityCacheChangeLogListener} and {@code
+ * JcasbinChangeListener} do: if removing one catalog from the cache fails, it clears the whole
+ * catalog cache, which also covers the entry it failed to remove and the rest of the batch. A row
+ * that cannot be parsed is simply skipped, because it does not point at any catalog and so cannot
+ * leave anything stale.
+ *
+ * <p>Before removing anything, the listener first goes through the whole batch and marks off the
+ * changes this node made itself. Doing it in that order means a later failure cannot leave one of
+ * those marks behind, which would otherwise make a future change from another node look like a
+ * local one. If the clear itself fails, the exception goes up to the poller, which logs it at
+ * {@code ERROR} and moves on, and the catalog stays stale until it expires.
+ *
+ * <p><b>What clearing costs:</b> dropping a catalog from the cache closes its {@code
+ * CatalogWrapper}, which shuts down its connection pool and its {@code IsolatedClassLoader}.
+ * Clearing the whole cache therefore also closes catalogs this process is serving right now, and
+ * requests still using classes from a closed classloader can fail with {@code NoClassDefFoundError}
+ * (that is the bug in #11739). We accept this on purpose so a changed catalog is never served from
+ * a stale cache; without it, this node would keep serving the old catalog for up to {@code
+ * gravitino.catalog.cache.evictionIntervalMs}. The clear only happens when a normal removal failed,
+ * never during normal operation.
  */
 public class CatalogChangeLogListener implements EntityChangeLogListener {
 
@@ -58,48 +75,84 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
 
   @Override
   public void onEntityChange(List<EntityChangeRecord> changes) {
+    List<CatalogInvalidation> remoteInvalidations = new ArrayList<>();
     for (EntityChangeRecord change : changes) {
+      if (!isCatalogChange(change)) {
+        continue;
+      }
+
+      Optional<NameIdentifier> identOpt = catalogIdentifier(change);
+      if (identOpt.isEmpty()) {
+        // Already logged. This row does not point at any catalog, so there is nothing stale to
+        // clean up. Just skip it instead of clearing the cache.
+        continue;
+      }
+      NameIdentifier ident = identOpt.get();
+
+      boolean localMutation;
       try {
-        if (!isCatalogChange(change)) {
-          continue;
-        }
-
-        Optional<NameIdentifier> identOpt = catalogIdentifier(change);
-        if (identOpt.isEmpty()) {
-          continue;
-        }
-        NameIdentifier ident = identOpt.get();
-
-        if (catalogManager.consumeLocalMutation(ident)) {
-          LOG.debug(
-              "Skipping catalog cache invalidation for local mutation: {}, change log id {}",
-              ident,
-              change.getId());
-          continue;
-        }
-
-        // Logged at INFO on purpose: this tears down the cached catalog, including its connection
-        // pool and isolated classloader, and it is the main cross-node effect of the change log.
-        // CatalogManager logs the matching "Closing catalog" line when the eviction runs.
-        LOG.info(
-            "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
+        localMutation = catalogManager.consumeLocalMutation(ident);
+      } catch (RuntimeException e) {
+        // We could not tell whether this change came from this node or another one. The name is
+        // valid, so assume it came from another node: the worst case is one extra cache removal,
+        // while skipping it could leave an old catalog cached forever.
+        LOG.error(
+            "Failed to check local mutation state for catalog {}, treating change log record id {} "
+                + "as remote to avoid serving stale metadata",
             ident,
-            change.getOperateType(),
+            change.getId(),
+            e);
+        localMutation = false;
+      }
+
+      if (localMutation) {
+        LOG.debug(
+            "Skipping catalog cache invalidation for local mutation: {}, change log id {}",
+            ident,
             change.getId());
+        continue;
+      }
+
+      remoteInvalidations.add(new CatalogInvalidation(change, ident));
+    }
+
+    for (CatalogInvalidation invalidation : remoteInvalidations) {
+      EntityChangeRecord change = invalidation.change;
+      NameIdentifier ident = invalidation.ident;
+      // INFO on purpose: dropping the catalog from the cache also closes its connection pool and
+      // its isolated classloader, and this is the main thing the change log does across nodes.
+      // CatalogManager prints the matching "Closing catalog" line when the removal happens.
+      LOG.info(
+          "Invalidating catalog cache for {} due to a remote {} recorded in change log id {}",
+          ident,
+          change.getOperateType(),
+          change.getId());
+
+      try {
         catalogManager.getCatalogCache().invalidate(ident);
       } catch (RuntimeException e) {
-        // Deliberately not rethrown: see the class javadoc. A dropped invalidation only costs
-        // bounded staleness here, while a retry of an already-applied batch can tear down a
-        // catalog that is still in use.
-        LOG.warn(
-            "Failed to process catalog change log record: id={}, fullName={}, entityType={}, "
-                + "operateType={}",
+        // This batch will never be sent again, so giving up here would keep serving the old
+        // catalog until it expires on its own. Clear the whole cache instead; see the class
+        // javadoc for the classloader cost that comes with it.
+        LOG.error(
+            "Failed to evict catalog {} for change log id {}, clearing the whole catalog cache to "
+                + "avoid serving it stale; catalogs in use by this node are closed as a result",
+            ident,
             change.getId(),
-            change.getFullName(),
-            change.getEntityType(),
-            change.getOperateType(),
             e);
+        catalogManager.getCatalogCache().invalidateAll();
+        return;
       }
+    }
+  }
+
+  private static class CatalogInvalidation {
+    private final EntityChangeRecord change;
+    private final NameIdentifier ident;
+
+    private CatalogInvalidation(EntityChangeRecord change, NameIdentifier ident) {
+      this.change = change;
+      this.ident = ident;
     }
   }
 
@@ -116,11 +169,20 @@ public class CatalogChangeLogListener implements EntityChangeLogListener {
       return Optional.empty();
     }
 
-    String[] names = change.getFullName().split("\\.");
-    if (names.length != 2) {
+    NameIdentifier ident;
+    try {
+      ident = EntityChangeLogNameIdentifierCodec.decode(change.getFullName());
+    } catch (RuntimeException e) {
+      // Catch every unchecked exception, not just IllegalArgumentException: if a future version of
+      // the codec throws something else, one bad row must still be skipped instead of aborting the
+      // whole batch, which would drop the invalidations already collected for the other rows.
+      LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName(), e);
+      return Optional.empty();
+    }
+    if (ident.namespace().length() != 1) {
       LOG.warn("Invalid catalog full name in entity change log: {}", change.getFullName());
       return Optional.empty();
     }
-    return Optional.of(NameIdentifier.of(names[0], names[1]));
+    return Optional.of(ident);
   }
 }

@@ -34,6 +34,8 @@ import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.cache.Coherence;
+import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.junit.jupiter.api.Assertions;
@@ -298,5 +300,56 @@ public class TestRelationalEntityStore {
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> store.updateEntityRelations(update));
     Mockito.verifyNoInteractions(backend);
+  }
+
+  @Test
+  void testLocalPerNodeCacheRegistersChangeLogListener() throws IllegalAccessException {
+    EntityChangeLogPoller poller = givenCacheWithCoherence(Coherence.LOCAL_PER_NODE);
+
+    store.registerCacheChangeLogListener();
+
+    // A per-node cache holds its own copy, so it must replay changes made on the other nodes.
+    EntityCacheChangeLogListener listener =
+        (EntityCacheChangeLogListener)
+            FieldUtils.readField(store, "entityCacheChangeLogListener", true);
+    Assertions.assertNotNull(listener);
+    Mockito.verify(poller).registerListener(listener);
+  }
+
+  @Test
+  void testSharedCacheDoesNotRegisterChangeLogListener() throws IllegalAccessException {
+    EntityChangeLogPoller poller = givenCacheWithCoherence(Coherence.SHARED);
+
+    store.registerCacheChangeLogListener();
+
+    // A shared cache has a single cluster-wide copy, so there is nothing per-node to invalidate.
+    Assertions.assertNull(FieldUtils.readField(store, "entityCacheChangeLogListener", true));
+    Mockito.verify(poller, Mockito.never()).registerListener(Mockito.any());
+  }
+
+  @Test
+  void testCacheDisabledDoesNotRegisterChangeLogListener() throws IllegalAccessException {
+    EntityChangeLogPoller poller = givenCacheWithCoherence(Coherence.NONE);
+
+    store.registerCacheChangeLogListener();
+
+    // Nothing is cached, so there is nothing to invalidate either.
+    Assertions.assertNull(FieldUtils.readField(store, "entityCacheChangeLogListener", true));
+    Mockito.verify(poller, Mockito.never()).registerListener(Mockito.any());
+  }
+
+  /**
+   * Installs a cache reporting the given coherence mode plus a mock poller, and returns the poller
+   * so the caller can assert on listener registration.
+   */
+  private EntityChangeLogPoller givenCacheWithCoherence(Coherence coherence)
+      throws IllegalAccessException {
+    EntityCache cache = Mockito.mock(EntityCache.class);
+    Mockito.when(cache.coherence()).thenReturn(coherence);
+    EntityChangeLogPoller poller = Mockito.mock(EntityChangeLogPoller.class);
+
+    FieldUtils.writeField(store, "cache", cache, true);
+    FieldUtils.writeField(store, "entityChangeLogPoller", poller, true);
+    return poller;
   }
 }

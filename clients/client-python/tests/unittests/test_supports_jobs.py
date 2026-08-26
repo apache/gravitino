@@ -15,7 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 import unittest
+from datetime import datetime, timezone
 from http.client import HTTPResponse
+from typing import Optional
 from unittest.mock import Mock, patch
 
 from gravitino import GravitinoClient
@@ -205,7 +207,11 @@ class TestSupportsJobs(unittest.TestCase):
         )
 
         job_template_name = "test_shell_job"
-        job_dto = self._new_job_dto(job_template_name)
+        job_dto = self._new_job_dto(
+            job_template_name,
+            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(timezone.utc),
+        )
         resp = JobResponse(_job=job_dto, _code=0)
         mock_resp = self._mock_http_response(resp.to_json())
 
@@ -310,15 +316,26 @@ class TestSupportsJobs(unittest.TestCase):
         mock_resp = Response(mock_http_resp)
         return mock_resp
 
-    def _new_job_dto(self, job_template_name: str) -> JobDTO:
+    def _new_job_dto(
+        self,
+        job_template_name: str,
+        finished_at: Optional[datetime] = None,
+        started_at: Optional[datetime] = None,
+    ) -> JobDTO:
         return JobDTO(
             _job_id="job-123",
             _job_template_name=job_template_name,
             _status=JobHandle.Status.QUEUED,
             _audit=AuditDTO(_creator="test", _create_time="2023-10-01T00:00:00Z"),
+            _queued_at=datetime(2023, 10, 1, tzinfo=timezone.utc),
+            _started_at=started_at,
+            _finished_at=finished_at,
         )
 
     def _compare_job_handle(self, job_handle: JobHandle, job_dto: JobDTO):
         self.assertEqual(job_handle.job_id(), job_dto.job_id())
         self.assertEqual(job_handle.job_template_name(), job_dto.job_template_name())
         self.assertEqual(job_handle.job_status(), job_dto.status())
+        self.assertEqual(job_handle.queued_at(), job_dto.queued_at())
+        self.assertEqual(job_handle.started_at(), job_dto.started_at())
+        self.assertEqual(job_handle.finished_at(), job_dto.finished_at())

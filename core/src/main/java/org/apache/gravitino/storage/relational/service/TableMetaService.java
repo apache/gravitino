@@ -37,7 +37,6 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.metrics.Monitored;
-import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
@@ -47,7 +46,6 @@ import org.apache.gravitino.storage.relational.mapper.TableVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.TablePO;
-import org.apache.gravitino.storage.relational.po.cache.OperateType;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -128,6 +126,15 @@ public class TableMetaService {
       AtomicReference<TablePO> tablePORef = new AtomicReference<>();
       TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the table cannot be
+          // written below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      tableEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
@@ -193,18 +200,21 @@ public class TableMetaService {
     TablePO newTablePO =
         POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
 
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.namespace().level(2);
-    String oldFullName =
-        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, oldTableEntity.name())
-            .toString();
-    boolean isFullNameChanged =
-        isSchemaChanged || !Objects.equals(oldTableEntity.name(), newTableEntity.name());
-
     final AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
+          () -> {
+            // Only a rename that moves the table to another schema needs a lock here, and it is the
+            // new parent that has to stay alive, not the old one.
+            if (isSchemaChanged) {
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      newTableEntity.nameIdentifier(),
+                      newSchemaId,
+                      oldTablePO.getCatalogId(),
+                      oldTablePO.getMetalakeId());
+            }
+          },
           () ->
               updateResult.set(
                   SessionUtils.getWithoutCommit(
@@ -222,18 +232,6 @@ public class TableMetaService {
             if (updateResult.get() > 0) {
               TableColumnMetaService.getInstance()
                   .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
-            }
-          },
-          () -> {
-            if (isFullNameChanged && updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.TABLE.name(),
-                          oldFullName,
-                          OperateType.ALTER));
             }
           });
 
@@ -253,13 +251,6 @@ public class TableMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
-
-    String metalakeName = identifier.namespace().level(0);
-    String catalogName = identifier.namespace().level(1);
-    String schemaName = identifier.namespace().level(2);
-    String tableFullName =
-        NameIdentifierUtil.ofTable(metalakeName, catalogName, schemaName, identifier.name())
-            .toString();
 
     AtomicInteger deleteResult = new AtomicInteger(0);
     SessionUtils.doMultipleWithCommit(
@@ -301,18 +292,6 @@ public class TableMetaService {
                 mapper ->
                     mapper.softDeleteTableVersionByTableIdAndVersion(
                         tablePO.getTableId(), tablePO.getCurrentVersion()));
-          }
-        },
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.TABLE.name(),
-                        tableFullName,
-                        OperateType.DROP));
           }
         });
 

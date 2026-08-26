@@ -29,6 +29,14 @@ package org.apache.gravitino.cache;
  */
 public interface EntityCache extends SupportsEntityStoreCache {
   /**
+   * Returns how this cache stays coherent across a multi-node cluster. The write path uses this to
+   * decide whether a local change must be propagated to the other nodes (see {@link Coherence}).
+   *
+   * @return the {@link Coherence} model of this cache
+   */
+  Coherence coherence();
+
+  /**
    * Clears all entries from the cache, including data and index, resetting it to an empty state.
    */
   void clear();

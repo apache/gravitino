@@ -18,6 +18,6 @@
 # under the License.
 #
 
-cd /root/mcp-server
+cd /opt/mcp-server
 
 uv run mcp_server $@

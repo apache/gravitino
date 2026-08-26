@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.EntityChangeLogNameIdentifierCodec;
 import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
@@ -95,17 +96,28 @@ public class ModelMetaService {
     try {
       ModelPO.Builder builder = ModelPO.builder();
       fillModelPOBuilderParentEntityId(builder, modelEntity.namespace());
+      ModelPO po = POConverters.initializeModelPO(modelEntity, builder);
 
-      SessionUtils.doWithCommit(
-          ModelMetaMapper.class,
-          mapper -> {
-            ModelPO po = POConverters.initializeModelPO(modelEntity, builder);
-            if (overwrite) {
-              mapper.insertModelMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertModelMeta(po);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the model cannot be
+          // written below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      modelEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertModelMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertModelMeta(po);
+                    }
+                  }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, modelEntity.nameIdentifier().toString());
@@ -129,7 +141,8 @@ public class ModelMetaService {
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
     String modelFullName =
-        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()).toString();
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()));
 
     AtomicInteger modelDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
@@ -373,8 +386,9 @@ public class ModelMetaService {
     String catalogName = identifier.namespace().level(1);
     String schemaName = identifier.namespace().level(2);
     String oldFullName =
-        NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, oldModelEntity.name())
-            .toString();
+        EntityChangeLogNameIdentifierCodec.encode(
+            NameIdentifierUtil.ofModel(
+                metalakeName, catalogName, schemaName, oldModelEntity.name()));
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
     AtomicInteger updateResult = new AtomicInteger(0);

@@ -126,7 +126,7 @@ Catalog catalog = gravitinoClient.createCatalog(
 </TabItem>
 </Tabs>
 
-Other catalog operations are general with relational catalogs. See [Catalog Operations](./manage-relational-metadata-using-gravitino.md#catalog-operations) for detailed documentation.
+Other catalog operations are general with relational catalogs. See [Catalog Operations](./manage-catalogs-and-schemas.md#catalog-operations) for detailed documentation.
 
 ## Schema Management
 
@@ -142,7 +142,7 @@ Schema operations follow the same patterns as relational catalogs:
 - ✅ Delete schemas
 - ✅ Check schema existence
 
-See [Schema Operations](./manage-relational-metadata-using-gravitino.md#schema-operations) for detailed documentation.
+See [Schema Operations](./manage-catalogs-and-schemas.md#schema-operations) for detailed documentation.
 
 ### Schema Properties
 
@@ -192,7 +192,7 @@ catalog.asSchemas().createSchema(
 </TabItem>
 </Tabs>
 
-For additional operations, refer to [Schema Operations documentation](./manage-relational-metadata-using-gravitino.md#schema-operations).
+For additional operations, refer to [Schema Operations documentation](./manage-catalogs-and-schemas.md#schema-operations).
 
 ## Table Management
 

@@ -18,6 +18,7 @@
 import logging
 from typing import Dict, List, Optional
 
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.catalog import Catalog
 from gravitino.api.function.function import Function
 from gravitino.api.function.function_catalog import FunctionCatalog
@@ -35,6 +36,12 @@ from gravitino.client.function_catalog_operations import FunctionCatalogOperatio
 from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
+)
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
+)
+from gravitino.client.metadata_object_secret_operations import (
+    MetadataObjectSecretOperations,
 )
 from gravitino.client.metadata_object_tag_operations import MetadataObjectTagOperations
 from gravitino.dto.audit_dto import AuditDTO
@@ -59,8 +66,9 @@ class BaseSchemaCatalog(
     CatalogDTO,
     SupportsSchemas,
     FunctionCatalog,
+    SupportsRoles,
     SupportsTags,
-):
+):  # pylint: disable=too-many-ancestors
     """
     BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
     common methods for managing schemas in a catalog. With BaseSchemaCatalog, users can list,
@@ -75,6 +83,9 @@ class BaseSchemaCatalog(
 
     # The metadata object credential operations
     _object_credential_operations: MetadataObjectCredentialOperations
+
+    # The metadata object secret property operations
+    _object_secret_operations: MetadataObjectSecretOperations
 
     _function_operations: FunctionCatalogOperations
 
@@ -104,14 +115,23 @@ class BaseSchemaCatalog(
         self._object_credential_operations = MetadataObjectCredentialOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
+        self._object_secret_operations = MetadataObjectSecretOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
         self._function_operations = FunctionCatalogOperations(
             rest_client, catalog_namespace, self.name()
         )
         self._object_tag_operations = MetadataObjectTagOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
+        self._object_role_operations = MetadataObjectRoleOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
 
         self.validate()
+
+    def get_secrets(self) -> Dict[str, str]:
+        return self._object_secret_operations.get_secrets()
 
     def as_schemas(self):
         return self
@@ -363,6 +383,13 @@ class BaseSchemaCatalog(
     def get_tag(self, name: str) -> Tag:
         return self._object_tag_operations.get_tag(name)
 
+    def assign_tags(
+        self,
+        tags_to_add: list[str | dict[str, str | None]] | None = None,
+        tags_to_remove: list[str | dict[str, str | None]] | None = None,
+    ) -> list[str]:
+        return self._object_tag_operations.assign_tags(tags_to_add, tags_to_remove)
+
     def associate_tags(
         self, tags_to_add: List[str], tags_to_remove: List[str]
     ) -> List[str]:
@@ -370,3 +397,9 @@ class BaseSchemaCatalog(
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
+    def list_binding_role_names(self) -> List[str]:
+        return self._object_role_operations.list_binding_role_names()

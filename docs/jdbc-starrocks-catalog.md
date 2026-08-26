@@ -26,7 +26,7 @@ Gravitino saves some system information in table comments, like
 
 - Gravitino catalog corresponds to the StarRocks instance.
 - Supports metadata management of StarRocks (3.3.x).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 ### Catalog Properties
 
@@ -80,10 +80,10 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
 :::
 
 ## Schema
@@ -101,14 +101,14 @@ As StarRocks can't get thr properties after set, So now we do not support set Sc
 ### Schema Operations
 
 Refer to
-[Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+[Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
 ### Table Capabilities
 
 - Gravitino's table concept corresponds to the StarRocks table.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 #### Table Column Types
 
@@ -131,7 +131,7 @@ Refer to
 
 
 StarRocks doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type.
+The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./tables-and-views.md#unparsed-type)** that represents an unresolvable data type.
 
 :::note
 Gravitino cannot load StarRocks `array`, `map` and `struct` type correctly, because StarRocks doesn't support these types in JDBC.

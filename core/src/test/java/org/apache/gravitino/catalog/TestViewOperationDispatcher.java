@@ -25,8 +25,12 @@ import static org.apache.gravitino.Entity.EntityType.SCHEMA;
 import static org.apache.gravitino.Entity.EntityType.VIEW;
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
 import static org.apache.gravitino.TestBasePropertiesMetadata.COMMENT_KEY;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 
 import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
@@ -50,6 +54,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.connector.TestCatalogOperations;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockManager;
@@ -578,9 +583,11 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertFalse(testCatalogOperations.schemaExists(schemaIdent));
     Assertions.assertFalse(testCatalogOperations.schemaExists(ancestorIdent));
 
-    // dropView returns false because the view is already gone from the catalog, but the
-    // orphaned schema entities must still be cleaned up.
+    // dropView returns false because the view is already gone from the catalog. Preserve the view
+    // entity because the same result can be caused by a concurrent rename, while still cleaning up
+    // orphaned schema entities.
     Assertions.assertFalse(viewOperationDispatcher.dropView(viewIdent));
+    Assertions.assertTrue(entityStore.exists(viewIdent, VIEW));
     Assertions.assertFalse(entityStore.exists(schemaIdent, SCHEMA));
     Assertions.assertFalse(entityStore.exists(ancestorIdent, SCHEMA));
   }
@@ -655,6 +662,66 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
 
     View altered = viewOperationDispatcher.alterView(oldIdent, ViewChange.rename("new_view"));
     Assertions.assertEquals("new_view", altered.name());
+  }
+
+  @Test
+  public void testRenameViewSurfacesStoreUpdateFailure() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_rename_view_store_failure");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier oldIdent = NameIdentifier.of(viewNs, "view_before_rename");
+    NameIdentifier newIdent = NameIdentifier.of(viewNs, "view_after_rename");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        oldIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    reset(entityStore);
+    doThrow(new NoSuchEntityException("mock update conflict"))
+        .when(entityStore)
+        .update(any(), any(), any(), any());
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class,
+            () -> viewOperationDispatcher.alterView(oldIdent, ViewChange.rename(newIdent.name())));
+    Assertions.assertTrue(exception.getMessage().contains(oldIdent.toString()));
+    Assertions.assertTrue(exception.getMessage().contains(newIdent.toString()));
+    reset(entityStore);
+  }
+
+  @Test
+  public void testRenameViewFailsBeforeExternalChangeWhenStoreReadFails() throws IOException {
+    Namespace viewNs = Namespace.of(metalake, catalog, "schema_rename_view_store_read_failure");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(viewNs.levels()), "c", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier oldIdent = NameIdentifier.of(viewNs, "view_before_failed_rename");
+    NameIdentifier newIdent = NameIdentifier.of(viewNs, "view_after_failed_rename");
+    Representation[] representations = {
+      SQLRepresentation.builder().withDialect("spark").withSql("SELECT 1").build()
+    };
+    viewOperationDispatcher.createView(
+        oldIdent, "c", new Column[0], representations, null, null, ImmutableMap.of("k1", "v1"));
+
+    reset(entityStore);
+    doThrow(new IOException("mock store read failure"))
+        .when(entityStore)
+        .get(any(), eq(VIEW), any());
+
+    Assertions.assertThrows(
+        GravitinoRuntimeException.class,
+        () -> viewOperationDispatcher.alterView(oldIdent, ViewChange.rename(newIdent.name())));
+
+    TestCatalog testCatalog =
+        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
+    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
+    Assertions.assertDoesNotThrow(() -> testCatalogOperations.loadView(oldIdent));
+    Assertions.assertThrows(
+        NoSuchViewException.class, () -> testCatalogOperations.loadView(newIdent));
+    reset(entityStore);
   }
 
   @Test

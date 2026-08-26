@@ -20,8 +20,6 @@ package org.apache.gravitino.catalog.fileset;
 
 import static org.apache.gravitino.Configs.DEFAULT_ENTITY_RELATIONAL_STORE;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS;
-import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION;
-import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS;
 import static org.apache.gravitino.Configs.ENTITY_CHANGE_LOG_RETENTION_SECS;
 import static org.apache.gravitino.Configs.ENTITY_RELATIONAL_JDBC_BACKEND_DRIVER;
@@ -59,6 +57,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ConnectException;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -69,6 +68,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.io.FileUtils;
@@ -91,12 +91,17 @@ import org.apache.gravitino.audit.FilesetDataOperation;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemProvider;
 import org.apache.gravitino.catalog.hadoop.fs.FileSystemUtils;
 import org.apache.gravitino.catalog.hadoop.fs.LocalFileSystemProvider;
+import org.apache.gravitino.catalog.hadoop.fs.SupportsCredentialVending;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.PropertyEntry;
+import org.apache.gravitino.credential.CatalogCredentialManager;
+import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.CredentialConstants;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
+import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
@@ -104,6 +109,11 @@ import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
+import org.apache.gravitino.meta.AuditInfo;
+import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
@@ -231,7 +241,7 @@ public class TestFilesetCatalogOperations {
   }
 
   @BeforeAll
-  public static void setUp() throws IllegalAccessException {
+  public static void setUp() throws IOException, IllegalAccessException {
     Config config = Mockito.mock(Config.class);
     when(config.get(ENTITY_STORE)).thenReturn(RELATIONAL_ENTITY_STORE);
     when(config.get(ENTITY_RELATIONAL_STORE)).thenReturn(DEFAULT_ENTITY_RELATIONAL_STORE);
@@ -256,8 +266,6 @@ public class TestFilesetCatalogOperations {
     when(config.get(STORE_TRANSACTION_MAX_SKEW_TIME)).thenReturn(1000L);
     when(config.get(STORE_DELETE_AFTER_TIME)).thenReturn(20 * 60 * 1000L);
     when(config.get(ENTITY_CHANGE_LOG_POLL_INTERVAL_SECS)).thenReturn(3L);
-    when(config.get(ENTITY_CHANGE_LOG_LISTENER_MAX_RETRIES)).thenReturn(10);
-    when(config.get(ENTITY_CHANGE_LOG_LISTENER_FAILURE_ACTION)).thenReturn("SKIP");
     when(config.get(ENTITY_CHANGE_LOG_RETENTION_SECS)).thenReturn(24 * 60 * 60L);
     when(config.get(ENTITY_CHANGE_LOG_CLEANUP_INTERVAL_SECS)).thenReturn(60 * 60L);
     // Fix cache config for test
@@ -272,6 +280,28 @@ public class TestFilesetCatalogOperations {
     store = EntityStoreFactory.createEntityStore(config);
     store.initialize(config);
     idGenerator = new RandomIdGenerator();
+
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build();
+    BaseMetalake metalake =
+        BaseMetalake.builder()
+            .withId(1L)
+            .withName("m1")
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(auditInfo)
+            .build();
+    store.put(metalake, false);
+
+    CatalogEntity catalog =
+        CatalogEntity.builder()
+            .withId(1L)
+            .withName("c1")
+            .withNamespace(Namespace.of("m1"))
+            .withProvider("fileset")
+            .withType(Catalog.Type.FILESET)
+            .withAuditInfo(auditInfo)
+            .build();
+    store.put(catalog, false);
 
     // Mock
     MetalakeMetaService metalakeMetaService = MetalakeMetaService.getInstance();
@@ -428,14 +458,13 @@ public class TestFilesetCatalogOperations {
     final long testId = generateTestId();
     final String name = "schema" + testId;
     final String comment = "comment" + testId;
-    Schema schema = createSchema(testId, name, comment, null, null);
+    Schema schema = createSchema(name, comment, null, null);
     Assertions.assertEquals(name, schema.name());
     Assertions.assertEquals(comment, schema.comment());
 
     Throwable exception =
         Assertions.assertThrows(
-            SchemaAlreadyExistsException.class,
-            () -> createSchema(testId, name, comment, null, null));
+            SchemaAlreadyExistsException.class, () -> createSchema(name, comment, null, null));
     Assertions.assertEquals(
         "Schema m1.c1.schema" + testId + " already exists", exception.getMessage());
   }
@@ -450,7 +479,7 @@ public class TestFilesetCatalogOperations {
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> createSchema(testId, schemaName, comment, catalogPath, null));
+            () -> createSchema(schemaName, comment, catalogPath, null));
     Assertions.assertEquals(
         "The value of the catalog property "
             + FilesetCatalogPropertiesMetadata.LOCATION
@@ -464,7 +493,7 @@ public class TestFilesetCatalogOperations {
     String name = "schema" + testId;
     final String comment = "comment" + testId;
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog12";
-    Schema schema = createSchema(testId, name, comment, catalogPath, null);
+    Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
     Path schemaPath = new Path(catalogPath, name);
@@ -476,7 +505,7 @@ public class TestFilesetCatalogOperations {
     // test placeholder in catalog location
     name = "schema" + testId + "_1";
     catalogPath = TEST_ROOT_PATH + "/" + "{{catalog}}-{{schema}}";
-    schema = createSchema(testId, name, comment, catalogPath, null);
+    schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
     schemaPath = new Path(catalogPath, name);
@@ -486,7 +515,7 @@ public class TestFilesetCatalogOperations {
     // Test disable server-side FS operations.
     name = "schema" + testId + "_2";
     catalogPath = TEST_ROOT_PATH + "/" + "catalog12_2";
-    schema = createSchema(testId, name, comment, catalogPath, null, true);
+    schema = createSchema(name, comment, catalogPath, null, true);
     Assertions.assertEquals(name, schema.name());
 
     // Schema path should not be existed if the server-side FS operations are disabled.
@@ -501,7 +530,7 @@ public class TestFilesetCatalogOperations {
     final String comment = "comment" + testId;
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
     String schemaPath = catalogPath + "/" + name;
-    Schema schema = createSchema(testId, name, comment, null, schemaPath);
+    Schema schema = createSchema(name, comment, null, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     Path schemaPath1 = new Path(schemaPath);
@@ -513,7 +542,7 @@ public class TestFilesetCatalogOperations {
     // test placeholder in schema location
     name = "schema" + testId + "_1";
     schemaPath = catalogPath + "/" + "{{schema}}";
-    schema = createSchema(testId, name, comment, null, schemaPath);
+    schema = createSchema(name, comment, null, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     schemaPath1 = new Path(schemaPath);
@@ -526,7 +555,7 @@ public class TestFilesetCatalogOperations {
     Throwable exception =
         Assertions.assertThrows(
             IllegalArgumentException.class,
-            () -> createSchema(testId, schemaName1, comment, null, schemaPath2));
+            () -> createSchema(schemaName1, comment, null, schemaPath2));
     Assertions.assertTrue(
         exception.getMessage().contains("Placeholder in location should not be empty"),
         exception.getMessage());
@@ -534,7 +563,7 @@ public class TestFilesetCatalogOperations {
     // Test disable server-side FS operations.
     name = "schema" + testId + "_3";
     schemaPath = catalogPath + "/" + name;
-    schema = createSchema(testId, name, comment, null, schemaPath, true);
+    schema = createSchema(name, comment, null, schemaPath, true);
     Assertions.assertEquals(name, schema.name());
 
     // Schema path should not be existed if the server-side FS operations are disabled.
@@ -548,7 +577,7 @@ public class TestFilesetCatalogOperations {
     String comment = "comment" + testId;
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
     String schemaPath = TEST_ROOT_PATH + "/" + "schema" + testId;
-    Schema schema = createSchema(testId, name, comment, catalogPath, schemaPath);
+    Schema schema = createSchema(name, comment, catalogPath, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     Path schemaPath1 = new Path(schemaPath);
@@ -564,7 +593,7 @@ public class TestFilesetCatalogOperations {
     name = "schema" + testId + "_1";
     catalogPath = TEST_ROOT_PATH + "/" + "{{catalog}}";
     schemaPath = TEST_ROOT_PATH + "/" + "{{schema}}";
-    schema = createSchema(testId, name, comment, catalogPath, schemaPath);
+    schema = createSchema(name, comment, catalogPath, schemaPath);
     Assertions.assertEquals(name, schema.name());
 
     schemaPath1 = new Path(schemaPath);
@@ -577,7 +606,7 @@ public class TestFilesetCatalogOperations {
     name = "schema" + testId + "_2";
     catalogPath = TEST_ROOT_PATH + "/" + "catalog14_2";
     schemaPath = TEST_ROOT_PATH + "/" + "schema14_2";
-    schema = createSchema(testId, name, comment, catalogPath, schemaPath, true);
+    schema = createSchema(name, comment, catalogPath, schemaPath, true);
     Assertions.assertEquals(name, schema.name());
 
     // Schema path should not be existed if the server-side FS operations are disabled.
@@ -591,7 +620,7 @@ public class TestFilesetCatalogOperations {
     String name = "schema" + testId;
     String comment = "comment" + testId;
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
-    Schema schema = createSchema(testId, name, comment, catalogPath, null);
+    Schema schema = createSchema(name, comment, catalogPath, null);
     NameIdentifier otherSchema = NameIdentifierUtil.ofSchema("m1", "c1", "otherSchema");
 
     Assertions.assertEquals(name, schema.name());
@@ -619,8 +648,8 @@ public class TestFilesetCatalogOperations {
     String comment1 = "comment" + testId1;
     String name2 = "schema" + testId2;
     String comment2 = "comment" + testId2;
-    createSchema(testId1, name1, comment1, null, null);
-    createSchema(testId2, name2, comment2, null, null);
+    createSchema(name1, comment1, null, null);
+    createSchema(name2, comment2, null, null);
 
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
       ops.initialize(Maps.newHashMap(), randomCatalogInfo(), FILESET_PROPERTIES_METADATA);
@@ -638,7 +667,7 @@ public class TestFilesetCatalogOperations {
     String name = "schema" + testId;
     String comment = "comment" + testId;
     String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
-    Schema schema = createSchema(testId, name, comment, catalogPath, null);
+    Schema schema = createSchema(name, comment, catalogPath, null);
     Assertions.assertEquals(name, schema.name());
 
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
@@ -686,7 +715,7 @@ public class TestFilesetCatalogOperations {
     final String comment = "comment" + testId;
     final String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
 
-    Schema schema = createSchema(testId, schemaName, comment, catalogPath, null);
+    Schema schema = createSchema(schemaName, comment, catalogPath, null);
     Assertions.assertEquals(schemaName, schema.name());
     NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
@@ -709,7 +738,7 @@ public class TestFilesetCatalogOperations {
       Assertions.assertFalse(fs.exists(schemaPath));
 
       // Test drop non-empty schema with cascade = false
-      createSchema(testId, schemaName, comment, catalogPath, null);
+      createSchema(schemaName, comment, catalogPath, null);
       Fileset fs1 =
           createFileset("fs1", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs1Path = new Path(fs1.storageLocation());
@@ -725,7 +754,7 @@ public class TestFilesetCatalogOperations {
       Assertions.assertFalse(fs.exists(fs1Path));
 
       // Test drop both managed and external filesets
-      createSchema(testId, schemaName, comment, catalogPath, null);
+      createSchema(schemaName, comment, catalogPath, null);
       Fileset fs2 =
           createFileset("fs2", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
       Path fs2Path = new Path(fs2.storageLocation());
@@ -741,7 +770,7 @@ public class TestFilesetCatalogOperations {
       Assertions.assertTrue(fs.exists(fs3Path));
 
       // Test drop schema with different storage location
-      createSchema(testId, schemaName, comment, catalogPath, null);
+      createSchema(schemaName, comment, catalogPath, null);
       Path fs4Path = new Path(TEST_ROOT_PATH + "/fs4");
       createFileset(
           "fs4", schemaName, "comment", Fileset.Type.MANAGED, catalogPath, fs4Path.toString());
@@ -758,7 +787,7 @@ public class TestFilesetCatalogOperations {
     final String filesetName = "fileset" + testId;
     final String catalogPath = TEST_ROOT_PATH + "/" + "catalog" + testId;
 
-    Schema schema = createSchema(testId, schemaName, comment, catalogPath, null);
+    Schema schema = createSchema(schemaName, comment, catalogPath, null);
     Assertions.assertEquals(schemaName, schema.name());
     NameIdentifier id = NameIdentifierUtil.ofSchema("m1", "c1", schemaName);
 
@@ -774,7 +803,7 @@ public class TestFilesetCatalogOperations {
       FileSystem fs = schemaPath.getFileSystem(new Configuration());
       Assertions.assertTrue(fs.exists(schemaPath));
 
-      createSchema(testId, schemaName, comment, catalogPath, null);
+      createSchema(schemaName, comment, catalogPath, null);
       Fileset fs1 =
           createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, catalogPath, null);
       Path fs1Path = new Path(fs1.storageLocation());
@@ -807,7 +836,7 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
+        createSchema(schemaName, comment, catalogPath, schemaPath);
       }
       Fileset fileset =
           createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
@@ -864,7 +893,7 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath, true);
+        createSchema(schemaName, comment, catalogPath, schemaPath, true);
       }
 
       Fileset fileset;
@@ -922,7 +951,7 @@ public class TestFilesetCatalogOperations {
     final String comment = "comment" + testId;
     final String filesetName = "fileset" + testId;
 
-    createSchema(testId, schemaName, comment, null, null);
+    createSchema(schemaName, comment, null, null);
     NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
     // If neither catalog location, nor schema location and storageLocation is specified.
@@ -966,13 +995,53 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
+  public void testCreateFilesetMapsSchemaDeletionDuringStoreWrite() throws IOException {
+    long testId = generateTestId();
+    String schemaName = "schema" + testId;
+    String filesetName = "fileset" + testId;
+    String catalogPath = TEST_ROOT_PATH + "/catalog" + testId;
+    createSchema(schemaName, "comment", catalogPath, null, true);
+
+    EntityStore racingStore = Mockito.spy(store);
+    NoSuchEntityException deletedSchema =
+        new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, "schema", schemaName);
+    Mockito.doThrow(deletedSchema)
+        .when(racingStore)
+        .put(Mockito.any(FilesetEntity.class), Mockito.eq(true));
+
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(racingStore, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(DISABLE_FILESYSTEM_OPS, "true", LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+      Map<String, String> filesetProperties =
+          StringIdentifier.newPropertiesWithId(
+              StringIdentifier.fromId(idGenerator.nextId()), Collections.emptyMap());
+
+      NoSuchSchemaException exception =
+          Assertions.assertThrows(
+              NoSuchSchemaException.class,
+              () ->
+                  ops.createMultipleLocationFileset(
+                      filesetIdent,
+                      "comment",
+                      Fileset.Type.MANAGED,
+                      Collections.emptyMap(),
+                      filesetProperties));
+      Assertions.assertSame(deletedSchema, exception.getCause());
+    }
+  }
+
+  @Test
   public void testListFilesets() throws IOException {
     final long testId = generateTestId();
     String schemaName = "schema" + testId;
     String comment = "comment" + testId;
     String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    createSchema(testId, schemaName, comment, null, schemaPath);
+    createSchema(schemaName, comment, null, schemaPath);
 
     String[] filesets = {
       "fileset" + testId + "_1", "fileset" + testId + "_2", "fileset" + testId + "_3"
@@ -1002,7 +1071,7 @@ public class TestFilesetCatalogOperations {
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
     final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
-    createSchema(testId, schemaName, comment, null, schemaPath);
+    createSchema(schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
@@ -1052,7 +1121,7 @@ public class TestFilesetCatalogOperations {
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
     final NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
 
-    createSchema(testId, schemaName, comment, null, schemaPath);
+    createSchema(schemaName, comment, null, schemaPath);
     createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     Map<String, String> catalogProps = Collections.singletonMap(DISABLE_FILESYSTEM_OPS, "true");
@@ -1079,7 +1148,7 @@ public class TestFilesetCatalogOperations {
     String filesetName = "fileset" + testId;
     final String nonExistentSubPath = "/non_existent_file.txt";
 
-    Schema schema = createSchema(testId, schemaName, comment, null, schemaPath);
+    Schema schema = createSchema(schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
     final NameIdentifier filesetIdent =
@@ -1121,7 +1190,7 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
+        createSchema(schemaName, comment, catalogPath, schemaPath);
       }
       Fileset fileset =
           createFileset(name, schemaName, "comment", type, catalogPath, storageLocation);
@@ -1159,7 +1228,7 @@ public class TestFilesetCatalogOperations {
     final String filesetName = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    createSchema(testId, schemaName, comment, null, schemaPath);
+    createSchema(schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
@@ -1274,7 +1343,7 @@ public class TestFilesetCatalogOperations {
     final String name = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    createSchema(testId, schemaName, comment, null, schemaPath);
+    createSchema(schemaName, comment, null, schemaPath);
     Fileset fileset = createFileset(name, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
     FilesetChange change1 = FilesetChange.updateComment(comment + "_new");
@@ -1298,7 +1367,7 @@ public class TestFilesetCatalogOperations {
     final String filesetName = "fileset" + testId;
     final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
 
-    createSchema(testId, schemaName, comment, null, schemaPath);
+    createSchema(schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(filesetName, schemaName, comment, Fileset.Type.MANAGED, null, null);
 
@@ -1316,16 +1385,380 @@ public class TestFilesetCatalogOperations {
   }
 
   @Test
-  public void testTestConnection() {
-    FilesetCatalogOperations catalogOperations = new FilesetCatalogOperations(store, secretManager);
-    Assertions.assertDoesNotThrow(
-        () ->
-            catalogOperations.testConnection(
-                NameIdentifier.of("metalake", "catalog"),
-                Catalog.Type.FILESET,
-                "fileset",
-                "comment",
-                ImmutableMap.of()));
+  public void testTestConnection() throws IOException {
+    File firstLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/first");
+    File secondLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/second");
+    FileUtils.forceMkdir(firstLocation);
+    FileUtils.forceMkdir(secondLocation);
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(LOCATION, firstLocation.toURI().toString());
+    properties.put(
+        PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive", secondLocation.toURI().toString());
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      Assertions.assertDoesNotThrow(
+          () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+    }
+  }
+
+  @Test
+  public void testResolveProbeLocationAllowsSchemeWithoutAuthority() throws IOException {
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      Path path =
+          catalogOperations.resolveProbeLocation(
+              "hdfs:///warehouse", NameIdentifier.of("metalake", "catalog"));
+
+      Assertions.assertEquals("hdfs", path.toUri().getScheme());
+      Assertions.assertNull(path.toUri().getAuthority());
+      Assertions.assertEquals("/warehouse", path.toUri().getPath());
+    }
+  }
+
+  @Test
+  public void testResolveProbeLocationReportsUnresolvedPlaceholderInAuthority() throws IOException {
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      UnsupportedOperationException exception =
+          Assertions.assertThrows(
+              UnsupportedOperationException.class,
+              () ->
+                  catalogOperations.resolveProbeLocation(
+                      "s3a://bucket{{schema}}", NameIdentifier.of("metalake", "catalog")));
+
+      Assertions.assertEquals(
+          "probe unsupported: unresolved placeholder {{schema}} in s3a://bucket{{schema}}; no "
+              + "filesystem path was tested",
+          exception.getMessage());
+    }
+  }
+
+  @Test
+  public void testInitializeRejectsNamedCatalogLocationThatIsAFile() throws IOException {
+    File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/file-location");
+    FileUtils.forceMkdir(fileLocation.getParentFile());
+    FileUtils.touch(fileLocation);
+
+    Map<String, String> properties =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive", fileLocation.toURI().toString());
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  catalogOperations.initialize(
+                      properties,
+                      randomCatalogInfo("metalake", "catalog"),
+                      FILESET_PROPERTIES_METADATA));
+      Assertions.assertTrue(
+          exception.getMessage().contains("Fileset catalog location cannot be a file"));
+      Assertions.assertTrue(exception.getMessage().contains("location name: archive"));
+    }
+  }
+
+  @Test
+  public void testTestConnectionRejectsDefaultCatalogLocationThatIsAFile() throws IOException {
+    File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/default-file-location");
+    FileUtils.forceMkdir(fileLocation.getParentFile());
+    FileUtils.touch(fileLocation);
+
+    Map<String, String> properties = ImmutableMap.of(LOCATION, fileLocation.toURI().toString());
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location (location is not a directory)"));
+      Assertions.assertFalse(exception.getMessage().contains(fileLocation.toURI().toString()));
+    }
+  }
+
+  @Test
+  public void testTestConnectionWithoutCatalogLocation() throws IOException {
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(), randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      IllegalArgumentException exception =
+          Assertions.assertThrows(
+              IllegalArgumentException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(exception.getMessage().contains("no catalog-level location"));
+    }
+  }
+
+  @Test
+  public void testTestConnectionWithFilesystemOperationsDisabled() throws IOException {
+    File fileLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "connection/disabled-file-location");
+    FileUtils.forceMkdir(fileLocation.getParentFile());
+    FileUtils.touch(fileLocation);
+
+    Map<String, String> properties =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
+            fileLocation.toURI().toString(),
+            DISABLE_FILESYSTEM_OPS,
+            "true");
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      Assertions.assertDoesNotThrow(
+          () ->
+              catalogOperations.initialize(
+                  properties,
+                  randomCatalogInfo("metalake", "catalog"),
+                  FILESET_PROPERTIES_METADATA));
+      Assertions.assertThrows(
+          UnsupportedOperationException.class,
+          () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+    }
+  }
+
+  @Test
+  public void testTestConnectionResolvesCatalogPlaceholder() throws IOException {
+    File catalogLocation = new File(UNFORMALIZED_TEST_ROOT_PATH, "placeholder/catalog");
+    FileUtils.forceMkdir(catalogLocation);
+    String location =
+        new File(UNFORMALIZED_TEST_ROOT_PATH, "placeholder").toURI().toString() + "{{catalog}}";
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, location),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      Assertions.assertDoesNotThrow(
+          () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+    }
+  }
+
+  @Test
+  public void testTestConnectionReportsUnresolvedPlaceholderWithoutProbingStaticParent()
+      throws IOException {
+    String location =
+        new File(UNFORMALIZED_TEST_ROOT_PATH, "placeholder").toURI().toString()
+            + "{{catalog}}/{{schema}}";
+    String resolvedLocation = location.replace("{{catalog}}", "catalog");
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, location),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains(
+                  "location (probe unsupported: unresolved placeholder {{schema}} in "
+                      + resolvedLocation
+                      + "; no filesystem path was tested)"));
+    }
+  }
+
+  @Test
+  public void testTestConnectionAggregatesLocationFailures() throws IOException {
+    Map<String, String> properties =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "primary",
+            "unsupported://primary/{{catalog}}",
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
+            "unsupported://archive/{{catalog}}");
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location-primary (probe unsupported)"));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location-archive (probe unsupported)"));
+      Assertions.assertFalse(exception.getMessage().contains("unsupported://"));
+    }
+  }
+
+  @Test
+  public void testTestConnectionAllowsMissingCatalogLocations() throws IOException {
+    String missingBase =
+        new File(UNFORMALIZED_TEST_ROOT_PATH, "missing-" + UUID.randomUUID()).toURI().toString();
+    Map<String, String> properties =
+        ImmutableMap.of(
+            LOCATION,
+            missingBase + "/default",
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
+            missingBase + "/archive");
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      Assertions.assertDoesNotThrow(
+          () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+    }
+  }
+
+  @Test
+  public void testTestConnectionAggregatesLocationResolutionAndProbeFailures() throws IOException {
+    String unsupportedLocation = "unsupported://archive/{{catalog}}";
+    Map<String, String> properties =
+        ImmutableMap.of(
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "primary",
+            "{{schema}}",
+            PROPERTY_MULTIPLE_LOCATIONS_PREFIX + "archive",
+            unsupportedLocation);
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(
+          exception
+              .getMessage()
+              .contains(
+                  "location-primary (probe unsupported: unresolved placeholder {{schema}} in "
+                      + "{{schema}}; no filesystem path was tested)"));
+      Assertions.assertTrue(
+          exception.getMessage().contains("location-archive (probe unsupported)"));
+      Assertions.assertFalse(exception.getMessage().contains(unsupportedLocation));
+    }
+  }
+
+  @Test
+  public void testTestConnectionUsesVendedCredential() throws Exception {
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "credential-vending");
+    FileUtils.forceMkdir(location);
+    Map<String, String> properties =
+        ImmutableMap.of(
+            LOCATION,
+            location.toURI().toString(),
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            TestFilesetCredentialProvider.TYPE);
+    AtomicBoolean credentialObserved = new AtomicBoolean(false);
+
+    class CredentialAwareProvider extends LocalFileSystemProvider
+        implements SupportsCredentialVending {
+      @Override
+      public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
+        Configuration hadoopConfiguration = FileSystemUtils.createCompatibleConfiguration(config);
+        Credential[] credentials =
+            FileSystemUtils.getGvfsCredentialProvider(hadoopConfiguration).getCredentials();
+        Assertions.assertEquals(1, credentials.length);
+        Assertions.assertEquals(
+            TestFilesetCredentialProvider.TYPE, credentials[0].credentialType());
+        credentialObserved.set(true);
+        return super.getFileSystem(path, config);
+      }
+    }
+    FileSystemProvider provider = new CredentialAwareProvider();
+
+    try (CatalogCredentialManager credentialManager =
+            new CatalogCredentialManager("catalog", properties);
+        FilesetCatalogOperations catalogOperations =
+            new FilesetCatalogOperations(store, secretManager, () -> credentialManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      FieldUtils.writeField(
+          catalogOperations, "fileSystemProvidersMap", ImmutableMap.of("file", provider), true);
+      catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog"));
+      Assertions.assertTrue(credentialObserved.get());
+    }
+  }
+
+  @Test
+  public void testTestConnectionUsesMultipleMatchingCredentialProviders() throws Exception {
+    File location = new File(UNFORMALIZED_TEST_ROOT_PATH, "multiple-credential-providers");
+    FileUtils.forceMkdir(location);
+    Map<String, String> properties =
+        ImmutableMap.of(
+            LOCATION,
+            location.toURI().toString(),
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            TestFilesetCredentialProvider.TYPE + "," + TestFilesetSecondCredentialProvider.TYPE);
+    AtomicBoolean credentialsObserved = new AtomicBoolean(false);
+
+    class CredentialAwareProvider extends LocalFileSystemProvider
+        implements SupportsCredentialVending {
+      @Override
+      public FileSystem getFileSystem(Path path, Map<String, String> config) throws IOException {
+        Configuration hadoopConfiguration = FileSystemUtils.createCompatibleConfiguration(config);
+        Credential[] credentials =
+            FileSystemUtils.getGvfsCredentialProvider(hadoopConfiguration).getCredentials();
+        Assertions.assertEquals(2, credentials.length);
+        Assertions.assertEquals(
+            Set.of(TestFilesetCredentialProvider.TYPE, TestFilesetSecondCredentialProvider.TYPE),
+            Arrays.stream(credentials).map(Credential::credentialType).collect(Collectors.toSet()));
+        credentialsObserved.set(true);
+        return super.getFileSystem(path, config);
+      }
+    }
+    FileSystemProvider provider = new CredentialAwareProvider();
+
+    try (CatalogCredentialManager credentialManager =
+            new CatalogCredentialManager("catalog", properties);
+        FilesetCatalogOperations catalogOperations =
+            new FilesetCatalogOperations(store, secretManager, () -> credentialManager)) {
+      catalogOperations.initialize(
+          properties, randomCatalogInfo("metalake", "catalog"), FILESET_PROPERTIES_METADATA);
+      FieldUtils.writeField(
+          catalogOperations, "fileSystemProvidersMap", ImmutableMap.of("file", provider), true);
+      catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog"));
+      Assertions.assertTrue(credentialsObserved.get());
+    }
+  }
+
+  @Test
+  public void testTestConnectionReportsUnsupportedLocationProbe() throws IOException {
+    String location = "unsupported://host/path";
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager)) {
+      catalogOperations.initialize(
+          ImmutableMap.of(LOCATION, location),
+          randomCatalogInfo("metalake", "catalog"),
+          FILESET_PROPERTIES_METADATA);
+      ConnectionFailedException exception =
+          Assertions.assertThrows(
+              ConnectionFailedException.class,
+              () -> catalogOperations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(exception.getMessage().contains("location (probe unsupported)"));
+      Assertions.assertFalse(exception.getMessage().contains(location));
+    }
+  }
+
+  @Test
+  void testCloseDoesNotCloseSharedCredentialManager() throws IOException {
+    CatalogCredentialManager credentialManager = Mockito.mock(CatalogCredentialManager.class);
+
+    try (FilesetCatalogOperations catalogOperations =
+        new FilesetCatalogOperations(store, secretManager, () -> credentialManager)) {
+      Assertions.assertSame(credentialManager, catalogOperations.catalogCredentialManager());
+    }
+
+    Mockito.verify(credentialManager, Mockito.never()).close();
   }
 
   @Test
@@ -1372,7 +1805,7 @@ public class TestFilesetCatalogOperations {
     final String storageLocation =
         TEST_ROOT_PATH + "/" + catalogName + "/" + schemaName + "/" + filesetName;
 
-    createSchema(testId, schemaName, comment, null, schemaPath);
+    createSchema(schemaName, comment, null, schemaPath);
     Fileset fileset =
         createFileset(
             filesetName, schemaName, comment, Fileset.Type.MANAGED, null, storageLocation);
@@ -1536,7 +1969,7 @@ public class TestFilesetCatalogOperations {
               final String schemaName = "schema" + testId;
               final String comment = "comment" + testId;
               final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
-              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+              return createSchema(schemaName, comment, null, schemaPath, false);
             });
 
     Assertions.assertNotNull(schemaCreatedByAlice);
@@ -1552,7 +1985,7 @@ public class TestFilesetCatalogOperations {
               final String comment = "comment" + testId;
               final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
               // Create schema with user "bob"
-              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+              return createSchema(schemaName, comment, null, schemaPath, false);
             });
     Assertions.assertNotNull(schemaCreatedByBob);
     Assertions.assertEquals("bob", schemaCreatedByBob.auditInfo().creator());
@@ -1567,7 +2000,7 @@ public class TestFilesetCatalogOperations {
               final String comment = "comment" + testId;
               final String schemaPath = TEST_ROOT_PATH + "/" + schemaName;
               // Create schema with user "lucy"
-              return createSchema(testId, schemaName, comment, null, schemaPath, false);
+              return createSchema(schemaName, comment, null, schemaPath, false);
             });
     Assertions.assertNotNull(schemaCreatedByLucy);
     Assertions.assertEquals("lucy", schemaCreatedByLucy.auditInfo().creator());
@@ -1581,7 +2014,7 @@ public class TestFilesetCatalogOperations {
     final String filesetName = "fileset" + testId;
     String storageLocation = TEST_ROOT_PATH + "/{{fileset}}/{{user}}/{{id}}";
 
-    createSchema(testId, schemaName, null, null, null);
+    createSchema(schemaName, null, null, null);
 
     Exception exception =
         Assertions.assertThrows(
@@ -1638,7 +2071,7 @@ public class TestFilesetCatalogOperations {
     try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
       ops.initialize(catalogProps, randomCatalogInfo("m1", "c1"), FILESET_PROPERTIES_METADATA);
       if (!ops.schemaExists(schemaIdent)) {
-        createSchema(generateTestId(), schemaName, comment, catalogPath, schemaPath);
+        createSchema(schemaName, comment, catalogPath, schemaPath);
       }
       Fileset fileset =
           createFileset(
@@ -2953,22 +3386,17 @@ public class TestFilesetCatalogOperations {
             TEST_ROOT_PATH + "/fileset39"));
   }
 
-  private Schema createSchema(
-      long testId, String name, String comment, String catalogPath, String schemaPath)
+  private Schema createSchema(String name, String comment, String catalogPath, String schemaPath)
       throws IOException {
-    return createSchema(testId, name, comment, catalogPath, schemaPath, false);
+    return createSchema(name, comment, catalogPath, schemaPath, false);
   }
 
   private Schema createSchema(
-      long testId,
-      String name,
-      String comment,
-      String catalogPath,
-      String schemaPath,
-      boolean disableFsOps)
+      String name, String comment, String catalogPath, String schemaPath, boolean disableFsOps)
       throws IOException {
+    long schemaId = idGenerator.nextId();
     // stub schema
-    doReturn(new SchemaIds(1L, 1L, testId))
+    doReturn(new SchemaIds(1L, 1L, schemaId))
         .when(spySchemaMetaService)
         .getSchemaIdByMetalakeNameAndCatalogNameAndSchemaName(
             Mockito.anyString(), Mockito.anyString(), Mockito.eq(name));
@@ -2984,7 +3412,7 @@ public class TestFilesetCatalogOperations {
 
       NameIdentifier schemaIdent = NameIdentifierUtil.ofSchema("m1", "c1", name);
       Map<String, String> schemaProps = Maps.newHashMap();
-      StringIdentifier stringId = StringIdentifier.fromId(testId);
+      StringIdentifier stringId = StringIdentifier.fromId(schemaId);
       schemaProps = Maps.newHashMap(StringIdentifier.newPropertiesWithId(stringId, schemaProps));
 
       if (schemaPath != null) {

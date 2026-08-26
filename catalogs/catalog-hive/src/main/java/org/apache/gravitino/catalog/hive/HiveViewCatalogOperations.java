@@ -26,11 +26,14 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
@@ -50,12 +53,33 @@ import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewCatalog;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 class HiveViewCatalogOperations implements ViewCatalog {
   private static final Logger LOG = LoggerFactory.getLogger(HiveViewCatalogOperations.class);
+  private static final String SUPPORTED_VIEW_DIALECTS =
+      String.join(", ", Dialects.HIVE, Dialects.TRINO, Dialects.FLINK, Dialects.SPARK);
+
+  /**
+   * The HMS-level representation derived from a logical view definition: the columns, comment, and
+   * {@code viewOriginalText} actually stored on the underlying HMS table. For a Trino dialect view
+   * these differ from the caller-supplied values (see {@link #encodeHmsView}); for every other
+   * dialect they are passed through unchanged.
+   */
+  private static final class HmsViewEncoding {
+    final Column[] columns;
+    final String comment;
+    final String viewOriginalText;
+
+    HmsViewEncoding(Column[] columns, String comment, String viewOriginalText) {
+      this.columns = columns;
+      this.comment = comment;
+      this.viewOriginalText = viewOriginalText;
+    }
+  }
 
   private final Supplier<CachedClientPool> clientPoolSupplier;
   private final Supplier<String> catalogNameSupplier;
@@ -116,18 +140,20 @@ class HiveViewCatalogOperations implements ViewCatalog {
     Map<String, String> safeProperties = properties == null ? ImmutableMap.of() : properties;
     SQLRepresentation sqlRepresentation =
         validateSQLRepresentation(
-            representations, defaultCatalog, defaultSchema, safeProperties, ident);
+            representations, defaultCatalog, defaultSchema, safeProperties, columns, ident);
 
     try {
       Map<String, String> params = Maps.newHashMap(safeProperties);
       params.put(TABLE_TYPE, TableType.VIRTUAL_VIEW.name());
-      String viewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
+      HmsViewEncoding encoding =
+          encodeHmsView(
+              sqlRepresentation, columns, comment, defaultCatalog, defaultSchema, params, ident);
 
       HiveTable hiveTable =
           HiveTable.builder()
               .withName(ident.name())
-              .withComment(comment)
-              .withColumns(copyColumns(columns))
+              .withComment(encoding.comment)
+              .withColumns(encoding.columns)
               .withProperties(params)
               .withAuditInfo(
                   AuditInfo.builder()
@@ -136,7 +162,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
                       .build())
               .withCatalogName(catalogName())
               .withDatabaseName(schemaIdent.name())
-              .withViewOriginalText(viewOriginalText)
+              .withViewOriginalText(encoding.viewOriginalText)
               .build();
 
       clientPool()
@@ -177,6 +203,34 @@ class HiveViewCatalogOperations implements ViewCatalog {
         throw new NoSuchViewException("No view named %s (it is a table, not a view)", ident.name());
       }
 
+      // Reuse the same dialect detection as loadHiveView()/toHiveView() so that a presto_view
+      // entry that is not a plain Trino view (e.g. a Trino/Presto materialized view) is rejected
+      // here too, instead of being silently treated as a non-Trino view.
+      boolean isTrinoView =
+          Dialects.TRINO.equalsIgnoreCase(HiveView.detectDialect(currentHiveTable.properties()));
+      // Gravitino's view model has no owner/runAsInvoker/path concept, so replacing a native Trino
+      // view that carries a non-default value for any of them would silently discard it (e.g. a
+      // SECURITY DEFINER view with an owner would silently become an ownerless SECURITY INVOKER
+      // view). Reject the replace instead of doing that.
+      boolean currentTrinoViewHasUnrepresentableFields = false;
+      if (isTrinoView) {
+        TrinoNativeViewCodec.ViewDefinition currentDefinition;
+        try {
+          currentDefinition = TrinoNativeViewCodec.decode(currentHiveTable.viewOriginalText());
+        } catch (IllegalArgumentException e) {
+          throw new UnsupportedOperationException(
+              "View "
+                  + ident
+                  + " carries the presto_view marker but its payload cannot be "
+                  + "decoded",
+              e);
+        }
+        currentTrinoViewHasUnrepresentableFields =
+            currentDefinition.owner != null
+                || !currentDefinition.runAsInvoker
+                || !currentDefinition.path.isEmpty();
+      }
+
       String newViewName = currentHiveTable.name();
       String updatedViewOriginalText = currentHiveTable.viewOriginalText();
       Map<String, String> updatedProperties = Maps.newHashMap(currentHiveTable.properties());
@@ -196,18 +250,48 @@ class HiveViewCatalogOperations implements ViewCatalog {
         } else if (change instanceof ViewChange.SetProperty) {
           ViewChange.SetProperty sp = (ViewChange.SetProperty) change;
           if (COMMENT.equals(sp.getProperty())) {
+            if (isTrinoView) {
+              throw new UnsupportedOperationException(
+                  "Trino dialect views store their comment inside the encoded view payload; use "
+                      + "ReplaceView to change it, not SetProperty(comment)");
+            }
             updatedComment = sp.getValue();
+          } else if (TrinoNativeViewCodec.PRESTO_VIEW_FLAG.equals(sp.getProperty())) {
+            throw new UnsupportedOperationException(
+                "Property '"
+                    + TrinoNativeViewCodec.PRESTO_VIEW_FLAG
+                    + "' is reserved for native Trino view storage and cannot be set directly; "
+                    + "use ReplaceView to change the view's dialect");
           } else {
             updatedProperties.put(sp.getProperty(), sp.getValue());
           }
         } else if (change instanceof ViewChange.RemoveProperty) {
           String property = ((ViewChange.RemoveProperty) change).getProperty();
           if (COMMENT.equals(property)) {
+            if (isTrinoView) {
+              throw new UnsupportedOperationException(
+                  "Trino dialect views store their comment inside the encoded view payload; use "
+                      + "ReplaceView to change it, not RemoveProperty(comment)");
+            }
             updatedComment = null;
+          } else if (TrinoNativeViewCodec.PRESTO_VIEW_FLAG.equals(property)) {
+            throw new UnsupportedOperationException(
+                "Property '"
+                    + TrinoNativeViewCodec.PRESTO_VIEW_FLAG
+                    + "' is reserved for native Trino view storage and cannot be removed "
+                    + "directly; use ReplaceView to change the view's dialect");
           } else {
             updatedProperties.remove(property);
           }
         } else if (change instanceof ViewChange.ReplaceView) {
+          if (currentTrinoViewHasUnrepresentableFields) {
+            throw new UnsupportedOperationException(
+                "View "
+                    + ident
+                    + " is a native Trino view with a non-default owner, runAsInvoker, or SQL "
+                    + "path; Gravitino cannot represent these fields, so replacing it would "
+                    + "silently discard them");
+          }
           ViewChange.ReplaceView replace = (ViewChange.ReplaceView) change;
           SQLRepresentation sqlRepresentation =
               validateSQLRepresentation(
@@ -215,10 +299,21 @@ class HiveViewCatalogOperations implements ViewCatalog {
                   replace.getDefaultCatalog(),
                   replace.getDefaultSchema(),
                   updatedProperties,
+                  replace.getColumns(),
                   ident);
-          updatedColumns = copyColumns(replace.getColumns());
-          updatedComment = replace.getComment();
-          updatedViewOriginalText = toHmsViewOriginalText(sqlRepresentation, ident);
+          HmsViewEncoding encoding =
+              encodeHmsView(
+                  sqlRepresentation,
+                  replace.getColumns(),
+                  replace.getComment(),
+                  replace.getDefaultCatalog(),
+                  replace.getDefaultSchema(),
+                  updatedProperties,
+                  ident);
+          updatedColumns = encoding.columns;
+          updatedViewOriginalText = encoding.viewOriginalText;
+          updatedComment = encoding.comment;
+          isTrinoView = Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect());
         } else {
           throw new IllegalArgumentException(
               "Unsupported view change type: " + change.getClass().getSimpleName());
@@ -324,6 +419,11 @@ class HiveViewCatalogOperations implements ViewCatalog {
       return true;
     } catch (NoSuchViewException e) {
       return false;
+    } catch (UnsupportedOperationException e) {
+      // The HMS entry exists but Gravitino cannot fully interpret it (e.g. a materialized view or
+      // an undecodable native Trino view payload); treat it as existing so callers (e.g. a rename
+      // target check) don't collide with it.
+      return true;
     }
   }
 
@@ -364,19 +464,52 @@ class HiveViewCatalogOperations implements ViewCatalog {
       AuditInfo auditInfo) {
     Map<String, String> params =
         Maps.newHashMap(properties != null ? properties : ImmutableMap.of());
-    String representationSql = viewOriginalText;
-    String detectedDialect = HiveView.detectDialect(representationSql, params);
+    String detectedDialect = HiveView.detectDialect(params);
     switch (detectedDialect.toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
+      case Dialects.TRINO:
       case Dialects.FLINK:
       case Dialects.SPARK:
         break;
       default:
-        // TODO(design-docs/gravitino-logical-view-management.md): support loading trino HMS views.
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but found '%s' for view %s",
-                Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, detectedDialect, ident));
+                "Hive catalog currently supports only [%s] view dialects, but found '%s' for view %s",
+                SUPPORTED_VIEW_DIALECTS, detectedDialect, ident));
+    }
+
+    String representationSql;
+    String resolvedComment;
+    String restoredDefaultCatalog = null;
+    String restoredDefaultSchema = null;
+    Column[] resolvedColumns;
+    if (Dialects.TRINO.equalsIgnoreCase(detectedDialect)) {
+      // Trino dialect views are encoded using Trino's native "Presto View" format, so the SQL,
+      // comment, default catalog/schema, and real columns all live in the encoded payload; the
+      // underlying HMS table only carries a single dummy column (see hmsColumns()).
+      TrinoNativeViewCodec.ViewDefinition decoded;
+      try {
+        decoded = TrinoNativeViewCodec.decode(viewOriginalText);
+      } catch (IllegalArgumentException e) {
+        throw new UnsupportedOperationException(
+            "View " + ident + " carries the presto_view marker but its payload cannot be decoded",
+            e);
+      }
+      representationSql = decoded.originalSql;
+      resolvedComment = decoded.comment;
+      restoredDefaultCatalog = decoded.catalog;
+      restoredDefaultSchema = decoded.schema;
+      resolvedColumns =
+          decoded.columns.stream()
+              .map(
+                  c ->
+                      Column.of(
+                          c.name, TrinoNativeViewCodec.fromTrinoTypeString(c.type), c.comment))
+              .toArray(Column[]::new);
+    } else {
+      representationSql = viewOriginalText;
+      resolvedComment = comment;
+      resolvedColumns = copyColumns(columns);
     }
 
     SQLRepresentation rep =
@@ -387,11 +520,13 @@ class HiveViewCatalogOperations implements ViewCatalog {
 
     return HiveView.builder()
         .withName(ident.name())
-        .withComment(comment)
-        .withColumns(copyColumns(columns))
+        .withComment(resolvedComment)
+        .withColumns(resolvedColumns)
         .withRepresentations(new SQLRepresentation[] {rep})
         .withProperties(params)
         .withAuditInfo(auditInfo)
+        .withDefaultCatalog(restoredDefaultCatalog)
+        .withDefaultSchema(restoredDefaultSchema)
         .build();
   }
 
@@ -407,6 +542,7 @@ class HiveViewCatalogOperations implements ViewCatalog {
       String defaultCatalog,
       String defaultSchema,
       Map<String, String> properties,
+      Column[] columns,
       NameIdentifier ident) {
     int representationCount = representations == null ? 0 : representations.length;
     Representation firstRepresentation =
@@ -429,6 +565,23 @@ class HiveViewCatalogOperations implements ViewCatalog {
             selected.dialect(),
             defaultCatalog,
             defaultSchema,
+            ident);
+        return selected;
+      case Dialects.TRINO:
+        // The default catalog/schema are encoded into the Trino native view payload by
+        // toHmsViewOriginalText() and restored in toHiveView(), so no value is required to be null
+        // here.
+        Preconditions.checkArgument(
+            columns != null && columns.length > 0,
+            "Dialect '%s' requires at least one column for view %s; without it the encoded "
+                + "payload cannot be decoded on the next load",
+            selected.dialect(),
+            ident);
+        Preconditions.checkArgument(
+            defaultSchema == null || defaultCatalog != null,
+            "Dialect '%s' does not support a defaultSchema without a defaultCatalog for view "
+                + "%s, since Trino's native view format rejects such a payload",
+            selected.dialect(),
             ident);
         return selected;
       case Dialects.FLINK:
@@ -457,27 +610,88 @@ class HiveViewCatalogOperations implements ViewCatalog {
             HiveView.SPARK_VERSION_KEY);
         return selected;
       default:
-        // TODO(design-docs/gravitino-logical-view-management.md): support creating trino HMS views.
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
-                Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, selected.dialect(), ident));
+                "Hive catalog currently supports only [%s] view dialects, but got '%s' for view %s",
+                SUPPORTED_VIEW_DIALECTS, selected.dialect(), ident));
     }
   }
 
-  private String toHmsViewOriginalText(SQLRepresentation representation, NameIdentifier ident) {
+  /**
+   * Sets or clears the {@code presto_view} marker in the given HMS property map, so that a Trino
+   * dialect view is recognized as a native Trino view (see {@link TrinoNativeViewCodec}).
+   */
+  private void applyTrinoViewMarker(Map<String, String> params, String dialect) {
+    if (!Dialects.TRINO.equalsIgnoreCase(dialect)) {
+      params.remove(TrinoNativeViewCodec.PRESTO_VIEW_FLAG);
+      return;
+    }
+    params.put(TrinoNativeViewCodec.PRESTO_VIEW_FLAG, "true");
+  }
+
+  /**
+   * Derives the HMS-level representation of a view from its logical definition, shared by {@link
+   * #createView} and the {@code ReplaceView} branch of {@link #alterView}. The caller supplies the
+   * logical SQL representation, output columns, user comment, and default catalog/schema; {@code
+   * properties} is mutated in place to set or clear the {@code presto_view} marker.
+   */
+  private HmsViewEncoding encodeHmsView(
+      SQLRepresentation sqlRepresentation,
+      Column[] columns,
+      String comment,
+      String defaultCatalog,
+      String defaultSchema,
+      Map<String, String> properties,
+      NameIdentifier ident) {
+    applyTrinoViewMarker(properties, sqlRepresentation.dialect());
+    String viewOriginalText =
+        toHmsViewOriginalText(
+            sqlRepresentation, columns, comment, defaultCatalog, defaultSchema, ident);
+    String hmsComment =
+        Dialects.TRINO.equalsIgnoreCase(sqlRepresentation.dialect())
+            ? TrinoNativeViewCodec.PRESTO_VIEW_COMMENT
+            : comment;
+    return new HmsViewEncoding(
+        hmsColumns(columns, sqlRepresentation.dialect()), hmsComment, viewOriginalText);
+  }
+
+  private String toHmsViewOriginalText(
+      SQLRepresentation representation,
+      Column[] columns,
+      String comment,
+      String defaultCatalog,
+      String defaultSchema,
+      NameIdentifier ident) {
     switch (representation.dialect().toLowerCase(Locale.ROOT)) {
       case Dialects.HIVE:
       case Dialects.FLINK:
       case Dialects.SPARK:
         return representation.sql();
+      case Dialects.TRINO:
+        List<TrinoNativeViewCodec.ViewColumn> viewColumns =
+            Arrays.stream(columns == null ? new Column[0] : columns)
+                .map(
+                    c ->
+                        new TrinoNativeViewCodec.ViewColumn(
+                            c.name(),
+                            TrinoNativeViewCodec.toTrinoTypeString(c.dataType()),
+                            c.comment()))
+                .collect(Collectors.toList());
+        return TrinoNativeViewCodec.encode(
+            new TrinoNativeViewCodec.ViewDefinition(
+                representation.sql(),
+                defaultCatalog,
+                defaultSchema,
+                viewColumns,
+                comment,
+                /* owner= */ null,
+                /* runAsInvoker= */ true,
+                /* path= */ Collections.emptyList()));
       default:
-        // TODO(design-docs/gravitino-logical-view-management.md): support serializing trino HMS
-        // view definitions.
         throw new UnsupportedOperationException(
             String.format(
-                "Hive catalog currently supports only '%s', '%s' and '%s' view dialects, but got '%s' for view %s",
-                Dialects.HIVE, Dialects.FLINK, Dialects.SPARK, representation.dialect(), ident));
+                "Hive catalog currently supports only [%s] view dialects, but got '%s' for view %s",
+                SUPPORTED_VIEW_DIALECTS, representation.dialect(), ident));
     }
   }
 
@@ -492,6 +706,19 @@ class HiveViewCatalogOperations implements ViewCatalog {
 
   private Column[] copyColumns(Column[] columns) {
     return columns == null ? new Column[0] : columns.clone();
+  }
+
+  /**
+   * Builds the columns to store on the underlying HMS table. Trino dialect views store their real
+   * columns inside the encoded Trino native view payload (see {@link #toHmsViewOriginalText}), so
+   * the HMS table itself only carries a single dummy column, matching real Trino's own behavior
+   * (see {@code io.trino.plugin.hive.HiveMetadata#createView}).
+   */
+  private Column[] hmsColumns(Column[] columns, String dialect) {
+    if (Dialects.TRINO.equalsIgnoreCase(dialect)) {
+      return new Column[] {Column.of("dummy", Types.StringType.get())};
+    }
+    return copyColumns(columns);
   }
 
   private CachedClientPool clientPool() {

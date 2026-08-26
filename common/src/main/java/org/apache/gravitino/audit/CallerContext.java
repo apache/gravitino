@@ -21,6 +21,8 @@ package org.apache.gravitino.audit;
 
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -31,12 +33,14 @@ import java.util.Map;
  * <p>hadoop-common-project/hadoop-common/src/main/java/org/apache/hadoop/ipc/CallerContext.java
  */
 public class CallerContext {
-  private Map<String, String> context;
+  private final Map<String, String> context;
 
-  private CallerContext() {}
+  private CallerContext(Map<String, String> context) {
+    this.context = context;
+  }
 
   /**
-   * Returns the context map in the caller context.
+   * Returns the context map in the caller context. The returned map is unmodifiable.
    *
    * @return the context map
    */
@@ -59,26 +63,26 @@ public class CallerContext {
 
   /** Builder to create a caller context. */
   public static class Builder {
-    private final CallerContext callerContext;
+    private Map<String, String> context;
 
-    private Builder() {
-      callerContext = new CallerContext();
-    }
+    private Builder() {}
 
     /**
-     * Sets the context for CallerContext
+     * Sets the context for CallerContext. The provided map is defensively copied into an
+     * unmodifiable map, so later mutations to the caller's map do not affect this context and the
+     * map returned by {@link CallerContext#context()} cannot be modified.
      *
      * @param context The context to set.
      * @return This Builder instance for method chaining.
      */
     public CallerContext.Builder withContext(Map<String, String> context) {
-      callerContext.context = context;
+      this.context = context == null ? null : Collections.unmodifiableMap(new HashMap<>(context));
       return this;
     }
 
     /** Validate the variables in the CallerContext. */
     private void validate() {
-      Preconditions.checkArgument(callerContext.context != null, "context cannot be null");
+      Preconditions.checkArgument(context != null, "context cannot be null");
     }
 
     /**
@@ -88,7 +92,7 @@ public class CallerContext {
      */
     public CallerContext build() {
       validate();
-      return callerContext;
+      return new CallerContext(context);
     }
   }
 

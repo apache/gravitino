@@ -344,20 +344,18 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
             return droppedFromCatalog;
           }
 
-          // For the unmanaged schema, it could happen that the schema:
-          // 1. It's not found in the catalog (dropped directly from underlying sources)
-          // 2. It's found in the catalog but not in the store (not managed by Gravitino)
-          // 3. It's found in the catalog and the store (managed by Gravitino)
-          // 4. Neither found in the catalog nor in the store.
-          // In all situations, we try to delete the schema from the store, but we don't take the
-          // return value of the store operation into account. We only take the return value of the
-          // catalog into account.
-          try {
-            store.delete(ident, SCHEMA, true);
-          } catch (NoSuchEntityException e) {
-            LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
-          } catch (Exception e) {
-            throw new RuntimeException(e);
+          // A false result is ambiguous: the external schema may have been renamed or dropped out
+          // of band. Preserve the registration because deleting it after a rename would lose
+          // Gravitino-only metadata. A true out-of-band drop can therefore leave a stale
+          // registration that requires separate cleanup.
+          if (droppedFromCatalog) {
+            try {
+              store.delete(ident, SCHEMA, true);
+            } catch (NoSuchEntityException e) {
+              LOG.warn("The schema to be dropped does not exist in the store: {}", ident, e);
+            } catch (Exception e) {
+              throw new RuntimeException(e);
+            }
           }
 
           SchemaEntityCleaner.deleteOrphanedSchemaEntities(

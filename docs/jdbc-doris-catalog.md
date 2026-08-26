@@ -27,7 +27,7 @@ Gravitino saves some system information in schema and table comments, like
 - Gravitino catalog corresponds to the Doris instance.
 - Supports metadata management of Doris (1.2.x, 3.0.x, 4.0.x).
 - Supports table index (PRIMARY_KEY, UNIQUE_KEY, INVERTED, BITMAP (legacy), ANN/VECTOR).
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 ### Catalog Properties
 
@@ -81,10 +81,10 @@ Returning null for DATETIME type precision. Driver version: mysql-connector-java
 
 ### Catalog Operations
 
-Refer to [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#catalog-operations) for more details.
+Refer to [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#catalog-operations) for more details.
 
 :::note
-Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the load catalog response. Use the [credential vending API](security/credential-vending.md) to retrieve them at runtime.
+Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden from the default load catalog response. Retrieve secret-manager-backed properties (including `jdbc-password` when stored as a secret URN) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The [credential vending API](security/credential-vending.md) (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery.
 :::
 
 ## Schema
@@ -102,7 +102,7 @@ Sensitive catalog properties such as `jdbc-user` and `jdbc-password` are hidden 
 ### Schema Operations
 
 Refer to
-[Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#schema-operations) for more details.
+[Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operations) for more details.
 
 ## Table
 
@@ -110,7 +110,7 @@ Refer to
 
 - Gravitino's table concept corresponds to the Doris table.
 - Supports index.
-- Supports [column default value](./manage-relational-metadata-using-gravitino.md#table-column-default-value).
+- Supports [column default value](./tables-and-views.md#table-column-default-value).
 
 #### Table Column Types
 
@@ -139,7 +139,7 @@ Refer to
 | `ExternalType("hll")`      | `HLL`                |
 
 Doris doesn't support Gravitino `Fixed` `Timestamp_tz` `IntervalDay` `IntervalYear` `Union` `UUID` type.
-The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./manage-relational-metadata-using-gravitino.md#unparsed-type)** that represents an unresolvable data type.
+The data types other than those listed above are mapped to Gravitino's **[Unparsed Type](./tables-and-views.md#unparsed-type)** that represents an unresolvable data type.
 
 :::note
 Doris `array`, `map`, and `struct` types are loaded as `ExternalType` with the full type string preserved (e.g. `array<int(11)>`). They are not resolved into Gravitino native composite types (`ListType`, `MapType`, `StructType`). The type identifier in `ExternalType` is always lowercase (e.g. `"json"`, not `"JSON"`), matching Doris JDBC metadata behavior.
@@ -212,6 +212,7 @@ Only Doris built-in table properties are supported; user-defined properties are 
 | Property Name                      | Description                                                                                                                                                                                 | Default Value | Required | Reserved | Immutable |
 |------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
 | `replication_num`                  | The number of replications for the table. If not specified and the number of backend servers less than 3, then the default value is 1; If BE ≥ 3, the server-side default (3) will be used. | `1` or `3`    | No       | No       | No        |
+| `replication_allocation`           | The replication allocation policy for the table. It cannot be set together with `replication_num`.                                                                                          | (none)        | No       | No       | No        |
 | `compression`                      | The compression type for the table. Supported values: `ZSTD`, `LZ4`, `LZ4F`, `ZLIB`. Deprecated as a table-level property in Doris 4.0+. Cannot be changed after table creation.            | (none)        | No       | No       | Yes       |
 | `bloom_filter_columns`             | Comma-separated list of columns for which bloom filter indexes are created.                                                                                                                 | (none)        | No       | No       | No        |
 | `storage_policy`                   | The name of the storage policy for cold-hot separation.                                                                                                                                     | (none)        | No       | No       | No        |

@@ -18,7 +18,6 @@
  */
 package org.apache.gravitino.iceberg.integration.test;
 
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -29,7 +28,6 @@ import org.apache.gravitino.integration.test.container.MinIOContainer;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.ITUtils;
 import org.apache.gravitino.storage.S3Properties;
-import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 
@@ -69,22 +67,7 @@ public class IcebergRESTMinIOTokenAuthorizationIT extends IcebergRESTCloudTokenA
 
     super.startIntegrationTest();
 
-    // A sibling IT may have left this schema behind in the shared Iceberg JDBC backend.
-    if (!catalogClientWithAllPrivilege.asSchemas().schemaExists(SCHEMA_NAME)) {
-      catalogClientWithAllPrivilege.asSchemas().createSchema(SCHEMA_NAME, "test", new HashMap<>());
-    }
-  }
-
-  @AfterAll
-  public void stopIntegrationTest() throws IOException, InterruptedException {
-    // super drops the metalake, so it has to run even when setup failed part way through.
-    try {
-      // The Iceberg JDBC backend is shared with sibling ITs; Iceberg has no cascading drop.
-      clearTable();
-      catalogClientWithAllPrivilege.asSchemas().dropSchema(SCHEMA_NAME, false);
-    } finally {
-      super.stopIntegrationTest();
-    }
+    createSchemaIfAbsent();
   }
 
   @Override
@@ -111,16 +94,9 @@ public class IcebergRESTMinIOTokenAuthorizationIT extends IcebergRESTCloudTokenA
   }
 
   @Override
-  protected void downloadCloudBundleJar() {
-    // gravitino-iceberg-aws-bundle already shades the Iceberg AWS bundle and the Gravitino
-    // credential providers, so it is built locally and nothing has to be fetched.
-  }
-
-  @Override
   protected void copyCloudBundleJar() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
-    // The REST server and the lakehouse-iceberg catalog resolve S3FileIO through separate
-    // classloaders, so each needs its own copy.
+    // The REST server and the catalog use separate classloaders, so each needs its own copy.
     BaseIT.copyBundleJarsToDirectory(
         BUNDLE_NAME, ITUtils.joinPath(gravitinoHome, "iceberg-rest-server", "libs"));
     BaseIT.copyBundleJarsToDirectory(

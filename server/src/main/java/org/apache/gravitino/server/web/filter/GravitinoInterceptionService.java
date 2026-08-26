@@ -54,6 +54,7 @@ import org.apache.gravitino.server.authorization.annotations.ExpressionCondition
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizationExecutor;
 import org.apache.gravitino.server.web.filter.authorization.AuthorizeExecutorFactory;
+import org.apache.gravitino.server.web.rest.BulkOperations;
 import org.apache.gravitino.server.web.rest.CatalogOperations;
 import org.apache.gravitino.server.web.rest.FilesetOperations;
 import org.apache.gravitino.server.web.rest.FunctionOperations;
@@ -61,6 +62,7 @@ import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectSecretOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
@@ -101,6 +103,7 @@ public class GravitinoInterceptionService implements InterceptionService {
             FunctionOperations.class.getName(),
             TopicOperations.class.getName(),
             FilesetOperations.class.getName(),
+            BulkOperations.class.getName(),
             UserOperations.class.getName(),
             GroupOperations.class.getName(),
             PermissionOperations.class.getName(),
@@ -113,7 +116,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName(),
             JobOperations.class.getName(),
-            MetadataObjectCredentialOperations.class.getName()));
+            MetadataObjectCredentialOperations.class.getName(),
+            MetadataObjectSecretOperations.class.getName()));
   }
 
   @Override
@@ -232,7 +236,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                     parameters,
                     args,
                     secondaryExpression,
-                    secondaryExpressionCondition);
+                    secondaryExpressionCondition,
+                    expressionAnnotation.allowCheckExistence());
             boolean authorizeResult = executor.execute(authorizationRequestContext);
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();

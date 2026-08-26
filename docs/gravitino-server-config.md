@@ -172,6 +172,7 @@ empty string or list; `(none)` means it has no default at all.
 | `gravitino.server.webserver.customFilters`           | Comma-separated list of servlet filter class names to apply to the API.                                                                                                                      | (empty)                                 |
 | `gravitino.server.rest.extensionPackages`            | Comma-separated list of packages to scan for additional REST resources.                                                                                                                      | (empty)                                 |
 | `gravitino.server.visibleConfigs`                    | Comma-separated list of extra properties to expose on the unauthenticated `GET /configs` endpoint, on top of the fixed set it always returns. Additive, so each entry widens what is public. | (empty)                                 |
+| `gravitino.server.bulk.maxItems`                     | Maximum number of items allowed in a single bulk request.                                                                                                                                    | `100`                                   |
 
 Filters named in `customFilters` must be standard `javax.servlet` filters. Pass parameters to a
 filter with properties of the form
@@ -307,13 +308,11 @@ Caches are local to each server, so a metalake modified on one server would othe
 its neighbors. Every server writes its changes to an entity change log table and polls that table
 to invalidate what other servers have touched. A separate cleaner trims old rows.
 
-| Configuration Item                                | Description                                                                                                                                                           | Default Value       |
-|---------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
-| `gravitino.entityChangeLog.pollIntervalSecs`      | Interval in seconds between polls. Must be positive.                                                                                                                  | `3`                 |
-| `gravitino.entityChangeLog.listenerMaxRetries`    | Times a batch is retried for a failing listener before `listenerFailureAction` applies. Must be non-negative.                                                         | `10`                |
-| `gravitino.entityChangeLog.listenerFailureAction` | What happens when a listener exhausts its retries. `EXIT` stops the server, on the grounds that its caches are known stale; `SKIP` drops the batch and keeps serving. | `EXIT`              |
-| `gravitino.entityChangeLog.retentionSecs`         | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`.                   | `2592000` (30 days) |
-| `gravitino.entityChangeLog.cleanupIntervalSecs`   | Interval in seconds between cleaner runs. Must be positive.                                                                                                           | `86400` (1 day)     |
+| Configuration Item                              | Description                                                                                                                                         | Default Value       |
+|-------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|
+| `gravitino.entityChangeLog.pollIntervalSecs`    | Interval in seconds between polls. Must be positive.                                                                                                | `3`                 |
+| `gravitino.entityChangeLog.retentionSecs`       | How long in seconds change log rows are kept, measured by database time. `0` disables cleanup; otherwise use at least ten times `pollIntervalSecs`. | `2592000` (30 days) |
+| `gravitino.entityChangeLog.cleanupIntervalSecs` | Interval in seconds between cleaner runs. Must be positive.                                                                                         | `86400` (1 day)     |
 
 #### Tree Lock
 
@@ -488,6 +487,45 @@ server, are documented with those services. See
 | `gravitino.job.stagingDirKeepTimeInMs` | How long in milliseconds a finished job's staging files are kept. Use at least 10 minutes outside testing. | `604800000` (7 days)          |
 | `gravitino.job.statusPullIntervalInMs` | Interval in milliseconds between job status polls. Use at least 1 minute outside testing.                  | `300000` (5 minutes)          |
 
+### Key Management
+
+The server talks to KMS instances you name in `gravitino.conf`. Each name is one configured
+instance. To add one, implement `KmsClientFactory` with a public no-arg constructor, put the jar on
+the server classpath, and set `gravitino.kms.provider.<name>.className` to that class.
+`create(provider, properties)` builds the `KmsClient` for that name. Gravitino does not ship AWS or
+Azure factories. Two names may share one class, which is how you run more than one vault of the
+same kind.
+
+The list is empty by default, and then the server has no KMS clients. Naming a provider without a
+`className`, or with a class the server cannot construct as a `KmsClientFactory`, fails startup.
+Client construction validates local configuration only; the first call to the provider is a later
+key inspection, not startup.
+
+| Configuration Item                         | Description                                                                                                                                                          | Default Value |
+|--------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.kms.providers`                  | Comma-separated KMS instance names, with no spaces after commas. Each name must match `[A-Za-z0-9][A-Za-z0-9_-]*` and cannot contain `.`. Duplicates fail startup. | (empty)       |
+| `gravitino.kms.provider.<name>.className`  | Required factory class name for that instance. The class must have a no-arg constructor and implement `KmsClientFactory`.                                          | (none)        |
+| `gravitino.kms.provider.<name>.<key>`      | Any other property under that name is passed to that factory. Nested dots in `<key>` are allowed, as in `endpoint.region`.                                           | (none)        |
+
+Every name in `providers` needs a matching `.className`. A `gravitino.kms.provider.<name>.*` key
+for a name that is not in the list, or any other `gravitino.kms.*` key, fails startup.
+
+Callers name the instance and the key. They do not send `className`. The server already constructed
+the factory for `aws-prod` at startup.
+
+```text
+# conf/gravitino.conf
+gravitino.kms.providers = aws-prod,aws-dr,azure-eu
+
+gravitino.kms.provider.aws-prod.className = com.example.kms.AwsCustomKmsClientFactory
+gravitino.kms.provider.aws-dr.className = com.example.kms.AwsCustomKmsClientFactory
+gravitino.kms.provider.azure-eu.className = com.example.kms.AzureCustomKmsClientFactory
+```
+
+That configuration builds three clients: two instances of one custom AWS factory and one custom
+Azure factory. Further `gravitino.kms.provider.<name>.*` keys are factory properties, not a closed
+schema; each factory documents the keys it accepts.
+
 ## Catalog Properties
 
 Catalog properties configure one catalog rather than the server. They come from two places: a
@@ -576,6 +614,7 @@ means the property is left alone.
 | `GRAVITINO_SERVER_WEBSERVER_THREAD_POOL_WORK_QUEUE_SIZE` | `gravitino.server.webserver.threadPoolWorkQueueSize` | `100`                                                |
 | `GRAVITINO_SERVER_WEBSERVER_REQUEST_HEADER_SIZE`         | `gravitino.server.webserver.requestHeaderSize`       | `131072`                                             |
 | `GRAVITINO_SERVER_WEBSERVER_RESPONSE_HEADER_SIZE`        | `gravitino.server.webserver.responseHeaderSize`      | `131072`                                             |
+| `GRAVITINO_SERVER_BULK_MAX_ITEMS`                        | `gravitino.server.bulk.maxItems`                     | `100`                                                |
 | `GRAVITINO_ENTITY_STORE`                                 | `gravitino.entity.store`                             | `relational`                                         |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL`                      | `gravitino.entity.store.relational`                  | `JDBCBackend`                                        |
 | `GRAVITINO_ENTITY_STORE_RELATIONAL_JDBC_URL`             | `gravitino.entity.store.relational.jdbcUrl`          | `jdbc:h2`                                            |

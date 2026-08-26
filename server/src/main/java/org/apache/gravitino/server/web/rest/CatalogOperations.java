@@ -203,6 +203,38 @@ public class CatalogOperations {
     }
   }
 
+  @POST
+  @Path("{catalog}/testConnection")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "test-existing-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
+  @ResponseMetered(name = "test-existing-connection", absolute = true)
+  public Response testExistingConnection(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName) {
+    LOG.info("Received test connection request for existing catalog: {}.{}", metalake, catalogName);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
+            catalogDispatcher.testConnection(ident);
+            LOG.info(
+                "Successfully tested connection for existing catalog: {}.{}",
+                metalake,
+                catalogName);
+            return Utils.ok(new BaseResponse());
+          });
+    } catch (Exception e) {
+      LOG.info("Failed to test connection for existing catalog: {}.{}", metalake, catalogName);
+      return ExceptionHandlers.handleExistingCatalogTestConnectionException(e);
+    }
+  }
+
   @PATCH
   @Path("{catalog}")
   @Produces("application/vnd.gravitino.v1+json")
