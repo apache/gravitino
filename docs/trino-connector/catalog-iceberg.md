@@ -35,19 +35,18 @@ protocol.
 
 The connector already connects to the Gravitino server (it is how catalogs are discovered in the
 first place), so it also asks that server whether it has an Iceberg REST server running as an
-[auxiliary service](../iceberg-rest-service.md) for the connector's metalake, and uses the endpoint
-the server reports. Nothing needs to be configured for this: `etc/catalog/gravitino.properties` only
-needs the usual `gravitino.uri` and `gravitino.metalake`. If the server reports no endpoint — the
-IRC is not running as an auxiliary service, or it serves a different metalake — `lakehouse-iceberg`
-catalogs fall back to translating `catalog-backend` as before, and credential vending does not work.
+[auxiliary service](../iceberg-rest-service.md) for the connector's metalake. By default, a
+non-REST `lakehouse-iceberg` catalog is not registered until an endpoint is discovered or configured
+explicitly. It is retried during every metadata refresh rather than silently falling back and
+disabling credential vending. To retain the behavior from older connector versions, set
+`gravitino.iceberg.rest-routing-enabled=false`; this skips discovery and translates the catalog's
+`catalog-backend` into the corresponding native Trino Iceberg configuration.
 
-Only the coordinator polls the Gravitino server, so the coordinator resolves the endpoint once, when
-a catalog is first registered or reloaded, and hands it to every node (coordinator and workers alike)
+Only the coordinator polls the Gravitino server, so the coordinator resolves the endpoint when a
+catalog is registered or refreshed and hands it to every node (coordinator and workers alike)
 as part of that catalog's own definition — the same way Trino replicates any other catalog property
-cluster-wide. A practical consequence: a catalog registered before the IRC started keeps its existing
-routing until Gravitino reports a change *and* the catalog itself is reloaded (its metadata changes,
-or Trino restarts) — starting the IRC alone does not retroactively re-route an already-registered
-catalog.
+cluster-wide. A catalog that could not be registered before the IRC started is registered
+automatically after a later discovery poll succeeds; no Trino restart is required.
 
 Set `gravitino.iceberg.rest-uri` to override the discovered endpoint, and it is required — not just
 an override — for a standalone IRC (its own process, not the Gravitino server's auxiliary service):
@@ -122,13 +121,14 @@ keeping per-user credential vending and per-user authorization intact. Set
 
 - One IRC serves exactly one metalake, fixed at startup by
   `gravitino.iceberg-rest.gravitino-metalake`. The Gravitino server only reports the IRC's endpoint
-  for that metalake; in multi-metalake mode (`gravitino.use-single-metalake=false`), catalogs in any
-  other metalake fall back to translating `catalog-backend` instead of failing outright.
+  for that metalake. In multi-metalake mode (`gravitino.use-single-metalake=false`), a non-REST
+  Iceberg catalog in another metalake therefore requires a metalake-scoped manual URI or remains
+  unregistered while REST routing is enabled.
 - A catalog created with `catalog-backend=rest` keeps pointing at its own configured `uri` and is
   not re-routed, since it already reaches an Iceberg REST catalog directly.
-- A deployment that does not run the IRC needs no configuration at all: the server reports no
-  endpoint, and `lakehouse-iceberg` catalogs are translated into Trino's `jdbc` or `hive_metastore`
-  catalog types as before.
+- A deployment that does not run the IRC must set
+  `gravitino.iceberg.rest-routing-enabled=false` to translate non-REST `lakehouse-iceberg` catalogs
+  into Trino's `jdbc` or `hive_metastore` catalog types as before.
 - Discovery only works for an IRC running as a Gravitino auxiliary service
   (`gravitino.auxService.names=iceberg-rest`), embedded in the same process as the Gravitino server.
   A standalone IRC — its own process, started with `GravitinoIcebergRESTServer` and its own

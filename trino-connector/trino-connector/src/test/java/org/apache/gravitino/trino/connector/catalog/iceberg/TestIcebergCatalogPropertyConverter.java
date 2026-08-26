@@ -320,8 +320,7 @@ public class TestIcebergCatalogPropertyConverter {
   }
 
   @Test
-  public void testBuildConnectorPropertiesFallsBackWhenNoIcebergRestUriIsAvailable()
-      throws Exception {
+  public void testBuildConnectorPropertiesFailsWhenNoIcebergRestUriIsAvailable() {
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
             .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
@@ -329,13 +328,12 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-driver", "org.postgresql.Driver")
             .build();
 
-    // Neither a manual gravitino.iceberg.rest-uri nor a discovered one for this metalake: the
-    // routing gate never fires, so this is the ordinary backend-translation path, not an error.
-    Map<String, String> config =
-        buildConnectorConfig("catalog1", properties, icebergRestUnavailableConfig());
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "test"));
 
-    Assertions.assertEquals("jdbc", config.get("iceberg.catalog.type"));
-    Assertions.assertNull(config.get("iceberg.rest-catalog.uri"));
+    TrinoException exception =
+        Assertions.assertThrows(
+            TrinoException.class, () -> buildConnectorConfig("catalog1", properties, config));
+    Assertions.assertTrue(exception.getMessage().contains("no Iceberg REST endpoint is available"));
   }
 
   @Test
@@ -384,7 +382,7 @@ public class TestIcebergCatalogPropertyConverter {
   }
 
   @Test
-  public void testBuildConnectorPropertiesIgnoresDiscoveryForOtherMetalakes() throws Exception {
+  public void testBuildConnectorPropertiesRejectsDiscoveryForOtherMetalakes() {
     Map<String, String> properties =
         ImmutableMap.<String, String>builder()
             .put("catalog-backend", "jdbc")
@@ -394,19 +392,18 @@ public class TestIcebergCatalogPropertyConverter {
 
     // Discovery reported an endpoint for a different metalake than the one this catalog belongs
     // to (the mock catalog's metalake is "test"); embedDiscoveredIcebergRestUri must not embed it.
-    Map<String, String> config =
-        buildConnectorConfig(
-            "catalog1",
-            properties,
-            icebergRestDiscoveredConfig("other_metalake", "http://other:9001/iceberg"),
-            /* embedDiscovery= */ true);
-
-    Assertions.assertEquals("jdbc", config.get("iceberg.catalog.type"));
-    Assertions.assertNull(config.get("iceberg.rest-catalog.uri"));
+    Assertions.assertThrows(
+        TrinoException.class,
+        () ->
+            buildConnectorConfig(
+                "catalog1",
+                properties,
+                icebergRestDiscoveredConfig("other_metalake", "http://other:9001/iceberg"),
+                /* embedDiscovery= */ true));
   }
 
   @Test
-  public void testDiscoveredUriUnusedWithoutEmbedding() throws Exception {
+  public void testDiscoveredUriUnusedWithoutEmbedding() {
     // A worker never runs discovery, so its own GravitinoConfig never has a discovered value
     // populated — this asserts that IcebergConnectorAdapter really does read the routing signal
     // from the catalog, not from GravitinoConfig's discovered map directly.
@@ -417,15 +414,14 @@ public class TestIcebergCatalogPropertyConverter {
             .put("jdbc-driver", "org.postgresql.Driver")
             .build();
 
-    Map<String, String> config =
-        buildConnectorConfig(
-            "catalog1",
-            properties,
-            icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg"),
-            /* embedDiscovery= */ false);
-
-    Assertions.assertEquals("jdbc", config.get("iceberg.catalog.type"));
-    Assertions.assertNull(config.get("iceberg.rest-catalog.uri"));
+    Assertions.assertThrows(
+        TrinoException.class,
+        () ->
+            buildConnectorConfig(
+                "catalog1",
+                properties,
+                icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg"),
+                /* embedDiscovery= */ false));
   }
 
   @Test
@@ -786,9 +782,10 @@ public class TestIcebergCatalogPropertyConverter {
   }
 
   private static GravitinoConfig icebergRestUnavailableConfig() {
-    // No manual gravitino.iceberg.rest-uri, and nothing discovered for this metalake: the
-    // connector has no endpoint to route through, so catalogs fall back to their own backend.
-    return new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "test"));
+    return new GravitinoConfig(
+        ImmutableMap.of(
+            "gravitino.metalake", "test",
+            "gravitino.iceberg.rest-routing-enabled", "false"));
   }
 
   private static GravitinoConfig icebergRestConfiguredConfig(Map<String, String> extraConfig) {

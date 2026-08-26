@@ -201,7 +201,10 @@ public class CatalogConnectorManager {
         try {
           GravitinoMetalake metalake = metalakes.get(usedMetalake);
           LOG.debug("Load metalake: {}", usedMetalake);
-          refreshIcebergRestUri(usedMetalake);
+          if (config.isIcebergRestRoutingEnabled()
+              && StringUtils.isBlank(config.getManualIcebergRestUri(usedMetalake))) {
+            refreshIcebergRestUri(usedMetalake);
+          }
           loadCatalogs(metalake);
         } catch (Exception e) {
           LOG.error("Load Metalake {} failed.", usedMetalake, e);
@@ -218,10 +221,8 @@ public class CatalogConnectorManager {
    * read on the next catalog load. Failures — including talking to a Gravitino server older than
    * this endpoint — must not interrupt catalog loading, so they are swallowed here; Iceberg
    * catalogs simply keep their last known routing decision until the next successful poll. A
-   * failure is logged at WARN only on the transition into that state (not on every poll), so a
-   * persistently failing/misconfigured discovery is still visible at the default log level without
-   * spamming the log for the common case of an older Gravitino server that lacks this endpoint
-   * entirely.
+   * failure is logged at ERROR on every poll because routing through Iceberg REST is required when
+   * enabled. Catalog loading continues so that unrelated catalogs remain available.
    */
   private void refreshIcebergRestUri(String metalakeName) {
     try {
@@ -231,18 +232,15 @@ public class CatalogConnectorManager {
         LOG.info("Iceberg REST service discovery for metalake {} recovered.", metalakeName);
       }
     } catch (Exception e) {
-      if (icebergRestDiscoveryFailing.add(metalakeName)) {
-        LOG.warn(
-            "Failed to query the Iceberg REST service endpoint for metalake {}; keeping the "
-                + "last known routing decision. This is expected when talking to a Gravitino "
-                + "server that predates this endpoint, but is otherwise worth investigating. "
-                + "Further failures for this metalake are logged at DEBUG until it recovers.",
-            metalakeName,
-            e);
-      } else {
-        LOG.debug(
-            "Failed to query the Iceberg REST service endpoint for metalake {}.", metalakeName, e);
-      }
+      icebergRestDiscoveryFailing.add(metalakeName);
+      LOG.error(
+          "Failed to query the Iceberg REST service endpoint for metalake {}; Iceberg catalogs "
+              + "without a configured REST endpoint cannot be registered until discovery "
+              + "recovers. Set gravitino.iceberg.rest-uri explicitly, upgrade the Gravitino "
+              + "server to one that supports discovery, or disable Iceberg REST routing with "
+              + "gravitino.iceberg.rest-routing-enabled=false to use legacy backend translation.",
+          metalakeName,
+          e);
     }
   }
 
