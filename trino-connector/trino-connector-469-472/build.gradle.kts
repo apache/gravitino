@@ -61,7 +61,8 @@ dependencies {
   implementation(libs.commons.lang3)
   implementation("io.trino:trino-jdbc:$trinoVersion")
   runtimeOnly("io.opentelemetry.semconv:opentelemetry-semconv:$otelSemconvVersion")
-  compileOnly(libs.airlift.log)
+  implementation(libs.airlift.log)
+  implementation(libs.slf4j.jdk14)
   compileOnly(libs.airlift.resolver)
   compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")

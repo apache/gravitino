@@ -180,7 +180,12 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
         <dependency>
             <groupId>io.airlift</groupId>
             <artifactId>log</artifactId>
-            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>2.0.17</version>
         </dependency>
 
         <dependency>

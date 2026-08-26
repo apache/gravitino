@@ -26,7 +26,7 @@ import java.util.Map;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 
 public class CatalogPropertyConverter extends PropertyConverter {
-  private static final Logger LOG = Logger.get(PropertyConverter.class);
+  private static final Logger LOG = Logger.get(CatalogPropertyConverter.class);
 
   private static final String TRINO_PROPERTIES_PREFIX = "trino.bypass.";
 
