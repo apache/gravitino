@@ -35,7 +35,7 @@ import org.lance.namespace.client.apache.api.NamespaceApi;
 import org.lance.namespace.model.ListNamespacesResponse;
 
 /** Discovers and configures Lance REST catalogs. */
-public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
+class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
 
   static final String FORMAT = "lance";
   static final String CATALOG_CLASS = "org.lance.spark.LanceNamespaceSparkCatalog";

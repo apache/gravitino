@@ -28,15 +28,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -65,18 +63,10 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
   private static final Pattern PROVIDER_URI_PATTERN =
       Pattern.compile("^spark\\.sql\\.gravitino\\.([A-Za-z][A-Za-z0-9]*)REST\\.uri$");
   private static final CatalogRegistrationPolicy DEFAULT_POLICY = (format, catalogName) -> true;
+  private static final Map<String, Supplier<LakehouseRESTCatalogProvider>> PROVIDER_FACTORIES =
+      Collections.singletonMap(LanceRESTCatalogProvider.FORMAT, LanceRESTCatalogProvider::new);
 
-  private final List<LakehouseRESTCatalogProvider> providersForTesting;
-
-  GravitinoLakehouseRESTDiscoveryDriverPlugin() {
-    this.providersForTesting = null;
-  }
-
-  @VisibleForTesting
-  GravitinoLakehouseRESTDiscoveryDriverPlugin(
-      List<LakehouseRESTCatalogProvider> providersForTesting) {
-    this.providersForTesting = new ArrayList<>(providersForTesting);
-  }
+  GravitinoLakehouseRESTDiscoveryDriverPlugin() {}
 
   @Override
   public Map<String, String> init(SparkContext sc, PluginContext pluginContext) {
@@ -86,6 +76,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @VisibleForTesting
   void initialize(SparkConf sparkConf) {
+    initialize(sparkConf, PROVIDER_FACTORIES);
+  }
+
+  @VisibleForTesting
+  void initialize(
+      SparkConf sparkConf, Map<String, Supplier<LakehouseRESTCatalogProvider>> providerFactories) {
     validatePluginOrder(sparkConf);
     SparkConf userConf = sparkConf.clone();
     Map<String, String> activeFormats = findActiveFormats(userConf);
@@ -94,7 +90,6 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
     }
 
     ClassLoader classLoader = contextClassLoader();
-    Map<String, LakehouseRESTCatalogProvider> providers = loadProviders(classLoader);
     CatalogRegistrationPolicy policy = loadRegistrationPolicy(userConf, classLoader);
     List<CatalogRegistration> registrations = new ArrayList<>();
     Set<String> registeredNames = new LinkedHashSet<>();
@@ -102,11 +97,12 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
     activeFormats.forEach(
         (format, uri) -> {
-          LakehouseRESTCatalogProvider provider = providers.get(format);
+          Supplier<LakehouseRESTCatalogProvider> providerFactory = providerFactories.get(format);
           Preconditions.checkArgument(
-              provider != null,
+              providerFactory != null,
               "No lakehouse REST catalog provider found for configured format: %s",
               format);
+          LakehouseRESTCatalogProvider provider = providerFactory.get();
           validateProviderRuntime(provider, classLoader);
 
           Map<String, String> globalProperties = extractCatalogProperties(userConf, format);
@@ -176,36 +172,6 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
       }
     }
     return activeFormats;
-  }
-
-  private Map<String, LakehouseRESTCatalogProvider> loadProviders(ClassLoader classLoader) {
-    List<LakehouseRESTCatalogProvider> loadedProviders = new ArrayList<>();
-    if (providersForTesting != null) {
-      loadedProviders.addAll(providersForTesting);
-    } else {
-      try {
-        ServiceLoader.load(LakehouseRESTCatalogProvider.class, classLoader)
-            .forEach(loadedProviders::add);
-      } catch (ServiceConfigurationError e) {
-        throw new IllegalArgumentException("Failed to load lakehouse REST catalog providers", e);
-      }
-    }
-
-    Map<String, LakehouseRESTCatalogProvider> providers = new HashMap<>();
-    for (LakehouseRESTCatalogProvider provider : loadedProviders) {
-      String format = provider.format();
-      Preconditions.checkArgument(
-          StringUtils.isNotBlank(format), "Lakehouse REST catalog provider format is blank");
-      Preconditions.checkArgument(
-          format.matches("[A-Za-z][A-Za-z0-9]*"),
-          "Invalid lakehouse REST catalog provider format: %s",
-          format);
-      Preconditions.checkArgument(
-          providers.put(format, provider) == null,
-          "Multiple lakehouse REST catalog providers found for format: %s",
-          format);
-    }
-    return providers;
   }
 
   private static CatalogRegistrationPolicy loadRegistrationPolicy(
