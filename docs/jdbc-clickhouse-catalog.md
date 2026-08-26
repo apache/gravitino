@@ -354,7 +354,7 @@ Supported:
 - Rename column.
 - Update column type/comment/default/position/nullability.
 - Delete columns (with `IF EXISTS` support).
-- Add data-skipping indexes with custom `GRANULARITY` and `set(N)` via `Index.properties()`; drop data-skipping indexes. Adding/dropping primary key is not supported.
+- Add and drop data-skipping indexes; configure custom `GRANULARITY`, `set(N)`, and `ngrambf_v1`/`tokenbf_v1` Bloom-filter parameters via `Index.properties()`. Adding/dropping primary key is not supported.
 - Update table comment.
 
 Unsupported:

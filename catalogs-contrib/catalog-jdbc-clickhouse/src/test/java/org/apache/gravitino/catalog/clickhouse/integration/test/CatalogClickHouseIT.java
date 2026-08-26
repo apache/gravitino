@@ -3182,6 +3182,8 @@ public class CatalogClickHouseIT extends BaseIT {
     Assertions.assertTrue(
         normalizedCreateSql.contains("Enum16('low'=100,'medium'=200,'high'=300)"),
         "SHOW CREATE TABLE should contain Enum16 definition: " + createSql);
+  }
+
   @Test
   @Tag("gravitino-docker-test")
   void testCreateAndLoadTableWithNgrambfAndTokenbfIndexes() {

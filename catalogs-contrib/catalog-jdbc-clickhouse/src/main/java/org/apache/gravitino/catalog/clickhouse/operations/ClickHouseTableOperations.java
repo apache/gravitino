@@ -1596,44 +1596,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String parameterSourceName = includesTypeFull ? "type_full" : "legacy type";
           String expression = resultSet.getString("expr");
           long granularity = resultSet.getLong("granularity");
-          Index.IndexType indexType = null;
+          Index.IndexType indexType;
+          String[][] fields;
           try {
             indexType = getClickHouseIndexType(type);
-            String[][] fields = parseIndexFields(expression);
-            if (ArrayUtils.isEmpty(fields)) {
-              continue;
-            }
-            // Only include granularity in properties when it differs from the default,
-            // so that indexes created without explicit granularity have empty properties
-            // and match the original creation state (avoids false index-change diffs).
-            Map<String, String> properties = new HashMap<>();
-            if (granularity != DEFAULT_INDEX_GRANULARITY) {
-              properties.put(GRANULARITY, String.valueOf(granularity));
-            }
-            Map<String, String> bloomFilterProperties =
-                parseBloomFilterPropertiesForQuery(
-                    indexType, parameterSource, name, !includesTypeFull);
-            if (!includesTypeFull
-                && isParameterizedBloomFilterIndex(indexType)
-                && bloomFilterProperties.isEmpty()) {
-              LOG.warn(
-                  "Legacy ClickHouse metadata does not expose bloom-filter parameters for "
-                      + "{} index '{}' on {}.{}; loaded Index.properties() is incomplete",
-                  type,
-                  name,
-                  databaseName,
-                  tableName);
-            }
-            properties.putAll(bloomFilterProperties);
-            secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
+            fields = parseIndexFields(expression);
           } catch (IllegalArgumentException e) {
-            if (isParameterizedBloomFilterIndex(indexType)) {
-              throw new IllegalArgumentException(
-                  "Failed to load data skipping index '%s' from %s.%s with %s '%s'"
-                      .formatted(
-                          name, databaseName, tableName, parameterSourceName, parameterSource),
-                  e);
-            }
             LOG.warn(
                 "Skip unsupported data skipping index {} for {}.{} with type {} "
                     + "(parameter metadata={}) and expression {}",
@@ -1644,7 +1612,43 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 parameterSource,
                 expression,
                 e);
+            continue;
           }
+          if (ArrayUtils.isEmpty(fields)) {
+            continue;
+          }
+
+          // Only include granularity in properties when it differs from the default,
+          // so that indexes created without explicit granularity have empty properties
+          // and match the original creation state (avoids false index-change diffs).
+          Map<String, String> properties = new HashMap<>();
+          if (granularity != DEFAULT_INDEX_GRANULARITY) {
+            properties.put(GRANULARITY, String.valueOf(granularity));
+          }
+          Map<String, String> bloomFilterProperties;
+          try {
+            bloomFilterProperties =
+                parseBloomFilterPropertiesForQuery(
+                    indexType, parameterSource, name, !includesTypeFull);
+          } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException(
+                "Failed to load data skipping index '%s' from %s.%s with %s '%s'"
+                    .formatted(name, databaseName, tableName, parameterSourceName, parameterSource),
+                e);
+          }
+          if (!includesTypeFull
+              && isParameterizedBloomFilterIndex(indexType)
+              && bloomFilterProperties.isEmpty()) {
+            LOG.warn(
+                "Legacy ClickHouse metadata does not expose bloom-filter parameters for "
+                    + "{} index '{}' on {}.{}; loaded Index.properties() is incomplete",
+                type,
+                name,
+                databaseName,
+                tableName);
+          }
+          properties.putAll(bloomFilterProperties);
+          secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
         }
       }
     }
