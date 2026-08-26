@@ -142,6 +142,16 @@ public class TestNameIdentifierUtil {
         MetadataObjects.parse("catalog1.schema1.view1", MetadataObject.Type.VIEW);
     assertEquals(viewObject, NameIdentifierUtil.toMetadataObject(view, Entity.EntityType.VIEW));
 
+    // test semantic model
+    NameIdentifier semanticModel =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "semantic_model1");
+    MetadataObject semanticModelObject =
+        MetadataObjects.parse(
+            "catalog1.schema1.semantic_model1", MetadataObject.Type.SEMANTIC_MODEL);
+    assertEquals(
+        semanticModelObject,
+        NameIdentifierUtil.toMetadataObject(semanticModel, Entity.EntityType.SEMANTIC_MODEL));
+
     // test null
     Throwable e1 =
         assertThrows(
@@ -363,5 +373,18 @@ public class TestNameIdentifierUtil {
         NameIdentifierUtil.buildNameIdentifier(Entity.EntityType.VIEW, viewName, viewEntities);
     assertEquals(NameIdentifier.of(metalake, catalog, schema, viewName), viewIdent);
     assertEquals(viewName, viewIdent.name());
+
+    // Test 14: Build a SEMANTIC_MODEL identifier
+    String semanticModelName = "my_semantic_model";
+    Map<Entity.EntityType, String> semanticModelEntities = Maps.newHashMap();
+    semanticModelEntities.put(Entity.EntityType.METALAKE, metalake);
+    semanticModelEntities.put(Entity.EntityType.CATALOG, catalog);
+    semanticModelEntities.put(Entity.EntityType.SCHEMA, schema);
+    NameIdentifier semanticModelIdent =
+        NameIdentifierUtil.buildNameIdentifier(
+            Entity.EntityType.SEMANTIC_MODEL, semanticModelName, semanticModelEntities);
+    assertEquals(
+        NameIdentifier.of(metalake, catalog, schema, semanticModelName), semanticModelIdent);
+    assertEquals(semanticModelName, semanticModelIdent.name());
   }
 }

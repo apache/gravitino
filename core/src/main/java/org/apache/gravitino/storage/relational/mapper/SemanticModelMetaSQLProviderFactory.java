@@ -1,0 +1,147 @@
+/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.gravitino.storage.relational.mapper;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.List;
+import java.util.Map;
+import org.apache.gravitino.storage.relational.JDBCBackend.JDBCBackendType;
+import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelMetaBaseSQLProvider;
+import org.apache.gravitino.storage.relational.mapper.provider.postgresql.SemanticModelMetaPostgreSQLProvider;
+import org.apache.gravitino.storage.relational.po.SemanticModelPO;
+import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.ibatis.annotations.Param;
+
+/** Selects database-specific SQL providers for Semantic Model identity metadata. */
+public class SemanticModelMetaSQLProviderFactory {
+
+  private static final Map<JDBCBackendType, SemanticModelMetaBaseSQLProvider>
+      SEMANTIC_MODEL_META_SQL_PROVIDER_MAP =
+          ImmutableMap.of(
+              JDBCBackendType.MYSQL, new SemanticModelMetaMySQLProvider(),
+              JDBCBackendType.H2, new SemanticModelMetaH2Provider(),
+              JDBCBackendType.POSTGRESQL, new SemanticModelMetaPostgreSQLProvider());
+
+  /** Returns the SQL provider for the configured relational backend. */
+  public static SemanticModelMetaBaseSQLProvider getProvider() {
+    String databaseId =
+        SqlSessionFactoryHelper.getInstance()
+            .getSqlSessionFactory()
+            .getConfiguration()
+            .getDatabaseId();
+    return SEMANTIC_MODEL_META_SQL_PROVIDER_MAP.get(JDBCBackendType.fromString(databaseId));
+  }
+
+  static class SemanticModelMetaMySQLProvider extends SemanticModelMetaBaseSQLProvider {}
+
+  static class SemanticModelMetaH2Provider extends SemanticModelMetaBaseSQLProvider {}
+
+  /** Provides SQL for listing Semantic Models by schema ID. */
+  public static String listSemanticModelPOsBySchemaId(@Param("schemaId") Long schemaId) {
+    return getProvider().listSemanticModelPOsBySchemaId(schemaId);
+  }
+
+  /** Provides SQL for listing Semantic Models by fully qualified schema name. */
+  public static String listSemanticModelPOsByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName) {
+    return getProvider()
+        .listSemanticModelPOsByFullQualifiedName(metalakeName, catalogName, schemaName);
+  }
+
+  /** Provides SQL for selecting a Semantic Model ID by schema ID and name. */
+  public static String selectSemanticModelIdBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName) {
+    return getProvider().selectSemanticModelIdBySchemaIdAndName(schemaId, semanticModelName);
+  }
+
+  /** Provides SQL for listing Semantic Models by stable IDs. */
+  public static String listSemanticModelPOsBySemanticModelIds(
+      @Param("semanticModelIds") List<Long> semanticModelIds) {
+    return getProvider().listSemanticModelPOsBySemanticModelIds(semanticModelIds);
+  }
+
+  /** Provides SQL for selecting a Semantic Model by schema ID and name. */
+  public static String selectSemanticModelMetaBySchemaIdAndName(
+      @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName) {
+    return getProvider().selectSemanticModelMetaBySchemaIdAndName(schemaId, semanticModelName);
+  }
+
+  /** Provides SQL for selecting a Semantic Model by fully qualified name. */
+  public static String selectSemanticModelByFullQualifiedName(
+      @Param("metalakeName") String metalakeName,
+      @Param("catalogName") String catalogName,
+      @Param("schemaName") String schemaName,
+      @Param("semanticModelName") String semanticModelName) {
+    return getProvider()
+        .selectSemanticModelByFullQualifiedName(
+            metalakeName, catalogName, schemaName, semanticModelName);
+  }
+
+  /** Provides SQL for inserting a Semantic Model identity. */
+  public static String insertSemanticModelMeta(
+      @Param("semanticModelMeta") SemanticModelPO semanticModelPO) {
+    return getProvider().insertSemanticModelMeta(semanticModelPO);
+  }
+
+  /** Provides SQL for inserting or overwriting a Semantic Model identity. */
+  public static String insertSemanticModelMetaOnDuplicateKeyUpdate(
+      @Param("semanticModelMeta") SemanticModelPO semanticModelPO) {
+    return getProvider().insertSemanticModelMetaOnDuplicateKeyUpdate(semanticModelPO);
+  }
+
+  /** Provides SQL for optimistically updating a Semantic Model identity. */
+  public static String updateSemanticModelMeta(
+      @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
+      @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO) {
+    return getProvider().updateSemanticModelMeta(newSemanticModelPO, oldSemanticModelPO);
+  }
+
+  /** Provides SQL for soft-deleting a Semantic Model identity by stable ID and current version. */
+  public static String softDeleteSemanticModelMetasBySemanticModelId(
+      @Param("semanticModelId") Long semanticModelId,
+      @Param("currentVersion") Long currentVersion) {
+    return getProvider()
+        .softDeleteSemanticModelMetasBySemanticModelId(semanticModelId, currentVersion);
+  }
+
+  /** Provides SQL for soft-deleting Semantic Model identities by metalake ID. */
+  public static String softDeleteSemanticModelMetasByMetalakeId(
+      @Param("metalakeId") Long metalakeId) {
+    return getProvider().softDeleteSemanticModelMetasByMetalakeId(metalakeId);
+  }
+
+  /** Provides SQL for soft-deleting Semantic Model identities by catalog ID. */
+  public static String softDeleteSemanticModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
+    return getProvider().softDeleteSemanticModelMetasByCatalogId(catalogId);
+  }
+
+  /** Provides SQL for soft-deleting Semantic Model identities by schema IDs. */
+  public static String softDeleteSemanticModelMetasBySchemaIds(
+      @Param("schemaIds") List<Long> schemaIds) {
+    return getProvider().softDeleteSemanticModelMetasBySchemaIds(schemaIds);
+  }
+
+  /** Provides SQL for permanently deleting old Semantic Model identities. */
+  public static String deleteSemanticModelMetasByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
+    return getProvider().deleteSemanticModelMetasByLegacyTimeline(legacyTimeline, limit);
+  }
+}

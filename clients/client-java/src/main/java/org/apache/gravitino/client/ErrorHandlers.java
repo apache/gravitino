@@ -39,6 +39,7 @@ import org.apache.gravitino.exceptions.IllegalJobTemplateOperationException;
 import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
 import org.apache.gravitino.exceptions.IllegalPrivilegeException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
+import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.IllegalStatisticNameException;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
@@ -63,6 +64,7 @@ import org.apache.gravitino.exceptions.NoSuchPartitionException;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchRoleException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
@@ -73,12 +75,14 @@ import org.apache.gravitino.exceptions.NonEmptyMetalakeException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.NotInUseException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PartitionAlreadyExistsException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RESTException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -299,6 +303,15 @@ public class ErrorHandlers {
    */
   public static Consumer<ErrorResponse> functionErrorHandler() {
     return FunctionErrorHandler.INSTANCE;
+  }
+
+  /**
+   * Creates an error handler specific to Semantic Model operations.
+   *
+   * @return A Consumer representing the Semantic Model error handler.
+   */
+  public static Consumer<ErrorResponse> semanticModelErrorHandler() {
+    return SemanticModelErrorHandler.INSTANCE;
   }
 
   private ErrorHandlers() {}
@@ -1483,6 +1496,63 @@ public class ErrorHandlers {
           } else {
             throw new NotInUseException(errorMessage);
           }
+
+        default:
+          super.accept(errorResponse);
+      }
+    }
+  }
+
+  /** Error handler specific to Semantic Model operations. */
+  @SuppressWarnings("FormatStringAnnotation")
+  private static class SemanticModelErrorHandler extends RestErrorHandler {
+
+    private static final SemanticModelErrorHandler INSTANCE = new SemanticModelErrorHandler();
+
+    @Override
+    public void accept(ErrorResponse errorResponse) {
+      String errorMessage = formatErrorMessage(errorResponse);
+
+      switch (errorResponse.getCode()) {
+        case ErrorConstants.ILLEGAL_ARGUMENTS_CODE:
+          if (IllegalSemanticModelException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new IllegalSemanticModelException(errorMessage);
+          }
+          throw new IllegalArgumentException(errorMessage);
+
+        case ErrorConstants.NOT_FOUND_CODE:
+          if (NoSuchMetalakeException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchMetalakeException(errorMessage);
+          } else if (NoSuchCatalogException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchCatalogException(errorMessage);
+          } else if (NoSuchSchemaException.class.getSimpleName().equals(errorResponse.getType())) {
+            throw new NoSuchSchemaException(errorMessage);
+          } else if (NoSuchSemanticModelException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new NoSuchSemanticModelException(errorMessage);
+          }
+          throw new NotFoundException(errorMessage);
+
+        case ErrorConstants.ALREADY_EXISTS_CODE:
+          if (SemanticModelAlreadyExistsException.class
+              .getSimpleName()
+              .equals(errorResponse.getType())) {
+            throw new SemanticModelAlreadyExistsException(errorMessage);
+          }
+          throw new AlreadyExistsException(errorMessage);
+
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
+        case ErrorConstants.FORBIDDEN_CODE:
+          throw new ForbiddenException(errorMessage);
+
+        case ErrorConstants.INTERNAL_ERROR_CODE:
+          throw new RuntimeException(errorMessage);
+
+        case ErrorConstants.OPTIMISTIC_LOCK_CONFLICT_CODE:
+          throw new OptimisticLockException(errorMessage);
 
         default:
           super.accept(errorResponse);

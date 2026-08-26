@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -72,6 +73,10 @@ import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.semantic.SemanticModel;
+import org.apache.gravitino.semantic.SemanticModelCatalog;
+import org.apache.gravitino.semantic.SemanticModelChange;
+import org.apache.gravitino.semantic.SemanticModelDefinition;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -79,9 +84,15 @@ import org.apache.gravitino.secret.SupportsSecrets;
  * catalog is under the metalake.
  */
 class RelationalCatalog extends BaseSchemaCatalog
-    implements TableCatalog, ViewCatalog, SupportsCredentials, SupportsSecrets {
+    implements TableCatalog,
+        ViewCatalog,
+        SemanticModelCatalog,
+        SupportsCredentials,
+        SupportsSecrets {
 
   public static final String PRIVILEGES = "privileges";
+
+  private final SemanticModelCatalogOperations semanticModelOperations;
 
   RelationalCatalog(
       Namespace namespace,
@@ -93,6 +104,7 @@ class RelationalCatalog extends BaseSchemaCatalog
       AuditDTO auditDTO,
       RESTClient restClient) {
     super(namespace, name, type, provider, comment, properties, auditDTO, restClient);
+    this.semanticModelOperations = new SemanticModelCatalogOperations(restClient, namespace, name);
   }
 
   @Override
@@ -103,6 +115,46 @@ class RelationalCatalog extends BaseSchemaCatalog
   @Override
   public ViewCatalog asViewCatalog() {
     return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModelCatalog asSemanticModelCatalog() {
+    return this;
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public NameIdentifier[] listSemanticModels(Namespace namespace) {
+    return semanticModelOperations.listSemanticModels(namespace);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModel loadSemanticModel(NameIdentifier ident) {
+    return semanticModelOperations.loadSemanticModel(ident);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModel createSemanticModel(
+      NameIdentifier ident,
+      @Nullable String comment,
+      SemanticModelDefinition definition,
+      Map<String, String> properties) {
+    return semanticModelOperations.createSemanticModel(ident, comment, definition, properties);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public SemanticModel alterSemanticModel(NameIdentifier ident, SemanticModelChange... changes) {
+    return semanticModelOperations.alterSemanticModel(ident, changes);
+  }
+
+  /** {@inheritDoc} */
+  @Override
+  public boolean dropSemanticModel(NameIdentifier ident) {
+    return semanticModelOperations.dropSemanticModel(ident);
   }
 
   /**
