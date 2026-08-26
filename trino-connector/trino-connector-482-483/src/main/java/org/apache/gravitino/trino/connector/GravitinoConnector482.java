@@ -27,9 +27,9 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 
-public class GravitinoConnector481 extends GravitinoConnector {
+public class GravitinoConnector482 extends GravitinoConnector {
 
-  public GravitinoConnector481(CatalogConnectorContext connectorContext) {
+  public GravitinoConnector482(CatalogConnectorContext connectorContext) {
     super(connectorContext);
   }
 
@@ -38,21 +38,21 @@ public class GravitinoConnector481 extends GravitinoConnector {
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       ConnectorMetadata internalMetadata) {
-    return new GravitinoMetadata481(catalogConnectorMetadata, metadataAdapter, internalMetadata);
+    return new GravitinoMetadata482(catalogConnectorMetadata, metadataAdapter, internalMetadata);
   }
 
   @Override
   public ConnectorSplitManager getSplitManager() {
     ConnectorSplitManager splitManager =
         catalogConnectorContext.getInternalConnector().getSplitManager();
-    return new GravitinoSplitManager481(splitManager);
+    return new GravitinoSplitManager482(splitManager);
   }
 
   @Override
   public ConnectorNodePartitioningProvider getNodePartitioningProvider() {
     ConnectorNodePartitioningProvider nodePartitioningProvider =
         catalogConnectorContext.getInternalConnector().getNodePartitioningProvider();
-    return new GravitinoNodePartitioningProvider481(nodePartitioningProvider);
+    return new GravitinoNodePartitioningProvider482(nodePartitioningProvider);
   }
 
   @Override
@@ -61,7 +61,7 @@ public class GravitinoConnector481 extends GravitinoConnector {
     ConnectorPageSourceProviderFactory internalConnectorPageSourceProviderFactory =
         internalConnector.getPageSourceProviderFactory();
     return () ->
-        new GravitinoDataSourceProvider481(
+        new GravitinoDataSourceProvider482(
             internalConnectorPageSourceProviderFactory.createPageSourceProvider());
   }
 }
