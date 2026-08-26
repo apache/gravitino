@@ -34,7 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
@@ -60,11 +59,14 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
   private static final String SPARK_CATALOG_PREFIX = "spark.sql.catalog.";
   private static final String URI_SUFFIX = "REST.uri";
   private static final String CATALOG_PROPERTIES_INFIX = "REST.catalogProperties.";
+  private static final String LANCE_FORMAT = "lance";
+  private static final String LANCE_PROVIDER_CLASS_NAME =
+      "org.apache.gravitino.spark.connector.plugin.lance.LanceRESTCatalogProvider";
   private static final Pattern PROVIDER_URI_PATTERN =
       Pattern.compile("^spark\\.sql\\.gravitino\\.([A-Za-z][A-Za-z0-9]*)REST\\.uri$");
   private static final CatalogRegistrationPolicy DEFAULT_POLICY = (format, catalogName) -> true;
-  private static final Map<String, Supplier<LakehouseRESTCatalogProvider>> PROVIDER_FACTORIES =
-      Collections.singletonMap(LanceRESTCatalogProvider.FORMAT, LanceRESTCatalogProvider::new);
+  private static final Map<String, String> PROVIDER_CLASS_NAMES =
+      Collections.singletonMap(LANCE_FORMAT, LANCE_PROVIDER_CLASS_NAME);
 
   GravitinoLakehouseRESTDiscoveryDriverPlugin() {}
 
@@ -76,12 +78,11 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @VisibleForTesting
   void initialize(SparkConf sparkConf) {
-    initialize(sparkConf, PROVIDER_FACTORIES);
+    initialize(sparkConf, PROVIDER_CLASS_NAMES);
   }
 
   @VisibleForTesting
-  void initialize(
-      SparkConf sparkConf, Map<String, Supplier<LakehouseRESTCatalogProvider>> providerFactories) {
+  void initialize(SparkConf sparkConf, Map<String, String> providerClassNames) {
     validatePluginOrder(sparkConf);
     SparkConf userConf = sparkConf.clone();
     Map<String, String> activeFormats = findActiveFormats(userConf);
@@ -97,12 +98,8 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
     activeFormats.forEach(
         (format, uri) -> {
-          Supplier<LakehouseRESTCatalogProvider> providerFactory = providerFactories.get(format);
-          Preconditions.checkArgument(
-              providerFactory != null,
-              "No lakehouse REST catalog provider found for configured format: %s",
-              format);
-          LakehouseRESTCatalogProvider provider = providerFactory.get();
+          LakehouseRESTCatalogProvider provider =
+              loadProvider(format, providerClassNames, classLoader);
           validateProviderRuntime(provider, classLoader);
 
           Map<String, String> globalProperties = extractCatalogProperties(userConf, format);
@@ -200,6 +197,33 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
         | InvocationTargetException e) {
       throw new IllegalArgumentException(
           "Failed to instantiate catalog registration policy " + policyClassName, e);
+    }
+  }
+
+  private static LakehouseRESTCatalogProvider loadProvider(
+      String format, Map<String, String> providerClassNames, ClassLoader classLoader) {
+    String providerClassName = providerClassNames.get(format);
+    Preconditions.checkArgument(
+        providerClassName != null,
+        "No lakehouse REST catalog provider found for configured format: %s",
+        format);
+    try {
+      Class<?> providerClass = Class.forName(providerClassName, true, classLoader);
+      Preconditions.checkArgument(
+          LakehouseRESTCatalogProvider.class.isAssignableFrom(providerClass),
+          "%s does not implement %s",
+          providerClassName,
+          LakehouseRESTCatalogProvider.class.getName());
+      return providerClass
+          .asSubclass(LakehouseRESTCatalogProvider.class)
+          .getConstructor()
+          .newInstance();
+    } catch (ReflectiveOperationException | LinkageError e) {
+      throw new IllegalArgumentException(
+          String.format(
+              "Failed to instantiate lakehouse REST catalog provider %s for format %s",
+              providerClassName, format),
+          e);
     }
   }
 

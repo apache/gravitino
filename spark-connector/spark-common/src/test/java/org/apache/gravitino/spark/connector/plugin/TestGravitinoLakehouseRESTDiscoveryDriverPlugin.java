@@ -25,12 +25,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Supplier;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,7 +64,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     SparkConf sparkConf =
         new SparkConf(false).set("spark.plugins", DISCOVERY_PLUGIN + "," + GRAVITINO_PLUGIN);
 
-    driver().initialize(sparkConf, providerFactories("fake", new FailingProvider()));
+    driver().initialize(sparkConf, providerClasses("fake", FailingProvider.class));
 
     assertFalse(sparkConf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
   }
@@ -113,14 +111,13 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
 
   @Test
   void testPolicyFiltersAndRenamesCatalogs() {
-    FakeProvider provider = new FakeProvider(Arrays.asList("catalog_a", "catalog_b"));
     SparkConf sparkConf =
         baseConf()
             .set(
                 GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
                 RenamePolicy.class.getName());
 
-    driver().initialize(sparkConf, providerFactories("fake", provider));
+    driver().initialize(sparkConf, providerClasses("fake", MultipleCatalogProvider.class));
 
     assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a"));
     assertEquals(String.class.getName(), sparkConf.get(CATALOG_PREFIX + "renamed_b"));
@@ -129,7 +126,6 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
 
   @Test
   void testDuplicatePolicyOutputDoesNotPartiallyModifySparkConf() {
-    FakeProvider provider = new FakeProvider(Arrays.asList("catalog_a", "catalog_b"));
     SparkConf sparkConf =
         baseConf()
             .set(
@@ -139,7 +135,9 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     IllegalArgumentException exception =
         assertThrows(
             IllegalArgumentException.class,
-            () -> driver().initialize(sparkConf, providerFactories("fake", provider)));
+            () ->
+                driver()
+                    .initialize(sparkConf, providerClasses("fake", MultipleCatalogProvider.class)));
 
     assertTrue(exception.getMessage().contains("duplicate name"));
     assertFalse(sparkConf.contains(CATALOG_PREFIX + "duplicate"));
@@ -173,6 +171,35 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     assertTrue(exception.getMessage().contains("No lakehouse REST catalog provider"));
   }
 
+  @Test
+  void testMissingProviderClassFails() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                driver()
+                    .initialize(
+                        baseConf(),
+                        Collections.singletonMap("fake", "example.MissingRESTCatalogProvider")));
+
+    assertTrue(exception.getMessage().contains("Failed to instantiate"));
+    assertTrue(exception.getCause() instanceof ClassNotFoundException);
+  }
+
+  @Test
+  void testProviderClassMustImplementProviderInterface() {
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                driver()
+                    .initialize(
+                        baseConf(), Collections.singletonMap("fake", String.class.getName())));
+
+    assertTrue(exception.getMessage().contains("does not implement"));
+    assertTrue(exception.getMessage().contains(LakehouseRESTCatalogProvider.class.getName()));
+  }
+
   private static SparkConf baseConf() {
     return new SparkConf(false).set("spark.plugins", DISCOVERY_PLUGIN).set(URI_CONFIG, "rest-uri");
   }
@@ -182,21 +209,18 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   private static void initialize(SparkConf sparkConf) {
-    FakeProvider provider = new FakeProvider(Collections.singletonList("catalog_a"));
-    driver().initialize(sparkConf, providerFactories("fake", provider));
+    driver().initialize(sparkConf, providerClasses("fake", FakeProvider.class));
   }
 
-  private static Map<String, Supplier<LakehouseRESTCatalogProvider>> providerFactories(
-      String format, LakehouseRESTCatalogProvider provider) {
-    return Collections.singletonMap(format, () -> provider);
+  private static Map<String, String> providerClasses(
+      String format, Class<? extends LakehouseRESTCatalogProvider> providerClass) {
+    return Collections.singletonMap(format, providerClass.getName());
   }
 
-  private static class FakeProvider implements LakehouseRESTCatalogProvider {
-    private final List<String> catalogs;
+  static class FakeProvider implements LakehouseRESTCatalogProvider {
 
-    private FakeProvider(List<String> catalogs) {
-      this.catalogs = new ArrayList<>(catalogs);
-    }
+    /** Creates the fake provider. */
+    public FakeProvider() {}
 
     @Override
     public String format() {
@@ -205,7 +229,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
 
     @Override
     public List<String> listCatalogs(String uri, Map<String, String> catalogProperties) {
-      return catalogs;
+      return Collections.singletonList("catalog_a");
     }
 
     @Override
@@ -225,7 +249,28 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     }
   }
 
-  private static class FailingProvider implements LakehouseRESTCatalogProvider {
+  static class MultipleCatalogProvider extends FakeProvider {
+
+    /** Creates the provider that advertises multiple catalogs. */
+    public MultipleCatalogProvider() {}
+
+    @Override
+    public List<String> listCatalogs(String uri, Map<String, String> catalogProperties) {
+      return Arrays.asList("catalog_a", "catalog_b");
+    }
+  }
+
+  static class FailingProvider implements LakehouseRESTCatalogProvider {
+
+    static {
+      if (Boolean.parseBoolean("true")) {
+        throw new AssertionError("Provider must not be loaded without a configured URI");
+      }
+    }
+
+    /** Creates the provider that must never be loaded. */
+    public FailingProvider() {}
+
     @Override
     public String format() {
       throw new AssertionError("Provider must not be loaded without a configured URI");
