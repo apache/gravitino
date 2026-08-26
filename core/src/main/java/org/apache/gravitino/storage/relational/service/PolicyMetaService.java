@@ -188,14 +188,13 @@ public class PolicyMetaService {
       baseMetricName = "deletePolicy")
   public boolean deletePolicy(NameIdentifier ident) {
     String metalakeName = ident.namespace().level(0);
-    PolicyPO[] deletedPolicy = new PolicyPO[1];
+    PolicyPO[] lockedPolicy = new PolicyPO[1];
     int[] policyMetaDeletedCount = new int[] {0};
     int[] policyVersionDeletedCount = new int[] {0};
     int[] policyTagRelDeletedCount = new int[] {0};
 
-    // Delete the endpoint first. Its UPDATE takes the exclusive row lock that relation writers
-    // share-lock before inserting, so a writer either commits before the cleanup below or observes
-    // the deleted policy after this transaction commits.
+    // Lock the endpoint before cleaning up its relations. Relation writers take a shared lock on
+    // the same row, so none can add a relation until this transaction deletes the policy.
     SessionUtils.doMultipleWithCommit(
         () -> {
           PolicyPO observed =
@@ -205,29 +204,41 @@ public class PolicyMetaService {
           if (observed == null) {
             return;
           }
-          policyMetaDeletedCount[0] =
+          PolicyPO locked =
               SessionUtils.getWithoutCommit(
                   PolicyMetaMapper.class,
-                  mapper ->
-                      mapper.softDeletePolicyByMetalakeAndPolicyName(metalakeName, ident.name()));
-          if (policyMetaDeletedCount[0] == 1) {
-            deletedPolicy[0] = observed;
+                  mapper -> mapper.selectPolicyByPolicyIdForUpdate(observed.getPolicyId()));
+          if (locked != null
+              && Objects.equals(locked.getPolicyName(), ident.name())
+              && Objects.equals(locked.getMetalakeId(), observed.getMetalakeId())) {
+            lockedPolicy[0] = locked;
           }
         },
         () -> {
-          if (deletedPolicy[0] != null) {
+          if (lockedPolicy[0] != null) {
             policyTagRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     PolicyTagRelMapper.class,
-                    mapper -> mapper.softDeleteByPolicyId(deletedPolicy[0].getPolicyId()));
+                    mapper -> mapper.softDeleteByPolicyId(lockedPolicy[0].getPolicyId()));
           }
         },
         () -> {
-          if (deletedPolicy[0] != null) {
+          if (lockedPolicy[0] != null) {
             policyVersionDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     PolicyVersionMapper.class,
-                    mapper -> mapper.softDeleteByPolicyId(deletedPolicy[0].getPolicyId()));
+                    mapper ->
+                        mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
+                            metalakeName, ident.name()));
+          }
+        },
+        () -> {
+          if (lockedPolicy[0] != null) {
+            policyMetaDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    PolicyMetaMapper.class,
+                    mapper ->
+                        mapper.softDeletePolicyByMetalakeAndPolicyName(metalakeName, ident.name()));
           }
         });
     return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] + policyTagRelDeletedCount[0]

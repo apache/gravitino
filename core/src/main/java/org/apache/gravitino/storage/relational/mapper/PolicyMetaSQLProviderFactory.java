@@ -100,6 +100,11 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().selectPolicyByPolicyId(policyId);
   }
 
+  /** Delegates an exclusive-lock policy query. */
+  public static String selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId) {
+    return getProvider().selectPolicyByPolicyIdForUpdate(policyId);
+  }
+
   /** Delegates a shared-lock policy query. */
   public static String selectPolicyByPolicyIdForShare(@Param("policyId") Long policyId) {
     return getProvider().selectPolicyByPolicyIdForShare(policyId);

@@ -62,11 +62,6 @@ public class PolicyVersionSQLProviderFactory {
     return getProvider().softDeletePolicyVersionByMetalakeAndPolicyName(metalakeName, policyName);
   }
 
-  /** Delegates policy-version deletion by policy ID. */
-  public static String softDeleteByPolicyId(@Param("policyId") Long policyId) {
-    return getProvider().softDeleteByPolicyId(policyId);
-  }
-
   public static String deletePolicyVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return getProvider().deletePolicyVersionsByLegacyTimeline(legacyTimeline, limit);

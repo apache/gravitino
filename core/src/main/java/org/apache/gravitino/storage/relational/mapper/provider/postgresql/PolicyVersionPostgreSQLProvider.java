@@ -42,14 +42,6 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
   }
 
   @Override
-  public String softDeleteByPolicyId(Long policyId) {
-    return "UPDATE "
-        + POLICY_VERSION_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
-  }
-
-  @Override
   public String deletePolicyVersionsByLegacyTimeline(Long legacyTimeline, int limit) {
     return "DELETE FROM "
         + POLICY_VERSION_TABLE_NAME
