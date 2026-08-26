@@ -28,6 +28,7 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.QueryParam;
+import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -45,7 +46,7 @@ import org.lance.namespace.errors.PermissionDeniedException;
 
 /** Resolves Lance namespace IDs and maps shared authorization failures to Lance REST responses. */
 public class LanceMetadataAuthorizationMethodInterceptor
-    extends BaseMetadataAuthorizationMethodInterceptor {
+    extends BaseMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
 
   private static final int SCHEMA_NAMESPACE_LEVELS = 2;
 
@@ -58,6 +59,12 @@ public class LanceMetadataAuthorizationMethodInterceptor
    */
   public LanceMetadataAuthorizationMethodInterceptor(String metalakeName) {
     this.metalakeName = metalakeName;
+  }
+
+  @Override
+  public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+    return authorizeMethod(
+        methodInvocation.getMethod(), methodInvocation.getArguments(), methodInvocation::proceed);
   }
 
   @Override
@@ -115,11 +122,8 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   @Override
-  protected Object toErrorResponse(MethodInvocation methodInvocation, Throwable throwable) {
-    String namespaceId =
-        pathArgument(
-                methodInvocation.getMethod().getParameters(), methodInvocation.getArguments(), "id")
-            .orElse("");
+  protected Object toErrorResponse(Method method, Object[] args, Throwable throwable) {
+    String namespaceId = pathArgument(method.getParameters(), args, "id").orElse("");
     Exception exception;
     if (throwable instanceof ForbiddenException) {
       exception =
