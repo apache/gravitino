@@ -35,10 +35,10 @@ dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
   implementation(libs.airlift.json)
-  implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation("io.trino:trino-jdbc:$trinoVersion")
+  compileOnly(libs.airlift.log)
   compileOnly(libs.airlift.resolver)
   compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")

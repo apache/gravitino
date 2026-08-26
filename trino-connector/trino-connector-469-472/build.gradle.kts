@@ -57,11 +57,11 @@ dependencies {
   compileOnly(project(":common"))
 
   implementation(libs.airlift.json)
-  implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation("io.trino:trino-jdbc:$trinoVersion")
   runtimeOnly("io.opentelemetry.semconv:opentelemetry-semconv:$otelSemconvVersion")
+  compileOnly(libs.airlift.log)
   compileOnly(libs.airlift.resolver)
   compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")
