@@ -22,11 +22,13 @@ import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -119,7 +121,7 @@ public class TestSchemaHookDispatcher {
   public void testCreateSchemaThrowsWhenSetOwnerFails() {
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "test_schema");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
     doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
@@ -130,7 +132,9 @@ public class TestSchemaHookDispatcher {
             RuntimeException.class,
             () -> hookDispatcher.createSchema(ident, "comment", Collections.emptyMap()));
     Assertions.assertEquals("Set owner failed", thrown.getMessage());
-    verify(mockDispatcher).createSchema(any(), any(), any());
+    verify(mockDispatcher).createSchema(any(), any(), any(), any(), any());
+    // Align with FilesetHookDispatcher / #12366: do not drop the schema when setOwner fails.
+    verify(mockDispatcher, never()).dropSchema(any(), anyBoolean());
   }
 
   @Test
@@ -141,7 +145,7 @@ public class TestSchemaHookDispatcher {
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "MY_SCHEMA");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
     hookDispatcher.createSchema(ident, "comment", Collections.emptyMap());
 
@@ -170,7 +174,7 @@ public class TestSchemaHookDispatcher {
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
     // No ancestor exists yet, so creating "A:B:C" auto-creates "A" and "A:B".
     when(mockDispatcher.schemaExists(any())).thenReturn(false);
 
@@ -190,7 +194,7 @@ public class TestSchemaHookDispatcher {
 
     NameIdentifier ident = NameIdentifier.of("test_metalake", "test_catalog", "A:B:C");
     Schema mockSchema = mock(Schema.class);
-    when(mockDispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(mockDispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
     // "A" already exists (and has its own owner); only "A:B" and the leaf are newly created.
     NameIdentifier existingA = NameIdentifier.of("test_metalake", "test_catalog", "A");
     when(mockDispatcher.schemaExists(any())).thenReturn(false);

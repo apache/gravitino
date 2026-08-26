@@ -715,12 +715,15 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         GravitinoRuntimeException.class,
         () -> viewOperationDispatcher.alterView(oldIdent, ViewChange.rename(newIdent.name())));
 
-    TestCatalog testCatalog =
-        (TestCatalog) catalogManager.loadCatalog(NameIdentifier.of(metalake, catalog));
-    TestCatalogOperations testCatalogOperations = (TestCatalogOperations) testCatalog.ops();
-    Assertions.assertDoesNotThrow(() -> testCatalogOperations.loadView(oldIdent));
-    Assertions.assertThrows(
-        NoSuchViewException.class, () -> testCatalogOperations.loadView(newIdent));
+    catalogManager.doWithCatalog(
+        NameIdentifier.of(metalake, catalog),
+        liveCatalog -> {
+          TestCatalogOperations testCatalogOperations = (TestCatalogOperations) liveCatalog.ops();
+          Assertions.assertDoesNotThrow(() -> testCatalogOperations.loadView(oldIdent));
+          Assertions.assertThrows(
+              NoSuchViewException.class, () -> testCatalogOperations.loadView(newIdent));
+          return null;
+        });
     reset(entityStore);
   }
 

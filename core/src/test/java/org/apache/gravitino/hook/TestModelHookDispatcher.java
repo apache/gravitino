@@ -123,16 +123,11 @@ public class TestModelHookDispatcher {
         "my_model",
         captor.getValue().name(),
         "Model name passed to setOwner must be lowercased by Capability.Scope.MODEL normalization");
-    // MODEL scope is intentionally excluded from CapabilityHelpers.applyCapabilities(Namespace,
-    // Scope, Capability), so the schema component in the namespace is NOT lowercased -- the
-    // captured parent reflects exactly what ModelNormalizeDispatcher would also pass to the
-    // manager. This assertion locks that behavior in.
     Assertions.assertEquals(
-        "test_catalog.TEST_SCHEMA",
+        "test_catalog.test_schema",
         captor.getValue().parent(),
-        "Model parent must keep its schema component as-is: Capability.Scope.MODEL is excluded"
-            + " from namespace normalization in CapabilityHelpers; if this changes, ownership"
-            + " attachment will diverge from what ModelNormalizeDispatcher passes to the manager");
+        "Model parent passed to setOwner must be lowercased by Capability.Scope.SCHEMA"
+            + " normalization");
   }
 
   @Test

@@ -178,4 +178,38 @@ public class TestCapabilityHelpers {
     Assertions.assertInstanceOf(IllegalStateException.class, e.getCause());
     Mockito.verify(wrapper).release();
   }
+
+  @Test
+  void testSemanticModelUsesSchemaNamespaceCapabilities() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
+
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCapabilities(
+            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCaseSensitive(
+            namespace, Capability.Scope.SEMANTIC_MODEL, UPPERCASE_CAPABILITY));
+  }
+
+  @Test
+  void testModelUsesSchemaNamespaceCapabilities() {
+    Namespace namespace = Namespace.of("metalake", "catalog", "mixedSchema");
+
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCapabilities(
+            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
+    Assertions.assertEquals(
+        Namespace.of("metalake", "catalog", "MIXEDSCHEMA"),
+        CapabilityHelpers.applyCaseSensitive(
+            namespace, Capability.Scope.MODEL, UPPERCASE_CAPABILITY));
+  }
+
+  @Test
+  void testSemanticModelUsesManagedStorageByDefault() {
+    Assertions.assertTrue(
+        Capability.DEFAULT.managedStorage(Capability.Scope.SEMANTIC_MODEL).supported());
+  }
 }
