@@ -540,7 +540,7 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             .deleteViewMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case SEMANTIC_MODEL:
-        // TODO: Delegate to SemanticModelMetaService when relational persistence is added.
+        // TODO(#12209): Delegate to SemanticModelMetaService when relational persistence is added.
         return 0;
       case AUDIT:
         return 0;
