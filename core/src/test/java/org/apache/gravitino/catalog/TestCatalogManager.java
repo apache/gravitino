@@ -1236,8 +1236,7 @@ public class TestCatalogManager {
     store.initialize(config);
     store.put(metalakeEntity, true);
 
-    try (CatalogManager manager =
-        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config))) {
+    try (CatalogManager manager = new CatalogManager(config, store, new RandomIdGenerator())) {
       // Create a catalog
       manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 

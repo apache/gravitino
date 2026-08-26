@@ -298,16 +298,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Nullable private final CatalogChangeLogListener catalogChangeLogListener;
 
   private final IdGenerator idGenerator;
-<<<<<<< HEAD
-  private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
-=======
-
-  private final SecretManager secretManager;
 
   // Copy-on-write: listeners may be registered while the cache's removal listener (running on a
   // cache executor thread) is iterating this list.
   private final List<Consumer<NameIdentifier>> removalListeners = new CopyOnWriteArrayList<>();
->>>>>>> 933401bda ([#12504] fix(core): Fix flaky TestCatalogManager.testCatalogCacheRemoveListener (#12514))
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
 
