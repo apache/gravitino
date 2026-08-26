@@ -77,6 +77,7 @@ if (!skipTrinoConnector) {
     "trino-connector:trino-connector-452-468",
     "trino-connector:trino-connector-469-472",
     "trino-connector:trino-connector-473-478",
+    "trino-connector:trino-connector-479-479",
     "trino-connector:integration-test"
   )
 } else {
