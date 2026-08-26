@@ -50,6 +50,7 @@ import org.apache.gravitino.trino.connector.catalog.hive.SortingColumn.Order;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
 /** Transforming Apache Gravitino Hive metadata to Trino. */
 public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -162,7 +163,7 @@ public class HiveMetadataAdapter extends CatalogConnectorMetadataAdapter {
               column.getName(),
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
-              column.getComment(),
+              SpiVersionCompat.columnComment(column),
               column.isNullable()));
     }
     GravitinoTable gravitinoTable =

@@ -56,6 +56,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdap
 import org.apache.gravitino.trino.connector.catalog.jdbc.JdbcColumnDefaultValueConverter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
 /** Transforming Apache Gravitino MySQL metadata to Trino. */
 public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
@@ -123,7 +124,7 @@ public class MySQLMetadataAdapter extends CatalogConnectorMetadataAdapter {
               column.getName(),
               gravitinoType,
               i,
-              column.getComment(),
+              SpiVersionCompat.columnComment(column),
               column.isNullable(),
               autoIncrement,
               columnDefaultValueConverter.toGravitino(

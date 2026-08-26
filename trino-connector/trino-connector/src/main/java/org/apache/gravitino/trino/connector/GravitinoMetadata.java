@@ -86,6 +86,7 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
 /**
  * The GravitinoMetadata class provides operations for Apache Gravitino metadata on the Gravitino
@@ -851,13 +852,16 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
     }
     try {
       Function function =
-          catalogConnectorMetadata.getFunction(name.getSchemaName(), name.getFunctionName());
+          catalogConnectorMetadata.getFunction(
+              SpiVersionCompat.schemaName(name), SpiVersionCompat.functionName(name));
       if (function == null) {
         return List.of();
       }
       return toLanguageFunctions(function);
     } catch (NoSuchFunctionException e) {
-      LOG.debug("Function %s not found in schema %s", name.getFunctionName(), name.getSchemaName());
+      LOG.debug(
+          "Function %s not found in schema %s",
+          SpiVersionCompat.functionName(name), SpiVersionCompat.schemaName(name));
       return List.of();
     }
   }
