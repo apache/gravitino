@@ -223,6 +223,50 @@ public class FilesetMetaBaseSQLProvider {
         + " AND fm.deleted_at = 0 AND vi.deleted_at = 0";
   }
 
+  /**
+   * Returns an active fileset metadata row and locks it for the current transaction.
+   *
+   * <p>This query reads {@code fileset_meta} alone. The regular ID lookup returns one joined row
+   * per storage location and would also lock version rows, neither of which is needed when
+   * classifying a failed metadata CAS.
+   *
+   * @param filesetId the fileset ID
+   * @return the locking select SQL
+   */
+  public String selectFilesetMetaByIdForUpdate(@Param("filesetId") Long filesetId) {
+    return "SELECT fileset_id as filesetId, fileset_name as filesetName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+        + " type as type, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + META_TABLE_NAME
+        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0 FOR UPDATE";
+  }
+
+  /**
+   * Returns the active fileset metadata row selected by its natural key.
+   *
+   * <p>An overwrite may match the natural key instead of the incoming ID. Reading the stored row
+   * after the upsert tells dependent version rows which ID and database-generated version to use.
+   *
+   * @param schemaId the schema ID
+   * @param filesetName the fileset name
+   * @return the metadata-only select SQL
+   */
+  public String selectFilesetMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("filesetName") String filesetName) {
+    return "SELECT fileset_id as filesetId, fileset_name as filesetName,"
+        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
+        + " type as type, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + META_TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND fileset_name = #{filesetName}"
+        + " AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String insertFilesetMeta(@Param("filesetMeta") FilesetPO filesetPO) {
     return "INSERT INTO "
         + META_TABLE_NAME
@@ -268,11 +312,24 @@ public class FilesetMetaBaseSQLProvider {
         + " schema_id = #{filesetMeta.schemaId},"
         + " type = #{filesetMeta.type},"
         + " audit_info = #{filesetMeta.auditInfo},"
-        + " current_version = #{filesetMeta.currentVersion},"
-        + " last_version = #{filesetMeta.lastVersion},"
+        // An overwrite is also a write observed by OCC. Advance from the stored value instead of
+        // resetting the row to the initial version carried by the incoming create request.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{filesetMeta.deletedAt}";
   }
 
+  /**
+   * Returns SQL that updates a fileset only while its OCC version is unchanged.
+   *
+   * <p>The version is the concurrency token, so payload, name, and audit columns are deliberately
+   * excluded from the predicate. This also detects change-then-change-back races that a full-row
+   * comparison would miss.
+   *
+   * @param newFilesetPO the new fileset values
+   * @param oldFilesetPO the fileset values and version observed by the caller
+   * @return the version-checked update SQL
+   */
   public String updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
       @Param("oldFilesetMeta") FilesetPO oldFilesetPO) {
@@ -288,14 +345,7 @@ public class FilesetMetaBaseSQLProvider {
         + " last_version = #{newFilesetMeta.lastVersion},"
         + " deleted_at = #{newFilesetMeta.deletedAt}"
         + " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
-        + " AND fileset_name = #{oldFilesetMeta.filesetName}"
-        + " AND metalake_id = #{oldFilesetMeta.metalakeId}"
-        + " AND catalog_id = #{oldFilesetMeta.catalogId}"
-        + " AND schema_id = #{oldFilesetMeta.schemaId}"
-        + " AND type = #{oldFilesetMeta.type}"
-        + " AND audit_info = #{oldFilesetMeta.auditInfo}"
         + " AND current_version = #{oldFilesetMeta.currentVersion}"
-        + " AND last_version = #{oldFilesetMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -329,12 +379,21 @@ public class FilesetMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId) {
+  /**
+   * Returns SQL that deletes only the fileset version observed by the caller.
+   *
+   * @param filesetId the fileset ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public String softDeleteFilesetMetasByFilesetId(
+      @Param("filesetId") Long filesetId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        + " WHERE fileset_id = #{filesetId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String deleteFilesetMetasByLegacyTimeline(

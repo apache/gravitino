@@ -57,11 +57,12 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
   }
 
   @Override
-  public String softDeleteFilesetMetasByFilesetId(Long filesetId) {
+  public String softDeleteFilesetMetasByFilesetId(Long filesetId, Long currentVersion) {
     return "UPDATE "
         + META_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+        + " WHERE fileset_id = #{filesetId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
@@ -100,8 +101,13 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + " schema_id = #{filesetMeta.schemaId},"
         + " type = #{filesetMeta.type},"
         + " audit_info = #{filesetMeta.auditInfo},"
-        + " current_version = #{filesetMeta.currentVersion},"
-        + " last_version = #{filesetMeta.lastVersion},"
+        // PostgreSQL requires the stored row to be qualified on the update side of ON CONFLICT.
+        + " current_version = "
+        + META_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + META_TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{filesetMeta.deletedAt}";
   }
 }

@@ -187,6 +187,30 @@ public interface FilesetMetaMapper {
   @SelectProvider(type = FilesetMetaSQLProviderFactory.class, method = "selectFilesetMetaById")
   FilesetPO selectFilesetMetaById(@Param("filesetId") Long filesetId);
 
+  /**
+   * Selects and exclusively locks an active fileset metadata row.
+   *
+   * @param filesetId the fileset ID
+   * @return the active fileset metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(
+      type = FilesetMetaSQLProviderFactory.class,
+      method = "selectFilesetMetaByIdForUpdate")
+  FilesetPO selectFilesetMetaByIdForUpdate(@Param("filesetId") Long filesetId);
+
+  /**
+   * Selects an active fileset metadata row by schema and name in the current transaction.
+   *
+   * @param schemaId the schema ID
+   * @param filesetName the fileset name
+   * @return the active fileset metadata, or {@code null} when it does not exist
+   */
+  @SelectProvider(
+      type = FilesetMetaSQLProviderFactory.class,
+      method = "selectFilesetMetaBySchemaIdAndNameForUpdate")
+  FilesetPO selectFilesetMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("filesetName") String filesetName);
+
   @Results({
     @Result(property = "filesetId", column = "fileset_id", id = true),
     @Result(property = "filesetName", column = "fileset_name"),
@@ -243,10 +267,18 @@ public interface FilesetMetaMapper {
       method = "softDeleteFilesetMetasBySchemaIds")
   Integer softDeleteFilesetMetasBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
 
+  /**
+   * Soft-deletes a fileset only if its version has not changed since the caller read it.
+   *
+   * @param filesetId the fileset ID
+   * @param currentVersion the version observed by the caller
+   * @return the number of deleted rows; zero means the fileset changed or disappeared
+   */
   @UpdateProvider(
       type = FilesetMetaSQLProviderFactory.class,
       method = "softDeleteFilesetMetasByFilesetId")
-  Integer softDeleteFilesetMetasByFilesetId(@Param("filesetId") Long filesetId);
+  Integer softDeleteFilesetMetasByFilesetId(
+      @Param("filesetId") Long filesetId, @Param("currentVersion") Long currentVersion);
 
   @DeleteProvider(
       type = FilesetMetaSQLProviderFactory.class,

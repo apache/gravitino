@@ -36,6 +36,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.tuple.Pair;
@@ -47,17 +48,24 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper;
+import org.apache.gravitino.storage.relational.po.FilesetPO;
+import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.Mockito;
@@ -392,8 +400,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateFilesetReturnsSuccessWhenVersionedMetaUpdateAffectsNoRows()
-      throws IOException {
+  public void testAlterReportsOptimisticLockConflictAndKeepsWinnerVersion() throws IOException {
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_conflict");
     NameIdentifier filesetIdent =
         NameIdentifier.of(metalakeName, catalogName, schemaName, filesetName);
@@ -405,6 +412,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
             AUDIT_INFO,
             "/tmp");
     FilesetMetaService.getInstance().insertFileset(filesetEntity, true);
+    FilesetPO initialPO = getFilesetPO(filesetEntity.id());
 
     AuditInfo conflictingAuditInfo =
         AuditInfo.builder()
@@ -427,36 +435,26 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                     .build())
             .build();
 
-    Exception exception =
-        Assertions.assertThrows(
-            IOException.class,
-            () ->
-                FilesetMetaService.getInstance()
-                    .updateFileset(
-                        filesetIdent,
-                        e -> {
-                          // Simulate an optimistic locking conflict
-                          try {
-                            backend.update(
-                                filesetIdent,
-                                Entity.EntityType.FILESET,
-                                entity -> {
-                                  FilesetEntity cloned =
-                                      createFilesetEntity(
-                                          entity.id(),
-                                          entity.namespace(),
-                                          entity.name(),
-                                          conflictingAuditInfo,
-                                          "/tmp");
-                                  return cloned;
-                                });
-                          } catch (Exception ex) {
-                            throw new RuntimeException(ex);
-                          }
-                          return updatedFilesetEntity;
-                        }));
-    Assertions.assertTrue(
-        exception.getMessage().contains("Failed to update the entity: " + filesetIdent));
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            FilesetMetaService.getInstance()
+                .updateFileset(
+                    filesetIdent,
+                    e -> {
+                      // Commit another alter after the outer call has read its snapshot. The
+                      // outer write must then lose the current_version comparison.
+                      updateFilesetUnchecked(
+                          filesetIdent,
+                          entity ->
+                              createFilesetEntity(
+                                  entity.id(),
+                                  entity.namespace(),
+                                  entity.name(),
+                                  conflictingAuditInfo,
+                                  "/tmp"));
+                      return updatedFilesetEntity;
+                    }));
 
     FilesetEntity persistedEntity =
         FilesetMetaService.getInstance().getFilesetByIdentifier(filesetIdent);
@@ -465,5 +463,315 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     Assertions.assertNull(persistedEntity.properties());
     Assertions.assertEquals("/tmp", persistedEntity.storageLocations().get(LOCATION_NAME_UNKNOWN));
     Assertions.assertNotEquals(updatedFilesetEntity, persistedEntity);
+    FilesetPO currentPO = getFilesetPO(filesetEntity.id());
+    Assertions.assertEquals(
+        initialPO.getCurrentVersion() + 1, currentPO.getCurrentVersion().longValue());
+    Assertions.assertEquals(currentPO.getCurrentVersion(), currentPO.getLastVersion());
+    Assertions.assertEquals(2, listFilesetVersions(filesetEntity.id()).size());
+  }
+
+  @TestTemplate
+  public void testOverwriteAdvancesVersionAndRejectsStaleAlter() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_overwrite_occ");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-original");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    FilesetPO beforeOverwrite = getFilesetPO(original.id());
+    FilesetEntity replacement =
+        copyFileset(
+            original,
+            original.id(),
+            original.name(),
+            "overwrite winner",
+            "/tmp-overwrite",
+            original.auditInfo());
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            FilesetMetaService.getInstance()
+                .updateFileset(
+                    original.nameIdentifier(),
+                    entity -> {
+                      insertFilesetUnchecked(replacement, true);
+                      FilesetEntity current = (FilesetEntity) entity;
+                      return copyFileset(
+                          current,
+                          current.id(),
+                          current.name(),
+                          "stale alter",
+                          "/tmp-stale",
+                          current.auditInfo());
+                    }));
+
+    FilesetEntity winner =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());
+    FilesetPO afterOverwrite = getFilesetPO(original.id());
+    Assertions.assertEquals("overwrite winner", winner.comment());
+    Assertions.assertEquals("/tmp-overwrite", winner.storageLocations().get(LOCATION_NAME_UNKNOWN));
+    Assertions.assertEquals(
+        beforeOverwrite.getCurrentVersion() + 1, afterOverwrite.getCurrentVersion().longValue());
+    Assertions.assertEquals(afterOverwrite.getCurrentVersion(), afterOverwrite.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testNaturalKeyOverwriteUsesPersistedFilesetId() throws IOException {
+    // PostgreSQL targets fileset_id explicitly and rejects a different ID on the natural key.
+    // MySQL/H2 may resolve ON DUPLICATE KEY through either key and must preserve the stored ID.
+    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_natural_key_overwrite");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-original");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    FilesetPO beforeOverwrite = getFilesetPO(original.id());
+    Map<String, String> replacementLocations =
+        ImmutableMap.of(LOCATION_NAME_UNKNOWN, "/tmp-replacement", "archive", "/tmp-archive");
+    FilesetEntity replacement =
+        FilesetEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(original.name())
+            .withNamespace(original.namespace())
+            .withFilesetType(original.filesetType())
+            .withStorageLocations(replacementLocations)
+            .withComment("replacement")
+            .withProperties(original.properties())
+            .withAuditInfo(original.auditInfo())
+            .build();
+
+    FilesetMetaService.getInstance().insertFileset(replacement, true);
+
+    FilesetEntity stored =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());
+    FilesetPO afterOverwrite = getFilesetPO(original.id());
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertEquals("replacement", stored.comment());
+    Assertions.assertEquals(replacementLocations, stored.storageLocations());
+    Assertions.assertEquals(
+        beforeOverwrite.getCurrentVersion() + 1, afterOverwrite.getCurrentVersion().longValue());
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenRenamedConcurrently() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_rename_conflict");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    String renamedName = filesetName + "_winner";
+    NameIdentifier renamedIdentifier = NameIdentifier.of(original.namespace(), renamedName);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            FilesetMetaService.getInstance()
+                .updateFileset(
+                    original.nameIdentifier(),
+                    entity -> {
+                      updateFilesetUnchecked(
+                          original.nameIdentifier(),
+                          current ->
+                              copyFileset(
+                                  current,
+                                  current.id(),
+                                  renamedName,
+                                  "rename winner",
+                                  "/tmp",
+                                  current.auditInfo()));
+                      FilesetEntity current = (FilesetEntity) entity;
+                      return copyFileset(
+                          current,
+                          current.id(),
+                          current.name(),
+                          "stale alter",
+                          "/tmp",
+                          current.auditInfo());
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier()));
+    Assertions.assertEquals(
+        "rename winner",
+        FilesetMetaService.getInstance().getFilesetByIdentifier(renamedIdentifier).comment());
+  }
+
+  @TestTemplate
+  public void testDeleteRejectsStaleVersionAndKeepsVersions() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_stale_delete");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-v1");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    FilesetPO stalePO = getFilesetPO(original.id());
+
+    FilesetMetaService.getInstance()
+        .updateFileset(
+            original.nameIdentifier(),
+            entity -> {
+              FilesetEntity current = (FilesetEntity) entity;
+              return copyFileset(
+                  current,
+                  current.id(),
+                  current.name(),
+                  "winning alter",
+                  "/tmp-v2",
+                  current.auditInfo());
+            });
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    FilesetMetaService.getInstance()
+                        .deleteFilesetWithVersion(original.nameIdentifier(), stalePO)));
+
+    FilesetEntity current =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals("winning alter", current.comment());
+    Assertions.assertEquals("/tmp-v2", current.storageLocations().get(LOCATION_NAME_UNKNOWN));
+    Map<Integer, Long> versions = listFilesetVersions(original.id());
+    Assertions.assertEquals(2, versions.size());
+    assertVersionActive(versions, 1);
+    assertVersionActive(versions, 2);
+  }
+
+  @TestTemplate
+  public void testDeleteReportsNoSuchWhenDeletedConcurrently() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_double_delete");
+    FilesetEntity fileset =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp");
+    FilesetMetaService.getInstance().insertFileset(fileset, false);
+    FilesetPO stalePO = getFilesetPO(fileset.id());
+
+    FilesetMetaService.getInstance().deleteFileset(fileset.nameIdentifier());
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    FilesetMetaService.getInstance()
+                        .deleteFilesetWithVersion(fileset.nameIdentifier(), stalePO)));
+  }
+
+  @TestTemplate
+  public void testUpdateRollsBackMetadataWhenVersionInsertFails() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_update_rollback");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-v1");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    FilesetPO initialPO = getFilesetPO(original.id());
+    FilesetVersionPO conflictingVersion =
+        FilesetVersionPO.builder()
+            .withMetalakeId(initialPO.getMetalakeId())
+            .withCatalogId(initialPO.getCatalogId())
+            .withSchemaId(initialPO.getSchemaId())
+            .withFilesetId(initialPO.getFilesetId())
+            .withVersion(initialPO.getCurrentVersion() + 1)
+            .withFilesetComment("conflicting version")
+            .withLocationName(LOCATION_NAME_UNKNOWN)
+            .withStorageLocation("/tmp-conflict")
+            .withDeletedAt(0L)
+            .build();
+    SessionUtils.doWithCommit(
+        FilesetVersionMapper.class,
+        mapper -> mapper.insertFilesetVersions(List.of(conflictingVersion)));
+
+    assertThrows(
+        RuntimeException.class,
+        () ->
+            FilesetMetaService.getInstance()
+                .updateFileset(
+                    original.nameIdentifier(),
+                    entity -> {
+                      FilesetEntity current = (FilesetEntity) entity;
+                      return copyFileset(
+                          current,
+                          current.id(),
+                          current.name(),
+                          "must roll back",
+                          "/tmp-v2",
+                          current.auditInfo());
+                    }));
+
+    FilesetEntity current =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());
+    FilesetPO currentPO = getFilesetPO(original.id());
+    Assertions.assertEquals(original.comment(), current.comment());
+    Assertions.assertEquals(
+        original.storageLocations().get(LOCATION_NAME_UNKNOWN),
+        current.storageLocations().get(LOCATION_NAME_UNKNOWN));
+    Assertions.assertEquals(initialPO.getCurrentVersion(), currentPO.getCurrentVersion());
+    Assertions.assertEquals(initialPO.getLastVersion(), currentPO.getLastVersion());
+  }
+
+  private FilesetPO getFilesetPO(Long filesetId) {
+    return SessionUtils.getWithoutCommit(
+        FilesetMetaMapper.class, mapper -> mapper.selectFilesetMetaById(filesetId));
+  }
+
+  private FilesetEntity copyFileset(
+      FilesetEntity source,
+      Long id,
+      String name,
+      String comment,
+      String location,
+      AuditInfo auditInfo) {
+    return FilesetEntity.builder()
+        .withId(id)
+        .withName(name)
+        .withNamespace(source.namespace())
+        .withFilesetType(source.filesetType())
+        .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, location))
+        .withComment(comment)
+        .withProperties(source.properties())
+        .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private void updateFilesetUnchecked(
+      NameIdentifier identifier, Function<FilesetEntity, FilesetEntity> updater) {
+    try {
+      FilesetMetaService.getInstance().updateFileset(identifier, updater);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void insertFilesetUnchecked(FilesetEntity fileset, boolean overwrite) {
+    try {
+      FilesetMetaService.getInstance().insertFileset(fileset, overwrite);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }
