@@ -82,15 +82,6 @@ public interface PolicyTagRelMapper {
   int softDeleteByPair(@Param("relation") PolicyTagRelPO relation);
 
   /**
-   * Soft-deletes active relations for a tag ID.
-   *
-   * @param tagId The tag ID.
-   * @return The number of updated rows.
-   */
-  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByTagId")
-  int softDeleteByTagId(@Param("tagId") Long tagId);
-
-  /**
    * Soft-deletes active relations in a metalake.
    *
    * @param metalakeId The metalake ID.

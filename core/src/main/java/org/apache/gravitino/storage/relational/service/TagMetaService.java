@@ -157,63 +157,26 @@ public class TagMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTag")
   public boolean deleteTag(NameIdentifier identifier) {
     String metalakeName = identifier.namespace().level(0);
-    TagPO[] lockedTag = new TagPO[1];
     int[] tagDeletedCount = new int[] {0};
     int[] tagMetadataObjectRelDeletedCount = new int[] {0};
-    int[] policyTagRelDeletedCount = new int[] {0};
 
-    // Lock the endpoint before cleaning up its relations. Relation writers take the same exclusive
-    // lock, so none can add a relation until this transaction deletes the tag.
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          TagPO observed =
-              SessionUtils.getWithoutCommit(
-                  TagMetaMapper.class,
-                  mapper -> mapper.selectTagMetaByMetalakeAndName(metalakeName, identifier.name()));
-          if (observed == null) {
-            return;
-          }
-          TagPO locked =
-              SessionUtils.getWithoutCommit(
-                  TagMetaMapper.class,
-                  mapper -> mapper.selectTagByTagIdForUpdate(observed.getTagId()));
-          if (locked != null
-              && Objects.equals(locked.getTagName(), identifier.name())
-              && Objects.equals(locked.getMetalakeId(), observed.getMetalakeId())) {
-            lockedTag[0] = locked;
-          }
-        },
-        () -> {
-          if (lockedTag[0] != null) {
-            policyTagRelDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    PolicyTagRelMapper.class,
-                    mapper -> mapper.softDeleteByTagId(lockedTag[0].getTagId()));
-          }
-        },
-        () -> {
-          if (lockedTag[0] != null) {
-            tagMetadataObjectRelDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper ->
-                        mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
-                            metalakeName, identifier.name()));
-          }
-        },
-        () -> {
-          if (lockedTag[0] != null) {
+        () ->
             tagDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     TagMetaMapper.class,
                     mapper ->
                         mapper.softDeleteTagMetaByMetalakeAndTagName(
-                            metalakeName, identifier.name()));
-          }
-        });
+                            metalakeName, identifier.name())),
+        () ->
+            tagMetadataObjectRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    TagMetadataObjectRelMapper.class,
+                    mapper ->
+                        mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
+                            metalakeName, identifier.name())));
 
-    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] + policyTagRelDeletedCount[0]
-        > 0;
+    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] > 0;
   }
 
   @Monitored(

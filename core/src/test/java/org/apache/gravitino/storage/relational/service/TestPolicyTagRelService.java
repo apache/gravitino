@@ -29,13 +29,11 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -50,7 +48,6 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
-import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -359,13 +356,13 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     executeUpdate("UPDATE policy_tag_relation_meta SET deleted_at = 100 WHERE deleted_at > 0");
 
     Assertions.assertEquals(
-        0, PolicyMetaService.getInstance().deletePolicyAndVersionMetasByLegacyTimeline(100L, 10));
+        0, TagMetaService.getInstance().deleteTagMetasByLegacyTimeline(100L, 10));
     Assertions.assertEquals(
-        1, PolicyMetaService.getInstance().deletePolicyAndVersionMetasByLegacyTimeline(101L, 1));
+        1, TagMetaService.getInstance().deleteTagMetasByLegacyTimeline(101L, 1));
     Assertions.assertEquals(
         1L, queryForLong("SELECT COUNT(*) FROM policy_tag_relation_meta WHERE deleted_at > 0"));
     Assertions.assertEquals(
-        1, PolicyMetaService.getInstance().deletePolicyAndVersionMetasByLegacyTimeline(101L, 10));
+        1, TagMetaService.getInstance().deleteTagMetasByLegacyTimeline(101L, 10));
   }
 
   @TestTemplate
@@ -408,12 +405,6 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
                           endpoints.policy.nameIdentifier(), Entity.EntityType.TAG, null)
                     },
                     new RelationEdgeTarget[0])));
-  }
-
-  @TestTemplate
-  public void testTagDeletionWinsAgainstConcurrentRelationAdd() throws Exception {
-    createAndInsertMakeLake(METALAKE);
-    assertTagDeletionWins(createEndpoints(METALAKE, "deleted_tag", "policy_for_deleted_tag"));
   }
 
   private TagEntity createAssociation(String metalake, String tagName, String policyName)
@@ -503,78 +494,6 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
       backend.updateEntityRelations(update);
     } catch (IOException e) {
       throw new UncheckedIOException(e);
-    }
-  }
-
-  private void assertTagDeletionWins(RelationEndpoints endpoints) throws Exception {
-    assertEndpointDeletionWins(
-        endpoints,
-        () ->
-            SessionUtils.doWithoutCommit(
-                TagMetaMapper.class,
-                mapper ->
-                    Assertions.assertEquals(
-                        1,
-                        mapper.softDeleteTagMetaByMetalakeAndTagName(
-                            METALAKE, endpoints.tag.name()))),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(endpoints.tag.id())));
-  }
-
-  private void assertEndpointDeletionWins(
-      RelationEndpoints endpoints, Runnable deleteEndpoint, Runnable deleteRelations)
-      throws Exception {
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    CountDownLatch endpointDeleted = new CountDownLatch(1);
-    CountDownLatch releaseDelete = new CountDownLatch(1);
-    try {
-      Future<Void> deleteFuture =
-          executor.submit(
-              () -> {
-                SessionUtils.doMultipleWithCommit(
-                    () -> {
-                      deleteEndpoint.run();
-                      endpointDeleted.countDown();
-                      await(releaseDelete);
-                    },
-                    deleteRelations);
-                return null;
-              });
-      Assertions.assertTrue(endpointDeleted.await(10, TimeUnit.SECONDS));
-      Future<Throwable> addFuture =
-          executor.submit(
-              () -> {
-                try {
-                  backend.updateEntityRelations(relationUpdate(endpoints, null, true));
-                  return null;
-                } catch (Throwable t) {
-                  return t;
-                }
-              });
-
-      Assertions.assertThrows(
-          TimeoutException.class, () -> addFuture.get(200, TimeUnit.MILLISECONDS));
-      releaseDelete.countDown();
-      deleteFuture.get(10, TimeUnit.SECONDS);
-      Throwable failure = addFuture.get(10, TimeUnit.SECONDS);
-      Assertions.assertTrue(
-          failure instanceof NoSuchEntityException,
-          () -> "Expected NoSuchEntityException, but got " + failure);
-    } finally {
-      releaseDelete.countDown();
-      executor.shutdownNow();
-    }
-  }
-
-  private void await(CountDownLatch latch) {
-    try {
-      if (!latch.await(10, TimeUnit.SECONDS)) {
-        throw new IllegalStateException("Timed out waiting for concurrent test operation");
-      }
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new IllegalStateException("Interrupted while waiting for concurrent test operation", e);
     }
   }
 
