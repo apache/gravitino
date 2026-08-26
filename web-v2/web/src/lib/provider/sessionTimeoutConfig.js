@@ -17,11 +17,11 @@
  * under the License.
  */
 
-const SESSION_IDLE_TIMEOUT_KEY = 'gravitino.server.webserver.sessionIdleTimeoutMs'
+const SESSION_IDLE_TIMEOUT_KEY = 'gravitino.ui.sessionIdleTimeoutMs'
 
-const SESSION_MAX_DURATION_KEY = 'gravitino.server.webserver.sessionMaxDurationMs'
+const SESSION_MAX_DURATION_KEY = 'gravitino.ui.sessionMaxDurationMs'
 
-const SESSION_IDLE_WARNING_LEAD_KEY = 'gravitino.server.webserver.sessionIdleWarningLeadMs'
+const SESSION_IDLE_WARNING_LEAD_KEY = 'gravitino.ui.sessionIdleWarningLeadMs'
 
 function resolveSessionDuration(serverValue, envValue, defaultValue) {
   const serverDuration = Number(serverValue)
