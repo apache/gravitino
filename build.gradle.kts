@@ -159,7 +159,9 @@ allprojects {
         )
         // The trino-connector module logs via io.airlift.log.Logger to match Trino's own
         // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
-        if (!project.path.startsWith(":trino-connector")) {
+        // integration-test is intentionally excluded from this carve-out: it runs outside
+        // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
+        if (!project.path.startsWith(":trino-connector:trino-connector")) {
           replaceRegex(
             "Use SLF4J Logger instead of other logging frameworks",
             "import\\s+.*\\.(Logger|LoggerFactory);",
