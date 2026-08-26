@@ -40,6 +40,7 @@ import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.exceptions.CatalogInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
@@ -277,7 +278,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
         CatalogChange[] changes =
             buildChanges(
                 properties,
-                removeInUseProperty(catalog.properties()),
+                filterInternalProperties(catalog.properties()),
                 CatalogChange::setProperty,
                 CatalogChange::removeProperty,
                 CatalogChange[]::new);
@@ -289,9 +290,18 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
     }
   }
 
-  private Map<String, String> removeInUseProperty(Map<String, String> properties) {
+  /**
+   * Drop server-managed properties from the overwrite baseline so we do not emit removeProperty for
+   * reserved keys such as {@code in-use} or {@code gravitino.identifier} (returned as a masked
+   * placeholder in API responses).
+   */
+  private Map<String, String> filterInternalProperties(Map<String, String> properties) {
+    if (properties == null) {
+      return Collections.emptyMap();
+    }
     return properties.entrySet().stream()
         .filter(e -> !e.getKey().equalsIgnoreCase(Catalog.PROPERTY_IN_USE))
+        .filter(e -> !StringIdentifier.ID_KEY.equals(e.getKey()))
         .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
   }
 
@@ -327,7 +337,7 @@ public class GravitinoLanceNameSpaceOperations implements LanceNamespaceOperatio
         SchemaChange[] changes =
             buildChanges(
                 properties,
-                schema.properties(),
+                filterInternalProperties(schema.properties()),
                 SchemaChange::setProperty,
                 SchemaChange::removeProperty,
                 SchemaChange[]::new);
