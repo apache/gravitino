@@ -25,8 +25,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import org.aopalliance.intercept.MethodInterceptor;
-import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.ActiveRoles;
@@ -49,7 +47,7 @@ import org.slf4j.LoggerFactory;
  * roles, runs any request-specific handler, and evaluates the standard authorization expression.
  */
 @SuppressWarnings("FormatStringAnnotation")
-public abstract class BaseMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
+public abstract class BaseMetadataAuthorizationMethodInterceptor {
   private static final Logger LOG =
       LoggerFactory.getLogger(BaseMetadataAuthorizationMethodInterceptor.class);
 
@@ -120,6 +118,18 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
     boolean authorizationCompleted();
   }
 
+  /** Invokes the protocol operation after authorization succeeds. */
+  @FunctionalInterface
+  protected interface MethodInvoker {
+    /**
+     * Invokes the intercepted protocol operation.
+     *
+     * @return the operation result
+     * @throws Throwable if the operation fails
+     */
+    Object proceed() throws Throwable;
+  }
+
   /**
    * Resolves the metadata identifiers and the directly addressed entity type from a protocol
    * request. The entity type is kept separately because some protocols encode catalog and schema
@@ -137,11 +147,12 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
   /**
    * Maps an authorization or operation failure to the response format required by a protocol.
    *
-   * @param methodInvocation invoked method, including protocol-specific request arguments
+   * @param method invoked protocol method
+   * @param args invoked method arguments
    * @param throwable failure to map
    * @return the protocol response
    */
-  protected abstract Object toErrorResponse(MethodInvocation methodInvocation, Throwable throwable);
+  protected abstract Object toErrorResponse(Method method, Object[] args, Throwable throwable);
 
   /**
    * Create an authorization handler for this request, if special handling is needed beyond standard
@@ -197,22 +208,26 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
   }
 
   /**
-   * Authorizes an annotated method invocation and maps all failures through the protocol hook.
+   * Authorizes a protocol method and maps all failures through the protocol hook.
    *
-   * @param methodInvocation method invocation to authorize
+   * <p>The protocol-specific interceptor adapts its invocation framework to these plain Java
+   * arguments. Keeping that adapter outside this shared pipeline avoids coupling server-common to
+   * the interception framework used by each REST server.
+   *
+   * @param method method to authorize
+   * @param args method arguments
+   * @param methodInvoker operation to invoke after authorization succeeds
    * @return the mapped error response, or the result of the invoked method
    * @throws Throwable if the invocation infrastructure itself cannot run
    */
-  @Override
-  public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+  protected final Object authorizeMethod(Method method, Object[] args, MethodInvoker methodInvoker)
+      throws Throwable {
     try {
-      Method method = methodInvocation.getMethod();
       Parameter[] parameters = method.getParameters();
       AuthorizationExpression expressionAnnotation =
           method.getAnnotation(AuthorizationExpression.class);
       if (expressionAnnotation != null) {
         String expression = expressionAnnotation.expression();
-        Object[] args = methodInvocation.getArguments();
         AuthorizationTarget target =
             resolveAuthorizationTarget(method, expressionAnnotation, parameters, args);
         Map<Entity.EntityType, NameIdentifier> nameIdentifierMap = target.nameIdentifiers();
@@ -244,7 +259,7 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
                 metalakeIdent.name(),
                 exception);
             return toErrorResponse(
-                methodInvocation, new RuntimeException("Failed to validate user", exception));
+                method, args, new RuntimeException("Failed to validate user", exception));
           }
 
           // ALL and NONE already describe a complete role selection. NAMED is different: every
@@ -304,22 +319,22 @@ public abstract class BaseMetadataAuthorizationMethodInterceptor implements Meth
       }
     } catch (Exception ex) {
       if (ex instanceof ForbiddenException || isExceptionPropagate(ex)) {
-        return toErrorResponse(methodInvocation, ex);
+        return toErrorResponse(method, args, ex);
       }
       String currentUser = PrincipalUtils.getCurrentUserName();
-      String methodName = methodInvocation.getMethod().getName();
+      String methodName = method.getName();
 
       String errorMessage =
           String.format(
               "Authorization failed due to system internal error, User: '%s', Operation: '%s'",
               currentUser, methodName);
       LOG.info(errorMessage, ex);
-      return toErrorResponse(methodInvocation, new RuntimeException(errorMessage, ex));
+      return toErrorResponse(method, args, new RuntimeException(errorMessage, ex));
     }
     try {
-      return methodInvocation.proceed();
+      return methodInvoker.proceed();
     } catch (Throwable e) {
-      return toErrorResponse(methodInvocation, e);
+      return toErrorResponse(method, args, e);
     }
   }
 }

@@ -33,7 +33,6 @@ dependencies {
   }
   implementation(project(":core"))
 
-  implementation(libs.aopalliance)
   implementation(libs.bundles.jetty)
   implementation(libs.bundles.jwt) {
     exclude(group = "com.google.errorprone", module = "error_prone_annotations")

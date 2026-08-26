@@ -24,6 +24,7 @@ import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.Entity.EntityType;
@@ -48,8 +49,14 @@ import org.apache.iceberg.rest.RESTUtil;
  * metadata authorization.
  */
 public class IcebergMetadataAuthorizationMethodInterceptor
-    extends BaseMetadataAuthorizationMethodInterceptor {
+    extends BaseMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
   private final String metalakeName = IcebergRESTServerContext.getInstance().metalakeName();
+
+  @Override
+  public Object invoke(MethodInvocation methodInvocation) throws Throwable {
+    return authorizeMethod(
+        methodInvocation.getMethod(), methodInvocation.getArguments(), methodInvocation::proceed);
+  }
 
   @Override
   protected AuthorizationTarget resolveAuthorizationTarget(
@@ -125,7 +132,7 @@ public class IcebergMetadataAuthorizationMethodInterceptor
   }
 
   @Override
-  protected Object toErrorResponse(MethodInvocation methodInvocation, Throwable throwable) {
+  protected Object toErrorResponse(Method method, Object[] args, Throwable throwable) {
     return IcebergExceptionMapper.toRESTResponse(throwable);
   }
 

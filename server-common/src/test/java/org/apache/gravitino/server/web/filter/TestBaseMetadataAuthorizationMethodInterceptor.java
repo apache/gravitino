@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
@@ -103,7 +102,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
                   || privilege == Privilege.Name.USE_SCHEMA;
             });
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
+    TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     assertEquals("authorized", interceptor.invoke(invocation));
     assertEquals("canAccessMetadata", interceptor.resolvedMethod.getName());
@@ -124,7 +123,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
                     eq("metalake"), eq("tester"), any(AuthorizationRequestContext.class)))
         .thenThrow(failure);
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
+    TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     assertSame(failure, interceptor.invoke(invocation));
     verify(invocation, never()).proceed();
@@ -140,7 +139,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
                     eq("metalake"), eq("tester"), any(AuthorizationRequestContext.class)))
         .thenThrow(failure);
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
+    TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     RuntimeException response =
         assertInstanceOf(RuntimeException.class, interceptor.invoke(invocation));
@@ -152,7 +151,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   @Test
   public void testExpressionDenialUsesResolvedTarget() throws Throwable {
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
+    TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     Object response = interceptor.invoke(invocation);
 
@@ -167,7 +166,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     principalUtils.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
     when(authorizer.findUnheldRoles(any(), any(), any(), any())).thenReturn(Set.of("admin"));
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
+    TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     Object response = interceptor.invoke(invocation);
 
@@ -182,7 +181,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     principalUtils.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.METALAKE);
     interceptor.skipExpressionEvaluation = true;
-    MethodInvocation invocation = invocation("alwaysDenied", "authorized");
+    TestInvocation invocation = invocation("alwaysDenied", "authorized");
 
     assertEquals("authorized", interceptor.invoke(invocation));
     verify(authorizer)
@@ -207,7 +206,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
                 return true;
               }
             });
-    MethodInvocation invocation = invocation("alwaysDenied", "authorized by handler");
+    TestInvocation invocation = invocation("alwaysDenied", "authorized by handler");
 
     assertEquals("authorized by handler", interceptor.invoke(invocation));
     verify(authorizer, never()).authorize(any(), any(), any(), any(), any());
@@ -217,7 +216,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   public void testExpressionOnlySkipStillValidatesUser() throws Throwable {
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.METALAKE);
     interceptor.skipExpressionEvaluation = true;
-    MethodInvocation invocation = invocation("alwaysDenied", "root list");
+    TestInvocation invocation = invocation("alwaysDenied", "root list");
 
     assertEquals("root list", interceptor.invoke(invocation));
     authorizationUtils.verify(
@@ -231,7 +230,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   public void testFullSkipBypassesLocalAuthorization() throws Throwable {
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
     interceptor.skipAuthorization = true;
-    MethodInvocation invocation = invocation("alwaysDenied", "proxied");
+    TestInvocation invocation = invocation("alwaysDenied", "proxied");
 
     assertEquals("proxied", interceptor.invoke(invocation));
     authorizationUtils.verifyNoInteractions();
@@ -243,7 +242,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.METALAKE);
     interceptor.includeMetalake = false;
     interceptor.skipExpressionEvaluation = true;
-    MethodInvocation invocation = invocation("alwaysDenied", "authorized");
+    TestInvocation invocation = invocation("alwaysDenied", "authorized");
 
     assertEquals("authorized", interceptor.invoke(invocation));
     authorizationUtils.verifyNoInteractions();
@@ -266,7 +265,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
                 return false;
               }
             });
-    MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
+    TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     assertSame(failure, interceptor.invoke(invocation));
     verify(invocation, never()).proceed();
@@ -277,7 +276,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     IllegalStateException failure = new IllegalStateException("resolver failed");
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
     interceptor.resolutionFailure = failure;
-    MethodInvocation invocation = invocation("canAccessMetadata", "authorized");
+    TestInvocation invocation = invocation("canAccessMetadata", "authorized");
 
     RuntimeException response =
         assertInstanceOf(RuntimeException.class, interceptor.invoke(invocation));
@@ -290,15 +289,15 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
   public void testOperationFailureUsesProtocolMapper() throws Throwable {
     IllegalStateException failure = new IllegalStateException("operation failed");
     TestInterceptor interceptor = new TestInterceptor(Entity.EntityType.SCHEMA);
-    MethodInvocation invocation = invocation("unannotated", null);
+    TestInvocation invocation = invocation("unannotated", null);
     when(invocation.proceed()).thenThrow(failure);
 
     assertSame(failure, interceptor.invoke(invocation));
   }
 
-  private static MethodInvocation invocation(String methodName, Object result) throws Throwable {
+  private static TestInvocation invocation(String methodName, Object result) throws Throwable {
     Method method = TestOperations.class.getDeclaredMethod(methodName);
-    MethodInvocation invocation = mock(MethodInvocation.class);
+    TestInvocation invocation = mock(TestInvocation.class);
     when(invocation.getMethod()).thenReturn(method);
     when(invocation.getArguments()).thenReturn(new Object[0]);
     when(invocation.proceed()).thenReturn(result);
@@ -316,6 +315,11 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
 
     private TestInterceptor(Entity.EntityType targetType) {
       this.targetType = targetType;
+    }
+
+    private Object invoke(TestInvocation invocation) throws Throwable {
+      return authorizeMethod(
+          invocation.getMethod(), invocation.getArguments(), invocation::proceed);
     }
 
     @Override
@@ -337,7 +341,7 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     }
 
     @Override
-    protected Object toErrorResponse(MethodInvocation methodInvocation, Throwable throwable) {
+    protected Object toErrorResponse(Method method, Object[] args, Throwable throwable) {
       return throwable;
     }
 
@@ -370,6 +374,14 @@ public class TestBaseMetadataAuthorizationMethodInterceptor {
     private TestProtocolException(String message) {
       super(message);
     }
+  }
+
+  private interface TestInvocation {
+    Method getMethod();
+
+    Object[] getArguments();
+
+    Object proceed() throws Throwable;
   }
 
   private static class TestOperations {
