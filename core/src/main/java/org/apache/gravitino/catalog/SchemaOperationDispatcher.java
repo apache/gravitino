@@ -673,7 +673,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
    */
   private Pair<SchemaChange[], List<SecretMaterial>> prepareSchemaSecretChanges(
       @Nullable Map<String, String> currentProperties, long entityId, SchemaChange... changes) {
-    Map<String, String> working =
+    Map<String, String> properties =
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
     List<SchemaChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
@@ -683,23 +683,23 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
           SchemaChange.SetSecretBinding c = (SchemaChange.SetSecretBinding) change;
           String urn =
               secretManager.alterSetSecretBinding(
-                  working, "schema", entityId, c.getProperty(), c.getBinding(), written);
+                  properties, "schema", entityId, c.getProperty(), c.getBinding(), written);
           out.add(SchemaChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof SchemaChange.SetSecretReference) {
           SchemaChange.SetSecretReference c = (SchemaChange.SetSecretReference) change;
           String urn =
               secretManager.alterSetSecretReference(
-                  working, "schema", entityId, c.getProperty(), c.getReference());
+                  properties, "schema", entityId, c.getProperty(), c.getReference());
           out.add(SchemaChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof SchemaChange.SetProperty) {
           SchemaChange.SetProperty c = (SchemaChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  working, "schema", entityId, c.getProperty(), c.getValue());
+                  properties, "schema", entityId, c.getProperty(), c.getValue());
           out.add(SchemaChange.setProperty(c.getProperty(), value));
         } else if (change instanceof SchemaChange.RemoveProperty) {
           SchemaChange.RemoveProperty c = (SchemaChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(working, "schema", entityId, c.getProperty());
+          secretManager.alterRemoveProperty(properties, "schema", entityId, c.getProperty());
           out.add(change);
         } else {
           out.add(change);

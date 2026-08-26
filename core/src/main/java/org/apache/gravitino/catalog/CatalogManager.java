@@ -1257,7 +1257,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
    */
   private Pair<CatalogChange[], List<SecretMaterial>> prepareCatalogSecretChanges(
       @Nullable Map<String, String> currentProperties, long entityId, CatalogChange... changes) {
-    Map<String, String> working =
+    Map<String, String> properties =
         currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
     List<CatalogChange> out = new ArrayList<>(changes.length);
     List<SecretMaterial> written = new ArrayList<>();
@@ -1267,23 +1267,23 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
           CatalogChange.SetSecretBinding c = (CatalogChange.SetSecretBinding) change;
           String urn =
               secretManager.alterSetSecretBinding(
-                  working, "catalog", entityId, c.getProperty(), c.getBinding(), written);
+                  properties, "catalog", entityId, c.getProperty(), c.getBinding(), written);
           out.add(CatalogChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof CatalogChange.SetSecretReference) {
           CatalogChange.SetSecretReference c = (CatalogChange.SetSecretReference) change;
           String urn =
               secretManager.alterSetSecretReference(
-                  working, "catalog", entityId, c.getProperty(), c.getReference());
+                  properties, "catalog", entityId, c.getProperty(), c.getReference());
           out.add(CatalogChange.setProperty(c.getProperty(), urn));
         } else if (change instanceof CatalogChange.SetProperty) {
           CatalogChange.SetProperty c = (CatalogChange.SetProperty) change;
           String value =
               secretManager.alterSetProperty(
-                  working, "catalog", entityId, c.getProperty(), c.getValue());
+                  properties, "catalog", entityId, c.getProperty(), c.getValue());
           out.add(CatalogChange.setProperty(c.getProperty(), value));
         } else if (change instanceof CatalogChange.RemoveProperty) {
           CatalogChange.RemoveProperty c = (CatalogChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(working, "catalog", entityId, c.getProperty());
+          secretManager.alterRemoveProperty(properties, "catalog", entityId, c.getProperty());
           out.add(change);
         } else {
           out.add(change);
