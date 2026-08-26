@@ -97,9 +97,31 @@ public class ModelMetaSQLProviderFactory {
     return getProvider().selectModelMetaByModelId(modelId);
   }
 
+  /**
+   * Returns SQL that selects and exclusively locks an active model metadata row.
+   *
+   * @param modelId the model ID
+   * @return the locking select SQL
+   */
+  public static String selectModelMetaByModelIdForUpdate(@Param("modelId") Long modelId) {
+    return getProvider().selectModelMetaByModelIdForUpdate(modelId);
+  }
+
   public static String softDeleteModelMetaBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return getProvider().softDeleteModelMetaBySchemaIdAndModelName(schemaId, modelName);
+  }
+
+  /**
+   * Returns SQL that soft-deletes a model with a version check.
+   *
+   * @param modelId the model ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked soft-delete SQL
+   */
+  public static String softDeleteModelMetaByIdAndVersion(
+      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteModelMetaByIdAndVersion(modelId, currentVersion);
   }
 
   public static String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
@@ -121,6 +143,19 @@ public class ModelMetaSQLProviderFactory {
 
   public static String updateModelLatestVersion(@Param("modelId") Long modelId) {
     return getProvider().updateModelLatestVersion(modelId);
+  }
+
+  /**
+   * Returns SQL that advances the shared model concurrency version after checking its current
+   * value.
+   *
+   * @param modelId the model ID
+   * @param currentVersion the version observed by the caller
+   * @return the version bump SQL
+   */
+  public static String bumpModelVersion(
+      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().bumpModelVersion(modelId, currentVersion);
   }
 
   public static String updateModelMeta(

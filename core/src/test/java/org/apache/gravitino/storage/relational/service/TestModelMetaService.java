@@ -32,12 +32,16 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -396,5 +400,115 @@ public class TestModelMetaService extends TestJDBCBackend {
         () ->
             ModelMetaService.getInstance()
                 .updateModel(NameIdentifier.of(MODEL_NS, "model3"), renameUpdater));
+  }
+
+  @TestTemplate
+  void testAlterRejectsStaleVersionAndKeepsWinner() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_alter_conflict",
+            "original",
+            0,
+            ImmutableMap.of("key", "value"),
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelPO initialPO = ModelMetaService.getInstance().getModelPOById(model.id());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ModelMetaService.getInstance()
+                .updateModel(
+                    model.nameIdentifier(),
+                    entity -> {
+                      updateModelUnchecked(
+                          model.nameIdentifier(), current -> copyModel(current, "winner"));
+                      return copyModel((ModelEntity) entity, "stale update");
+                    }));
+
+    ModelEntity current =
+        ModelMetaService.getInstance().getModelByIdentifier(model.nameIdentifier());
+    ModelPO currentPO = ModelMetaService.getInstance().getModelPOById(model.id());
+    Assertions.assertEquals("winner", current.comment());
+    Assertions.assertEquals(initialPO.getCurrentVersion() + 1, currentPO.getCurrentVersion());
+    Assertions.assertEquals(currentPO.getCurrentVersion(), currentPO.getLastVersion());
+  }
+
+  @TestTemplate
+  void testOverwriteAdvancesVersionAndRejectsStaleDelete() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_overwrite_conflict",
+            "original",
+            0,
+            ImmutableMap.of("key", "value"),
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity modelVersion =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(model.nameIdentifier())
+            .withVersion(0)
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"))
+            .withAliases(List.of("surviving_alias"))
+            .withComment("version comment")
+            .withProperties(ImmutableMap.of("version_key", "version_value"))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    ModelVersionMetaService.getInstance().insertModelVersion(modelVersion);
+    ModelPO stalePO = ModelMetaService.getInstance().getModelPOById(model.id());
+
+    ModelEntity registered =
+        ModelMetaService.getInstance().getModelByIdentifier(model.nameIdentifier());
+    ModelMetaService.getInstance().insertModel(copyModel(registered, "winner"), true);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            SessionUtils.doMultipleWithCommit(
+                () ->
+                    ModelMetaService.getInstance()
+                        .deleteModelWithVersion(model.nameIdentifier(), stalePO)));
+    ModelEntity current =
+        ModelMetaService.getInstance().getModelByIdentifier(model.nameIdentifier());
+    ModelPO currentPO = ModelMetaService.getInstance().getModelPOById(model.id());
+    Assertions.assertEquals("winner", current.comment());
+    Assertions.assertEquals(stalePO.getCurrentVersion() + 1, currentPO.getCurrentVersion());
+    Assertions.assertEquals(currentPO.getCurrentVersion(), currentPO.getLastVersion());
+    Assertions.assertEquals(
+        modelVersion,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(modelVersion.nameIdentifier()));
+    Assertions.assertEquals(
+        modelVersion,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                NameIdentifier.of(modelVersion.nameIdentifier().namespace(), "surviving_alias")));
+  }
+
+  private ModelEntity copyModel(ModelEntity model, String comment) {
+    return ModelEntity.builder()
+        .withId(model.id())
+        .withName(model.name())
+        .withNamespace(model.namespace())
+        .withComment(comment)
+        .withLatestVersion(model.latestVersion())
+        .withProperties(model.properties())
+        .withAuditInfo(model.auditInfo())
+        .build();
+  }
+
+  private void updateModelUnchecked(
+      NameIdentifier identifier, Function<ModelEntity, ModelEntity> updater) {
+    try {
+      ModelMetaService.getInstance().updateModel(identifier, updater);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 }

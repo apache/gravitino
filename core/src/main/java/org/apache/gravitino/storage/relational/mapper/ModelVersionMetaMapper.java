@@ -64,6 +64,17 @@ public interface ModelVersionMetaMapper {
   Integer softDeleteModelVersionsBySchemaIdAndModelName(
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName);
 
+  /**
+   * Soft-deletes every active version row for a model ID.
+   *
+   * @param modelId the model ID
+   * @return the number of changed rows
+   */
+  @UpdateProvider(
+      type = ModelVersionMetaSQLProviderFactory.class,
+      method = "softDeleteModelVersionsByModelId")
+  Integer softDeleteModelVersionsByModelId(@Param("modelId") Long modelId);
+
   @UpdateProvider(
       type = ModelVersionMetaSQLProviderFactory.class,
       method = "softDeleteModelVersionMetaByModelIdAndVersion")

@@ -32,10 +32,12 @@ public class ModelMetaBaseSQLProvider {
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
         + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
-        + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
+        + " model_comment, model_properties, model_latest_version, current_version, last_version,"
+        + " audit_info, deleted_at)"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
-        + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion}, #{modelMeta.auditInfo},"
+        + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion},"
+        + " #{modelMeta.currentVersion}, #{modelMeta.lastVersion}, #{modelMeta.auditInfo},"
         + " #{modelMeta.deletedAt})";
   }
 
@@ -43,10 +45,12 @@ public class ModelMetaBaseSQLProvider {
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
         + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
-        + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
+        + " model_comment, model_properties, model_latest_version, current_version, last_version,"
+        + " audit_info, deleted_at)"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
-        + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion}, #{modelMeta.auditInfo},"
+        + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion},"
+        + " #{modelMeta.currentVersion}, #{modelMeta.lastVersion}, #{modelMeta.auditInfo},"
         + " #{modelMeta.deletedAt})"
         + " ON DUPLICATE KEY UPDATE"
         + " model_name = #{modelMeta.modelName},"
@@ -56,6 +60,10 @@ public class ModelMetaBaseSQLProvider {
         + " model_comment = #{modelMeta.modelComment},"
         + " model_properties = #{modelMeta.modelProperties},"
         + " model_latest_version = #{modelMeta.modelLatestVersion},"
+        // A replacement ModelPO starts at version 1. Advance the version already stored in the
+        // database instead of copying that 1, or an older request could become valid again.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " audit_info = #{modelMeta.auditInfo},"
         + " deleted_at = #{modelMeta.deletedAt}";
   }
@@ -63,8 +71,9 @@ public class ModelMetaBaseSQLProvider {
   public String listModelPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
-        + " model_properties AS modelProperties, model_latest_version AS"
-        + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " model_properties AS modelProperties, model_latest_version AS modelLatestVersion,"
+        + " current_version AS currentVersion, last_version AS lastVersion,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
@@ -84,6 +93,8 @@ public class ModelMetaBaseSQLProvider {
             mo.model_comment AS modelComment,
             mo.model_properties AS modelProperties,
             mo.model_latest_version AS modelLatestVersion,
+            mo.current_version AS currentVersion,
+            mo.last_version AS lastVersion,
             mo.audit_info AS auditInfo,
             mo.deleted_at AS deletedAt
         FROM
@@ -114,8 +125,9 @@ public class ModelMetaBaseSQLProvider {
     return "<script>"
         + " SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
-        + " model_properties AS modelProperties, model_latest_version AS"
-        + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " model_properties AS modelProperties, model_latest_version AS modelLatestVersion,"
+        + " current_version AS currentVersion, last_version AS lastVersion,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at = 0"
@@ -131,8 +143,9 @@ public class ModelMetaBaseSQLProvider {
       @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
     return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
-        + " model_properties AS modelProperties, model_latest_version AS"
-        + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " model_properties AS modelProperties, model_latest_version AS modelLatestVersion,"
+        + " current_version AS currentVersion, last_version AS lastVersion,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
@@ -153,6 +166,8 @@ public class ModelMetaBaseSQLProvider {
             mo.model_comment AS modelComment,
             mo.model_properties AS modelProperties,
             mo.model_latest_version AS modelLatestVersion,
+            mo.current_version AS currentVersion,
+            mo.last_version AS lastVersion,
             mo.audit_info AS auditInfo,
             mo.deleted_at AS deletedAt
         FROM
@@ -191,11 +206,22 @@ public class ModelMetaBaseSQLProvider {
   public String selectModelMetaByModelId(@Param("modelId") Long modelId) {
     return "SELECT model_id AS modelId, model_name AS modelName, metalake_id AS metalakeId,"
         + " catalog_id AS catalogId, schema_id AS schemaId, model_comment AS modelComment,"
-        + " model_properties AS modelProperties, model_latest_version AS"
-        + " modelLatestVersion, audit_info AS auditInfo, deleted_at AS deletedAt"
+        + " model_properties AS modelProperties, model_latest_version AS modelLatestVersion,"
+        + " current_version AS currentVersion, last_version AS lastVersion,"
+        + " audit_info AS auditInfo, deleted_at AS deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE model_id = #{modelId} AND deleted_at = 0";
+  }
+
+  /**
+   * Returns SQL that selects and exclusively locks an active model row by its stable ID.
+   *
+   * @param modelId the model ID
+   * @return the locking select SQL
+   */
+  public String selectModelMetaByModelIdForUpdate(@Param("modelId") Long modelId) {
+    return selectModelMetaByModelId(modelId) + " FOR UPDATE";
   }
 
   public String softDeleteModelMetaBySchemaIdAndModelName(
@@ -205,6 +231,23 @@ public class ModelMetaBaseSQLProvider {
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+  }
+
+  /**
+   * Returns SQL that soft-deletes a model only while its stored version is unchanged.
+   *
+   * @param modelId the model ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked soft-delete SQL
+   */
+  public String softDeleteModelMetaByIdAndVersion(
+      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + ModelMetaMapper.TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE model_id = #{modelId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
@@ -251,6 +294,22 @@ public class ModelMetaBaseSQLProvider {
         + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
+  /**
+   * Returns SQL that advances the shared model concurrency version when its current value matches.
+   *
+   * @param modelId the model ID
+   * @param currentVersion the version observed by the caller
+   * @return the version bump SQL
+   */
+  public String bumpModelVersion(
+      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + ModelMetaMapper.TABLE_NAME
+        + " SET last_version = current_version + 1, current_version = current_version + 1"
+        + " WHERE model_id = #{modelId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+  }
+
   public String updateModelMeta(
       @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
     return "UPDATE "
@@ -262,18 +321,12 @@ public class ModelMetaBaseSQLProvider {
         + " model_comment = #{newModelMeta.modelComment},"
         + " model_properties = #{newModelMeta.modelProperties},"
         + " model_latest_version = #{newModelMeta.modelLatestVersion},"
+        + " current_version = #{newModelMeta.currentVersion},"
+        + " last_version = #{newModelMeta.lastVersion},"
         + " audit_info = #{newModelMeta.auditInfo},"
         + " deleted_at = #{newModelMeta.deletedAt}"
         + " WHERE model_id = #{oldModelMeta.modelId}"
-        + " AND model_name = #{oldModelMeta.modelName}"
-        + " AND metalake_id = #{oldModelMeta.metalakeId}"
-        + " AND catalog_id = #{oldModelMeta.catalogId}"
-        + " AND schema_id = #{oldModelMeta.schemaId}"
-        + " AND (model_comment = #{oldModelMeta.modelComment}"
-        + "   OR (model_comment IS NULL and #{oldModelMeta.modelComment} IS NULL))"
-        + " AND model_properties = #{oldModelMeta.modelProperties}"
-        + " AND model_latest_version = #{oldModelMeta.modelLatestVersion}"
-        + " AND audit_info = #{oldModelMeta.auditInfo}"
+        + " AND current_version = #{oldModelMeta.currentVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -286,7 +339,9 @@ public class ModelMetaBaseSQLProvider {
         + "SELECT mm.model_id as modelId, mm.model_name as modelName,"
         + " mm.metalake_id as metalakeId, mm.catalog_id as catalogId, mm.schema_id as schemaId,"
         + " mm.model_comment as modelComment, mm.model_properties as modelProperties,"
-        + " mm.model_latest_version as modelLatestVersion, mm.audit_info as auditInfo,"
+        + " mm.model_latest_version as modelLatestVersion,"
+        + " mm.current_version as currentVersion, mm.last_version as lastVersion,"
+        + " mm.audit_info as auditInfo,"
         + " mm.deleted_at as deletedAt"
         + " FROM "
         + ModelMetaMapper.TABLE_NAME

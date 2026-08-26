@@ -40,6 +40,14 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
   }
 
   @Override
+  public String softDeleteModelVersionAliasRelsByModelId(Long modelId) {
+    return "UPDATE "
+        + ModelVersionAliasRelMapper.TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+  }
+
+  @Override
   public String softDeleteModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "

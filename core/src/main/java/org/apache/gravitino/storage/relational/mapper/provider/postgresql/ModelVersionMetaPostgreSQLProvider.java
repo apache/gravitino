@@ -42,6 +42,14 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
   }
 
   @Override
+  public String softDeleteModelVersionsByModelId(Long modelId) {
+    return "UPDATE "
+        + ModelVersionMetaMapper.TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+  }
+
+  @Override
   public String softDeleteModelVersionMetaByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "

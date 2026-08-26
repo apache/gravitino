@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -134,9 +133,6 @@ public class ModelMetaService {
       LOG.warn("Failed to delete model: {}", ident, e);
       return false;
     }
-    Long schemaId = modelPO.getSchemaId();
-    Long modelId = modelPO.getModelId();
-
     String metalakeName = ident.namespace().level(0);
     String catalogName = ident.namespace().level(1);
     String schemaName = ident.namespace().level(2);
@@ -144,72 +140,59 @@ public class ModelMetaService {
         EntityChangeLogNameIdentifierCodec.encode(
             NameIdentifierUtil.ofModel(metalakeName, catalogName, schemaName, ident.name()));
 
-    AtomicInteger modelDeletedCount = new AtomicInteger();
+    // Delete the model row first, and only when its concurrency version still matches the value
+    // read above. If another writer changed the model, stop before removing any related data.
     SessionUtils.doMultipleWithCommit(
-        // delete model versions first
-        () ->
-            SessionUtils.doWithoutCommit(
-                ModelVersionMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteModelVersionsBySchemaIdAndModelName(schemaId, ident.name())),
-
-        // delete model version aliases
-        () ->
-            SessionUtils.doWithoutCommit(
-                ModelVersionAliasRelMapper.class,
-                mapper ->
-                    mapper.softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
-                        schemaId, ident.name())),
-
-        // delete model meta
-        () ->
-            modelDeletedCount.set(
-                SessionUtils.getWithoutCommit(
-                    ModelMetaMapper.class,
-                    mapper ->
-                        mapper.softDeleteModelMetaBySchemaIdAndModelName(schemaId, ident.name()))),
-        () ->
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        modelId, MetadataObject.Type.MODEL.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        modelId, MetadataObject.Type.MODEL.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        modelId, MetadataObject.Type.MODEL.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(modelId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        modelId, MetadataObject.Type.MODEL.name())),
+        () -> deleteModelWithVersion(ident, modelPO),
+        () -> deleteModelDependents(modelPO),
         () -> {
-          if (modelDeletedCount.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                EntityChangeLogMapper.class,
-                mapper ->
-                    mapper.insertEntityChange(
-                        metalakeName,
-                        Entity.EntityType.MODEL.name(),
-                        modelFullName,
-                        OperateType.DROP));
-          }
+          SessionUtils.doWithoutCommit(
+              EntityChangeLogMapper.class,
+              mapper ->
+                  mapper.insertEntityChange(
+                      metalakeName,
+                      Entity.EntityType.MODEL.name(),
+                      modelFullName,
+                      OperateType.DROP));
         });
 
-    return modelDeletedCount.get() > 0;
+    return true;
+  }
+
+  /**
+   * Deletes a model row only when its concurrency version has not changed since it was read.
+   *
+   * <p>The caller must run this method in the same transaction that removes the model's related
+   * data. This allows any later cleanup failure to restore the model row as well.
+   */
+  void deleteModelWithVersion(NameIdentifier ident, ModelPO observedModelPO) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.softDeleteModelMetaByIdAndVersion(
+                    observedModelPO.getModelId(), observedModelPO.getCurrentVersion()));
+    if (deleted == 0) {
+      throw modelWriteFailure(ident, observedModelPO);
+    }
+  }
+
+  /**
+   * Advances the concurrency version shared by a model, its versions, and its aliases.
+   *
+   * <p>The caller uses this as the first write in a model-version transaction. If the model changed
+   * after it was read, this method fails before any version or alias row is modified.
+   */
+  void bumpModelVersion(NameIdentifier ident, ModelPO observedModelPO) {
+    int updated =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.bumpModelVersion(
+                    observedModelPO.getModelId(), observedModelPO.getCurrentVersion()));
+    if (updated == 0) {
+      throw modelWriteFailure(ident, observedModelPO);
+    }
   }
 
   @Monitored(
@@ -391,18 +374,24 @@ public class ModelMetaService {
                 metalakeName, catalogName, schemaName, oldModelEntity.name()));
     boolean isRenamed = !Objects.equals(oldModelEntity.name(), newEntity.name());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      ModelMetaMapper.class,
-                      mapper ->
-                          mapper.updateModelMeta(
-                              POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
           () -> {
-            if (isRenamed && updateResult.get() > 0) {
+            // This is the first write in the transaction. It succeeds only if the model still has
+            // the concurrency version read above, so an older request cannot overwrite a newer
+            // model or add an incorrect change-log entry.
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    ModelMetaMapper.class,
+                    mapper ->
+                        mapper.updateModelMeta(
+                            POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO));
+            if (updated == 0) {
+              throw modelWriteFailure(identifier, oldModelPO);
+            }
+          },
+          () -> {
+            if (isRenamed) {
               SessionUtils.doWithoutCommit(
                   EntityChangeLogMapper.class,
                   mapper ->
@@ -419,11 +408,7 @@ public class ModelMetaService {
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + identifier);
-    }
+    return newEntity;
   }
 
   @Monitored(
@@ -446,5 +431,62 @@ public class ModelMetaService {
                   modelNames);
           return POConverters.fromModelPOs(modelPOs, firstIdent.namespace());
         });
+  }
+
+  /**
+   * Explains why a version-checked model write changed no rows.
+   *
+   * <p>The locking read waits for a competing transaction to finish. If the same model is still at
+   * the requested name, only its concurrency version changed and the caller should retry. If it was
+   * deleted, renamed, or moved, the requested model no longer exists.
+   */
+  RuntimeException modelWriteFailure(NameIdentifier ident, ModelPO observedModelPO) {
+    ModelPO currentModelPO =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper -> mapper.selectModelMetaByModelIdForUpdate(observedModelPO.getModelId()));
+    if (currentModelPO == null
+        || !Objects.equals(currentModelPO.getModelName(), observedModelPO.getModelName())
+        || !Objects.equals(currentModelPO.getSchemaId(), observedModelPO.getSchemaId())
+        || !Objects.equals(currentModelPO.getCatalogId(), observedModelPO.getCatalogId())
+        || !Objects.equals(currentModelPO.getMetalakeId(), observedModelPO.getMetalakeId())) {
+      return new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
+          ident.toString());
+    }
+    return ExceptionUtils.concurrentModification(Entity.EntityType.MODEL, ident);
+  }
+
+  private void deleteModelDependents(ModelPO modelPO) {
+    Long modelId = modelPO.getModelId();
+    // The model row has already passed its version check. All cleanup below uses the same
+    // transaction, so a failure restores both the model row and any related rows already removed.
+    SessionUtils.doWithoutCommit(
+        ModelVersionAliasRelMapper.class,
+        mapper -> mapper.softDeleteModelVersionAliasRelsByModelId(modelId));
+    SessionUtils.doWithoutCommit(
+        ModelVersionMetaMapper.class, mapper -> mapper.softDeleteModelVersionsByModelId(modelId));
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                modelId, MetadataObject.Type.MODEL.name()));
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(modelId, MetadataObject.Type.MODEL.name()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                modelId, MetadataObject.Type.MODEL.name()));
+    SessionUtils.doWithoutCommit(
+        StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(modelId));
+    SessionUtils.doWithoutCommit(
+        PolicyMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                modelId, MetadataObject.Type.MODEL.name()));
   }
 }

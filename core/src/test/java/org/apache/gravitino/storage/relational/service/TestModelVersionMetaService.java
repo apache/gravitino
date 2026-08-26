@@ -42,6 +42,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NonEmptyEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
@@ -52,6 +53,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -1141,6 +1143,142 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testModelVersionWritesAdvanceAggregateVersion() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    assertModelCurrentVersion(model.id(), 1L);
+
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
+            ImmutableList.of("aggregate_alias"),
+            "original",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+    assertModelCurrentVersion(model.id(), 2L);
+
+    ModelVersionMetaService.getInstance()
+        .updateModelVersion(
+            version.nameIdentifier(),
+            current -> copyModelVersion((ModelVersionEntity) current, "updated"));
+    assertModelCurrentVersion(model.id(), 3L);
+
+    Assertions.assertTrue(
+        ModelVersionMetaService.getInstance().deleteModelVersion(version.nameIdentifier()));
+    assertModelCurrentVersion(model.id(), 4L);
+  }
+
+  @TestTemplate
+  void testModelVersionAlterRejectsStaleAggregateVersion() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
+            ImmutableList.of("stale_alias"),
+            "original",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    version.nameIdentifier(),
+                    current -> {
+                      updateModelVersionUnchecked(
+                          version.nameIdentifier(), winner -> copyModelVersion(winner, "winner"));
+                      return copyModelVersion((ModelVersionEntity) current, "stale update");
+                    }));
+
+    ModelVersionEntity current =
+        ModelVersionMetaService.getInstance().getModelVersionByIdentifier(version.nameIdentifier());
+    Assertions.assertEquals("winner", current.comment());
+    assertModelCurrentVersion(model.id(), 3L);
+  }
+
+  @TestTemplate
+  void testAliasConflictRollsBackAggregateVersionAndVersionUpdate() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity first =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "first_path"),
+            ImmutableList.of("taken_alias"),
+            "first",
+            properties,
+            AUDIT_INFO);
+    ModelVersionEntity second =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "second_path"),
+            ImmutableList.of("second_alias"),
+            "second",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(first);
+    ModelVersionMetaService.getInstance().insertModelVersion(second);
+    ModelPO beforeFailure = ModelMetaService.getInstance().getModelPOById(model.id());
+
+    Assertions.assertThrows(
+        RuntimeException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    second.nameIdentifier(),
+                    current ->
+                        copyModelVersion(
+                            (ModelVersionEntity) current,
+                            "must roll back",
+                            ImmutableList.of("taken_alias"))));
+
+    ModelPO afterFailure = ModelMetaService.getInstance().getModelPOById(model.id());
+    ModelVersionEntity unchanged =
+        ModelVersionMetaService.getInstance().getModelVersionByIdentifier(second.nameIdentifier());
+    Assertions.assertEquals(beforeFailure.getCurrentVersion(), afterFailure.getCurrentVersion());
+    Assertions.assertEquals(beforeFailure.getLastVersion(), afterFailure.getLastVersion());
+    Assertions.assertEquals("second", unchanged.comment());
+    Assertions.assertEquals(ImmutableList.of("second_alias"), unchanged.aliases());
+  }
+
+  @TestTemplate
   void testDeleteModelVersionsByLegacyTimeline() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
@@ -1260,5 +1398,36 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         .withProperties(properties)
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  private ModelVersionEntity copyModelVersion(ModelVersionEntity version, String comment) {
+    return copyModelVersion(version, comment, version.aliases());
+  }
+
+  private ModelVersionEntity copyModelVersion(
+      ModelVersionEntity version, String comment, List<String> updatedAliases) {
+    return createModelVersionEntity(
+        version.modelIdentifier(),
+        version.version(),
+        version.uris(),
+        updatedAliases,
+        comment,
+        version.properties(),
+        version.auditInfo());
+  }
+
+  private void updateModelVersionUnchecked(
+      NameIdentifier identifier, Function<ModelVersionEntity, ModelVersionEntity> updater) {
+    try {
+      ModelVersionMetaService.getInstance().updateModelVersion(identifier, updater);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void assertModelCurrentVersion(long modelId, long expectedVersion) {
+    ModelPO modelPO = ModelMetaService.getInstance().getModelPOById(modelId);
+    Assertions.assertEquals(expectedVersion, modelPO.getCurrentVersion());
+    Assertions.assertEquals(modelPO.getCurrentVersion(), modelPO.getLastVersion());
   }
 }

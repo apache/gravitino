@@ -1664,6 +1664,9 @@ public class POConverters {
           .withModelName(modelEntity.name())
           .withModelComment(modelEntity.comment())
           .withModelLatestVersion(modelEntity.latestVersion())
+          // A new model has no earlier writes, so its concurrency version starts at 1.
+          .withCurrentVersion(INIT_VERSION)
+          .withLastVersion(INIT_VERSION)
           .withModelProperties(
               JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(modelEntity.auditInfo()))
@@ -1708,12 +1711,14 @@ public class POConverters {
   }
 
   /**
-   * Updata ModelPO with new ModelEntity object, metalakeID, catalogID, schemaID will be the same as
-   * the old one. the id, name, comment, properties, latestVersion and auditInfo will be updated.
+   * Creates a {@link ModelPO} for a model update.
    *
-   * @param oldModelPO the old ModelPO object
-   * @param newModel the new ModelEntity object
-   * @return the updated ModelPO object
+   * <p>The parent metalake, catalog, and schema IDs stay unchanged. The model fields come from the
+   * new entity, and the shared concurrency version advances by one.
+   *
+   * @param oldModelPO the model record read before the update
+   * @param newModel the updated model entity
+   * @return the model record to store
    */
   public static ModelPO updateModelPO(ModelPO oldModelPO, ModelEntity newModel) {
     try {
@@ -1725,6 +1730,9 @@ public class POConverters {
           .withSchemaId(oldModelPO.getSchemaId())
           .withModelComment(newModel.comment())
           .withModelLatestVersion(newModel.latestVersion())
+          // Reserve the next shared concurrency version for this model change.
+          .withCurrentVersion(oldModelPO.getLastVersion() + 1)
+          .withLastVersion(oldModelPO.getLastVersion() + 1)
           .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(newModel.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newModel.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)

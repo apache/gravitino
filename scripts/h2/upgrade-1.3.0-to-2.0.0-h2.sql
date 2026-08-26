@@ -28,6 +28,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS `uk_mid_geid_del` ON `group_meta` (`metalake_i
 ALTER TABLE `table_column_version_info`
     ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
 
+ALTER TABLE `model_meta` ADD COLUMN `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`;
+ALTER TABLE `model_meta` ADD COLUMN `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
+
 ALTER TABLE `tag_meta` ADD COLUMN `allowed_values` CLOB DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;
 
 ALTER TABLE `tag_relation_meta` DROP INDEX `uk_ti_mi_del`;

@@ -132,6 +132,20 @@ public class ModelVersionMetaBaseSQLProvider {
         + " AND mm.deleted_at = 0) AND mvi.deleted_at = 0";
   }
 
+  /**
+   * Returns SQL that soft-deletes every active version row for a model ID.
+   *
+   * @param modelId the model ID
+   * @return the soft-delete SQL
+   */
+  public String softDeleteModelVersionsByModelId(@Param("modelId") Long modelId) {
+    return "UPDATE "
+        + ModelVersionMetaMapper.TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+  }
+
   public String softDeleteModelVersionMetaByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "

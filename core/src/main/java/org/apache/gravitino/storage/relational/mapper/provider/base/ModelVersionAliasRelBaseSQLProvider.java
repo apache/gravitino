@@ -87,6 +87,20 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " AND mm.deleted_at = 0) AND mvar.deleted_at = 0";
   }
 
+  /**
+   * Returns SQL that soft-deletes every active alias row for a model ID.
+   *
+   * @param modelId the model ID
+   * @return the soft-delete SQL
+   */
+  public String softDeleteModelVersionAliasRelsByModelId(@Param("modelId") Long modelId) {
+    return "UPDATE "
+        + ModelVersionAliasRelMapper.TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
+  }
+
   public String softDeleteModelVersionAliasRelsByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return "UPDATE "

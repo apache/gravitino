@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -173,10 +172,13 @@ public class ModelVersionMetaService {
 
     try {
       SessionUtils.doMultipleWithCommit(
-          // Model versions carry the schema ID directly, so they must take the same parent fence
-          // as models. Otherwise a schema cascade can pass its model-version cleanup and a
-          // concurrent registration can insert a new active version below the deleted schema.
+          // Keep the schema locked while adding the version. Otherwise a concurrent schema delete
+          // could finish its cleanup just before these new rows are inserted.
           () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
+          // Advance the concurrency version shared by the model and all its versions before
+          // inserting URI or alias rows. A competing writer makes this check fail before any
+          // partial data is added.
+          () -> ModelMetaService.getInstance().bumpModelVersion(modelIdent, modelPO),
           () ->
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
@@ -190,9 +192,9 @@ public class ModelVersionMetaService {
                 mapper -> mapper.insertModelVersionAliasRels(aliasRelPOs));
           },
           () -> {
-            // If the model version is inserted successfully, update the model latest version. A
-            // zero result means the model disappeared after the read above, so the inserted version
-            // and aliases must roll back with this transaction.
+            // The insert statements above use the old model_latest_version as the number of the new
+            // version. Increment it only after those inserts. The earlier version check keeps the
+            // model row locked, so another registration cannot choose the same number.
             int updated =
                 SessionUtils.getWithoutCommit(
                     ModelMetaMapper.class, mapper -> mapper.updateModelLatestVersion(modelId));
@@ -214,52 +216,59 @@ public class ModelVersionMetaService {
     NameIdentifierUtil.checkModelVersion(ident);
 
     NameIdentifier modelIdent = NameIdentifier.of(ident.namespace().levels());
-    // Will throw a NoSuchEntityException if the model does not exist.
-    ModelEntity modelEntity;
+    ModelPO modelPO;
     try {
-      modelEntity = ModelMetaService.getInstance().getModelByIdentifier(modelIdent);
+      modelPO = ModelMetaService.getInstance().getModelPOByIdentifier(modelIdent);
     } catch (NoSuchEntityException e) {
       return false;
     }
 
     boolean isVersionNumber = NumberUtils.isCreatable(ident.name());
+    // Resolve an alias to its numeric model-version value once. The concurrency-version check
+    // below will fail if another writer changes the version or alias after this read.
+    List<ModelVersionPO> observedVersionPOs =
+        SessionUtils.getWithoutCommit(
+            ModelVersionMetaMapper.class,
+            mapper -> {
+              if (isVersionNumber) {
+                return mapper.selectModelVersionMeta(
+                    modelPO.getModelId(), Integer.valueOf(ident.name()));
+              }
+              return mapper.selectModelVersionMetaByAlias(modelPO.getModelId(), ident.name());
+            });
+    if (observedVersionPOs.isEmpty()) {
+      return false;
+    }
+    Integer modelVersion = observedVersionPOs.get(0).getModelVersion();
 
-    AtomicInteger modelVersionDeletedCount = new AtomicInteger();
     SessionUtils.doMultipleWithCommit(
-        // Delete model version relations first
-        () ->
-            modelVersionDeletedCount.set(
-                SessionUtils.getWithoutCommit(
-                    ModelVersionMetaMapper.class,
-                    mapper -> {
-                      if (isVersionNumber) {
-                        return mapper.softDeleteModelVersionMetaByModelIdAndVersion(
-                            modelEntity.id(), Integer.valueOf(ident.name()));
-                      } else {
-                        return mapper.softDeleteModelVersionMetaByModelIdAndAlias(
-                            modelEntity.id(), ident.name());
-                      }
-                    })),
+        // Keep the parent schema from being deleted while this transaction changes version rows.
+        () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
+        // Reserve this write by advancing the shared concurrency version before deleting anything.
+        // If the model changed after the read above, leave the version and its aliases untouched.
+        () -> ModelMetaService.getInstance().bumpModelVersion(modelIdent, modelPO),
         () -> {
-          // Delete model version alias relations
-          if (modelVersionDeletedCount.get() == 0) {
-            return;
+          // An alias was resolved to its numeric version above. Delete every URI row belonging to
+          // that version, regardless of whether the caller supplied the number or an alias.
+          int deleted =
+              SessionUtils.getWithoutCommit(
+                  ModelVersionMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteModelVersionMetaByModelIdAndVersion(
+                          modelPO.getModelId(), modelVersion));
+          if (deleted == 0) {
+            throw noSuchModelVersionException(ident);
           }
+        },
+        // Remove all aliases for the same numeric version in the same transaction.
+        () ->
+            SessionUtils.doWithoutCommit(
+                ModelVersionAliasRelMapper.class,
+                mapper ->
+                    mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
+                        modelPO.getModelId(), modelVersion)));
 
-          SessionUtils.doWithoutCommit(
-              ModelVersionAliasRelMapper.class,
-              mapper -> {
-                if (isVersionNumber) {
-                  mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
-                      modelEntity.id(), Integer.valueOf(ident.name()));
-                } else {
-                  mapper.softDeleteModelVersionAliasRelsByModelIdAndAlias(
-                      modelEntity.id(), ident.name());
-                }
-              });
-        });
-
-    return modelVersionDeletedCount.get() > 0;
+    return true;
   }
 
   @Monitored(
@@ -356,61 +365,64 @@ public class ModelVersionMetaService {
     boolean isModelVersionUriUpdated =
         isModelVersionUriUpdated(oldModelVersionEntity, newModelVersionEntity);
 
-    final AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          // URI and alias updates can reinsert active model-version rows, so they need the same
-          // schema fence as a new version registration.
+          // Keep the schema locked because URI and alias changes may replace active child rows.
           () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
+          // Advance the shared concurrency version before changing child rows. A competing model
+          // or model-version writer then makes this operation fail without leaving partial changes.
+          () -> ModelMetaService.getInstance().bumpModelVersion(modelIdent, modelPO),
           () -> {
+            int updated;
             if (isModelVersionUriUpdated) {
-              // delete old model version POs first
-              updateResult.addAndGet(
+              // URI rows share the same model-version number. Replace the complete set so URI
+              // names removed by the update do not remain active.
+              updated =
                   SessionUtils.getWithoutCommit(
                       ModelVersionMetaMapper.class,
-                      mapper -> {
-                        if (isVersionNumber) {
-                          return mapper.softDeleteModelVersionMetaByModelIdAndVersion(
-                              modelId, Integer.valueOf(ident.name()));
-                        } else {
-                          return mapper.softDeleteModelVersionMetaByModelIdAndAlias(
-                              modelId, ident.name());
-                        }
-                      }));
+                      mapper ->
+                          mapper.softDeleteModelVersionMetaByModelIdAndVersion(
+                              modelId, oldModelVersionPOs.get(0).getModelVersion()));
 
-              // insert model version POs with updated URIs
               List<ModelVersionPO> modelVersionPOs =
                   POConverters.initializeModelVersionPO(newModelVersionEntity, modelId);
               SessionUtils.doWithoutCommit(
                   ModelVersionMetaMapper.class,
                   mapper -> mapper.insertModelVersionMetasWithVersionNumber(modelVersionPOs));
             } else {
-              // update model version POs directly
-              updateResult.addAndGet(
+              // When the URI set is unchanged, update the common fields in place.
+              updated =
                   SessionUtils.getWithoutCommit(
                       ModelVersionMetaMapper.class,
                       mapper ->
                           mapper.updateModelVersionMeta(
                               POConverters.updateModelVersionPO(
                                   oldModelVersionPOs.get(0), newModelVersionEntity),
-                              oldModelVersionPOs.get(0))));
+                              oldModelVersionPOs.get(0)));
+            }
+            if (updated == 0) {
+              // The version disappeared after the initial read. Throwing here also rolls back the
+              // shared concurrency-version change made above.
+              throw noSuchModelVersionException(ident);
             }
           },
           () -> {
             if (isAliasChanged) {
+              // Replace the full alias set by numeric version. This also works when the request
+              // identified the version through one of its aliases.
               SessionUtils.doWithoutCommit(
                   ModelVersionAliasRelMapper.class,
                   mapper ->
-                      oldModelVersionEntity
-                          .aliases()
-                          .forEach(
-                              alias ->
-                                  mapper.softDeleteModelVersionAliasRelsByModelIdAndAlias(
-                                      modelId, alias)));
+                      mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
+                          modelId, oldModelVersionEntity.version()));
 
-              SessionUtils.doWithoutCommit(
-                  ModelVersionAliasRelMapper.class,
-                  mapper -> mapper.updateModelVersionAliasRel(newAliasRelPOs));
+              if (!newAliasRelPOs.isEmpty()) {
+                // An empty list means that the update removed every alias; there is nothing to
+                // insert after the old aliases have been deleted.
+                SessionUtils.doWithoutCommit(
+                    ModelVersionAliasRelMapper.class,
+                    mapper -> mapper.updateModelVersionAliasRel(newAliasRelPOs));
+              }
             }
           });
 
@@ -420,11 +432,7 @@ public class ModelVersionMetaService {
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newModelVersionEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + ident);
-    }
+    return newModelVersionEntity;
   }
 
   private boolean isModelVersionAliasUpdated(
@@ -461,5 +469,12 @@ public class ModelVersionMetaService {
         NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
         Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
         modelIdentifier.toString());
+  }
+
+  private NoSuchEntityException noSuchModelVersionException(NameIdentifier modelVersionIdentifier) {
+    return new NoSuchEntityException(
+        NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+        Entity.EntityType.MODEL_VERSION.name().toLowerCase(Locale.ROOT),
+        modelVersionIdentifier.toString());
   }
 }
