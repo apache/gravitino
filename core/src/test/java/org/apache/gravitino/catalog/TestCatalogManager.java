@@ -122,6 +122,9 @@ public class TestCatalogManager {
   void reset() throws IOException {
     ((InMemoryEntityStore) entityStore).clear();
     entityStore.put(metalakeEntity, true);
+    // The shared CatalogManager is created once in @BeforeAll, so its cache would otherwise keep
+    // entries created by previously executed test methods and make tests order-dependent.
+    catalogManager.getCatalogCache().invalidateAll();
   }
 
   @AfterAll
@@ -1220,37 +1223,49 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testCatalogCacheRemoveListener() {
+  public void testCatalogCacheRemoveListener() throws IOException {
     NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
     Map<String, String> props =
         ImmutableMap.of(
             PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
 
-    // Create a catalog
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    // Use a dedicated CatalogManager (and entity store) instead of the shared static one: the
+    // shared instance keeps cache entries and cache removal listeners registered by other test
+    // methods, which would make the assertions below depend on the test execution order.
+    EntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
 
-    // Load the catalog to add it to the cache
-    catalogManager.loadCatalog(ident);
-    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config))) {
+      // Create a catalog
+      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
-    // Add a listener to track removed catalogs
-    Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
-    catalogManager.addCatalogCacheRemoveListener(removedCatalogs::add);
+      // Load the catalog to add it to the cache
+      manager.loadCatalog(ident);
+      Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-    // Invalidate the cache to trigger the removal listener
-    catalogManager.getCatalogCache().invalidate(ident);
+      // Add a listener to track removed catalogs
+      Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
+      manager.addCatalogCacheRemoveListener(removedCatalogs::add);
 
-    // Wait for the async eviction to complete
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () -> {
-              Assertions.assertTrue(
-                  removedCatalogs.contains(ident),
-                  "Listener should be notified of catalog removal");
-              Assertions.assertEquals(
-                  1, removedCatalogs.size(), "Only one catalog should be removed");
-            });
+      // Invalidate the cache to trigger the removal listener
+      manager.getCatalogCache().invalidate(ident);
+
+      // Wait for the async eviction to complete
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                Assertions.assertTrue(
+                    removedCatalogs.contains(ident),
+                    "Listener should be notified of catalog removal");
+                Assertions.assertEquals(
+                    1, removedCatalogs.size(), "Only one catalog should be removed");
+              });
+    } finally {
+      store.close();
+    }
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
