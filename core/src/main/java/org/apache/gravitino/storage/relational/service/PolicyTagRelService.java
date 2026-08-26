@@ -25,8 +25,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -155,8 +153,7 @@ public class PolicyTagRelService {
     String metalake = tagIdentifier.namespace().level(0);
     TagPO tagPO = lockTag(tagIdentifier);
     long tagId = tagPO.getTagId();
-    Map<String, Long> policyIds =
-        resolveAndLockPolicyIds(metalake, tagPO.getMetalakeId(), targetsToAdd, targetsToRemove);
+    Map<String, Long> policyIds = resolvePolicyIds(metalake, targetsToAdd, targetsToRemove);
 
     for (RelationEdgeTarget target : targetsToRemove) {
       long policyId = policyIds.get(target.nameIdentifier().name());
@@ -315,11 +312,8 @@ public class PolicyTagRelService {
         });
   }
 
-  private static Map<String, Long> resolveAndLockPolicyIds(
-      String metalake,
-      Long metalakeId,
-      RelationEdgeTarget[] targetsToAdd,
-      RelationEdgeTarget[] targetsToRemove) {
+  private static Map<String, Long> resolvePolicyIds(
+      String metalake, RelationEdgeTarget[] targetsToAdd, RelationEdgeTarget[] targetsToRemove) {
     Set<String> policyNames = new LinkedHashSet<>();
     Arrays.stream(targetsToAdd)
         .map(target -> target.nameIdentifier().name())
@@ -331,41 +325,21 @@ public class PolicyTagRelService {
       return Collections.emptyMap();
     }
 
-    List<PolicyPO> observedPolicies =
+    List<PolicyPO> policies =
         SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class,
             mapper ->
                 mapper.listPolicyPOsByMetalakeAndPolicyNames(
                     metalake, new ArrayList<>(policyNames)));
-    Map<String, PolicyPO> observedByName =
-        observedPolicies.stream()
-            .collect(Collectors.toMap(PolicyPO::getPolicyName, policy -> policy));
+    Map<String, Long> policyIds =
+        policies.stream().collect(Collectors.toMap(PolicyPO::getPolicyName, PolicyPO::getPolicyId));
 
     for (String policyName : policyNames) {
-      if (!observedByName.containsKey(policyName)) {
+      if (!policyIds.containsKey(policyName)) {
         throw noSuchEntity(Entity.EntityType.POLICY, policyName);
       }
     }
-
-    List<PolicyPO> orderedPolicies =
-        observedPolicies.stream()
-            .sorted(Comparator.comparing(PolicyPO::getPolicyId))
-            .collect(Collectors.toList());
-    return SessionUtils.getWithoutCommit(
-        PolicyMetaMapper.class,
-        mapper -> {
-          Map<String, Long> result = new LinkedHashMap<>();
-          for (PolicyPO observed : orderedPolicies) {
-            PolicyPO locked = mapper.selectPolicyByPolicyIdForShare(observed.getPolicyId());
-            if (locked == null
-                || !Objects.equals(locked.getPolicyName(), observed.getPolicyName())
-                || !Objects.equals(locked.getMetalakeId(), metalakeId)) {
-              throw noSuchEntity(Entity.EntityType.POLICY, observed.getPolicyName());
-            }
-            result.put(locked.getPolicyName(), locked.getPolicyId());
-          }
-          return result;
-        });
+    return policyIds;
   }
 
   private static NoSuchEntityException noSuchEntity(Entity.EntityType type, String name) {

@@ -77,11 +77,6 @@ public class PolicyTagRelSQLProviderFactory {
     return getProvider().softDeleteByPair(relation);
   }
 
-  /** Delegates policy-ID deletion cleanup. */
-  public static String softDeleteByPolicyId(@Param("policyId") Long policyId) {
-    return getProvider().softDeleteByPolicyId(policyId);
-  }
-
   /** Delegates tag-ID deletion cleanup. */
   public static String softDeleteByTagId(@Param("tagId") Long tagId) {
     return getProvider().softDeleteByTagId(tagId);

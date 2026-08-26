@@ -26,11 +26,6 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
 
   @Override
-  public String selectPolicyByPolicyIdForShare(Long policyId) {
-    return selectPolicyByPolicyId(policyId) + " FOR SHARE";
-  }
-
-  @Override
   public String softDeletePolicyByMetalakeAndPolicyName(String metalakeName, String policyName) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME

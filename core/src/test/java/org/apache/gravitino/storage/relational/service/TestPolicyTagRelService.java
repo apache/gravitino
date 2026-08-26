@@ -49,7 +49,6 @@ import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
-import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
@@ -412,10 +411,9 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testEndpointDeletionWinsAgainstConcurrentRelationAdd() throws Exception {
+  public void testTagDeletionWinsAgainstConcurrentRelationAdd() throws Exception {
     createAndInsertMakeLake(METALAKE);
     assertTagDeletionWins(createEndpoints(METALAKE, "deleted_tag", "policy_for_deleted_tag"));
-    assertPolicyDeletionWins(createEndpoints(METALAKE, "tag_for_deleted_policy", "deleted_policy"));
   }
 
   private TagEntity createAssociation(String metalake, String tagName, String policyName)
@@ -522,23 +520,6 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
         () ->
             SessionUtils.doWithoutCommit(
                 PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(endpoints.tag.id())));
-  }
-
-  private void assertPolicyDeletionWins(RelationEndpoints endpoints) throws Exception {
-    assertEndpointDeletionWins(
-        endpoints,
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyMetaMapper.class,
-                mapper ->
-                    Assertions.assertEquals(
-                        1,
-                        mapper.softDeletePolicyByMetalakeAndPolicyName(
-                            METALAKE, endpoints.policy.name()))),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyTagRelMapper.class,
-                mapper -> mapper.softDeleteByPolicyId(endpoints.policy.id())));
   }
 
   private void assertEndpointDeletionWins(
