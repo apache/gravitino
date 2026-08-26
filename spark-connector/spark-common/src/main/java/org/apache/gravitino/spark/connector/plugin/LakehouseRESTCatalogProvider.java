@@ -23,7 +23,7 @@ import java.util.List;
 import java.util.Map;
 
 /** Provides format-specific discovery and Spark configuration for lakehouse REST catalogs. */
-interface LakehouseRESTCatalogProvider {
+public interface LakehouseRESTCatalogProvider {
 
   /**
    * Returns the format token used in {@code spark.sql.gravitino.<format>REST.*} configuration.

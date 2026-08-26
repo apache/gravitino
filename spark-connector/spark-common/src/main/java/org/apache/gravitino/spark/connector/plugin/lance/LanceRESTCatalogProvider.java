@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.spark.connector.plugin;
+package org.apache.gravitino.spark.connector.plugin.lance;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -29,13 +29,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.spark.connector.plugin.LakehouseRESTCatalogProvider;
 import org.lance.namespace.client.apache.ApiClient;
 import org.lance.namespace.client.apache.ApiException;
 import org.lance.namespace.client.apache.api.NamespaceApi;
 import org.lance.namespace.model.ListNamespacesResponse;
 
 /** Discovers and configures Lance REST catalogs. */
-class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
+public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
 
   static final String FORMAT = "lance";
   static final String CATALOG_CLASS = "org.lance.spark.LanceNamespaceSparkCatalog";
