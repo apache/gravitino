@@ -64,8 +64,7 @@ After unpacking, you can see the connector directory:
 1. Download and unpack the correct Gravitino Trino connector tarball for your Trino version.
 2. Rename the unpacked connector directory to `gravitino`, and then copy it to the Trino plugin directory.
    Normally, the directory location is `Trino-server-<version>/plugin`, and the directory contains other catalogs used by Trino.
-3. Add Trino JVM arguments `-Dlog4j.configurationFile=file:////etc/trino/log4j2.properties` to enable logging for the Gravitino Trino connector.
-4. Update Trino coordinator configuration. 
+3. Update Trino coordinator configuration. 
    You need to set `catalog.management=dynamic`, The config location is `Trino-server-<version>/etc/config.properties`,  and the contents like:
 
 ```text
