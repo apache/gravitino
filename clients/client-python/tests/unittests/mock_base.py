@@ -224,15 +224,27 @@ def mock_load_schema(name: str):
         _last_modifier="test",
         _last_modified_time="2024-04-05T10:10:35.218Z",
     )
-    return SchemaDTO(
+    schema = SchemaDTO(
         _name=name,
         _comment="this is schema test",
         _properties={"schema-prop": "schema-val"},
         _audit=audit_dto,
     )
+    mock_schema = MagicMock()
+    mock_schema.properties.return_value = schema.properties()
+    mock_schema.get_secrets.return_value = {}
+    return mock_schema
 
 
 def mock_data(cls):
+    @patch(
+        "gravitino.client.generic_fileset.GenericFileset.get_secrets",
+        return_value={},
+    )
+    @patch(
+        "gravitino.client.fileset_catalog.FilesetCatalog.get_secrets",
+        return_value={},
+    )
     @patch(
         "gravitino.client.gravitino_client_base.GravitinoClientBase.load_metalake",
         return_value=mock_load_metalake(),

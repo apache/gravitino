@@ -223,7 +223,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
         new SchemaCreateRequest("schema1", "comment", ImmutableMap.of("key", "value"));
     Schema mockSchema = mockSchema("schema1", "comment", ImmutableMap.of("key", "value"));
 
-    when(dispatcher.createSchema(any(), any(), any())).thenReturn(mockSchema);
+    when(dispatcher.createSchema(any(), any(), any(), any(), any())).thenReturn(mockSchema);
 
     Response resp =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -245,7 +245,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
     // Test throw NoSuchCatalogException
     doThrow(new NoSuchCatalogException("mock error"))
         .when(dispatcher)
-        .createSchema(any(), any(), any());
+        .createSchema(any(), any(), any(), any(), any());
     Response resp1 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -262,7 +262,7 @@ public class TestSchemaOperations extends BaseOperationsTest {
     // Test throw SchemaAlreadyExistsException
     doThrow(new SchemaAlreadyExistsException("mock error"))
         .when(dispatcher)
-        .createSchema(any(), any(), any());
+        .createSchema(any(), any(), any(), any(), any());
 
     Response resp2 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
@@ -279,7 +279,9 @@ public class TestSchemaOperations extends BaseOperationsTest {
         SchemaAlreadyExistsException.class.getSimpleName(), errorResp2.getType());
 
     // Test throw RuntimeException
-    doThrow(new RuntimeException("mock error")).when(dispatcher).createSchema(any(), any(), any());
+    doThrow(new RuntimeException("mock error"))
+        .when(dispatcher)
+        .createSchema(any(), any(), any(), any(), any());
 
     Response resp3 =
         target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")

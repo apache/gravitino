@@ -263,6 +263,11 @@ public class AuthorizationExpressionConverter {
                 + "&& !(ANY(DENY_CREATE_TABLE, METALAKE, CATALOG, SCHEMA, TABLE)))");
     expression =
         expression.replaceAll(
+            "ANY_PROBE_TABLE_LIKE",
+            "((ANY(PROBE_TABLE_LIKE, METALAKE, CATALOG, SCHEMA, TABLE)) "
+                + "&& !(ANY(DENY_PROBE_TABLE_LIKE, METALAKE, CATALOG, SCHEMA, TABLE)))");
+    expression =
+        expression.replaceAll(
             "ANY_SELECT_VIEW",
             "((ANY(SELECT_VIEW, METALAKE, CATALOG, SCHEMA, VIEW)) "
                 + "&& !(ANY(DENY_SELECT_VIEW, METALAKE, CATALOG, SCHEMA, VIEW)))");

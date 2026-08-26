@@ -40,6 +40,21 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
                   """;
 
+  public static final String PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  ANY_CREATE_TABLE || ANY_CREATE_VIEW)
+                  """;
+
+  public static final String LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  ANY_CREATE_TABLE || ANY_CREATE_VIEW)
+                  """;
+
   //  Adding ANY_CREATE_TABLE here as Spark calls tableExists before creating a table.
   public static final String ICEBERG_LOAD_TABLE_AUTHORIZATION_EXPRESSION =
       """

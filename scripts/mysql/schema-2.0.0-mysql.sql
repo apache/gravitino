@@ -560,6 +560,42 @@ CREATE TABLE IF NOT EXISTS `view_version_info` (
     KEY `idx_vvsid` (`schema_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'view version info';
 
+CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
+    `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model identity audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last allocated version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'semantic model deleted at',
+    PRIMARY KEY (`semantic_model_id`),
+    UNIQUE KEY `uk_sid_smn_del` (`schema_id`, `semantic_model_name`, `deleted_at`),
+    KEY `idx_smm_mid` (`metalake_id`),
+    KEY `idx_smm_cid` (`catalog_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model metadata';
+
+CREATE TABLE IF NOT EXISTS `semantic_model_version_info` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `metalake_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'metalake id',
+    `catalog_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'catalog id',
+    `schema_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'schema id',
+    `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',
+    `version` INT UNSIGNED NOT NULL COMMENT 'semantic model version',
+    `semantic_model_name` VARCHAR(128) NOT NULL COMMENT 'semantic model name snapshot',
+    `semantic_model_comment` TEXT DEFAULT NULL COMMENT 'semantic model comment snapshot',
+    `semantic_model_definition` MEDIUMTEXT NOT NULL COMMENT 'structured definition snapshot (JSON)',
+    `properties` MEDIUMTEXT DEFAULT NULL COMMENT 'semantic model properties snapshot (JSON)',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'semantic model version audit info',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'version deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `uk_smid_ver_del` (`semantic_model_id`, `version`, `deleted_at`),
+    KEY `idx_smvi_mid` (`metalake_id`),
+    KEY `idx_smvi_cid` (`catalog_id`),
+    KEY `idx_smvi_sid` (`schema_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'semantic model version information';
+
 -- This schema extends version 1.1.0 with partition statistics storage support
 -- The partition_statistic_meta table stores partition-level statistics for tables
 

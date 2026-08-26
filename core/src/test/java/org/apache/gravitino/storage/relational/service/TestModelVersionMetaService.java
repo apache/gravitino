@@ -28,6 +28,12 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -39,9 +45,15 @@ import org.apache.gravitino.exceptions.NonEmptyEntityException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -59,6 +71,162 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   private final Map<String, String> properties = ImmutableMap.of("k1", "v1");
 
   private final List<String> aliases = Lists.newArrayList("alias1", "alias2");
+
+  @TestTemplate
+  public void testInsertModelVersionWaitsForConcurrentSchemaDelete() throws Exception {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    SchemaEntity schema =
+        SchemaMetaService.getInstance()
+            .getSchemaByIdentifier(NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME));
+    SchemaPO observedSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class, mapper -> mapper.selectSchemaMetaById(schema.id()));
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_racing_schema_drop",
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(modelEntity, false);
+    ModelVersionEntity modelVersionEntity =
+        createModelVersionEntity(
+            modelEntity.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
+            aliases,
+            "version comment",
+            properties,
+            AUDIT_INFO);
+
+    CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch versionInsertStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () -> {
+                      int deleted =
+                          SessionUtils.getWithoutCommit(
+                              SchemaMetaMapper.class,
+                              mapper ->
+                                  mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                      observedSchemaPO.getSchemaId(),
+                                      observedSchemaPO.getCurrentVersion()));
+                      Assertions.assertEquals(1, deleted);
+                      schemaDeleteLocked.countDown();
+                      try {
+                        Assertions.assertTrue(allowDeleteCommit.await(30, TimeUnit.SECONDS));
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException(e);
+                      }
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+    try {
+      Assertions.assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> insertResult =
+          executor.submit(
+              () -> {
+                versionInsertStarted.countDown();
+                try {
+                  ModelVersionMetaService.getInstance().insertModelVersion(modelVersionEntity);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      Assertions.assertTrue(versionInsertStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> insertResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertInstanceOf(
+          NoSuchEntityException.class, insertResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(
+                ModelVersionMetaMapper.class,
+                mapper -> mapper.listModelVersionMetasByModelId(modelEntity.id()))
+            .isEmpty());
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(
+                ModelVersionAliasRelMapper.class,
+                mapper -> mapper.selectModelVersionAliasRelsByModelId(modelEntity.id()))
+            .isEmpty());
+  }
+
+  @TestTemplate
+  public void testUpdateModelVersionFailsWhenSchemaIsDeletedConcurrently() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_updated_during_schema_drop",
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity modelVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "old_path"),
+            aliases,
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(modelVersion);
+
+    ModelVersionEntity updatedVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "new_path"),
+            aliases,
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    NameIdentifier schemaIdent = NameIdentifier.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    modelVersion.nameIdentifier(),
+                    ignored -> {
+                      // The update has already resolved both the model and its version here. A
+                      // schema cascade that commits now must make the write fail before it can
+                      // reinsert the version with its new URI.
+                      Assertions.assertTrue(
+                          SchemaMetaService.getInstance().deleteSchema(schemaIdent, true));
+                      return updatedVersion;
+                    }));
+
+    Assertions.assertTrue(
+        SessionUtils.getWithoutCommit(
+                ModelVersionMetaMapper.class,
+                mapper -> mapper.listModelVersionMetasByModelId(model.id()))
+            .isEmpty());
+  }
 
   @TestTemplate
   public void testInsertAndSelectModelVersion() throws IOException {

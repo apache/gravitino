@@ -19,8 +19,10 @@
 package org.apache.gravitino.dto.requests;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.Preconditions;
+import java.util.Collections;
 import java.util.Map;
 import javax.annotation.Nullable;
 import lombok.EqualsAndHashCode;
@@ -29,6 +31,8 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogProvider;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.rest.RESTRequest;
 
 /** Represents a request to create a catalog. */
@@ -54,6 +58,32 @@ public class CatalogCreateRequest implements RESTRequest {
   @JsonProperty("properties")
   private final Map<String, String> properties;
 
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonProperty("secretBindings")
+  private final Map<String, SecretBindingDTO> secretBindings;
+
+  @JsonInclude(JsonInclude.Include.NON_EMPTY)
+  @JsonProperty("secretReferences")
+  private final Map<String, SecretReferenceDTO> secretReferences;
+
+  /**
+   * Constructor for CatalogCreateRequest without secret maps.
+   *
+   * @param name The name of the catalog.
+   * @param type The type of the catalog.
+   * @param provider The provider of the catalog.
+   * @param comment The comment for the catalog.
+   * @param properties The properties for the catalog.
+   */
+  public CatalogCreateRequest(
+      String name,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties) {
+    this(name, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
   /**
    * Constructor for CatalogCreateRequest.
    *
@@ -62,6 +92,10 @@ public class CatalogCreateRequest implements RESTRequest {
    * @param provider The provider of the catalog.
    * @param comment The comment for the catalog.
    * @param properties The properties for the catalog.
+   * @param secretBindings Optional property key → binding DTO ({@code provider} + {@code
+   *     plaintext}) for write-through secrets.
+   * @param secretReferences Optional property key → secret locator DTO ({@code provider} plus
+   *     provider-specific attributes).
    */
   @JsonCreator
   public CatalogCreateRequest(
@@ -69,11 +103,17 @@ public class CatalogCreateRequest implements RESTRequest {
       @JsonProperty("type") Catalog.Type type,
       @JsonProperty("provider") String provider,
       @JsonProperty("comment") String comment,
-      @JsonProperty("properties") Map<String, String> properties) {
+      @JsonProperty("properties") Map<String, String> properties,
+      @JsonProperty("secretBindings") Map<String, SecretBindingDTO> secretBindings,
+      @JsonProperty("secretReferences") Map<String, SecretReferenceDTO> secretReferences) {
     this.name = name;
     this.type = type;
     this.comment = comment;
     this.properties = properties;
+    // Match FilesetCreateRequest field defaults when JSON omits secret maps (@JsonCreator passes
+    // null for absent properties).
+    this.secretBindings = secretBindings == null ? Collections.emptyMap() : secretBindings;
+    this.secretReferences = secretReferences == null ? Collections.emptyMap() : secretReferences;
 
     if (StringUtils.isNotBlank(provider)) {
       this.provider = provider;

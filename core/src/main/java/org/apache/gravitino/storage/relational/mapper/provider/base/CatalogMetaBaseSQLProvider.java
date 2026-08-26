@@ -147,6 +147,11 @@ public class CatalogMetaBaseSQLProvider {
     return selectCatalogMetaById(catalogId) + " FOR UPDATE";
   }
 
+  /** Returns SQL that selects and share-locks an active catalog by ID. */
+  public String selectCatalogMetaByIdForShare(@Param("catalogId") Long catalogId) {
+    return selectCatalogMetaById(catalogId) + " LOCK IN SHARE MODE";
+  }
+
   public String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME

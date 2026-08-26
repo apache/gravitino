@@ -18,6 +18,7 @@
 from typing import Any, Optional, cast
 
 from gravitino.api.audit import Audit
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.rel.column import Column
@@ -33,6 +34,9 @@ from gravitino.api.stats.supports_statistics import SupportsStatistics
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.client.generic_column import GenericColumn
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
+)
 from gravitino.client.metadata_object_statistics_operations import (
     MetadataObjectStatisticsOperations,
 )
@@ -57,6 +61,7 @@ from gravitino.utils import HTTPClient
 
 class RelationalTable(
     Table,
+    SupportsRoles,
     SupportsStatistics,
     SupportsTags,
 ):
@@ -73,6 +78,9 @@ class RelationalTable(
             MetadataObject.Type.TABLE,
         )
         self._object_tag_operations = MetadataObjectTagOperations(
+            namespace.level(0), table_object, rest_client
+        )
+        self._object_role_operations = MetadataObjectRoleOperations(
             namespace.level(0), table_object, rest_client
         )
         self._object_statistics_operations = MetadataObjectStatisticsOperations(
@@ -266,6 +274,12 @@ class RelationalTable(
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
+    def list_binding_role_names(self) -> list[str]:
+        return self._object_role_operations.list_binding_role_names()
 
     def list_statistics(self) -> list[Statistic]:
         return self._object_statistics_operations.list_statistics()

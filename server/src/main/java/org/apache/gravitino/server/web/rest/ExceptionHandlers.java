@@ -145,6 +145,11 @@ public class ExceptionHandlers {
     return CredentialExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
   }
 
+  public static Response handleSecretException(
+      OperationType op, String metadataObjectName, Exception e) {
+    return SecretExceptionHandler.INSTANCE.handle(op, metadataObjectName, "", e);
+  }
+
   public static Response handleModelException(
       OperationType op, String model, String schema, Exception e) {
     return ModelExceptionHandler.INSTANCE.handle(op, model, schema, e);
@@ -166,30 +171,17 @@ public class ExceptionHandlers {
   }
 
   public static Response handleTestConnectionException(Exception e) {
-    ErrorResponse response;
-    if (e instanceof IllegalArgumentException) {
-      response = ErrorResponse.illegalArguments(e.getMessage(), e);
+    return handleTestConnectionException(e, true);
+  }
 
-    } else if (e instanceof ConnectionFailedException) {
-      response = ErrorResponse.connectionFailed(e.getMessage(), e);
-
-    } else if (e instanceof NotFoundException) {
-      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof AlreadyExistsException) {
-      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof NotInUseException) {
-      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else {
-      return Utils.internalError(e.getMessage(), e);
-    }
-
-    return Response.status(Response.Status.OK)
-        .entity(response)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+  /**
+   * Handles an existing catalog connection test failure without exposing its stack trace.
+   *
+   * @param e the connection test failure
+   * @return an HTTP 200 response containing the application error
+   */
+  public static Response handleExistingCatalogTestConnectionException(Exception e) {
+    return handleTestConnectionException(e, false);
   }
 
   public static Response handleOwnerException(
@@ -210,6 +202,38 @@ public class ExceptionHandlers {
   public static Response handlePartitionStatsException(
       OperationType type, String name, String parent, Exception e) {
     return PartitionStatsExceptionHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
+  private static Response handleTestConnectionException(Exception e, boolean includeStack) {
+    Throwable throwable = includeStack ? e : null;
+    ErrorResponse response;
+    if (e instanceof IllegalArgumentException) {
+      response = ErrorResponse.illegalArguments(e.getMessage(), throwable);
+
+    } else if (e instanceof ConnectionFailedException) {
+      response = ErrorResponse.connectionFailed(e.getMessage(), throwable);
+
+    } else if (e instanceof UnsupportedOperationException) {
+      response = ErrorResponse.unsupportedOperation(e.getMessage(), throwable);
+
+    } else if (e instanceof NotFoundException) {
+      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof AlreadyExistsException) {
+      response =
+          ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof NotInUseException) {
+      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else {
+      return Utils.internalError(e.getMessage(), throwable);
+    }
+
+    return Response.status(Response.Status.OK)
+        .entity(response)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
@@ -745,6 +769,34 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, credential, parent, e);
+      }
+    }
+  }
+
+  private static class SecretExceptionHandler extends BaseExceptionHandler {
+
+    private static final ExceptionHandler INSTANCE = new SecretExceptionHandler();
+
+    private static String getSecretErrorMsg(String parent, String reason) {
+      return String.format("Failed to get secrets under object [%s], reason [%s]", parent, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String secret, String parent, Exception e) {
+      String errorMsg = getSecretErrorMsg(parent, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof NotInUseException) {
+        return Utils.notInUse(errorMsg, e);
+
+      } else {
+        return super.handle(op, secret, parent, e);
       }
     }
   }

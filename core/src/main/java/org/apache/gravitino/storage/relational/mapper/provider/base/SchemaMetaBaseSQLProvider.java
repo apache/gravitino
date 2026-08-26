@@ -182,6 +182,16 @@ public class SchemaMetaBaseSQLProvider {
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
+  /** Returns SQL that selects and locks an active schema by ID. */
+  public String selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId) {
+    return selectSchemaMetaById(schemaId) + " FOR UPDATE";
+  }
+
+  /** Returns SQL that selects and share-locks an active schema by ID. */
+  public String selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId) {
+    return selectSchemaMetaById(schemaId) + " LOCK IN SHARE MODE";
+  }
+
   public String insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -227,8 +237,12 @@ public class SchemaMetaBaseSQLProvider {
         + " schema_comment = #{schemaMeta.schemaComment},"
         + " properties = #{schemaMeta.properties},"
         + " audit_info = #{schemaMeta.auditInfo},"
-        + " current_version = #{schemaMeta.currentVersion},"
-        + " last_version = #{schemaMeta.lastVersion},"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. last_version is assigned first, so both columns are computed from the
+        // version the row had before this statement.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{schemaMeta.deletedAt}";
   }
 
@@ -265,12 +279,24 @@ public class SchemaMetaBaseSQLProvider {
         + " schema_comment = VALUES(schema_comment),"
         + " properties = VALUES(properties),"
         + " audit_info = VALUES(audit_info),"
-        + " current_version = VALUES(current_version),"
-        + " last_version = VALUES(last_version),"
+        // Move the version forward instead of writing the initial version again. Resetting it
+        // would let a slow alter or drop that still holds an older version pass its own version
+        // check later on. last_version is assigned first, so both columns are computed from the
+        // version the row had before this statement.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = VALUES(deleted_at)"
         + "</script>";
   }
 
+  /**
+   * Builds SQL that updates a schema only if nobody changed it in the meantime.
+   *
+   * <p>The WHERE clause used to repeat every column. Comparing the version alone is enough now,
+   * because every update moves the version forward, and it also avoids a MySQL trap: MySQL reports
+   * zero affected rows when an UPDATE writes the values a row already has, which the old SQL could
+   * not tell apart from a real conflict.
+   */
   public String updateSchemaMeta(
       @Param("newSchemaMeta") SchemaPO newSchemaPO, @Param("oldSchemaMeta") SchemaPO oldSchemaPO) {
     return "UPDATE "
@@ -285,15 +311,7 @@ public class SchemaMetaBaseSQLProvider {
         + " last_version = #{newSchemaMeta.lastVersion},"
         + " deleted_at = #{newSchemaMeta.deletedAt}"
         + " WHERE schema_id = #{oldSchemaMeta.schemaId}"
-        + " AND schema_name = #{oldSchemaMeta.schemaName}"
-        + " AND metalake_id = #{oldSchemaMeta.metalakeId}"
-        + " AND catalog_id = #{oldSchemaMeta.catalogId}"
-        + " AND (schema_comment = #{oldSchemaMeta.schemaComment}"
-        + "   OR (schema_comment IS NULL and #{oldSchemaMeta.schemaComment} IS NULL))"
-        + " AND properties = #{oldSchemaMeta.properties}"
-        + " AND audit_info = #{oldSchemaMeta.auditInfo}"
         + " AND current_version = #{oldSchemaMeta.currentVersion}"
-        + " AND last_version = #{oldSchemaMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -309,6 +327,16 @@ public class SchemaMetaBaseSQLProvider {
         + "</foreach>"
         + ") AND deleted_at = 0"
         + "</script>";
+  }
+
+  public String softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE schema_id = #{schemaId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */

@@ -124,11 +124,12 @@ The Gravitino entity combines common metadata with the Ossie-compatible definiti
 SemanticModel
   name: string
   comment?: string
-  ai_context?: AIContext
-  datasets: Dataset[1..*]
-  relationships?: Relationship[]
-  metrics?: Metric[]
-  custom_extensions?: CustomExtension[]
+  definition: SemanticModelDefinition
+    ai_context?: AIContext
+    datasets: Dataset[1..*]
+    relationships?: Relationship[]
+    metrics?: Metric[]
+    custom_extensions?: CustomExtension[]
   properties: map<string, string>
   audit_info: AuditInfo
 ```
@@ -136,6 +137,8 @@ SemanticModel
 - `name` is the Gravitino entity name and maps to Ossie `SemanticModel.name`.
 - `comment` follows the common Gravitino entity convention and maps to Ossie
   `SemanticModel.description`.
+- `definition` is the immutable Ossie-compatible definition used by create, load, and replace
+  operations.
 - `properties` stores Gravitino-specific metadata and is not part of an exported Ossie model.
 - `custom_extensions` is part of the semantic definition and is preserved for Ossie interchange.
 - Collection order is preserved so consumers can produce stable serialized output.
@@ -337,7 +340,7 @@ SemanticModelCatalog
 ```
 
 Expected exceptions include `NoSuchSemanticModelException`,
-`SemanticModelAlreadyExistsException`, and `InvalidSemanticModelException`.
+`SemanticModelAlreadyExistsException`, and `IllegalSemanticModelException`.
 `listSemanticModels` returns identifiers rather than complete definitions so listing a schema does
 not transfer every model body. Callers use `loadSemanticModel` to retrieve selected models.
 
@@ -453,9 +456,9 @@ SemanticModel updated =
 boolean dropped = catalog.asSemanticModelCatalog().dropSemanticModel(ident);
 ```
 
-`SemanticModelDefinition` is an immutable request value that groups the definition fields. It has no
-name or independent lifecycle and is not another metadata object. The returned `SemanticModel`
-exposes its definition fields directly.
+`SemanticModelDefinition` is an immutable value that groups the definition fields. It has no name or
+independent lifecycle and is not another metadata object. The returned `SemanticModel` composes the
+same value through `definition()` alongside the managed entity metadata.
 
 #### REST API
 
