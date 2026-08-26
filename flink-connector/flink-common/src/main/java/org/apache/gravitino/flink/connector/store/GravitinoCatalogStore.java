@@ -20,6 +20,8 @@
 package org.apache.gravitino.flink.connector.store;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -97,11 +99,12 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
   public Optional<CatalogDescriptor> getCatalog(String catalogName) throws CatalogException {
     try {
       Catalog catalog = gravitinoCatalogManager.getGravitinoCatalogInfo(catalogName);
-      BaseCatalogFactory catalogFactory = getCatalogFactory(catalog.provider());
+      BaseCatalogFactory catalogFactory = catalogFactoryForProvider(catalog.provider());
       CatalogPropertiesConverter catalogPropertiesConverter =
           catalogFactory.catalogPropertiesConverter();
+      Map<String, String> catalogProperties = propsWithSecrets(catalog);
       Map<String, String> flinkCatalogProperties =
-          catalogPropertiesConverter.toFlinkCatalogProperties(catalog.properties());
+          catalogPropertiesConverter.toFlinkCatalogProperties(catalogProperties);
       CatalogDescriptor descriptor =
           newCatalogDescriptor(catalogName, Configuration.fromMap(flinkCatalogProperties));
       return Optional.of(descriptor);
@@ -150,7 +153,13 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
             catalogType));
   }
 
-  private BaseCatalogFactory getCatalogFactory(String provider) {
+  /**
+   * Resolve the Flink catalog factory for a Gravitino provider. Package-visible for unit tests.
+   *
+   * @param provider Gravitino catalog provider name
+   * @return matching {@link BaseCatalogFactory}
+   */
+  BaseCatalogFactory catalogFactoryForProvider(String provider) {
     return discoverFactories(
         catalogFactory ->
             ((BaseCatalogFactory) catalogFactory)
@@ -209,5 +218,12 @@ public class GravitinoCatalogStore extends AbstractCatalogStore {
       throw new RuntimeException(errorMessage);
     }
     return (BaseCatalogFactory) factories.get(0);
+  }
+
+  private static Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
+    props.putAll(catalog.supportsSecrets().getSecrets());
+    return props;
   }
 }

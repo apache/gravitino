@@ -106,4 +106,20 @@ public interface PolicyOperations {
    * @return True if the policy is deleted, false if the policy does not exist.
    */
   boolean deletePolicy(String name);
+
+  /**
+   * Lists all direct tag associations for a policy.
+   *
+   * <p>The returned associations are not filtered by their selectors. A selector is evaluated
+   * against the effective tag assignment of a specific metadata object only when resolving policies
+   * for that object.
+   *
+   * @param policyName The policy name.
+   * @return The direct tag associations, including their selectors.
+   * @throws UnsupportedOperationException If listing policy-to-tag associations is not supported.
+   */
+  default PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
+    throw new UnsupportedOperationException(
+        "Listing tag associations for a policy is not supported");
+  }
 }

@@ -539,6 +539,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return ViewMetaService.getInstance()
             .deleteViewMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case SEMANTIC_MODEL:
+        // TODO(#12209): Delegate to SemanticModelMetaService when relational persistence is added.
+        return 0;
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -577,6 +580,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB:
       case VIEW:
         // These entity types have not implemented multi-versions, so we can skip.
+        return 0;
+
+      case SEMANTIC_MODEL:
+        // TODO: Delegate to SemanticModelMetaService when relational persistence is added.
         return 0;
 
       case FILESET:
