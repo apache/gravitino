@@ -22,7 +22,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -36,7 +35,6 @@ import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.TableProcedureMetadata;
 import io.trino.spi.procedure.Procedure;
-import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
@@ -128,20 +126,10 @@ public class TestGravitinoConnectorProcedures {
     assertSame(resultSourceHandle, wrappedSource.getInternalHandle());
   }
 
-  @Test
-  void testFinishTableExecuteDelegatesToInternalMetadata() {
-    ConnectorMetadata internalMetadata = mock(ConnectorMetadata.class);
-    ConnectorSession session = mock(ConnectorSession.class);
-    ConnectorTableExecuteHandle internalExecuteHandle = mock(ConnectorTableExecuteHandle.class);
-    GravitinoTableExecuteHandle wrappedHandle =
-        new GravitinoTableExecuteHandle(internalExecuteHandle);
-
-    GravitinoMetadata metadata = createMetadata(internalMetadata);
-    metadata.finishTableExecute(session, wrappedHandle, List.of(), List.of());
-
-    verify(internalMetadata)
-        .finishTableExecute(eq(session), eq(internalExecuteHandle), any(), any());
-  }
+  // Note: finishTableExecute is version-specific (returns void up to Trino 480 and
+  // Map<String, Long> from Trino 481), so it lives in the per-version GravitinoMetadataNNN
+  // subclasses rather than the shared base and is covered by the version-segment module tests,
+  // mirroring how executeTableExecute is handled.
 
   private GravitinoConnector createConnector(Connector internalConnector) {
     GravitinoCatalog mockCatalog = mock(GravitinoCatalog.class);

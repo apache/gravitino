@@ -25,7 +25,6 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
-import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
 import io.trino.spi.connector.AggregationApplicationResult;
@@ -801,16 +800,6 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
         new GravitinoTableExecuteHandle(result.getTableExecuteHandle()),
         new GravitinoTableHandle(
             tableName.getSchemaName(), tableName.getTableName(), result.getSourceHandle()));
-  }
-
-  @Override
-  public void finishTableExecute(
-      ConnectorSession session,
-      ConnectorTableExecuteHandle tableExecuteHandle,
-      Collection<Slice> fragments,
-      List<Object> tableExecuteState) {
-    internalMetadata.finishTableExecute(
-        session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
   }
 
   protected SchemaTableName getTableName(ConnectorTableHandle tableHandle) {

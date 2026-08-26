@@ -31,6 +31,8 @@ trino-connector/
 │   └── src/main/java/
 ├── trino-connector-480-480/      # Version-specific adapters for Trino 480
 │   └── src/main/java/
+├── trino-connector-481-481/      # Version-specific adapters for Trino 481
+│   └── src/main/java/
 └── integration-test/             # Integration tests
 ```
 
@@ -80,6 +82,7 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
    | 473-478       | `trino-connector-473-478` |
    | 479           | `trino-connector-479-479` |
    | 480           | `trino-connector-480-480` |
+   | 481           | `trino-connector-481-481` |
 
 5. Add `<module>plugin/trino-gravitino</module>` to `trino/pom.xml` and create the `pom.xml` for the `trino-gravitino` module. The example below uses Trino `469`. Ensure the `trino-root` version matches the Trino version you are developing against.
 
