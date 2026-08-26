@@ -36,6 +36,7 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
 import org.apache.gravitino.trino.connector.util.GeneralDataTypeTransformer;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
 /**
  * This interface is used to handle different parts of catalog metadata from different catalog
@@ -138,7 +139,7 @@ public class CatalogConnectorMetadataAdapter {
               column.getName(),
               dataTypeTransformer.getGravitinoType(column.getType()),
               i,
-              column.getComment(),
+              SpiVersionCompat.columnComment(column),
               column.isNullable(),
               false,
               column.getProperties()));
@@ -285,7 +286,7 @@ public class CatalogConnectorMetadataAdapter {
         column.getName(),
         dataTypeTransformer.getGravitinoType(column.getType()),
         -1,
-        column.getComment(),
+        SpiVersionCompat.columnComment(column),
         column.isNullable(),
         false,
         column.getProperties());
