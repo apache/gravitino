@@ -115,7 +115,6 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
     Object result =
         interceptor.invoke(
             invocation(namespaceMethod("namespaceExists"), CATALOG + "$" + SCHEMA, "$"));
-
     assertErrorResponse(result, Response.Status.FORBIDDEN);
   }
 
@@ -125,7 +124,6 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
         LanceNamespaceOperations.class.getMethod(
             "listNamespacesOnRoot", String.class, String.class, Integer.class);
     MethodInvocation invocation = invocation(rootMethod, "$", null, null);
-
     assertEquals(PROCEEDED, interceptor.invoke(invocation));
     verify(authorizer, never()).authorize(any(), any(), any(), any(), any());
   }

@@ -88,10 +88,17 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     // is only applied when Lance REST is an auxiliary service of the Gravitino server.
     // The Gravitino configuration is only available in auxiliary mode, so it is read behind the
     // mode check.
-    boolean enableAuthorization =
+    boolean authorizationEnabled =
         auxMode && GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
-    String metalakeName = lanceConfig.get(LanceConfig.METALAKE_NAME);
-    if (enableAuthorization) {
+    boolean enableMetadataAuthorization =
+        authorizationEnabled && lanceConfig.isGravitinoMetalakeConfigured();
+    String metalakeName = lanceConfig.getGravitinoMetalake();
+    if (authorizationEnabled && !enableMetadataAuthorization) {
+      // A missing metalake makes the Lance backend unusable, but it should not prevent the main
+      // Gravitino server from starting. The backend reports the missing setting when it is used.
+      LOG.warn("Lance REST metadata authorization is disabled because no metalake is configured");
+    }
+    if (enableMetadataAuthorization) {
       lanceNamespace.setMetadataFilter(new LanceAuthorizationMetadataFilter(metalakeName));
     }
 
@@ -102,7 +109,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
-            if (enableAuthorization) {
+            if (enableMetadataAuthorization) {
               // Pass the metalake through HK2 constructor injection so authorization code does not
               // need mutable process-wide state.
               bind(metalakeName).to(String.class).named(METALAKE_BINDING);
@@ -143,7 +150,7 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
         lanceConfig.getNamespaceBackend(),
         auxMode ? "auxiliary" : "standalone",
-        enableAuthorization ? "enabled" : "disabled");
+        enableMetadataAuthorization ? "enabled" : "disabled");
   }
 
   @Override
