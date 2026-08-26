@@ -49,6 +49,7 @@ import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
 import org.apache.gravitino.exceptions.RoleAlreadyExistsException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
+import org.apache.gravitino.exceptions.SemanticModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -158,6 +159,20 @@ public class ExceptionHandlers {
   public static Response handleFunctionException(
       OperationType op, String function, String schema, Exception e) {
     return FunctionExceptionHandler.INSTANCE.handle(op, function, schema, e);
+  }
+
+  /**
+   * Handles an exception raised by a Semantic Model REST operation.
+   *
+   * @param op The operation type.
+   * @param semanticModel The Semantic Model name, or an empty string for a list operation.
+   * @param schema The parent schema name.
+   * @param e The exception to handle.
+   * @return The mapped REST response.
+   */
+  public static Response handleSemanticModelException(
+      OperationType op, String semanticModel, String schema, Exception e) {
+    return SemanticModelExceptionHandler.INSTANCE.handle(op, semanticModel, schema, e);
   }
 
   public static Response handleJobTemplateException(
@@ -982,6 +997,46 @@ public class ExceptionHandlers {
 
       } else {
         return super.handle(op, function, schema, e);
+      }
+    }
+  }
+
+  private static class SemanticModelExceptionHandler extends BaseExceptionHandler {
+    private static final ExceptionHandler INSTANCE = new SemanticModelExceptionHandler();
+
+    private static String getSemanticModelErrorMsg(
+        String semanticModel, String operation, String schema, String reason) {
+      return String.format(
+          "Failed to operate Semantic Model(s)%s operation [%s] under schema [%s], reason [%s]",
+          semanticModel, operation, schema, reason);
+    }
+
+    @Override
+    public Response handle(OperationType op, String semanticModel, String schema, Exception e) {
+      String formatted = StringUtil.isBlank(semanticModel) ? "" : " [" + semanticModel + "]";
+      String errorMsg = getSemanticModelErrorMsg(formatted, op.name(), schema, getErrorMsg(e));
+      LOG.warn(errorMsg, e);
+
+      if (e instanceof IllegalArgumentException) {
+        return Utils.illegalArguments(errorMsg, e);
+
+      } else if (e instanceof NotFoundException) {
+        return Utils.notFound(errorMsg, e);
+
+      } else if (e instanceof SemanticModelAlreadyExistsException) {
+        return Utils.alreadyExists(errorMsg, e);
+
+      } else if (e instanceof ForbiddenException) {
+        return Utils.forbidden(errorMsg, e);
+
+      } else if (e instanceof UnsupportedOperationException) {
+        return Utils.unsupportedOperation(errorMsg, e);
+
+      } else if (e instanceof ConnectionFailedException) {
+        return Utils.connectionFailed(errorMsg, e);
+
+      } else {
+        return super.handle(op, semanticModel, schema, e);
       }
     }
   }
