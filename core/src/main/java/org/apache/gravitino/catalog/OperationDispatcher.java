@@ -37,6 +37,8 @@ import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.model.ModelChange;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -277,13 +279,11 @@ public abstract class OperationDispatcher {
       } else if (item instanceof ViewChange.SetProperty) {
         ViewChange.SetProperty setProperty = (ViewChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
-      } else if (item instanceof org.apache.gravitino.model.ModelChange.SetProperty) {
-        org.apache.gravitino.model.ModelChange.SetProperty setProperty =
-            (org.apache.gravitino.model.ModelChange.SetProperty) item;
+      } else if (item instanceof ModelChange.SetProperty) {
+        ModelChange.SetProperty setProperty = (ModelChange.SetProperty) item;
         properties.put(setProperty.property(), setProperty.value());
-      } else if (item instanceof org.apache.gravitino.model.ModelVersionChange.SetProperty) {
-        org.apache.gravitino.model.ModelVersionChange.SetProperty setProperty =
-            (org.apache.gravitino.model.ModelVersionChange.SetProperty) item;
+      } else if (item instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) item;
         properties.put(setProperty.property(), setProperty.value());
       }
     }

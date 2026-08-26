@@ -159,15 +159,12 @@ public abstract class TestOperationDispatcher {
         (k, v) -> {
           Assertions.assertEquals(v, testProps.get(k));
         });
-    // If a hidden key is present, it must be masked (never plaintext).
-    if (testProps.containsKey(StringIdentifier.ID_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, testProps.get(StringIdentifier.ID_KEY));
-    }
-    if (testProps.containsKey(TEST_FILESET_HIDDEN_KEY)) {
-      Assertions.assertEquals(
-          HiddenPropertyMaskUtils.MASKED_VALUE, testProps.get(TEST_FILESET_HIDDEN_KEY));
-    }
+    // Hidden reserved keys must be returned as a masked placeholder.
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        testProps.getOrDefault(TEST_FILESET_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE));
   }
 
   void testPropertyException(Executable operation, String... errorMessage) {
