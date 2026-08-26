@@ -21,11 +21,9 @@ package org.apache.gravitino.spark.connector.plugin;
 
 import java.util.List;
 import java.util.Map;
-import org.apache.gravitino.annotation.DeveloperApi;
 
 /** Provides format-specific discovery and Spark configuration for lakehouse REST catalogs. */
-@DeveloperApi
-public interface LakehouseRESTCatalogProvider {
+interface LakehouseRESTCatalogProvider {
 
   /**
    * Returns the format token used in {@code spark.sql.gravitino.<format>REST.*} configuration.
