@@ -18,11 +18,13 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Entity.EntityType.FILESET;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -42,6 +44,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
