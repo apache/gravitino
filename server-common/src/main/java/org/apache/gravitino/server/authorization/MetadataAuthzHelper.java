@@ -167,8 +167,11 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
+<<<<<<< HEAD
     preloadToCache(entityType, nameIdentifiers);
     preloadOwner(entityType, nameIdentifiers);
+=======
+>>>>>>> d54358e1b ([#12622] improvement(server): apply the list authorization short-circuit to every list shape (#12623))
     return filterByExpression(metalake, expression, entityType, nameIdentifiers, e -> e);
   }
 
@@ -212,6 +215,39 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType,
       E[] entities,
       Function<E, NameIdentifier> toNameIdentifier) {
+    // Every list endpoint funnels through here, whichever shape it holds its results in, so the
+    // short-circuit and the preloads live at this one point. Keeping them in the NameIdentifier[]
+    // overload alone let the verbose catalog listing, which carries Catalog objects, run the
+    // per-object loop over every catalog in the metalake.
+    NameIdentifier[] nameIdentifiers =
+        Arrays.stream(entities).map(toNameIdentifier).toArray(NameIdentifier[]::new);
+    if (enableAuthorization() && nameIdentifiers.length > 0) {
+      String principalName = PrincipalUtils.getCurrentPrincipal().getName();
+      if (allVisibleViaParentScope(metalake, expression, entityType, nameIdentifiers)) {
+        // A privilege granted at a parent scope (metalake/catalog/schema) makes every object in
+        // the list visible, and no object-level deny exists, so the per-object authorization loop
+        // is skipped entirely. See AuthorizationExpressionConstants.*_LIST_PARENT_SCOPE_*.
+        LOG.debug(
+            "List authorization short-circuit HIT for principal {}, entity type {} under metalake "
+                + "{}: all {} listed object(s) are visible via a parent-scope grant; skipping the "
+                + "per-object authorization loop.",
+            principalName,
+            entityType,
+            metalake,
+            nameIdentifiers.length);
+        return entities;
+      }
+      LOG.debug(
+          "List authorization short-circuit MISS for principal {}, entity type {} under metalake "
+              + "{} ({} object(s)); falling back to the per-object authorization loop.",
+          principalName,
+          entityType,
+          metalake,
+          nameIdentifiers.length);
+    }
+    preloadToCache(entityType, nameIdentifiers);
+    preloadOwner(entityType, nameIdentifiers);
+
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
