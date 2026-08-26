@@ -244,62 +244,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         TreeLockUtils.doWithTreeLock(
             nameIdentifierForLock,
             LockType.WRITE,
-            () -> {
-              Fileset currentFileset =
-                  doWithCatalog(
-                      catalogIdent,
-                      c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
-                      NoSuchFilesetException.class);
-              // Prefer FilesetEntity properties for secret URNs (catalog loadFileset may omit
-              // them).
-              FilesetEntity filesetEntity = getEntity(ident, FILESET, FilesetEntity.class);
-              Map<String, String> currentProperties;
-              if (filesetEntity != null
-                  && filesetEntity.properties() != null
-                  && !filesetEntity.properties().isEmpty()) {
-                currentProperties = new HashMap<>(filesetEntity.properties());
-              } else if (currentFileset.properties() != null) {
-                currentProperties = new HashMap<>(currentFileset.properties());
-              } else {
-                currentProperties = new HashMap<>();
-              }
-
-              validateAlterProperties(
-                  ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
-
-              StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
-              long filesetId;
-              if (currentStringId != null) {
-                filesetId = currentStringId.id();
-              } else if (filesetEntity != null) {
-                filesetId = filesetEntity.id();
-              } else {
-                filesetId = 0L;
-              }
-
-              List<SecretMaterial> writtenSecretMaterials = List.of();
-              boolean alterCommitted = false;
-              Fileset altered;
-              try {
-                Pair<FilesetChange[], List<SecretMaterial>> secretResult =
-                    prepareFilesetSecretChanges(currentProperties, filesetId, changes);
-                writtenSecretMaterials = secretResult.getRight();
-                FilesetChange[] effectiveChanges = secretResult.getLeft();
-
-                altered =
-                    doWithCatalog(
-                        catalogIdent,
-                        c -> c.doWithFilesetOps(f -> f.alterFileset(ident, effectiveChanges)),
-                        NoSuchFilesetException.class,
-                        IllegalArgumentException.class);
-                alterCommitted = true;
-              } finally {
-                if (!alterCommitted) {
-                  secretManager.rollbackSecrets(writtenSecretMaterials);
-                }
-              }
-              return altered;
-            });
+            () -> alterFilesetUnderLock(ident, catalogIdent, changes));
 
     return EntityCombinedFileset.of(alteredFileset)
         .withHiddenProperties(
@@ -307,6 +252,61 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 alteredFileset.properties()));
+  }
+
+  private Fileset alterFilesetUnderLock(
+      NameIdentifier ident, NameIdentifier catalogIdent, FilesetChange... changes) {
+    Fileset currentFileset =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+            NoSuchFilesetException.class);
+    // Prefer FilesetEntity properties for secret URNs (catalog loadFileset may omit them).
+    FilesetEntity filesetEntity = getEntity(ident, FILESET, FilesetEntity.class);
+    Map<String, String> currentProperties;
+    if (filesetEntity != null
+        && filesetEntity.properties() != null
+        && !filesetEntity.properties().isEmpty()) {
+      currentProperties = new HashMap<>(filesetEntity.properties());
+    } else if (currentFileset.properties() != null) {
+      currentProperties = new HashMap<>(currentFileset.properties());
+    } else {
+      currentProperties = new HashMap<>();
+    }
+
+    validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
+
+    StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
+    long filesetId;
+    if (currentStringId != null) {
+      filesetId = currentStringId.id();
+    } else if (filesetEntity != null) {
+      filesetId = filesetEntity.id();
+    } else {
+      filesetId = 0L;
+    }
+
+    List<SecretMaterial> writtenSecretMaterials = List.of();
+    boolean alterCommitted = false;
+    try {
+      Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+          prepareFilesetSecretChanges(currentProperties, filesetId, changes);
+      writtenSecretMaterials = secretResult.getRight();
+      FilesetChange[] effectiveChanges = secretResult.getLeft();
+
+      Fileset altered =
+          doWithCatalog(
+              catalogIdent,
+              c -> c.doWithFilesetOps(f -> f.alterFileset(ident, effectiveChanges)),
+              NoSuchFilesetException.class,
+              IllegalArgumentException.class);
+      alterCommitted = true;
+      return altered;
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials);
+      }
+    }
   }
 
   /**
