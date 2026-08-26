@@ -158,6 +158,19 @@ public class JsonCodec {
       LOG.debug("Instantiated BlockEncodingManager with an empty BlockEncoding set");
       return instance;
     } catch (NoSuchMethodException ignored) {
+      // fall through
+    }
+
+    try {
+      // Trino 479+ takes a BlockEncodingSimdSupport. SIMD only affects the CPU path, not the wire
+      // format, so we disable it via the public boolean constructor for a deterministic serde.
+      Class<?> simdSupportClass = classLoader.loadClass("io.trino.simd.BlockEncodingSimdSupport");
+      Constructor<?> ctor = blockEncodingManagerClass.getConstructor(simdSupportClass);
+      Object simdSupport = simdSupportClass.getConstructor(boolean.class).newInstance(false);
+      Object instance = ctor.newInstance(simdSupport);
+      LOG.debug("Instantiated BlockEncodingManager with BlockEncodingSimdSupport");
+      return instance;
+    } catch (NoSuchMethodException | ClassNotFoundException ignored) {
       // fall through to last-resort scan
     }
 
