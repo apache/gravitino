@@ -21,6 +21,7 @@ package org.apache.gravitino.flink.connector.utils;
 
 import java.util.Collections;
 import java.util.Map;
+import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.Schema;
 import org.apache.flink.table.catalog.CatalogTable;
@@ -30,12 +31,12 @@ import org.apache.flink.table.catalog.ResolvedSchema;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-public class TestDefaultCatalogCompat {
+public class TestCatalogCompatFlink118 {
 
   @Test
   public void testCreateCatalogTable() {
     CatalogTable catalogTable =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+        CatalogCompatFlink118.INSTANCE.createCatalogTable(
             Schema.newBuilder().column("id", DataTypes.INT()).build(),
             "comment",
             Collections.singletonList("id"),
@@ -50,7 +51,7 @@ public class TestDefaultCatalogCompat {
   @Test
   public void testSerializeCatalogTable() {
     CatalogTable catalogTable =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+        CatalogCompatFlink118.INSTANCE.createCatalogTable(
             Schema.newBuilder().column("id", DataTypes.INT()).build(),
             "comment",
             Collections.emptyList(),
@@ -64,9 +65,15 @@ public class TestDefaultCatalogCompat {
                 null));
 
     Map<String, String> serialized =
-        DefaultCatalogCompat.INSTANCE.serializeCatalogTable(resolvedCatalogTable);
+        CatalogCompatFlink118.INSTANCE.serializeCatalogTable(resolvedCatalogTable);
 
     Assertions.assertEquals("id", serialized.get("schema.0.name"));
     Assertions.assertEquals("value", serialized.get("key"));
+  }
+
+  @Test
+  public void testJdbcDynamicTableFactory() {
+    Assertions.assertInstanceOf(
+        JdbcDynamicTableFactory.class, CatalogCompatFlink118.INSTANCE.jdbcDynamicTableFactory());
   }
 }

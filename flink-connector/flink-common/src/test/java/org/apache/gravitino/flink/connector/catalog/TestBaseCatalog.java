@@ -43,7 +43,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.paimon.PaimonConstants;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
-import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.Representation;
 import org.apache.gravitino.rel.SQLRepresentation;
@@ -55,7 +55,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
-public class TestBaseCatalog {
+/**
+ * Base test for {@link BaseCatalog}. Concrete Flink version modules extend this and supply their
+ * own {@link CatalogCompat}, since some fixtures require a Flink-version-specific {@code
+ * CatalogTable} constructor.
+ */
+public abstract class TestBaseCatalog {
+
+  protected abstract CatalogCompat catalogCompat();
 
   @Test
   public void testHiveSchemaChanges() {
@@ -126,11 +133,16 @@ public class TestBaseCatalog {
   public void testTableChangesWithoutColumnChange() {
     Schema schema = Schema.newBuilder().column("test", "INT").build();
     CatalogBaseTable table =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "test", ImmutableList.of(), ImmutableMap.of("key", "value", "key2", "value2"));
+        catalogCompat()
+            .createCatalogTable(
+                schema,
+                "test",
+                ImmutableList.of(),
+                ImmutableMap.of("key", "value", "key2", "value2"));
     CatalogBaseTable newTable =
-        DefaultCatalogCompat.INSTANCE.createCatalogTable(
-            schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
+        catalogCompat()
+            .createCatalogTable(
+                schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "new value"));
     org.apache.gravitino.rel.TableChange[] tableChanges =
         BaseCatalog.getGravitinoTableChanges(table, newTable);
     List<org.apache.gravitino.rel.TableChange> expected =

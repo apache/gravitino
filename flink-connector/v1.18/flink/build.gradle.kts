@@ -16,8 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import org.gradle.api.tasks.SourceSetContainer
-
 plugins {
   `maven-publish`
   id("java")
@@ -28,9 +26,32 @@ repositories {
   mavenCentral()
 }
 
+// flink-common's sources are compiled directly into this module's own sourceSet (in addition
+// to flink-common's own jar) so that they are re-checked against this module's own
+// Flink/Iceberg/Paimon dependency versions (this matters once versions diverge in incompatible
+// ways, e.g. Flink 2.x removing APIs that are still present in the 1.x line).
 val commonProject = project(":flink-connector:flink-common")
-val commonSourceSets = commonProject.extensions.getByType<SourceSetContainer>()
-val commonTestOutput = commonSourceSets.named("test").get().output
+
+sourceSets {
+  main {
+    java.srcDir(commonProject.file("src/main/java"))
+  }
+  test {
+    java.srcDir(commonProject.file("src/test/java"))
+    resources.srcDir(commonProject.file("src/test/resources"))
+  }
+}
+
+// Spotless can't format files outside the project dir; flink-common's own sources are linted
+// by the flink-common project itself, so restrict this project's spotless target to its own.
+plugins.withType<com.diffplug.gradle.spotless.SpotlessPlugin>().configureEach {
+  configure<com.diffplug.gradle.spotless.SpotlessExtension> {
+    java {
+      target("src/**/*.java")
+    }
+  }
+}
+
 val flinkVersion: String = libs.versions.flink18.get()
 val flinkMajorVersion: String = flinkVersion.substringBeforeLast(".")
 val icebergVersion: String = libs.versions.iceberg4flink18.get()
@@ -45,7 +66,12 @@ dependencies {
     testImplementation(libs.thrift)
   }
 
-  implementation(commonProject)
+  // Dependencies needed to compile flink-common's sources (mirrors flink-common/build.gradle.kts).
+  implementation(project(":catalogs:catalog-common")) {
+    exclude("org.apache.logging.log4j")
+  }
+  implementation(libs.guava)
+  implementation(libs.commons.lang3)
 
   compileOnly(project(":clients:client-java-runtime", configuration = "shadow"))
   compileOnly("org.apache.iceberg:iceberg-flink-runtime-$flinkMajorVersion:$icebergVersion")
@@ -59,6 +85,26 @@ dependencies {
     exclude("org.eclipse.jetty.orbit", "javax.servlet")
     exclude("org.apache.logging.log4j")
   }
+  compileOnly(libs.hive2.exec) {
+    artifact {
+      classifier = "core"
+    }
+    exclude("com.fasterxml.jackson.core")
+    exclude("com.google.code.findbugs", "jsr305")
+    exclude("com.google.protobuf")
+    exclude("org.apache.avro")
+    exclude("org.apache.calcite")
+    exclude("org.apache.calcite.avatica")
+    exclude("org.apache.curator")
+    exclude("org.apache.hadoop", "hadoop-yarn-server-resourcemanager")
+    exclude("org.apache.logging.log4j")
+    exclude("org.apache.zookeeper")
+    exclude("org.eclipse.jetty.aggregate", "jetty-all")
+    exclude("org.eclipse.jetty.orbit", "javax.servlet")
+    exclude("org.openjdk.jol")
+    exclude("org.pentaho")
+    exclude("org.slf4j")
+  }
 
   testImplementation(project(":api"))
   testImplementation(project(":catalogs:catalog-jdbc-common")) {
@@ -70,7 +116,6 @@ dependencies {
   testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(project(":server"))
   testImplementation(project(":server-common"))
-  testImplementation(project(":flink-connector:flink-common", "testArtifacts"))
   testImplementation(libs.awaitility)
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
@@ -172,12 +217,6 @@ dependencies {
 }
 
 tasks.test {
-  dependsOn(commonProject.tasks.named("testClasses"))
-  // A test artifact dependency only adds common test classes to the classpath. Add the common
-  // test output explicitly so Gradle discovers and executes those shared tests in this variant.
-  testClassesDirs = files(commonTestOutput.classesDirs, sourceSets["test"].output.classesDirs)
-  classpath = files(commonTestOutput, sourceSets["test"].runtimeClasspath)
-
   val skipITs = project.hasProperty("skipITs")
   if (skipITs) {
     exclude("**/integration/test/**")
