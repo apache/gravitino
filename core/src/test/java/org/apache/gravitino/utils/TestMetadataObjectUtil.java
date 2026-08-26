@@ -85,6 +85,12 @@ public class TestMetadataObjectUtil {
         Entity.EntityType.FUNCTION,
         MetadataObjectUtil.toEntityType(
             MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION)));
+
+    Assertions.assertEquals(
+        Entity.EntityType.SEMANTIC_MODEL,
+        MetadataObjectUtil.toEntityType(
+            MetadataObjects.of(
+                "catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL)));
   }
 
   @Test
@@ -158,6 +164,13 @@ public class TestMetadataObjectUtil {
         MetadataObjectUtil.toEntityIdent(
             "metalake",
             MetadataObjects.of("catalog.schema", "function", MetadataObject.Type.FUNCTION)));
+
+    Assertions.assertEquals(
+        NameIdentifier.of("metalake", "catalog", "schema", "sales_model"),
+        MetadataObjectUtil.toEntityIdent(
+            "metalake",
+            MetadataObjects.of(
+                "catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL)));
   }
 
   @Test

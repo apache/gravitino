@@ -24,8 +24,8 @@
 ## Core Design
 
 The core model is that policies are associated with tag names, not directly with tag assignment
-values. A policy-to-tag relation may include a simple `selector` JSON object that decides whether
-the relation matches a metadata object's effective tag assignment values. The selector refines when
+values. A policy-to-tag relation contains a required `selector` JSON object that decides whether
+the relation matches a metadata object's effective tag assignment values. The selector defines when
 a policy bound to a tag name applies; it does not make policy objects bind directly to individual
 tag values.
 
@@ -145,7 +145,7 @@ Consumer -> ObjectPolicyResolver -> object policies
 | Policy on tag with selector | `policyA -> data_domain` with selector `{"type": "TAG_VALUE", "value": "finance"}` | Supports tag presence and simple valued-tag matching without an expression language | **Chosen for phase 1** |
 
 Phase 1 therefore makes an explicit behavior decision: a policy-to-tag relation is keyed by a tag
-definition and carries one optional `selector`. If `selector` is omitted or null, the relation
+definition and carries one required `selector`. If `selector.type` is `ALL_VALUES`, the relation
 matches by tag presence. If `selector.type` is `TAG_VALUE`, the relation matches only when the
 object's effective tag assignment contains `selector.value`.
 
@@ -161,7 +161,7 @@ The target model has four concepts:
 |---------|-------------|
 | Policy | A metalake-scoped governance rule with typed content, enabled state, audit information, and version history. |
 | Tag | A flat metalake-scoped classification object associated with metadata objects. Tags do not have parent or child tags. |
-| Policy-tag relation | A relation that binds one policy to one tag in the same metalake, optionally scoped by a simple selector. |
+| Policy-tag relation | A relation that binds one policy to one tag in the same metalake, scoped by one required selector. |
 | Object policy | A read-only policy result for a metadata object, derived from effective tags and matching policy-tag relations. |
 
 Object-side governance becomes:
@@ -212,7 +212,7 @@ table iceberg.db.orders
 
 If the table has a direct assignment `data_domain = ["risk", "ml"]`, the direct assignment wins.
 The `retention_finance` policy is not selected because `TAG_VALUE("finance")` does not match the
-effective values `["risk", "ml"]`. A policy-to-tag relation without a selector would match
+effective values `["risk", "ml"]`. An `ALL_VALUES` selector would match
 either assignment by tag presence.
 
 ### Policy Supported Object Types
@@ -311,22 +311,23 @@ Constraints and indexes:
 
 `selector` rules:
 
-1. An omitted or null `selector` matches the tag by presence.
-2. `TAG_VALUE` matches when the effective tag assignment contains the same value as
+1. `selector` is required and must not be null.
+2. `ALL_VALUES` matches whenever the effective tag assignment exists.
+3. `TAG_VALUE` matches when the effective tag assignment contains the same value as
    `selector.value`.
-3. `TAG_VALUE` contains one non-blank `value` string.
-4. If the tag defines allowed values, the selector value must be one of the allowed values.
-5. Selector JSON is canonicalized before storage and comparison.
-6. The first version supports only `TAG_VALUE`. It does not support value absence,
+4. `TAG_VALUE` contains one non-blank `value` string.
+5. If the tag defines allowed values, the selector value must be one of the allowed values.
+6. Selector JSON is canonicalized before storage and comparison.
+7. The first version supports `ALL_VALUES` and `TAG_VALUE`. It does not support value absence,
    negative matching, principals, scopes, or general expressions. Future versions can add new
    selector types in the same `selector` JSON field without changing the policy-to-tag relation
    model.
 
-### Selector Evolution Examples
+### Selector Types and Evolution Examples
 
-`TAG_VALUE` remains the basic selector for exact value matching. Future selector versions can make
-the current tag-presence behavior explicit through `ALL_VALUES` and use `EXPRESSION` for conditions
-that cannot be represented by one tag value.
+Phase 1 uses `ALL_VALUES` for explicit tag-presence matching and `TAG_VALUE` for exact value
+matching. Future selector versions can use `EXPRESSION` for conditions that cannot be represented
+by one tag value.
 
 ```json
 {
@@ -373,7 +374,8 @@ A future expression selector can combine values from multiple effective tags:
 This expression matches effective tag assignments `classification = ["pii"]` and
 `data_domain = ["finance"]`. It does not match if either tag is absent or its effective assignment
 does not contain the required value. These examples describe selector shapes only. Phase 1 supports
-only `TAG_VALUE`; the expression language and cross-tag lookup contract require a separate design.
+`ALL_VALUES` and `TAG_VALUE`; the expression language and cross-tag lookup contract require a
+separate design.
 
 ### ABAC Column Masking Example
 
@@ -459,7 +461,7 @@ Returns `404 Not Found` if the tag does not exist.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `selector` | object or null | no | Tag selector. Missing or null matches by tag presence. |
+| `selector` | object | yes | Required selector. `ALL_VALUES` matches by tag presence; `TAG_VALUE` matches one value. |
 
 ```json
 {
@@ -765,8 +767,8 @@ Rules:
 1. If no system iceberg compaction policy appears in the object policy result, TMS does not generate
    a compaction strategy from policy-on-tag.
 2. If a system iceberg compaction policy appears in the object policy result, TMS uses its content.
-3. A system iceberg compaction policy can omit `selector` for tag-presence behavior or use a
-   simple `TAG_VALUE` selector when maintenance behavior should depend on assignment values.
+3. A system iceberg compaction policy uses `ALL_VALUES` for tag-presence behavior or a simple
+   `TAG_VALUE` selector when maintenance behavior should depend on assignment values.
 4. TMS does not read direct object policy relations.
 
 ### User Process

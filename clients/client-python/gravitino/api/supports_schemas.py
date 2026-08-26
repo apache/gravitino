@@ -16,11 +16,16 @@
 # under the License.
 
 from abc import ABC, abstractmethod
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.exceptions.base import NoSuchSchemaException
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class SupportsSchemas(ABC):
@@ -79,7 +84,12 @@ class SupportsSchemas(ABC):
 
     @abstractmethod
     def create_schema(
-        self, schema_name: str, comment: str, properties: Dict[str, str]
+        self,
+        schema_name: str,
+        comment: str,
+        properties: Dict[str, str],
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Schema:
         """Create a schema in the catalog.
 
@@ -87,6 +97,8 @@ class SupportsSchemas(ABC):
             schema_name: The name of the schema.
             comment: The comment of the schema.
             properties: The properties of the schema.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchCatalogException: If the catalog does not exist.

@@ -571,6 +571,9 @@ public class ErrorHandlers {
         case ErrorConstants.CONNECTION_FAILED_CODE:
           throw new ConnectionFailedException(errorMessage);
 
+        case ErrorConstants.UNSUPPORTED_OPERATION_CODE:
+          throw new UnsupportedOperationException(errorMessage);
+
         case ErrorConstants.NOT_FOUND_CODE:
           if (errorResponse.getType().equals(NoSuchMetalakeException.class.getSimpleName())) {
             throw new NoSuchMetalakeException(errorMessage);

@@ -154,7 +154,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    Map<String, String> entityProperties =
+        SecretPropertyUtils.copyEntityProperties(properties, secretBindings, secretReferences);
     List<SecretMaterial> secretMaterials =
         secretManager.assembleSecretMaterials(
             properties, entityProperties, "fileset", uid, secretBindings, secretReferences);
@@ -167,7 +168,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
-    secretManager.writeSecrets(secretMaterials);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
     // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
@@ -175,6 +175,10 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
+    // Write secrets before create: paths that resolve URNs (e.g. mergeUpLevelConfigurations for FS
+    // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back on any create
+    // failure (same pattern as CatalogManager / SchemaOperationDispatcher).
+    secretManager.writeSecrets(secretMaterials);
     try {
       Fileset createdFileset =
           TreeLockUtils.doWithTreeLock(

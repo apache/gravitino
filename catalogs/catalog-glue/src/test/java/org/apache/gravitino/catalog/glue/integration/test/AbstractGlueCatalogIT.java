@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.catalog.glue.integration.test;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -178,6 +179,11 @@ abstract class AbstractGlueCatalogIT {
         new String[][] {{"dt"}},
         new Literal[] {Literals.stringLiteral(dateValue)},
         Collections.emptyMap());
+  }
+
+  @Test
+  void testExistingCatalogConnection() {
+    assertDoesNotThrow(() -> ops.testConnection(NameIdentifier.of("ml", "cat")));
   }
 
   // -------------------------------------------------------------------------

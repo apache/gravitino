@@ -16,7 +16,8 @@
 # under the License.
 # pylint: disable=too-many-lines
 import logging
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.authorization.group import Group
 from gravitino.api.authorization.owner import Owner
@@ -33,6 +34,7 @@ from gravitino.api.job.job_template_change import JobTemplateChange
 from gravitino.api.job.supports_jobs import SupportsJobs
 from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.tag.tag import Tag
 from gravitino.api.tag.tag_operations import TagOperations
 from gravitino.client.dto_converters import DTOConverters
@@ -62,10 +64,12 @@ from gravitino.dto.requests.privilege_grant_request import PrivilegeGrantRequest
 from gravitino.dto.requests.privilege_revoke_request import PrivilegeRevokeRequest
 from gravitino.dto.requests.role_grant_request import RoleGrantRequest
 from gravitino.dto.requests.role_revoke_request import RoleRevokeRequest
+from gravitino.dto.responses.base_response import BaseResponse
 from gravitino.dto.responses.catalog_list_response import CatalogListResponse
 from gravitino.dto.responses.catalog_response import CatalogResponse
 from gravitino.dto.responses.drop_response import DropResponse
 from gravitino.dto.responses.entity_list_response import EntityListResponse
+from gravitino.dto.responses.error_response import ErrorResponse
 from gravitino.dto.responses.job_list_response import JobListResponse
 from gravitino.dto.responses.job_response import JobResponse
 from gravitino.dto.responses.job_template_list_response import JobTemplateListResponse
@@ -108,6 +112,9 @@ from gravitino.utils.precondition import Precondition
 from gravitino.utils.string_utils import StringUtils
 
 logger = logging.getLogger(__name__)
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class GravitinoMetalake(
@@ -229,6 +236,8 @@ class GravitinoMetalake(
         provider: str,
         comment: str,
         properties: Dict[str, str],
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Catalog:
         """Create a new catalog with specified name, catalog type, comment and properties.
 
@@ -240,6 +249,8 @@ class GravitinoMetalake(
             None provider. For the details, please refer to the Catalog.Type.
             comment: The comment of the catalog.
             properties: The properties of the catalog.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchMetalakeException if the metalake does not exist.
@@ -255,6 +266,8 @@ class GravitinoMetalake(
             provider=provider,
             comment=comment,
             properties=properties,
+            secret_bindings=secret_bindings,
+            secret_references=secret_references,
         )
         catalog_create_request.validate()
 
@@ -263,6 +276,7 @@ class GravitinoMetalake(
             url, json=catalog_create_request, error_handler=CATALOG_ERROR_HANDLER
         )
         catalog_resp = CatalogResponse.from_json(response.body, infer_missing=True)
+        catalog_resp.validate()
 
         return DTOConverters.to_catalog(
             self.name(), catalog_resp.catalog(), self.rest_client
@@ -362,6 +376,33 @@ class GravitinoMetalake(
         self.rest_client.patch(
             url, json=catalog_disable_request, error_handler=CATALOG_ERROR_HANDLER
         )
+
+    def test_connection(self, name: str) -> None:
+        """Test an existing catalog connection using its stored configuration.
+
+        Args:
+            name: The name of the existing catalog.
+
+        Raises:
+            NoSuchCatalogException: If the catalog does not exist.
+            UnsupportedOperationException: If the catalog does not define a connection probe.
+            ConnectionFailedException: If the catalog cannot reach its external system.
+        """
+        url = (
+            self.API_METALAKES_CATALOGS_PATH.format(
+                encode_string(self.name()), encode_string(name)
+            )
+            + "/testConnection"
+        )
+        response = self.rest_client.post(url, error_handler=CATALOG_ERROR_HANDLER)
+        base_response = BaseResponse.from_json(response.body, infer_missing=True)
+        base_response.validate()
+        if base_response.code() == 0:
+            return
+
+        error_response = ErrorResponse.from_json(response.body, infer_missing=True)
+        error_response.validate()
+        CATALOG_ERROR_HANDLER.handle(error_response)
 
     ##########
     # Job operations

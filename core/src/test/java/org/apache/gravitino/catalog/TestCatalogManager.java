@@ -37,8 +37,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -58,17 +65,27 @@ import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
+import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.lock.LockType;
+import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretConstants;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyUtils;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
+import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -128,6 +145,9 @@ public class TestCatalogManager {
   void reset() throws IOException {
     ((InMemoryEntityStore) entityStore).clear();
     entityStore.put(metalakeEntity, true);
+    // The shared CatalogManager is created once in @BeforeAll, so its cache would otherwise keep
+    // entries created by previously executed test methods and make tests order-dependent.
+    catalogManager.getCatalogCache().invalidateAll();
   }
 
   @AfterAll
@@ -1363,46 +1383,112 @@ public class TestCatalogManager {
     catalogManager.disableCatalog(ident);
     CatalogEntity disabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
     Assertions.assertEquals("false", disabled.getProperties().get(Catalog.PROPERTY_IN_USE));
+    Assertions.assertThrows(
+        CatalogNotInUseException.class, () -> catalogManager.testConnection(ident));
 
     catalogManager.enableCatalog(ident);
     CatalogEntity enabled = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
     Assertions.assertEquals("true", enabled.getProperties().get(Catalog.PROPERTY_IN_USE));
-
     Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> catalogManager.testConnection(ident));
   }
 
   @Test
-  public void testCatalogCacheRemoveListener() {
+  void testExistingCatalogConnectionHoldsCatalogReadLock() throws Exception {
+    NameIdentifier ident = NameIdentifier.of("metalake", "connection_lock_test");
+    CatalogManager.CatalogWrapper wrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    CountDownLatch connectionStarted = new CountDownLatch(1);
+    CountDownLatch releaseConnection = new CountDownLatch(1);
+    CountDownLatch writerStarted = new CountDownLatch(1);
+    CountDownLatch writeLockAcquired = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doReturn(catalog).when(wrapper).catalog();
+    Mockito.doAnswer(
+            invocation -> {
+              connectionStarted.countDown();
+              Assertions.assertTrue(releaseConnection.await(5, TimeUnit.SECONDS));
+              return null;
+            })
+        .when(wrapper)
+        .doWithCatalogOps(any());
+
+    Future<?> connectionFuture = executor.submit(() -> catalogManager.testConnection(ident));
+    Future<?> writerFuture = null;
+    try {
+      Assertions.assertTrue(connectionStarted.await(5, TimeUnit.SECONDS));
+      writerFuture =
+          executor.submit(
+              () -> {
+                writerStarted.countDown();
+                TreeLockUtils.doWithTreeLock(
+                    ident,
+                    LockType.WRITE,
+                    () -> {
+                      writeLockAcquired.countDown();
+                      return null;
+                    });
+              });
+      Assertions.assertTrue(writerStarted.await(5, TimeUnit.SECONDS));
+      Assertions.assertFalse(writeLockAcquired.await(200, TimeUnit.MILLISECONDS));
+
+      releaseConnection.countDown();
+      connectionFuture.get(5, TimeUnit.SECONDS);
+      writerFuture.get(5, TimeUnit.SECONDS);
+      Assertions.assertEquals(0, writeLockAcquired.getCount());
+    } finally {
+      releaseConnection.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  @Test
+  public void testCatalogCacheRemoveListener() throws IOException {
     NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
     Map<String, String> props =
         ImmutableMap.of(
             PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
 
-    // Create a catalog
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    // Use a dedicated CatalogManager (and entity store) instead of the shared static one: the
+    // shared instance keeps cache entries and cache removal listeners registered by other test
+    // methods, which would make the assertions below depend on the test execution order.
+    EntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
 
-    // Load the catalog to add it to the cache
-    catalogManager.loadCatalog(ident);
-    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config))) {
+      // Create a catalog
+      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
-    // Add a listener to track removed catalogs
-    Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
-    catalogManager.addCatalogCacheRemoveListener(removedCatalogs::add);
+      // Load the catalog to add it to the cache
+      manager.loadCatalog(ident);
+      Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-    // Invalidate the cache to trigger the removal listener
-    catalogManager.getCatalogCache().invalidate(ident);
+      // Add a listener to track removed catalogs
+      Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
+      manager.addCatalogCacheRemoveListener(removedCatalogs::add);
 
-    // Wait for the async eviction to complete
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () -> {
-              Assertions.assertTrue(
-                  removedCatalogs.contains(ident),
-                  "Listener should be notified of catalog removal");
-              Assertions.assertEquals(
-                  1, removedCatalogs.size(), "Only one catalog should be removed");
-            });
+      // Invalidate the cache to trigger the removal listener
+      manager.getCatalogCache().invalidate(ident);
+
+      // Wait for the async eviction to complete
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                Assertions.assertTrue(
+                    removedCatalogs.contains(ident),
+                    "Listener should be notified of catalog removal");
+                Assertions.assertEquals(
+                    1, removedCatalogs.size(), "Only one catalog should be removed");
+              });
+    } finally {
+      store.close();
+    }
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
@@ -1412,5 +1498,118 @@ public class TestCatalogManager {
         });
 
     Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+  }
+
+  @Test
+  void testSecrets() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets)) {
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_ok");
+      Catalog catalog =
+          manager.createCatalog(
+              ident,
+              Catalog.Type.RELATIONAL,
+              provider,
+              "comment",
+              catalogProps(),
+              Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
+              Map.of());
+      Assertions.assertFalse(catalog.properties().containsKey(PROPERTY_KEY4));
+      String urn =
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+    }
+  }
+
+  @Test
+  void testSecretRollback() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      IdGenerator ids = new AtomicLong(4242L)::getAndIncrement;
+      CatalogManager manager = Mockito.spy(new CatalogManager(config, entityStore, ids, secrets));
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_fail");
+      Mockito.doThrow(new RuntimeException("init failed"))
+          .when(manager)
+          .createCatalogWrapper(any(CatalogEntity.class), any());
+      SecretUrn urn = writeThroughUrn("catalog", 4242L, PROPERTY_KEY4);
+      Assertions.assertThrows(
+          RuntimeException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                  Map.of()));
+      Assertions.assertFalse(entityStore.exists(ident, EntityType.CATALOG));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+      manager.close();
+    }
+  }
+
+  @Test
+  void testSecretNoMetalake() throws Exception {
+    try (SecretManager secrets = memorySecretManager();
+        CatalogManager manager =
+            new CatalogManager(
+                config, entityStore, new AtomicLong(4343L)::getAndIncrement, secrets)) {
+      NameIdentifier ident = NameIdentifier.of("missing_metalake", "secret_catalog");
+      SecretUrn urn = writeThroughUrn("catalog", 4343L, PROPERTY_KEY4);
+      Assertions.assertThrows(
+          NoSuchMetalakeException.class,
+          () ->
+              manager.createCatalog(
+                  ident,
+                  Catalog.Type.RELATIONAL,
+                  provider,
+                  "comment",
+                  catalogProps(),
+                  Map.of(PROPERTY_KEY4, new SecretBinding("memory", "x")),
+                  Map.of()));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  private static Map<String, String> catalogProps() {
+    return ImmutableMap.of(
+        "provider",
+        "test",
+        PROPERTY_KEY1,
+        "value1",
+        PROPERTY_KEY2,
+        "value2",
+        PROPERTY_KEY5_PREFIX + "1",
+        "value3");
+  }
+
+  private static SecretUrn writeThroughUrn(String entityType, long entityId, String key) {
+    return SecretUrn.buildWriteThrough(
+        "memory",
+        Map.of(
+            SecretConstants.ATTR_ENTITY_TYPE, entityType,
+            SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+            SecretConstants.ATTR_PROPERTY_KEY, key));
+  }
+
+  private static SecretManager memorySecretManager() {
+    Config c = new Config(false) {};
+    Properties p = new Properties();
+    p.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    p.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    c.loadFromProperties(p);
+    return new SecretManager(c);
   }
 }

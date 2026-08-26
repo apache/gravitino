@@ -43,7 +43,8 @@ public interface Capability {
     TOPIC,
     PARTITION,
     MODEL,
-    FUNCTION
+    FUNCTION,
+    SEMANTIC_MODEL
   }
 
   /**
@@ -179,7 +180,7 @@ public interface Capability {
 
     @Override
     public CapabilityResult managedStorage(Scope scope) {
-      if (scope == Scope.FUNCTION) {
+      if (scope == Scope.FUNCTION || scope == Scope.SEMANTIC_MODEL) {
         return CapabilityResult.SUPPORTED;
       }
 

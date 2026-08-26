@@ -171,30 +171,17 @@ public class ExceptionHandlers {
   }
 
   public static Response handleTestConnectionException(Exception e) {
-    ErrorResponse response;
-    if (e instanceof IllegalArgumentException) {
-      response = ErrorResponse.illegalArguments(e.getMessage(), e);
+    return handleTestConnectionException(e, true);
+  }
 
-    } else if (e instanceof ConnectionFailedException) {
-      response = ErrorResponse.connectionFailed(e.getMessage(), e);
-
-    } else if (e instanceof NotFoundException) {
-      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof AlreadyExistsException) {
-      response = ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else if (e instanceof NotInUseException) {
-      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), e);
-
-    } else {
-      return Utils.internalError(e.getMessage(), e);
-    }
-
-    return Response.status(Response.Status.OK)
-        .entity(response)
-        .type(MediaType.APPLICATION_JSON)
-        .build();
+  /**
+   * Handles an existing catalog connection test failure without exposing its stack trace.
+   *
+   * @param e the connection test failure
+   * @return an HTTP 200 response containing the application error
+   */
+  public static Response handleExistingCatalogTestConnectionException(Exception e) {
+    return handleTestConnectionException(e, false);
   }
 
   public static Response handleOwnerException(
@@ -215,6 +202,38 @@ public class ExceptionHandlers {
   public static Response handlePartitionStatsException(
       OperationType type, String name, String parent, Exception e) {
     return PartitionStatsExceptionHandler.INSTANCE.handle(type, name, parent, e);
+  }
+
+  private static Response handleTestConnectionException(Exception e, boolean includeStack) {
+    Throwable throwable = includeStack ? e : null;
+    ErrorResponse response;
+    if (e instanceof IllegalArgumentException) {
+      response = ErrorResponse.illegalArguments(e.getMessage(), throwable);
+
+    } else if (e instanceof ConnectionFailedException) {
+      response = ErrorResponse.connectionFailed(e.getMessage(), throwable);
+
+    } else if (e instanceof UnsupportedOperationException) {
+      response = ErrorResponse.unsupportedOperation(e.getMessage(), throwable);
+
+    } else if (e instanceof NotFoundException) {
+      response = ErrorResponse.notFound(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof AlreadyExistsException) {
+      response =
+          ErrorResponse.alreadyExists(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else if (e instanceof NotInUseException) {
+      response = ErrorResponse.notInUse(e.getClass().getSimpleName(), e.getMessage(), throwable);
+
+    } else {
+      return Utils.internalError(e.getMessage(), throwable);
+    }
+
+    return Response.status(Response.Status.OK)
+        .entity(response)
+        .type(MediaType.APPLICATION_JSON)
+        .build();
   }
 
   private static class PartitionExceptionHandler extends BaseExceptionHandler {
