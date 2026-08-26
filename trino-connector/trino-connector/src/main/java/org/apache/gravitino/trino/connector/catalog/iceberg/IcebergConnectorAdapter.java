@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.catalog.iceberg;
 import static java.util.Collections.emptyList;
 
 import com.google.common.collect.ImmutableMap;
+import io.trino.spi.TrinoException;
 import io.trino.spi.session.PropertyMetadata;
 import java.util.HashMap;
 import java.util.List;
@@ -29,6 +30,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
+import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorAdapter;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -81,8 +83,8 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
     // Trino reaches the data. Whenever an Iceberg REST server endpoint is available for this
     // catalog's metalake, the catalog is loaded through it, the only path that supports temporary
     // credentials. A catalog that already has a REST backend keeps pointing at its own configured
-    // endpoint. If no endpoint is available, this falls back to translating catalog-backend as
-    // before — nothing to configure either way.
+    // endpoint. If no endpoint is available, routing is required unless the compatibility switch
+    // explicitly enables the legacy catalog-backend translation.
     //
     // The manual override is plain local config, so it is valid on every node as-is. The
     // discovered endpoint is coordinator-only knowledge, so it is read from the catalog's own
@@ -104,6 +106,21 @@ public class IcebergConnectorAdapter implements CatalogConnectorAdapter {
           catalog.getName(),
           credentials.length);
       return catalogConverter.buildIcebergRestProperties(catalog, config, restUri);
+    }
+
+    String catalogBackend = catalog.getProperty(IcebergConstants.CATALOG_BACKEND, null);
+    if (config.isIcebergRestRoutingEnabled()
+        && StringUtils.isBlank(restUri)
+        && !REST_CATALOG_BACKEND.equalsIgnoreCase(catalogBackend)) {
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
+          String.format(
+              "Cannot register Iceberg catalog '%s' in metalake '%s': no Iceberg REST endpoint "
+                  + "is available. Configure gravitino.iceberg.rest-uri, use a Gravitino server "
+                  + "that supports /api/system/iceberg-rest, or set "
+                  + "gravitino.iceberg.rest-routing-enabled=false to use legacy backend "
+                  + "translation.",
+              catalog.getName(), catalog.getMetalake()));
     }
 
     Map<String, String> connectorConfig =

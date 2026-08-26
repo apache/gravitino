@@ -307,7 +307,32 @@ public class TestGravitinoConfig {
     // Nothing configured, and nothing discovered yet.
     assertEquals("", config.getManualIcebergRestUri("user_001"));
     assertEquals("", config.getDiscoveredIcebergRestUri("user_001"));
+    assertTrue(config.isIcebergRestRoutingEnabled());
     assertTrue(config.getIcebergRestCatalogConfig().isEmpty());
+  }
+
+  @Test
+  public void testIcebergRestRoutingCanBeDisabled() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-routing-enabled", "false"));
+
+    assertFalse(config.isIcebergRestRoutingEnabled());
+    assertTrue(
+        config.toCatalogConfig().contains("\"gravitino.iceberg.rest-routing-enabled\"='false'"));
+  }
+
+  @Test
+  public void testIcebergRestRoutingRejectsInvalidBoolean() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-routing-enabled", "yes"));
+
+    assertThrows(TrinoException.class, config::isIcebergRestRoutingEnabled);
   }
 
   @Test

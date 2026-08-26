@@ -287,6 +287,14 @@ public class GravitinoConfig {
           "",
           false);
 
+  private static final ConfigEntry GRAVITINO_ICEBERG_REST_ROUTING_ENABLED =
+      new ConfigEntry(
+          "gravitino.iceberg.rest-routing-enabled",
+          "Whether non-REST Iceberg catalogs must be routed through the Gravitino Iceberg REST "
+              + "server. Disable this only to retain the legacy catalog-backend translation.",
+          "true",
+          false);
+
   private static final ConfigEntry GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX =
       new ConfigEntry(
           "gravitino.iceberg.rest-catalog.",
@@ -768,6 +776,20 @@ public class GravitinoConfig {
    */
   public String getDiscoveredIcebergRestUri(String metalake) {
     return discoveredIcebergRestUriByMetalake.getOrDefault(metalake, "");
+  }
+
+  /**
+   * Returns whether non-REST Iceberg catalogs must be routed through the Gravitino Iceberg REST
+   * server.
+   *
+   * @return {@code true} when Iceberg REST routing is enabled
+   */
+  public boolean isIcebergRestRoutingEnabled() {
+    String value =
+        config.getOrDefault(
+            GRAVITINO_ICEBERG_REST_ROUTING_ENABLED.key,
+            GRAVITINO_ICEBERG_REST_ROUTING_ENABLED.defaultValue);
+    return parseBooleanConfig(GRAVITINO_ICEBERG_REST_ROUTING_ENABLED.key, value);
   }
 
   /**
