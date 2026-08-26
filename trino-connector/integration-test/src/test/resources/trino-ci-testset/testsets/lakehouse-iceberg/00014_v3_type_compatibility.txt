@@ -1,0 +1,17 @@
+CREATE SCHEMA
+
+USE
+
+<QUERY_FAILED> Iceberg V3 nanosecond timestamp requires Trino 481 or newer; current Trino version is ${trino_version}
+
+<BLANK_LINE>
+
+<QUERY_FAILED> Iceberg V3 geometry requires Trino 482 or newer; current Trino version is ${trino_version}
+
+<BLANK_LINE>
+
+<QUERY_FAILED> Iceberg V3 geography requires Trino 482 or newer; current Trino version is ${trino_version}
+
+<BLANK_LINE>
+
+DROP SCHEMA

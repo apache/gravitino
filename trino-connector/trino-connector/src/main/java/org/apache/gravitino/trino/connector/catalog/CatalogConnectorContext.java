@@ -39,6 +39,8 @@ import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
  */
 public class CatalogConnectorContext {
 
+  private static final int MIN_SUPPORTED_TRINO_VERSION = 435;
+
   private final GravitinoCatalog catalog;
   private final GravitinoMetalake metalake;
 
@@ -51,6 +53,8 @@ public class CatalogConnectorContext {
   private final CatalogConnectorAdapter adapter;
 
   private final GravitinoConfig config;
+
+  private final int trinoVersion;
 
   /**
    * Constructs a new CatalogConnectorContext.
@@ -67,11 +71,32 @@ public class CatalogConnectorContext {
       Connector internalConnector,
       CatalogConnectorAdapter adapter,
       GravitinoConfig config) {
+    this(catalog, metalake, internalConnector, adapter, config, MIN_SUPPORTED_TRINO_VERSION);
+  }
+
+  /**
+   * Constructs a new CatalogConnectorContext for a specific Trino runtime.
+   *
+   * @param catalog the Gravitino catalog
+   * @param metalake the Gravitino metalake
+   * @param internalConnector the internal connector
+   * @param adapter the catalog connector adapter
+   * @param config the Gravitino connector configuration
+   * @param trinoVersion the runtime Trino SPI version
+   */
+  public CatalogConnectorContext(
+      GravitinoCatalog catalog,
+      GravitinoMetalake metalake,
+      Connector internalConnector,
+      CatalogConnectorAdapter adapter,
+      GravitinoConfig config,
+      int trinoVersion) {
     this.catalog = catalog;
     this.metalake = metalake;
     this.internalConnector = internalConnector;
     this.adapter = adapter;
     this.config = config;
+    this.trinoVersion = trinoVersion;
   }
 
   /**
@@ -166,7 +191,7 @@ public class CatalogConnectorContext {
    * @return the metadata adapter
    */
   public CatalogConnectorMetadataAdapter getMetadataAdapter() {
-    return adapter.getMetadataAdapter();
+    return adapter.getMetadataAdapter(trinoVersion);
   }
 
   /** Builder class for creating CatalogConnectorContext instances. */
@@ -271,7 +296,13 @@ public class CatalogConnectorContext {
       Connector connector =
           GravitinoConnectorPluginManager.instance(context.getClass().getClassLoader())
               .createConnector(internalConnectorName, connectorConfig, context);
-      return new CatalogConnectorContext(catalog, metalake, connector, connectorAdapter, config);
+      return new CatalogConnectorContext(
+          catalog,
+          metalake,
+          connector,
+          connectorAdapter,
+          config,
+          Integer.parseInt(context.getSpiVersion()));
     }
   }
 }
