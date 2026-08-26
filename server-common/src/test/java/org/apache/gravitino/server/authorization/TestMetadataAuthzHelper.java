@@ -23,6 +23,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -318,6 +320,49 @@ public class TestMetadataAuthzHelper {
               catalogs);
 
       Assertions.assertEquals(2, filtered.length);
+    }
+  }
+
+  /**
+   * The verbose catalog listing hands this helper {@code Catalog} objects rather than identifiers,
+   * so it goes through the generic overload. That overload used to skip the short-circuit, which
+   * left every catalog in the metalake on the per-object path. Any element type must reach the same
+   * point, so this test filters a non-identifier array and proves no per-object evaluation ran.
+   */
+  @Test
+  public void testListShortCircuitAppliesToNonIdentifierResults() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer =
+          mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, Privilege.Name.USE_CATALOG);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      // Stands in for the Catalog objects the verbose listing carries: anything that is not a
+      // NameIdentifier and needs a mapper to become one.
+      String[] catalogNames = new String[] {"c1", "c2", "c3"};
+
+      String[] filtered =
+          MetadataAuthzHelper.filterByExpression(
+              "testMetalake",
+              AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+              Entity.EntityType.CATALOG,
+              catalogNames,
+              name -> NameIdentifierUtil.ofCatalog("testMetalake", name));
+
+      Assertions.assertArrayEquals(catalogNames, filtered);
+      // hasDenyPolicy is asked exactly once, and only by the short-circuit: it is the last gate
+      // before returning the whole list untouched. Never asking it means the per-object loop ran,
+      // which is what this test is here to catch. Asserting on the result alone would not, because
+      // the metalake-scope grant also satisfies the per-object expression.
+      verify(authorizer, times(1)).hasDenyPolicy(any(), eq("testMetalake"), anySet(), any());
     }
   }
 
