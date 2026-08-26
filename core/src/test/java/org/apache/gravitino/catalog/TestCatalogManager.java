@@ -1561,7 +1561,8 @@ public class TestCatalogManager {
               catalogProps(),
               Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
               Map.of());
-      Assertions.assertFalse(catalog.properties().containsKey(PROPERTY_KEY4));
+      Assertions.assertEquals(
+          HiddenPropertyMaskUtils.MASKED_VALUE, catalog.properties().get(PROPERTY_KEY4));
       String urn =
           entityStore
               .get(ident, EntityType.CATALOG, CatalogEntity.class)

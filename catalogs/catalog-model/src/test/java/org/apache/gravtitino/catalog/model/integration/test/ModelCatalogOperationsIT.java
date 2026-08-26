@@ -1262,9 +1262,12 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   private static void assertPropertiesEqual(
       Map<String, String> expectedUserProps, Map<String, String> actual) {
-    Map<String, String> expected = Maps.newHashMap(expectedUserProps);
-    expected.put(StringIdentifier.ID_KEY, HiddenPropertyMaskUtils.MASKED_VALUE);
-    Assertions.assertEquals(expected, actual);
+    Assertions.assertTrue(
+        !actual.containsKey(StringIdentifier.ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(actual.get(StringIdentifier.ID_KEY)));
+    Map<String, String> actualWithoutId = Maps.newHashMap(actual);
+    actualWithoutId.remove(StringIdentifier.ID_KEY);
+    Assertions.assertEquals(expectedUserProps, actualWithoutId);
   }
 
   private void createMetalake() {

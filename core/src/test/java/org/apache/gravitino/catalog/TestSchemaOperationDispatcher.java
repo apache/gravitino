@@ -450,7 +450,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
       Schema schema =
           d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of());
-      Assertions.assertFalse(schema.properties().containsKey("k2"));
+      Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, schema.properties().get("k2"));
 
       Schema stored =
           catalogManager

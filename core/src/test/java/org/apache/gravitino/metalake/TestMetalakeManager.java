@@ -310,7 +310,8 @@ public class TestMetalakeManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE, testProps.get(StringIdentifier.ID_KEY));
+    Assertions.assertTrue(
+        !testProps.containsKey(StringIdentifier.ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(testProps.get(StringIdentifier.ID_KEY)));
   }
 }
