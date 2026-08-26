@@ -65,13 +65,13 @@ public class TestGravitinoClientTLS {
 
   @Test
   void testGravitinoClientmTLSConfigurer() throws Exception {
-    // set up a gravitino server
+    // set up a gravitino server with client auth enabled
     // create a tls config, with a client cert
     // create a metalake utilizing the admin client (must include the tls config)
     // create a gravitino client with the tls config
     // make the gravitino client request to the server and verify that it succeeds
 
-    testServer = startGravitinoHttpsServer(true);
+    testServer = startGravitinoServer(true, true);
     TLSConfigurer tlsConfigurer = createTestTlsConfigurer(true);
 
     // create an admin client with the tls config, to then create a metalake
@@ -92,12 +92,12 @@ public class TestGravitinoClientTLS {
 
   @Test
   void testGravitinoClientmTLSConfigurerRejectsMissingClientCert() throws Exception {
-    // set up a gravitino server
+    // set up a gravitino server with client auth enabled
     // create a tls config, without a client cert
     // Create a gravitino admin client with the tls config
     // Attempt to make a request to the server, which should fail
 
-    testServer = startGravitinoHttpsServer(true);
+    testServer = startGravitinoServer(true, true);
     TLSConfigurer tlsConfigurer = createTestTlsConfigurer(false);
 
     // Create an admin client with the tls config, to then create a metalake
@@ -111,13 +111,13 @@ public class TestGravitinoClientTLS {
 
   @Test
   void testGravitinoClientTLSConfigurer() throws Exception {
-    // set up a gravitino server
+    // set up a gravitino server without client auth, but with tls config
     // create a tls config without a client cert
     // create a metalake utilizing the admin client (must include the tls config)
     // create a gravitino client with the tls config
     // make the gravitino client request to the server and verify that it succeeds
 
-    testServer = startGravitinoHttpsServer(false);
+    testServer = startGravitinoServer(false, true);
     TLSConfigurer tlsConfigurer = createTestTlsConfigurer(false);
 
     adminClient =
@@ -127,6 +127,28 @@ public class TestGravitinoClientTLS {
 
     GravitinoClient gravitinoClient =
         createGravitinoClient(testServer.uri(), "metalake", tlsConfigurer);
+
+    String[] catalogs = gravitinoClient.listCatalogs();
+
+    // verify that the request succeeds and returns an empty list of catalogs (expected)
+    assertEquals(0, catalogs.length);
+  }
+
+  @Test
+  void testGravitinoClientHTTP() throws Exception {
+    // set up a gravitino server without client auth or tls config (http only)
+    // create a metalake utilizing the admin client
+    // create a gravitino client
+    // make the gravitino client request to the server and verify that it succeeds
+
+    testServer = startGravitinoServer(false, false);
+
+    adminClient = GravitinoAdminClient.builder(testServer.uri()).build();
+    adminClient.createMetalake("metalake", "test metalake", Map.of());
+    cleanupMetalake = true;
+
+    GravitinoClient gravitinoClient =
+        GravitinoClient.builder(testServer.uri()).withMetalake("metalake").build();
 
     String[] catalogs = gravitinoClient.listCatalogs();
 
@@ -159,7 +181,8 @@ public class TestGravitinoClientTLS {
         .build();
   }
 
-  public record TestGravitinoServer(GravitinoServer server, int port, Path backendDir) {
+  public record TestGravitinoServer(
+      GravitinoServer server, int port, Path backendDir, boolean tlsEnabled) {
     public void stop() throws IOException {
       try {
         server.stop();
@@ -169,11 +192,12 @@ public class TestGravitinoClientTLS {
     }
 
     public String uri() {
-      return "https://localhost:" + port;
+      return (tlsEnabled ? "https" : "http") + "://localhost:" + port;
     }
   }
 
-  public static TestGravitinoServer startGravitinoHttpsServer(boolean clientAuth) throws Exception {
+  public static TestGravitinoServer startGravitinoServer(boolean clientAuth, boolean tlsEnabled)
+      throws Exception {
     // create a temporary directory for the backend database to delete after the test is done
     Path backendDir = Files.createTempDirectory("gravitino-client-tls-");
     Path backendPath = backendDir.resolve("gravitino.db");
@@ -183,39 +207,48 @@ public class TestGravitinoClientTLS {
     Map<String, String> configs = new HashMap<>();
 
     configs.put(ENTITY_RELATIONAL_JDBC_BACKEND_PATH.getKey(), backendPath.toString());
-
-    configs.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.ENABLE_HTTPS.getKey(), "true");
-
-    configs.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTPS_PORT.getKey(),
-        String.valueOf(port));
-
-    configs.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_KEYSTORE_PATH.getKey(),
-        TestTlsServerUtils.testResource("test-server-keystore.p12").toString());
-
-    configs.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_KEYSTORE_PASSWORD.getKey(),
-        TEST_STORE_PASSWORD);
-
-    configs.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_MANAGER_PASSWORD.getKey(),
-        TEST_STORE_PASSWORD);
-
-    configs.put(
-        GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.ENABLE_CLIENT_AUTH.getKey(),
-        String.valueOf(clientAuth));
-
-    if (clientAuth) {
-      configs.put(
-          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_TRUST_STORE_PATH.getKey(),
-          TestTlsServerUtils.testResource("test-server-truststore.p12").toString());
+    if (tlsEnabled) {
 
       configs.put(
-          GravitinoServer.WEBSERVER_CONF_PREFIX
-              + JettyServerConfig.SSL_TRUST_STORE_PASSWORD.getKey(),
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.ENABLE_HTTPS.getKey(), "true");
+
+      configs.put(
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTPS_PORT.getKey(),
+          String.valueOf(port));
+
+      configs.put(
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_KEYSTORE_PATH.getKey(),
+          TestTlsServerUtils.testResource("test-server-keystore.p12").toString());
+
+      configs.put(
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_KEYSTORE_PASSWORD.getKey(),
           TEST_STORE_PASSWORD);
+
+      configs.put(
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_MANAGER_PASSWORD.getKey(),
+          TEST_STORE_PASSWORD);
+
+      configs.put(
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.ENABLE_CLIENT_AUTH.getKey(),
+          String.valueOf(clientAuth));
+
+      if (clientAuth) {
+        configs.put(
+            GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.SSL_TRUST_STORE_PATH.getKey(),
+            TestTlsServerUtils.testResource("test-server-truststore.p12").toString());
+
+        configs.put(
+            GravitinoServer.WEBSERVER_CONF_PREFIX
+                + JettyServerConfig.SSL_TRUST_STORE_PASSWORD.getKey(),
+            TEST_STORE_PASSWORD);
+      }
+    } else {
+      configs.put(
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.ENABLE_HTTPS.getKey(), "false");
+
+      configs.put(
+          GravitinoServer.WEBSERVER_CONF_PREFIX + JettyServerConfig.WEBSERVER_HTTP_PORT.getKey(),
+          String.valueOf(port));
     }
 
     ServerConfig serverConfig = new ServerConfig();
@@ -233,6 +266,6 @@ public class TestGravitinoClientTLS {
     server.initialize();
     server.start();
 
-    return new TestGravitinoServer(server, port, backendDir);
+    return new TestGravitinoServer(server, port, backendDir, tlsEnabled);
   }
 }
