@@ -55,6 +55,9 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFac
  * through Trino catalog configuration, a GravitinoSystemConnector is initially created. And it
  * provides some system tables and stored procedures of Gravitino connector.
  */
+// Trino 481 deprecates the split-based createPageSource for removal; it is still the only variant
+// available on 435-481. Trino 482 removes it and is handled by a separate version-segment module.
+@SuppressWarnings("removal")
 public class GravitinoSystemConnector implements Connector {
 
   private final GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory;

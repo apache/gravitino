@@ -43,9 +43,9 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoColumn;
 
-public class GravitinoMetadata480 extends GravitinoMetadata {
+public class GravitinoMetadata481 extends GravitinoMetadata {
 
-  public GravitinoMetadata480(
+  public GravitinoMetadata481(
       CatalogConnectorMetadata catalogConnectorMetadata,
       CatalogConnectorMetadataAdapter metadataAdapter,
       io.trino.spi.connector.ConnectorMetadata internalMetadata) {
@@ -89,12 +89,12 @@ public class GravitinoMetadata480 extends GravitinoMetadata {
   }
 
   @Override
-  public void finishTableExecute(
+  public Map<String, Long> finishTableExecute(
       ConnectorSession session,
       ConnectorTableExecuteHandle tableExecuteHandle,
       Collection<Slice> fragments,
       List<Object> tableExecuteState) {
-    internalMetadata.finishTableExecute(
+    return internalMetadata.finishTableExecute(
         session, GravitinoHandle.unWrap(tableExecuteHandle), fragments, tableExecuteState);
   }
 

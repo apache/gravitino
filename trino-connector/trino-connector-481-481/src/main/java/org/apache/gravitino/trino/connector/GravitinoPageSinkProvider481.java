@@ -26,24 +26,27 @@ import io.trino.spi.connector.ConnectorPageSink;
 import io.trino.spi.connector.ConnectorPageSinkId;
 import io.trino.spi.connector.ConnectorPageSinkProvider;
 import io.trino.spi.connector.ConnectorSession;
+import io.trino.spi.connector.ConnectorTableCredentials;
 import io.trino.spi.connector.ConnectorTableExecuteHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
+import java.util.Optional;
 
-/** This class provides a ConnectorPageSink for Trino to write data to internal connector. */
-// Trino 481 deprecates these createPageSink/createMergeSink variants for removal; they remain
-// the only ones available on 435-481. Trino 482 removes them and is handled by a separate module.
-@SuppressWarnings("removal")
-public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
-
-  ConnectorPageSinkProvider pageSinkProvider;
+/**
+ * Trino 480 introduced {@code createPageSink}/{@code createMergeSink} variants that take an {@code
+ * Optional<ConnectorTableCredentials>}; from Trino 481 the older variants without credentials are
+ * deprecated and their default implementations throw, so the connector must delegate through the
+ * credential-aware variants. Those types do not exist before Trino 480, so this version-specific
+ * subclass lives in the version-segment module rather than the shared source.
+ */
+public class GravitinoPageSinkProvider481 extends GravitinoPageSinkProvider {
 
   /**
-   * Constructs a new GravitinoPageSinkProvider with the specified page sink provider.
+   * Constructs a new GravitinoPageSinkProvider481 with the specified page sink provider.
    *
    * @param pageSinkProvider the internal connector page sink provider
    */
-  public GravitinoPageSinkProvider(ConnectorPageSinkProvider pageSinkProvider) {
-    this.pageSinkProvider = pageSinkProvider;
+  public GravitinoPageSinkProvider481(ConnectorPageSinkProvider pageSinkProvider) {
+    super(pageSinkProvider);
   }
 
   @Override
@@ -51,13 +54,18 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
       ConnectorTransactionHandle transactionHandle,
       ConnectorSession session,
       ConnectorOutputTableHandle outputTableHandle,
+      Optional<ConnectorTableCredentials> tableCredentials,
       ConnectorPageSinkId pageSinkId) {
     // GravitinoOutputTableHandle wraps a ConnectorInsertTableHandle internally,
-    // so delegate to the insert-path createPageSink
+    // so delegate to the insert-path createPageSink.
     ConnectorInsertTableHandle insertHandle =
         ((GravitinoOutputTableHandle) outputTableHandle).getInternalHandle();
     return pageSinkProvider.createPageSink(
-        GravitinoHandle.unWrap(transactionHandle), session, insertHandle, pageSinkId);
+        GravitinoHandle.unWrap(transactionHandle),
+        session,
+        insertHandle,
+        tableCredentials,
+        pageSinkId);
   }
 
   @Override
@@ -65,11 +73,13 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
       ConnectorTransactionHandle transactionHandle,
       ConnectorSession session,
       ConnectorInsertTableHandle insertTableHandle,
+      Optional<ConnectorTableCredentials> tableCredentials,
       ConnectorPageSinkId pageSinkId) {
     return pageSinkProvider.createPageSink(
         GravitinoHandle.unWrap(transactionHandle),
         session,
         GravitinoHandle.unWrap(insertTableHandle),
+        tableCredentials,
         pageSinkId);
   }
 
@@ -78,11 +88,13 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
       ConnectorTransactionHandle transactionHandle,
       ConnectorSession session,
       ConnectorTableExecuteHandle tableExecuteHandle,
+      Optional<ConnectorTableCredentials> tableCredentials,
       ConnectorPageSinkId pageSinkId) {
     return pageSinkProvider.createPageSink(
         GravitinoHandle.unWrap(transactionHandle),
         session,
         GravitinoHandle.unWrap(tableExecuteHandle),
+        tableCredentials,
         pageSinkId);
   }
 
@@ -91,11 +103,13 @@ public class GravitinoPageSinkProvider implements ConnectorPageSinkProvider {
       ConnectorTransactionHandle transactionHandle,
       ConnectorSession session,
       ConnectorMergeTableHandle mergeHandle,
+      Optional<ConnectorTableCredentials> tableCredentials,
       ConnectorPageSinkId pageSinkId) {
     return pageSinkProvider.createMergeSink(
         GravitinoHandle.unWrap(transactionHandle),
         session,
         GravitinoHandle.unWrap(mergeHandle),
+        tableCredentials,
         pageSinkId);
   }
 }
