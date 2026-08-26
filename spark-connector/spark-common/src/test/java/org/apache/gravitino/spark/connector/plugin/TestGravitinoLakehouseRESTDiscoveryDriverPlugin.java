@@ -30,6 +30,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Supplier;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +55,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
         baseConf().set("spark.plugins", GRAVITINO_PLUGIN + "," + DISCOVERY_PLUGIN);
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> driver().initialize(sparkConf));
+        assertThrows(IllegalArgumentException.class, () -> initialize(sparkConf));
 
     assertTrue(exception.getMessage().contains("must be listed before"));
     assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a"));
@@ -65,9 +66,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     SparkConf sparkConf =
         new SparkConf(false).set("spark.plugins", DISCOVERY_PLUGIN + "," + GRAVITINO_PLUGIN);
 
-    new GravitinoLakehouseRESTDiscoveryDriverPlugin(
-            Collections.singletonList(new FailingProvider()))
-        .initialize(sparkConf);
+    driver().initialize(sparkConf, providerFactories("fake", new FailingProvider()));
 
     assertFalse(sparkConf.contains(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key()));
   }
@@ -84,7 +83,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
                 StaticSQLConf.SPARK_SESSION_EXTENSIONS().key(),
                 "example.UserExtension,java.lang.Runnable");
 
-    driver().initialize(sparkConf);
+    initialize(sparkConf);
 
     assertEquals(String.class.getName(), sparkConf.get(CATALOG_PREFIX + "catalog_a"));
     assertEquals("rest", sparkConf.get(CATALOG_PREFIX + "catalog_a.impl"));
@@ -105,7 +104,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
                 GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
                 TrackingPolicy.class.getName());
 
-    driver().initialize(sparkConf);
+    initialize(sparkConf);
 
     assertEquals(0, TrackingPolicy.invocationCount);
     assertEquals("example.UserCatalog", sparkConf.get(CATALOG_PREFIX + "catalog_a"));
@@ -121,8 +120,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
                 GravitinoLakehouseRESTDiscoveryDriverPlugin.REGISTRATION_POLICY_CONFIG,
                 RenamePolicy.class.getName());
 
-    new GravitinoLakehouseRESTDiscoveryDriverPlugin(Collections.singletonList(provider))
-        .initialize(sparkConf);
+    driver().initialize(sparkConf, providerFactories("fake", provider));
 
     assertFalse(sparkConf.contains(CATALOG_PREFIX + "catalog_a"));
     assertEquals(String.class.getName(), sparkConf.get(CATALOG_PREFIX + "renamed_b"));
@@ -141,9 +139,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     IllegalArgumentException exception =
         assertThrows(
             IllegalArgumentException.class,
-            () ->
-                new GravitinoLakehouseRESTDiscoveryDriverPlugin(Collections.singletonList(provider))
-                    .initialize(sparkConf));
+            () -> driver().initialize(sparkConf, providerFactories("fake", provider)));
 
     assertTrue(exception.getMessage().contains("duplicate name"));
     assertFalse(sparkConf.contains(CATALOG_PREFIX + "duplicate"));
@@ -159,7 +155,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
                 InvalidNamePolicy.class.getName());
 
     IllegalArgumentException exception =
-        assertThrows(IllegalArgumentException.class, () -> driver().initialize(sparkConf));
+        assertThrows(IllegalArgumentException.class, () -> initialize(sparkConf));
 
     assertTrue(exception.getMessage().contains("invalid Spark identifier"));
     assertFalse(sparkConf.contains(CATALOG_PREFIX + "invalid-name"));
@@ -172,9 +168,7 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
     IllegalArgumentException exception =
         assertThrows(
             IllegalArgumentException.class,
-            () ->
-                new GravitinoLakehouseRESTDiscoveryDriverPlugin(Collections.emptyList())
-                    .initialize(sparkConf));
+            () -> driver().initialize(sparkConf, Collections.emptyMap()));
 
     assertTrue(exception.getMessage().contains("No lakehouse REST catalog provider"));
   }
@@ -184,8 +178,17 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
   }
 
   private static GravitinoLakehouseRESTDiscoveryDriverPlugin driver() {
-    return new GravitinoLakehouseRESTDiscoveryDriverPlugin(
-        Collections.singletonList(new FakeProvider(Collections.singletonList("catalog_a"))));
+    return new GravitinoLakehouseRESTDiscoveryDriverPlugin();
+  }
+
+  private static void initialize(SparkConf sparkConf) {
+    FakeProvider provider = new FakeProvider(Collections.singletonList("catalog_a"));
+    driver().initialize(sparkConf, providerFactories("fake", provider));
+  }
+
+  private static Map<String, Supplier<LakehouseRESTCatalogProvider>> providerFactories(
+      String format, LakehouseRESTCatalogProvider provider) {
+    return Collections.singletonMap(format, () -> provider);
   }
 
   private static class FakeProvider implements LakehouseRESTCatalogProvider {
