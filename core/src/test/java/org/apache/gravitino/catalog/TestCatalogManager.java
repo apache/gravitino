@@ -1530,7 +1530,51 @@ public class TestCatalogManager {
   }
 
   @Test
-  void testSecretRollback() throws Exception {
+  void testAlterRemovePropertyDeletesWriteThroughSecret() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      CatalogManager manager =
+          new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets);
+      NameIdentifier ident = NameIdentifier.of("metalake", "secret_catalog_remove");
+      Map<String, String> props =
+          ImmutableMap.of(
+              "provider",
+              "test",
+              PROPERTY_KEY1,
+              "value1",
+              PROPERTY_KEY2,
+              "value2",
+              PROPERTY_KEY5_PREFIX + "1",
+              "value3");
+      Map<String, SecretBinding> bindings =
+          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t"));
+
+      manager.createCatalog(
+          ident, Catalog.Type.RELATIONAL, provider, "comment", props, bindings, Map.of());
+
+      String urn =
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .get(PROPERTY_KEY4);
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+
+      manager.alterCatalog(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
+
+      Assertions.assertFalse(
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .containsKey(PROPERTY_KEY4));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+
+      Assertions.assertTrue(manager.dropCatalog(ident, true));
+      manager.close();
+    }
+  }
+
+  @Test
+  void testCreateSecretRollback() throws Exception {
     try (SecretManager secrets = memorySecretManager()) {
       IdGenerator ids = new AtomicLong(4242L)::getAndIncrement;
       CatalogManager manager = Mockito.spy(new CatalogManager(config, entityStore, ids, secrets));
