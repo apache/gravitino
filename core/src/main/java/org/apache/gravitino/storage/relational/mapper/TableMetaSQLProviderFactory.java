@@ -89,6 +89,16 @@ public class TableMetaSQLProviderFactory {
     return getProvider().selectTableMetaById(tableId);
   }
 
+  /**
+   * Returns SQL that selects and exclusively locks an active table metadata row.
+   *
+   * @param tableId the table ID
+   * @return the locking select SQL
+   */
+  public static String selectTableMetaByIdForUpdate(@Param("tableId") Long tableId) {
+    return getProvider().selectTableMetaByIdForUpdate(tableId);
+  }
+
   public static String insertTableMeta(@Param("tableMeta") TablePO tablePO) {
     return getProvider().insertTableMeta(tablePO);
   }
@@ -104,8 +114,16 @@ public class TableMetaSQLProviderFactory {
     return getProvider().updateTableMeta(newTablePO, oldTablePO, newSchemaId);
   }
 
-  public static String softDeleteTableMetasByTableId(@Param("tableId") Long tableId) {
-    return getProvider().softDeleteTableMetasByTableId(tableId);
+  /**
+   * Returns SQL that soft-deletes a table with a version check.
+   *
+   * @param tableId the table ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public static String softDeleteTableMetasByTableId(
+      @Param("tableId") Long tableId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteTableMetasByTableId(tableId, currentVersion);
   }
 
   public static String softDeleteTableMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
