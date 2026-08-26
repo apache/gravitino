@@ -52,8 +52,8 @@ gravitino.server.webserver.responseHeaderSize = 131072
 # UI warning countdown duration in milliseconds before the inactivity timeout. The UI environment
 # variable NEXT_PUBLIC_IDLE_WARNING_LEAD_MS is used when this config is not set.
 # gravitino.server.webserver.sessionIdleWarningLeadMs = 60000
-# multiple visibleConfigs are spitted by comma.
-# gravitino.server.visibleConfigs=gravitino.server.webserver.sessionIdleTimeoutMs,gravitino.server.webserver.sessionMaxDurationMs,gravitino.server.webserver.sessionIdleWarningLeadMs
+# Multiple visibleConfigs are split by commas.
+# gravitino.server.visibleConfigs = gravitino.server.webserver.sessionIdleTimeoutMs,gravitino.server.webserver.sessionMaxDurationMs,gravitino.server.webserver.sessionIdleWarningLeadMs
 
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
 # The entity store to use, we only supports relational
@@ -99,7 +99,7 @@ gravitino.fetchFile.blockUnsafeRemoteUri = true
 # THE CONFIGURATION FOR authorization
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = false
-# The admins of Gravitino service
+# The admins of Gravitino service, separated by commas.
 gravitino.authorization.serviceAdmins = anonymous
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE
