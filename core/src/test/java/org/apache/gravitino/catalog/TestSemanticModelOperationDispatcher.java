@@ -21,6 +21,7 @@ package org.apache.gravitino.catalog;
 import static org.apache.gravitino.Configs.TREE_LOCK_CLEAN_INTERVAL;
 import static org.apache.gravitino.Configs.TREE_LOCK_MAX_NODE_IN_MEMORY;
 import static org.apache.gravitino.Configs.TREE_LOCK_MIN_NODE_IN_MEMORY;
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -47,6 +48,7 @@ import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.IllegalSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
+import org.apache.gravitino.exceptions.NoSuchSemanticModelException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.exceptions.NoSuchViewException;
 import org.apache.gravitino.lock.LockManager;
@@ -271,16 +273,99 @@ public class TestSemanticModelOperationDispatcher {
   }
 
   @Test
-  public void testRemainingManagedCapabilitiesStayUnsupported() {
+  public void testListAlterAndDropLifecycleWithSelectiveSourceValidation() {
+    doReturn(tableWithColumns("order_id", "customer_id"))
+        .when(tableDispatcher)
+        .loadTable(ORDERS_SOURCE);
+    when(tableDispatcher.loadTable(CUSTOMERS_SOURCE))
+        .thenThrow(new NoSuchTableException("Table does not exist"));
+    doReturn(viewWithColumns("customer_id")).when(viewDispatcher).loadView(CUSTOMERS_SOURCE);
+    dispatcher.createSemanticModel(MODEL_IDENT, "Original", validDefinition(), Map.of());
+    clearInvocations(tableDispatcher, viewDispatcher);
+
+    SemanticModel propertyUpdated =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT, SemanticModelChange.setProperty("owner", "analytics"));
+    SemanticModel renamed =
+        dispatcher.alterSemanticModel(
+            MODEL_IDENT,
+            SemanticModelChange.rename("renamed_sales_model"),
+            SemanticModelChange.updateComment("Updated"));
+    NameIdentifier renamedIdent = NameIdentifier.of(NAMESPACE, renamed.name());
+    assertEquals(Map.of("owner", "analytics"), propertyUpdated.properties());
+    assertEquals("Updated", renamed.comment());
+    verifyNoInteractions(tableDispatcher, viewDispatcher);
+
+    SemanticModel replaced =
+        dispatcher.alterSemanticModel(
+            renamedIdent, SemanticModelChange.replaceDefinition(validDefinition()));
+    assertEquals(2, replaced.definition().datasets().length);
+    verify(tableDispatcher).loadTable(ORDERS_SOURCE);
+    verify(tableDispatcher).loadTable(CUSTOMERS_SOURCE);
+    verify(viewDispatcher).loadView(CUSTOMERS_SOURCE);
+    assertArrayEquals(
+        new NameIdentifier[] {renamedIdent}, dispatcher.listSemanticModels(NAMESPACE));
+    assertTrue(dispatcher.dropSemanticModel(renamedIdent));
+    assertFalse(dispatcher.dropSemanticModel(renamedIdent));
+  }
+
+  @Test
+  public void testRejectedSourceReplacementDoesNotPersistOtherChanges() {
+    doReturn(tableWithColumns("order_id", "customer_id"))
+        .when(tableDispatcher)
+        .loadTable(ORDERS_SOURCE);
+    when(tableDispatcher.loadTable(CUSTOMERS_SOURCE))
+        .thenThrow(new NoSuchTableException("Table does not exist"));
+    doReturn(viewWithColumns("customer_id")).when(viewDispatcher).loadView(CUSTOMERS_SOURCE);
+    SemanticModel original =
+        dispatcher.createSemanticModel(
+            MODEL_IDENT, "Original", validDefinition(), Map.of("owner", "sales"));
+
+    NameIdentifier missingSource =
+        NameIdentifier.of(Namespace.of(METALAKE, "sales", "mart"), "replacement_missing");
+    when(tableDispatcher.loadTable(missingSource))
+        .thenThrow(new NoSuchTableException("Table does not exist"));
+    when(viewDispatcher.loadView(missingSource))
+        .thenThrow(new NoSuchViewException("View does not exist"));
+    SemanticModelDefinition invalidReplacement =
+        definition(dataset("missing", "replacement_missing", null, null));
+
     assertThrows(
-        UnsupportedOperationException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
-    assertThrows(
-        UnsupportedOperationException.class,
+        IllegalSemanticModelException.class,
         () ->
             dispatcher.alterSemanticModel(
-                MODEL_IDENT, SemanticModelChange.updateComment("Not implemented")));
+                MODEL_IDENT,
+                SemanticModelChange.rename("must_not_persist"),
+                SemanticModelChange.updateComment("Must not persist"),
+                SemanticModelChange.setProperty("owner", "changed"),
+                SemanticModelChange.replaceDefinition(invalidReplacement)));
+
+    SemanticModel loaded = dispatcher.loadSemanticModel(MODEL_IDENT);
+    assertEquals(original.name(), loaded.name());
+    assertEquals(original.comment(), loaded.comment());
+    assertEquals(original.properties(), loaded.properties());
+    assertEquals(original.definition(), loaded.definition());
+    assertFalse(dispatcher.semanticModelExists(NameIdentifier.of(NAMESPACE, "must_not_persist")));
+  }
+
+  @Test
+  public void testLifecycleMissingParentAndInvalidChangeSemantics() {
     assertThrows(
-        UnsupportedOperationException.class, () -> dispatcher.dropSemanticModel(MODEL_IDENT));
+        IllegalSemanticModelException.class,
+        () -> dispatcher.alterSemanticModel(MODEL_IDENT, (SemanticModelChange[]) null));
+    assertThrows(
+        IllegalSemanticModelException.class, () -> dispatcher.alterSemanticModel(MODEL_IDENT));
+
+    when(schemaDispatcher.loadSchema(SCHEMA_IDENT))
+        .thenThrow(new NoSuchSchemaException("Schema does not exist"));
+    assertThrows(NoSuchSchemaException.class, () -> dispatcher.listSemanticModels(NAMESPACE));
+    when(schemaDispatcher.schemaExists(SCHEMA_IDENT)).thenReturn(false);
+    assertThrows(
+        NoSuchSemanticModelException.class,
+        () ->
+            dispatcher.alterSemanticModel(
+                MODEL_IDENT, SemanticModelChange.updateComment("Missing")));
+    assertFalse(dispatcher.dropSemanticModel(MODEL_IDENT));
   }
 
   @Test

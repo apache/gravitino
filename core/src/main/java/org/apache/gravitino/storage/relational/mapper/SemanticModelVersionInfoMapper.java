@@ -18,11 +18,15 @@
  */
 package org.apache.gravitino.storage.relational.mapper;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
+import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
-/** A MyBatis mapper for creating Semantic Model version snapshots. */
+/** A MyBatis mapper for Semantic Model version snapshot operations. */
 public interface SemanticModelVersionInfoMapper {
 
   /** The Semantic Model version snapshot table name. */
@@ -41,4 +45,59 @@ public interface SemanticModelVersionInfoMapper {
       method = "insertSemanticModelVersionInfoOnDuplicateKeyUpdate")
   void insertSemanticModelVersionInfoOnDuplicateKeyUpdate(
       @Param("semanticModelVersionInfo") SemanticModelVersionInfoPO versionInfoPO);
+
+  /** Selects a Semantic Model version snapshot. */
+  @SelectProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "selectSemanticModelVersionInfoBySemanticModelIdAndVersion")
+  SemanticModelVersionInfoPO selectSemanticModelVersionInfoBySemanticModelIdAndVersion(
+      @Param("semanticModelId") Long semanticModelId, @Param("version") Integer version);
+
+  /** Soft-deletes all snapshots for a Semantic Model ID. */
+  @UpdateProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "softDeleteSemanticModelVersionsBySemanticModelId")
+  Integer softDeleteSemanticModelVersionsBySemanticModelId(
+      @Param("semanticModelId") Long semanticModelId);
+
+  /** Soft-deletes Semantic Model snapshots under schemas. */
+  @UpdateProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "softDeleteSemanticModelVersionsBySchemaIds")
+  Integer softDeleteSemanticModelVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds);
+
+  /** Soft-deletes Semantic Model snapshots under a catalog. */
+  @UpdateProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "softDeleteSemanticModelVersionsByCatalogId")
+  Integer softDeleteSemanticModelVersionsByCatalogId(@Param("catalogId") Long catalogId);
+
+  /** Soft-deletes Semantic Model snapshots under a metalake. */
+  @UpdateProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "softDeleteSemanticModelVersionsByMetalakeId")
+  Integer softDeleteSemanticModelVersionsByMetalakeId(@Param("metalakeId") Long metalakeId);
+
+  /** Permanently deletes soft-deleted snapshots older than a timeline. */
+  @DeleteProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "deleteSemanticModelVersionsByLegacyTimeline")
+  Integer deleteSemanticModelVersionsByLegacyTimeline(
+      @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
+
+  /** Selects active Semantic Models whose version count exceeds the retention count. */
+  @SelectProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "selectSemanticModelVersionsByRetentionCount")
+  List<SemanticModelVersionInfoPO> selectSemanticModelVersionsByRetentionCount(
+      @Param("versionRetentionCount") Long versionRetentionCount);
+
+  /** Soft-deletes old snapshots through a per-model retention line. */
+  @UpdateProvider(
+      type = SemanticModelVersionInfoSQLProviderFactory.class,
+      method = "softDeleteSemanticModelVersionsByRetentionLine")
+  Integer softDeleteSemanticModelVersionsByRetentionLine(
+      @Param("semanticModelId") Long semanticModelId,
+      @Param("versionRetentionLine") long versionRetentionLine,
+      @Param("limit") int limit);
 }

@@ -140,6 +140,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (List<E>) TableMetaService.getInstance().listTablesByNamespace(namespace);
       case VIEW:
         return (List<E>) ViewMetaService.getInstance().listViewsByNamespace(namespace);
+      case SEMANTIC_MODEL:
+        return (List<E>)
+            SemanticModelMetaService.getInstance().listSemanticModelsByNamespace(namespace);
       case FILESET:
         return (List<E>) FilesetMetaService.getInstance().listFilesetsByNamespace(namespace);
       case TOPIC:
@@ -430,6 +433,19 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           }
         }
         return views;
+      case SEMANTIC_MODEL:
+        List<E> semanticModels = Lists.newArrayList();
+        for (NameIdentifier identifier : identifiers) {
+          try {
+            semanticModels.add(
+                (E)
+                    SemanticModelMetaService.getInstance()
+                        .getSemanticModelByIdentifier(identifier));
+          } catch (NoSuchEntityException e) {
+            LOG.debug("Skipping missing semantic model during batch get: {}", identifier.name());
+          }
+        }
+        return semanticModels;
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for batch get operation", entityType);
@@ -544,8 +560,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
             .deleteViewMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case SEMANTIC_MODEL:
-        // TODO: Delegate to SemanticModelMetaService when relational persistence is added.
-        return 0;
+        return SemanticModelMetaService.getInstance()
+            .deleteSemanticModelMetasByLegacyTimeline(
+                legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -587,8 +604,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return 0;
 
       case SEMANTIC_MODEL:
-        // TODO: Delegate to SemanticModelMetaService when relational persistence is added.
-        return 0;
+        return SemanticModelMetaService.getInstance()
+            .deleteSemanticModelVersionsByRetentionCount(
+                versionRetentionCount, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
 
       case FILESET:
         return FilesetMetaService.getInstance()
@@ -1058,6 +1076,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
       case VIEW:
         return (E) ViewMetaService.getInstance().updateView(ident, updater);
+      case SEMANTIC_MODEL:
+        return (E) SemanticModelMetaService.getInstance().updateSemanticModel(ident, updater);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for update operation", entityType);
@@ -1101,6 +1121,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return JobMetaService.getInstance().deleteJob(ident);
       case VIEW:
         return ViewMetaService.getInstance().deleteView(ident);
+      case SEMANTIC_MODEL:
+        return SemanticModelMetaService.getInstance().deleteSemanticModel(ident);
       default:
         throw new UnsupportedEntityTypeException(
             "Unsupported entity type: %s for delete operation", entityType);
