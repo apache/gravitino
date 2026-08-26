@@ -326,8 +326,17 @@ public class TestMetadataAuthzHelper {
   /**
    * The verbose catalog listing hands this helper {@code Catalog} objects rather than identifiers,
    * so it goes through the generic overload. That overload used to skip the short-circuit, which
-   * left every catalog in the metalake on the per-object path. Any element type must reach the same
-   * point, so this test filters a non-identifier array and proves no per-object evaluation ran.
+   * left every catalog in the metalake on the per-object path.
+   *
+   * <p>Proving which path ran needs care. Comparing the returned elements does not work, because
+   * the metalake-scope grant satisfies the per-object expression too and every catalog comes back
+   * either way. Counting authorizer calls does not work either: the per-request cache in {@link
+   * org.apache.gravitino.authorization.AuthorizationRequestContext} collapses the repeated
+   * metalake-scope check, so the count is the same for three catalogs and for thirty.
+   *
+   * <p>What does separate them is the array itself. The short-circuit hands back the caller's own
+   * array untouched, while the per-object path collects survivors into a new one, so identity says
+   * which branch produced the result.
    */
   @Test
   public void testListShortCircuitAppliesToNonIdentifierResults() {
@@ -357,11 +366,12 @@ public class TestMetadataAuthzHelper {
               catalogNames,
               name -> NameIdentifierUtil.ofCatalog("testMetalake", name));
 
-      Assertions.assertArrayEquals(catalogNames, filtered);
-      // hasDenyPolicy is asked exactly once, and only by the short-circuit: it is the last gate
-      // before returning the whole list untouched. Never asking it means the per-object loop ran,
-      // which is what this test is here to catch. Asserting on the result alone would not, because
-      // the metalake-scope grant also satisfies the per-object expression.
+      Assertions.assertSame(
+          catalogNames,
+          filtered,
+          "The parent-scope short-circuit must return the caller's array as is; a new array means "
+              + "the per-object authorization loop ran for every catalog");
+      // Only the short-circuit asks this, and it asks once, after the parent grant is confirmed.
       verify(authorizer, times(1)).hasDenyPolicy(any(), eq("testMetalake"), anySet(), any());
     }
   }
