@@ -192,7 +192,6 @@ jobs:
 
           gradle_args=(
             build
-            --max-workers=2
             -PskipWeb=true
             -PskipITs
             -PskipDockerTests=false
