@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.spark.connector.plugin.lance;
+package org.apache.gravitino.spark.connector.plugin.restcatalog.lance;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.spark.connector.plugin.LakehouseRESTCatalogProvider;
+import org.apache.gravitino.spark.connector.plugin.restcatalog.LakehouseRESTCatalogProvider;
 import org.lance.namespace.client.apache.ApiClient;
 import org.lance.namespace.client.apache.ApiException;
 import org.lance.namespace.client.apache.api.NamespaceApi;
@@ -106,6 +106,9 @@ public class LanceRESTCatalogProvider implements LakehouseRESTCatalogProvider {
 
   private static Closeable getHttpClient(ApiClient apiClient) {
     try {
+      // Use reflection to keep Apache HttpClient types out of this class's bytecode. Those types
+      // are relocated in Spark runtime JARs but remain unshaded in external Lance bundles, so a
+      // direct call can encode an incompatible method descriptor and cause a NoSuchMethodError.
       Object httpClient = ApiClient.class.getMethod("getHttpClient").invoke(apiClient);
       Preconditions.checkState(
           httpClient instanceof Closeable,
