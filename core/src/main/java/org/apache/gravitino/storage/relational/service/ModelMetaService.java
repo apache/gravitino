@@ -142,19 +142,27 @@ public class ModelMetaService {
 
     // Delete the model row first, and only when its concurrency version still matches the value
     // read above. If another writer changed the model, stop before removing any related data.
-    SessionUtils.doMultipleWithCommit(
-        () -> deleteModelWithVersion(ident, modelPO),
-        () -> deleteModelDependents(modelPO),
-        () -> {
-          SessionUtils.doWithoutCommit(
-              EntityChangeLogMapper.class,
-              mapper ->
-                  mapper.insertEntityChange(
-                      metalakeName,
-                      Entity.EntityType.MODEL.name(),
-                      modelFullName,
-                      OperateType.DROP));
-        });
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> deleteModelWithVersion(ident, modelPO),
+          () -> deleteModelDependents(modelPO),
+          () -> {
+            SessionUtils.doWithoutCommit(
+                EntityChangeLogMapper.class,
+                mapper ->
+                    mapper.insertEntityChange(
+                        metalakeName,
+                        Entity.EntityType.MODEL.name(),
+                        modelFullName,
+                        OperateType.DROP));
+          });
+    } catch (NoSuchEntityException e) {
+      // Another writer dropped the model between the read above and this transaction. A drop that
+      // finds nothing to drop is reported the same way as the read above reports it, so that a
+      // duplicate drop stays a plain "false" instead of surfacing as an error.
+      LOG.warn("Failed to delete model: {}", ident, e);
+      return false;
+    }
 
     return true;
   }

@@ -53,8 +53,12 @@ import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class ModelVersionMetaService {
+
+  private static final Logger LOG = LoggerFactory.getLogger(ModelVersionMetaService.class);
 
   private static final ModelVersionMetaService INSTANCE = new ModelVersionMetaService();
 
@@ -241,32 +245,41 @@ public class ModelVersionMetaService {
     }
     Integer modelVersion = observedVersionPOs.get(0).getModelVersion();
 
-    SessionUtils.doMultipleWithCommit(
-        // Keep the parent schema from being deleted while this transaction changes version rows.
-        () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
-        // Reserve this write by advancing the shared concurrency version before deleting anything.
-        // If the model changed after the read above, leave the version and its aliases untouched.
-        () -> ModelMetaService.getInstance().bumpModelVersion(modelIdent, modelPO),
-        () -> {
-          // An alias was resolved to its numeric version above. Delete every URI row belonging to
-          // that version, regardless of whether the caller supplied the number or an alias.
-          int deleted =
-              SessionUtils.getWithoutCommit(
-                  ModelVersionMetaMapper.class,
+    try {
+      SessionUtils.doMultipleWithCommit(
+          // Keep the parent schema from being deleted while this transaction changes version rows.
+          () -> lockSchemaForModelVersionWrite(modelIdent, modelPO),
+          // Reserve this write by advancing the shared concurrency version before deleting
+          // anything. If the model changed after the read above, leave the version and its aliases
+          // untouched.
+          () -> ModelMetaService.getInstance().bumpModelVersion(modelIdent, modelPO),
+          () -> {
+            // An alias was resolved to its numeric version above. Delete every URI row belonging to
+            // that version, regardless of whether the caller supplied the number or an alias.
+            int deleted =
+                SessionUtils.getWithoutCommit(
+                    ModelVersionMetaMapper.class,
+                    mapper ->
+                        mapper.softDeleteModelVersionMetaByModelIdAndVersion(
+                            modelPO.getModelId(), modelVersion));
+            if (deleted == 0) {
+              throw noSuchModelVersionException(ident);
+            }
+          },
+          // Remove all aliases for the same numeric version in the same transaction.
+          () ->
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
                   mapper ->
-                      mapper.softDeleteModelVersionMetaByModelIdAndVersion(
-                          modelPO.getModelId(), modelVersion));
-          if (deleted == 0) {
-            throw noSuchModelVersionException(ident);
-          }
-        },
-        // Remove all aliases for the same numeric version in the same transaction.
-        () ->
-            SessionUtils.doWithoutCommit(
-                ModelVersionAliasRelMapper.class,
-                mapper ->
-                    mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
-                        modelPO.getModelId(), modelVersion)));
+                      mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
+                          modelPO.getModelId(), modelVersion)));
+    } catch (NoSuchEntityException e) {
+      // The model, its parent schema or the version itself was dropped between the reads above and
+      // this transaction. Both reads report that case by returning false, so a delete that races
+      // with another delete keeps returning false instead of surfacing as an error.
+      LOG.warn("Failed to delete model version: {}", ident, e);
+      return false;
+    }
 
     return true;
   }

@@ -50,6 +50,7 @@ import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.model.ModelVersion;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -59,6 +60,8 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 
 public class TestModelVersionMetaService extends TestJDBCBackend {
 
@@ -171,6 +174,55 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                 ModelVersionAliasRelMapper.class,
                 mapper -> mapper.selectModelVersionAliasRelsByModelId(modelEntity.id()))
             .isEmpty());
+  }
+
+  @TestTemplate
+  public void testDeleteModelVersionLosingRaceToModelDropReturnsFalse() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_dropped_during_version_delete",
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity modelVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path"),
+            aliases,
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(modelVersion);
+
+    ModelPO observedModelPO =
+        ModelMetaService.getInstance().getModelPOByIdentifier(model.nameIdentifier());
+    // Another node drops the model row after this one read it, while the version rows this delete
+    // is about are still visible. The version bump below is what discovers the model is gone.
+    SessionUtils.doWithCommit(
+        ModelMetaMapper.class,
+        mapper ->
+            mapper.softDeleteModelMetaByIdAndVersion(
+                observedModelPO.getModelId(), observedModelPO.getCurrentVersion()));
+
+    ModelMetaService modelMetaService = Mockito.spy(ModelMetaService.getInstance());
+    Mockito.doReturn(observedModelPO)
+        .when(modelMetaService)
+        .getModelPOByIdentifier(model.nameIdentifier());
+
+    try (MockedStatic<ModelMetaService> mocked = Mockito.mockStatic(ModelMetaService.class)) {
+      mocked.when(ModelMetaService::getInstance).thenReturn(modelMetaService);
+
+      // A version delete whose model disappeared underneath it reports the same false as a delete
+      // that found no model in the first place.
+      Assertions.assertFalse(
+          ModelVersionMetaService.getInstance().deleteModelVersion(modelVersion.nameIdentifier()));
+    }
   }
 
   @TestTemplate

@@ -45,6 +45,7 @@ import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
+import org.mockito.Mockito;
 
 public class TestModelMetaService extends TestJDBCBackend {
 
@@ -203,6 +204,37 @@ public class TestModelMetaService extends TestJDBCBackend {
         () ->
             ModelMetaService.getInstance()
                 .listModelsByNamespace(Namespace.of(METALAKE_NAME, CATALOG_NAME, "inexistent")));
+  }
+
+  @TestTemplate
+  public void testDeleteModelLosingRaceToAnotherDeleteReturnsFalse() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model1",
+            "model1 comment",
+            0,
+            ImmutableMap.of("k1", "v1"),
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(modelEntity, false);
+
+    ModelPO observedModelPO =
+        ModelMetaService.getInstance().getModelPOByIdentifier(modelEntity.nameIdentifier());
+    // Another node drops the model after this one read it, so the compare-and-set below matches no
+    // row and the model turns out to be gone rather than concurrently modified.
+    Assertions.assertTrue(ModelMetaService.getInstance().deleteModel(modelEntity.nameIdentifier()));
+
+    ModelMetaService service = Mockito.spy(ModelMetaService.getInstance());
+    Mockito.doReturn(observedModelPO)
+        .when(service)
+        .getModelPOByIdentifier(modelEntity.nameIdentifier());
+
+    // A drop that finds nothing left to drop stays a plain false, the same answer the caller gets
+    // when the model was already gone before it was read.
+    Assertions.assertFalse(service.deleteModel(modelEntity.nameIdentifier()));
   }
 
   @TestTemplate
