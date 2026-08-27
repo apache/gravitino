@@ -38,6 +38,7 @@ import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeInUseException;
@@ -234,10 +235,8 @@ public class MetalakeManager implements MetalakeDispatcher, Closeable {
     Map<String, String> newProps =
         metalakeEntity.properties() == null
             ? new HashMap<>()
-            : new HashMap<>(metalakeEntity.properties());
-    newProps
-        .entrySet()
-        .removeIf(e -> metalakeEntity.propertiesMetadata().isHiddenProperty(e.getKey()));
+            : HiddenPropertyMaskUtils.maskHiddenProperties(
+                metalakeEntity.properties(), metalakeEntity.propertiesMetadata());
     newProps.putIfAbsent(
         PROPERTY_IN_USE,
         metalakeEntity.propertiesMetadata().getDefaultValue(PROPERTY_IN_USE).toString());

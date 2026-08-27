@@ -18,11 +18,12 @@
  */
 package org.apache.gravitino.catalog;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TopicEntity;
@@ -36,8 +37,8 @@ public class EntityCombinedTopic implements Topic {
   private final Topic topic;
   private final TopicEntity topicEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties;
+  // Property keys whose values are masked in API responses.
+  private Set<String> hiddenProperties = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -69,7 +70,7 @@ public class EntityCombinedTopic implements Topic {
   }
 
   public EntityCombinedTopic withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
     return this;
   }
 
@@ -90,10 +91,7 @@ public class EntityCombinedTopic implements Topic {
 
   @Override
   public Map<String, String> properties() {
-    return topic.properties().entrySet().stream()
-        .filter(p -> !hiddenProperties.contains(p.getKey()))
-        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return HiddenPropertyMaskUtils.maskHiddenProperties(topic.properties(), hiddenProperties);
   }
 
   @Override

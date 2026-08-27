@@ -21,8 +21,8 @@ package org.apache.gravitino.catalog;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -84,10 +84,7 @@ public final class EntityCombinedFileset implements Fileset {
 
   @Override
   public Map<String, String> properties() {
-    return fileset.properties().entrySet().stream()
-        .filter(p -> !hiddenProperties.contains(p.getKey()))
-        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return HiddenPropertyMaskUtils.maskHiddenProperties(fileset.properties(), hiddenProperties);
   }
 
   @Override

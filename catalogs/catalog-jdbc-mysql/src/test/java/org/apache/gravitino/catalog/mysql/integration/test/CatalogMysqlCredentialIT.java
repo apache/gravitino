@@ -166,11 +166,13 @@ public class CatalogMysqlCredentialIT extends BaseIT {
     Catalog catalog = metalake.loadCatalog(catalogName);
     Map<String, String> props = catalog.properties();
 
-    Assertions.assertFalse(
-        props.containsKey(JdbcConfig.USERNAME.getKey()),
-        "jdbc-user must be hidden in catalog properties");
-    Assertions.assertFalse(
-        props.containsKey(JdbcConfig.PASSWORD.getKey()),
-        "jdbc-password must be hidden in catalog properties");
+    Assertions.assertEquals(
+        org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
+        props.get(JdbcConfig.USERNAME.getKey()),
+        "jdbc-user must be masked in catalog properties");
+    Assertions.assertEquals(
+        org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
+        props.get(JdbcConfig.PASSWORD.getKey()),
+        "jdbc-password must be masked in catalog properties");
   }
 }
