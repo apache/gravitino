@@ -20,7 +20,6 @@
 package org.apache.gravitino.spark.connector.iceberg;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
@@ -57,25 +56,72 @@ public class TestIcebergRestOAuthConfig {
   }
 
   @Test
-  void testLegacyExplicitOAuthPropertiesDisableAutomaticReuse() {
+  void testExplicitOAuthCredentialOverridesReusedCredential() {
     SparkConf sparkConf = oauthSparkConf("https://identity.example.com", "oauth/token");
+    Map<String, String> explicit = ImmutableMap.of("credential", "irc:secret");
 
-    for (String property :
-        ImmutableSet.of(
-            "token",
-            "credential",
-            "scope",
-            "oauth2-server-uri",
-            "audience",
-            "resource",
-            "token-refresh-enabled",
-            "token-exchange-enabled")) {
-      Map<String, String> explicit = ImmutableMap.of(property, "explicit-value");
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
 
-      Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+    Assertions.assertEquals("oauth2", result.get(IcebergRestOAuthConfig.AUTH_TYPE));
+    Assertions.assertEquals("irc:secret", result.get(IcebergRestOAuthConfig.CREDENTIAL));
+    Assertions.assertEquals("openid", result.get(IcebergRestOAuthConfig.SCOPE));
+    Assertions.assertEquals(
+        "https://identity.example.com/oauth/token",
+        result.get(IcebergRestOAuthConfig.OAUTH2_SERVER_URI));
+  }
 
-      Assertions.assertEquals(explicit, result, property);
-    }
+  @Test
+  void testAllExplicitOAuthPropertiesOverrideReusedProperties() {
+    SparkConf sparkConf = oauthSparkConf("https://identity.example.com", "oauth/token");
+    Map<String, String> explicit =
+        ImmutableMap.of(
+            IcebergRestOAuthConfig.AUTH_TYPE,
+            "oauth2",
+            IcebergRestOAuthConfig.CREDENTIAL,
+            "irc:secret",
+            IcebergRestOAuthConfig.SCOPE,
+            "irc-scope",
+            IcebergRestOAuthConfig.OAUTH2_SERVER_URI,
+            "https://irc-identity.example.com/token");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals(explicit, result);
+  }
+
+  @Test
+  void testPartialOAuthConfigFailsWhenReuseIsUnavailable() {
+    SparkConf sparkConf = new SparkConf(false);
+    Map<String, String> explicit = ImmutableMap.of("credential", "irc:secret");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergRestOAuthConfig.resolve(sparkConf, explicit));
+
+    Assertions.assertTrue(exception.getMessage().contains("scope"));
+    Assertions.assertTrue(exception.getMessage().contains("oauth2-server-uri"));
+  }
+
+  @Test
+  void testNamespacedOAuthTokenIsKeptIndependent() {
+    SparkConf sparkConf = oauthSparkConf("https://identity.example.com", "oauth/token");
+    Map<String, String> explicit =
+        ImmutableMap.of("rest.auth.type", "oauth2", "rest.auth.oauth2.token", "irc-token");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals(explicit, result);
+  }
+
+  @Test
+  void testLegacyBearerTokenIsKeptIndependent() {
+    SparkConf sparkConf = oauthSparkConf("https://identity.example.com", "oauth/token");
+    Map<String, String> explicit = ImmutableMap.of("token", "irc-token");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals(explicit, result);
   }
 
   @Test

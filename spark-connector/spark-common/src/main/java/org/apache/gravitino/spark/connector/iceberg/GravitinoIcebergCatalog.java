@@ -25,6 +25,8 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
@@ -81,7 +83,11 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       }
     }
     String catalogBackendName = IcebergPropertiesUtils.getCatalogBackendName(properties);
-    Optional<String> icebergRestUri = resolveIcebergRestUri(properties);
+    Optional<String> icebergRestUri =
+        resolveIcebergRestUri(
+            properties,
+            key -> SparkSession.active().conf().get(key, null),
+            () -> GravitinoCatalogManager.get().getIcebergRestUri());
     Map<String, String> all;
     if (icebergRestUri.isPresent()) {
       all = buildAutoRoutedIcebergRestProperties(name, options, properties, icebergRestUri.get());
@@ -100,7 +106,10 @@ public class GravitinoIcebergCatalog extends BaseCatalog
    * backed catalogs are eligible; a catalog already configured with {@code catalog-backend=rest} or
    * {@code custom} is left untouched.
    */
-  private Optional<String> resolveIcebergRestUri(Map<String, String> properties) {
+  static Optional<String> resolveIcebergRestUri(
+      Map<String, String> properties,
+      UnaryOperator<String> sessionConfig,
+      Supplier<Optional<String>> endpointDiscovery) {
     String backend = properties.get(IcebergConstants.CATALOG_BACKEND);
     if (backend == null) {
       return Optional.empty();
@@ -114,12 +123,46 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       return Optional.empty();
     }
 
-    String manualUri =
-        SparkSession.active().conf().get(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI, null);
+    String routingEnabled =
+        sessionConfig.apply(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED);
+    if (StringUtils.isNotBlank(routingEnabled)
+        && !"true".equalsIgnoreCase(routingEnabled)
+        && !"false".equalsIgnoreCase(routingEnabled)) {
+      throw new IllegalArgumentException(
+          GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
+              + " must be true or false, but was: "
+              + routingEnabled);
+    }
+    if ("false".equalsIgnoreCase(routingEnabled)) {
+      return Optional.empty();
+    }
+
+    String manualUri = sessionConfig.apply(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI);
     if (StringUtils.isNotBlank(manualUri)) {
       return Optional.of(manualUri);
     }
-    return GravitinoCatalogManager.get().getIcebergRestUri();
+
+    Optional<String> discoveredUri;
+    try {
+      discoveredUri = endpointDiscovery.get();
+    } catch (RuntimeException e) {
+      throw new IllegalStateException(
+          "Failed to discover the Iceberg REST endpoint. Configure "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI
+              + ", use a Gravitino server that supports /api/system/iceberg-rest, or set "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
+              + "=false to use legacy Hive/JDBC backend translation.",
+          e);
+    }
+    if (!discoveredUri.isPresent()) {
+      throw new IllegalStateException(
+          "No Iceberg REST endpoint is available. Configure "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI
+              + ", use a Gravitino server that supports /api/system/iceberg-rest, or set "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
+              + "=false to use legacy Hive/JDBC backend translation.");
+    }
+    return discoveredUri;
   }
 
   private Map<String, String> buildAutoRoutedIcebergRestProperties(
