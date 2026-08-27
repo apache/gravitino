@@ -40,14 +40,18 @@ class TestFilesetMetaBaseSQLProvider {
   }
 
   @Test
-  void testUpdateUsesOnlyIdVersionAndActiveStateForCas() {
+  void testUpdateUsesVersionCasAndRejectsAnOccupiedSnapshotVersion() {
     String sql = PROVIDER.updateFilesetMeta(null, null);
     String whereClause = sql.substring(sql.indexOf(" WHERE"));
 
     Assertions.assertEquals(
         " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
             + " AND current_version = #{oldFilesetMeta.currentVersion}"
-            + " AND deleted_at = 0",
+            + " AND deleted_at = 0"
+            + " AND NOT EXISTS (SELECT 1 FROM fileset_version_info fv"
+            + " WHERE fv.fileset_id = #{oldFilesetMeta.filesetId}"
+            + " AND fv.version >= #{newFilesetMeta.currentVersion}"
+            + " AND fv.deleted_at = 0)",
         whereClause);
   }
 
@@ -57,15 +61,6 @@ class TestFilesetMetaBaseSQLProvider {
 
     Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
-  }
-
-  @Test
-  void testConflictReadLocksOnlyActiveMetadataRow() {
-    String sql = PROVIDER.selectFilesetMetaByIdForUpdate(null);
-
-    Assertions.assertTrue(sql.contains("WHERE fileset_id = #{filesetId} AND deleted_at = 0"));
-    Assertions.assertFalse(sql.contains("fileset_version_info"));
-    Assertions.assertTrue(sql.endsWith("FOR UPDATE"));
   }
 
   @Test

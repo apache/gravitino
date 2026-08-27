@@ -82,16 +82,6 @@ public class FilesetMetaSQLProviderFactory {
   }
 
   /**
-   * Returns SQL that locks an active fileset metadata row by ID.
-   *
-   * @param filesetId the fileset ID
-   * @return the locking select SQL
-   */
-  public static String selectFilesetMetaByIdForUpdate(@Param("filesetId") Long filesetId) {
-    return getProvider().selectFilesetMetaByIdForUpdate(filesetId);
-  }
-
-  /**
    * Returns SQL that selects an active fileset metadata row by schema and name.
    *
    * @param schemaId the schema ID
@@ -119,13 +109,6 @@ public class FilesetMetaSQLProviderFactory {
   public static String insertFilesetMetaOnDuplicateKeyUpdate(
       @Param("filesetMeta") FilesetPO filesetPO) {
     return getProvider().insertFilesetMetaOnDuplicateKeyUpdate(filesetPO);
-  }
-
-  public static String liftFilesetVersion(
-      @Param("filesetId") Long filesetId,
-      @Param("liftedVersion") Long liftedVersion,
-      @Param("currentVersion") Long currentVersion) {
-    return getProvider().liftFilesetVersion(filesetId, liftedVersion, currentVersion);
   }
 
   public static String updateFilesetMeta(

@@ -188,17 +188,6 @@ public interface FilesetMetaMapper {
   FilesetPO selectFilesetMetaById(@Param("filesetId") Long filesetId);
 
   /**
-   * Selects and exclusively locks an active fileset metadata row.
-   *
-   * @param filesetId the fileset ID
-   * @return the active fileset metadata, or {@code null} when it no longer exists
-   */
-  @SelectProvider(
-      type = FilesetMetaSQLProviderFactory.class,
-      method = "selectFilesetMetaByIdForUpdate")
-  FilesetPO selectFilesetMetaByIdForUpdate(@Param("filesetId") Long filesetId);
-
-  /**
    * Selects an active fileset metadata row by schema and name in the current transaction.
    *
    * @param schemaId the schema ID
@@ -246,20 +235,6 @@ public interface FilesetMetaMapper {
       type = FilesetMetaSQLProviderFactory.class,
       method = "insertFilesetMetaOnDuplicateKeyUpdate")
   void insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO);
-
-  /**
-   * Lifts the OCC version of a fileset to a value above every snapshot it still owns.
-   *
-   * @param filesetId the fileset whose version is lifted
-   * @param liftedVersion the version to store
-   * @param currentVersion the version the caller observed
-   * @return the number of rows updated
-   */
-  @UpdateProvider(type = FilesetMetaSQLProviderFactory.class, method = "liftFilesetVersion")
-  Integer liftFilesetVersion(
-      @Param("filesetId") Long filesetId,
-      @Param("liftedVersion") Long liftedVersion,
-      @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(type = FilesetMetaSQLProviderFactory.class, method = "updateFilesetMeta")
   Integer updateFilesetMeta(

@@ -784,7 +784,9 @@ public class TestFilesetMetaService extends TestJDBCBackend {
             .withFilesetId(initialPO.getFilesetId())
             .withVersion(initialPO.getCurrentVersion() + 1)
             .withFilesetComment("left behind by an older release")
-            .withLocationName(LOCATION_NAME_UNKNOWN)
+            // Use a different location name from the new snapshot. The legacy row therefore would
+            // not cause a unique-key collision; the metadata CAS itself must detect it.
+            .withLocationName("legacy-location")
             .withStorageLocation("/tmp-stale")
             .withDeletedAt(0L)
             .build();

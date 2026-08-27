@@ -224,27 +224,6 @@ public class FilesetMetaBaseSQLProvider {
   }
 
   /**
-   * Returns an active fileset metadata row and locks it for the current transaction.
-   *
-   * <p>This query reads {@code fileset_meta} alone. The regular ID lookup returns one joined row
-   * per storage location and would also lock version rows, neither of which is needed when
-   * classifying a failed metadata CAS.
-   *
-   * @param filesetId the fileset ID
-   * @return the locking select SQL
-   */
-  public String selectFilesetMetaByIdForUpdate(@Param("filesetId") Long filesetId) {
-    return "SELECT fileset_id as filesetId, fileset_name as filesetName,"
-        + " metalake_id as metalakeId, catalog_id as catalogId, schema_id as schemaId,"
-        + " type as type, audit_info as auditInfo,"
-        + " current_version as currentVersion, last_version as lastVersion,"
-        + " deleted_at as deletedAt"
-        + " FROM "
-        + META_TABLE_NAME
-        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0 FOR UPDATE";
-  }
-
-  /**
    * Returns the active fileset metadata row selected by its natural key.
    *
    * <p>An overwrite may match the natural key instead of the incoming ID. Reading the stored row
@@ -325,32 +304,13 @@ public class FilesetMetaBaseSQLProvider {
   }
 
   /**
-   * Returns SQL that lifts the OCC version of a fileset, checked against the observed version.
-   *
-   * @param filesetId the fileset whose version is lifted
-   * @param liftedVersion the version to store
-   * @param currentVersion the version observed by the caller
-   * @return the version-checked update SQL
-   */
-  public String liftFilesetVersion(
-      @Param("filesetId") Long filesetId,
-      @Param("liftedVersion") Long liftedVersion,
-      @Param("currentVersion") Long currentVersion) {
-    return "UPDATE "
-        + META_TABLE_NAME
-        + " SET current_version = #{liftedVersion},"
-        + " last_version = #{liftedVersion}"
-        + " WHERE fileset_id = #{filesetId}"
-        + " AND current_version = #{currentVersion}"
-        + " AND deleted_at = 0";
-  }
-
-  /**
-   * Returns SQL that updates a fileset only while its OCC version is unchanged.
+   * Returns SQL that updates a fileset only while its OCC version is unchanged and its next
+   * snapshot version is free.
    *
    * <p>The version is the concurrency token, so payload, name, and audit columns are deliberately
    * excluded from the predicate. This also detects change-then-change-back races that a full-row
-   * comparison would miss.
+   * comparison would miss. The snapshot check detects rows affected by the legacy overwrite bug
+   * without requiring a separate {@code MAX(version)} query on every normal alter.
    *
    * @param newFilesetPO the new fileset values
    * @param oldFilesetPO the fileset values and version observed by the caller
@@ -372,7 +332,12 @@ public class FilesetMetaBaseSQLProvider {
         + " deleted_at = #{newFilesetMeta.deletedAt}"
         + " WHERE fileset_id = #{oldFilesetMeta.filesetId}"
         + " AND current_version = #{oldFilesetMeta.currentVersion}"
-        + " AND deleted_at = 0";
+        + " AND deleted_at = 0"
+        + " AND NOT EXISTS (SELECT 1 FROM "
+        + VERSION_TABLE_NAME
+        + " fv WHERE fv.fileset_id = #{oldFilesetMeta.filesetId}"
+        + " AND fv.version >= #{newFilesetMeta.currentVersion}"
+        + " AND fv.deleted_at = 0)";
   }
 
   public String softDeleteFilesetMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
