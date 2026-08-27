@@ -231,16 +231,6 @@ public final class SecretPropertyUtils {
   }
 
   /**
-   * Applies each URN string into {@code properties} under the property key encoded in the URN.
-   *
-   * @param properties mutable entity properties
-   * @param secretUrns secret URNs whose property key is encoded in the URN
-   */
-  public static void applySecretUrns(Map<String, String> properties, List<SecretUrn> secretUrns) {
-    putSecretUrns(properties, secretUrns);
-  }
-
-  /**
    * Validates create-time {@code secretBindings} request shape.
    *
    * @param bindings property key → write-through binding
