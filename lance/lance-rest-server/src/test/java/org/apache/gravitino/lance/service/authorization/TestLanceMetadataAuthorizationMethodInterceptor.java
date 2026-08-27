@@ -48,10 +48,14 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.model.AlterTableAlterColumnsRequest;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.DeclareTableRequest;
+import org.lance.namespace.model.DeregisterTableRequest;
 import org.lance.namespace.model.DescribeTableRequest;
 import org.lance.namespace.model.DropNamespaceRequest;
+import org.lance.namespace.model.DropTableRequest;
 import org.lance.namespace.model.ErrorResponse;
 import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.TableExistsRequest;
@@ -379,6 +383,111 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
     when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
     assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "overwrite")));
+  }
+
+  @Test
+  void testColumnMutationRequiresModifyTable() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(dropColumnsInvocation(tableId())));
+    assertEquals(PROCEEDED, interceptor.invoke(alterColumnsInvocation(tableId())));
+
+    // Reading a table does not authorize changing its columns.
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.SELECT_TABLE);
+    MethodInvocation dropColumns = dropColumnsInvocation(tableId());
+    assertErrorResponse(interceptor.invoke(dropColumns), Response.Status.FORBIDDEN);
+    verify(dropColumns, never()).proceed();
+    MethodInvocation alterColumns = alterColumnsInvocation(tableId());
+    assertErrorResponse(interceptor.invoke(alterColumns), Response.Status.FORBIDDEN);
+    verify(alterColumns, never()).proceed();
+  }
+
+  @Test
+  void testExplicitDenyOverridesModifyTable() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
+    doAnswer(
+            invocation ->
+                Privilege.Name.MODIFY_TABLE.equals(invocation.<Privilege.Name>getArgument(3)))
+        .when(authorizer)
+        .deny(any(), any(), any(), any(), any());
+
+    MethodInvocation dropColumns = dropColumnsInvocation(tableId());
+    assertErrorResponse(interceptor.invoke(dropColumns), Response.Status.FORBIDDEN);
+    verify(dropColumns, never()).proceed();
+    MethodInvocation alterColumns = alterColumnsInvocation(tableId());
+    assertErrorResponse(interceptor.invoke(alterColumns), Response.Status.FORBIDDEN);
+    verify(alterColumns, never()).proceed();
+  }
+
+  @Test
+  void testRemovingATableRequiresOwnership() throws Throwable {
+    // MODIFY_TABLE alters a table but never removes it.
+    allow(
+        Privilege.Name.USE_CATALOG,
+        Privilege.Name.USE_SCHEMA,
+        Privilege.Name.MODIFY_TABLE,
+        Privilege.Name.CREATE_TABLE);
+    MethodInvocation drop = dropTableInvocation(tableId());
+    assertErrorResponse(interceptor.invoke(drop), Response.Status.FORBIDDEN);
+    verify(drop, never()).proceed();
+    MethodInvocation deregister = deregisterTableInvocation(tableId());
+    assertErrorResponse(interceptor.invoke(deregister), Response.Status.FORBIDDEN);
+    verify(deregister, never()).proceed();
+
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    assertEquals(PROCEEDED, interceptor.invoke(dropTableInvocation(tableId())));
+    assertEquals(PROCEEDED, interceptor.invoke(deregisterTableInvocation(tableId())));
+  }
+
+  @Test
+  void testMutationExpressionsRejectIdentifiersOfTheWrongDepth() throws Throwable {
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.values());
+
+    // A schema identifier must not be authorized as if it addressed a table.
+    assertErrorResponse(
+        interceptor.invoke(dropTableInvocation(CATALOG + "$" + SCHEMA)), Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(dropColumnsInvocation(CATALOG)), Response.Status.FORBIDDEN);
+  }
+
+  private MethodInvocation dropTableInvocation(String tableId) throws Throwable {
+    Method method =
+        LanceTableOperations.class.getMethod(
+            "dropTable", String.class, String.class, HttpHeaders.class, DropTableRequest.class);
+    return invocation(method, tableId, "$", null, new DropTableRequest());
+  }
+
+  private MethodInvocation deregisterTableInvocation(String tableId) throws Throwable {
+    Method method =
+        LanceTableOperations.class.getMethod(
+            "deregisterTable",
+            String.class,
+            String.class,
+            HttpHeaders.class,
+            DeregisterTableRequest.class);
+    return invocation(method, tableId, "$", null, new DeregisterTableRequest());
+  }
+
+  private MethodInvocation dropColumnsInvocation(String tableId) throws Throwable {
+    Method method =
+        LanceTableOperations.class.getMethod(
+            "dropColumns",
+            String.class,
+            String.class,
+            HttpHeaders.class,
+            AlterTableDropColumnsRequest.class);
+    return invocation(method, tableId, "$", null, new AlterTableDropColumnsRequest());
+  }
+
+  private MethodInvocation alterColumnsInvocation(String tableId) throws Throwable {
+    Method method =
+        LanceTableOperations.class.getMethod(
+            "alterColumns",
+            String.class,
+            String.class,
+            HttpHeaders.class,
+            AlterTableAlterColumnsRequest.class);
+    return invocation(method, tableId, "$", null, new AlterTableAlterColumnsRequest());
   }
 
   private MethodInvocation createTableInvocation(String tableId, String mode) throws Throwable {

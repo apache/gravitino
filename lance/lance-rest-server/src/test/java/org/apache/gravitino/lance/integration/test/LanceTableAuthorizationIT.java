@@ -28,6 +28,9 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
+import org.apache.arrow.vector.types.pojo.ArrowType;
+import org.apache.arrow.vector.types.pojo.Field;
+import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.authorization.Privileges;
@@ -35,24 +38,28 @@ import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.integration.test.util.BaseIT;
+import org.apache.gravitino.lance.common.utils.ArrowUtils;
+import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.lance.namespace.model.AlterTableDropColumnsRequest;
 import org.lance.namespace.model.CreateNamespaceRequest;
 import org.lance.namespace.model.DeclareTableRequest;
 import org.lance.namespace.model.DescribeTableResponse;
 import org.lance.namespace.model.ListTablesResponse;
 import org.lance.namespace.model.RegisterTableRequest;
 
-/** Verifies that read-only Lance REST table operations are authorized and filtered. */
+/** Verifies that Lance REST table operations are authorized and filtered. */
 public class LanceTableAuthorizationIT extends BaseIT {
 
   private static final String ADMIN = "lance_table_authz_admin";
   private static final String READER = "lance_table_authz_reader";
   private static final String PROBER = "lance_table_authz_prober";
+  private static final String MUTATOR = "lance_table_authz_mutator";
   private static final String CATALOG = "lance_table_authz_catalog";
   private static final String SCHEMA = "lance_table_authz_schema";
   // Tables created by the write tests live in their own schema, so the listing tests keep asserting
@@ -65,6 +72,9 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String VISIBLE_TABLE = "b_visible_table";
   private static final String MISSING_TABLE = "c_missing_table";
   private static final String PROBER_TABLE = "d_prober_table";
+  private static final String MUTABLE_TABLE = "e_mutable_table";
+  private static final String DEREGISTER_TABLE = "f_deregister_table";
+  private static final String DROP_TABLE = "g_drop_table";
   private static final String DELIMITER = ".";
 
   @TempDir private static Path tempDir;
@@ -85,12 +95,14 @@ public class LanceTableAuthorizationIT extends BaseIT {
     GravitinoMetalake metalake = client.loadMetalake(metalakeName);
     metalake.addUser(READER);
     metalake.addUser(PROBER);
+    metalake.addUser(MUTATOR);
 
     createNamespace(CATALOG);
     createNamespace(id(CATALOG, SCHEMA));
     createNamespace(id(CATALOG, WRITE_SCHEMA));
     registerTable(VISIBLE_TABLE);
     registerTable(HIDDEN_TABLE);
+    createTable(WRITE_SCHEMA, MUTABLE_TABLE);
 
     SecurableObject catalogScope = SecurableObjects.ofCatalog(CATALOG, new ArrayList<>());
     SecurableObject schemaScope =
@@ -129,6 +141,25 @@ public class LanceTableAuthorizationIT extends BaseIT {
                 WRITE_SCHEMA,
                 new ArrayList<>(
                     List.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow())))));
+
+    // The mutator may change tables it does not own, which must not let it remove them.
+    grant(
+        metalake,
+        "lance_table_authz_mutator_role",
+        MUTATOR,
+        List.of(
+            SecurableObjects.ofCatalog(
+                CATALOG, new ArrayList<>(List.of(Privileges.UseCatalog.allow()))),
+            SecurableObjects.ofSchema(
+                catalogScope,
+                SCHEMA,
+                new ArrayList<>(
+                    List.of(Privileges.UseSchema.allow(), Privileges.ModifyTable.allow()))),
+            SecurableObjects.ofSchema(
+                catalogScope,
+                WRITE_SCHEMA,
+                new ArrayList<>(
+                    List.of(Privileges.UseSchema.allow(), Privileges.ModifyTable.allow())))));
   }
 
   @AfterAll
@@ -202,6 +233,69 @@ public class LanceTableAuthorizationIT extends BaseIT {
     Assertions.assertEquals(location(HIDDEN_TABLE), describedLocation(ADMIN, HIDDEN_TABLE));
   }
 
+  @Test
+  public void testColumnMutationRequiresModifyTable() throws Exception {
+    // Selecting a table does not authorize changing its columns.
+    assertStatus(403, dropColumns(READER, MUTABLE_TABLE, "value"));
+    assertStatus(403, alterColumns(READER, MUTABLE_TABLE, "value", "renamed"));
+    Assertions.assertEquals(List.of("id", "value"), describedColumns(MUTABLE_TABLE));
+
+    // An inherited MODIFY_TABLE grant authorizes both mutations, and each reaches the metadata
+    // store rather than merely passing the authorization interceptor.
+    assertStatus(200, alterColumns(MUTATOR, MUTABLE_TABLE, "value", "renamed"));
+    Assertions.assertEquals(List.of("id", "renamed"), describedColumns(MUTABLE_TABLE));
+    assertStatus(200, dropColumns(MUTATOR, MUTABLE_TABLE, "renamed"));
+    Assertions.assertEquals(List.of("id"), describedColumns(MUTABLE_TABLE));
+
+    assertStatus(404, dropColumns(MUTATOR, MISSING_TABLE, "value"));
+  }
+
+  @Test
+  public void testRemovingATableRequiresOwnership() throws Exception {
+    // MODIFY_TABLE alters a table but never removes it.
+    assertStatus(403, table(MUTATOR, VISIBLE_TABLE, "deregister"));
+    assertStatus(403, table(MUTATOR, VISIBLE_TABLE, "drop"));
+    // The denied requests left the table in place.
+    assertStatus(200, table(ADMIN, VISIBLE_TABLE, "describe"));
+
+    // Creating assigns ownership, so the creator may use either removal operation.
+    assertStatus(
+        200, register(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, null, location(DEREGISTER_TABLE)));
+    assertStatus(200, register(PROBER, WRITE_SCHEMA, DROP_TABLE, null, location(DROP_TABLE)));
+    assertStatus(200, table(PROBER, WRITE_SCHEMA, DEREGISTER_TABLE, "deregister"));
+    assertStatus(200, table(PROBER, WRITE_SCHEMA, DROP_TABLE, "drop"));
+    assertStatus(404, table(ADMIN, WRITE_SCHEMA, DEREGISTER_TABLE, "describe"));
+    assertStatus(404, table(ADMIN, WRITE_SCHEMA, DROP_TABLE, "describe"));
+  }
+
+  @Test
+  public void testMutationConcealsTablesTheCallerMayNotSee() throws Exception {
+    // Both are forbidden for the reader, so the endpoint cannot be used to probe for existence.
+    HttpResponse<String> denied = table(READER, HIDDEN_TABLE, "deregister");
+    assertStatus(403, denied);
+    Assertions.assertFalse(denied.body().contains(location(HIDDEN_TABLE)), denied.body());
+    assertStatus(403, table(READER, MISSING_TABLE, "deregister"));
+    assertStatus(200, table(ADMIN, HIDDEN_TABLE, "describe"));
+    assertStatus(404, table(ADMIN, MISSING_TABLE, "deregister"));
+  }
+
+  private HttpResponse<String> dropColumns(String user, String tableName, String column)
+      throws Exception {
+    AlterTableDropColumnsRequest body = new AlterTableDropColumnsRequest();
+    body.setColumns(List.of(column));
+    return send(user, "/v1/table/" + id(CATALOG, WRITE_SCHEMA, tableName) + "/drop_columns", body);
+  }
+
+  private HttpResponse<String> alterColumns(
+      String user, String tableName, String column, String renamedColumn) throws Exception {
+    // Sent as raw JSON because the generated request model serializes the rename field in a shape
+    // the server does not accept, which would fail before authorization runs.
+    return sendRaw(
+        user,
+        "/v1/table/" + id(CATALOG, WRITE_SCHEMA, tableName) + "/alter_columns",
+        "{\"alterations\":[{\"path\":\"%s\",\"rename\":\"%s\"}]}".formatted(column, renamedColumn));
+  }
+
   private List<String> listTables(String user, int limit) throws Exception {
     HttpRequest request =
         request(user, "/v1/namespace/" + id(CATALOG, SCHEMA) + "/table/list", "&limit=" + limit)
@@ -244,6 +338,21 @@ public class LanceTableAuthorizationIT extends BaseIT {
     assertStatus(200, register(ADMIN, SCHEMA, tableName, null, location(tableName)));
   }
 
+  private void createTable(String schemaName, String tableName) throws Exception {
+    Schema schema =
+        new Schema(
+            List.of(
+                Field.nullable("id", new ArrowType.Int(32, true)),
+                Field.nullable("value", new ArrowType.Utf8())));
+    HttpRequest request =
+        request(ADMIN, "/v1/table/" + id(CATALOG, schemaName, tableName) + "/create", "")
+            .setHeader("Content-Type", "application/vnd.apache.arrow.stream")
+            .setHeader(LanceConstants.LANCE_TABLE_LOCATION_HEADER, location(tableName))
+            .POST(HttpRequest.BodyPublishers.ofByteArray(ArrowUtils.generateIpcStream(schema)))
+            .build();
+    assertStatus(200, httpClient.send(request, HttpResponse.BodyHandlers.ofString()));
+  }
+
   private HttpResponse<String> register(
       String user, String schema, String tableName, String mode, String location) throws Exception {
     RegisterTableRequest body = new RegisterTableRequest();
@@ -262,11 +371,25 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private String describedLocation(String user, String tableName) throws Exception {
-    HttpResponse<String> response = table(user, tableName, "describe");
+    return describe(user, tableName).getLocation();
+  }
+
+  private List<String> describedColumns(String tableName) throws Exception {
+    return describe(ADMIN, WRITE_SCHEMA, tableName).getSchema().getFields().stream()
+        .map(field -> field.getName())
+        .toList();
+  }
+
+  private DescribeTableResponse describe(String user, String tableName) throws Exception {
+    return describe(user, SCHEMA, tableName);
+  }
+
+  private DescribeTableResponse describe(String user, String schemaName, String tableName)
+      throws Exception {
+    HttpResponse<String> response = table(user, schemaName, tableName, "describe");
     assertStatus(200, response);
     return ObjectMapperProvider.objectMapper()
-        .readValue(response.body(), DescribeTableResponse.class)
-        .getLocation();
+        .readValue(response.body(), DescribeTableResponse.class);
   }
 
   private HttpResponse<String> table(String user, String tableName, String operation)
@@ -284,12 +407,12 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private HttpResponse<String> send(String user, String path, Object body) throws Exception {
+    return sendRaw(user, path, ObjectMapperProvider.objectMapper().writeValueAsString(body));
+  }
+
+  private HttpResponse<String> sendRaw(String user, String path, String body) throws Exception {
     HttpRequest request =
-        request(user, path, "")
-            .POST(
-                HttpRequest.BodyPublishers.ofString(
-                    ObjectMapperProvider.objectMapper().writeValueAsString(body)))
-            .build();
+        request(user, path, "").POST(HttpRequest.BodyPublishers.ofString(body)).build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 

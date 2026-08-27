@@ -23,6 +23,8 @@ import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCAT
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.DROP_TABLE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.READ_TABLE_AUTHORIZATION_EXPRESSION;
 
@@ -221,6 +223,7 @@ public class LanceTableOperations {
   @Path("/deregister")
   @Timed(name = "deregister-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "deregister-table", absolute = true)
+  @AuthorizationExpression(expression = DROP_TABLE_AUTHORIZATION_EXPRESSION)
   public Response deregisterTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -263,6 +266,7 @@ public class LanceTableOperations {
   @Path("/drop")
   @Timed(name = "drop-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-table", absolute = true)
+  @AuthorizationExpression(expression = DROP_TABLE_AUTHORIZATION_EXPRESSION)
   public Response dropTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -281,6 +285,7 @@ public class LanceTableOperations {
   @Path("/drop_columns")
   @Timed(name = "drop-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-columns", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
   public Response dropColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
@@ -304,6 +309,7 @@ public class LanceTableOperations {
   @Path("/alter_columns")
   @Timed(name = "alter-columns." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-columns", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_TABLE_AUTHORIZATION_EXPRESSION)
   public Response alterColumns(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,
