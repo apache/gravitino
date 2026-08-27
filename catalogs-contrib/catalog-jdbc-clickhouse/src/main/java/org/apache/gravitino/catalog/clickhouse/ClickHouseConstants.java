@@ -48,6 +48,9 @@ public class ClickHouseConstants {
     public static final String ENGINE_UPPER = "ENGINE";
     public static final String SETTINGS_PREFIX = "settings.";
     public static final String GRAPHITE_CONFIG = "graphite.config";
+
+    /** Parameters for supported parameterized MergeTree engines, without outer parentheses. */
+    public static final String ENGINE_PARAMETERS = "engine_parameters";
   }
 
   public static final class IndexConstants {
