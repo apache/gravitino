@@ -21,6 +21,7 @@ package org.apache.gravitino.lance.service.authorization;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.never;
@@ -45,6 +46,8 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.DropNamespaceRequest;
 import org.lance.namespace.model.ErrorResponse;
 import org.mockito.MockedStatic;
 
@@ -152,10 +155,88 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
     assertErrorResponse(interceptor.invoke(operation), Response.Status.BAD_REQUEST);
   }
 
+  @Test
+  void testCreateNamespaceRequiresCreatePrivilegeAtEachLevel() throws Throwable {
+    allow(Privilege.Name.CREATE_CATALOG);
+    assertEquals(PROCEEDED, interceptor.invoke(createInvocation(CATALOG, "$", "create")));
+    assertErrorResponse(
+        interceptor.invoke(createInvocation(CATALOG + "$" + SCHEMA, "$", "create")),
+        Response.Status.FORBIDDEN);
+
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
+    assertEquals(
+        PROCEEDED, interceptor.invoke(createInvocation(CATALOG + "$" + SCHEMA, "$", "create")));
+    assertErrorResponse(
+        interceptor.invoke(createInvocation(CATALOG, "$", "create")), Response.Status.FORBIDDEN);
+  }
+
+  @Test
+  void testCreatePrivilegeCannotOverwriteAnExistingNamespace() throws Throwable {
+    allow(Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
+
+    // The same privileges that authorize a create must not authorize an overwrite, which replaces
+    // the properties of a namespace the caller does not own.
+    assertEquals(PROCEEDED, interceptor.invoke(createInvocation(CATALOG, "$", "exist_ok")));
+    assertErrorResponse(
+        interceptor.invoke(createInvocation(CATALOG, "$", "overwrite")), Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(createInvocation(CATALOG + "$" + SCHEMA, "$", "OVERWRITE")),
+        Response.Status.FORBIDDEN);
+  }
+
+  @Test
+  void testOwnerMayOverwriteAndDropNamespaces() throws Throwable {
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.USE_CATALOG);
+
+    assertEquals(PROCEEDED, interceptor.invoke(createInvocation(CATALOG, "$", "overwrite")));
+    assertEquals(
+        PROCEEDED, interceptor.invoke(createInvocation(CATALOG + "$" + SCHEMA, "$", "overwrite")));
+    assertEquals(PROCEEDED, interceptor.invoke(dropInvocation(CATALOG, "$")));
+    assertEquals(PROCEEDED, interceptor.invoke(dropInvocation(CATALOG + "$" + SCHEMA, "$")));
+  }
+
+  @Test
+  void testDropNamespaceRequiresOwnership() throws Throwable {
+    allow(
+        Privilege.Name.USE_CATALOG,
+        Privilege.Name.CREATE_CATALOG,
+        Privilege.Name.CREATE_SCHEMA,
+        Privilege.Name.USE_SCHEMA);
+
+    MethodInvocation dropCatalog = dropInvocation(CATALOG, "$");
+    assertErrorResponse(interceptor.invoke(dropCatalog), Response.Status.FORBIDDEN);
+    verify(dropCatalog, never()).proceed();
+
+    MethodInvocation dropSchema = dropInvocation(CATALOG + "$" + SCHEMA, "$");
+    assertErrorResponse(interceptor.invoke(dropSchema), Response.Status.FORBIDDEN);
+    verify(dropSchema, never()).proceed();
+  }
+
+  private MethodInvocation createInvocation(String namespaceId, String delimiter, String mode)
+      throws Throwable {
+    Method method =
+        LanceNamespaceOperations.class.getMethod(
+            "createNamespace", String.class, String.class, CreateNamespaceRequest.class);
+    CreateNamespaceRequest request = new CreateNamespaceRequest();
+    request.setMode(mode);
+    return invocation(method, namespaceId, delimiter, request);
+  }
+
+  private MethodInvocation dropInvocation(String namespaceId, String delimiter) throws Throwable {
+    Method method =
+        LanceNamespaceOperations.class.getMethod(
+            "dropNamespace", String.class, String.class, DropNamespaceRequest.class);
+    return invocation(method, namespaceId, delimiter, new DropNamespaceRequest());
+  }
+
   private void allow(Privilege.Name... privileges) {
     Set<Privilege.Name> allowed = Set.of(privileges);
-    when(authorizer.authorize(any(), any(), any(), any(), any()))
-        .thenAnswer(invocation -> allowed.contains(invocation.getArgument(3)));
+    // doAnswer, not when(...): a test that narrows the allowed privileges calls this twice, and
+    // when(...) would invoke the already-stubbed answer with null arguments.
+    doAnswer(invocation -> allowed.contains(invocation.getArgument(3)))
+        .when(authorizer)
+        .authorize(any(), any(), any(), any(), any());
   }
 
   private Method namespaceMethod(String name) throws NoSuchMethodException {
