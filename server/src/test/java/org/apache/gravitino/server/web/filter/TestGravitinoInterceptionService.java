@@ -134,6 +134,38 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+  public void testNoAuthResponseUsesFullMetadataNameIdentifier() throws Exception {
+    MethodInterceptor methodInterceptor =
+        new GravitinoInterceptionService()
+            .getMethodInterceptors(TestOperations.class.getMethods()[0])
+            .get(0);
+    Method buildNoAuthResponse =
+        methodInterceptor
+            .getClass()
+            .getDeclaredMethod(
+                "buildNoAuthResponse",
+                String.class,
+                NameIdentifier.class,
+                String.class,
+                String.class);
+    buildNoAuthResponse.setAccessible(true);
+
+    Response response =
+        (Response)
+            buildNoAuthResponse.invoke(
+                methodInterceptor,
+                "",
+                NameIdentifier.of("testMetalake", "testCatalog", "testSchema", "testTable"),
+                "tester",
+                "loadTable");
+
+    assertEquals(
+        "User 'tester' is not authorized to perform operation 'loadTable' on metadata "
+            + "'testMetalake.testCatalog.testSchema.testTable'",
+        ((ErrorResponse) response.getEntity()).getMessage());
+  }
+
+  @Test
   public void testRejectsUnheldActiveRolesWith403() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
