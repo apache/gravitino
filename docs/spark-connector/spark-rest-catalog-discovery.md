@@ -30,14 +30,14 @@ does not package another copy of that client in its Spark connector runtime.
 Configure the discovery plugin and the Lance REST server URI:
 
 ```text
-spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin
+spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin
 spark.sql.gravitino.lanceREST.uri=http://127.0.0.1:9101/lance
 ```
 
 When the regular Gravitino Spark plugin is also required, the discovery plugin must be listed first:
 
 ```text
-spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin,\
+spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin,\
               org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin
 ```
 
@@ -79,8 +79,8 @@ to come from the Lance REST service or from explicit Spark catalog properties.
 
 By default, every advertised catalog is registered under its advertised name. To filter or rename
 catalogs, implement
-`org.apache.gravitino.spark.connector.plugin.CatalogRegistrationPolicy` with a public no-argument
-constructor and configure its class name:
+`org.apache.gravitino.spark.connector.plugin.restcatalog.CatalogRegistrationPolicy` with a public
+no-argument constructor and configure its class name:
 
 ```text
 spark.sql.gravitino.REST.registrationPolicy=com.example.MyCatalogRegistrationPolicy

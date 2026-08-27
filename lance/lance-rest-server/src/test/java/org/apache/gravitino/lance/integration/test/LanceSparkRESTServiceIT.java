@@ -46,7 +46,7 @@ import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
 import org.apache.gravitino.rel.Table;
-import org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin;
+import org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.AnalysisException;
 import org.apache.spark.sql.Row;

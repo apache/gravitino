@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.spark.connector.plugin;
+package org.apache.gravitino.spark.connector.plugin.restcatalog;
 
 import java.util.List;
 import java.util.Map;
