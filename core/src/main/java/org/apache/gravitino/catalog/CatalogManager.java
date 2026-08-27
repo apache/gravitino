@@ -53,6 +53,7 @@ import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -367,7 +368,9 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private final SecretManager secretManager;
 
-  private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
+  // Copy-on-write: listeners may be registered while the cache's removal listener (running on a
+  // cache executor thread) is iterating this list.
+  private final List<Consumer<NameIdentifier>> removalListeners = new CopyOnWriteArrayList<>();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
 
@@ -1359,8 +1362,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Get the resolved properties (filter out the hidden properties and add some required default
-   * properties) of the catalog entity.
+   * Get the resolved properties (mask hidden properties and add some required default properties)
+   * of the catalog entity.
    *
    * @param entity The catalog entity.
    * @return The resolved properties.

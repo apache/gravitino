@@ -34,6 +34,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.audit.CallerContext;
 import org.apache.gravitino.audit.FilesetAuditConstants;
 import org.apache.gravitino.audit.FilesetDataOperation;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.FilesetAlreadyExistsException;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.file.Fileset;
@@ -347,7 +348,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
       Fileset fileset =
           filesets.createMultipleLocationFileset(
               ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
-      Assertions.assertFalse(fileset.properties().containsKey("k2"));
+      Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, fileset.properties().get("k2"));
 
       Fileset stored =
           catalogManager
@@ -371,6 +372,77 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
                   ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of()));
       Assertions.assertTrue(filesets.dropFileset(ident));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+    }
+  }
+
+  @Test
+  public void testCreateAndAlterFilesetRejectMaskedPlaceholder() {
+    Namespace filesetNs = Namespace.of(metalake, catalog, "schema_masked_fileset");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(filesetNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier filesetIdent = NameIdentifier.of(filesetNs, "fileset_masked");
+    Map<String, String> createProps =
+        ImmutableMap.of("k1", "v1", "k2", HiddenPropertyMaskUtils.MASKED_VALUE);
+    testMaskedPlaceholderRejected(
+        () ->
+            filesetOperationDispatcher.createFileset(
+                filesetIdent, "comment", Fileset.Type.MANAGED, "loc", createProps),
+        "k2");
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    filesetOperationDispatcher.createFileset(
+        filesetIdent, "comment", Fileset.Type.MANAGED, "loc", props);
+    testMaskedPlaceholderRejected(
+        () ->
+            filesetOperationDispatcher.alterFileset(
+                filesetIdent,
+                FilesetChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
+        "k3");
+  }
+
+  @Test
+  public void testAlterRemovePropertyDeletesWriteThroughSecret() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(9100L);
+      IdGenerator ids = nextId::getAndIncrement;
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets, filesets)
+          .createSchema(
+              NameIdentifier.of(metalake, catalog, "schema_secret_fileset_remove"),
+              "comment",
+              ImmutableMap.of("k1", "v1"));
+
+      NameIdentifier ident =
+          NameIdentifier.of(
+              metalake, catalog, "schema_secret_fileset_remove", "fileset_secret_remove");
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+      Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
+      Map<String, String> props = ImmutableMap.of("k1", "v1");
+      long entityId = nextId.get();
+      filesets.createMultipleLocationFileset(
+          ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
+
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+
+      filesets.alterFileset(ident, FilesetChange.removeProperty("k2"));
+
+      Fileset stored =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident));
+      Assertions.assertFalse(stored.properties().containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+
+      Assertions.assertTrue(filesets.dropFileset(ident));
     }
   }
 

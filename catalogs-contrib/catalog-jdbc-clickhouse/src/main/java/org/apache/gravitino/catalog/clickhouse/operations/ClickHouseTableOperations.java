@@ -40,14 +40,17 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -92,6 +95,13 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
 
+  private static final Set<ENGINE> GENERIC_ENGINE_PARAMETER_ENGINES =
+      Collections.unmodifiableSet(
+          EnumSet.of(
+              ENGINE.REPLACINGMERGETREE,
+              ENGINE.SUMMINGMERGETREE,
+              ENGINE.COLLAPSINGMERGETREE,
+              ENGINE.VERSIONEDCOLLAPSINGMERGETREE));
   private static final Pattern PARTITION_BY_PATTERN =
       Pattern.compile(
           "(?is)\\bPARTITION\\s+BY\\s*(.+?)(?=\\bORDER\\s+BY\\b|\\bPRIMARY\\s+KEY\\b|\\bSAMPLE\\s+BY\\b|\\bTTL\\b|\\bSETTINGS\\b|\\bCOMMENT\\b|$)");
@@ -438,6 +448,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
 
+    String engineParams = StringUtils.trim(properties.get(TableConstants.ENGINE_PARAMETERS));
+    validateEngineParameters(engine, engineParams);
+
     if (engine == ENGINE.DISTRIBUTED) {
       handleDistributeTable(properties, sqlBuilder, columns);
       return engine;
@@ -449,13 +462,16 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           StringUtils.isNotBlank(config),
           "GraphiteMergeTree requires '%s' property referencing a <graphite_rollup> config element",
           TableConstants.GRAPHITE_CONFIG);
-      // Escape single quotes to prevent SQL injection
-      String escapedConfig = config.replace("'", "''");
+      String escapedConfig = JdbcConnectorUtils.escapeSqlLiteral(config, '\'');
       sqlBuilder.append("\n ENGINE = GraphiteMergeTree('%s')".formatted(escapedConfig));
       return engine;
     }
 
-    sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
+    if (StringUtils.isNotBlank(engineParams)) {
+      sqlBuilder.append("\n ENGINE = %s(%s)".formatted(engine.getValue(), engineParams));
+    } else {
+      sqlBuilder.append("\n ENGINE = %s".formatted(engine.getValue()));
+    }
     return engine;
   }
 
@@ -684,44 +700,53 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         while (resultSet.next()) {
           String name = resultSet.getString("name");
           if (Objects.equals(name, tableName)) {
-            return Collections.unmodifiableMap(
-                new HashMap<String, String>() {
-                  {
-                    // Extract cluster name embedded in the COMMENT at create time.
-                    // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
-                    String storedComment = resultSet.getString(COMMENT);
-                    String clusterName =
-                        ClickHouseClusterUtils.extractClusterFromComment(storedComment);
-                    put(COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
-                    String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
-                    put(GRAVITINO_ENGINE_KEY, engine);
-                    if (StringUtils.isNotBlank(clusterName)) {
-                      put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
-                      put(ClusterConstants.CLUSTER_NAME, clusterName);
-                    } else {
-                      put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
-                    }
+            Map<String, String> tableProperties = new HashMap<>();
 
-                    if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
-                      String engineFull = resultSet.getString("engine_full");
-                      Matcher distributedEngineMatcher =
-                          DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
-                      if (distributedEngineMatcher.matches()) {
-                        String distributedClusterName = unquote(distributedEngineMatcher.group(1));
-                        put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
-                        put(
-                            DistributedTableConstants.REMOTE_DATABASE,
-                            unquote(distributedEngineMatcher.group(2)));
-                        put(
-                            DistributedTableConstants.REMOTE_TABLE,
-                            unquote(distributedEngineMatcher.group(3)));
-                        put(
-                            DistributedTableConstants.SHARDING_KEY,
-                            StringUtils.trim(distributedEngineMatcher.group(4)));
-                      }
-                    }
-                  }
-                });
+            // Extract cluster name embedded in the COMMENT at create time.
+            // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
+            String storedComment = resultSet.getString(COMMENT);
+            String clusterName = ClickHouseClusterUtils.extractClusterFromComment(storedComment);
+            tableProperties.put(
+                COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
+            String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
+            String engineFull = resultSet.getString("engine_full");
+            tableProperties.put(GRAVITINO_ENGINE_KEY, engine);
+            if (StringUtils.isNotBlank(clusterName)) {
+              tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+              tableProperties.put(ClusterConstants.CLUSTER_NAME, clusterName);
+            } else {
+              tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+            }
+
+            if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
+              Matcher distributedEngineMatcher =
+                  DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
+              if (distributedEngineMatcher.matches()) {
+                String distributedClusterName = unquote(distributedEngineMatcher.group(1));
+                tableProperties.put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
+                tableProperties.put(
+                    DistributedTableConstants.REMOTE_DATABASE,
+                    unquote(distributedEngineMatcher.group(2)));
+                tableProperties.put(
+                    DistributedTableConstants.REMOTE_TABLE,
+                    unquote(distributedEngineMatcher.group(3)));
+                tableProperties.put(
+                    DistributedTableConstants.SHARDING_KEY,
+                    StringUtils.trim(distributedEngineMatcher.group(4)));
+              }
+            } else if (StringUtils.equalsIgnoreCase(engine, ENGINE.GRAPHITEMERGETREE.getValue())) {
+              String graphiteConfig = extractGraphiteConfig(engineFull);
+              if (StringUtils.isNotBlank(graphiteConfig)) {
+                tableProperties.put(TableConstants.GRAPHITE_CONFIG, graphiteConfig);
+              }
+            } else if (isGenericEngineParameterEngine(engine)) {
+              String engineParams = extractEngineParams(engine, engineFull);
+              if (StringUtils.isNotBlank(engineParams)) {
+                tableProperties.put(TableConstants.ENGINE_PARAMETERS, engineParams);
+              }
+            }
+
+            return Collections.unmodifiableMap(tableProperties);
           }
         }
 
@@ -1670,6 +1695,144 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
         StringUtils.isNotBlank(indexName), "Data skipping index name must not be blank");
     return "INDEX %s %s TYPE %s GRANULARITY %d"
         .formatted(quoteIdentifier(indexName), fieldStr, typeName, granularity);
+  }
+
+  /**
+   * Extracts engine parameters from the {@code engine_full} column of {@code system.tables}.
+   *
+   * <p>Matches the outer parentheses while ignoring parentheses inside quoted strings and
+   * identifiers. For example, {@code SummingMergeTree((a, b))} returns {@code "(a, b)"}, and {@code
+   * ReplacingMergeTree(`ver)`)} returns {@code "`ver)`"}. Engines without parameters return {@code
+   * null}.
+   */
+  @VisibleForTesting
+  @Nullable
+  static String extractEngineParams(@Nullable String engineName, @Nullable String engineFull) {
+    if (StringUtils.isBlank(engineFull) || StringUtils.isBlank(engineName)) {
+      return null;
+    }
+
+    String normalizedEngineName = StringUtils.trim(engineName);
+    String normalizedEngineFull = StringUtils.trim(engineFull);
+    if (!StringUtils.startsWithIgnoreCase(normalizedEngineFull, normalizedEngineName)) {
+      return null;
+    }
+
+    int paramsStart = normalizedEngineName.length();
+    while (paramsStart < normalizedEngineFull.length()
+        && Character.isWhitespace(normalizedEngineFull.charAt(paramsStart))) {
+      paramsStart++;
+    }
+    if (paramsStart >= normalizedEngineFull.length()
+        || normalizedEngineFull.charAt(paramsStart) != '(') {
+      return null;
+    }
+
+    int paramsEnd = findMatchingParenthesis(normalizedEngineFull, paramsStart);
+    if (paramsEnd < 0) {
+      return null;
+    }
+    return normalizedEngineFull.substring(paramsStart + 1, paramsEnd).trim();
+  }
+
+  private static void validateEngineParameters(ENGINE engine, @Nullable String engineParams) {
+    if (StringUtils.isBlank(engineParams)) {
+      return;
+    }
+
+    if (engine == ENGINE.GRAPHITEMERGETREE) {
+      throw new IllegalArgumentException(
+          "'engine_parameters' is not supported for GraphiteMergeTree; use 'graphite.config'");
+    }
+    if (engine == ENGINE.DISTRIBUTED) {
+      throw new IllegalArgumentException(
+          "'engine_parameters' is not supported for Distributed; use the distributed table "
+              + "properties");
+    }
+    Preconditions.checkArgument(
+        GENERIC_ENGINE_PARAMETER_ENGINES.contains(engine),
+        "'engine_parameters' is not supported for ClickHouse engine %s",
+        engine.getValue());
+
+    String wrappedParams = "(" + engineParams + ")";
+    Preconditions.checkArgument(
+        findMatchingParenthesis(wrappedParams, 0) == wrappedParams.length() - 1,
+        "Invalid 'engine_parameters' for ClickHouse engine %s: parentheses and quotes must be "
+            + "balanced",
+        engine.getValue());
+  }
+
+  private static boolean isGenericEngineParameterEngine(@Nullable String engineName) {
+    return GENERIC_ENGINE_PARAMETER_ENGINES.stream()
+        .anyMatch(engine -> StringUtils.equalsIgnoreCase(engine.getValue(), engineName));
+  }
+
+  @Nullable
+  private static String extractGraphiteConfig(@Nullable String engineFull) {
+    String engineParams = extractEngineParams(ENGINE.GRAPHITEMERGETREE.getValue(), engineFull);
+    if (!isSingleQuotedLiteral(engineParams)) {
+      return null;
+    }
+
+    String quotedConfig = StringUtils.trim(engineParams);
+    return JdbcConnectorUtils.unescapeSqlLiteral(
+        quotedConfig.substring(1, quotedConfig.length() - 1), '\'');
+  }
+
+  private static boolean isSingleQuotedLiteral(@Nullable String value) {
+    String literal = StringUtils.trim(value);
+    if (StringUtils.length(literal) < 2 || literal.charAt(0) != '\'') {
+      return false;
+    }
+
+    for (int i = 1; i < literal.length(); i++) {
+      char current = literal.charAt(i);
+      if (current == '\\') {
+        if (i + 1 >= literal.length()) {
+          return false;
+        }
+        i++;
+      } else if (current == '\'') {
+        if (i + 1 < literal.length() && literal.charAt(i + 1) == '\'') {
+          i++;
+        } else {
+          return i == literal.length() - 1;
+        }
+      }
+    }
+    return false;
+  }
+
+  private static int findMatchingParenthesis(String value, int openParenthesis) {
+    int depth = 1;
+    char quote = 0;
+    for (int i = openParenthesis + 1; i < value.length(); i++) {
+      char current = value.charAt(i);
+      if (quote != 0) {
+        if (current == '\\' && i + 1 < value.length()) {
+          i++;
+        } else if (current == quote) {
+          if (i + 1 < value.length() && value.charAt(i + 1) == quote) {
+            i++;
+          } else {
+            quote = 0;
+          }
+        }
+        continue;
+      }
+
+      if (current == '\'' || current == '"' || current == '`') {
+        quote = current;
+      } else if (current == '(') {
+        depth++;
+      } else if (current == ')') {
+        depth--;
+        if (depth == 0) {
+          return i;
+        }
+      }
+    }
+    return -1;
   }
 
   private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {

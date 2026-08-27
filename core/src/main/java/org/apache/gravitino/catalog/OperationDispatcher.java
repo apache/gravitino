@@ -38,6 +38,8 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.model.ModelChange;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -290,12 +292,25 @@ public abstract class OperationDispatcher {
       } else if (item instanceof FilesetChange.SetProperty) {
         FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof FilesetChange.SetSecretBinding) {
+        FilesetChange.SetSecretBinding setSecretBinding = (FilesetChange.SetSecretBinding) item;
+        properties.put(setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
+      } else if (item instanceof FilesetChange.SetSecretReference) {
+        FilesetChange.SetSecretReference setSecretReference =
+            (FilesetChange.SetSecretReference) item;
+        properties.put(setSecretReference.getProperty(), setSecretReference.getProperty());
       } else if (item instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
       } else if (item instanceof ViewChange.SetProperty) {
         ViewChange.SetProperty setProperty = (ViewChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof ModelChange.SetProperty) {
+        ModelChange.SetProperty setProperty = (ModelChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
+      } else if (item instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
       }
     }
 

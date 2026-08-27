@@ -22,6 +22,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   external = '******',
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
    location = 'hdfs://%/user/hive/warehouse/gt_db1.db/tb01',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',

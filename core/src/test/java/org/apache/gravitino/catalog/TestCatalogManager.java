@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.TestCatalog.PROPERTY_HIDDEN_KEY;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY3;
@@ -61,6 +62,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -145,6 +147,9 @@ public class TestCatalogManager {
   void reset() throws IOException {
     ((InMemoryEntityStore) entityStore).clear();
     entityStore.put(metalakeEntity, true);
+    // The shared CatalogManager is created once in @BeforeAll, so its cache would otherwise keep
+    // entries created by previously executed test methods and make tests order-dependent.
+    catalogManager.getCatalogCache().invalidateAll();
   }
 
   @AfterAll
@@ -235,6 +240,62 @@ public class TestCatalogManager {
             IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident2, change5));
     Assertions.assertTrue(
         e3.getMessage().contains("Property key6-1 is immutable"), e3.getMessage());
+    reset();
+  }
+
+  @Test
+  void testAlterCatalogRejectsMaskedHiddenProperty() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "masked_hidden");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put(PROPERTY_HIDDEN_KEY, "secret")
+            .put("mock", "mock")
+            .build();
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.alterCatalog(
+                    ident,
+                    CatalogChange.setProperty(
+                        PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)));
+
+    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
+    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    Assertions.assertEquals("secret", entity.getProperties().get(PROPERTY_HIDDEN_KEY));
+    reset();
+  }
+
+  @Test
+  void testCreateCatalogRejectsMaskedHiddenProperty() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "masked_create");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put(PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)
+            .put("mock", "mock")
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props));
+    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
     reset();
   }
 
@@ -1443,37 +1504,49 @@ public class TestCatalogManager {
   }
 
   @Test
-  public void testCatalogCacheRemoveListener() {
+  public void testCatalogCacheRemoveListener() throws IOException {
     NameIdentifier ident = NameIdentifier.of(metalake, "catalog");
     Map<String, String> props =
         ImmutableMap.of(
             PROPERTY_KEY1, "value1", PROPERTY_KEY2, "value2", PROPERTY_KEY5_PREFIX + "1", "value3");
 
-    // Create a catalog
-    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+    // Use a dedicated CatalogManager (and entity store) instead of the shared static one: the
+    // shared instance keeps cache entries and cache removal listeners registered by other test
+    // methods, which would make the assertions below depend on the test execution order.
+    EntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    store.put(metalakeEntity, true);
 
-    // Load the catalog to add it to the cache
-    catalogManager.loadCatalog(ident);
-    Assertions.assertNotNull(catalogManager.getCatalogCache().getIfPresent(ident));
+    try (CatalogManager manager =
+        new CatalogManager(config, store, new RandomIdGenerator(), new SecretManager(config))) {
+      // Create a catalog
+      manager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
 
-    // Add a listener to track removed catalogs
-    Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
-    catalogManager.addCatalogCacheRemoveListener(removedCatalogs::add);
+      // Load the catalog to add it to the cache
+      manager.loadCatalog(ident);
+      Assertions.assertNotNull(manager.getCatalogCache().getIfPresent(ident));
 
-    // Invalidate the cache to trigger the removal listener
-    catalogManager.getCatalogCache().invalidate(ident);
+      // Add a listener to track removed catalogs
+      Set<NameIdentifier> removedCatalogs = Sets.newConcurrentHashSet();
+      manager.addCatalogCacheRemoveListener(removedCatalogs::add);
 
-    // Wait for the async eviction to complete
-    await()
-        .atMost(Duration.ofSeconds(5))
-        .untilAsserted(
-            () -> {
-              Assertions.assertTrue(
-                  removedCatalogs.contains(ident),
-                  "Listener should be notified of catalog removal");
-              Assertions.assertEquals(
-                  1, removedCatalogs.size(), "Only one catalog should be removed");
-            });
+      // Invalidate the cache to trigger the removal listener
+      manager.getCatalogCache().invalidate(ident);
+
+      // Wait for the async eviction to complete
+      await()
+          .atMost(Duration.ofSeconds(5))
+          .untilAsserted(
+              () -> {
+                Assertions.assertTrue(
+                    removedCatalogs.contains(ident),
+                    "Listener should be notified of catalog removal");
+                Assertions.assertEquals(
+                    1, removedCatalogs.size(), "Only one catalog should be removed");
+              });
+    } finally {
+      store.close();
+    }
   }
 
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
@@ -1482,7 +1555,10 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        testProps.get(ID_KEY),
+        "`gravitino.identifier` should be returned as a masked placeholder");
   }
 
   @Test
@@ -1500,7 +1576,8 @@ public class TestCatalogManager {
               catalogProps(),
               Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
               Map.of());
-      Assertions.assertFalse(catalog.properties().containsKey(PROPERTY_KEY4));
+      Assertions.assertEquals(
+          HiddenPropertyMaskUtils.MASKED_VALUE, catalog.properties().get(PROPERTY_KEY4));
       String urn =
           entityStore
               .get(ident, EntityType.CATALOG, CatalogEntity.class)

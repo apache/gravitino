@@ -43,6 +43,7 @@ import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -309,6 +310,8 @@ public class TestMetalakeManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertTrue(
+        !testProps.containsKey(StringIdentifier.ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(testProps.get(StringIdentifier.ID_KEY)));
   }
 }
