@@ -467,6 +467,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
                   SecretConstants.ATTR_PROPERTY_KEY, "k2"));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+      Assertions.assertFalse(
+          entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of()));
@@ -476,7 +480,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testCreateAndAlterSchemaRejectMaskedPlaceholder() {
+  public void testRejectMaskedOnAlter() {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_masked");
     Map<String, String> createProps =
         ImmutableMap.of("k1", HiddenPropertyMaskUtils.MASKED_VALUE, "k2", "v2");
@@ -490,38 +494,6 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
             dispatcher.alterSchema(
                 schemaIdent, SchemaChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
         "k3");
-  }
-
-  @Test
-  public void testAlterRemovePropertyDeletesWriteThroughSecret() throws Exception {
-    try (SecretManager secrets = memorySecretManager()) {
-      SchemaOperationDispatcher d =
-          new SchemaOperationDispatcher(
-              catalogManager, entityStore, idGenerator, secrets, mock(FilesetDispatcher.class));
-      NameIdentifier ident = NameIdentifier.of(metalake, catalog, "schema_secret_remove");
-      Map<String, String> props = ImmutableMap.of("k1", "v1");
-      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
-
-      d.createSchema(ident, "comment", props, bindings, Map.of());
-
-      SchemaEntity entity = entityStore.get(ident, SCHEMA, SchemaEntity.class);
-      SecretUrn urn =
-          SecretUrn.buildWriteThrough(
-              "memory",
-              Map.of(
-                  SecretConstants.ATTR_ENTITY_TYPE, "schema",
-                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
-                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
-      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
-
-      d.alterSchema(ident, SchemaChange.removeProperty("k2"));
-
-      SchemaEntity updated = entityStore.get(ident, SCHEMA, SchemaEntity.class);
-      Assertions.assertFalse(updated.properties().containsKey("k2"));
-      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
-
-      Assertions.assertTrue(d.dropSchema(ident, false));
-    }
   }
 
   private static SecretManager memorySecretManager() {

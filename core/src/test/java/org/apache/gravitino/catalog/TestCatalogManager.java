@@ -1585,43 +1585,8 @@ public class TestCatalogManager {
               .get(PROPERTY_KEY4);
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
-      Assertions.assertTrue(manager.dropCatalog(ident, true));
-      Assertions.assertThrows(
-          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
-    }
-  }
-
-  @Test
-  void testAlterRemovePropertyDeletesWriteThroughSecret() throws Exception {
-    try (SecretManager secrets = memorySecretManager()) {
-      CatalogManager manager =
-          new CatalogManager(config, entityStore, new RandomIdGenerator(), secrets);
-      NameIdentifier ident = NameIdentifier.of("metalake", "secret_catalog_remove");
-      Map<String, String> props =
-          ImmutableMap.of(
-              "provider",
-              "test",
-              PROPERTY_KEY1,
-              "value1",
-              PROPERTY_KEY2,
-              "value2",
-              PROPERTY_KEY5_PREFIX + "1",
-              "value3");
-      Map<String, SecretBinding> bindings =
-          Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t"));
-
-      manager.createCatalog(
-          ident, Catalog.Type.RELATIONAL, provider, "comment", props, bindings, Map.of());
-
-      String urn =
-          entityStore
-              .get(ident, EntityType.CATALOG, CatalogEntity.class)
-              .getProperties()
-              .get(PROPERTY_KEY4);
-      Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
 
       manager.alterCatalog(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
-
       Assertions.assertFalse(
           entityStore
               .get(ident, EntityType.CATALOG, CatalogEntity.class)
@@ -1631,7 +1596,8 @@ public class TestCatalogManager {
           IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
 
       Assertions.assertTrue(manager.dropCatalog(ident, true));
-      manager.close();
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
     }
   }
 

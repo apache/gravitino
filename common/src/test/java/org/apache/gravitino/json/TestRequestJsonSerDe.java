@@ -157,56 +157,35 @@ public class TestRequestJsonSerDe {
     CatalogUpdateRequest deserReq3 =
         JsonUtils.objectMapper().readValue(serJson3, CatalogUpdateRequest.class);
     Assertions.assertEquals(req3, deserReq3);
+  }
 
-    CatalogUpdateRequest req4 =
-        new CatalogUpdateRequest.SetCatalogSecretBindingRequest("password", "env", "secret");
-    String serJson4 = JsonUtils.objectMapper().writeValueAsString(req4);
-    CatalogUpdateRequest deserReq4 =
-        JsonUtils.objectMapper().readValue(serJson4, CatalogUpdateRequest.class);
-    Assertions.assertEquals(req4, deserReq4);
-
-    CatalogUpdateRequest req5 =
+  @Test
+  public void testSecretUpdateRequestSerDe() throws JsonProcessingException {
+    roundTrip(
+        new CatalogUpdateRequest.SetCatalogSecretBindingRequest("password", "env", "secret"),
+        CatalogUpdateRequest.class);
+    roundTrip(
         new CatalogUpdateRequest.SetCatalogSecretReferenceRequest(
-            "password", "vault", ImmutableMap.of("path", "secret/data/my-password"));
-    String serJson5 = JsonUtils.objectMapper().writeValueAsString(req5);
-    CatalogUpdateRequest deserReq5 =
-        JsonUtils.objectMapper().readValue(serJson5, CatalogUpdateRequest.class);
-    Assertions.assertEquals(req5, deserReq5);
-  }
-
-  @Test
-  public void testSchemaUpdateRequestSerDe() throws JsonProcessingException {
-    SchemaUpdateRequest req =
-        new SchemaUpdateRequest.SetSchemaSecretBindingRequest("password", "env", "secret");
-    String serJson = JsonUtils.objectMapper().writeValueAsString(req);
-    SchemaUpdateRequest deserReq =
-        JsonUtils.objectMapper().readValue(serJson, SchemaUpdateRequest.class);
-    Assertions.assertEquals(req, deserReq);
-
-    SchemaUpdateRequest req1 =
+            "password", "vault", ImmutableMap.of("path", "secret/data/my-password")),
+        CatalogUpdateRequest.class);
+    roundTrip(
+        new SchemaUpdateRequest.SetSchemaSecretBindingRequest("password", "env", "secret"),
+        SchemaUpdateRequest.class);
+    roundTrip(
         new SchemaUpdateRequest.SetSchemaSecretReferenceRequest(
-            "password", "vault", ImmutableMap.of("path", "secret/data/my-password"));
-    String serJson1 = JsonUtils.objectMapper().writeValueAsString(req1);
-    SchemaUpdateRequest deserReq1 =
-        JsonUtils.objectMapper().readValue(serJson1, SchemaUpdateRequest.class);
-    Assertions.assertEquals(req1, deserReq1);
+            "password", "vault", ImmutableMap.of("path", "secret/data/my-password")),
+        SchemaUpdateRequest.class);
+    roundTrip(
+        new FilesetUpdateRequest.SetFilesetSecretBindingRequest("password", "env", "secret"),
+        FilesetUpdateRequest.class);
+    roundTrip(
+        new FilesetUpdateRequest.SetFilesetSecretReferenceRequest(
+            "password", "vault", ImmutableMap.of("path", "secret/data/my-password")),
+        FilesetUpdateRequest.class);
   }
 
-  @Test
-  public void testFilesetUpdateRequestSerDe() throws JsonProcessingException {
-    FilesetUpdateRequest req =
-        new FilesetUpdateRequest.SetFilesetSecretBindingRequest("password", "env", "secret");
-    String serJson = JsonUtils.objectMapper().writeValueAsString(req);
-    FilesetUpdateRequest deserReq =
-        JsonUtils.objectMapper().readValue(serJson, FilesetUpdateRequest.class);
-    Assertions.assertEquals(req, deserReq);
-
-    FilesetUpdateRequest req1 =
-        new FilesetUpdateRequest.SetFilesetSecretReferenceRequest(
-            "password", "vault", ImmutableMap.of("path", "secret/data/my-password"));
-    String serJson1 = JsonUtils.objectMapper().writeValueAsString(req1);
-    FilesetUpdateRequest deserReq1 =
-        JsonUtils.objectMapper().readValue(serJson1, FilesetUpdateRequest.class);
-    Assertions.assertEquals(req1, deserReq1);
+  private static <T> void roundTrip(T request, Class<T> type) throws JsonProcessingException {
+    String json = JsonUtils.objectMapper().writeValueAsString(request);
+    Assertions.assertEquals(request, JsonUtils.objectMapper().readValue(json, type));
   }
 }
