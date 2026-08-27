@@ -450,11 +450,16 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   private Pair<Schema, SchemaChange[]> alterExternalSchemaUnderLock(
       NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
       throws NoSuchSchemaException {
-    Schema currentSchema =
-        doWithCatalog(
-            catalogIdent,
-            c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
-            NoSuchSchemaException.class);
+    Schema currentSchema = null;
+    try {
+      currentSchema =
+          doWithCatalog(
+              catalogIdent,
+              c -> c.doWithSchemaOps(s -> s.loadSchema(ident)),
+              NoSuchSchemaException.class);
+    } catch (NoSuchSchemaException e) {
+      // Defer missing-schema handling to catalog alterSchema to preserve catalog semantics.
+    }
     // Prefer SchemaEntity properties for secret URNs (catalog loadSchema may omit them).
     SchemaEntity schemaEntityForSecrets = getEntity(ident, SCHEMA, SchemaEntity.class);
     Map<String, String> currentProperties;
@@ -462,7 +467,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
         && schemaEntityForSecrets.properties() != null
         && !schemaEntityForSecrets.properties().isEmpty()) {
       currentProperties = new HashMap<>(schemaEntityForSecrets.properties());
-    } else if (currentSchema.properties() != null) {
+    } else if (currentSchema != null && currentSchema.properties() != null) {
       currentProperties = new HashMap<>(currentSchema.properties());
     } else {
       currentProperties = new HashMap<>();
