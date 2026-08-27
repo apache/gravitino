@@ -41,7 +41,9 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.sql.gravitino.clientCacheMaxSize   | int    | `100`         | The maximum number of Gravitino clients cached, one per identity.                               | No       |
 | spark.sql.gravitino.clientCacheTtlSec    | long   | `3600`        | Evicts a cached Gravitino client this many seconds after it was last used.                      | No       |
 | spark.sql.gravitino.catalogCacheTtlSec   | long   | `300`         | Evicts a cached catalog this many seconds after it was loaded.                                  | No       |
+| spark.sql.gravitino.iceberg.rest-routing-enabled | boolean | `true` | Whether `hive` and `jdbc` backed Iceberg catalogs must be routed through the Gravitino Iceberg REST server. Set to `false` to retain legacy native backend translation. | No |
 | spark.sql.gravitino.iceberg.rest-uri     | string | (none)        | Overrides the auto-discovered Gravitino Iceberg REST server endpoint. See [Iceberg catalog](spark-catalog-iceberg.md#routing-through-the-gravitino-iceberg-rest-server). | No       |
+| spark.sql.gravitino.iceberg.reuseOAuth2  | boolean | `true`        | Reuses the Gravitino OAuth2 client configuration for routed Iceberg REST catalogs. Explicit IRC OAuth2 properties override individual reused values. | No |
 | spark.sql.gravitino.iceberg.rest.        | string | (none)        | The configuration key prefix for the Iceberg REST client config (e.g. `rest.auth.type`), applied when a catalog is routed through the Gravitino Iceberg REST server. | No       |
 
 To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.

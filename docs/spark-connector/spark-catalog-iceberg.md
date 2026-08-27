@@ -160,15 +160,22 @@ instead of the static, long-lived secrets (JDBC password, S3/OSS access keys) th
 placed in the Spark Iceberg connector configuration. See [Credential vending](../security/credential-vending.md)
 for how to enable credential vending on the Gravitino server.
 
-The endpoint is discovered once, when a catalog is first initialized in a Spark session; it is not
-re-checked afterward. If the server does not expose a discoverable endpoint (for example, the `iceberg-rest`
-auxiliary service is disabled, or not configured with `catalog-config-provider=dynamic-config-provider`), the
-catalog falls back to the existing hive/jdbc translation described above.
+REST routing is enabled by default. The endpoint is discovered once, when a catalog is first initialized
+in a Spark session; it is not re-checked afterward. If the server does not expose a discoverable endpoint
+(for example, the `iceberg-rest` auxiliary service is disabled or not configured with
+`catalog-config-provider=dynamic-config-provider`), catalog initialization fails instead of silently using
+the native Hive/JDBC backend.
 
 To force a specific endpoint instead of relying on auto-discovery, set:
 
 ```properties
 spark.sql.gravitino.iceberg.rest-uri    http://<gravitino-host>:9001/iceberg
+```
+
+To retain the legacy Hive/JDBC translation and skip endpoint discovery, disable routing explicitly:
+
+```properties
+spark.sql.gravitino.iceberg.rest-routing-enabled    false
 ```
 
 If Gravitino requires authentication on the IRC endpoint, pass the Iceberg REST client's own auth
@@ -183,6 +190,36 @@ spark.sql.gravitino.iceberg.rest.rest.auth.basic.password  <password>
 See [Connect Spark to Iceberg REST](../iceberg-rest-engine/spark.md) for the full set of supported
 `rest.auth.*` properties and how to configure them when connecting directly to the IRC endpoint.
 
+When the Gravitino client uses OAuth2, the connector reuses its OAuth2 client configuration for IRC by
+default. This avoids duplicating configuration when both endpoints accept the same client identity. The
+equivalent explicit setting is:
+
+```properties
+spark.sql.gravitino.iceberg.reuseOAuth2    true
+```
+
+Gravitino and IRC may use different OAuth2 clients even when IRC runs as a Gravitino auxiliary service.
+Override any reused value with an IRC-specific Iceberg REST property; unspecified values continue to come
+from the Gravitino client configuration:
+
+```properties
+# Gravitino metadata API client
+spark.sql.gravitino.authType                  oauth2
+spark.sql.gravitino.oauth2.serverUri           https://identity.example.com
+spark.sql.gravitino.oauth2.tokenPath           /oauth/token
+spark.sql.gravitino.oauth2.credential          <gravitino-client-id>:<gravitino-client-secret>
+spark.sql.gravitino.oauth2.scope               gravitino
+
+# IRC data-plane client override
+spark.sql.gravitino.iceberg.rest.credential   <irc-client-id>:<irc-client-secret>
+spark.sql.gravitino.iceberg.rest.scope        iceberg
+```
+
+The IRC properties take precedence field by field. If an explicit legacy OAuth2 configuration cannot be
+completed from the reused Gravitino configuration, catalog initialization fails and identifies the missing
+properties. Set `spark.sql.gravitino.iceberg.reuseOAuth2=false` when supplying a complete, independent IRC
+authentication configuration or when IRC does not require OAuth2.
+
 Because vended credentials are only consumed by Iceberg's native `FileIO` implementations, make sure the
 warehouse storage jars listed under [Storage](#storage) below are on the Spark classpath; the connector
 derives `io-impl` automatically from the warehouse location's scheme (`s3`/`s3a`/`s3n`, `gs`,
@@ -194,7 +231,11 @@ Spark connector could convert storage properties in the Gravitino catalog to Spa
 
 ### S3
 
-Please downloading the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle) and place it in the classpath of Spark.
+Download the [Iceberg AWS bundle](https://mvnrepository.com/artifact/org.apache.iceberg/iceberg-aws-bundle)
+that matches the Iceberg runtime version and place it on the Spark driver and executor classpaths. This is
+required for `S3FileIO` even when the Spark image already includes the AWS SDK v1 used by Hadoop S3A;
+`S3FileIO` uses AWS SDK v2 from `iceberg-aws-bundle`. If the bundle is absent, initialization can fail with
+a `NoClassDefFoundError` that does not identify the missing bundle directly.
 
 ### OSS
 

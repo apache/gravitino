@@ -216,8 +216,8 @@ public class GravitinoCatalogManager {
 
   /**
    * Resolves the Gravitino Iceberg REST server endpoint for this manager's metalake, if the server
-   * exposes one. The lookup is performed once and the result, including a lookup failure, is cached
-   * for the lifetime of this manager.
+   * exposes one. The lookup is performed once and a successful response, including a response with
+   * no endpoint, is cached for the lifetime of this manager. Request failures are propagated.
    *
    * @return the discovered Iceberg REST endpoint, or empty if none is available
    */
@@ -234,16 +234,7 @@ public class GravitinoCatalogManager {
 
   private Optional<String> resolveIcebergRestUri() {
     String metalakeName = sparkConf.get(GravitinoSparkConfig.GRAVITINO_METALAKE);
-    try {
-      return getClient(applicationIdentity()).icebergRestServiceUri(metalakeName);
-    } catch (Exception e) {
-      LOG.debug(
-          "No Iceberg REST server endpoint is available for metalake {}, "
-              + "falling back to native catalog backend routing.",
-          metalakeName,
-          e);
-      return Optional.empty();
-    }
+    return getClient(applicationIdentity()).icebergRestServiceUri(metalakeName);
   }
 
   private Catalog loadCatalog(GravitinoIdentity identity, String catalogName) {
