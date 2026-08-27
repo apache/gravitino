@@ -24,6 +24,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import javax.ws.rs.PathParam;
@@ -49,6 +50,7 @@ import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.LanceNamespaceException;
 import org.lance.namespace.errors.PermissionDeniedException;
 import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.RegisterTableRequest;
 
 /** Resolves Lance namespace IDs and maps shared authorization failures to Lance REST responses. */
 public class LanceMetadataAuthorizationMethodInterceptor
@@ -147,24 +149,19 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   /**
-   * Returns the handler that authorizes an overwrite of an existing namespace. Overwrite is the
-   * only Lance namespace write whose required privileges are carried in the request body rather
-   * than in the request path, so it cannot be expressed by the method annotation alone.
+   * Returns the handler that authorizes an overwrite of an existing object. The mode of a Lance
+   * create request travels in the request body or in a query parameter rather than in the request
+   * path, so which privileges a create needs cannot be expressed by the method annotation alone.
    *
    * @param method invoked protocol method
    * @param parameters invoked method parameters
    * @param args invoked method arguments
-   * @return the overwrite handler when the request carries a create-namespace body
+   * @return the overwrite handler for a create request, empty for every other operation
    */
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
       Method method, Parameter[] parameters, Object[] args) {
-    for (Object arg : args) {
-      if (arg instanceof CreateNamespaceRequest) {
-        return Optional.of(new CreateNamespaceAuthzHandler((CreateNamespaceRequest) arg));
-      }
-    }
-    return Optional.empty();
+    return createMode(parameters, args).map(OverwriteAuthzHandler::new);
   }
 
   @Override
@@ -196,43 +193,45 @@ public class LanceMetadataAuthorizationMethodInterceptor
   }
 
   /**
-   * Authorizes a create-namespace request whose mode overwrites an existing namespace.
+   * Authorizes a create request whose mode overwrites an object that already exists.
    *
-   * <p>An overwrite replaces the properties of a namespace that already exists, so it is a
-   * modification rather than a creation and is authorized against {@link
-   * LanceAuthorizationExpressions#MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION}. The mode alone
-   * decides this, without probing whether the namespace exists: an existence probe at authorization
-   * time would race with the create that follows it, and the resulting privilege requirement would
-   * depend on that race.
+   * <p>An overwrite replaces an existing namespace or table, so it is a modification rather than a
+   * creation and is authorized against the ownership expression for the addressed entity instead of
+   * the create expression on the method. Without this, CREATE_CATALOG, CREATE_SCHEMA, or
+   * CREATE_TABLE would escalate into permission to replace an object the caller does not own.
+   *
+   * <p>The mode alone decides this, without probing whether the object exists: an existence probe
+   * at authorization time would race with the create that follows it, and the required privilege
+   * would then depend on that race.
    */
-  private static final class CreateNamespaceAuthzHandler implements AuthorizationHandler {
+  private static final class OverwriteAuthzHandler implements AuthorizationHandler {
 
     private static final String OVERWRITE_MODE = "OVERWRITE";
 
-    private final CreateNamespaceRequest request;
-    private boolean overwriteAuthorized;
+    private final boolean overwrite;
 
-    private CreateNamespaceAuthzHandler(CreateNamespaceRequest request) {
-      this.request = request;
+    private OverwriteAuthzHandler(String mode) {
+      // Read the mode through the same normalization the create operation applies, so a token the
+      // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
+      // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
+      // would not match, and a caller holding only a create privilege could replace an object owned
+      // by somebody else.
+      this.overwrite = OVERWRITE_MODE.equals(CommonUtil.normalizeToken(mode));
     }
 
     @Override
     public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
-      if (!isOverwrite()) {
+      if (!overwrite) {
         return;
       }
 
-      // A namespace that is being overwritten already exists, so the create expression on the
-      // method must not be evaluated: it would let CREATE_CATALOG or CREATE_SCHEMA replace an
-      // object the caller does not own.
-      overwriteAuthorized = true;
-      Entity.EntityType entityType =
-          nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
-              ? Entity.EntityType.SCHEMA
-              : Entity.EntityType.CATALOG;
+      Entity.EntityType entityType = deepestEntityType(nameIdentifierMap);
+      String expression =
+          entityType == Entity.EntityType.TABLE
+              ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
+              : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
       boolean authorized =
-          new AuthorizationExpressionEvaluator(
-                  LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION)
+          new AuthorizationExpressionEvaluator(expression)
               .evaluate(
                   nameIdentifierMap,
                   new HashMap<>(),
@@ -240,23 +239,26 @@ public class LanceMetadataAuthorizationMethodInterceptor
                   Optional.of(entityType.name()));
       if (!authorized) {
         throw new ForbiddenException(
-            "User '%s' is not authorized to overwrite the namespace '%s'",
+            "User '%s' is not authorized to overwrite '%s'",
             PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
       }
     }
 
     @Override
     public boolean authorizationCompleted() {
-      return overwriteAuthorized;
+      // An overwrite is fully authorized here, so the create expression on the method must not be
+      // evaluated afterwards. A create that does not overwrite falls through to it unchanged.
+      return overwrite;
     }
 
-    private boolean isOverwrite() {
-      // Read the mode through the same normalization the create operation applies, so a token the
-      // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
-      // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
-      // would not match, and a caller holding only a create privilege could replace a namespace
-      // owned by somebody else.
-      return OVERWRITE_MODE.equals(CommonUtil.normalizeToken(request.getMode()));
+    private static Entity.EntityType deepestEntityType(
+        Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+      if (nameIdentifierMap.containsKey(Entity.EntityType.TABLE)) {
+        return Entity.EntityType.TABLE;
+      }
+      return nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
+          ? Entity.EntityType.SCHEMA
+          : Entity.EntityType.CATALOG;
     }
   }
 
@@ -269,6 +271,23 @@ public class LanceMetadataAuthorizationMethodInterceptor
   private InvalidInputException unsupportedIdentifier(String namespaceId) {
     return new InvalidInputException(
         "Unsupported Lance namespace identifier: " + namespaceId, "", namespaceId);
+  }
+
+  /**
+   * Returns the requested create mode, or empty when the invoked operation does not create an
+   * object. Lance carries the mode in the create-namespace body, in the register-table body, or in
+   * the {@code mode} query parameter of create-table.
+   */
+  private static Optional<String> createMode(Parameter[] parameters, Object[] args) {
+    for (Object arg : args) {
+      if (arg instanceof CreateNamespaceRequest) {
+        return Optional.of(Objects.toString(((CreateNamespaceRequest) arg).getMode(), ""));
+      }
+      if (arg instanceof RegisterTableRequest) {
+        return Optional.of(Objects.toString(((RegisterTableRequest) arg).getMode(), ""));
+      }
+    }
+    return queryArgument(parameters, args, "mode");
   }
 
   private static Optional<String> pathArgument(Parameter[] parameters, Object[] args, String name) {

@@ -42,6 +42,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.DeclareTableRequest;
+import org.lance.namespace.model.DescribeTableResponse;
 import org.lance.namespace.model.ListTablesResponse;
 import org.lance.namespace.model.RegisterTableRequest;
 
@@ -53,12 +55,16 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String PROBER = "lance_table_authz_prober";
   private static final String CATALOG = "lance_table_authz_catalog";
   private static final String SCHEMA = "lance_table_authz_schema";
+  // Tables created by the write tests live in their own schema, so the listing tests keep asserting
+  // the exact contents of the read schema whatever order the tests run in.
+  private static final String WRITE_SCHEMA = "lance_table_authz_write_schema";
 
   // The hidden table sorts first so that a listing filtered after pagination rather than before it
   // would return an empty first page instead of the visible table.
   private static final String HIDDEN_TABLE = "a_hidden_table";
   private static final String VISIBLE_TABLE = "b_visible_table";
   private static final String MISSING_TABLE = "c_missing_table";
+  private static final String PROBER_TABLE = "d_prober_table";
   private static final String DELIMITER = ".";
 
   @TempDir private static Path tempDir;
@@ -82,6 +88,7 @@ public class LanceTableAuthorizationIT extends BaseIT {
 
     createNamespace(CATALOG);
     createNamespace(id(CATALOG, SCHEMA));
+    createNamespace(id(CATALOG, WRITE_SCHEMA));
     registerTable(VISIBLE_TABLE);
     registerTable(HIDDEN_TABLE);
 
@@ -115,6 +122,11 @@ public class LanceTableAuthorizationIT extends BaseIT {
             SecurableObjects.ofSchema(
                 catalogScope,
                 SCHEMA,
+                new ArrayList<>(
+                    List.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow()))),
+            SecurableObjects.ofSchema(
+                catalogScope,
+                WRITE_SCHEMA,
                 new ArrayList<>(
                     List.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow())))));
   }
@@ -169,6 +181,27 @@ public class LanceTableAuthorizationIT extends BaseIT {
     Assertions.assertEquals(List.of(HIDDEN_TABLE, VISIBLE_TABLE), listTables(ADMIN, 10));
   }
 
+  @Test
+  public void testTableCreationRequiresCreateTablePrivilege() throws Exception {
+    // Selecting a table is not creating one.
+    assertStatus(403, register(READER, SCHEMA, "reader_table", null, location("reader_table")));
+    assertStatus(403, declare(READER, SCHEMA, "reader_table"));
+
+    assertStatus(200, register(PROBER, WRITE_SCHEMA, PROBER_TABLE, null, location(PROBER_TABLE)));
+    // Creating assigns ownership, so the creator can read back what it created even though it
+    // holds no SELECT_TABLE privilege.
+    assertStatus(200, table(PROBER, WRITE_SCHEMA, PROBER_TABLE, "describe"));
+  }
+
+  @Test
+  public void testCreateTablePrivilegeCannotOverwriteAnotherOwnersTable() throws Exception {
+    String replacement = location(HIDDEN_TABLE) + "overwritten/";
+    assertStatus(403, register(PROBER, SCHEMA, HIDDEN_TABLE, "overwrite", replacement));
+
+    // A denied overwrite must not have reached the metadata store.
+    Assertions.assertEquals(location(HIDDEN_TABLE), describedLocation(ADMIN, HIDDEN_TABLE));
+  }
+
   private List<String> listTables(String user, int limit) throws Exception {
     HttpRequest request =
         request(user, "/v1/namespace/" + id(CATALOG, SCHEMA) + "/table/list", "&limit=" + limit)
@@ -208,17 +241,43 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   private void registerTable(String tableName) throws Exception {
+    assertStatus(200, register(ADMIN, SCHEMA, tableName, null, location(tableName)));
+  }
+
+  private HttpResponse<String> register(
+      String user, String schema, String tableName, String mode, String location) throws Exception {
     RegisterTableRequest body = new RegisterTableRequest();
-    body.setId(List.of(CATALOG, SCHEMA, tableName));
+    body.setId(List.of(CATALOG, schema, tableName));
+    body.setLocation(location);
+    body.setMode(mode);
+    return send(user, "/v1/table/" + id(CATALOG, schema, tableName) + "/register", body);
+  }
+
+  private HttpResponse<String> declare(String user, String schema, String tableName)
+      throws Exception {
+    DeclareTableRequest body = new DeclareTableRequest();
+    body.setId(List.of(CATALOG, schema, tableName));
     body.setLocation(location(tableName));
-    assertStatus(
-        200, send(ADMIN, "/v1/table/" + id(CATALOG, SCHEMA, tableName) + "/register", body));
+    return send(user, "/v1/table/" + id(CATALOG, schema, tableName) + "/declare", body);
+  }
+
+  private String describedLocation(String user, String tableName) throws Exception {
+    HttpResponse<String> response = table(user, tableName, "describe");
+    assertStatus(200, response);
+    return ObjectMapperProvider.objectMapper()
+        .readValue(response.body(), DescribeTableResponse.class)
+        .getLocation();
   }
 
   private HttpResponse<String> table(String user, String tableName, String operation)
       throws Exception {
+    return table(user, SCHEMA, tableName, operation);
+  }
+
+  private HttpResponse<String> table(String user, String schema, String tableName, String operation)
+      throws Exception {
     HttpRequest request =
-        request(user, "/v1/table/" + id(CATALOG, SCHEMA, tableName) + "/" + operation, "")
+        request(user, "/v1/table/" + id(CATALOG, schema, tableName) + "/" + operation, "")
             .POST(HttpRequest.BodyPublishers.ofString("{}"))
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
