@@ -53,6 +53,7 @@ import java.util.Properties;
 import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -297,7 +298,10 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   @Nullable private final CatalogChangeLogListener catalogChangeLogListener;
 
   private final IdGenerator idGenerator;
-  private final List<Consumer<NameIdentifier>> removalListeners = Lists.newArrayList();
+
+  // Copy-on-write: listeners may be registered while the cache's removal listener (running on a
+  // cache executor thread) is iterating this list.
+  private final List<Consumer<NameIdentifier>> removalListeners = new CopyOnWriteArrayList<>();
   private final ConcurrentHashMap<NameIdentifier, AtomicInteger> localMutationCounts =
       new ConcurrentHashMap<>();
 
