@@ -32,6 +32,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationalEntity;
@@ -104,16 +105,18 @@ public class PolicyTagRelService {
   }
 
   /**
-   * Creates, replaces, or removes policy-to-tag relations for one tag.
+   * Creates or removes policy-to-tag relations for one tag.
    *
-   * <p>An add for an existing pair replaces its selector. Repeating the same selector and removing
-   * a missing pair are idempotent no-ops.
+   * <p>An add for an existing policy and tag pair conflicts regardless of its selector. Removing a
+   * missing pair is an idempotent no-op. The same pair cannot be added and removed in one update.
    *
    * @param tagIdentifier The source tag identifier.
-   * @param targetsToAdd Policy targets to create or replace.
+   * @param targetsToAdd Policy targets to create.
    * @param targetsToRemove Policy targets to remove.
    * @return All active policy targets for the tag after the update.
    * @throws IOException If selector audit information cannot be serialized.
+   * @throws EntityAlreadyExistsException If a relation to add already exists.
+   * @throws IllegalArgumentException If the same relation is both added and removed.
    */
   public List<PolicyEntity> updateRelations(
       NameIdentifier tagIdentifier,
@@ -126,6 +129,7 @@ public class PolicyTagRelService {
     RelationEdgeTarget[] targetsToRemoveOrEmpty = nullToEmpty(targetsToRemove);
     validatePolicyTargets(metalake, targetsToAddOrEmpty);
     validatePolicyTargets(metalake, targetsToRemoveOrEmpty);
+    validateNoOverlappingTargets(targetsToAddOrEmpty, targetsToRemoveOrEmpty);
 
     List<PolicyEntity> updatedPolicies = new ArrayList<>();
     try {
@@ -163,7 +167,7 @@ public class PolicyTagRelService {
       if (existing != null) {
         int deleted =
             SessionUtils.getWithoutCommit(
-                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(existing));
+                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(existing));
         if (deleted != 1) {
           throw relationConflict(tagIdentifier);
         }
@@ -172,7 +176,12 @@ public class PolicyTagRelService {
 
     for (RelationEdgeTarget target : targetsToAdd) {
       long policyId = policyIds.get(target.nameIdentifier().name());
-      insertIfAbsent(policyId, tagId, target.relationValue().orElse(null));
+      insertIfAbsent(
+          tagIdentifier,
+          target.nameIdentifier(),
+          policyId,
+          tagId,
+          target.relationValue().orElse(null));
     }
 
     return listRelations(Collections.singletonList(tagIdentifier), Entity.EntityType.TAG).stream()
@@ -240,15 +249,13 @@ public class PolicyTagRelService {
     return result;
   }
 
-  private static void insertIfAbsent(long policyId, long tagId, String selector)
+  private static void insertIfAbsent(
+      NameIdentifier tagIdentifier,
+      NameIdentifier policyIdentifier,
+      long policyId,
+      long tagId,
+      String selector)
       throws IOException {
-    PolicyTagRelPO existing =
-        SessionUtils.getWithoutCommit(
-            PolicyTagRelMapper.class, mapper -> mapper.getByPolicyIdAndTagId(policyId, tagId));
-    if (existing != null) {
-      return;
-    }
-
     PolicyTagRelPO relation =
         PolicyTagRelPO.builder()
             .withPolicyId(policyId)
@@ -259,7 +266,20 @@ public class PolicyTagRelService {
             .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
-    SessionUtils.doWithoutCommit(PolicyTagRelMapper.class, mapper -> mapper.insert(relation));
+    int inserted =
+        SessionUtils.getWithoutCommit(
+            PolicyTagRelMapper.class, mapper -> mapper.insertIfAbsent(relation));
+    if (inserted == 1) {
+      return;
+    }
+
+    PolicyTagRelPO winner =
+        SessionUtils.getWithoutCommit(
+            PolicyTagRelMapper.class, mapper -> mapper.getByPolicyIdAndTagId(policyId, tagId));
+    if (winner != null) {
+      throw relationAlreadyExists(tagIdentifier, policyIdentifier);
+    }
+    throw relationConflict(tagIdentifier);
   }
 
   private static String auditInfo() throws IOException {
@@ -273,6 +293,13 @@ public class PolicyTagRelService {
     return new OptimisticLockException(
         "A policy-to-tag relation for tag %s was modified concurrently; retry the operation",
         tagIdentifier);
+  }
+
+  private static EntityAlreadyExistsException relationAlreadyExists(
+      NameIdentifier tagIdentifier, NameIdentifier policyIdentifier) {
+    return new EntityAlreadyExistsException(
+        "The policy-to-tag relation between tag %s and policy %s already exists",
+        tagIdentifier, policyIdentifier);
   }
 
   private static void validatePolicyTarget(String metalake, RelationEdgeTarget target) {
@@ -290,6 +317,20 @@ public class PolicyTagRelService {
   private static void validatePolicyTargets(String metalake, RelationEdgeTarget[] targets) {
     for (RelationEdgeTarget target : targets) {
       validatePolicyTarget(metalake, target);
+    }
+  }
+
+  private static void validateNoOverlappingTargets(
+      RelationEdgeTarget[] targetsToAdd, RelationEdgeTarget[] targetsToRemove) {
+    Set<String> policyNamesToAdd =
+        Arrays.stream(targetsToAdd)
+            .map(target -> target.nameIdentifier().name())
+            .collect(Collectors.toSet());
+    for (RelationEdgeTarget target : targetsToRemove) {
+      Preconditions.checkArgument(
+          !policyNamesToAdd.contains(target.nameIdentifier().name()),
+          "Policy-to-tag relation target %s cannot be both added and removed",
+          target.nameIdentifier());
     }
   }
 

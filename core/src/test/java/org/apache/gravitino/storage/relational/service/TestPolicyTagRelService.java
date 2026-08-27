@@ -19,7 +19,6 @@
 package org.apache.gravitino.storage.relational.service;
 
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -36,6 +35,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationUpdate;
@@ -65,7 +65,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   private static final String RISK_SELECTOR = "{\"type\":\"TAG_VALUE\",\"value\":\"risk\"}";
 
   @TestTemplate
-  public void testSelectorCreateReplaceBidirectionalReadAndIdempotentDelete() throws IOException {
+  public void testSelectorCreateConflictBidirectionalReadAndIdempotentDelete() throws IOException {
     createAndInsertMakeLake(METALAKE);
     TagEntity tag =
         TagEntity.builder()
@@ -94,7 +94,21 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
             new RelationEdgeTarget[] {financeTarget},
             new RelationEdgeTarget[0]);
     backend.updateEntityRelations(financeUpdate);
-    backend.updateEntityRelations(financeUpdate);
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> backend.updateEntityRelations(financeUpdate));
+
+    RelationEdgeTarget riskTarget =
+        RelationEdgeTarget.of(policy.nameIdentifier(), Entity.EntityType.POLICY, RISK_SELECTOR);
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            backend.updateEntityRelations(
+                RelationUpdate.of(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    tag.nameIdentifier(),
+                    Entity.EntityType.TAG,
+                    new RelationEdgeTarget[] {riskTarget},
+                    new RelationEdgeTarget[0])));
 
     List<RelationalEntity<?>> byTag =
         backend.batchListEntitiesByRelation(
@@ -115,30 +129,16 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
             Entity.EntityType.TAG,
             policy.nameIdentifier()));
 
-    RelationEdgeTarget riskTarget =
-        RelationEdgeTarget.of(policy.nameIdentifier(), Entity.EntityType.POLICY, RISK_SELECTOR);
-    backend.updateEntityRelations(
-        RelationUpdate.of(
-            SupportsRelationOperations.Type.POLICY_TAG_REL,
-            tag.nameIdentifier(),
-            Entity.EntityType.TAG,
-            new RelationEdgeTarget[] {riskTarget},
-            new RelationEdgeTarget[0]));
-    byTag =
-        backend.batchListEntitiesByRelation(
-            SupportsRelationOperations.Type.POLICY_TAG_REL,
-            Collections.singletonList(tag.nameIdentifier()),
-            Entity.EntityType.TAG);
-    Assertions.assertEquals(1, byTag.size());
-    Assertions.assertEquals(FINANCE_SELECTOR, byTag.get(0).relationValue().orElse(null));
-
-    backend.updateEntityRelations(
-        RelationUpdate.of(
-            SupportsRelationOperations.Type.POLICY_TAG_REL,
-            tag.nameIdentifier(),
-            Entity.EntityType.TAG,
-            new RelationEdgeTarget[] {riskTarget},
-            new RelationEdgeTarget[] {financeTarget}));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            backend.updateEntityRelations(
+                RelationUpdate.of(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    tag.nameIdentifier(),
+                    Entity.EntityType.TAG,
+                    new RelationEdgeTarget[] {riskTarget},
+                    new RelationEdgeTarget[] {financeTarget})));
     List<RelationalEntity<?>> byPolicy =
         backend.batchListEntitiesByRelation(
             SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -148,7 +148,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     Assertions.assertEquals(policy.nameIdentifier(), byPolicy.get(0).source());
     Assertions.assertEquals(Entity.EntityType.POLICY, byPolicy.get(0).sourceType());
     Assertions.assertEquals(tag, byPolicy.get(0).targetEntity());
-    Assertions.assertEquals(RISK_SELECTOR, byPolicy.get(0).relationValue().orElse(null));
+    Assertions.assertEquals(FINANCE_SELECTOR, byPolicy.get(0).relationValue().orElse(null));
 
     RelationUpdate removeUpdate =
         RelationUpdate.of(
@@ -156,7 +156,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
             tag.nameIdentifier(),
             Entity.EntityType.TAG,
             new RelationEdgeTarget[0],
-            new RelationEdgeTarget[] {riskTarget});
+            new RelationEdgeTarget[] {financeTarget});
     backend.updateEntityRelations(removeUpdate);
     backend.updateEntityRelations(removeUpdate);
     Assertions.assertTrue(
@@ -238,6 +238,47 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDuplicateAddRollsBackAllRelationWrites() throws IOException {
+    createAndInsertMakeLake(METALAKE);
+    TagEntity tag = createAssociation(METALAKE, "domain", "retention");
+    PolicyEntity newPolicy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE),
+            "new_policy",
+            AUDIT_INFO);
+    backend.insert(newPolicy, false);
+
+    RelationEdgeTarget newTarget =
+        RelationEdgeTarget.of(newPolicy.nameIdentifier(), Entity.EntityType.POLICY, null);
+    RelationEdgeTarget existingTarget =
+        RelationEdgeTarget.of(
+            NameIdentifierUtil.ofPolicy(METALAKE, "retention"), Entity.EntityType.POLICY, null);
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            backend.updateEntityRelations(
+                RelationUpdate.of(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    tag.nameIdentifier(),
+                    Entity.EntityType.TAG,
+                    new RelationEdgeTarget[] {newTarget, existingTarget},
+                    new RelationEdgeTarget[0])));
+
+    List<RelationalEntity<?>> relations =
+        backend.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Collections.singletonList(tag.nameIdentifier()),
+            Entity.EntityType.TAG);
+    Assertions.assertEquals(1, relations.size());
+    Assertions.assertEquals("retention", relations.get(0).targetEntity().name());
+    Assertions.assertNull(
+        SessionUtils.getWithoutCommit(
+            PolicyTagRelMapper.class,
+            mapper -> mapper.getByPolicyIdAndTagId(newPolicy.id(), tag.id())));
+  }
+
+  @TestTemplate
   public void testEntityDeletesCascadePolicyTagRelations() throws IOException {
     createAndInsertMakeLake(METALAKE);
     TagEntity policyDeletedTag =
@@ -285,16 +326,28 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testConcurrentIdenticalAddsAreIdempotent() throws Exception {
+  public void testConcurrentInsertsHaveOneWinner() throws Exception {
     createAndInsertMakeLake(METALAKE);
     RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
-    RelationUpdate add = relationUpdate(endpoints, null, true);
+    PolicyTagRelPO relation = newRelation(endpoints, null);
+    CyclicBarrier bothObservedAbsent = new CyclicBarrier(2);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    List<Integer> affectedRows;
+    try {
+      Future<Integer> first = executor.submit(concurrentInsertTask(relation, bothObservedAbsent));
+      Future<Integer> second = executor.submit(concurrentInsertTask(relation, bothObservedAbsent));
+      affectedRows =
+          Arrays.asList(first.get(20, TimeUnit.SECONDS), second.get(20, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+    }
+    Collections.sort(affectedRows);
 
-    runConcurrently(() -> updateRelationsUnchecked(add), () -> updateRelationsUnchecked(add));
-
-    PolicyTagRelPO relation = getRelation(endpoints);
-    Assertions.assertNotNull(relation);
-    Assertions.assertEquals(1L, relation.getCurrentVersion());
+    Assertions.assertEquals(Arrays.asList(0, 1), affectedRows);
+    PolicyTagRelPO persisted = getRelation(endpoints);
+    Assertions.assertNotNull(persisted);
+    Assertions.assertNotNull(persisted.getId());
+    Assertions.assertEquals(1L, persisted.getCurrentVersion());
     Assertions.assertEquals(
         1L,
         queryForLong(
@@ -316,13 +369,35 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
     Assertions.assertEquals(
         Integer.valueOf(0),
         SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(replacement)));
+            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(replacement)));
 
     PolicyTagRelPO current = getRelation(endpoints);
     Assertions.assertEquals(
         Integer.valueOf(1),
         SessionUtils.doWithCommitAndFetchResult(
-            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPair(current)));
+            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(current)));
+  }
+
+  @TestTemplate
+  public void testStaleRelationCannotDeleteRecreatedRow() throws Exception {
+    createAndInsertMakeLake(METALAKE);
+    RelationEndpoints endpoints = createEndpoints(METALAKE, "domain", "retention");
+    backend.updateEntityRelations(relationUpdate(endpoints, null, true));
+    PolicyTagRelPO stale = getRelation(endpoints);
+
+    backend.updateEntityRelations(relationUpdate(endpoints, null, false));
+    backend.updateEntityRelations(relationUpdate(endpoints, null, true));
+    PolicyTagRelPO recreated = getRelation(endpoints);
+    Assertions.assertNotEquals(stale.getId(), recreated.getId());
+
+    Assertions.assertEquals(
+        Integer.valueOf(0),
+        SessionUtils.doWithCommitAndFetchResult(
+            PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(stale)));
+
+    PolicyTagRelPO current = getRelation(endpoints);
+    Assertions.assertNotNull(current);
+    Assertions.assertEquals(recreated.getId(), current.getId());
   }
 
   @TestTemplate
@@ -455,6 +530,7 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
 
   private PolicyTagRelPO copyWithVersion(PolicyTagRelPO relation, long version) {
     return PolicyTagRelPO.builder()
+        .withId(relation.getId())
         .withPolicyId(relation.getPolicyId())
         .withTagId(relation.getTagId())
         .withSelector(relation.getSelector())
@@ -465,36 +541,33 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
         .build();
   }
 
-  private void runConcurrently(Runnable first, Runnable second) throws Exception {
-    ExecutorService executor = Executors.newFixedThreadPool(2);
-    CyclicBarrier start = new CyclicBarrier(3);
-    Callable<Void> firstTask = concurrentTask(start, first);
-    Callable<Void> secondTask = concurrentTask(start, second);
-    try {
-      Future<Void> firstFuture = executor.submit(firstTask);
-      Future<Void> secondFuture = executor.submit(secondTask);
-      start.await(10, TimeUnit.SECONDS);
-      firstFuture.get(10, TimeUnit.SECONDS);
-      secondFuture.get(10, TimeUnit.SECONDS);
-    } finally {
-      executor.shutdownNow();
-    }
+  private PolicyTagRelPO newRelation(RelationEndpoints endpoints, String selector) {
+    return PolicyTagRelPO.builder()
+        .withPolicyId(endpoints.policy.id())
+        .withTagId(endpoints.tag.id())
+        .withSelector(selector)
+        .withAuditInfo("{}")
+        .withCurrentVersion(1L)
+        .withLastVersion(1L)
+        .withDeletedAt(0L)
+        .build();
   }
 
-  private Callable<Void> concurrentTask(CyclicBarrier start, Runnable operation) {
+  private Callable<Integer> concurrentInsertTask(
+      PolicyTagRelPO relation, CyclicBarrier bothObservedAbsent) {
     return () -> {
-      start.await(10, TimeUnit.SECONDS);
-      operation.run();
-      return null;
+      try (SqlSession sqlSession =
+          SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(false)) {
+        PolicyTagRelMapper mapper = sqlSession.getMapper(PolicyTagRelMapper.class);
+        PolicyTagRelPO observed =
+            mapper.getByPolicyIdAndTagId(relation.getPolicyId(), relation.getTagId());
+        bothObservedAbsent.await(10, TimeUnit.SECONDS);
+        Assertions.assertNull(observed);
+        int inserted = mapper.insertIfAbsent(relation);
+        sqlSession.commit();
+        return inserted;
+      }
     };
-  }
-
-  private void updateRelationsUnchecked(RelationUpdate update) {
-    try {
-      backend.updateEntityRelations(update);
-    } catch (IOException e) {
-      throw new UncheckedIOException(e);
-    }
   }
 
   private long queryForLong(String sql) throws SQLException {

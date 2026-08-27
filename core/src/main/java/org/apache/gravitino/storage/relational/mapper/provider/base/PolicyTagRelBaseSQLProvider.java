@@ -51,9 +51,9 @@ public class PolicyTagRelBaseSQLProvider {
         + activePredicates();
   }
 
-  /** Returns SQL for inserting one relation. */
-  public String insert(@Param("relation") PolicyTagRelPO relation) {
-    return "INSERT INTO "
+  /** Returns SQL for inserting one relation if the active pair does not exist. */
+  public String insertIfAbsent(@Param("relation") PolicyTagRelPO relation) {
+    return "INSERT IGNORE INTO "
         + POLICY_TAG_RELATION_TABLE_NAME
         + " (policy_id, tag_id, selector, audit_info, current_version, last_version, deleted_at)"
         + " VALUES (#{relation.policyId}, #{relation.tagId}, #{relation.selector},"
@@ -62,13 +62,13 @@ public class PolicyTagRelBaseSQLProvider {
   }
 
   /** Returns SQL for soft-deleting one relation. */
-  public String softDeleteByPair(@Param("relation") PolicyTagRelPO relation) {
+  public String softDeleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation) {
     return "UPDATE "
         + POLICY_TAG_RELATION_TABLE_NAME
         + " SET deleted_at = "
         + deletedAtNowExpression()
-        + " WHERE policy_id = #{relation.policyId} AND tag_id = #{relation.tagId}"
-        + " AND current_version = #{relation.currentVersion} AND deleted_at = 0";
+        + " WHERE id = #{relation.id} AND current_version = #{relation.currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   /** Returns SQL for soft-deleting relations when a metalake is deleted. */
@@ -124,7 +124,7 @@ public class PolicyTagRelBaseSQLProvider {
   }
 
   private String selectColumns() {
-    return "SELECT ptr.policy_id AS policyId, pm.policy_name AS policyName,"
+    return "SELECT ptr.id AS id, ptr.policy_id AS policyId, pm.policy_name AS policyName,"
         + " ptr.tag_id AS tagId, tm.tag_name AS tagName, ptr.selector,"
         + " ptr.audit_info AS auditInfo, ptr.current_version AS currentVersion,"
         + " ptr.last_version AS lastVersion, ptr.deleted_at AS deletedAt";

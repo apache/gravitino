@@ -21,10 +21,22 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper.POLICY_TAG_RELATION_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyTagRelBaseSQLProvider;
+import org.apache.gravitino.storage.relational.po.PolicyTagRelPO;
 import org.apache.ibatis.annotations.Param;
 
 /** PostgreSQL SQL provider for policy-to-tag relations. */
 public class PolicyTagRelPostgreSQLProvider extends PolicyTagRelBaseSQLProvider {
+
+  @Override
+  public String insertIfAbsent(@Param("relation") PolicyTagRelPO relation) {
+    return "INSERT INTO "
+        + POLICY_TAG_RELATION_TABLE_NAME
+        + " (policy_id, tag_id, selector, audit_info, current_version, last_version, deleted_at)"
+        + " VALUES (#{relation.policyId}, #{relation.tagId}, #{relation.selector},"
+        + " #{relation.auditInfo}, #{relation.currentVersion}, #{relation.lastVersion},"
+        + " #{relation.deletedAt})"
+        + " ON CONFLICT (policy_id, tag_id, deleted_at) DO NOTHING";
+  }
 
   @Override
   public String deleteByLegacyTimeline(

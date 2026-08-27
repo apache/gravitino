@@ -26,6 +26,7 @@ import lombok.Getter;
 /** Persistent object for a policy-to-tag relation row. */
 @Getter
 public class PolicyTagRelPO {
+  private Long id;
   private Long policyId;
   private String policyName;
   private Long tagId;
@@ -52,7 +53,8 @@ public class PolicyTagRelPO {
       return false;
     }
     PolicyTagRelPO that = (PolicyTagRelPO) o;
-    return Objects.equal(policyId, that.policyId)
+    return Objects.equal(id, that.id)
+        && Objects.equal(policyId, that.policyId)
         && Objects.equal(policyName, that.policyName)
         && Objects.equal(tagId, that.tagId)
         && Objects.equal(tagName, that.tagName)
@@ -66,6 +68,7 @@ public class PolicyTagRelPO {
   @Override
   public int hashCode() {
     return Objects.hashCode(
+        id,
         policyId,
         policyName,
         tagId,
@@ -83,6 +86,12 @@ public class PolicyTagRelPO {
 
     private Builder() {
       relation = new PolicyTagRelPO();
+    }
+
+    /** Sets the relation row ID. */
+    public Builder withId(Long id) {
+      relation.id = id;
+      return this;
     }
 
     /** Sets the policy ID. */

@@ -65,12 +65,13 @@ public interface PolicyTagRelMapper {
       @Param("policyId") Long policyId, @Param("tagId") Long tagId);
 
   /**
-   * Inserts a policy-to-tag relation.
+   * Inserts a policy-to-tag relation if the active pair does not exist.
    *
    * @param relation The relation to insert.
+   * @return The number of inserted rows.
    */
-  @InsertProvider(type = PolicyTagRelSQLProviderFactory.class, method = "insert")
-  void insert(@Param("relation") PolicyTagRelPO relation);
+  @InsertProvider(type = PolicyTagRelSQLProviderFactory.class, method = "insertIfAbsent")
+  int insertIfAbsent(@Param("relation") PolicyTagRelPO relation);
 
   /**
    * Soft-deletes one active relation.
@@ -78,8 +79,8 @@ public interface PolicyTagRelMapper {
    * @param relation The observed relation and version.
    * @return The number of updated rows.
    */
-  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByPair")
-  int softDeleteByPair(@Param("relation") PolicyTagRelPO relation);
+  @UpdateProvider(type = PolicyTagRelSQLProviderFactory.class, method = "softDeleteByIdAndVersion")
+  int softDeleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation);
 
   /**
    * Soft-deletes active relations in a metalake.

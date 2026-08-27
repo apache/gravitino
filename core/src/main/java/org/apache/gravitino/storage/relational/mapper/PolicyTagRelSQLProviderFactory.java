@@ -67,14 +67,14 @@ public class PolicyTagRelSQLProviderFactory {
     return getProvider().getByPolicyIdAndTagId(policyId, tagId);
   }
 
-  /** Delegates a relation insert. */
-  public static String insert(@Param("relation") PolicyTagRelPO relation) {
-    return getProvider().insert(relation);
+  /** Delegates an insert-if-absent operation. */
+  public static String insertIfAbsent(@Param("relation") PolicyTagRelPO relation) {
+    return getProvider().insertIfAbsent(relation);
   }
 
   /** Delegates a relation soft delete. */
-  public static String softDeleteByPair(@Param("relation") PolicyTagRelPO relation) {
-    return getProvider().softDeleteByPair(relation);
+  public static String softDeleteByIdAndVersion(@Param("relation") PolicyTagRelPO relation) {
+    return getProvider().softDeleteByIdAndVersion(relation);
   }
 
   /** Delegates metalake deletion cleanup. */
