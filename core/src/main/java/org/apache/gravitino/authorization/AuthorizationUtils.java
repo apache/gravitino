@@ -570,19 +570,21 @@ public class AuthorizationUtils {
 
             case FILESET:
               if ("fileset".equals(catalogObj.provider())) {
-                if (schema.properties().containsKey(FILESET_SCHEMA_LOCATION)) {
-                  String schemaLocation = schema.properties().get(FILESET_SCHEMA_LOCATION);
-                  if (StringUtils.isNotBlank(schemaLocation)) {
+                String schemaLocation =
+                    schema.properties() == null
+                        ? null
+                        : schema.properties().get(FILESET_SCHEMA_LOCATION);
+                if (StringUtils.isNotBlank(schemaLocation)) {
+                  locations.add(schemaLocation);
+                } else if (catalogObj.properties() != null
+                    && catalogObj.properties().containsKey(FILESET_CATALOG_LOCATION)) {
+                  String catalogLocation = catalogObj.properties().get(FILESET_CATALOG_LOCATION);
+                  if (StringUtils.isNotBlank(catalogLocation)) {
+                    schemaLocation = catalogLocation + "/" + schema.name();
                     locations.add(schemaLocation);
-                  } else if (catalogObj.properties().containsKey(FILESET_CATALOG_LOCATION)) {
-                    String catalogLocation = catalogObj.properties().get(FILESET_CATALOG_LOCATION);
-                    if (StringUtils.isNotBlank(catalogLocation)) {
-                      schemaLocation = catalogLocation + "/" + schema.name();
-                      locations.add(schemaLocation);
-                    }
-                  } else {
-                    LOG.warn("Schema {} location is not found", ident);
                   }
+                } else {
+                  LOG.warn("Schema {} location is not found", ident);
                 }
               }
               break;
