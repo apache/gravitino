@@ -46,6 +46,19 @@ val venvPython = when {
     venvDir.resolve("bin/python").absolutePath
 }
 
+// The formatters are invoked through their console scripts rather than `python -m <tool>`:
+// isort 9 no longer ships an `__main__` module, so `python -m isort` cannot be executed.
+fun venvExecutable(name: String): String = when {
+  System.getProperty("os.name").contains("win", ignoreCase = true) ->
+    venvDir.resolve("Scripts/$name.exe").absolutePath
+  else ->
+    venvDir.resolve("bin/$name").absolutePath
+}
+
+// Pinned so that a new formatter release cannot change the outcome of the format check in CI.
+val blackRequirement = "black==26.5.1"
+val isortRequirement = "isort==9.0.0"
+
 tasks {
   register<Exec>("installUv") {
     group = "python"
@@ -160,7 +173,7 @@ tasks {
     workingDir(pythonProjectDir)
 
     doFirst {
-      commandLine(getUvExecutable(), "pip", "install", "--python", venvPython, "black", "isort")
+      commandLine(getUvExecutable(), "pip", "install", "--python", venvPython, blackRequirement, isortRequirement)
     }
 
     doLast {
@@ -213,13 +226,13 @@ tasks {
       // Apply isort
       exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "isort", "mcp_server", "tests")
+        commandLine(venvExecutable("isort"), "mcp_server", "tests")
       }
 
       // Apply Black
       exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "black", "mcp_server", "tests")
+        commandLine(venvExecutable("black"), "mcp_server", "tests")
       }
 
       logger.lifecycle("Python formatting applied (isort + Black)")
@@ -234,7 +247,7 @@ tasks {
     doLast {
       val isortExitCode = exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "isort", "--check", "mcp_server", "tests")
+        commandLine(venvExecutable("isort"), "--check", "mcp_server", "tests")
         isIgnoreExitValue = false
       }.exitValue
 
@@ -244,7 +257,7 @@ tasks {
 
       val blackExitCode = exec {
         workingDir = pythonProjectDir
-        commandLine(venvPython, "-m", "black", "--check", "mcp_server", "tests")
+        commandLine(venvExecutable("black"), "--check", "mcp_server", "tests")
         isIgnoreExitValue = false
       }.exitValue
 
