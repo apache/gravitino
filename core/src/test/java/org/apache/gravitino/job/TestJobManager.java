@@ -863,6 +863,98 @@ public class TestJobManager {
   }
 
   @Test
+  public void testPullJobStatusDoesNotRegressConcurrentlyFinishedJob() throws IOException {
+    // listJobs() observes the job as QUEUED, but by the time entityStore.update() re-fetches it,
+    // a concurrent writer (e.g. another poll run) has already finished the job with a different
+    // terminal status. The stale QUEUED snapshot - and the executor status derived from it - must
+    // not be allowed to regress that terminal state or clobber its recorded startedAt/finishedAt.
+    JobEntity queuedSnapshot = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    JobEntity latestSucceeded =
+        JobEntity.builder()
+            .withId(queuedSnapshot.id())
+            .withJobExecutionId(queuedSnapshot.jobExecutionId())
+            .withNamespace(queuedSnapshot.namespace())
+            .withJobTemplateName(queuedSnapshot.jobTemplateName())
+            .withStatus(JobHandle.Status.SUCCEEDED)
+            .withAuditInfo(queuedSnapshot.auditInfo())
+            .withStartedAt(12345L)
+            .withFinishedAt(67890L)
+            .build();
+
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
+    when(jobManager.listJobs(metalake, Optional.empty()))
+        .thenReturn(ImmutableList.of(queuedSnapshot));
+    stubEntityStoreUpdateToApply(latestSucceeded);
+    // The stale QUEUED snapshot leads the poll to observe (and try to apply) FAILED - a
+    // different terminal status than the one the job has actually already settled into.
+    when(jobExecutor.getJobStatus(queuedSnapshot.jobExecutionId()))
+        .thenReturn(JobHandle.Status.FAILED);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity result = captureUpdatedJobEntity(latestSucceeded);
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, result.status());
+    Assertions.assertEquals(12345L, result.startedAt());
+    Assertions.assertEquals(67890L, result.finishedAt());
+  }
+
+  @Test
+  public void testPullJobStatusDoesNotRegressConcurrentlyCancellingJob() throws IOException {
+    // listJobs() observes the job as QUEUED, but a concurrent cancelJob() moves it to CANCELLING
+    // before entityStore.update() re-fetches it. The executor reports STARTED for this poll
+    // (a legitimate observation for the same jobExecutionId) - that must not move the job back
+    // out of CANCELLING, nor overwrite the startedAt it already carries.
+    JobEntity queuedSnapshot = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    JobEntity latestCancelling =
+        JobEntity.builder()
+            .withId(queuedSnapshot.id())
+            .withJobExecutionId(queuedSnapshot.jobExecutionId())
+            .withNamespace(queuedSnapshot.namespace())
+            .withJobTemplateName(queuedSnapshot.jobTemplateName())
+            .withStatus(JobHandle.Status.CANCELLING)
+            .withAuditInfo(queuedSnapshot.auditInfo())
+            .withStartedAt(12345L)
+            .withFinishedAt(0L)
+            .build();
+
+    BaseMetalake mockMetalake =
+        BaseMetalake.builder()
+            .withName(metalake)
+            .withId(idGenerator.nextId())
+            .withVersion(SchemaVersion.V_0_1)
+            .withAuditInfo(AuditInfo.EMPTY)
+            .build();
+    when(entityStore.list(Namespace.empty(), BaseMetalake.class, Entity.EntityType.METALAKE))
+        .thenReturn(ImmutableList.of(mockMetalake));
+    mockedMetalake
+        .when(() -> MetalakeManager.listInUseMetalakes(entityStore))
+        .thenReturn(ImmutableList.of(metalake));
+
+    when(jobManager.listJobs(metalake, Optional.empty()))
+        .thenReturn(ImmutableList.of(queuedSnapshot));
+    stubEntityStoreUpdateToApply(latestCancelling);
+    when(jobExecutor.getJobStatus(queuedSnapshot.jobExecutionId()))
+        .thenReturn(JobHandle.Status.STARTED);
+    Assertions.assertDoesNotThrow(() -> jobManager.pullAndUpdateJobStatus());
+
+    JobEntity result = captureUpdatedJobEntity(latestCancelling);
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, result.status());
+    Assertions.assertEquals(12345L, result.startedAt());
+    Assertions.assertEquals(0L, result.finishedAt());
+  }
+
+  @Test
   public void testCleanUpStagingDirs() throws IOException, InterruptedException {
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.STARTED);
     BaseMetalake mockMetalake =
