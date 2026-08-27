@@ -26,7 +26,6 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.ofFileset;
 
 import java.io.IOException;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -52,9 +51,11 @@ import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
@@ -387,6 +388,60 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   private Pair<Schema, SchemaChange[]> alterSchemaUnderLock(
       NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
       throws NoSuchSchemaException {
+    if (isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)) {
+      return alterManagedSchemaUnderLock(ident, changes);
+    }
+    return alterExternalSchemaUnderLock(ident, catalogIdent, changes);
+  }
+
+  private Pair<Schema, SchemaChange[]> alterManagedSchemaUnderLock(
+      NameIdentifier ident, SchemaChange... changes) throws NoSuchSchemaException {
+    validateAlterProperties(ident, HasPropertyMetadata::schemaPropertiesMetadata, changes);
+
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    SchemaChange[][] effectiveChangesHolder = new SchemaChange[1][];
+    boolean alterCommitted = false;
+    try {
+      SchemaEntity updatedEntity =
+          store.update(
+              ident,
+              SchemaEntity.class,
+              SCHEMA,
+              existing -> {
+                Map<String, String> currentProperties =
+                    existing.properties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.properties());
+                Pair<SchemaChange[], List<SecretMaterial>> secretResult =
+                    SecretAlterChanges.prepareSchemaChanges(
+                        secretManager, currentProperties, existing.id(), changes);
+                writtenSecretMaterials.set(secretResult.getRight());
+                effectiveChangesHolder[0] = secretResult.getLeft();
+                return SchemaEntityChanges.apply(ident, existing, secretResult.getLeft());
+              });
+      alterCommitted = true;
+      Schema alteredSchema =
+          ManagedSchemaOperations.ManagedSchema.builder()
+              .withName(ident.name())
+              .withComment(updatedEntity.comment())
+              .withProperties(updatedEntity.properties())
+              .withAuditInfo(updatedEntity.auditInfo())
+              .build();
+      return Pair.of(alteredSchema, effectiveChangesHolder[0]);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchSchemaException(e, "Schema %s does not exist", ident);
+    } catch (IOException e) {
+      throw new RuntimeException("Failed to alter schema " + ident, e);
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
+    }
+  }
+
+  private Pair<Schema, SchemaChange[]> alterExternalSchemaUnderLock(
+      NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
+      throws NoSuchSchemaException {
     Schema currentSchema =
         doWithCatalog(
             catalogIdent,
@@ -417,12 +472,13 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       entityIdForSecrets = 0L;
     }
 
-    List<SecretMaterial> writtenSecretMaterials = List.of();
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
       Pair<SchemaChange[], List<SecretMaterial>> secretResult =
-          prepareSchemaSecretChanges(currentProperties, entityIdForSecrets, changes);
-      writtenSecretMaterials = secretResult.getRight();
+          SecretAlterChanges.prepareSchemaChanges(
+              secretManager, currentProperties, entityIdForSecrets, changes);
+      writtenSecretMaterials.set(secretResult.getRight());
       SchemaChange[] effectiveChanges = secretResult.getLeft();
 
       Schema alteredSchema =
@@ -434,7 +490,7 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
       return Pair.of(alteredSchema, effectiveChanges);
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials);
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
       }
     }
   }
@@ -668,55 +724,5 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
                 HasPropertyMetadata::schemaPropertiesMetadata,
                 schema.properties()))
         .withImported(schemaEntity != null);
-  }
-
-  /**
-   * Rewrites schema changes that involve secrets into plain setProperty / removeProperty, writing
-   * secrets as needed. Rolls back any written materials if preparation fails.
-   *
-   * @param currentProperties current schema properties (may be null)
-   * @param entityId schema entity id
-   * @param changes schema changes
-   * @return effective changes and written write-through materials
-   */
-  private Pair<SchemaChange[], List<SecretMaterial>> prepareSchemaSecretChanges(
-      @Nullable Map<String, String> currentProperties, long entityId, SchemaChange... changes) {
-    Map<String, String> properties =
-        currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
-    List<SchemaChange> out = new ArrayList<>(changes.length);
-    List<SecretMaterial> written = new ArrayList<>();
-    try {
-      for (SchemaChange change : changes) {
-        if (change instanceof SchemaChange.SetSecretBinding) {
-          SchemaChange.SetSecretBinding c = (SchemaChange.SetSecretBinding) change;
-          String urn =
-              secretManager.alterSetSecretBinding(
-                  properties, "schema", entityId, c.getProperty(), c.getBinding(), written);
-          out.add(SchemaChange.setProperty(c.getProperty(), urn));
-        } else if (change instanceof SchemaChange.SetSecretReference) {
-          SchemaChange.SetSecretReference c = (SchemaChange.SetSecretReference) change;
-          String urn =
-              secretManager.alterSetSecretReference(
-                  properties, "schema", entityId, c.getProperty(), c.getReference());
-          out.add(SchemaChange.setProperty(c.getProperty(), urn));
-        } else if (change instanceof SchemaChange.SetProperty) {
-          SchemaChange.SetProperty c = (SchemaChange.SetProperty) change;
-          String value =
-              secretManager.alterSetProperty(
-                  properties, "schema", entityId, c.getProperty(), c.getValue());
-          out.add(SchemaChange.setProperty(c.getProperty(), value));
-        } else if (change instanceof SchemaChange.RemoveProperty) {
-          SchemaChange.RemoveProperty c = (SchemaChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(properties, "schema", entityId, c.getProperty());
-          out.add(change);
-        } else {
-          out.add(change);
-        }
-      }
-      return Pair.of(out.toArray(new SchemaChange[0]), List.copyOf(written));
-    } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(written);
-      throw e;
-    }
   }
 }

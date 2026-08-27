@@ -108,9 +108,11 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
@@ -978,7 +980,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
                         : new HashMap<>(existing.getProperties());
 
                 Pair<CatalogChange[], List<SecretMaterial>> secretResult =
-                    prepareCatalogSecretChanges(currentProperties, existing.id(), changes);
+                    SecretAlterChanges.prepareCatalogChanges(
+                        secretManager, currentProperties, existing.id(), changes);
                 writtenSecretMaterials.set(secretResult.getRight());
                 CatalogChange[] effectiveChanges = secretResult.getLeft();
 
@@ -999,19 +1002,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
       if (!alterCommitted) {
         secretManager.rollbackSecrets(writtenSecretMaterials.get());
       }
-    }
-  }
-
-  /** Mutable holder so {@code store.update} lambdas can record written secrets for rollback. */
-  private static final class SecretMaterialsHolder {
-    private List<SecretMaterial> materials = List.of();
-
-    private List<SecretMaterial> get() {
-      return materials;
-    }
-
-    private void set(List<SecretMaterial> materials) {
-      this.materials = materials;
     }
   }
 
@@ -1266,56 +1256,6 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // load catalog-related configuration from catalog-specific configuration file
     Map<String, String> catalogSpecificConfig = loadCatalogSpecificConfig(newProperties, provider);
     return mergeConf(newProperties, catalogSpecificConfig);
-  }
-
-  /**
-   * Rewrites catalog changes that involve secrets into plain setProperty / removeProperty, writing
-   * secrets as needed. Rolls back any written materials if preparation fails.
-   *
-   * @param currentProperties current catalog properties (may be null)
-   * @param entityId catalog entity id
-   * @param changes catalog changes
-   * @return effective changes and written write-through materials
-   */
-  private Pair<CatalogChange[], List<SecretMaterial>> prepareCatalogSecretChanges(
-      @Nullable Map<String, String> currentProperties, long entityId, CatalogChange... changes) {
-    Map<String, String> properties =
-        currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
-    List<CatalogChange> out = new ArrayList<>(changes.length);
-    List<SecretMaterial> written = new ArrayList<>();
-    try {
-      for (CatalogChange change : changes) {
-        if (change instanceof CatalogChange.SetSecretBinding) {
-          CatalogChange.SetSecretBinding c = (CatalogChange.SetSecretBinding) change;
-          String urn =
-              secretManager.alterSetSecretBinding(
-                  properties, "catalog", entityId, c.getProperty(), c.getBinding(), written);
-          out.add(CatalogChange.setProperty(c.getProperty(), urn));
-        } else if (change instanceof CatalogChange.SetSecretReference) {
-          CatalogChange.SetSecretReference c = (CatalogChange.SetSecretReference) change;
-          String urn =
-              secretManager.alterSetSecretReference(
-                  properties, "catalog", entityId, c.getProperty(), c.getReference());
-          out.add(CatalogChange.setProperty(c.getProperty(), urn));
-        } else if (change instanceof CatalogChange.SetProperty) {
-          CatalogChange.SetProperty c = (CatalogChange.SetProperty) change;
-          String value =
-              secretManager.alterSetProperty(
-                  properties, "catalog", entityId, c.getProperty(), c.getValue());
-          out.add(CatalogChange.setProperty(c.getProperty(), value));
-        } else if (change instanceof CatalogChange.RemoveProperty) {
-          CatalogChange.RemoveProperty c = (CatalogChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(properties, "catalog", entityId, c.getProperty());
-          out.add(change);
-        } else {
-          out.add(change);
-        }
-      }
-      return Pair.of(out.toArray(new CatalogChange[0]), List.copyOf(written));
-    } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(written);
-      throw e;
-    }
   }
 
   private Pair<Map<String, String>, Map<String, String>> getCatalogAlterProperty(
