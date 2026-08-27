@@ -23,6 +23,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableMap;
+import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -31,6 +33,8 @@ import lombok.ToString;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.rest.RESTRequest;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 
 /** Request to update a fileset. */
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -48,7 +52,13 @@ import org.apache.gravitino.rest.RESTRequest;
       name = "setProperty"),
   @JsonSubTypes.Type(
       value = FilesetUpdateRequest.RemoveFilesetPropertiesRequest.class,
-      name = "removeProperty")
+      name = "removeProperty"),
+  @JsonSubTypes.Type(
+      value = FilesetUpdateRequest.SetFilesetSecretBindingRequest.class,
+      name = "setSecretBinding"),
+  @JsonSubTypes.Type(
+      value = FilesetUpdateRequest.SetFilesetSecretReferenceRequest.class,
+      name = "setSecretReference")
 })
 public interface FilesetUpdateRequest extends RESTRequest {
 
@@ -204,5 +214,75 @@ public interface FilesetUpdateRequest extends RESTRequest {
      */
     @Override
     public void validate() throws IllegalArgumentException {}
+  }
+
+  /** The fileset update request for binding a write-through secret to a property. */
+  @EqualsAndHashCode
+  @NoArgsConstructor(force = true)
+  @AllArgsConstructor
+  @ToString(exclude = "plaintext")
+  class SetFilesetSecretBindingRequest implements FilesetUpdateRequest {
+
+    @Getter
+    @JsonProperty("property")
+    private final String property;
+
+    @Getter
+    @JsonProperty("provider")
+    private final String provider;
+
+    @Getter
+    @JsonProperty("plaintext")
+    private final String plaintext;
+
+    @Override
+    public FilesetChange filesetChange() {
+      return FilesetChange.setSecretBinding(property, new SecretBinding(provider, plaintext));
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(provider), "\"provider\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          plaintext != null, "\"plaintext\" field is required and cannot be null");
+    }
+  }
+
+  /** The fileset update request for binding an external secret reference to a property. */
+  @EqualsAndHashCode
+  @NoArgsConstructor(force = true)
+  @AllArgsConstructor
+  @ToString
+  class SetFilesetSecretReferenceRequest implements FilesetUpdateRequest {
+
+    @Getter
+    @JsonProperty("property")
+    private final String property;
+
+    @Getter
+    @JsonProperty("provider")
+    private final String provider;
+
+    @Getter
+    @JsonProperty("attributes")
+    private final Map<String, String> attributes;
+
+    @Override
+    public FilesetChange filesetChange() {
+      return FilesetChange.setSecretReference(
+          property,
+          new SecretReference(provider, attributes == null ? ImmutableMap.of() : attributes));
+    }
+
+    @Override
+    public void validate() throws IllegalArgumentException {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(property), "\"property\" field is required and cannot be empty");
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(provider), "\"provider\" field is required and cannot be empty");
+    }
   }
 }
