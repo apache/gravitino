@@ -376,6 +376,14 @@ public class TestPolicyTagRelService extends TestJDBCBackend {
         Integer.valueOf(1),
         SessionUtils.doWithCommitAndFetchResult(
             PolicyTagRelMapper.class, mapper -> mapper.softDeleteByIdAndVersion(current)));
+    Assertions.assertEquals(
+        2L,
+        queryForLong(
+            "SELECT current_version FROM policy_tag_relation_meta WHERE id = " + observed.getId()));
+    Assertions.assertEquals(
+        2L,
+        queryForLong(
+            "SELECT last_version FROM policy_tag_relation_meta WHERE id = " + observed.getId()));
   }
 
   @TestTemplate

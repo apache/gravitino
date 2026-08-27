@@ -74,7 +74,7 @@ public interface PolicyTagRelMapper {
   int insertIfAbsent(@Param("relation") PolicyTagRelPO relation);
 
   /**
-   * Soft-deletes one active relation.
+   * Soft-deletes one active relation and advances its optimistic-concurrency version.
    *
    * @param relation The observed relation and version.
    * @return The number of updated rows.

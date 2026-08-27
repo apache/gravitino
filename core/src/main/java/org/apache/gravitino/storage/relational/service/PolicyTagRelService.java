@@ -273,6 +273,8 @@ public class PolicyTagRelService {
       return;
     }
 
+    // A zero-row insert means another writer won the active-pair uniqueness race. Re-read the
+    // pair to distinguish an existing relation from another concurrent state transition.
     PolicyTagRelPO winner =
         SessionUtils.getWithoutCommit(
             PolicyTagRelMapper.class, mapper -> mapper.getByPolicyIdAndTagId(policyId, tagId));
