@@ -55,7 +55,10 @@ public class TestLanceConfig {
     LanceConfig lanceConfig = new LanceConfig(properties);
     Assertions.assertEquals("http://localhost:8090", lanceConfig.getNamespaceBackendUri());
     Assertions.assertNull(lanceConfig.getGravitinoMetalake()); // No default, must be configured
+    Assertions.assertFalse(lanceConfig.isGravitinoMetalakeConfigured());
 
+    lanceConfig = new LanceConfig(ImmutableMap.of(LanceConfig.METALAKE_NAME.getKey(), "  "));
+    Assertions.assertFalse(lanceConfig.isGravitinoMetalakeConfigured());
     // Test custom values
     properties =
         ImmutableMap.of(
@@ -66,6 +69,7 @@ public class TestLanceConfig {
     lanceConfig = new LanceConfig(properties);
     Assertions.assertEquals("http://gravitino-server:8090", lanceConfig.getNamespaceBackendUri());
     Assertions.assertEquals("production", lanceConfig.getGravitinoMetalake());
+    Assertions.assertTrue(lanceConfig.isGravitinoMetalakeConfigured());
   }
 
   @Test

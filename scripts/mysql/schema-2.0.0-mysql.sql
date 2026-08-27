@@ -422,6 +422,20 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     KEY `policy_relation_meta_idx_mid` (`metadata_object_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy metadata object relation';
 
+CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `selector` MEDIUMTEXT DEFAULT NULL COMMENT 'policy tag selector JSON, NULL matches tag presence',
+    `audit_info` MEDIUMTEXT NOT NULL COMMENT 'policy tag relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy tag relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `policy_tag_relation_meta_uk_pid_tid_del` (`policy_id`, `tag_id`, `deleted_at`),
+    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin COMMENT 'policy tag relation';
+
 CREATE TABLE IF NOT EXISTS `statistic_meta` (
     `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
     `statistic_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'statistic id',

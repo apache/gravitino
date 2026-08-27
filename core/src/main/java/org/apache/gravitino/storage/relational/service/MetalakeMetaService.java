@@ -49,6 +49,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
@@ -285,6 +286,9 @@ public class MetalakeMetaService {
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
+                    PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
                     PolicyMetaMapper.class,
                     mapper -> mapper.softDeletePolicyMetasByMetalakeId(metalakeId)),
             () ->
@@ -374,6 +378,9 @@ public class MetalakeMetaService {
                 SessionUtils.doWithoutCommit(
                     TagMetadataObjectRelMapper.class,
                     mapper -> mapper.softDeleteTagMetadataObjectRelsByMetalakeId(metalakeId)),
+            () ->
+                SessionUtils.doWithoutCommit(
+                    PolicyTagRelMapper.class, mapper -> mapper.softDeleteByMetalakeId(metalakeId)),
             () ->
                 SessionUtils.doWithoutCommit(
                     OwnerMetaMapper.class,

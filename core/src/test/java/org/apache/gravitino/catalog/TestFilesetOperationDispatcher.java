@@ -401,6 +401,51 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
         "k3");
   }
 
+  @Test
+  public void testAlterRemovePropertyDeletesWriteThroughSecret() throws Exception {
+    try (SecretManager secrets = memorySecretManager()) {
+      AtomicLong nextId = new AtomicLong(9100L);
+      IdGenerator ids = nextId::getAndIncrement;
+      FilesetOperationDispatcher filesets =
+          new FilesetOperationDispatcher(catalogManager, entityStore, ids, secrets);
+      new SchemaOperationDispatcher(catalogManager, entityStore, ids, secrets, filesets)
+          .createSchema(
+              NameIdentifier.of(metalake, catalog, "schema_secret_fileset_remove"),
+              "comment",
+              ImmutableMap.of("k1", "v1"));
+
+      NameIdentifier ident =
+          NameIdentifier.of(
+              metalake, catalog, "schema_secret_fileset_remove", "fileset_secret_remove");
+      Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
+      Map<String, String> locations = Map.of(Fileset.LOCATION_NAME_UNKNOWN, "loc");
+      Map<String, String> props = ImmutableMap.of("k1", "v1");
+      long entityId = nextId.get();
+      filesets.createMultipleLocationFileset(
+          ident, "comment", Fileset.Type.MANAGED, locations, props, bindings, Map.of());
+
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE, "fileset",
+                  SecretConstants.ATTR_ENTITY_ID, String.valueOf(entityId),
+                  SecretConstants.ATTR_PROPERTY_KEY, "k2"));
+      Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+
+      filesets.alterFileset(ident, FilesetChange.removeProperty("k2"));
+
+      Fileset stored =
+          catalogManager
+              .loadCatalogAndWrap(NameIdentifier.of(metalake, catalog))
+              .doWithFilesetOps(ops -> ops.loadFileset(ident));
+      Assertions.assertFalse(stored.properties().containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
+
+      Assertions.assertTrue(filesets.dropFileset(ident));
+    }
+  }
+
   private static SecretManager memorySecretManager() {
     Config c = new Config(false) {};
     Properties p = new Properties();

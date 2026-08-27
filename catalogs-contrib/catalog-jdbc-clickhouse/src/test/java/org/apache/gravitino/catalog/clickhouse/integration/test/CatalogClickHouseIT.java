@@ -20,6 +20,9 @@ package org.apache.gravitino.catalog.clickhouse.integration.test;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.REPLACINGMERGETREE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.SUMMINGMERGETREE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.VERSIONEDCOLLAPSINGMERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -473,8 +476,8 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
-  void testLoadTableFromShowCreateParsing() {
-    String name = GravitinoITUtils.genRandomName("show_create_table");
+  void testLoadTableMetadataFromNativeSql() {
+    String name = GravitinoITUtils.genRandomName("native_table_metadata");
     clickhouseService.executeQuery(
         String.format(
             "CREATE TABLE `%s`.`%s` (\n"
@@ -2917,6 +2920,225 @@ public class CatalogClickHouseIT extends BaseIT {
                     Distributions.NONE,
                     getSortOrders("id"),
                     Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testLoadTableWithProjectionUsesTableSortKey() {
+    String name = GravitinoITUtils.genRandomName("proj_normal");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertTrue(
+        sortOrders[0].expression() instanceof NamedReference,
+        "First sort key should be a named reference");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertTrue(sortOrders[1].expression() instanceof NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+    Assertions.assertEquals(
+        "8192", loaded.properties().get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
+  @Test
+  void testEngineParametersRoundTrip() {
+    // Create a ReplacingMergeTree table with engine parameter via Gravitino API and verify
+    // engine_parameters is preserved on load (round-trip).
+    String name = GravitinoITUtils.genRandomName("engine_params_rpt");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("ts", Types.IntegerType.get(), "version", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, REPLACINGMERGETREE.getValue());
+    properties.put(TableConstants.ENGINE_PARAMETERS, "ts");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "Engine params round-trip test",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "ts",
+        loadedProps.get(TableConstants.ENGINE_PARAMETERS),
+        "engine_parameters 'ts' should survive create→load round-trip");
+
+    // Verify the actual DDL in ClickHouse contains the engine parameter.
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertTrue(
+        createSql.contains("ReplacingMergeTree(ts)"),
+        "SHOW CREATE TABLE should contain ReplacingMergeTree(ts): " + createSql);
+  }
+
+  @Test
+  void testEngineParametersNestedParensRoundTrip() {
+    // SummingMergeTree with multi-column tuple parameter, e.g. SummingMergeTree((a, b)).
+    String name = GravitinoITUtils.genRandomName("engine_params_nested");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("a", Types.IntegerType.get(), "a", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("b", Types.IntegerType.get(), "b", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, SUMMINGMERGETREE.getValue());
+    properties.put(TableConstants.ENGINE_PARAMETERS, "(a, b)");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "Nested parens round-trip",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "(a, b)",
+        loadedProps.get(TableConstants.ENGINE_PARAMETERS),
+        "engine_parameters '(a, b)' should survive round-trip");
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertTrue(
+        createSql.contains("SummingMergeTree((a, b))"),
+        "SHOW CREATE TABLE should contain SummingMergeTree((a, b)): " + createSql);
+  }
+
+  @Test
+  void testEngineParametersMultiParamRoundTrip() {
+    // VersionedCollapsingMergeTree(sign, ver) — multi-parameter engine round-trip.
+    String name = GravitinoITUtils.genRandomName("engine_params_multi");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("sign", Types.ByteType.get(), "sign", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("ver", Types.IntegerType.get(), "ver", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, VERSIONEDCOLLAPSINGMERGETREE.getValue());
+    properties.put(TableConstants.ENGINE_PARAMETERS, "sign, ver");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "Multi-param engine round-trip",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "sign, ver",
+        loadedProps.get(TableConstants.ENGINE_PARAMETERS),
+        "engine_parameters 'sign, ver' should survive round-trip");
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertTrue(
+        createSql.contains("VersionedCollapsingMergeTree(sign, ver)"),
+        "SHOW CREATE TABLE should contain VersionedCollapsingMergeTree(sign, ver): " + createSql);
+  }
+
+  @Test
+  void testEngineParamsLoadFromExistingTable() {
+    // Create a table directly in ClickHouse (bypass Gravitino) with engine parameters,
+    // then load via Gravitino and verify engine_parameters is extracted.
+    String name = GravitinoITUtils.genRandomName("engine_params_load");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32, sign Int8) "
+                + "ENGINE = CollapsingMergeTree(sign) ORDER BY id",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Map<String, String> props = loaded.properties();
+    Assertions.assertEquals(
+        "sign",
+        props.get(TableConstants.ENGINE_PARAMETERS),
+        "CollapsingMergeTree(sign) should have engine_parameters='sign'");
+  }
+
+  @Test
+  void testEngineParamsAbsentForParameterizedNonMergeTreeEngine() {
+    String name = GravitinoITUtils.genRandomName("engine_params_join");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32, payload String) " + "ENGINE = Join(ANY, LEFT, id)",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(ENGINE.JOIN.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertFalse(
+        loaded.properties().containsKey(TableConstants.ENGINE_PARAMETERS),
+        "Parameterized non-MergeTree engines must not expose engine_parameters");
+  }
+
+  @Test
+  void testEngineParamsAbsentForMergeTree() {
+    // MergeTree has no engine parameters — verify the property is not present.
+    String name = GravitinoITUtils.genRandomName("engine_params_none");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, MERGETREE.getValue());
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, cols, "No engine params", properties, Distributions.NONE, getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertFalse(
+        loadedProps.containsKey(TableConstants.ENGINE_PARAMETERS),
+        "MergeTree should not have engine_parameters property");
   }
 
   @Test
