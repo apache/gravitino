@@ -39,13 +39,6 @@ fun getUvExecutable(): String {
   }
 }
 
-val venvPython = when {
-  System.getProperty("os.name").contains("win", ignoreCase = true) ->
-    venvDir.resolve("Scripts/python.exe").absolutePath
-  else ->
-    venvDir.resolve("bin/python").absolutePath
-}
-
 // The formatters are invoked through their console scripts rather than `python -m <tool>`:
 // isort 9 no longer ships an `__main__` module, so `python -m isort` cannot be executed.
 fun venvExecutable(name: String): String = when {
@@ -54,6 +47,8 @@ fun venvExecutable(name: String): String = when {
   else ->
     venvDir.resolve("bin/$name").absolutePath
 }
+
+val venvPython = venvExecutable("python")
 
 // Pinned so that a new formatter release cannot change the outcome of the format check in CI.
 val blackRequirement = "black==26.5.1"
