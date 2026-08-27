@@ -874,6 +874,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
 
       boolean dropped = super.dropSchema(ident, cascade);
       if (disableFSOps) {
+        // No FS cleanup; still remove fileset write-through secrets when cascade deleted them.
+        // Schema secrets are cleaned by SchemaOperationDispatcher.
+        if (dropped && cascade) {
+          for (FilesetEntity fileset : filesets) {
+            secretManager.deleteSecretsFromProperties(fileset.properties());
+          }
+        }
         return dropped;
       }
 
@@ -970,6 +977,16 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             });
         if (exception.get() != null) {
           throw exception.get();
+        }
+      }
+
+      // Cascade store.delete removes fileset entities without
+      // FilesetOperationDispatcher.dropFileset;
+      // clean fileset secrets after FS ops (still need plaintext for mergeUpLevelConfigurations).
+      // Schema secrets are cleaned by SchemaOperationDispatcher.
+      if (cascade) {
+        for (FilesetEntity fileset : filesets) {
+          secretManager.deleteSecretsFromProperties(fileset.properties());
         }
       }
 

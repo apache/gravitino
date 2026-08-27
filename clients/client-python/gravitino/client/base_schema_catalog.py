@@ -16,7 +16,8 @@
 # under the License.
 
 import logging
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
 from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.catalog import Catalog
@@ -29,6 +30,7 @@ from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
@@ -60,6 +62,9 @@ from gravitino.rest.rest_utils import encode_string
 from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
+
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
 
 
 class BaseSchemaCatalog(
@@ -179,6 +184,8 @@ class BaseSchemaCatalog(
         schema_name: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Schema:
         """Create a new schema with specified identifier, comment and metadata.
 
@@ -186,6 +193,8 @@ class BaseSchemaCatalog(
             schema_name: The name of the schema.
             comment: The comment of the schema.
             properties: The properties of the schema.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchCatalogException if the catalog with specified namespace does not exist.
@@ -194,7 +203,13 @@ class BaseSchemaCatalog(
         Returns:
              The created Schema.
         """
-        req = SchemaCreateRequest(encode_string(schema_name), comment, properties)
+        req = SchemaCreateRequest(
+            encode_string(schema_name),
+            comment,
+            properties,
+            secret_bindings,
+            secret_references,
+        )
         req.validate()
 
         resp = self.rest_client.post(

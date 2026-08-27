@@ -110,6 +110,7 @@ public interface Entity extends Serializable {
     SCHEMA,
     TABLE,
     VIEW,
+    SEMANTIC_MODEL,
     COLUMN,
     FILESET,
     TOPIC,

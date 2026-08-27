@@ -170,7 +170,7 @@ public interface FilesetCatalog {
       Map<String, SecretBinding> secretBindings,
       Map<String, SecretReference> secretReferences)
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("Creating a fileset with secrets is not supported");
   }
 
   /**
@@ -258,6 +258,6 @@ public interface FilesetCatalog {
    */
   default String getFileLocation(NameIdentifier ident, String subPath, String locationName)
       throws NoSuchFilesetException, NoSuchLocationNameException {
-    throw new UnsupportedOperationException("Not implemented");
+    throw new UnsupportedOperationException("getFileLocation is not supported");
   }
 }

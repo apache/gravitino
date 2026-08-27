@@ -26,6 +26,16 @@ public class AuthorizationExpressionConstants {
           ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA)
            """;
 
+  /**
+   * Authorizes a schema existence probe. CREATE_SCHEMA is intentionally included because clients
+   * commonly check whether a schema exists before attempting to create it.
+   */
+  public static final String PROBE_SCHEMA_AUTHORIZATION_EXPRESSION =
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA || ANY_CREATE_SCHEMA)
+          """;
+
   public static final String LOAD_MODEL_AUTHORIZATION_EXPRESSION =
       """
             ANY(OWNER, METALAKE, CATALOG) ||

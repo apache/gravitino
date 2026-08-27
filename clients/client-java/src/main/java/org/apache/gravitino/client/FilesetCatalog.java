@@ -138,8 +138,38 @@ class FilesetCatalog extends BaseSchemaCatalog
    * @param type The type of the fileset.
    * @param storageLocations The location names and storage locations of the fileset.
    * @param properties The properties of the fileset.
-   * @param secretBindings Optional property key → binding ({ provider} + { plaintext}) for
-   *     write-through.
+   * @return The created fileset metadata
+   * @throws NoSuchSchemaException If the schema does not exist.
+   * @throws FilesetAlreadyExistsException If the fileset already exists.
+   */
+  @Override
+  public Fileset createMultipleLocationFileset(
+      NameIdentifier ident,
+      String comment,
+      Fileset.Type type,
+      Map<String, String> storageLocations,
+      Map<String, String> properties)
+      throws NoSuchSchemaException, FilesetAlreadyExistsException {
+    return createMultipleLocationFileset(
+        ident,
+        comment,
+        type,
+        storageLocations,
+        properties,
+        Collections.emptyMap(),
+        Collections.emptyMap());
+  }
+
+  /**
+   * Create a fileset metadata with multiple storage locations in the catalog.
+   *
+   * @param ident A fileset identifier.
+   * @param comment The comment of the fileset.
+   * @param type The type of the fileset.
+   * @param storageLocations The location names and storage locations of the fileset.
+   * @param properties The properties of the fileset.
+   * @param secretBindings Optional property key → binding ({@code provider} + {@code plaintext})
+   *     for write-through.
    * @param secretReferences Optional property key → secret locator ({@code provider} plus
    *     provider-specific attributes).
    * @return The created fileset metadata
