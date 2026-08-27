@@ -19,11 +19,14 @@
 package org.apache.gravitino.lance;
 
 import static org.apache.gravitino.lance.common.config.LanceConfig.NAMESPACE_BACKEND;
+import static org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService.METALAKE_BINDING;
 
 import java.lang.reflect.Constructor;
 import java.util.HashMap;
 import java.util.Map;
+import javax.inject.Singleton;
 import javax.servlet.Servlet;
+import org.apache.gravitino.Configs;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.auxiliary.GravitinoAuxiliaryService;
 import org.apache.gravitino.lance.common.config.LanceConfig;
@@ -31,6 +34,8 @@ import org.apache.gravitino.lance.common.ops.LanceNamespaceBackend;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
 import org.apache.gravitino.lance.service.LanceHealthCheckPathMatcher;
 import org.apache.gravitino.lance.service.LanceServiceIdentityFilter;
+import org.apache.gravitino.lance.service.authorization.LanceAuthorizationMetadataFilter;
+import org.apache.gravitino.lance.service.authorization.LanceRESTAuthInterceptionService;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
 import org.apache.gravitino.metrics.MetricsSystem;
@@ -40,6 +45,7 @@ import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
+import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.jackson.JacksonFeature;
 import org.glassfish.jersey.server.ResourceConfig;
@@ -78,6 +84,24 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
 
     this.lanceNamespace = loadNamespaceImpl(lanceConfig, auxMode);
 
+    // Metadata authorization relies on the Gravitino authorizer running in the same process, so it
+    // is only applied when Lance REST is an auxiliary service of the Gravitino server.
+    // The Gravitino configuration is only available in auxiliary mode, so it is read behind the
+    // mode check.
+    boolean authorizationEnabled =
+        auxMode && GravitinoEnv.getInstance().config().get(Configs.ENABLE_AUTHORIZATION);
+    boolean enableMetadataAuthorization =
+        authorizationEnabled && lanceConfig.isGravitinoMetalakeConfigured();
+    String metalakeName = lanceConfig.getGravitinoMetalake();
+    if (authorizationEnabled && !enableMetadataAuthorization) {
+      // A missing metalake makes the Lance backend unusable, but it should not prevent the main
+      // Gravitino server from starting. The backend reports the missing setting when it is used.
+      LOG.warn("Lance REST metadata authorization is disabled because no metalake is configured");
+    }
+    if (enableMetadataAuthorization) {
+      lanceNamespace.setMetadataFilter(new LanceAuthorizationMetadataFilter(metalakeName));
+    }
+
     ResourceConfig resourceConfig = new ResourceConfig();
     resourceConfig.register(JacksonFeature.class);
     resourceConfig.packages(LANCE_REST_SPEC_PACKAGE);
@@ -85,6 +109,14 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
         new AbstractBinder() {
           @Override
           protected void configure() {
+            if (enableMetadataAuthorization) {
+              // Pass the metalake through HK2 constructor injection so authorization code does not
+              // need mutable process-wide state.
+              bind(metalakeName).to(String.class).named(METALAKE_BINDING);
+              bind(LanceRESTAuthInterceptionService.class)
+                  .to(InterceptionService.class)
+                  .in(Singleton.class);
+            }
             bind(lanceNamespace).to(NamespaceWrapper.class).ranked(1);
           }
         });
@@ -115,9 +147,10 @@ public class LanceRESTService implements GravitinoAuxiliaryService {
     server.addServlet(new HealthAliasServlet("/lance"), "/health.html");
 
     LOG.info(
-        "Initialized Lance REST service for backend {} in {} mode",
+        "Initialized Lance REST service for backend {} in {} mode, metadata authorization {}",
         lanceConfig.getNamespaceBackend(),
-        auxMode ? "auxiliary" : "standalone");
+        auxMode ? "auxiliary" : "standalone",
+        enableMetadataAuthorization ? "enabled" : "disabled");
   }
 
   @Override
