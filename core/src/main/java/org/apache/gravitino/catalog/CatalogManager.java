@@ -963,30 +963,25 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
 
   private CatalogEntity alterCatalogUnderLock(NameIdentifier ident, CatalogChange... changes)
       throws NoSuchCatalogException, IllegalArgumentException, IOException {
-    CatalogEntity catalog;
-    try {
-      catalog = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
-    }
-
-    Map<String, String> currentProperties =
-        catalog.getProperties() == null ? new HashMap<>() : new HashMap<>(catalog.getProperties());
-
-    List<SecretMaterial> writtenSecretMaterials = List.of();
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
-      Pair<CatalogChange[], List<SecretMaterial>> secretResult =
-          prepareCatalogSecretChanges(currentProperties, catalog.id(), changes);
-      writtenSecretMaterials = secretResult.getRight();
-      CatalogChange[] effectiveChanges = secretResult.getLeft();
-
       CatalogEntity updatedCatalog =
           store.update(
               ident,
               CatalogEntity.class,
               EntityType.CATALOG,
               existing -> {
+                Map<String, String> currentProperties =
+                    existing.getProperties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.getProperties());
+
+                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+                    prepareCatalogSecretChanges(currentProperties, existing.id(), changes);
+                writtenSecretMaterials.set(secretResult.getRight());
+                CatalogChange[] effectiveChanges = secretResult.getLeft();
+
                 CatalogEntity.Builder newCatalogBuilder =
                     newCatalogBuilder(ident.namespace(), existing);
 
@@ -998,10 +993,25 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               });
       alterCommitted = true;
       return updatedCatalog;
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials);
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
       }
+    }
+  }
+
+  /** Mutable holder so {@code store.update} lambdas can record written secrets for rollback. */
+  private static final class SecretMaterialsHolder {
+    private List<SecretMaterial> materials = List.of();
+
+    private List<SecretMaterial> get() {
+      return materials;
+    }
+
+    private void set(List<SecretMaterial> materials) {
+      this.materials = materials;
     }
   }
 
