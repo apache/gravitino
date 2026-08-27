@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.spark.connector.plugin;
+package org.apache.gravitino.spark.connector.plugin.restcatalog;
 
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.ExecutorPlugin;

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.spark.connector.plugin;
+package org.apache.gravitino.spark.connector.plugin.restcatalog;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.BeforeEach;
@@ -169,6 +170,16 @@ public class TestGravitinoLakehouseRESTDiscoveryDriverPlugin {
             () -> driver().initialize(sparkConf, Collections.emptyMap()));
 
     assertTrue(exception.getMessage().contains("No lakehouse REST catalog provider"));
+  }
+
+  @Test
+  void testBuiltinProviderClassNames() {
+    Map<String, String> providerClassNames = BuiltinRESTCatalogProviders.providerClassNames();
+
+    assertEquals(1, providerClassNames.size());
+    assertEquals(
+        "org.apache.gravitino.spark.connector.plugin.restcatalog.lance.LanceRESTCatalogProvider",
+        providerClassNames.get("lance"));
   }
 
   @Test

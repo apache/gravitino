@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.apache.gravitino.spark.connector.plugin;
+package org.apache.gravitino.spark.connector.plugin.restcatalog;
 
 import static org.apache.gravitino.spark.connector.ConnectorConstants.COMMA;
 import static org.apache.gravitino.spark.connector.utils.ConnectorUtil.removeDuplicateSparkExtensions;
@@ -37,6 +37,7 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
@@ -59,14 +60,9 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
   private static final String SPARK_CATALOG_PREFIX = "spark.sql.catalog.";
   private static final String URI_SUFFIX = "REST.uri";
   private static final String CATALOG_PROPERTIES_INFIX = "REST.catalogProperties.";
-  private static final String LANCE_FORMAT = "lance";
-  private static final String LANCE_PROVIDER_CLASS_NAME =
-      "org.apache.gravitino.spark.connector.plugin.lance.LanceRESTCatalogProvider";
   private static final Pattern PROVIDER_URI_PATTERN =
       Pattern.compile("^spark\\.sql\\.gravitino\\.([A-Za-z][A-Za-z0-9]*)REST\\.uri$");
   private static final CatalogRegistrationPolicy DEFAULT_POLICY = (format, catalogName) -> true;
-  private static final Map<String, String> PROVIDER_CLASS_NAMES =
-      Collections.singletonMap(LANCE_FORMAT, LANCE_PROVIDER_CLASS_NAME);
 
   GravitinoLakehouseRESTDiscoveryDriverPlugin() {}
 
@@ -78,7 +74,7 @@ class GravitinoLakehouseRESTDiscoveryDriverPlugin implements DriverPlugin {
 
   @VisibleForTesting
   void initialize(SparkConf sparkConf) {
-    initialize(sparkConf, PROVIDER_CLASS_NAMES);
+    initialize(sparkConf, BuiltinRESTCatalogProviders.providerClassNames());
   }
 
   @VisibleForTesting

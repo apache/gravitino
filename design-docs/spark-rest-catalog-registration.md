@@ -109,7 +109,7 @@ hand-write them. Which catalogs are registered, and under what Spark name, is de
 `CatalogRegistrationPolicy`.
 
 ```text
-spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin
+spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin
 ```
 
 The plugin is format-agnostic. Each lakehouse format is a **provider** — Iceberg in V1, Lance later
@@ -236,7 +236,7 @@ reach Spark is intentionally left to the two existing Iceberg REST paths:
 When both plugins are configured, `GravitinoLakehouseRESTDiscoveryPlugin` **must be listed first**:
 
 ```text
-spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin,\
+spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin,\
               org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin
 ```
 
@@ -257,7 +257,7 @@ which would now fire once per REST-registered catalog and read as an error.
 2. Add to Spark configuration:
 
    ```text
-   spark.plugins=org.apache.gravitino.spark.connector.plugin.GravitinoLakehouseRESTDiscoveryPlugin
+   spark.plugins=org.apache.gravitino.spark.connector.plugin.restcatalog.GravitinoLakehouseRESTDiscoveryPlugin
    spark.sql.gravitino.icebergREST.uri=http://127.0.0.1:9001/iceberg/
    ```
 
