@@ -2875,8 +2875,6 @@ public class CatalogClickHouseIT extends BaseIT {
                     getSortOrders("id"),
                     Indexes.EMPTY_INDEXES));
   }
-<<<<<<< HEAD
-=======
 
   @Test
   void testEngineParametersRoundTrip() {
@@ -3060,84 +3058,4 @@ public class CatalogClickHouseIT extends BaseIT {
         loadedProps.containsKey(TableConstants.ENGINE_PARAMETERS),
         "MergeTree should not have engine_parameters property");
   }
-
-  @Test
-  void testEnumRoundTrip() {
-    // Create a table in ClickHouse with Enum8 and Enum16 columns
-    String tableName = GravitinoITUtils.genRandomName("enum_test");
-    clickhouseService.executeQuery(
-        String.format(
-            "CREATE TABLE `%s`.`%s` ("
-                + "id Int32, "
-                + "status Enum8('active' = 1, 'inactive' = 2), "
-                + "priority Enum16('low' = 100, 'medium' = 200, 'high' = 300)"
-                + ") ENGINE = MergeTree ORDER BY id",
-            schemaName, tableName));
-
-    // Load through Gravitino and verify column types are ExternalType
-    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
-    Column[] columns = loaded.columns();
-    Assertions.assertEquals(3, columns.length);
-
-    // Enum8 type verification
-    Type enum8Type = columns[1].dataType();
-    Assertions.assertTrue(
-        enum8Type instanceof Types.ExternalType,
-        "Enum8 should map to ExternalType, but got: " + enum8Type.simpleString());
-    Assertions.assertEquals(
-        normalizeEnumFormatting("Enum8('active' = 1, 'inactive' = 2)"),
-        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()));
-
-    // Enum16 type verification
-    Type enum16Type = columns[2].dataType();
-    Assertions.assertTrue(
-        enum16Type instanceof Types.ExternalType,
-        "Enum16 should map to ExternalType, but got: " + enum16Type.simpleString());
-    Assertions.assertEquals(
-        normalizeEnumFormatting("Enum16('low' = 100, 'medium' = 200, 'high' = 300)"),
-        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()));
-
-    // Round-trip: recreate table through Gravitino with the loaded schema
-    String rtTableName = GravitinoITUtils.genRandomName("enum_rt");
-    catalog
-        .asTableCatalog()
-        .createTable(
-            NameIdentifier.of(schemaName, rtTableName),
-            columns,
-            "enum round-trip test",
-            createProperties(),
-            Transforms.EMPTY_TRANSFORM,
-            Distributions.NONE,
-            new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)});
-
-    // Verify types survived round-trip
-    Table rtLoaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, rtTableName));
-    Column[] rtColumns = rtLoaded.columns();
-    Type rtEnum8 = rtColumns[1].dataType();
-    Type rtEnum16 = rtColumns[2].dataType();
-    Assertions.assertTrue(
-        rtEnum8 instanceof Types.ExternalType, "Enum8 should survive round-trip as ExternalType");
-    Assertions.assertTrue(
-        rtEnum16 instanceof Types.ExternalType, "Enum16 should survive round-trip as ExternalType");
-    Assertions.assertEquals(
-        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()),
-        normalizeEnumFormatting(((Types.ExternalType) rtEnum8).catalogString()));
-    Assertions.assertEquals(
-        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()),
-        normalizeEnumFormatting(((Types.ExternalType) rtEnum16).catalogString()));
-
-    // Verify DDL on ClickHouse side contains full enum definitions
-    String createSql =
-        clickhouseService.executeQueryForResult(
-            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, rtTableName));
-    Assertions.assertNotNull(createSql, "SHOW CREATE TABLE should return a result");
-    String normalizedCreateSql = normalizeEnumFormatting(createSql);
-    Assertions.assertTrue(
-        normalizedCreateSql.contains("Enum8('active'=1,'inactive'=2)"),
-        "SHOW CREATE TABLE should contain Enum8 definition: " + createSql);
-    Assertions.assertTrue(
-        normalizedCreateSql.contains("Enum16('low'=100,'medium'=200,'high'=300)"),
-        "SHOW CREATE TABLE should contain Enum16 definition: " + createSql);
-  }
->>>>>>> 59ca78424 ([#12273] fix(clickhouse): preserve MergeTree engine parameters through create-load round-trip (#12274))
 }
