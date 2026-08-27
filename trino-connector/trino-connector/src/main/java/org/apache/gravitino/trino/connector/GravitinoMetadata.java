@@ -24,6 +24,7 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.AggregateFunction;
@@ -85,8 +86,6 @@ import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadata;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorMetadataAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoSchema;
 import org.apache.gravitino.trino.connector.metadata.GravitinoTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoMetadata class provides operations for Apache Gravitino metadata on the Gravitino
@@ -95,7 +94,7 @@ import org.slf4j.LoggerFactory;
  */
 public abstract class GravitinoMetadata implements ConnectorMetadata {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoMetadata.class);
+  private static final Logger LOG = Logger.get(GravitinoMetadata.class);
 
   // The column handle name that will generate row IDs for the merge operation.
   public static final String MERGE_ROW_ID = "$row_id";
@@ -285,7 +284,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       try {
         catalogConnectorMetadata.dropTable(tableName);
       } catch (Exception dropException) {
-        LOG.warn("Failed to drop table {} during CTAS cleanup", tableName, dropException);
+        LOG.warn(dropException, "Failed to drop table %s during CTAS cleanup", tableName);
       }
       throw e;
     }
@@ -310,7 +309,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       // (e.g., Hive 'format' is a String in Gravitino but HiveStorageFormat enum internally).
       // Returning empty is correct for non-bucketed CTAS.
       LOG.debug(
-          "Skipping internal getNewTableLayout due to property type mismatch: {}", e.getMessage());
+          "Skipping internal getNewTableLayout due to property type mismatch: %s", e.getMessage());
       return Optional.empty();
     }
   }
@@ -858,7 +857,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
       }
       return toLanguageFunctions(function);
     } catch (NoSuchFunctionException e) {
-      LOG.debug("Function {} not found in schema {}", name.getFunctionName(), name.getSchemaName());
+      LOG.debug("Function %s not found in schema %s", name.getFunctionName(), name.getSchemaName());
       return List.of();
     }
   }
@@ -881,7 +880,7 @@ public abstract class GravitinoMetadata implements ConnectorMetadata {
           String signatureToken = buildSignatureToken(function.name(), definition.parameters());
           result.add(new LanguageFunction(signatureToken, sql, List.of(), Optional.empty()));
         } catch (TrinoException e) {
-          LOG.warn("Failed to build signature token for function {}", function.name(), e);
+          LOG.warn(e, "Failed to build signature token for function %s", function.name());
         }
       }
     }
