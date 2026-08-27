@@ -19,11 +19,7 @@
 package org.apache.gravitino.trino.connector.security;
 
 import com.google.common.base.Preconditions;
-<<<<<<< HEAD
-=======
 import io.airlift.log.Logger;
-import io.trino.spi.TrinoException;
->>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
 import io.trino.spi.connector.ConnectorSession;
 import java.io.File;
 import java.util.Locale;
@@ -34,12 +30,6 @@ import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoClientConfiguration;
 import org.apache.gravitino.client.KerberosTokenProvider;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
-<<<<<<< HEAD
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-=======
-import org.apache.gravitino.trino.connector.GravitinoErrorCode;
->>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
 
 /**
  * Builds a {@link GravitinoAdminClient} with the appropriate authentication provider based on the

@@ -25,11 +25,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalNotification;
-<<<<<<< HEAD
-=======
-import com.google.common.util.concurrent.UncheckedExecutionException;
 import io.airlift.log.Logger;
->>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorAccessControl;
@@ -246,28 +242,7 @@ public class GravitinoConnector implements Connector {
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
       LOG.warn(
-<<<<<<< HEAD
-          "Failed to create per-user Gravitino client for user '{}': {}",
-          session.getUser(),
-          cause.getMessage());
-=======
           cause, "Failed to create per-user Gravitino client for user '%s'", session.getUser());
-      if (cause instanceof TrinoException) {
-        // Already carries a specific Trino error code (e.g. from buildForSession); re-wrapping
-        // would swallow it.
-        throw (TrinoException) cause;
-      }
-      if (cause instanceof IllegalArgumentException
-          || cause instanceof UnsupportedOperationException) {
-        throw new TrinoException(
-            PERMISSION_DENIED,
-            "Failed to authenticate user '"
-                + session.getUser()
-                + "' with Gravitino: "
-                + cause.getMessage(),
-            cause);
-      }
->>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
       throw new TrinoException(
           PERMISSION_DENIED,
           "Failed to authenticate user '"

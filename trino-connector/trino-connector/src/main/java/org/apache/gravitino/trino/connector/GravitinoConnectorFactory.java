@@ -112,16 +112,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         } catch (Exception e) {
           String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
-          LOG.error(message);
+          LOG.error(e, message);
           throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
         }
-<<<<<<< HEAD
-=======
-      } catch (Exception e) {
-        String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
-        LOG.error(e, message);
-        throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
->>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
       }
     }
 
