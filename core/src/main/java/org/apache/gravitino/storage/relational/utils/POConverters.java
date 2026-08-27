@@ -137,8 +137,10 @@ public class POConverters {
    */
   public static MetalakePO updateMetalakePOWithVersion(
       MetalakePO oldMetalakePO, BaseMetalake newMetalake) {
-    // Every metadata update advances the OCC token. Both version columns stay aligned because
-    // metalakes do not retain independently addressable historical versions.
+    // Every update moves the version forward, even when nothing else changes. The version is what
+    // the UPDATE compares against, so a version that stands still would let two servers overwrite
+    // each other. Both columns get the same value because a metalake keeps no old versions to
+    // address, unlike a fileset.
     Long nextVersion = oldMetalakePO.getCurrentVersion() + 1;
     try {
       return MetalakePO.builder()
@@ -234,9 +236,11 @@ public class POConverters {
    */
   public static CatalogPO updateCatalogPOWithVersion(
       CatalogPO oldCatalogPO, CatalogEntity newCatalog, Long metalakeId) {
-    Long lastVersion = oldCatalogPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Every update moves the version forward, even when nothing else changes. The version is what
+    // the UPDATE compares against, so a version that stands still would let two servers overwrite
+    // each other. Both columns get the same value because a catalog keeps no old versions to
+    // address, unlike a fileset.
+    Long nextVersion = oldCatalogPO.getCurrentVersion() + 1;
     try {
       return CatalogPO.builder()
           .withCatalogId(newCatalog.id())
@@ -330,9 +334,11 @@ public class POConverters {
    * @return SchemaPO object with updated version
    */
   public static SchemaPO updateSchemaPOWithVersion(SchemaPO oldSchemaPO, SchemaEntity newSchema) {
-    Long lastVersion = oldSchemaPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Every update moves the version forward, even when nothing else changes. The version is what
+    // the UPDATE compares against, so a version that stands still would let two servers overwrite
+    // each other. Both columns get the same value because a schema keeps no old versions to
+    // address, unlike a fileset.
+    Long nextVersion = oldSchemaPO.getCurrentVersion() + 1;
     try {
       return SchemaPO.builder()
           .withSchemaId(oldSchemaPO.getSchemaId())

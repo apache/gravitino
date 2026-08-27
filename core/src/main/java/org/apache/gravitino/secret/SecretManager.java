@@ -127,7 +127,8 @@ public class SecretManager implements Closeable {
    * is the mutable map that will be stored (may already contain merged catalog conf).
    *
    * @param properties properties used for key uniqueness checks (may be null)
-   * @param targetProperties mutable properties that receive URN values
+   * @param targetProperties mutable properties that receive URN values (may be null only when both
+   *     secret maps are null or empty)
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
    * @param secretBindings property key → write-through binding (may be null)
@@ -137,12 +138,17 @@ public class SecretManager implements Closeable {
    */
   public List<SecretMaterial> assembleSecretMaterials(
       @Nullable Map<String, String> properties,
-      Map<String, String> targetProperties,
+      @Nullable Map<String, String> targetProperties,
       String entityType,
       long entityId,
       @Nullable Map<String, SecretBinding> secretBindings,
       @Nullable Map<String, SecretReference> secretReferences) {
     checkSecretKeys(properties, secretBindings, secretReferences);
+    if (!SecretPropertyUtils.hasSecretMaps(secretBindings, secretReferences)) {
+      return List.of();
+    }
+    Preconditions.checkArgument(
+        targetProperties != null, "targetProperties must not be null when secrets are present");
     Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
     Map<String, SecretReference> references =
         secretReferences == null ? Map.of() : secretReferences;

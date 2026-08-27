@@ -50,6 +50,7 @@ import org.apache.gravitino.connector.SupportsSchemas;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.TableAlreadyExistsException;
 import org.apache.gravitino.lance.common.ops.gravitino.LanceDataTypeConverter;
 import org.apache.gravitino.lance.common.utils.LanceConstants;
@@ -65,7 +66,6 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.storage.IdGenerator;
-import org.apache.gravitino.storage.relational.service.TableMetaService;
 import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.Dataset;
 import org.lance.ReadOptions;
@@ -561,30 +561,20 @@ public class LanceTableOperations extends ManagedTableOperations {
   }
 
   /**
-   * Applies an idempotent update to the stored table, retrying when the optimistic-lock CAS is lost
-   * to a concurrent update. The repair-on-load path runs on every {@code loadTable}, so concurrent
-   * loads of the same table race on the version CAS; {@code store.update} surfaces the lost race as
-   * an {@link IOException} whose message starts with {@link
-   * TableMetaService#UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX}. Because the updater is idempotent, the
-   * loser sleeps a short randomized backoff (to avoid re-colliding), re-reads the latest (already
-   * repaired) entity, and retries instead of failing the whole load with a fatal error. Other IO
-   * failures (DB outage, serialization errors, etc.) are not conflicts and fail fast.
+   * Repairs stored table metadata and retries only when another repair wins the same race.
+   *
+   * <p>Two concurrent loads can both read the old metadata. The first update wins; the second gets
+   * {@link OptimisticLockException}. Repair is safe to run more than once, so the loser waits
+   * briefly, reads the winner's latest row, and tries again. Ordinary IO failures are not safe to
+   * retry here and are returned immediately.
    */
   private TableEntity updateTableWithCasRetry(
       NameIdentifier ident, Function<TableEntity, TableEntity> updater) throws IOException {
-    IOException lastConflict = null;
+    OptimisticLockException lastConflict = null;
     for (int attempt = 1; attempt <= REPAIR_UPDATE_MAX_ATTEMPTS; attempt++) {
       try {
         return store.update(ident, TableEntity.class, Entity.EntityType.TABLE, updater);
-      } catch (IOException e) {
-        // Only retry when the update matched 0 rows (lost optimistic-lock CAS). Other IO failures
-        // (DB outage, serialization errors, etc.) should fail fast.
-        String message = e.getMessage();
-        if (message == null
-            || !message.startsWith(TableMetaService.UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX)) {
-          throw e;
-        }
-
+      } catch (OptimisticLockException e) {
         lastConflict = e;
         LOG.debug(
             "Optimistic-lock conflict updating table {} metadata (attempt {}/{}), {}",
@@ -599,11 +589,13 @@ public class LanceTableOperations extends ManagedTableOperations {
         }
       }
     }
-    throw new IOException(
-        String.format(
-            "Failed to update table %s after %d optimistic-lock retries",
-            ident, REPAIR_UPDATE_MAX_ATTEMPTS),
-        lastConflict);
+    // Reaching here means every attempt lost to another writer. Keep the exception type so the
+    // caller still knows this is an OCC conflict, and add the attempt count for diagnosis.
+    throw new OptimisticLockException(
+        lastConflict,
+        "Failed to repair table %s after %d optimistic-lock attempts",
+        ident,
+        REPAIR_UPDATE_MAX_ATTEMPTS);
   }
 
   /**

@@ -315,5 +315,24 @@ public class TestGravitinoAdminClient extends TestBase {
                 metaLake.testConnection(
                     "catalog", Catalog.Type.RELATIONAL, "hive", "comment", Collections.emptyMap()));
     Assertions.assertTrue(exception.getMessage().contains("connection failed"));
+
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        null,
+        new BaseResponse(),
+        HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(() -> metaLake.testConnection("catalog"));
+
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        null,
+        ErrorResponse.unsupportedOperation("unsupported"),
+        HttpStatus.SC_OK);
+    exception =
+        Assertions.assertThrows(
+            UnsupportedOperationException.class, () -> metaLake.testConnection("catalog"));
+    Assertions.assertTrue(exception.getMessage().contains("unsupported"));
   }
 }

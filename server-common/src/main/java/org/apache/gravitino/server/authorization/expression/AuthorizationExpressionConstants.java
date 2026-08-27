@@ -26,6 +26,16 @@ public class AuthorizationExpressionConstants {
           ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA)
            """;
 
+  /**
+   * Authorizes a schema existence probe. CREATE_SCHEMA is intentionally included because clients
+   * commonly check whether a schema exists before attempting to create it.
+   */
+  public static final String PROBE_SCHEMA_AUTHORIZATION_EXPRESSION =
+      """
+          ANY(OWNER, METALAKE, CATALOG) ||
+          ANY_USE_CATALOG && (SCHEMA::OWNER || ANY_USE_SCHEMA || ANY_CREATE_SCHEMA)
+          """;
+
   public static final String LOAD_MODEL_AUTHORIZATION_EXPRESSION =
       """
             ANY(OWNER, METALAKE, CATALOG) ||
@@ -38,6 +48,21 @@ public class AuthorizationExpressionConstants {
                   ANY(OWNER, METALAKE, CATALOG) ||
                   SCHEMA_OWNER_WITH_USE_CATALOG ||
                   ANY_USE_CATALOG && ANY_USE_SCHEMA  && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MODIFY_TABLE)
+                  """;
+
+  public static final String PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  ANY_CREATE_TABLE || ANY_CREATE_VIEW)
+                  """;
+
+  public static final String LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, TABLE) ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (ANY_PROBE_TABLE_LIKE || ANY_SELECT_TABLE || ANY_MODIFY_TABLE ||
+                  ANY_CREATE_TABLE || ANY_CREATE_VIEW)
                   """;
 
   //  Adding ANY_CREATE_TABLE here as Spark calls tableExists before creating a table.
