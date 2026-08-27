@@ -21,6 +21,8 @@ package org.apache.gravitino.storage.relational;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -194,6 +196,53 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    */
   boolean delete(NameIdentifier ident, Entity.EntityType entityType, boolean cascade)
       throws IOException;
+
+  /**
+   * Deletes an entity and returns the snapshot used by that delete.
+   *
+   * <p>Backends with a native compare-and-set delete should override this method so the returned
+   * entity and the deleted row are based on the same read.
+   *
+   * @param ident the identifier of the entity
+   * @param entityType the entity type
+   * @param clazz the concrete entity class
+   * @param <E> the concrete entity type
+   * @return the deleted entity, or empty when it did not exist
+   * @throws IOException if the store operation fails
+   */
+  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident, Entity.EntityType entityType, Class<E> clazz) throws IOException {
+    return deleteAndGet(ident, entityType, clazz, ignored -> {});
+  }
+
+  /**
+   * Deletes an entity and runs an action against the deleted snapshot before commit when supported.
+   *
+   * @param ident the identifier of the entity
+   * @param entityType the entity type
+   * @param clazz the concrete entity class
+   * @param postDeleteAction the action to run after deletion but before commit when supported
+   * @param <E> the concrete entity type
+   * @return the deleted entity, or empty when it did not exist
+   * @throws IOException if the store operation fails
+   */
+  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Class<E> clazz,
+      Consumer<E> postDeleteAction)
+      throws IOException {
+    try {
+      E entity = get(ident, entityType);
+      if (!delete(ident, entityType, false)) {
+        return Optional.empty();
+      }
+      postDeleteAction.accept(entity);
+      return Optional.of(entity);
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    }
+  }
 
   /**
    * Deletes the entities in the specified namespace and entity type.

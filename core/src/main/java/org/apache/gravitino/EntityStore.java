@@ -23,6 +23,8 @@ import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity.EntityType;
@@ -220,6 +222,56 @@ public interface EntityStore extends Closeable {
    * @throws IOException if the delete operation fails
    */
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
+
+  /**
+   * Deletes an entity and returns the snapshot chosen by the delete operation.
+   *
+   * <p>The default implementation is intended for stores that serialize operations through {@link
+   * #executeInTransaction(Executable)}. Stores that can read and delete with one native
+   * compare-and-set should override this method so the returned snapshot is exactly the one that
+   * was deleted.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity
+   * @param clazz the concrete entity class
+   * @param <E> the entity type
+   * @return the deleted entity, or empty when it did not exist
+   * @throws IOException if the delete operation fails
+   */
+  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident, EntityType entityType, Class<E> clazz) throws IOException {
+    return deleteAndGet(ident, entityType, clazz, ignored -> {});
+  }
+
+  /**
+   * Deletes an entity, runs an action against the deleted snapshot, and returns that snapshot.
+   *
+   * <p>A transactional store should run the action after its delete has won but before committing.
+   * This lets callers couple non-database cleanup to the metadata transaction: an action failure
+   * can still roll the metadata delete back.
+   *
+   * @param ident the name identifier of the entity
+   * @param entityType the type of the entity
+   * @param clazz the concrete entity class
+   * @param postDeleteAction the action to run after deletion but before commit when supported
+   * @param <E> the entity type
+   * @return the deleted entity, or empty when it did not exist
+   * @throws IOException if the delete operation fails
+   */
+  default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident, EntityType entityType, Class<E> clazz, Consumer<E> postDeleteAction)
+      throws IOException {
+    try {
+      E entity = get(ident, entityType, clazz);
+      if (!delete(ident, entityType)) {
+        return Optional.empty();
+      }
+      postDeleteAction.accept(entity);
+      return Optional.of(entity);
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
+    }
+  }
 
   /**
    * Batch delete entities from the underlying storage by the specified list of {@link

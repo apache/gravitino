@@ -116,6 +116,12 @@ public class FilesetVersionBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
+  /**
+   * Returns SQL that finds the highest active snapshot version owned by a fileset.
+   *
+   * @param filesetId the fileset ID
+   * @return the maximum-version query
+   */
   public String selectMaxFilesetVersion(@Param("filesetId") Long filesetId) {
     return "SELECT MAX(version)"
         + " FROM "

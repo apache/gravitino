@@ -39,6 +39,7 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -709,65 +710,58 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean dropFileset(NameIdentifier ident) {
     try {
-      FilesetEntity filesetEntity =
-          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-
-      // Drop the metadata first. It is the only step that can still be rejected, because the drop
-      // is refused when another writer altered the fileset after the read above. Deleting the files
-      // first would leave the data gone while the rejected drop keeps the fileset row pointing at
-      // storage locations that no longer exist.
-      // A false here means the fileset was already gone when the delete reached the store; every
-      // other outcome, a lost concurrency check included, is reported as an exception.
-      if (!store.delete(ident, Entity.EntityType.FILESET)) {
-        return false;
-      }
-
-      // For managed fileset, we should delete the related files. The metadata is already gone at
-      // this point, so a location that cannot be removed is reported and skipped rather than
-      // failing the drop: the fileset can no longer be looked up, and a caller that retried would
-      // only be told the fileset does not exist.
-      if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        Map<String, Path> storageLocations =
-            Maps.transformValues(filesetEntity.storageLocations(), Path::new);
-        storageLocations.forEach(
-            (locationName, location) -> {
-              try {
-                Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
-                FileSystem fs = getFileSystemWithCache(location, fsConf);
-                if (fs.exists(location)) {
-                  if (!fs.delete(location, true)) {
-                    LOG.warn(
-                        "Failed to delete fileset {} location {} with location name {}",
-                        ident,
-                        location,
-                        locationName);
+      // The relational store runs this cleanup after the metadata CAS wins but before committing
+      // its transaction. The callback therefore sees the exact deleted snapshot, and an I/O
+      // failure can still restore the metadata so the caller may fix permissions and retry.
+      Optional<FilesetEntity> deletedFileset =
+          store.deleteAndGet(
+              ident,
+              Entity.EntityType.FILESET,
+              FilesetEntity.class,
+              filesetEntity -> {
+                if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
+                  try {
+                    deleteManagedFilesetStorage(ident, filesetEntity);
+                  } catch (IOException ioe) {
+                    throw new UncheckedIOException(ioe);
                   }
-                } else {
-                  LOG.warn(
-                      "Fileset {} location {} with location name {} does not exist",
-                      ident,
-                      location,
-                      locationName);
                 }
-              } catch (IOException ioe) {
-                LOG.warn(
-                    "Failed to delete fileset {} location {} with location name {}, the location is"
-                        + " left behind",
-                    ident,
-                    location,
-                    locationName,
-                    ioe);
-              }
-            });
-      }
-
-      return true;
+              });
+      return deletedFileset.isPresent();
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
       return false;
+    } catch (UncheckedIOException uioe) {
+      throw new RuntimeException("Failed to delete fileset " + ident, uioe.getCause());
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete fileset " + ident, ioe);
+    }
+  }
+
+  private void deleteManagedFilesetStorage(NameIdentifier ident, FilesetEntity filesetEntity)
+      throws IOException {
+    Map<String, Path> storageLocations =
+        Maps.transformValues(filesetEntity.storageLocations(), Path::new);
+    for (Map.Entry<String, Path> entry : storageLocations.entrySet()) {
+      String locationName = entry.getKey();
+      Path location = entry.getValue();
+      Map<String, String> fsConf =
+          mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
+      FileSystem fs = getFileSystemWithCache(location, fsConf);
+      if (!fs.exists(location)) {
+        LOG.warn(
+            "Fileset {} location {} with location name {} does not exist",
+            ident,
+            location,
+            locationName);
+        continue;
+      }
+      if (!fs.delete(location, true)) {
+        throw new IOException(
+            String.format(
+                "Failed to delete fileset %s location %s with location name %s",
+                ident, location, locationName));
+      }
     }
   }
 

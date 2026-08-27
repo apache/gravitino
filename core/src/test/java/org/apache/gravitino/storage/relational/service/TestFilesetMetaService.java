@@ -67,7 +67,6 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
 import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.Mockito;
@@ -523,9 +522,6 @@ public class TestFilesetMetaService extends TestJDBCBackend {
 
   @TestTemplate
   public void testNaturalKeyOverwriteUsesPersistedFilesetId() throws IOException {
-    // PostgreSQL targets fileset_id explicitly and rejects a different ID on the natural key.
-    // MySQL/H2 may resolve ON DUPLICATE KEY through either key and must preserve the stored ID.
-    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_natural_key_overwrite");
     FilesetEntity original =
         createFilesetEntity(
@@ -678,6 +674,44 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                 () ->
                     FilesetMetaService.getInstance()
                         .deleteFilesetWithVersion(fileset.nameIdentifier(), stalePO)));
+  }
+
+  @TestTemplate
+  public void testDeleteAndGetReturnsSnapshotProtectedByDeleteCas() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_delete_snapshot");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-v1");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    FilesetEntity updated =
+        FilesetMetaService.getInstance()
+            .updateFileset(
+                original.nameIdentifier(),
+                entity -> {
+                  FilesetEntity current = (FilesetEntity) entity;
+                  return copyFileset(
+                      current,
+                      current.id(),
+                      current.name(),
+                      "snapshot selected by delete",
+                      "/tmp-v2",
+                      current.auditInfo());
+                });
+
+    FilesetEntity deleted =
+        FilesetMetaService.getInstance().deleteFilesetAndGet(original.nameIdentifier());
+
+    Assertions.assertEquals(updated, deleted);
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier()));
+    Map<Integer, Long> versions = listFilesetVersions(original.id());
+    assertVersionSoftDeleted(versions, 1);
+    assertVersionSoftDeleted(versions, 2);
   }
 
   @TestTemplate
@@ -837,8 +871,6 @@ public class TestFilesetMetaService extends TestJDBCBackend {
 
   @TestTemplate
   public void testNaturalKeyOverwriteRewritesIdentifierProperty() throws IOException {
-    // PostgreSQL targets fileset_id explicitly and rejects a different ID on the natural key.
-    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
     String filesetName = GravitinoITUtils.genRandomName("tst_fs_overwrite_identifier");
     FilesetEntity original =
         createFilesetEntity(

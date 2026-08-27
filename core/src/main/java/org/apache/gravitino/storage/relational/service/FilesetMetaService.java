@@ -284,7 +284,23 @@ public class FilesetMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteFileset")
   public boolean deleteFileset(NameIdentifier identifier) {
+    deleteFilesetAndGet(identifier);
+    return true;
+  }
+
+  /**
+   * Deletes a fileset and returns the exact entity snapshot protected by the delete CAS.
+   *
+   * <p>Callers that also remove managed storage use this snapshot rather than a separate earlier
+   * read. Otherwise an alter between the two reads could make metadata deletion succeed for new
+   * locations while physical cleanup still deletes the old locations.
+   *
+   * @param identifier the fileset identifier
+   * @return the fileset snapshot that was deleted
+   */
+  public FilesetEntity deleteFilesetAndGet(NameIdentifier identifier) {
     FilesetPO filesetPO = getFilesetPOByIdentifier(identifier);
+    FilesetEntity deletedFileset = POConverters.fromFilesetPO(filesetPO, identifier.namespace());
 
     // Delete the root row first and only if it still has the version we read. A stale drop stops
     // before it can remove versions, tags, policies, or any other related data.
@@ -292,29 +308,7 @@ public class FilesetMetaService {
         () -> deleteFilesetWithVersion(identifier, filesetPO),
         () -> deleteFilesetDependents(filesetPO.getFilesetId()));
 
-    return true;
-  }
-
-  /**
-   * Soft-deletes the observed fileset metadata row without starting a transaction.
-   *
-   * <p>The caller must run this method in the same transaction as dependent cleanup. Package access
-   * also lets concurrency tests submit a deliberately stale snapshot without duplicating the
-   * production CAS logic.
-   *
-   * @param identifier the fileset identity observed by the caller
-   * @param observedFilesetPO the fileset row and OCC version observed by the caller
-   */
-  void deleteFilesetWithVersion(NameIdentifier identifier, FilesetPO observedFilesetPO) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class,
-            mapper ->
-                mapper.softDeleteFilesetMetasByFilesetId(
-                    observedFilesetPO.getFilesetId(), observedFilesetPO.getCurrentVersion()));
-    if (deleted == 0) {
-      throw filesetWriteFailure(identifier, observedFilesetPO);
-    }
+    return deletedFileset;
   }
 
   @Monitored(
@@ -467,6 +461,28 @@ public class FilesetMetaService {
                   filesetNames);
           return POConverters.fromFilesetPOs(filesetPOs, firstIdent.namespace());
         });
+  }
+
+  /**
+   * Soft-deletes the observed fileset metadata row without starting a transaction.
+   *
+   * <p>The caller must run this method in the same transaction as dependent cleanup. Package access
+   * also lets concurrency tests submit a deliberately stale snapshot without duplicating the
+   * production CAS logic.
+   *
+   * @param identifier the fileset identity observed by the caller
+   * @param observedFilesetPO the fileset row and OCC version observed by the caller
+   */
+  void deleteFilesetWithVersion(NameIdentifier identifier, FilesetPO observedFilesetPO) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class,
+            mapper ->
+                mapper.softDeleteFilesetMetasByFilesetId(
+                    observedFilesetPO.getFilesetId(), observedFilesetPO.getCurrentVersion()));
+    if (deleted == 0) {
+      throw filesetWriteFailure(identifier, observedFilesetPO);
+    }
   }
 
   /**

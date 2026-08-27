@@ -94,7 +94,10 @@ public class FilesetMetaPostgreSQLProvider extends FilesetMetaBaseSQLProvider {
         + " #{filesetMeta.lastVersion},"
         + " #{filesetMeta.deletedAt}"
         + " )"
-        + " ON CONFLICT(fileset_id) DO UPDATE SET"
+        // Overwrite is selected by name, and a create request normally carries a newly generated
+        // ID. Target the natural key so PostgreSQL preserves the ID of the row being replaced, the
+        // same behavior that MySQL and H2 provide for their duplicate-key upsert.
+        + " ON CONFLICT(schema_id, fileset_name, deleted_at) DO UPDATE SET"
         + " fileset_name = #{filesetMeta.filesetName},"
         + " metalake_id = #{filesetMeta.metalakeId},"
         + " catalog_id = #{filesetMeta.catalogId},"

@@ -30,6 +30,8 @@ class TestFilesetMetaPostgreSQLProvider {
     String conflictClause = sql.substring(sql.indexOf(" ON CONFLICT"));
 
     Assertions.assertTrue(
+        conflictClause.startsWith(" ON CONFLICT(schema_id, fileset_name, deleted_at)"));
+    Assertions.assertTrue(
         conflictClause.contains(
             "current_version = " + FilesetMetaMapper.META_TABLE_NAME + ".current_version + 1"));
     Assertions.assertTrue(

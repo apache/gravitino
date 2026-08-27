@@ -29,6 +29,8 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.tuple.Pair;
@@ -454,6 +456,43 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       }
       committed = true;
       return deleted;
+    } finally {
+      if (transactionOwner && !committed) {
+        SessionUtils.rollbackTransaction();
+      }
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Class<E> clazz,
+      Consumer<E> postDeleteAction)
+      throws IOException {
+    if (entityType != Entity.EntityType.FILESET) {
+      return RelationalBackend.super.deleteAndGet(ident, entityType, clazz, postDeleteAction);
+    }
+
+    boolean transactionOwner = !SessionUtils.isInTransaction();
+    if (transactionOwner) {
+      SessionUtils.beginTransaction();
+    }
+    boolean committed = false;
+    try {
+      FilesetEntity deletedFileset = FilesetMetaService.getInstance().deleteFilesetAndGet(ident);
+      insertEntityChange(ident, entityType, OperateType.DROP);
+      E deletedEntity = clazz.cast(deletedFileset);
+      // Run external cleanup while the metadata delete can still be rolled back. The callback uses
+      // the same snapshot whose OCC token won above, so it cannot act on stale locations.
+      postDeleteAction.accept(deletedEntity);
+      if (transactionOwner) {
+        SessionUtils.commitTransaction();
+      }
+      committed = true;
+      return Optional.of(deletedEntity);
+    } catch (NoSuchEntityException e) {
+      return Optional.empty();
     } finally {
       if (transactionOwner && !committed) {
         SessionUtils.rollbackTransaction();

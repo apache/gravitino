@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -322,6 +323,20 @@ public class RelationalEntityStore
       return deleted;
     } catch (NoSuchEntityException e) {
       return false;
+    } finally {
+      cache.invalidate(ident, entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Class<E> clazz,
+      Consumer<E> postDeleteAction)
+      throws IOException {
+    try {
+      return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     } finally {
       cache.invalidate(ident, entityType);
     }
