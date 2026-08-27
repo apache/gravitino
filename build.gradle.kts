@@ -157,11 +157,17 @@ allprojects {
           "import\\s+.*\\.org\\.apache\\.commons\\.io\\.([A-Z][a-zA-Z0-9_]*);",
           "import org.apache.commons.io.${'$'}1;"
         )
-        replaceRegex(
-          "Use SLF4J Logger instead of other logging frameworks",
-          "import\\s+.*\\.(Logger|LoggerFactory);",
-          "import org.slf4j.${'$'}1;"
-        )
+        // The trino-connector module logs via io.airlift.log.Logger to match Trino's own
+        // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
+        // integration-test is intentionally excluded from this carve-out: it runs outside
+        // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
+        if (!project.path.startsWith(":trino-connector:trino-connector")) {
+          replaceRegex(
+            "Use SLF4J Logger instead of other logging frameworks",
+            "import\\s+.*\\.(Logger|LoggerFactory);",
+            "import org.slf4j.${'$'}1;"
+          )
+        }
         replaceRegex(
           "Remove Testcontainers shading",
           "import\\s+org\\.testcontainers\\.shaded\\.([^;]+);",
