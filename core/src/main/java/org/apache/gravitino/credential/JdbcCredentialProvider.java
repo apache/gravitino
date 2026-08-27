@@ -50,6 +50,11 @@ public class JdbcCredentialProvider implements CredentialProvider {
     return JdbcCredential.JDBC_CREDENTIAL_TYPE;
   }
 
+  @Override
+  public boolean supportsScheme(String scheme) {
+    return "jdbc".equalsIgnoreCase(scheme);
+  }
+
   @Nullable
   @Override
   public Credential getCredential(CredentialContext context) {
