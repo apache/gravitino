@@ -480,7 +480,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testRejectMaskedOnAlter() {
+  public void testCreateAndAlterSchemaRejectMaskedPlaceholder() {
     NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_masked");
     Map<String, String> createProps =
         ImmutableMap.of("k1", HiddenPropertyMaskUtils.MASKED_VALUE, "k2", "v2");

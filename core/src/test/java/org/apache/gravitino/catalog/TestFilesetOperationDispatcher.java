@@ -384,7 +384,7 @@ public class TestFilesetOperationDispatcher extends TestOperationDispatcher {
   }
 
   @Test
-  public void testRejectMaskedOnAlter() {
+  public void testCreateAndAlterFilesetRejectMaskedPlaceholder() {
     Namespace filesetNs = Namespace.of(metalake, catalog, "schema_masked_fileset");
     schemaOperationDispatcher.createSchema(
         NameIdentifier.of(filesetNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
