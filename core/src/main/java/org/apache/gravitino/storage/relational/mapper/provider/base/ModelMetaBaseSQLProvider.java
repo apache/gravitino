@@ -291,19 +291,26 @@ public class ModelMetaBaseSQLProvider {
   }
 
   /**
-   * Returns SQL that advances the shared model concurrency version when its current value matches.
+   * Returns SQL that advances the shared model concurrency version while the model still exists
+   * under the name the caller resolved.
    *
    * @param modelId the model ID
-   * @param currentVersion the version observed by the caller
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
    * @return the version bump SQL
    */
   public String bumpModelVersion(
-      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion) {
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName) {
+    // Guarded on the identity the caller resolved, not on the version it observed. The row lock
+    // this takes serializes the model's version writes, while a version registered by somebody
+    // else in the meantime is no reason to reject this one.
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET last_version = current_version + 1, current_version = current_version + 1"
-        + " WHERE model_id = #{modelId}"
-        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND schema_id = #{schemaId}"
+        + " AND model_name = #{modelName} AND deleted_at = 0";
   }
 
   public String updateModelMeta(

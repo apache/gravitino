@@ -58,6 +58,7 @@ import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
 import org.mockito.MockedStatic;
@@ -174,6 +175,65 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                 ModelVersionAliasRelMapper.class,
                 mapper -> mapper.selectModelVersionAliasRelsByModelId(modelEntity.id()))
             .isEmpty());
+  }
+
+  @TestTemplate
+  public void testRegisterModelVersionAcceptsAConcurrentRegistration() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_registered_from_two_nodes",
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+
+    ModelPO observedModelPO =
+        ModelMetaService.getInstance().getModelPOByIdentifier(model.nameIdentifier());
+    // Another node registers a version after this one read the model. That advances the version the
+    // model shares with its versions, but it does not conflict with the registration below: the two
+    // append different rows.
+    ModelVersionMetaService.getInstance()
+        .insertModelVersion(
+            createModelVersionEntity(
+                model.nameIdentifier(),
+                0,
+                ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path_from_the_other_node"),
+                ImmutableList.of("alias_from_the_other_node"),
+                "version comment",
+                properties,
+                AUDIT_INFO));
+
+    ModelMetaService modelMetaService = Mockito.spy(ModelMetaService.getInstance());
+    Mockito.doReturn(observedModelPO)
+        .when(modelMetaService)
+        .getModelPOByIdentifier(model.nameIdentifier());
+
+    try (MockedStatic<ModelMetaService> mocked = Mockito.mockStatic(ModelMetaService.class)) {
+      mocked.when(ModelMetaService::getInstance).thenReturn(modelMetaService);
+
+      Assertions.assertDoesNotThrow(
+          () ->
+              ModelVersionMetaService.getInstance()
+                  .insertModelVersion(
+                      createModelVersionEntity(
+                          model.nameIdentifier(),
+                          1,
+                          ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path_from_this_node"),
+                          ImmutableList.of("alias_from_this_node"),
+                          "version comment",
+                          properties,
+                          AUDIT_INFO)));
+    }
+
+    Assertions.assertEquals(
+        2,
+        ModelVersionMetaService.getInstance()
+            .listModelVersionsByNamespace(NamespaceUtil.toModelVersionNs(model.nameIdentifier()))
+            .size());
   }
 
   @TestTemplate

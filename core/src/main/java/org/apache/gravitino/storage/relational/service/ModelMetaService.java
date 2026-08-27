@@ -188,8 +188,12 @@ public class ModelMetaService {
   /**
    * Advances the concurrency version shared by a model, its versions, and its aliases.
    *
-   * <p>The caller uses this as the first write in a model-version transaction. If the model changed
-   * after it was read, this method fails before any version or alias row is modified.
+   * <p>The caller uses this as the first write in a model-version transaction. It takes the model
+   * row, so the model's version writes run one at a time, and a model that was dropped or renamed
+   * away makes this fail before any version or alias row is modified. Version writes append to or
+   * replace rows the caller already resolved, so a version somebody else registered in the meantime
+   * is not a reason to reject this one; a lost update on the same row is still caught where that
+   * row is written.
    */
   void bumpModelVersion(NameIdentifier ident, ModelPO observedModelPO) {
     int updated =
@@ -197,7 +201,9 @@ public class ModelMetaService {
             ModelMetaMapper.class,
             mapper ->
                 mapper.bumpModelVersion(
-                    observedModelPO.getModelId(), observedModelPO.getCurrentVersion()));
+                    observedModelPO.getModelId(),
+                    observedModelPO.getSchemaId(),
+                    observedModelPO.getModelName()));
     if (updated == 0) {
       throw modelWriteFailure(ident, observedModelPO);
     }

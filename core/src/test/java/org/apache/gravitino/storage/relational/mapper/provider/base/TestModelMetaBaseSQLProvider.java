@@ -83,12 +83,17 @@ class TestModelMetaBaseSQLProvider {
   }
 
   @Test
-  void testAggregateVersionBumpUsesCas() {
-    String sql = PROVIDER.bumpModelVersion(null, null);
+  void testAggregateVersionBumpIsGuardedOnIdentity() {
+    String sql = PROVIDER.bumpModelVersion(null, null, null);
 
     Assertions.assertTrue(
         sql.contains("last_version = current_version + 1, current_version = current_version + 1"));
-    Assertions.assertTrue(sql.contains("AND current_version = #{currentVersion}"));
+    // Guarded on the identity the caller resolved: a version another writer registered in the
+    // meantime must not reject this write, while a dropped or renamed model must.
+    Assertions.assertTrue(sql.contains("WHERE model_id = #{modelId}"));
+    Assertions.assertTrue(sql.contains("AND schema_id = #{schemaId}"));
+    Assertions.assertTrue(sql.contains("AND model_name = #{modelName}"));
+    Assertions.assertFalse(sql.contains("AND current_version = #{currentVersion}"));
     Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
   }
 

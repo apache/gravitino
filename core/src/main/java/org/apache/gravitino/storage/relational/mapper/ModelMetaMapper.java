@@ -124,16 +124,19 @@ public interface ModelMetaMapper {
   Integer updateModelLatestVersion(@Param("modelId") Long modelId);
 
   /**
-   * Advances the concurrency version shared by a model and its child records when the expected
-   * version matches.
+   * Advances the concurrency version shared by a model and its child records, as long as the model
+   * still exists under the name the caller resolved.
    *
    * @param modelId the model ID
-   * @param currentVersion the version observed by the caller
-   * @return the number of changed rows; zero means the model changed or disappeared
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
+   * @return the number of changed rows; zero means the model was dropped or renamed away
    */
   @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "bumpModelVersion")
   Integer bumpModelVersion(
-      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion);
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName);
 
   @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelMeta")
   Integer updateModelMeta(

@@ -141,16 +141,19 @@ public class ModelMetaSQLProviderFactory {
   }
 
   /**
-   * Returns SQL that advances the shared model concurrency version after checking its current
-   * value.
+   * Returns SQL that advances the shared model concurrency version while the model still exists
+   * under the name the caller resolved.
    *
    * @param modelId the model ID
-   * @param currentVersion the version observed by the caller
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
    * @return the version bump SQL
    */
   public static String bumpModelVersion(
-      @Param("modelId") Long modelId, @Param("currentVersion") Long currentVersion) {
-    return getProvider().bumpModelVersion(modelId, currentVersion);
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName) {
+    return getProvider().bumpModelVersion(modelId, schemaId, modelName);
   }
 
   public static String updateModelMeta(

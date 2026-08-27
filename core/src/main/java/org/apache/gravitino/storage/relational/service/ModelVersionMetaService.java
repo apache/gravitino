@@ -414,9 +414,9 @@ public class ModelVersionMetaService {
                               oldModelVersionPOs.get(0)));
             }
             if (updated == 0) {
-              // The version disappeared after the initial read. Throwing here also rolls back the
-              // shared concurrency-version change made above.
-              throw noSuchModelVersionException(ident);
+              // The row this update was built from is no longer there. Throwing here also rolls
+              // back the shared concurrency-version change made above.
+              throw modelVersionWriteFailure(ident, modelId, oldModelVersionPOs.get(0));
             }
           },
           () -> {
@@ -482,6 +482,25 @@ public class ModelVersionMetaService {
         NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
         Entity.EntityType.MODEL.name().toLowerCase(Locale.ROOT),
         modelIdentifier.toString());
+  }
+
+  /**
+   * Decides which error a model-version write that matched no row should report.
+   *
+   * <p>The write compares the values it read, so it matches nothing either because the version was
+   * deleted, which is a missing entity, or because somebody else changed the same version first,
+   * which is a conflict.
+   */
+  private RuntimeException modelVersionWriteFailure(
+      NameIdentifier ident, Long modelId, ModelVersionPO observedVersionPO) {
+    List<ModelVersionPO> currentVersionPOs =
+        SessionUtils.getWithoutCommit(
+            ModelVersionMetaMapper.class,
+            mapper -> mapper.selectModelVersionMeta(modelId, observedVersionPO.getModelVersion()));
+    if (currentVersionPOs.isEmpty()) {
+      return noSuchModelVersionException(ident);
+    }
+    return ExceptionUtils.concurrentModification(Entity.EntityType.MODEL_VERSION, ident);
   }
 
   private NoSuchEntityException noSuchModelVersionException(NameIdentifier modelVersionIdentifier) {
