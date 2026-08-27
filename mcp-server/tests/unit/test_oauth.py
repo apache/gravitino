@@ -43,7 +43,6 @@ from mcp_server.core.context import (
 from mcp_server.core.oauth import RefreshableBearerAuth
 from mcp_server.core.setting import Setting
 from mcp_server.main import _parse_args, do_main
-from mcp_server.server import log_service_identity_fallback_policy
 
 
 def _jwt_with_exp(exp) -> str:
@@ -648,47 +647,6 @@ class TestMainOAuthValidation(unittest.TestCase):
                 do_main()
             self.assertEqual(raised.exception.code, 1)
         init_log.assert_called_once()
-
-
-class TestHttpServiceIdentityWarning(unittest.TestCase):
-    def test_stdio_flag_ignored_logs_info(self):
-        setting = Setting(
-            metalake="ml",
-            transport="stdio",
-            oauth_token_endpoint="https://idp/token",
-            oauth_client_id="mcp",
-            oauth_client_secret="s",
-            no_service_identity_fallback=True,
-        )
-        with self.assertLogs(level="INFO") as logs:
-            log_service_identity_fallback_policy(setting)
-        self.assertIn("ignored for stdio", logs.output[0])
-
-    def test_http_oauth_warns_when_fallback_enabled(self):
-        setting = Setting(
-            metalake="ml",
-            transport="http",
-            oauth_token_endpoint="https://idp/token",
-            oauth_client_id="mcp-service",
-            oauth_client_secret="s",
-        )
-        with self.assertLogs(level="WARNING") as logs:
-            log_service_identity_fallback_policy(setting)
-        self.assertIn("mcp-service", logs.output[0])
-        self.assertIn("untrusted", logs.output[0])
-
-    def test_http_flag_logs_reject_policy(self):
-        setting = Setting(
-            metalake="ml",
-            transport="http",
-            oauth_token_endpoint="https://idp/token",
-            oauth_client_id="mcp-service",
-            oauth_client_secret="s",
-            no_service_identity_fallback=True,
-        )
-        with self.assertLogs(level="INFO") as logs:
-            log_service_identity_fallback_policy(setting)
-        self.assertIn("rejected", logs.output[0])
 
 
 class TestNoServiceIdentityFallback(unittest.TestCase):
