@@ -480,7 +480,15 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     }
     boolean committed = false;
     try {
-      FilesetEntity deletedFileset = FilesetMetaService.getInstance().deleteFilesetAndGet(ident);
+      FilesetEntity deletedFileset;
+      try {
+        deletedFileset = FilesetMetaService.getInstance().deleteFilesetAndGet(ident);
+      } catch (NoSuchEntityException e) {
+        // Only the delete itself may report the fileset as missing. A NoSuchEntityException from
+        // any later step means the delete did happen and something else failed, which must not be
+        // reported to the caller as "there was nothing to delete".
+        return Optional.empty();
+      }
       insertEntityChange(ident, entityType, OperateType.DROP);
       E deletedEntity = clazz.cast(deletedFileset);
       // Run external cleanup while the metadata delete can still be rolled back. The callback uses
@@ -491,8 +499,6 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       }
       committed = true;
       return Optional.of(deletedEntity);
-    } catch (NoSuchEntityException e) {
-      return Optional.empty();
     } finally {
       if (transactionOwner && !committed) {
         SessionUtils.rollbackTransaction();

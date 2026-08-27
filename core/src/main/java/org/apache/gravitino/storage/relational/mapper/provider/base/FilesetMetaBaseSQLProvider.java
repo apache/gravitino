@@ -314,6 +314,11 @@ public class FilesetMetaBaseSQLProvider {
         + " audit_info = #{filesetMeta.auditInfo},"
         // An overwrite is also a write observed by OCC. Advance from the stored value instead of
         // resetting the row to the initial version carried by the incoming create request.
+        //
+        // Keep current_version last: MySQL evaluates these assignments left to right against the
+        // columns already assigned, while H2 and PostgreSQL evaluate every right-hand side against
+        // the row as it was before the update. Both agree only while current_version is read
+        // before it is assigned.
         + " last_version = current_version + 1,"
         + " current_version = current_version + 1,"
         + " deleted_at = #{filesetMeta.deletedAt}";

@@ -28,6 +28,7 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -212,7 +213,7 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
    */
   default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
       NameIdentifier ident, Entity.EntityType entityType, Class<E> clazz) throws IOException {
-    return deleteAndGet(ident, entityType, clazz, ignored -> {});
+    return deleteAndGet(ident, entityType, clazz, EntityStore.noPostDeleteAction());
   }
 
   /**
@@ -232,6 +233,14 @@ public interface RelationalBackend extends Closeable, SupportsRelationOperations
       Class<E> clazz,
       Consumer<E> postDeleteAction)
       throws IOException {
+    if (postDeleteAction != EntityStore.NO_POST_DELETE_ACTION) {
+      // This implementation can only run the action once the delete is committed, which is the
+      // opposite of what the contract promises. Refusing is better than silently leaving the
+      // caller with a committed delete and a failed cleanup.
+      throw new UnsupportedOperationException(
+          "This store cannot run a post-delete action while the delete can still be rolled back");
+    }
+
     try {
       E entity = get(ident, entityType);
       if (!delete(ident, entityType, false)) {

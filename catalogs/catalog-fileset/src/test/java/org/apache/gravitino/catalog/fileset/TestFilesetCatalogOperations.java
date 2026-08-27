@@ -3470,6 +3470,33 @@ public class TestFilesetCatalogOperations {
         .delete(new Path(fileset.storageLocation()), true);
   }
 
+  @Test
+  public void testDropFilesetSucceedsWhenTheLocationDisappearsFirst() throws IOException {
+    String schemaName = "schema_drop_vanished";
+    String filesetName = "fileset_drop_vanished";
+    String catalogPath = TEST_ROOT_PATH + "/catalog_drop_vanished";
+    createSchema(schemaName, "comment", catalogPath, null);
+    Fileset fileset =
+        createFileset(filesetName, schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
+
+    Path filesetPath = new Path(fileset.storageLocation());
+    FileSystem fs = filesetPath.getFileSystem(new Configuration());
+    Assertions.assertTrue(fs.exists(filesetPath));
+    // Somebody else removed the location already. A drop that finds nothing left to delete has
+    // nothing to complain about.
+    Assertions.assertTrue(fs.delete(filesetPath, true));
+
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      Assertions.assertTrue(ops.dropFileset(filesetIdent));
+      Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
+    }
+  }
+
   private Schema createSchema(String name, String comment, String catalogPath, String schemaPath)
       throws IOException {
     return createSchema(name, comment, catalogPath, schemaPath, false);

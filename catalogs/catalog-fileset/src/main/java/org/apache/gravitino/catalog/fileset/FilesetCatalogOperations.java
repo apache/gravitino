@@ -713,6 +713,11 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // The relational store runs this cleanup after the metadata CAS wins but before committing
       // its transaction. The callback therefore sees the exact deleted snapshot, and an I/O
       // failure can still restore the metadata so the caller may fix permissions and retry.
+      //
+      // The price is that the recursive storage delete runs inside that transaction, holding the
+      // fileset rows and a pooled connection for as long as the filesystem takes. Dropping a
+      // fileset with a very large tree is therefore a slow write for that fileset, and enough
+      // concurrent drops can hold up the connection pool.
       Optional<FilesetEntity> deletedFileset =
           store.deleteAndGet(
               ident,
@@ -738,6 +743,13 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
     }
   }
 
+  /**
+   * Removes the storage of a managed fileset while its metadata delete can still be rolled back.
+   *
+   * <p>The first location that cannot be removed stops the loop, so the drop is rejected before it
+   * takes away more data than it already has. The locations removed up to that point are gone for
+   * good, but attempting the remaining ones would only widen that gap.
+   */
   private void deleteManagedFilesetStorage(NameIdentifier ident, FilesetEntity filesetEntity)
       throws IOException {
     Map<String, Path> storageLocations =
@@ -756,7 +768,9 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
             locationName);
         continue;
       }
-      if (!fs.delete(location, true)) {
+      if (!fs.delete(location, true) && fs.exists(location)) {
+        // A false return also covers a location that somebody else removed between the check above
+        // and this call. Only a location that is still there is a reason to reject the drop.
         throw new IOException(
             String.format(
                 "Failed to delete fileset %s location %s with location name %s",

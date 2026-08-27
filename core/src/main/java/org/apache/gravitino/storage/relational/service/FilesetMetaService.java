@@ -617,15 +617,29 @@ public class FilesetMetaService {
         SessionUtils.getWithoutCommit(
             FilesetMetaMapper.class,
             mapper -> mapper.selectFilesetMetaByIdForUpdate(observedFilesetPO.getFilesetId()));
-    if (currentFilesetPO == null
-        || !Objects.equals(currentFilesetPO.getFilesetName(), observedFilesetPO.getFilesetName())
-        || !Objects.equals(currentFilesetPO.getSchemaId(), observedFilesetPO.getSchemaId())
-        || !Objects.equals(currentFilesetPO.getCatalogId(), observedFilesetPO.getCatalogId())
-        || !Objects.equals(currentFilesetPO.getMetalakeId(), observedFilesetPO.getMetalakeId())) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.FILESET.name().toLowerCase(),
-          identifier.name());
+    boolean identityMoved =
+        currentFilesetPO == null
+            || !Objects.equals(
+                currentFilesetPO.getFilesetName(), observedFilesetPO.getFilesetName())
+            || !Objects.equals(currentFilesetPO.getSchemaId(), observedFilesetPO.getSchemaId())
+            || !Objects.equals(currentFilesetPO.getCatalogId(), observedFilesetPO.getCatalogId())
+            || !Objects.equals(currentFilesetPO.getMetalakeId(), observedFilesetPO.getMetalakeId());
+    if (identityMoved) {
+      // The fileset the caller resolved is no longer reachable under that name. The name itself
+      // may still be taken, by a fileset created or renamed into it, and then this is a race the
+      // caller can retry rather than a name that does not exist.
+      Long currentFilesetId =
+          SessionUtils.getWithoutCommit(
+              FilesetMetaMapper.class,
+              mapper ->
+                  mapper.selectFilesetIdBySchemaIdAndName(
+                      observedFilesetPO.getSchemaId(), observedFilesetPO.getFilesetName()));
+      if (currentFilesetId == null) {
+        return new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.FILESET.name().toLowerCase(),
+            identifier.name());
+      }
     }
     return ExceptionUtils.concurrentModification(Entity.EntityType.FILESET, identifier);
   }

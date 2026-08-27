@@ -712,7 +712,8 @@ public class POConverters {
     try {
       // Every successful fileset alter advances the OCC token. The current version is also the
       // value used by reads to find the fileset details, so even a rename or audit-only change
-      // needs a complete snapshot at the new version.
+      // needs a complete snapshot at the new version. Alters that change nothing therefore still
+      // write one row per storage location; the version retention job is what removes them again.
       //
       // The stored snapshots are taken into account as well, because a fileset written before the
       // version reset was fixed can carry snapshots newer than the version its metadata row

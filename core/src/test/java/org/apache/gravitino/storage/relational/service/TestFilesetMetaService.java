@@ -55,6 +55,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
@@ -906,6 +907,73 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         StringIdentifier.fromId(original.id()).toString(),
         stored.properties().get(StringIdentifier.ID_KEY));
+  }
+
+  @TestTemplate
+  public void testDeleteAndGetRefusesAPreCommitActionItCannotHonor() {
+    // Only the fileset path runs the action while the delete can still be rolled back. Any other
+    // entity type would run it after the commit, which is the opposite of what callers rely on, so
+    // it has to say so instead of doing it anyway.
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () ->
+            backend.deleteAndGet(
+                NameIdentifier.of(metalakeName, catalogName, schemaName),
+                Entity.EntityType.SCHEMA,
+                SchemaEntity.class,
+                ignored -> {
+                  throw new IllegalStateException("not reached");
+                }));
+  }
+
+  @TestTemplate
+  public void testAlterReportsConflictWhenTheNameWasTakenOver() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_name_taken_over");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-original");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+
+    // The fileset this alter resolved is renamed away and a different one takes over its name. The
+    // name still resolves, so the loser is told to retry rather than that the name is gone.
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            FilesetMetaService.getInstance()
+                .updateFileset(
+                    original.nameIdentifier(),
+                    entity -> {
+                      updateFilesetUnchecked(
+                          original.nameIdentifier(),
+                          current ->
+                              copyFileset(
+                                  current,
+                                  current.id(),
+                                  filesetName + "_moved",
+                                  "rename winner",
+                                  "/tmp-moved",
+                                  current.auditInfo()));
+                      insertFilesetUnchecked(
+                          createFilesetEntity(
+                              RandomIdGenerator.INSTANCE.nextId(),
+                              original.namespace(),
+                              filesetName,
+                              AUDIT_INFO,
+                              "/tmp-taken-over"),
+                          false);
+                      FilesetEntity current = (FilesetEntity) entity;
+                      return copyFileset(
+                          current,
+                          current.id(),
+                          current.name(),
+                          "stale alter",
+                          "/tmp-loser",
+                          current.auditInfo());
+                    }));
   }
 
   private String storageLocationOfVersion(Long filesetId, Long version) {

@@ -224,6 +224,25 @@ public interface EntityStore extends Closeable {
   boolean delete(NameIdentifier ident, EntityType entityType, boolean cascade) throws IOException;
 
   /**
+   * The only post-delete action an implementation that cannot run it before commit accepts.
+   *
+   * <p>Compared by reference, so a caller that supplies its own action reaches an implementation
+   * that honors the contract or gets told that this one cannot.
+   */
+  Consumer<? extends Entity> NO_POST_DELETE_ACTION = ignored -> {};
+
+  /**
+   * Returns the shared no-op post-delete action.
+   *
+   * @param <E> the entity type
+   * @return an action that does nothing
+   */
+  @SuppressWarnings("unchecked")
+  static <E extends Entity & HasIdentifier> Consumer<E> noPostDeleteAction() {
+    return (Consumer<E>) NO_POST_DELETE_ACTION;
+  }
+
+  /**
    * Deletes an entity and returns the snapshot chosen by the delete operation.
    *
    * <p>The default implementation is intended for stores that serialize operations through {@link
@@ -240,7 +259,7 @@ public interface EntityStore extends Closeable {
    */
   default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
       NameIdentifier ident, EntityType entityType, Class<E> clazz) throws IOException {
-    return deleteAndGet(ident, entityType, clazz, ignored -> {});
+    return deleteAndGet(ident, entityType, clazz, noPostDeleteAction());
   }
 
   /**
@@ -261,6 +280,14 @@ public interface EntityStore extends Closeable {
   default <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
       NameIdentifier ident, EntityType entityType, Class<E> clazz, Consumer<E> postDeleteAction)
       throws IOException {
+    if (postDeleteAction != NO_POST_DELETE_ACTION) {
+      // This implementation can only run the action once the delete is committed, which is the
+      // opposite of what the contract promises. Refusing is better than silently leaving the
+      // caller with a committed delete and a failed cleanup.
+      throw new UnsupportedOperationException(
+          "This store cannot run a post-delete action while the delete can still be rolled back");
+    }
+
     try {
       E entity = get(ident, entityType, clazz);
       if (!delete(ident, entityType)) {
