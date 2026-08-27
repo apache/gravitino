@@ -825,13 +825,42 @@ public class GravitinoConfig {
    */
   public Map<String, String> getIcebergRestCatalogConfig() {
     String prefix = GRAVITINO_ICEBERG_REST_CATALOG_CONFIG_PREFIX.key;
-    return config.entrySet().stream()
+    Map<String, String> restCatalogConfig = new HashMap<>();
+
+    if ("oauth2".equalsIgnoreCase(config.get(GravitinoAuthProvider.AUTH_TYPE_KEY))) {
+      restCatalogConfig.put(TRINO_ICEBERG_REST_CATALOG_PREFIX + "security", "OAUTH2");
+      putIfNotBlank(
+          restCatalogConfig,
+          TRINO_ICEBERG_REST_CATALOG_PREFIX + "oauth2.credential",
+          config.get(GravitinoAuthProvider.OAUTH_CREDENTIAL_KEY));
+      putIfNotBlank(
+          restCatalogConfig,
+          TRINO_ICEBERG_REST_CATALOG_PREFIX + "oauth2.scope",
+          config.get(GravitinoAuthProvider.OAUTH_SCOPE_KEY));
+
+      String serverUri = config.get(GravitinoAuthProvider.OAUTH_SERVER_URI_KEY);
+      String path = config.get(GravitinoAuthProvider.OAUTH_PATH_KEY);
+      if (StringUtils.isNotBlank(serverUri) && StringUtils.isNotBlank(path)) {
+        restCatalogConfig.put(
+            TRINO_ICEBERG_REST_CATALOG_PREFIX + "oauth2.server-uri",
+            StringUtils.removeEnd(serverUri, "/") + "/" + StringUtils.removeStart(path, "/"));
+      }
+    }
+
+    config.entrySet().stream()
         .filter(entry -> entry.getKey().startsWith(prefix))
-        .collect(
-            Collectors.toMap(
-                entry ->
+        .forEach(
+            entry ->
+                restCatalogConfig.put(
                     TRINO_ICEBERG_REST_CATALOG_PREFIX + entry.getKey().substring(prefix.length()),
-                Map.Entry::getValue));
+                    entry.getValue()));
+    return restCatalogConfig;
+  }
+
+  private static void putIfNotBlank(Map<String, String> target, String key, String value) {
+    if (StringUtils.isNotBlank(value)) {
+      target.put(key, value);
+    }
   }
 
   private long parseLongConfigEntry(ConfigEntry entry) {
