@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -123,6 +124,21 @@ public class TestGravitinoConnectorFactoryStart {
     // The static catalog is loaded afterwards and must start the manager with its own config.
     // Had the dynamic config been used instead, `discovery.uri` would have been missing and the
     // register would have failed to build the JDBC URI.
+    assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
+    assertTrue(factory.isCatalogConnectorManagerStartTriggered());
+  }
+
+  @Test
+  public void testFailedClientInitializationDoesNotPublishManager() {
+    CoordinatorFactory factory = new CoordinatorFactory(null);
+    Map<String, String> brokenDynamicConfig = dynamicConfig();
+    brokenDynamicConfig.put("gravitino.client.authType", "oauth2");
+
+    assertThrows(
+        Exception.class,
+        () -> factory.create("broken_catalog", brokenDynamicConfig, mockContext()));
+
+    assertNull(factory.getCatalogConnectorManager());
     assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
     assertTrue(factory.isCatalogConnectorManagerStartTriggered());
   }

@@ -126,11 +126,15 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogRegister catalogRegister = new CatalogRegister();
 
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
-          catalogConnectorManager =
+          CatalogConnectorManager newCatalogConnectorManager =
               new CatalogConnectorManager(
                   catalogRegister, catalogConnectorFactory, this::getTrinoCatalogName);
-          catalogConnectorManager.config(config, client);
+          newCatalogConnectorManager.config(config, client);
 
+          // Publish the manager only after it has been configured successfully. Otherwise a
+          // failed client initialization leaves a shared manager with a null Gravitino client,
+          // causing later connector creation attempts to fail with a misleading NPE.
+          catalogConnectorManager = newCatalogConnectorManager;
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         }
 

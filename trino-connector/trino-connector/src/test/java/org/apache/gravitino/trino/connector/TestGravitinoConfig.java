@@ -356,6 +356,54 @@ public class TestGravitinoConfig {
   }
 
   @Test
+  public void testIcebergRestOAuthDefaultsToGravitinoClientOAuth() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.<String, String>builder()
+                .put("gravitino.metalake", "user_001")
+                .put("gravitino.client.authType", "oauth2")
+                .put("gravitino.client.oauth2.serverUri", "https://oauth.example.com/")
+                .put("gravitino.client.oauth2.path", "/realms/gravitino/token")
+                .put("gravitino.client.oauth2.credential", "shared-client:shared-secret")
+                .put("gravitino.client.oauth2.scope", "openid")
+                .build());
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals("OAUTH2", restCatalogConfig.get("iceberg.rest-catalog.security"));
+    assertEquals(
+        "shared-client:shared-secret",
+        restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+    assertEquals("openid", restCatalogConfig.get("iceberg.rest-catalog.oauth2.scope"));
+    assertEquals(
+        "https://oauth.example.com/realms/gravitino/token",
+        restCatalogConfig.get("iceberg.rest-catalog.oauth2.server-uri"));
+  }
+
+  @Test
+  public void testIcebergRestOAuthOverridesGravitinoClientOAuthByField() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.<String, String>builder()
+                .put("gravitino.metalake", "user_001")
+                .put("gravitino.client.authType", "oauth2")
+                .put("gravitino.client.oauth2.serverUri", "https://oauth.example.com")
+                .put("gravitino.client.oauth2.path", "realms/gravitino/token")
+                .put("gravitino.client.oauth2.credential", "shared-client:shared-secret")
+                .put("gravitino.client.oauth2.scope", "openid")
+                .put("gravitino.iceberg.rest-catalog.oauth2.credential", "irc-client:irc-secret")
+                .put("gravitino.iceberg.rest-catalog.oauth2.scope", "irc-scope")
+                .build());
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals(
+        "irc-client:irc-secret", restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+    assertEquals("irc-scope", restCatalogConfig.get("iceberg.rest-catalog.oauth2.scope"));
+    assertEquals(
+        "https://oauth.example.com/realms/gravitino/token",
+        restCatalogConfig.get("iceberg.rest-catalog.oauth2.server-uri"));
+  }
+
+  @Test
   public void testIcebergRestConfigScopedToMetalakeInMultiMetalakeMode() {
     ImmutableMap<String, String> configMap =
         ImmutableMap.of(
