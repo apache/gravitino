@@ -57,7 +57,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
@@ -927,41 +926,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           try {
-            AtomicReference<List<SecretMaterial>> writtenSecretMaterials =
-                new AtomicReference<>(List.of());
-            boolean secretUpdateCommitted = false;
-            CatalogEntity updatedCatalog;
-            try {
-              updatedCatalog =
-                  store.update(
-                      ident,
-                      CatalogEntity.class,
-                      EntityType.CATALOG,
-                      catalog -> {
-                        Pair<CatalogChange[], List<SecretMaterial>> secretResult =
-                            prepareCatalogSecretChanges(
-                                catalog.getProperties(), catalog.id(), changes);
-                        writtenSecretMaterials.set(secretResult.getRight());
-                        CatalogChange[] effectiveChanges = secretResult.getLeft();
-
-                        CatalogEntity.Builder newCatalogBuilder =
-                            newCatalogBuilder(ident.namespace(), catalog);
-
-                        Map<String, String> newProps =
-                            catalog.getProperties() == null
-                                ? new HashMap<>()
-                                : new HashMap<>(catalog.getProperties());
-                        newCatalogBuilder =
-                            updateEntity(newCatalogBuilder, newProps, effectiveChanges);
-
-                        return newCatalogBuilder.build();
-                      });
-              secretUpdateCommitted = true;
-            } finally {
-              if (!secretUpdateCommitted) {
-                secretManager.rollbackSecrets(writtenSecretMaterials.get());
-              }
-            }
+            CatalogEntity updatedCatalog = alterCatalogUnderLock(ident, changes);
             // Invalidate after store.update() so that any background thread that tries to reload
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
@@ -978,19 +943,66 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             catalogCache.put(convertedCatalog.nameIdentifier(), newWrapper);
             return newWrapper.catalog();
 
-          } catch (NoSuchEntityException ne) {
-            LOG.warn("Catalog {} does not exist", ident, ne);
-            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
+          } catch (NoSuchCatalogException e) {
+            throw e;
 
           } catch (IllegalArgumentException iae) {
             LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
             throw iae;
+
+          } catch (NoSuchEntityException ne) {
+            LOG.warn("Catalog {} does not exist", ident, ne);
+            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
           } catch (IOException ioe) {
             LOG.error("Failed to alter catalog {}", ident, ioe);
             throw new RuntimeException(ioe);
           }
         });
+  }
+
+  private CatalogEntity alterCatalogUnderLock(NameIdentifier ident, CatalogChange... changes)
+      throws NoSuchCatalogException, IllegalArgumentException, IOException {
+    CatalogEntity catalog;
+    try {
+      catalog = store.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
+    }
+
+    Map<String, String> currentProperties =
+        catalog.getProperties() == null ? new HashMap<>() : new HashMap<>(catalog.getProperties());
+
+    List<SecretMaterial> writtenSecretMaterials = List.of();
+    boolean alterCommitted = false;
+    try {
+      Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+          prepareCatalogSecretChanges(currentProperties, catalog.id(), changes);
+      writtenSecretMaterials = secretResult.getRight();
+      CatalogChange[] effectiveChanges = secretResult.getLeft();
+
+      CatalogEntity updatedCatalog =
+          store.update(
+              ident,
+              CatalogEntity.class,
+              EntityType.CATALOG,
+              existing -> {
+                CatalogEntity.Builder newCatalogBuilder =
+                    newCatalogBuilder(ident.namespace(), existing);
+
+                Map<String, String> newProps =
+                    existing.getProperties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.getProperties());
+                return updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
+              });
+      alterCommitted = true;
+      return updatedCatalog;
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials);
+      }
+    }
   }
 
   @Override
