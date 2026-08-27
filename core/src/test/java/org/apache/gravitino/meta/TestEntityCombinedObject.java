@@ -33,6 +33,7 @@ import org.apache.gravitino.catalog.EntityCombinedModelVersion;
 import org.apache.gravitino.catalog.EntityCombinedSchema;
 import org.apache.gravitino.catalog.EntityCombinedTable;
 import org.apache.gravitino.catalog.EntityCombinedTopic;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
@@ -76,10 +77,7 @@ public class TestEntityCombinedObject {
         EntityCombinedSchema.of(originSchema).withHiddenProperties(hiddenProperties);
     Assertions.assertEquals(originSchema.name(), entityCombinedSchema.name());
     Assertions.assertEquals(originSchema.comment(), entityCombinedSchema.comment());
-    Map<String, String> filterProp = new HashMap<>(originSchema.properties());
-    filterProp.remove("k3");
-    filterProp.remove(null);
-    filterProp.remove("k5");
+    Map<String, String> filterProp = expectedMaskedProperties(originSchema.properties());
     Assertions.assertEquals(filterProp, entityCombinedSchema.properties());
     Assertions.assertEquals(originSchema.auditInfo(), entityCombinedSchema.auditInfo());
   }
@@ -90,10 +88,7 @@ public class TestEntityCombinedObject {
         EntityCombinedTopic.of(originTopic).withHiddenProperties(hiddenProperties);
     Assertions.assertEquals(originTopic.name(), entityCombinedTopic.name());
     Assertions.assertEquals(originTopic.comment(), entityCombinedTopic.comment());
-    Map<String, String> filterProp = new HashMap<>(originTopic.properties());
-    filterProp.remove("k3");
-    filterProp.remove(null);
-    filterProp.remove("k5");
+    Map<String, String> filterProp = expectedMaskedProperties(originTopic.properties());
     Assertions.assertEquals(filterProp, entityCombinedTopic.properties());
     Assertions.assertEquals(originTopic.auditInfo(), entityCombinedTopic.auditInfo());
   }
@@ -104,10 +99,7 @@ public class TestEntityCombinedObject {
         EntityCombinedTable.of(originTable).withHiddenProperties(hiddenProperties);
     Assertions.assertEquals(originTable.name(), entityCombinedTable.name());
     Assertions.assertEquals(originTable.comment(), entityCombinedTable.comment());
-    Map<String, String> filterProp = new HashMap<>(originTopic.properties());
-    filterProp.remove("k3");
-    filterProp.remove(null);
-    filterProp.remove("k5");
+    Map<String, String> filterProp = expectedMaskedProperties(originTable.properties());
     Assertions.assertEquals(filterProp, entityCombinedTable.properties());
     Assertions.assertEquals(originTable.auditInfo(), entityCombinedTable.auditInfo());
   }
@@ -118,10 +110,7 @@ public class TestEntityCombinedObject {
         EntityCombinedFileset.of(originFileset).withHiddenProperties(hiddenProperties);
     Assertions.assertEquals(originFileset.name(), entityCombinedFileset.name());
     Assertions.assertEquals(originFileset.comment(), entityCombinedFileset.comment());
-    Map<String, String> filterProp = new HashMap<>(originFileset.properties());
-    filterProp.remove("k3");
-    filterProp.remove(null);
-    filterProp.remove("k5");
+    Map<String, String> filterProp = expectedMaskedProperties(originFileset.properties());
     Assertions.assertEquals(filterProp, entityCombinedFileset.properties());
     Assertions.assertEquals(originFileset.auditInfo(), entityCombinedFileset.auditInfo());
   }
@@ -132,10 +121,7 @@ public class TestEntityCombinedObject {
         EntityCombinedModel.of(originModel).withHiddenProperties(hiddenProperties);
     Assertions.assertEquals(originModel.name(), entityCombinedModel.name());
     Assertions.assertEquals(originModel.comment(), entityCombinedModel.comment());
-    Map<String, String> filterProp = new HashMap<>(originModel.properties());
-    filterProp.remove("k3");
-    filterProp.remove(null);
-    filterProp.remove("k5");
+    Map<String, String> filterProp = expectedMaskedProperties(originModel.properties());
     Assertions.assertEquals(filterProp, entityCombinedModel.properties());
     Assertions.assertEquals(originModel.auditInfo(), entityCombinedModel.auditInfo());
   }
@@ -145,14 +131,19 @@ public class TestEntityCombinedObject {
     EntityCombinedModelVersion entityCombinedModelVersion =
         EntityCombinedModelVersion.of(originModelVersion).withHiddenProperties(hiddenProperties);
     Assertions.assertEquals(originModelVersion.comment(), entityCombinedModelVersion.comment());
-    Map<String, String> filterProp = new HashMap<>(originModelVersion.properties());
-    filterProp.remove("k3");
-    filterProp.remove(null);
-    filterProp.remove("k5");
+    Map<String, String> filterProp = expectedMaskedProperties(originModelVersion.properties());
     Assertions.assertEquals(filterProp, entityCombinedModelVersion.properties());
     Assertions.assertEquals(originModelVersion.auditInfo(), entityCombinedModelVersion.auditInfo());
     Assertions.assertEquals(originModelVersion.version(), entityCombinedModelVersion.version());
     Assertions.assertEquals(originModelVersion.uris(), entityCombinedModelVersion.uris());
+  }
+
+  private static Map<String, String> expectedMaskedProperties(Map<String, String> source) {
+    Map<String, String> expected = new HashMap<>(source);
+    expected.put("k3", HiddenPropertyMaskUtils.MASKED_VALUE);
+    expected.remove(null);
+    expected.remove("k5");
+    return expected;
   }
 
   private Schema mockSchema() {
