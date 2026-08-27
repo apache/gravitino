@@ -716,13 +716,17 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // is refused when another writer altered the fileset after the read above. Deleting the files
       // first would leave the data gone while the rejected drop keeps the fileset row pointing at
       // storage locations that no longer exist.
+      // A false here means the fileset was already gone when the delete reached the store; every
+      // other outcome, a lost concurrency check included, is reported as an exception.
       if (!store.delete(ident, Entity.EntityType.FILESET)) {
         return false;
       }
 
-      // For managed fileset, we should delete the related files.
+      // For managed fileset, we should delete the related files. The metadata is already gone at
+      // this point, so a location that cannot be removed is reported and skipped rather than
+      // failing the drop: the fileset can no longer be looked up, and a caller that retried would
+      // only be told the fileset does not exist.
       if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        AtomicReference<IOException> exception = new AtomicReference<>();
         Map<String, Path> storageLocations =
             Maps.transformValues(filesetEntity.storageLocations(), Path::new);
         storageLocations.forEach(
@@ -748,17 +752,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
                 }
               } catch (IOException ioe) {
                 LOG.warn(
-                    "Failed to delete fileset {} location {} with location name {}",
+                    "Failed to delete fileset {} location {} with location name {}, the location is"
+                        + " left behind",
                     ident,
                     location,
                     locationName,
                     ioe);
-                exception.set(ioe);
               }
             });
-        if (exception.get() != null) {
-          throw exception.get();
-        }
       }
 
       return true;

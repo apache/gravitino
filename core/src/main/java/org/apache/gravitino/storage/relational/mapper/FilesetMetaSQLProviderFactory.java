@@ -121,6 +121,13 @@ public class FilesetMetaSQLProviderFactory {
     return getProvider().insertFilesetMetaOnDuplicateKeyUpdate(filesetPO);
   }
 
+  public static String liftFilesetVersion(
+      @Param("filesetId") Long filesetId,
+      @Param("liftedVersion") Long liftedVersion,
+      @Param("currentVersion") Long currentVersion) {
+    return getProvider().liftFilesetVersion(filesetId, liftedVersion, currentVersion);
+  }
+
   public static String updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
       @Param("oldFilesetMeta") FilesetPO oldFilesetPO) {

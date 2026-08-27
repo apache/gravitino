@@ -178,7 +178,14 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
-    cache.put(e);
+    if (overwritten) {
+      // An overwrite is resolved by the database, which may keep the identity and version of the
+      // row it already had. Caching the copy handed in here would publish values the stored row
+      // does not carry, so the next read is served from the backend instead.
+      cache.invalidate(e.nameIdentifier(), e.type());
+    } else {
+      cache.put(e);
+    }
   }
 
   @Override

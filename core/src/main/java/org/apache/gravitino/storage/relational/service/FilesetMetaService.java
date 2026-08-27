@@ -201,7 +201,9 @@ public class FilesetMetaService {
                           "The overwritten fileset %s in schema %s does not exist",
                           po.getFilesetName(),
                           po.getSchemaId());
-                      persistedPO.set(filesetPOWithPersistedIdentityAndVersion(po, storedPO));
+                      persistedPO.set(
+                          filesetPOWithPersistedIdentityAndVersion(
+                              po, storedPO, versionAboveStoredSnapshots(mapper, storedPO)));
                     } else {
                       mapper.insertFilesetMeta(po);
                     }
@@ -468,6 +470,35 @@ public class FilesetMetaService {
   }
 
   /**
+   * Lifts the version the upsert derived above every snapshot the fileset still owns.
+   *
+   * <p>The upsert advances the version from the metadata row alone. A fileset written before the
+   * version reset was fixed can own snapshots above that row, and writing the derived version would
+   * overwrite one of them instead of adding a new one. The row is already locked by the caller, so
+   * the compare-and-set below cannot lose.
+   */
+  private long versionAboveStoredSnapshots(FilesetMetaMapper mapper, FilesetPO storedPO) {
+    Long maxStoredVersion =
+        SessionUtils.getWithoutCommit(
+            FilesetVersionMapper.class,
+            versionMapper -> versionMapper.selectMaxFilesetVersion(storedPO.getFilesetId()));
+    if (maxStoredVersion == null || maxStoredVersion < storedPO.getCurrentVersion()) {
+      return storedPO.getCurrentVersion();
+    }
+
+    long liftedVersion = maxStoredVersion + 1;
+    Integer updated =
+        mapper.liftFilesetVersion(
+            storedPO.getFilesetId(), liftedVersion, storedPO.getCurrentVersion());
+    Preconditions.checkState(
+        updated != null && updated == 1,
+        "The overwritten fileset %s in schema %s changed while its row was held",
+        storedPO.getFilesetName(),
+        storedPO.getSchemaId());
+    return liftedVersion;
+  }
+
+  /**
    * Rewrites the stored identifier property so that it names the fileset the row is actually stored
    * under. The overwrite keeps the fileset ID the database already had, while the properties still
    * carry the ID the caller generated, and a reader that trusts the property would disagree with
@@ -493,7 +524,7 @@ public class FilesetMetaService {
   }
 
   private FilesetPO filesetPOWithPersistedIdentityAndVersion(
-      FilesetPO incomingPO, FilesetPO persistedPO) {
+      FilesetPO incomingPO, FilesetPO persistedPO, long persistedVersion) {
     // The upsert chooses the version inside the database and may keep an existing fileset ID. All
     // storage-location rows must use those stored values or the metadata row would point at a
     // version snapshot that cannot be loaded.
@@ -506,7 +537,7 @@ public class FilesetMetaService {
                         .withCatalogId(persistedPO.getCatalogId())
                         .withSchemaId(persistedPO.getSchemaId())
                         .withFilesetId(persistedPO.getFilesetId())
-                        .withVersion(persistedPO.getCurrentVersion())
+                        .withVersion(persistedVersion)
                         .withFilesetComment(versionPO.getFilesetComment())
                         .withProperties(
                             propertiesWithFilesetId(
@@ -524,8 +555,8 @@ public class FilesetMetaService {
         .withSchemaId(persistedPO.getSchemaId())
         .withType(persistedPO.getType())
         .withAuditInfo(persistedPO.getAuditInfo())
-        .withCurrentVersion(persistedPO.getCurrentVersion())
-        .withLastVersion(persistedPO.getLastVersion())
+        .withCurrentVersion(persistedVersion)
+        .withLastVersion(persistedVersion)
         .withDeletedAt(persistedPO.getDeletedAt())
         .withFilesetVersionPOs(persistedVersions)
         .build();

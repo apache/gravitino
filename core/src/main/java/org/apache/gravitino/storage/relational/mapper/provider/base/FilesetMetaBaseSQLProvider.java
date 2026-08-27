@@ -320,6 +320,27 @@ public class FilesetMetaBaseSQLProvider {
   }
 
   /**
+   * Returns SQL that lifts the OCC version of a fileset, checked against the observed version.
+   *
+   * @param filesetId the fileset whose version is lifted
+   * @param liftedVersion the version to store
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked update SQL
+   */
+  public String liftFilesetVersion(
+      @Param("filesetId") Long filesetId,
+      @Param("liftedVersion") Long liftedVersion,
+      @Param("currentVersion") Long currentVersion) {
+    return "UPDATE "
+        + META_TABLE_NAME
+        + " SET current_version = #{liftedVersion},"
+        + " last_version = #{liftedVersion}"
+        + " WHERE fileset_id = #{filesetId}"
+        + " AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
+  }
+
+  /**
    * Returns SQL that updates a fileset only while its OCC version is unchanged.
    *
    * <p>The version is the concurrency token, so payload, name, and audit columns are deliberately

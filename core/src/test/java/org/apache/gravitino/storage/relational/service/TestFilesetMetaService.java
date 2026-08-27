@@ -782,6 +782,60 @@ public class TestFilesetMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteSkipsVersionsAlreadyStored() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_overwrite_stale_version");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-v1");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    FilesetPO initialPO = getFilesetPO(original.id());
+
+    // The same legacy shape the alter path already handles: a snapshot above the version the
+    // metadata row records. The overwrite derives its version from that row, so it has to be
+    // lifted above the snapshot instead of rewriting it.
+    FilesetVersionPO staleVersion =
+        FilesetVersionPO.builder()
+            .withMetalakeId(initialPO.getMetalakeId())
+            .withCatalogId(initialPO.getCatalogId())
+            .withSchemaId(initialPO.getSchemaId())
+            .withFilesetId(initialPO.getFilesetId())
+            .withVersion(initialPO.getCurrentVersion() + 1)
+            .withFilesetComment("left behind by an older release")
+            .withLocationName(LOCATION_NAME_UNKNOWN)
+            .withStorageLocation("/tmp-stale")
+            .withDeletedAt(0L)
+            .build();
+    SessionUtils.doWithCommit(
+        FilesetVersionMapper.class, mapper -> mapper.insertFilesetVersions(List.of(staleVersion)));
+
+    FilesetEntity replacement =
+        copyFileset(
+            original,
+            original.id(),
+            original.name(),
+            "overwritten past the stale version",
+            "/tmp-v2",
+            original.auditInfo());
+    FilesetMetaService.getInstance().insertFileset(replacement, true);
+
+    FilesetPO afterOverwrite = getFilesetPO(original.id());
+    Assertions.assertEquals(
+        staleVersion.getVersion() + 1, afterOverwrite.getCurrentVersion().longValue());
+    FilesetEntity stored =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals("overwritten past the stale version", stored.comment());
+    Assertions.assertEquals("/tmp-v2", stored.storageLocations().get(LOCATION_NAME_UNKNOWN));
+    // The snapshot that was left behind is untouched at its own version.
+    Assertions.assertEquals(
+        "/tmp-stale",
+        storageLocationOfVersion(initialPO.getFilesetId(), staleVersion.getVersion()));
+  }
+
+  @TestTemplate
   public void testNaturalKeyOverwriteRewritesIdentifierProperty() throws IOException {
     // PostgreSQL targets fileset_id explicitly and rejects a different ID on the natural key.
     Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
@@ -820,6 +874,23 @@ public class TestFilesetMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         StringIdentifier.fromId(original.id()).toString(),
         stored.properties().get(StringIdentifier.ID_KEY));
+  }
+
+  private String storageLocationOfVersion(Long filesetId, Long version) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT storage_location FROM fileset_version_info"
+                        + " WHERE fileset_id = %d AND version = %d AND deleted_at = 0",
+                    filesetId, version))) {
+      return rs.next() ? rs.getString("storage_location") : null;
+    } catch (SQLException e) {
+      throw new RuntimeException("SQL execution failed", e);
+    }
   }
 
   private FilesetPO getFilesetPO(Long filesetId) {

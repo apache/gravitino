@@ -247,6 +247,20 @@ public interface FilesetMetaMapper {
       method = "insertFilesetMetaOnDuplicateKeyUpdate")
   void insertFilesetMetaOnDuplicateKeyUpdate(@Param("filesetMeta") FilesetPO filesetPO);
 
+  /**
+   * Lifts the OCC version of a fileset to a value above every snapshot it still owns.
+   *
+   * @param filesetId the fileset whose version is lifted
+   * @param liftedVersion the version to store
+   * @param currentVersion the version the caller observed
+   * @return the number of rows updated
+   */
+  @UpdateProvider(type = FilesetMetaSQLProviderFactory.class, method = "liftFilesetVersion")
+  Integer liftFilesetVersion(
+      @Param("filesetId") Long filesetId,
+      @Param("liftedVersion") Long liftedVersion,
+      @Param("currentVersion") Long currentVersion);
+
   @UpdateProvider(type = FilesetMetaSQLProviderFactory.class, method = "updateFilesetMeta")
   Integer updateFilesetMeta(
       @Param("newFilesetMeta") FilesetPO newFilesetPO,
