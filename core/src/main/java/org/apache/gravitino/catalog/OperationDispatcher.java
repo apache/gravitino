@@ -35,8 +35,11 @@ import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.messaging.TopicChange;
+import org.apache.gravitino.model.ModelChange;
+import org.apache.gravitino.model.ModelVersionChange;
 import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.TableChange;
 import org.apache.gravitino.rel.ViewChange;
@@ -214,11 +217,29 @@ public abstract class OperationDispatcher {
     }
   }
 
+  /**
+   * Runs a store operation as a best-effort side effect of the request.
+   *
+   * <p>Every failure is logged and reported as a null result, because the external catalog is the
+   * source of truth on these paths: a load that imports or repairs the Gravitino copy must still
+   * return the entity it read, and the next load repairs what this one could not write.
+   */
   protected <R extends HasIdentifier> R operateOnEntity(
       NameIdentifier ident, ThrowableFunction<NameIdentifier, R> fn, String opName, long id) {
     R ret = null;
     try {
       ret = fn.apply(ident);
+    } catch (OptimisticLockException e) {
+      // Only external entities reach this point, so swallowing the conflict is safe: alterTable,
+      // alterSchema and alterView return before calling this helper when the entity is managed,
+      // and no catalog reports managed storage for topics (KafkaCatalogCapability). A managed
+      // alter therefore hits the store directly and its conflict still reaches the caller.
+      //
+      // For an external entity the catalog was already changed and remains the source of truth.
+      // Failing the request would invite a retry that re-applies the external change, and some
+      // changes are not idempotent, so the stale Gravitino copy is the lesser problem: the next
+      // load imports the entity again.
+      LOG.warn(FormattedErrorMessages.STORE_OP_FAILURE, opName, ident, e);
     } catch (NoSuchEntityException e) {
       // Case 2: The table is created by Gravitino, but has no corresponding entity in Gravitino.
       LOG.error(FormattedErrorMessages.ENTITY_NOT_FOUND, ident);
@@ -271,12 +292,25 @@ public abstract class OperationDispatcher {
       } else if (item instanceof FilesetChange.SetProperty) {
         FilesetChange.SetProperty setProperty = (FilesetChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof FilesetChange.SetSecretBinding) {
+        FilesetChange.SetSecretBinding setSecretBinding = (FilesetChange.SetSecretBinding) item;
+        properties.put(setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
+      } else if (item instanceof FilesetChange.SetSecretReference) {
+        FilesetChange.SetSecretReference setSecretReference =
+            (FilesetChange.SetSecretReference) item;
+        properties.put(setSecretReference.getProperty(), setSecretReference.getProperty());
       } else if (item instanceof TopicChange.SetProperty) {
         TopicChange.SetProperty setProperty = (TopicChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
       } else if (item instanceof ViewChange.SetProperty) {
         ViewChange.SetProperty setProperty = (ViewChange.SetProperty) item;
         properties.put(setProperty.getProperty(), setProperty.getValue());
+      } else if (item instanceof ModelChange.SetProperty) {
+        ModelChange.SetProperty setProperty = (ModelChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
+      } else if (item instanceof ModelVersionChange.SetProperty) {
+        ModelVersionChange.SetProperty setProperty = (ModelVersionChange.SetProperty) item;
+        properties.put(setProperty.property(), setProperty.value());
       }
     }
 

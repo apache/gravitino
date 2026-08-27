@@ -233,6 +233,11 @@ public class TagMetaBaseSQLProvider {
         + " WHERE tag_id = #{tagId} and deleted_at = 0";
   }
 
+  /** Returns SQL that selects and locks an active tag by ID. */
+  public String selectTagByTagIdForUpdate(@Param("tagId") Long tagId) {
+    return selectTagByTagId(tagId) + " FOR UPDATE";
+  }
+
   public String listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds) {
     return "<script>"
         + "SELECT tag_id as tagId, tag_name as tagName,"

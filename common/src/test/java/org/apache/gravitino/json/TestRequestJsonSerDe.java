@@ -24,6 +24,7 @@ import com.google.common.collect.ImmutableMap;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
+import org.apache.gravitino.dto.requests.FilesetUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
@@ -155,5 +156,23 @@ public class TestRequestJsonSerDe {
     CatalogUpdateRequest deserReq3 =
         JsonUtils.objectMapper().readValue(serJson3, CatalogUpdateRequest.class);
     Assertions.assertEquals(req3, deserReq3);
+  }
+
+  @Test
+  public void testFilesetUpdateRequestSerDe() throws JsonProcessingException {
+    FilesetUpdateRequest req =
+        new FilesetUpdateRequest.SetFilesetSecretBindingRequest("password", "env", "secret");
+    String serJson = JsonUtils.objectMapper().writeValueAsString(req);
+    FilesetUpdateRequest deserReq =
+        JsonUtils.objectMapper().readValue(serJson, FilesetUpdateRequest.class);
+    Assertions.assertEquals(req, deserReq);
+
+    FilesetUpdateRequest req1 =
+        new FilesetUpdateRequest.SetFilesetSecretReferenceRequest(
+            "password", "vault", ImmutableMap.of("path", "secret/data/my-password"));
+    String serJson1 = JsonUtils.objectMapper().writeValueAsString(req1);
+    FilesetUpdateRequest deserReq1 =
+        JsonUtils.objectMapper().readValue(serJson1, FilesetUpdateRequest.class);
+    Assertions.assertEquals(req1, deserReq1);
   }
 }

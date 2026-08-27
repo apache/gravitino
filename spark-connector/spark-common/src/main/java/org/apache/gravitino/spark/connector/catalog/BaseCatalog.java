@@ -22,6 +22,7 @@ package org.apache.gravitino.spark.connector.catalog;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Sets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -165,8 +166,8 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
     String provider = gravitinoCatalogClient.provider();
     Preconditions.checkArgument(
         StringUtils.isNotBlank(provider), name + " catalog provider is empty");
-    this.sparkCatalog =
-        createAndInitSparkCatalog(name, options, gravitinoCatalogClient.properties());
+    Map<String, String> catalogProperties = propsWithSecrets(gravitinoCatalogClient);
+    this.sparkCatalog = createAndInitSparkCatalog(name, options, catalogProperties);
     this.propertiesConverter = getPropertiesConverter();
     this.sparkTransformConverter = getSparkTransformConverter();
     this.sparkTypeConverter = getSparkTypeConverter();
@@ -707,6 +708,13 @@ public abstract class BaseCatalog implements TableCatalog, SupportsNamespaces, F
               String.join(".", getDatabase(ident), ident.name())),
           e);
     }
+  }
+
+  private static Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Collections.emptyMap() : catalog.properties());
+    props.putAll(catalog.supportsSecrets().getSecrets());
+    return props;
   }
 
   @Override

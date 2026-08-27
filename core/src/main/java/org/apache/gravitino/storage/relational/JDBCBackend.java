@@ -84,6 +84,7 @@ import org.apache.gravitino.storage.relational.service.ModelVersionMetaService;
 import org.apache.gravitino.storage.relational.service.OrphanedMetadataObjectRelationService;
 import org.apache.gravitino.storage.relational.service.OwnerMetaService;
 import org.apache.gravitino.storage.relational.service.PolicyMetaService;
+import org.apache.gravitino.storage.relational.service.PolicyTagRelService;
 import org.apache.gravitino.storage.relational.service.RoleMetaService;
 import org.apache.gravitino.storage.relational.service.SchemaMetaService;
 import org.apache.gravitino.storage.relational.service.StatisticMetaService;
@@ -539,6 +540,9 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return ViewMetaService.getInstance()
             .deleteViewMetasByLegacyTimeline(
                 legacyTimeline, GARBAGE_COLLECTOR_SINGLE_DELETION_LIMIT);
+      case SEMANTIC_MODEL:
+        // TODO(#12209): Delegate to SemanticModelMetaService when relational persistence is added.
+        return 0;
       case AUDIT:
         return 0;
         // TODO: Implement hard delete logic for these entity types.
@@ -577,6 +581,10 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
       case JOB:
       case VIEW:
         // These entity types have not implemented multi-versions, so we can skip.
+        return 0;
+
+      case SEMANTIC_MODEL:
+        // TODO: Delegate to SemanticModelMetaService when relational persistence is added.
         return 0;
 
       case FILESET:
@@ -730,6 +738,13 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
           return (List<E>)
               TagMetaService.getInstance().listTagsForMetadataObject(nameIdentifier, identType);
         }
+      case POLICY_TAG_REL:
+        return (List<E>)
+            PolicyTagRelService.getInstance()
+                .listRelations(List.of(nameIdentifier), identType)
+                .stream()
+                .map(RelationalEntity::targetEntity)
+                .collect(Collectors.toList());
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -743,6 +758,8 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
     switch (relType) {
       case OWNER_REL:
         return OwnerMetaService.getInstance().batchGetOwner(nameIdentifiers, identType);
+      case POLICY_TAG_REL:
+        return PolicyTagRelService.getInstance().listRelations(nameIdentifiers, identType);
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));
@@ -855,6 +872,14 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
                     update.sourceEntityType(),
                     toTagValues(update.targetsToAdd()),
                     toTagValues(update.targetsToRemove()));
+      case POLICY_TAG_REL:
+        Preconditions.checkArgument(
+            update.sourceEntityType() == Entity.EntityType.TAG,
+            "Policy-to-tag relation updates must use a tag as the source entity");
+        return (List<E>)
+            PolicyTagRelService.getInstance()
+                .updateRelations(
+                    update.sourceIdentifier(), update.targetsToAdd(), update.targetsToRemove());
       default:
         Preconditions.checkArgument(
             !update.hasRelationValues(),
@@ -914,6 +939,21 @@ public class JDBCBackend implements RelationalBackend, SupportsOrphanedRelationC
         return (E)
             TagMetaService.getInstance()
                 .getTagForMetadataObject(srcIdentifier, srcType, destEntityIdent);
+      case POLICY_TAG_REL:
+        return (E)
+            PolicyTagRelService.getInstance()
+                .listRelations(List.of(srcIdentifier), srcType)
+                .stream()
+                .filter(
+                    relation -> relation.targetEntity().nameIdentifier().equals(destEntityIdent))
+                .map(RelationalEntity::targetEntity)
+                .findFirst()
+                .orElseThrow(
+                    () ->
+                        new NoSuchEntityException(
+                            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+                            srcType == Entity.EntityType.TAG ? "policy" : "tag",
+                            destEntityIdent.name()));
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

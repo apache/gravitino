@@ -50,7 +50,6 @@ import java.util.Set;
 import java.util.concurrent.ThreadFactory;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.ArrayUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -1015,18 +1014,9 @@ public class HiveCatalogOperations
    * Performs `getAllDatabases` operation in Hive Metastore to test the connection.
    *
    * @param catalogIdent the name of the catalog.
-   * @param type the type of the catalog.
-   * @param provider the provider of the catalog.
-   * @param comment the comment of the catalog.
-   * @param properties the properties of the catalog.
    */
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       clientPool.run(c -> c.getAllDatabases(catalogName));
     } catch (ConnectionFailedException e) {

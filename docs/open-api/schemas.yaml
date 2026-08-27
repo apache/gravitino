@@ -79,7 +79,7 @@ paths:
         - schema
       summary: Get schema
       operationId: loadSchema
-      description: Returns the specified schema in the specified catalog and metalake
+      description: Returns the specified schema in the specified catalog and metalake.
       responses:
         "200":
           $ref: "#/components/responses/SchemaResponse"
@@ -194,6 +194,22 @@ components:
           default: { }
           additionalProperties:
             type: string
+        secretBindings:
+          type: object
+          description: >
+            Optional map of property key to write-through binding. Persisted value
+            becomes a URN.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretBinding"
+        secretReferences:
+          type: object
+          description: >
+            Optional map of property key to secret locator. Server builds and
+            persists the URN. Must not overlap with secretBindings.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretReference"
 
     Schema:
       type: object

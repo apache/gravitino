@@ -50,17 +50,24 @@ public class TableMetaPostgreSQLProvider extends TableMetaBaseSQLProvider {
         + " catalog_id = #{tableMeta.catalogId},"
         + " schema_id = #{tableMeta.schemaId},"
         + " audit_info = #{tableMeta.auditInfo},"
-        + " current_version = #{tableMeta.currentVersion},"
-        + " last_version = #{tableMeta.lastVersion},"
+        // Qualify the stored row's version because a bare name is ambiguous on this side of
+        // ON CONFLICT in PostgreSQL.
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{tableMeta.deletedAt}";
   }
 
   @Override
-  public String softDeleteTableMetasByTableId(Long tableId) {
+  public String softDeleteTableMetasByTableId(Long tableId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE table_id = #{tableId} AND deleted_at = 0";
+        + " WHERE table_id = #{tableId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override

@@ -80,6 +80,7 @@ import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchLocationNameException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
@@ -726,7 +727,7 @@ public abstract class BaseGVFSOperations implements Closeable {
           filesetIdent);
 
       Path targetLocation = new Path(fileset.storageLocations().get(targetLocationName));
-      Map<String, String> allProperties = getAllProperties(filesetIdent, fileset.properties());
+      Map<String, String> allProperties = getAllProperties(filesetIdent);
       allProperties.putAll(
           FilesetUtil.getUserDefinedFileSystemConfigs(
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
@@ -961,21 +962,29 @@ public abstract class BaseGVFSOperations implements Closeable {
     return cacheBuilder.build();
   }
 
-  private Map<String, String> getAllProperties(
-      NameIdentifier filesetIdent, Map<String, String> filesetProperties) {
-    Map<String, String> allProperties = new HashMap<>();
-    Catalog catalog =
-        (Catalog)
-            getFilesetCatalog(
-                NameIdentifier.of(
-                    filesetIdent.namespace().level(0), filesetIdent.namespace().level(1)));
-    allProperties.putAll(catalog.properties());
+  @VisibleForTesting
+  Map<String, String> getAllProperties(NameIdentifier filesetIdent) {
+    String catalogName = filesetIdent.namespace().level(1);
+    String schemaName = filesetIdent.namespace().level(2);
+    Catalog catalog = getGravitinoClient().loadCatalog(catalogName);
+    Schema schema = catalog.asSchemas().loadSchema(schemaName);
+    Fileset fileset =
+        catalog.asFilesetCatalog().loadFileset(NameIdentifier.of(schemaName, filesetIdent.name()));
 
-    Schema schema = getSchema(NameIdentifier.parse(filesetIdent.namespace().toString()));
-    allProperties.putAll(schema.properties());
-    allProperties.putAll(filesetProperties);
-    allProperties.putAll(extractNonDefaultConfig(conf));
-    return allProperties;
+    Map<String, String> all = new HashMap<>();
+    putPropsAndSecrets(all, catalog.properties(), catalog.supportsSecrets());
+    putPropsAndSecrets(all, schema.properties(), schema.supportsSecrets());
+    putPropsAndSecrets(all, fileset.properties(), fileset.supportsSecrets());
+    all.putAll(extractNonDefaultConfig(conf));
+    return all;
+  }
+
+  private static void putPropsAndSecrets(
+      Map<String, String> target, Map<String, String> props, SupportsSecrets secrets) {
+    if (props != null) {
+      target.putAll(props);
+    }
+    target.putAll(secrets.getSecrets());
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {

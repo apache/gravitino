@@ -71,6 +71,7 @@ import org.apache.gravitino.rel.expressions.sorts.SortOrder;
 import org.apache.gravitino.rel.expressions.transforms.Transform;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rest.RESTUtils;
+import org.apache.gravitino.secret.SupportsSecrets;
 
 /**
  * Relational catalog is a catalog implementation that supports relational database like metadata
@@ -78,7 +79,7 @@ import org.apache.gravitino.rest.RESTUtils;
  * catalog is under the metalake.
  */
 class RelationalCatalog extends BaseSchemaCatalog
-    implements TableCatalog, ViewCatalog, SupportsCredentials {
+    implements TableCatalog, ViewCatalog, SupportsCredentials, SupportsSecrets {
 
   public static final String PRIVILEGES = "privileges";
 
@@ -311,6 +312,16 @@ class RelationalCatalog extends BaseSchemaCatalog
   @Override
   public Credential[] getCredentials() {
     return objectCredentialOperations.getCredentials();
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() throws UnsupportedOperationException {
+    return this;
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   /**
