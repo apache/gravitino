@@ -509,40 +509,48 @@ public class JobManager implements JobOperationDispatcher {
         LockType.WRITE,
         () -> {
           try {
-            // Re-fetch under the lock rather than reusing the snapshot taken before the
-            // (potentially slow) external cancel call above - a concurrent status poll could
-            // have persisted a real startedAt/finishedAt in that gap, and carrying forward the
-            // stale snapshot would clobber it back to the sentinel.
-            JobEntity latestJobEntity = getJob(metalake, jobId);
-            JobEntity newJobEntity =
-                JobEntity.builder()
-                    .withId(latestJobEntity.id())
-                    .withJobExecutionId(latestJobEntity.jobExecutionId())
-                    .withJobTemplateName(latestJobEntity.jobTemplateName())
-                    .withStatus(JobHandle.Status.CANCELLING)
-                    .withNamespace(latestJobEntity.namespace())
-                    .withAuditInfo(
-                        AuditInfo.builder()
-                            .withCreator(latestJobEntity.auditInfo().creator())
-                            .withCreateTime(latestJobEntity.auditInfo().createTime())
-                            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                            .withLastModifiedTime(Instant.now())
-                            .build())
-                    // CANCELLING is not a terminal state; carry forward whatever
-                    // startedAt/finishedAt the job already had.
-                    .withStartedAt(latestJobEntity.startedAt())
-                    .withFinishedAt(latestJobEntity.finishedAt())
-                    .build();
-
-            // Update the job entity in the entity store
-            entityStore.put(newJobEntity, true /* overwrite */);
-            return newJobEntity;
+            // entityStore.update() re-fetches the latest entity itself right before applying the
+            // updater, rather than reusing the snapshot taken before the (potentially slow)
+            // external cancel call above - a concurrent status poll could have persisted a real
+            // startedAt/finishedAt in that gap, and carrying forward the stale snapshot would
+            // clobber it back to the sentinel.
+            return entityStore.update(
+                NameIdentifierUtil.ofJob(metalake, jobId),
+                JobEntity.class,
+                Entity.EntityType.JOB,
+                this::toCancellingJobEntity);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchJobException(
+                "Job with ID %s under metalake %s does not exist, this could be due to the job "
+                    + "not existing or being deleted concurrently.",
+                jobId, metalake);
           } catch (IOException e) {
             throw new RuntimeException(
                 String.format("Failed to update job entity for job %s to CANCELING status", jobId),
                 e);
           }
         });
+  }
+
+  private JobEntity toCancellingJobEntity(JobEntity latestJobEntity) {
+    return JobEntity.builder()
+        .withId(latestJobEntity.id())
+        .withJobExecutionId(latestJobEntity.jobExecutionId())
+        .withJobTemplateName(latestJobEntity.jobTemplateName())
+        .withStatus(JobHandle.Status.CANCELLING)
+        .withNamespace(latestJobEntity.namespace())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(latestJobEntity.auditInfo().creator())
+                .withCreateTime(latestJobEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        // CANCELLING is not a terminal state; carry forward whatever startedAt/finishedAt the
+        // job already had.
+        .withStartedAt(latestJobEntity.startedAt())
+        .withFinishedAt(latestJobEntity.finishedAt())
+        .build();
   }
 
   @Override
@@ -625,41 +633,46 @@ public class JobManager implements JobOperationDispatcher {
                       ? Instant.now().toEpochMilli()
                       : job.startedAt();
 
-              JobEntity newJobEntity =
-                  JobEntity.builder()
-                      .withId(job.id())
-                      .withJobExecutionId(job.jobExecutionId())
-                      .withJobTemplateName(job.jobTemplateName())
-                      .withStatus(newStatus)
-                      .withNamespace(job.namespace())
-                      .withAuditInfo(
-                          AuditInfo.builder()
-                              .withCreator(job.auditInfo().creator())
-                              .withCreateTime(job.auditInfo().createTime())
-                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                              .withLastModifiedTime(Instant.now())
-                              .build())
-                      .withStartedAt(startedAt)
-                      .withFinishedAt(isFinished ? Instant.now().toEpochMilli() : job.finishedAt())
-                      .build();
-
-              // Update the job entity with new status.
+              // Update the job entity with new status. entityStore.update() re-fetches the
+              // latest entity itself right before applying the updater, so the identity/audit
+              // fields it carries forward can't clobber a concurrent change made in the gap
+              // between the listJobs() snapshot above and this point (e.g. by cancelJob()).
               JobHandle.Status finalNewStatus = newStatus;
-              TreeLockUtils.doWithTreeLock(
-                  NameIdentifierUtil.ofJob(metalake, job.name()),
-                  LockType.WRITE,
-                  () -> {
-                    try {
-                      entityStore.put(newJobEntity, true /* overwrite */);
-                      return null;
-                    } catch (IOException e) {
-                      throw new RuntimeException(
-                          String.format(
-                              "Failed to update job entity %s to status %s",
-                              newJobEntity, finalNewStatus),
-                          e);
-                    }
-                  });
+              boolean finalIsFinished = isFinished;
+              try {
+                TreeLockUtils.doWithTreeLock(
+                    NameIdentifierUtil.ofJob(metalake, job.name()),
+                    LockType.WRITE,
+                    () -> {
+                      try {
+                        return entityStore.update(
+                            NameIdentifierUtil.ofJob(metalake, job.name()),
+                            JobEntity.class,
+                            Entity.EntityType.JOB,
+                            latestJobEntity ->
+                                toUpdatedStatusJobEntity(
+                                    latestJobEntity, finalNewStatus, startedAt, finalIsFinished));
+                      } catch (IOException e) {
+                        throw new RuntimeException(
+                            String.format(
+                                "Failed to update job entity %s to status %s",
+                                job.name(), finalNewStatus),
+                            e);
+                      }
+                    });
+              } catch (NoSuchEntityException e) {
+                // The job could have been deleted concurrently (e.g. by legacy-timeline cleanup)
+                // in the gap between the listJobs() snapshot above and this update. Skip it rather
+                // than letting the exception escape this scheduled task, which would silently
+                // cancel all future status-pull runs (ScheduledExecutorService semantics).
+                LOG.warn(
+                    "Job {} under metalake {} no longer exists, skipping status update to {}. "
+                        + "This could be due to the job being deleted concurrently.",
+                    job.name(),
+                    metalake,
+                    finalNewStatus);
+                return;
+              }
 
               LOG.info(
                   "Updated the job {} with execution id {} status to {}",
@@ -669,6 +682,26 @@ public class JobManager implements JobOperationDispatcher {
             }
           });
     }
+  }
+
+  private JobEntity toUpdatedStatusJobEntity(
+      JobEntity latestJobEntity, JobHandle.Status newStatus, long startedAt, boolean isFinished) {
+    return JobEntity.builder()
+        .withId(latestJobEntity.id())
+        .withJobExecutionId(latestJobEntity.jobExecutionId())
+        .withJobTemplateName(latestJobEntity.jobTemplateName())
+        .withStatus(newStatus)
+        .withNamespace(latestJobEntity.namespace())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(latestJobEntity.auditInfo().creator())
+                .withCreateTime(latestJobEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .withStartedAt(startedAt)
+        .withFinishedAt(isFinished ? Instant.now().toEpochMilli() : latestJobEntity.finishedAt())
+        .build();
   }
 
   @VisibleForTesting
