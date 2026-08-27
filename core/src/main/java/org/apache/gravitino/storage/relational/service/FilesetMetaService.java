@@ -20,9 +20,13 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -33,7 +37,9 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
@@ -233,8 +239,16 @@ public class FilesetMetaService {
         newEntity.id(),
         oldFilesetEntity.id());
 
+    // A fileset written before the version reset was fixed can still own snapshots newer than the
+    // version its metadata row records. The new snapshot has to be built above all of them.
+    Long maxStoredVersion =
+        SessionUtils.getWithoutCommit(
+            FilesetVersionMapper.class,
+            mapper -> mapper.selectMaxFilesetVersion(oldFilesetPO.getFilesetId()));
+
     try {
-      FilesetPO newFilesetPO = POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity);
+      FilesetPO newFilesetPO =
+          POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, maxStoredVersion);
       SessionUtils.doMultipleWithCommit(
           () -> {
             // Decide the winner before writing fileset_version_info. Two writers that read version
@@ -453,6 +467,31 @@ public class FilesetMetaService {
         });
   }
 
+  /**
+   * Rewrites the stored identifier property so that it names the fileset the row is actually stored
+   * under. The overwrite keeps the fileset ID the database already had, while the properties still
+   * carry the ID the caller generated, and a reader that trusts the property would disagree with
+   * {@code fileset_meta}.
+   */
+  private String propertiesWithFilesetId(String serializedProperties, Long filesetId) {
+    if (serializedProperties == null) {
+      return null;
+    }
+    try {
+      Map<String, String> properties =
+          JsonUtils.anyFieldMapper()
+              .readValue(serializedProperties, new TypeReference<Map<String, String>>() {});
+      if (properties == null || !properties.containsKey(StringIdentifier.ID_KEY)) {
+        return serializedProperties;
+      }
+      Map<String, String> rewritten = new HashMap<>(properties);
+      rewritten.put(StringIdentifier.ID_KEY, StringIdentifier.fromId(filesetId).toString());
+      return JsonUtils.anyFieldMapper().writeValueAsString(rewritten);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to rewrite the fileset identifier property", e);
+    }
+  }
+
   private FilesetPO filesetPOWithPersistedIdentityAndVersion(
       FilesetPO incomingPO, FilesetPO persistedPO) {
     // The upsert chooses the version inside the database and may keep an existing fileset ID. All
@@ -469,7 +508,9 @@ public class FilesetMetaService {
                         .withFilesetId(persistedPO.getFilesetId())
                         .withVersion(persistedPO.getCurrentVersion())
                         .withFilesetComment(versionPO.getFilesetComment())
-                        .withProperties(versionPO.getProperties())
+                        .withProperties(
+                            propertiesWithFilesetId(
+                                versionPO.getProperties(), persistedPO.getFilesetId()))
                         .withLocationName(versionPO.getLocationName())
                         .withStorageLocation(versionPO.getStorageLocation())
                         .withDeletedAt(versionPO.getDeletedAt())

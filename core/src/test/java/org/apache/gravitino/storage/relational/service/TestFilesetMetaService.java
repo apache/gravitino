@@ -38,6 +38,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Config;
@@ -47,6 +48,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.file.Fileset;
@@ -690,24 +692,14 @@ public class TestFilesetMetaService extends TestJDBCBackend {
             "/tmp-v1");
     FilesetMetaService.getInstance().insertFileset(original, false);
     FilesetPO initialPO = getFilesetPO(original.id());
-    FilesetVersionPO conflictingVersion =
-        FilesetVersionPO.builder()
-            .withMetalakeId(initialPO.getMetalakeId())
-            .withCatalogId(initialPO.getCatalogId())
-            .withSchemaId(initialPO.getSchemaId())
-            .withFilesetId(initialPO.getFilesetId())
-            .withVersion(initialPO.getCurrentVersion() + 1)
-            .withFilesetComment("conflicting version")
-            .withLocationName(LOCATION_NAME_UNKNOWN)
-            .withStorageLocation("/tmp-conflict")
-            .withDeletedAt(0L)
-            .build();
-    SessionUtils.doWithCommit(
-        FilesetVersionMapper.class,
-        mapper -> mapper.insertFilesetVersions(List.of(conflictingVersion)));
+    // fileset_meta carries no comment, so an over-long comment passes the metadata update and only
+    // fails once the version snapshot is written.
+    String tooLongComment = StringUtils.repeat("c", 300);
 
+    // Each backend reports the rejected snapshot differently, so only the rollback below is
+    // asserted on.
     assertThrows(
-        RuntimeException.class,
+        Exception.class,
         () ->
             FilesetMetaService.getInstance()
                 .updateFileset(
@@ -718,7 +710,7 @@ public class TestFilesetMetaService extends TestJDBCBackend {
                           current,
                           current.id(),
                           current.name(),
-                          "must roll back",
+                          tooLongComment,
                           "/tmp-v2",
                           current.auditInfo());
                     }));
@@ -732,6 +724,102 @@ public class TestFilesetMetaService extends TestJDBCBackend {
         current.storageLocations().get(LOCATION_NAME_UNKNOWN));
     Assertions.assertEquals(initialPO.getCurrentVersion(), currentPO.getCurrentVersion());
     Assertions.assertEquals(initialPO.getLastVersion(), currentPO.getLastVersion());
+  }
+
+  @TestTemplate
+  public void testAlterSkipsVersionsAlreadyStored() throws IOException {
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_stale_version");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-v1");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+    FilesetPO initialPO = getFilesetPO(original.id());
+
+    // A fileset written before the version reset was fixed owns snapshots above the version its
+    // metadata row records. The next alter has to start above those, not on top of them.
+    FilesetVersionPO staleVersion =
+        FilesetVersionPO.builder()
+            .withMetalakeId(initialPO.getMetalakeId())
+            .withCatalogId(initialPO.getCatalogId())
+            .withSchemaId(initialPO.getSchemaId())
+            .withFilesetId(initialPO.getFilesetId())
+            .withVersion(initialPO.getCurrentVersion() + 1)
+            .withFilesetComment("left behind by an older release")
+            .withLocationName(LOCATION_NAME_UNKNOWN)
+            .withStorageLocation("/tmp-stale")
+            .withDeletedAt(0L)
+            .build();
+    SessionUtils.doWithCommit(
+        FilesetVersionMapper.class, mapper -> mapper.insertFilesetVersions(List.of(staleVersion)));
+
+    FilesetEntity altered =
+        FilesetMetaService.getInstance()
+            .updateFileset(
+                original.nameIdentifier(),
+                entity -> {
+                  FilesetEntity current = (FilesetEntity) entity;
+                  return copyFileset(
+                      current,
+                      current.id(),
+                      current.name(),
+                      "altered past the stale version",
+                      "/tmp-v2",
+                      current.auditInfo());
+                });
+
+    Assertions.assertEquals("altered past the stale version", altered.comment());
+    FilesetPO afterAlter = getFilesetPO(original.id());
+    Assertions.assertEquals(
+        staleVersion.getVersion() + 1, afterAlter.getCurrentVersion().longValue());
+    FilesetEntity reloaded =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals("altered past the stale version", reloaded.comment());
+    Assertions.assertEquals("/tmp-v2", reloaded.storageLocations().get(LOCATION_NAME_UNKNOWN));
+  }
+
+  @TestTemplate
+  public void testNaturalKeyOverwriteRewritesIdentifierProperty() throws IOException {
+    // PostgreSQL targets fileset_id explicitly and rejects a different ID on the natural key.
+    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
+    String filesetName = GravitinoITUtils.genRandomName("tst_fs_overwrite_identifier");
+    FilesetEntity original =
+        createFilesetEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFileset(metalakeName, catalogName, schemaName),
+            filesetName,
+            AUDIT_INFO,
+            "/tmp-original");
+    FilesetMetaService.getInstance().insertFileset(original, false);
+
+    long replacementId = RandomIdGenerator.INSTANCE.nextId();
+    FilesetEntity replacement =
+        FilesetEntity.builder()
+            .withId(replacementId)
+            .withName(original.name())
+            .withNamespace(original.namespace())
+            .withFilesetType(original.filesetType())
+            .withStorageLocations(ImmutableMap.of(LOCATION_NAME_UNKNOWN, "/tmp-replacement"))
+            .withComment("replacement")
+            .withProperties(
+                ImmutableMap.of(
+                    StringIdentifier.ID_KEY, StringIdentifier.fromId(replacementId).toString()))
+            .withAuditInfo(original.auditInfo())
+            .build();
+
+    FilesetMetaService.getInstance().insertFileset(replacement, true);
+
+    // The overwrite keeps the fileset ID the database already had, so the identifier property has
+    // to name that ID as well instead of the one the rejected snapshot was built with.
+    FilesetEntity stored =
+        FilesetMetaService.getInstance().getFilesetByIdentifier(original.nameIdentifier());
+    Assertions.assertEquals(original.id(), stored.id());
+    Assertions.assertEquals(
+        StringIdentifier.fromId(original.id()).toString(),
+        stored.properties().get(StringIdentifier.ID_KEY));
   }
 
   private FilesetPO getFilesetPO(Long filesetId) {

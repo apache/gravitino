@@ -83,6 +83,10 @@ public class FilesetVersionSQLProviderFactory {
     return getProvider().deleteFilesetVersionsByLegacyTimeline(legacyTimeline, limit);
   }
 
+  public static String selectMaxFilesetVersion(@Param("filesetId") Long filesetId) {
+    return getProvider().selectMaxFilesetVersion(filesetId);
+  }
+
   public static String selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
     return getProvider().selectFilesetVersionsByRetentionCount(versionRetentionCount);

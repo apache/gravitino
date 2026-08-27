@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
@@ -701,16 +702,28 @@ public class POConverters {
    *
    * @param oldFilesetPO the existing {@link FilesetPO} containing the current and last version data
    * @param newFileset the {@link FilesetEntity} with updated metadata and storage locations
+   * @param maxStoredVersion the highest version the fileset still has a stored snapshot for, or
+   *     {@code null} when it has none
    * @return {@code FilesetPO} object with updated version
    * @throws RuntimeException if JSON serialization of properties fails
    */
   public static FilesetPO updateFilesetPOWithVersion(
-      FilesetPO oldFilesetPO, FilesetEntity newFileset) {
+      FilesetPO oldFilesetPO, FilesetEntity newFileset, @Nullable Long maxStoredVersion) {
     try {
       // Every successful fileset alter advances the OCC token. The current version is also the
       // value used by reads to find the fileset details, so even a rename or audit-only change
       // needs a complete snapshot at the new version.
-      Long currentVersion = oldFilesetPO.getLastVersion() + 1;
+      //
+      // The stored snapshots are taken into account as well, because a fileset written before the
+      // version reset was fixed can carry snapshots newer than the version its metadata row
+      // records. Starting from the metadata row alone would rebuild a version that already exists
+      // and collide with the unique key over (fileset_id, version, storage_location_name).
+      long previousVersion =
+          Math.max(oldFilesetPO.getLastVersion(), oldFilesetPO.getCurrentVersion());
+      if (maxStoredVersion != null) {
+        previousVersion = Math.max(previousVersion, maxStoredVersion);
+      }
+      Long currentVersion = previousVersion + 1;
       String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
       List<FilesetVersionPO> newFilesetVersionPOs =
           newFileset.storageLocations().entrySet().stream()

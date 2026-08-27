@@ -116,6 +116,13 @@ public class FilesetVersionBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
+  public String selectMaxFilesetVersion(@Param("filesetId") Long filesetId) {
+    return "SELECT MAX(version)"
+        + " FROM "
+        + VERSION_TABLE_NAME
+        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
+  }
+
   public String selectFilesetVersionsByRetentionCount(
       @Param("versionRetentionCount") Long versionRetentionCount) {
     return "SELECT fileset_id as filesetId,"

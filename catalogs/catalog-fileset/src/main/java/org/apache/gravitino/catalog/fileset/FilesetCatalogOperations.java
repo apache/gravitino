@@ -712,6 +712,14 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       FilesetEntity filesetEntity =
           store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
 
+      // Drop the metadata first. It is the only step that can still be rejected, because the drop
+      // is refused when another writer altered the fileset after the read above. Deleting the files
+      // first would leave the data gone while the rejected drop keeps the fileset row pointing at
+      // storage locations that no longer exist.
+      if (!store.delete(ident, Entity.EntityType.FILESET)) {
+        return false;
+      }
+
       // For managed fileset, we should delete the related files.
       if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
         AtomicReference<IOException> exception = new AtomicReference<>();
@@ -753,7 +761,7 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
         }
       }
 
-      return store.delete(ident, Entity.EntityType.FILESET);
+      return true;
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
       return false;
