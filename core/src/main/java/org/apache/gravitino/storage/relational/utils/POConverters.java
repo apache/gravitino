@@ -1721,6 +1721,8 @@ public class POConverters {
    * @return the model record to store
    */
   public static ModelPO updateModelPO(ModelPO oldModelPO, ModelEntity newModel) {
+    long nextModelVersion =
+        Math.max(oldModelPO.getCurrentVersion(), oldModelPO.getLastVersion()) + 1;
     try {
       return ModelPO.builder()
           .withModelId(newModel.id())
@@ -1730,9 +1732,11 @@ public class POConverters {
           .withSchemaId(oldModelPO.getSchemaId())
           .withModelComment(newModel.comment())
           .withModelLatestVersion(newModel.latestVersion())
-          // Reserve the next shared concurrency version for this model change.
-          .withCurrentVersion(oldModelPO.getLastVersion() + 1)
-          .withLastVersion(oldModelPO.getLastVersion() + 1)
+          // Reserve the next shared concurrency version for this model change. The guard on the
+          // write matches current_version, so that column is what the next version is derived from;
+          // last_version only mirrors it.
+          .withCurrentVersion(nextModelVersion)
+          .withLastVersion(nextModelVersion)
           .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(newModel.properties()))
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newModel.auditInfo()))
           .withDeletedAt(DEFAULT_DELETED_AT)

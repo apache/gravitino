@@ -75,11 +75,6 @@ public class ModelVersionMetaSQLProviderFactory {
     return getProvider().selectModelVersionMetaByAlias(modelId, alias);
   }
 
-  public static String softDeleteModelVersionsBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
-    return getProvider().softDeleteModelVersionsBySchemaIdAndModelName(schemaId, modelName);
-  }
-
   /**
    * Returns SQL that soft-deletes every active version row for a model ID.
    *
@@ -93,11 +88,6 @@ public class ModelVersionMetaSQLProviderFactory {
   public static String softDeleteModelVersionMetaByModelIdAndVersion(
       @Param("modelId") Long modelId, @Param("modelVersion") Integer modelVersion) {
     return getProvider().softDeleteModelVersionMetaByModelIdAndVersion(modelId, modelVersion);
-  }
-
-  public static String softDeleteModelVersionMetaByModelIdAndAlias(
-      @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return getProvider().softDeleteModelVersionMetaByModelIdAndAlias(modelId, alias);
   }
 
   public static String softDeleteModelVersionMetasBySchemaIds(

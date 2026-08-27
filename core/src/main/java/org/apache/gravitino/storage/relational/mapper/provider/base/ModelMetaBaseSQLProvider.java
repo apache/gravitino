@@ -224,15 +224,6 @@ public class ModelMetaBaseSQLProvider {
     return selectModelMetaByModelId(modelId) + " FOR UPDATE";
   }
 
-  public String softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
-    return "UPDATE "
-        + ModelMetaMapper.TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
-  }
-
   /**
    * Returns SQL that soft-deletes a model only while its stored version is unchanged.
    *

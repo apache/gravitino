@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -204,6 +205,50 @@ public class TestModelMetaService extends TestJDBCBackend {
         () ->
             ModelMetaService.getInstance()
                 .listModelsByNamespace(Namespace.of(METALAKE_NAME, CATALOG_NAME, "inexistent")));
+  }
+
+  @TestTemplate
+  public void testDeleteModelRetriesWhenAVersionIsRegisteredConcurrently() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+
+    ModelEntity modelEntity =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            "model_dropped_during_version_register",
+            "model comment",
+            0,
+            ImmutableMap.of("k1", "v1"),
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(modelEntity, false);
+
+    ModelPO stalePO =
+        ModelMetaService.getInstance().getModelPOByIdentifier(modelEntity.nameIdentifier());
+    // Registering a version advances the concurrency version the model shares with its versions,
+    // so a drop that read the model before that point loses its compare-and-set.
+    ModelVersionMetaService.getInstance()
+        .insertModelVersion(
+            ModelVersionEntity.builder()
+                .withModelIdentifier(modelEntity.nameIdentifier())
+                .withVersion(0)
+                .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path"))
+                .withAliases(Lists.newArrayList("alias1"))
+                .withComment("version comment")
+                .withProperties(ImmutableMap.of("k1", "v1"))
+                .withAuditInfo(AUDIT_INFO)
+                .build());
+
+    ModelMetaService service = Mockito.spy(ModelMetaService.getInstance());
+    Mockito.doReturn(stalePO)
+        .doCallRealMethod()
+        .when(service)
+        .getModelPOByIdentifier(modelEntity.nameIdentifier());
+
+    // The drop reads the model again instead of reporting a conflict the caller cannot act on.
+    Assertions.assertTrue(service.deleteModel(modelEntity.nameIdentifier()));
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> ModelMetaService.getInstance().getModelByIdentifier(modelEntity.nameIdentifier()));
   }
 
   @TestTemplate

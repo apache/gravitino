@@ -107,11 +107,6 @@ public class ModelMetaSQLProviderFactory {
     return getProvider().selectModelMetaByModelIdForUpdate(modelId);
   }
 
-  public static String softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
-    return getProvider().softDeleteModelMetaBySchemaIdAndModelName(schemaId, modelName);
-  }
-
   /**
    * Returns SQL that soft-deletes a model with a version check.
    *

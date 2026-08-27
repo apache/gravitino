@@ -86,12 +86,6 @@ public interface ModelMetaMapper {
       method = "selectModelMetaByModelIdForUpdate")
   ModelPO selectModelMetaByModelIdForUpdate(@Param("modelId") Long modelId);
 
-  @UpdateProvider(
-      type = ModelMetaSQLProviderFactory.class,
-      method = "softDeleteModelMetaBySchemaIdAndModelName")
-  Integer softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName);
-
   /**
    * Soft-deletes a model only if its stored version is unchanged.
    *
