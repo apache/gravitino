@@ -28,9 +28,9 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
@@ -52,6 +52,7 @@ import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
@@ -147,8 +148,8 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
             ImmutableMap.of());
 
     assertThrows(NoSuchEntityException.class, () -> backend.insert(missingParent, false));
-    assertEquals(0, countRows("semantic_model_meta", missingParent.id()));
-    assertEquals(0, countRows("semantic_model_version_info", missingParent.id()));
+    assertEquals(0, countRows(SemanticModelMetaMapper.TABLE_NAME, missingParent.id()));
+    assertEquals(0, countRows(SemanticModelVersionInfoMapper.TABLE_NAME, missingParent.id()));
   }
 
   @TestTemplate
@@ -168,8 +169,8 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
         mapper -> mapper.insertSemanticModelVersionInfo(po.getSemanticModelVersionInfoPO()));
 
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(semanticModel, false));
-    assertEquals(0, countRows("semantic_model_meta", semanticModel.id()));
-    assertEquals(1, countRows("semantic_model_version_info", semanticModel.id()));
+    assertEquals(0, countRows(SemanticModelMetaMapper.TABLE_NAME, semanticModel.id()));
+    assertEquals(1, countRows(SemanticModelVersionInfoMapper.TABLE_NAME, semanticModel.id()));
   }
 
   private Namespace createParents(String prefix) throws IOException {
@@ -242,16 +243,20 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
   }
 
   private int countRows(String tableName, Long semanticModelId) {
-    String sql =
-        String.format(
-            "SELECT count(*) FROM %s WHERE semantic_model_id = %d", tableName, semanticModelId);
+    if (!SemanticModelMetaMapper.TABLE_NAME.equals(tableName)
+        && !SemanticModelVersionInfoMapper.TABLE_NAME.equals(tableName)) {
+      throw new IllegalArgumentException("Unsupported Semantic Model table: " + tableName);
+    }
+    String sql = String.format("SELECT count(*) FROM %s WHERE semantic_model_id = ?", tableName);
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
         Connection connection = sqlSession.getConnection();
-        Statement statement = connection.createStatement();
-        ResultSet resultSet = statement.executeQuery(sql)) {
-      assertTrue(resultSet.next());
-      return resultSet.getInt(1);
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setLong(1, semanticModelId);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        assertTrue(resultSet.next());
+        return resultSet.getInt(1);
+      }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to count Semantic Model rows", e);
     }

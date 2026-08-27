@@ -44,7 +44,7 @@ import org.apache.gravitino.storage.relational.service.EntityIdService;
 public class SemanticModelPO {
 
   /** The initial version allocated to a newly created Semantic Model. */
-  public static final Long INITIAL_VERSION = 1L;
+  public static final Integer INITIAL_VERSION = 1;
 
   private Long semanticModelId;
   private String semanticModelName;
@@ -52,8 +52,8 @@ public class SemanticModelPO {
   private Long catalogId;
   private Long schemaId;
   private String auditInfo;
-  private Long currentVersion;
-  private Long lastVersion;
+  private Integer currentVersion;
+  private Integer lastVersion;
   private Long deletedAt;
   private SemanticModelVersionInfoPO semanticModelVersionInfoPO;
 
@@ -73,8 +73,8 @@ public class SemanticModelPO {
       Long catalogId,
       Long schemaId,
       String auditInfo,
-      Long currentVersion,
-      Long lastVersion,
+      Integer currentVersion,
+      Integer lastVersion,
       Long deletedAt,
       SemanticModelVersionInfoPO semanticModelVersionInfoPO) {
     Preconditions.checkArgument(semanticModelId != null, "Semantic Model id is required");
@@ -146,8 +146,7 @@ public class SemanticModelPO {
    */
   public static SemanticModelPO initializeSemanticModelPO(
       SemanticModelEntity semanticModelEntity, SemanticModelPOBuilder builder) {
-    builder.withCurrentVersion(INITIAL_VERSION).withLastVersion(INITIAL_VERSION);
-    return buildSemanticModelPO(semanticModelEntity, builder, INITIAL_VERSION.intValue());
+    return buildSemanticModelPO(semanticModelEntity, builder, INITIAL_VERSION);
   }
 
   /**
@@ -214,6 +213,8 @@ public class SemanticModelPO {
           .withSchemaId(namespacedEntityId.entityId())
           .withAuditInfo(
               JsonUtils.anyFieldMapper().writeValueAsString(semanticModelEntity.auditInfo()))
+          .withCurrentVersion(version)
+          .withLastVersion(version)
           .withSemanticModelVersionInfoPO(versionPO)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .build();
