@@ -248,7 +248,9 @@ tasks {
       val isortExitCode = exec {
         workingDir = pythonProjectDir
         commandLine(venvExecutable("isort"), "--check", "mcp_server", "tests")
-        isIgnoreExitValue = false
+        // Let the exit code reach the check below, so the failure is reported with the message
+        // that names the tool instead of a bare Gradle ExecException.
+        isIgnoreExitValue = true
       }.exitValue
 
       if (isortExitCode != 0) {
@@ -258,7 +260,9 @@ tasks {
       val blackExitCode = exec {
         workingDir = pythonProjectDir
         commandLine(venvExecutable("black"), "--check", "mcp_server", "tests")
-        isIgnoreExitValue = false
+        // Let the exit code reach the check below, so the failure is reported with the message
+        // that names the tool instead of a bare Gradle ExecException.
+        isIgnoreExitValue = true
       }.exitValue
 
       if (blackExitCode != 0) {
