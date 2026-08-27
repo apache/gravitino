@@ -17,7 +17,6 @@
 
 from abc import ABC
 from dataclasses import dataclass, field
-from typing import Dict
 
 from dataclasses_json import config
 
@@ -180,8 +179,7 @@ class SchemaChange(ABC):
             if not isinstance(other, SchemaChange.SetSecretBinding):
                 return False
             return (
-                self._property == other.property()
-                and self._binding == other.binding()
+                self._property == other.property() and self._binding == other.binding()
             )
 
         def __hash__(self):

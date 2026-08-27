@@ -388,10 +388,18 @@ public class SchemaOperationDispatcher extends OperationDispatcher implements Sc
   private Pair<Schema, SchemaChange[]> alterSchemaUnderLock(
       NameIdentifier ident, NameIdentifier catalogIdent, SchemaChange... changes)
       throws NoSuchSchemaException {
-    if (isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)) {
+    if (isManagedEntity(catalogIdent, Capability.Scope.SCHEMA)
+        && usesManagedSchemaOperations(catalogIdent)) {
       return alterManagedSchemaUnderLock(ident, changes);
     }
     return alterExternalSchemaUnderLock(ident, catalogIdent, changes);
+  }
+
+  private boolean usesManagedSchemaOperations(NameIdentifier catalogIdent) {
+    return doWithCatalog(
+        catalogIdent,
+        c -> c.doWithSchemaOps(s -> s instanceof ManagedSchemaOperations),
+        NoSuchSchemaException.class);
   }
 
   private Pair<Schema, SchemaChange[]> alterManagedSchemaUnderLock(
