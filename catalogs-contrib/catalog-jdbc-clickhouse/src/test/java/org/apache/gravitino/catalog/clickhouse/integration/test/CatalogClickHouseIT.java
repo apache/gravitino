@@ -476,8 +476,8 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
-  void testLoadTableFromShowCreateParsing() {
-    String name = GravitinoITUtils.genRandomName("show_create_table");
+  void testLoadTableMetadataFromNativeSql() {
+    String name = GravitinoITUtils.genRandomName("native_table_metadata");
     clickhouseService.executeQuery(
         String.format(
             "CREATE TABLE `%s`.`%s` (\n"
@@ -2920,6 +2920,42 @@ public class CatalogClickHouseIT extends BaseIT {
                     Distributions.NONE,
                     getSortOrders("id"),
                     Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testLoadTableWithProjectionUsesTableSortKey() {
+    String name = GravitinoITUtils.genRandomName("proj_normal");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertTrue(
+        sortOrders[0].expression() instanceof NamedReference,
+        "First sort key should be a named reference");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertTrue(sortOrders[1].expression() instanceof NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+    Assertions.assertEquals(
+        "8192", loaded.properties().get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
   }
 
   @Test
