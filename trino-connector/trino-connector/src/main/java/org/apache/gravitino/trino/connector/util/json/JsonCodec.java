@@ -31,6 +31,7 @@ import com.fasterxml.jackson.datatype.jdk8.Jdk8Module;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.fasterxml.jackson.module.paramnames.ParameterNamesModule;
 import io.airlift.json.RecordAutoDetectModule;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.block.Block;
 import io.trino.spi.block.BlockEncodingSerde;
@@ -56,6 +57,11 @@ import org.apache.gravitino.trino.connector.GravitinoConnectorPluginManager;
  * Provides functionality for handling various Trino-specific types and plugin classes.
  */
 public class JsonCodec {
+<<<<<<< HEAD
+=======
+
+  private static final Logger LOG = Logger.get(JsonCodec.class);
+>>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
   private static volatile ObjectMapper mapper;
   private static volatile Type jsonType;
 
@@ -110,7 +116,118 @@ public class JsonCodec {
     return (BlockEncodingSerde)
         internalBlockEncodingSerdeClass
             .getConstructor(blockEncodingManagerClass, TypeManager.class)
+<<<<<<< HEAD
             .newInstance(blockEncodingManagerClass.getConstructor().newInstance(), typeManager);
+=======
+            .newInstance(blockEncodingManager, typeManager);
+  }
+
+  /**
+   * Instantiate BlockEncodingManager across Trino/Starburst variants. OSS Trino exposes a public
+   * no-arg constructor; Starburst replaces it with BlockEncodingManager(FeaturesConfig) (used to
+   * gate type-specific encodings via feature flags). Newer Trino branches additionally publish a
+   * {@code Set<BlockEncoding>} variant for Guice multibindings. We probe each known signature in
+   * order, then fall back to a generic constructor scan that fills unknown reference parameters
+   * with default values as a last-resort compatibility mechanism.
+   */
+  @VisibleForTesting
+  static Object instantiateBlockEncodingManager(
+      Class<?> blockEncodingManagerClass, ClassLoader classLoader) throws Exception {
+    try {
+      Object instance = blockEncodingManagerClass.getConstructor().newInstance();
+      LOG.debug("Instantiated BlockEncodingManager with its public no-argument constructor");
+      return instance;
+    } catch (NoSuchMethodException ignored) {
+      // fall through to parameterized variants
+    }
+
+    try {
+      Class<?> featuresConfigClass = classLoader.loadClass("io.trino.FeaturesConfig");
+      Constructor<?> ctor = blockEncodingManagerClass.getConstructor(featuresConfigClass);
+      Object featuresConfig = featuresConfigClass.getConstructor().newInstance();
+      Object instance = ctor.newInstance(featuresConfig);
+      LOG.debug("Instantiated BlockEncodingManager with FeaturesConfig");
+      return instance;
+    } catch (NoSuchMethodException | ClassNotFoundException ignored) {
+      // fall through
+    }
+
+    try {
+      Constructor<?> setCtor = blockEncodingManagerClass.getConstructor(Set.class);
+      Object instance = setCtor.newInstance(Collections.emptySet());
+      LOG.debug("Instantiated BlockEncodingManager with an empty BlockEncoding set");
+      return instance;
+    } catch (NoSuchMethodException ignored) {
+      // fall through to last-resort scan
+    }
+
+    NoSuchMethodException lastError = null;
+    for (Constructor<?> ctor : blockEncodingManagerClass.getDeclaredConstructors()) {
+      if (!ctor.trySetAccessible()) {
+        continue;
+      }
+
+      Class<?>[] paramTypes = ctor.getParameterTypes();
+      Object[] args = new Object[paramTypes.length];
+      boolean resolvable = true;
+      for (int i = 0; i < paramTypes.length && resolvable; i++) {
+        if (Set.class.isAssignableFrom(paramTypes[i])) {
+          args[i] = Collections.emptySet();
+        } else if (paramTypes[i].isPrimitive()) {
+          args[i] = defaultPrimitive(paramTypes[i]);
+        } else {
+          Object defaultInstance = tryDefaultInstance(paramTypes[i]);
+          if (defaultInstance == null) {
+            resolvable = false;
+          } else {
+            args[i] = defaultInstance;
+          }
+        }
+      }
+      if (!resolvable) {
+        continue;
+      }
+
+      try {
+        Object instance = ctor.newInstance(args);
+        LOG.debug("Instantiated BlockEncodingManager with fallback constructor %s", ctor);
+        return instance;
+      } catch (ReflectiveOperationException | RuntimeException e) {
+        lastError =
+            new NoSuchMethodException(
+                "Failed invoking BlockEncodingManager constructor " + ctor + ": " + e.getMessage());
+      }
+    }
+
+    throw new NoSuchMethodException(
+        "No usable BlockEncodingManager constructor found in "
+            + blockEncodingManagerClass.getName()
+            + (lastError == null ? "" : " (last error: " + lastError.getMessage() + ")"));
+  }
+
+  private static Object tryDefaultInstance(Class<?> type) {
+    try {
+      Constructor<?> ctor = type.getDeclaredConstructor();
+      if (!ctor.trySetAccessible()) {
+        return null;
+      }
+      return ctor.newInstance();
+    } catch (ReflectiveOperationException | RuntimeException e) {
+      return null;
+    }
+  }
+
+  private static Object defaultPrimitive(Class<?> type) {
+    if (type == boolean.class) return false;
+    if (type == char.class) return '\0';
+    if (type == byte.class) return (byte) 0;
+    if (type == short.class) return (short) 0;
+    if (type == int.class) return 0;
+    if (type == long.class) return 0L;
+    if (type == float.class) return 0f;
+    if (type == double.class) return 0d;
+    throw new IllegalArgumentException("Unsupported primitive type: " + type);
+>>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
   }
 
   static void registerHandleSerializationModule(ObjectMapper objectMapper) {

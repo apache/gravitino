@@ -24,6 +24,7 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
@@ -39,13 +40,11 @@ import org.apache.gravitino.trino.connector.catalog.DefaultCatalogConnectorFacto
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Gravitino connector factory. */
 public class GravitinoConnectorFactory implements ConnectorFactory {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
+  private static final Logger LOG = Logger.get(GravitinoConnectorFactory.class);
   private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
   private static final int MAX_SUPPORT_TRINO_SPI_VERSION = Integer.MAX_VALUE;
   /** The default connector name. */
@@ -116,6 +115,13 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           LOG.error(message);
           throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
         }
+<<<<<<< HEAD
+=======
+      } catch (Exception e) {
+        String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
+        LOG.error(e, message);
+        throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
+>>>>>>> 52b8f5341 ([#12634] improvement(trino-connector): Log via io.airlift.log.Logger (#12635))
       }
     }
 
@@ -162,10 +168,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     // check catalog name with metalake are supported in this trino version
     if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
       LOG.warn(
-          "The trino-connector-{}-{} does not fully support catalog name with metalake. "
+          "The trino-connector-%s-%s does not fully support catalog name with metalake. "
               + "The DROP CATALOG operation may not work correctly in multi-metalake mode.",
-          getMinSupportTrinoSpiVersion(),
-          getMaxSupportTrinoSpiVersion());
+          getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
     }
 
     // skip version validation
@@ -174,7 +179,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (trinoVersion < getMinSupportTrinoSpiVersion()
           || trinoVersion > getMaxSupportTrinoSpiVersion()) {
         LOG.warn(
-            "Trino version {} has not been tested with Gravitino and may have compatibility issues",
+            "Trino version %s has not been tested with Gravitino and may have compatibility issues",
             trinoVersion);
       }
       return;
