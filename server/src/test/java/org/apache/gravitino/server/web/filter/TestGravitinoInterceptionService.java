@@ -122,6 +122,90 @@ public class TestGravitinoInterceptionService {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testNoAuthResponseUsesFullMetadataNameIdentifier() throws Exception {
+    MethodInterceptor methodInterceptor =
+        new GravitinoInterceptionService()
+            .getMethodInterceptors(TestOperations.class.getMethods()[0])
+            .get(0);
+    Method buildNoAuthResponse =
+        methodInterceptor
+            .getClass()
+            .getDeclaredMethod(
+                "buildNoAuthResponse",
+                String.class,
+                NameIdentifier.class,
+                String.class,
+                String.class);
+    buildNoAuthResponse.setAccessible(true);
+
+    Response response =
+        (Response)
+            buildNoAuthResponse.invoke(
+                methodInterceptor,
+                "",
+                NameIdentifier.of("testMetalake", "testCatalog", "testSchema", "testTable"),
+                "tester",
+                "loadTable");
+
+    assertEquals(
+        "User 'tester' is not authorized to perform operation 'loadTable' on metadata "
+            + "'testMetalake.testCatalog.testSchema.testTable'",
+        ((ErrorResponse) response.getEntity()).getMessage());
+  }
+
+  @Test
+  public void testRejectsUnheldActiveRolesWith403() throws Throwable {
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class);
+        MockedStatic<GravitinoEnv> envMocked = mockStatic(GravitinoEnv.class);
+        MockedStatic<MetalakeManager> metalakeManagerMocked = mockStatic(MetalakeManager.class)) {
+      // The caller declares an active role via the header; the authorizer reports it as unheld.
+      UserPrincipal principal =
+          new UserPrincipal("tester")
+              .withActiveRoles(ActiveRoles.of(Collections.singletonList("ghostRole")));
+      principalUtilsMocked.when(PrincipalUtils::getCurrentPrincipal).thenReturn(principal);
+      principalUtilsMocked.when(PrincipalUtils::getCurrentUserName).thenReturn("tester");
+
+      MethodInvocation methodInvocation = mock(MethodInvocation.class);
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+      when(authorizer.findUnheldRoles(
+              ArgumentMatchers.any(),
+              ArgumentMatchers.eq("testMetalake"),
+              ArgumentMatchers.any(),
+              ArgumentMatchers.any()))
+          .thenReturn(Collections.singleton("ghostRole"));
+
+      GravitinoEnv mockEnv = mock(GravitinoEnv.class);
+      EntityStore mockStore = mock(EntityStore.class);
+      envMocked.when(GravitinoEnv::getInstance).thenReturn(mockEnv);
+      when(mockEnv.entityStore()).thenReturn(mockStore);
+      metalakeManagerMocked
+          .when(() -> MetalakeManager.checkMetalake(ArgumentMatchers.any(), ArgumentMatchers.any()))
+          .thenAnswer(invocation -> null);
+
+      GravitinoInterceptionService service = new GravitinoInterceptionService();
+      Method testMethod = TestOperations.class.getMethods()[0];
+      MethodInterceptor interceptor = service.getMethodInterceptors(testMethod).get(0);
+      when(methodInvocation.getMethod()).thenReturn(testMethod);
+      when(methodInvocation.getArguments()).thenReturn(new Object[] {"testMetalake"});
+
+      Response response = (Response) interceptor.invoke(methodInvocation);
+
+      assertEquals(Response.Status.FORBIDDEN.getStatusCode(), response.getStatus());
+      Assertions.assertTrue(
+          ((ErrorResponse) response.getEntity()).getMessage().contains("ghostRole"));
+      verify(methodInvocation, never()).proceed();
+    }
+  }
+
+  @Test
+>>>>>>> c9f861cad ([#12670] improve(authz): Show full NameIdentifier in denial messages (#12671))
   public void testSystemInternalErrorHandling() throws Throwable {
     try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
         MockedStatic<GravitinoAuthorizerProvider> mockStatic =
