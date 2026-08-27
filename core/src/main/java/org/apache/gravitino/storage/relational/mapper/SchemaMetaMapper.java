@@ -25,7 +25,6 @@ import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.DeleteProvider;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
-import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
 import org.apache.ibatis.annotations.UpdateProvider;
 
@@ -94,27 +93,7 @@ public interface SchemaMetaMapper {
    * <p>Only a literal is selected because callers need an existence answer, not complete child
    * metadata. The final limit also lets the database stop as soon as it finds the first child.
    */
-  @Select({
-    "SELECT 1 FROM "
-        + TableMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0",
-    "UNION ALL SELECT 1 FROM "
-        + ViewMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0",
-    "UNION ALL SELECT 1 FROM "
-        + FilesetMetaMapper.META_TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0",
-    "UNION ALL SELECT 1 FROM "
-        + FunctionMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0",
-    "UNION ALL SELECT 1 FROM "
-        + ModelMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0",
-    "UNION ALL SELECT 1 FROM "
-        + TopicMetaMapper.TABLE_NAME
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0",
-    "LIMIT 1"
-  })
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectActiveChildBySchemaId")
   Integer selectActiveChildBySchemaId(@Param("schemaId") Long schemaId);
 
   /** Selects and locks an active schema by ID for the current transaction. */
