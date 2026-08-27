@@ -45,7 +45,10 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
         + " schema_id = #{modelMeta.schemaId},"
         + " model_comment = #{modelMeta.modelComment},"
         + " model_properties = #{modelMeta.modelProperties},"
-        + " model_latest_version = #{modelMeta.modelLatestVersion},"
+        // Use the larger allocator value when an overwrite carries an older model snapshot.
+        + " model_latest_version = GREATEST("
+        + ModelMetaMapper.TABLE_NAME
+        + ".model_latest_version, #{modelMeta.modelLatestVersion}),"
         // Qualify current_version with the table name so PostgreSQL knows this is the stored value,
         // not the value from the insert that caused the conflict.
         + " current_version = "

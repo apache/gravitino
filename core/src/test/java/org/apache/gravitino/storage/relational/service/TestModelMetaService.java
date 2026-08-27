@@ -43,6 +43,7 @@ import org.apache.gravitino.storage.relational.TestJDBCBackend;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.utils.POConverters;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
+import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.TestTemplate;
@@ -208,7 +209,7 @@ public class TestModelMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testDeleteModelRetriesWhenAVersionIsRegisteredConcurrently() throws IOException {
+  public void testDeleteModelRejectsConcurrentVersionRegistration() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
 
     ModelEntity modelEntity =
@@ -239,16 +240,24 @@ public class TestModelMetaService extends TestJDBCBackend {
                 .build());
 
     ModelMetaService service = Mockito.spy(ModelMetaService.getInstance());
-    Mockito.doReturn(stalePO)
-        .doCallRealMethod()
-        .when(service)
-        .getModelPOByIdentifier(modelEntity.nameIdentifier());
+    Mockito.doReturn(stalePO).when(service).getModelPOByIdentifier(modelEntity.nameIdentifier());
 
-    // The drop reads the model again instead of reporting a conflict the caller cannot act on.
-    Assertions.assertTrue(service.deleteModel(modelEntity.nameIdentifier()));
+    // A stale drop must not retry with a newer snapshot. Retrying would silently delete the model
+    // version that won the race and defeat the compare-and-set contract exposed to callers.
     Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> ModelMetaService.getInstance().getModelByIdentifier(modelEntity.nameIdentifier()));
+        OptimisticLockException.class, () -> service.deleteModel(modelEntity.nameIdentifier()));
+    ModelEntity survivingModel =
+        ModelMetaService.getInstance().getModelByIdentifier(modelEntity.nameIdentifier());
+    Assertions.assertEquals(modelEntity.id(), survivingModel.id());
+    Assertions.assertEquals(1, survivingModel.latestVersion());
+    Assertions.assertEquals(
+        "path",
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                NameIdentifierUtil.ofModelVersion(
+                    METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, modelEntity.name(), "alias1"))
+            .uris()
+            .get(ModelVersion.URI_NAME_UNKNOWN));
   }
 
   @TestTemplate
@@ -540,9 +549,9 @@ public class TestModelMetaService extends TestJDBCBackend {
     ModelVersionMetaService.getInstance().insertModelVersion(modelVersion);
     ModelPO stalePO = ModelMetaService.getInstance().getModelPOById(model.id());
 
-    ModelEntity registered =
-        ModelMetaService.getInstance().getModelByIdentifier(model.nameIdentifier());
-    ModelMetaService.getInstance().insertModel(copyModel(registered, "winner"), true);
+    // Simulate an overwrite request that carries the model snapshot from before version 0 was
+    // registered. It must update model metadata without moving the version allocator backwards.
+    ModelMetaService.getInstance().insertModel(copyModel(model, "winner"), true);
 
     Assertions.assertThrows(
         OptimisticLockException.class,
@@ -557,6 +566,7 @@ public class TestModelMetaService extends TestJDBCBackend {
     Assertions.assertEquals("winner", current.comment());
     Assertions.assertEquals(stalePO.getCurrentVersion() + 1, currentPO.getCurrentVersion());
     Assertions.assertEquals(currentPO.getCurrentVersion(), currentPO.getLastVersion());
+    Assertions.assertEquals(1, current.latestVersion());
     Assertions.assertEquals(
         modelVersion,
         ModelVersionMetaService.getInstance()
@@ -566,6 +576,23 @@ public class TestModelMetaService extends TestJDBCBackend {
         ModelVersionMetaService.getInstance()
             .getModelVersionByIdentifier(
                 NameIdentifier.of(modelVersion.nameIdentifier().namespace(), "surviving_alias")));
+
+    ModelVersionEntity nextModelVersion =
+        ModelVersionEntity.builder()
+            .withModelIdentifier(model.nameIdentifier())
+            .withVersion(1)
+            .withUris(ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "next_model_path"))
+            .withAliases(List.of("next_alias"))
+            .withComment("next version comment")
+            .withProperties(ImmutableMap.of("next_key", "next_value"))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    ModelVersionMetaService.getInstance().insertModelVersion(nextModelVersion);
+    Assertions.assertEquals(
+        nextModelVersion,
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(
+                NameIdentifier.of(nextModelVersion.nameIdentifier().namespace(), "1")));
   }
 
   private ModelEntity copyModel(ModelEntity model, String comment) {

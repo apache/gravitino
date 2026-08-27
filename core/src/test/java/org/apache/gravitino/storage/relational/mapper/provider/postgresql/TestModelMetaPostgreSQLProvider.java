@@ -39,6 +39,11 @@ class TestModelMetaPostgreSQLProvider {
     Assertions.assertTrue(
         updateClause.contains(
             "last_version = " + ModelMetaMapper.TABLE_NAME + ".current_version + 1"));
+    Assertions.assertTrue(
+        updateClause.contains(
+            "model_latest_version = GREATEST("
+                + ModelMetaMapper.TABLE_NAME
+                + ".model_latest_version, #{modelMeta.modelLatestVersion})"));
     Assertions.assertFalse(updateClause.matches(".*[^.\\w]current_version\\s*\\+.*"));
   }
 

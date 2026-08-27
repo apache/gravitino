@@ -35,7 +35,6 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
-import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.metrics.Monitored;
@@ -62,9 +61,6 @@ import org.slf4j.LoggerFactory;
 public class ModelMetaService {
 
   private static final Logger LOG = LoggerFactory.getLogger(ModelMetaService.class);
-
-  /** How often a drop re-reads the model after losing the concurrency check. */
-  private static final int DELETE_MODEL_MAX_ATTEMPTS = 3;
 
   private static final ModelMetaService INSTANCE = new ModelMetaService();
 
@@ -130,26 +126,6 @@ public class ModelMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteModel")
   public boolean deleteModel(NameIdentifier ident) {
-    for (int attempt = 1; ; attempt++) {
-      try {
-        return deleteModelOnce(ident);
-      } catch (OptimisticLockException e) {
-        // The concurrency version is shared with the model's versions and aliases, so registering
-        // or deleting a version moves it as well. A drop discards all of that anyway, so it reads
-        // the model again and drops what is there now instead of reporting a conflict the caller
-        // cannot act on. A model that keeps changing this fast still gives up eventually.
-        if (attempt >= DELETE_MODEL_MAX_ATTEMPTS) {
-          throw e;
-        }
-        LOG.info(
-            "Retrying the delete of model {}, it was modified concurrently (attempt {})",
-            ident,
-            attempt);
-      }
-    }
-  }
-
-  private boolean deleteModelOnce(NameIdentifier ident) {
     ModelPO modelPO;
     try {
       modelPO = getModelPOByIdentifier(ident);

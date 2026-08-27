@@ -59,7 +59,12 @@ public class ModelMetaBaseSQLProvider {
         + " schema_id = #{modelMeta.schemaId},"
         + " model_comment = #{modelMeta.modelComment},"
         + " model_properties = #{modelMeta.modelProperties},"
-        + " model_latest_version = #{modelMeta.modelLatestVersion},"
+        // Overwrite may receive an entity that was read before one or more versions were
+        // registered. Keep the stored allocator at its highest value so the next registration
+        // cannot reuse an existing version number. Older schemas allowed this column to be null,
+        // so treat that legacy value as the initial allocator value zero.
+        + " model_latest_version ="
+        + " GREATEST(COALESCE(model_latest_version, 0), #{modelMeta.modelLatestVersion}),"
         // A replacement ModelPO starts at version 1. Advance the version already stored in the
         // database instead of copying that 1, or an older request could become valid again.
         + " last_version = current_version + 1,"

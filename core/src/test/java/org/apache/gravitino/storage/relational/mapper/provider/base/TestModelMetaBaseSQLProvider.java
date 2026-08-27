@@ -45,6 +45,11 @@ class TestModelMetaBaseSQLProvider {
         insertClause.contains("#{modelMeta.currentVersion}, #{modelMeta.lastVersion}"));
     Assertions.assertTrue(updateClause.contains("last_version = current_version + 1"));
     Assertions.assertTrue(updateClause.contains("current_version = current_version + 1"));
+    Assertions.assertTrue(
+        updateClause.contains(
+            "model_latest_version ="
+                + " GREATEST(COALESCE(model_latest_version, 0),"
+                + " #{modelMeta.modelLatestVersion})"));
     Assertions.assertFalse(updateClause.contains("current_version = #{modelMeta.currentVersion}"));
     Assertions.assertFalse(updateClause.contains("last_version = #{modelMeta.lastVersion}"));
   }
