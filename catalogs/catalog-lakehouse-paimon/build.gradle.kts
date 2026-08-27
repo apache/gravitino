@@ -133,6 +133,7 @@ dependencies {
   implementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
+  runtimeOnly(libs.hadoop3.aws)
 
   // Required by Paimon HiveCatalog#createView, which calls hive ql metadata Table APIs.
   runtimeOnly(libs.hive2.exec) {
