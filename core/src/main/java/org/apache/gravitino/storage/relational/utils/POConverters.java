@@ -908,9 +908,10 @@ public class POConverters {
   }
 
   public static TopicPO updateTopicPOWithVersion(TopicPO oldTopicPO, TopicEntity newEntity) {
-    Long lastVersion = oldTopicPO.getLastVersion();
-    // Will set the version to the last version + 1 when having some fields need be multiple version
-    Long nextVersion = lastVersion;
+    // Every successful alter advances beyond both stored version markers. They normally match, but
+    // taking the larger value also prevents an inconsistent legacy row from moving either marker
+    // backwards and making an old request current again.
+    Long nextVersion = Math.max(oldTopicPO.getCurrentVersion(), oldTopicPO.getLastVersion()) + 1;
     try {
       return TopicPO.builder()
           .withTopicId(oldTopicPO.getTopicId())

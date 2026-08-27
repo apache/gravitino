@@ -78,8 +78,11 @@ public class TopicMetaBaseSQLProvider {
         + " comment = #{topicMeta.comment},"
         + " properties = #{topicMeta.properties},"
         + " audit_info = #{topicMeta.auditInfo},"
-        + " current_version = #{topicMeta.currentVersion},"
-        + " last_version = #{topicMeta.lastVersion},"
+        // An overwrite is a concurrent write too. Advance from the stored value so an existing
+        // topic never returns to the initial version carried by the incoming create request.
+        // MySQL evaluates assignments from left to right, so update last_version first.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{topicMeta.deletedAt}";
   }
 
@@ -219,6 +222,29 @@ public class TopicMetaBaseSQLProvider {
         + " WHERE topic_id = #{topicId} AND deleted_at = 0";
   }
 
+  /**
+   * Returns an active topic metadata row and locks it for the current transaction.
+   *
+   * <p>The stable ID lets a failed CAS distinguish a newer topic from one that was deleted,
+   * renamed, or moved while the caller was writing.
+   *
+   * @param topicId the topic ID
+   * @return the locking select SQL
+   */
+  public String selectTopicMetaByIdForUpdate(@Param("topicId") Long topicId) {
+    return selectTopicMetaById(topicId) + " FOR UPDATE";
+  }
+
+  /**
+   * Returns SQL that updates a topic only while its OCC version is unchanged.
+   *
+   * <p>The version is the concurrency token. Comparing payload columns would miss a writer that
+   * changes a value and then changes it back before this update runs.
+   *
+   * @param newTopicPO the new topic values
+   * @param oldTopicPO the topic values and version observed by the caller
+   * @return the version-checked update SQL
+   */
   public String updateTopicMeta(
       @Param("newTopicMeta") TopicPO newTopicPO, @Param("oldTopicMeta") TopicPO oldTopicPO) {
     return "UPDATE "
@@ -234,16 +260,7 @@ public class TopicMetaBaseSQLProvider {
         + " last_version = #{newTopicMeta.lastVersion},"
         + " deleted_at = #{newTopicMeta.deletedAt}"
         + " WHERE topic_id = #{oldTopicMeta.topicId}"
-        + " AND topic_name = #{oldTopicMeta.topicName}"
-        + " AND metalake_id = #{oldTopicMeta.metalakeId}"
-        + " AND catalog_id = #{oldTopicMeta.catalogId}"
-        + " AND schema_id = #{oldTopicMeta.schemaId}"
-        + " AND (comment = #{oldTopicMeta.comment}"
-        + "   OR (comment IS NULL and #{oldTopicMeta.comment} IS NULL))"
-        + " AND properties = #{oldTopicMeta.properties}"
-        + " AND audit_info = #{oldTopicMeta.auditInfo}"
         + " AND current_version = #{oldTopicMeta.currentVersion}"
-        + " AND last_version = #{oldTopicMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -255,12 +272,21 @@ public class TopicMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId) {
+  /**
+   * Returns SQL that deletes only the topic version observed by the caller.
+   *
+   * @param topicId the topic ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public String softDeleteTopicMetasByTopicId(
+      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE topic_id = #{topicId} AND deleted_at = 0";
+        + " WHERE topic_id = #{topicId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {

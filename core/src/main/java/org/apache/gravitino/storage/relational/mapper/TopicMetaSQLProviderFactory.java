@@ -93,6 +93,16 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().selectTopicMetaById(topicId);
   }
 
+  /**
+   * Returns SQL that locks an active topic metadata row by ID.
+   *
+   * @param topicId the topic ID
+   * @return the locking select SQL
+   */
+  public static String selectTopicMetaByIdForUpdate(@Param("topicId") Long topicId) {
+    return getProvider().selectTopicMetaByIdForUpdate(topicId);
+  }
+
   public static String updateTopicMeta(
       @Param("newTopicMeta") TopicPO newTopicPO, @Param("oldTopicMeta") TopicPO oldTopicPO) {
     return getProvider().updateTopicMeta(newTopicPO, oldTopicPO);
@@ -103,8 +113,16 @@ public class TopicMetaSQLProviderFactory {
     return getProvider().selectTopicIdBySchemaIdAndName(schemaId, name);
   }
 
-  public static String softDeleteTopicMetasByTopicId(@Param("topicId") Long topicId) {
-    return getProvider().softDeleteTopicMetasByTopicId(topicId);
+  /**
+   * Returns SQL that soft-deletes a topic by ID and expected version.
+   *
+   * @param topicId the topic ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public static String softDeleteTopicMetasByTopicId(
+      @Param("topicId") Long topicId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteTopicMetasByTopicId(topicId, currentVersion);
   }
 
   public static String softDeleteTopicMetasByCatalogId(@Param("catalogId") Long catalogId) {
