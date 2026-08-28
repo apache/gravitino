@@ -53,6 +53,8 @@ from gravitino.api.authorization.privileges import (
     UseJobTemplate,
     UseModel,
     UseSchema,
+    ViewPolicy,
+    ViewTag,
     WriteFileset,
 )
 from gravitino.api.metadata_object import MetadataObject
@@ -311,6 +313,15 @@ class TestPrivileges(unittest.TestCase):
                     deny_privilege.can_bind_to(obj_type),
                 )
 
+    def test_view_tag_binding(self) -> None:
+        deny_privilege = ViewTag.deny()
+        for obj_type in MetadataObject.Type:
+            with self.subTest(obj_type=obj_type.name):
+                self.assertEqual(
+                    obj_type in [MetadataObject.Type.METALAKE, MetadataObject.Type.TAG],
+                    deny_privilege.can_bind_to(obj_type),
+                )
+
     def test_create_policy_binding(self) -> None:
         deny_privilege = CreatePolicy.deny()
         for obj_type in MetadataObject.Type:
@@ -331,6 +342,16 @@ class TestPrivileges(unittest.TestCase):
 
     def test_apply_policy_binding(self) -> None:
         deny_privilege = ApplyPolicy.deny()
+        for obj_type in MetadataObject.Type:
+            with self.subTest(obj_type=obj_type.name):
+                self.assertEqual(
+                    obj_type
+                    in [MetadataObject.Type.METALAKE, MetadataObject.Type.POLICY],
+                    deny_privilege.can_bind_to(obj_type),
+                )
+
+    def test_view_policy_binding(self) -> None:
+        deny_privilege = ViewPolicy.deny()
         for obj_type in MetadataObject.Type:
             with self.subTest(obj_type=obj_type.name):
                 self.assertEqual(

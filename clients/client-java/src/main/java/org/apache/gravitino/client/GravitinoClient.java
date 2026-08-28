@@ -65,9 +65,11 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
+import org.apache.gravitino.policy.PolicyTagAssociation;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.tag.Tag;
@@ -628,6 +630,22 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
+  public PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName) {
+    return getMetalake().listPolicyAssociationsForTag(tagName);
+  }
+
+  @Override
+  public PolicyTagAssociation addPolicyForTag(
+      String tagName, String policyName, PolicyAssociationSelector selector) {
+    return getMetalake().addPolicyForTag(tagName, policyName, selector);
+  }
+
+  @Override
+  public void removePolicyFromTag(String tagName, String policyName) {
+    getMetalake().removePolicyFromTag(tagName, policyName);
+  }
+
+  @Override
   public List<JobTemplate> listJobTemplates() {
     return getMetalake().listJobTemplates();
   }
@@ -721,6 +739,11 @@ public class GravitinoClient extends GravitinoClientBase
   @Override
   public boolean deletePolicy(String name) {
     return getMetalake().deletePolicy(name);
+  }
+
+  @Override
+  public PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
+    return getMetalake().listTagAssociationsForPolicy(policyName);
   }
 
   /** Builder class for constructing a GravitinoClient. */

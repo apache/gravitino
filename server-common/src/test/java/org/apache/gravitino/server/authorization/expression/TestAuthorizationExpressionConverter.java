@@ -139,4 +139,22 @@ public class TestAuthorizationExpressionConverter {
             + " VIEW, TOPIC, FILESET, MODEL, MODEL_VERSION)))",
         replaced);
   }
+
+  @Test
+  public void testViewTagIncludesApplyCompatibilityAndViewDeny() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_TAG");
+    Assertions.assertTrue(replaced.contains("ANY(VIEW_TAG, METALAKE, TAG)"));
+    Assertions.assertTrue(replaced.contains("ANY(APPLY_TAG, METALAKE, TAG)"));
+    Assertions.assertTrue(replaced.contains("ANY(DENY_APPLY_TAG, METALAKE, TAG)"));
+    Assertions.assertTrue(replaced.contains("ANY(DENY_VIEW_TAG, METALAKE, TAG)"));
+  }
+
+  @Test
+  public void testViewPolicyIncludesApplyCompatibilityAndViewDeny() {
+    String replaced = AuthorizationExpressionConverter.replaceAnyPrivilege("ANY_VIEW_POLICY");
+    Assertions.assertTrue(replaced.contains("ANY(VIEW_POLICY, METALAKE, POLICY)"));
+    Assertions.assertTrue(replaced.contains("ANY(APPLY_POLICY, METALAKE, POLICY)"));
+    Assertions.assertTrue(replaced.contains("ANY(DENY_APPLY_POLICY, METALAKE, POLICY)"));
+    Assertions.assertTrue(replaced.contains("ANY(DENY_VIEW_POLICY, METALAKE, POLICY)"));
+  }
 }
