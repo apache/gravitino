@@ -22,8 +22,10 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 import static org.apache.gravitino.storage.relational.po.SemanticModelPO.fromSemanticModelPO;
 import static org.apache.gravitino.storage.relational.po.SemanticModelPO.initializeSemanticModelPO;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.Locale;
+import java.util.concurrent.atomic.AtomicReference;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -32,6 +34,7 @@ import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
+import org.apache.gravitino.storage.relational.po.SemanticModelVersionInfoPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -96,7 +99,7 @@ public class SemanticModelMetaService {
    * Inserts a Semantic Model identity and its version-one snapshot atomically.
    *
    * @param semanticModelEntity The Semantic Model entity.
-   * @param overwrite Whether to overwrite rows for the same stable ID.
+   * @param overwrite Whether to overwrite rows for the same stable ID or natural key.
    * @throws IOException If relational persistence fails.
    */
   @Monitored(
@@ -108,6 +111,9 @@ public class SemanticModelMetaService {
     try {
       SemanticModelPO po =
           initializeSemanticModelPO(semanticModelEntity, SemanticModelPO.builder());
+      AtomicReference<SemanticModelPO> persistedPO = new AtomicReference<>();
+      AtomicReference<SemanticModelVersionInfoPO> persistedVersionInfoPO =
+          new AtomicReference<>(po.getSemanticModelVersionInfoPO());
       SessionUtils.doMultipleWithCommit(
           () ->
               SchemaMetaService.getInstance()
@@ -118,14 +124,36 @@ public class SemanticModelMetaService {
                       po.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
-                  SemanticModelMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
+                  SemanticModelMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      Long persistedId =
+                          mapper.selectSemanticModelIdBySchemaIdAndName(
+                              po.getSchemaId(), po.getSemanticModelName());
+                      SemanticModelPO existingPO =
+                          mapper.selectSemanticModelMetaByIdForUpdate(
+                              persistedId == null ? po.getSemanticModelId() : persistedId);
+                      persistedPO.set(existingPO);
+                      if (existingPO != null) {
+                        persistedVersionInfoPO.set(
+                            versionInfoForOverwrite(
+                                po.getSemanticModelVersionInfoPO(), existingPO));
+                      }
+                    }
+                    ops.insertPO(
+                        mapper,
+                        persistedPO.get() == null
+                            ? po
+                            : identityForOverwrite(po, persistedPO.get()),
+                        overwrite);
+                  }),
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelVersionInfoMapper.class,
                   mapper -> {
                     if (overwrite) {
                       mapper.insertSemanticModelVersionInfoOnDuplicateKeyUpdate(
-                          po.getSemanticModelVersionInfoPO());
+                          persistedVersionInfoPO.get());
                     } else {
                       mapper.insertSemanticModelVersionInfo(po.getSemanticModelVersionInfoPO());
                     }
@@ -140,6 +168,43 @@ public class SemanticModelMetaService {
   /** Returns the persistent-object operations used by this service. */
   public BasePOStorageOps<SemanticModelPO, SemanticModelMetaMapper> ops() {
     return ops;
+  }
+
+  private static SemanticModelPO identityForOverwrite(
+      SemanticModelPO source, SemanticModelPO persistedPO) {
+    return SemanticModelPO.builder()
+        .withSemanticModelId(persistedPO.getSemanticModelId())
+        .withSemanticModelName(source.getSemanticModelName())
+        .withMetalakeId(source.getMetalakeId())
+        .withCatalogId(source.getCatalogId())
+        .withSchemaId(source.getSchemaId())
+        .withAuditInfo(source.getAuditInfo())
+        .withCurrentVersion(source.getCurrentVersion())
+        .withLastVersion(source.getLastVersion())
+        .withDeletedAt(source.getDeletedAt())
+        .withSemanticModelVersionInfoPO(source.getSemanticModelVersionInfoPO())
+        .build();
+  }
+
+  private static SemanticModelVersionInfoPO versionInfoForOverwrite(
+      SemanticModelVersionInfoPO source, SemanticModelPO persistedPO) {
+    Preconditions.checkState(
+        persistedPO.getCurrentVersion() < Integer.MAX_VALUE,
+        "Semantic Model %s has exhausted the version range",
+        persistedPO.getSemanticModelId());
+    return SemanticModelVersionInfoPO.builder()
+        .withMetalakeId(persistedPO.getMetalakeId())
+        .withCatalogId(persistedPO.getCatalogId())
+        .withSchemaId(persistedPO.getSchemaId())
+        .withSemanticModelId(persistedPO.getSemanticModelId())
+        .withVersion(persistedPO.getCurrentVersion() + 1)
+        .withSemanticModelName(source.semanticModelName())
+        .withSemanticModelComment(source.semanticModelComment())
+        .withSemanticModelDefinition(source.semanticModelDefinition())
+        .withProperties(source.properties())
+        .withAuditInfo(source.auditInfo())
+        .withDeletedAt(source.deletedAt())
+        .build();
   }
 
   private SemanticModelPO getSemanticModelPOByIdentifier(NameIdentifier identifier) {

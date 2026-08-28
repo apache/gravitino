@@ -63,6 +63,17 @@ public class SemanticModelMetaSQLProviderFactory {
     return getProvider().selectSemanticModelMetaBySchemaIdAndName(schemaId, semanticModelName);
   }
 
+  /** Provides SQL for selecting a Semantic Model by stable ID. */
+  public static String selectSemanticModelMetaById(@Param("semanticModelId") Long semanticModelId) {
+    return getProvider().selectSemanticModelMetaById(semanticModelId);
+  }
+
+  /** Provides SQL for selecting and locking a Semantic Model identity by stable ID. */
+  public static String selectSemanticModelMetaByIdForUpdate(
+      @Param("semanticModelId") Long semanticModelId) {
+    return getProvider().selectSemanticModelMetaByIdForUpdate(semanticModelId);
+  }
+
   /** Provides SQL for selecting a Semantic Model by fully qualified name. */
   public static String selectSemanticModelByFullQualifiedName(
       @Param("metalakeName") String metalakeName,

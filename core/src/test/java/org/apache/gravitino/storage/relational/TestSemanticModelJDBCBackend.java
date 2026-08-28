@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -31,13 +32,22 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.semantic.AIContext;
 import org.apache.gravitino.semantic.AIContextObject;
@@ -52,9 +62,12 @@ import org.apache.gravitino.semantic.Metric;
 import org.apache.gravitino.semantic.Relationship;
 import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.storage.relational.mapper.EntityChangeLogMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SemanticModelVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
+import org.apache.gravitino.storage.relational.service.POStorageReadRouting;
+import org.apache.gravitino.storage.relational.service.SemanticModelMetaService;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -171,6 +184,173 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     assertThrows(EntityAlreadyExistsException.class, () -> backend.insert(semanticModel, false));
     assertEquals(0, countRows(SemanticModelMetaMapper.TABLE_NAME, semanticModel.id()));
     assertEquals(1, countRows(SemanticModelVersionInfoMapper.TABLE_NAME, semanticModel.id()));
+    assertEquals(0, countEntityChanges());
+  }
+
+  @TestTemplate
+  public void testOverwriteAdvancesVersionAndRetainsPreviousSnapshot() throws IOException {
+    Namespace namespace = createParents("overwrite_version");
+    SemanticModelEntity original =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            "versioned_model",
+            false,
+            ImmutableMap.of("revision", "one"));
+    SemanticModelEntity replacement =
+        semanticModel(
+            original.id(), namespace, original.name(), true, ImmutableMap.of("revision", "two"));
+
+    backend.insert(original, false);
+    backend.insert(replacement, true);
+
+    assertEquals(
+        replacement, backend.get(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
+    SemanticModelPO persisted = getSemanticModelPO(original.id());
+    assertEquals(2, persisted.getCurrentVersion());
+    assertEquals(2, persisted.getLastVersion());
+    assertEquals(List.of(1, 2), activeSnapshotVersions(original.id()));
+    assertEquals(1, countEntityChanges());
+  }
+
+  @TestTemplate
+  public void testNaturalKeyOverwriteUsesPersistedSemanticModelId() throws IOException {
+    Namespace namespace = createParents("natural_key_overwrite");
+    SemanticModelEntity original =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            "natural_key_model",
+            false,
+            ImmutableMap.of("revision", "one"));
+    SemanticModelEntity replacement =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            original.name(),
+            true,
+            ImmutableMap.of("revision", "two"));
+    SemanticModelEntity expected =
+        semanticModel(
+            original.id(), namespace, original.name(), true, ImmutableMap.of("revision", "two"));
+
+    backend.insert(original, false);
+    backend.insert(replacement, true);
+
+    assertEquals(
+        expected, backend.get(original.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
+    SemanticModelPO persisted = getSemanticModelPO(original.id());
+    assertEquals(2, persisted.getCurrentVersion());
+    assertEquals(2, persisted.getLastVersion());
+    assertEquals(List.of(1, 2), activeSnapshotVersions(original.id()));
+    assertEquals(0, countRows(SemanticModelMetaMapper.TABLE_NAME, replacement.id()));
+    assertEquals(0, countRows(SemanticModelVersionInfoMapper.TABLE_NAME, replacement.id()));
+  }
+
+  @TestTemplate
+  public void testSemanticModelReadRoutesAndEntityIdResolver() throws IOException {
+    Namespace namespace = createParents("read_routes");
+    SemanticModelEntity semanticModel =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            "routed_model",
+            false,
+            ImmutableMap.of("domain", "sales"));
+    backend.insert(semanticModel, false);
+
+    SemanticModelPO byParentId = readSemanticModelPO(semanticModel.nameIdentifier(), true);
+    SemanticModelPO byFullName = readSemanticModelPO(semanticModel.nameIdentifier(), false);
+    assertEquals(semanticModel.id(), byParentId.getSemanticModelId());
+    assertEquals(semanticModel.id(), byFullName.getSemanticModelId());
+
+    RelationalEntityStoreIdResolver resolver = new RelationalEntityStoreIdResolver();
+    NamespacedEntityId resolved =
+        resolver.getEntityIds(semanticModel.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL);
+    assertEquals(semanticModel.id().longValue(), resolved.entityId());
+
+    String metalake = namespace.level(0);
+    String catalog = namespace.level(1);
+    String schema = namespace.level(2);
+    List<NameIdentifier> missingParents =
+        List.of(
+            NameIdentifier.of(
+                NamespaceUtil.ofSemanticModel("missing_metalake", catalog, schema),
+                semanticModel.name()),
+            NameIdentifier.of(
+                NamespaceUtil.ofSemanticModel(metalake, "missing_catalog", schema),
+                semanticModel.name()),
+            NameIdentifier.of(
+                NamespaceUtil.ofSemanticModel(metalake, catalog, "missing_schema"),
+                semanticModel.name()));
+    for (NameIdentifier missing : missingParents) {
+      assertThrows(NoSuchEntityException.class, () -> readSemanticModelPO(missing, true));
+      assertThrows(NoSuchEntityException.class, () -> readSemanticModelPO(missing, false));
+      assertThrows(
+          NoSuchEntityException.class,
+          () -> resolver.getEntityIds(missing, Entity.EntityType.SEMANTIC_MODEL));
+    }
+
+    NameIdentifier missingModel = NameIdentifier.of(namespace, "missing_model");
+    assertNull(readSemanticModelPO(missingModel, true));
+    assertNull(readSemanticModelPO(missingModel, false));
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> resolver.getEntityIds(missingModel, Entity.EntityType.SEMANTIC_MODEL));
+  }
+
+  @TestTemplate
+  public void testConcurrentCreatesAndOverwriteRacesRemainAtomic() throws Exception {
+    Namespace namespace = createParents("concurrent");
+    SemanticModelEntity first =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            "concurrent_model",
+            false,
+            ImmutableMap.of("candidate", "first"));
+    SemanticModelEntity second =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            first.name(),
+            true,
+            ImmutableMap.of("candidate", "second"));
+
+    List<Throwable> createResults = insertConcurrently(first, false, second, false);
+    assertEquals(1, createResults.stream().filter(Objects::isNull).count());
+    Throwable createFailure =
+        createResults.stream().filter(Objects::nonNull).findFirst().orElseThrow();
+    assertTrue(createFailure instanceof EntityAlreadyExistsException);
+    assertEquals(
+        1,
+        countRows(SemanticModelMetaMapper.TABLE_NAME, first.id())
+            + countRows(SemanticModelMetaMapper.TABLE_NAME, second.id()));
+    assertEquals(
+        1,
+        countRows(SemanticModelVersionInfoMapper.TABLE_NAME, first.id())
+            + countRows(SemanticModelVersionInfoMapper.TABLE_NAME, second.id()));
+
+    SemanticModelEntity created =
+        backend.get(first.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL);
+    SemanticModelEntity overwriteOne =
+        semanticModel(
+            created.id(), namespace, created.name(), false, ImmutableMap.of("winner", "one"));
+    SemanticModelEntity overwriteTwo =
+        semanticModel(
+            created.id(), namespace, created.name(), true, ImmutableMap.of("winner", "two"));
+
+    List<Throwable> overwriteResults = insertConcurrently(overwriteOne, true, overwriteTwo, true);
+    assertTrue(overwriteResults.stream().allMatch(Objects::isNull));
+
+    SemanticModelPO persisted = getSemanticModelPO(created.id());
+    assertEquals(3, persisted.getCurrentVersion());
+    assertEquals(3, persisted.getLastVersion());
+    assertEquals(List.of(1, 2, 3), activeSnapshotVersions(created.id()));
+    SemanticModelEntity winner =
+        backend.get(created.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL);
+    assertTrue(winner.equals(overwriteOne) || winner.equals(overwriteTwo));
+    assertEquals(2, countEntityChanges());
   }
 
   private Namespace createParents(String prefix) throws IOException {
@@ -259,6 +439,93 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
       }
     } catch (SQLException e) {
       throw new RuntimeException("Failed to count Semantic Model rows", e);
+    }
+  }
+
+  private SemanticModelPO getSemanticModelPO(Long semanticModelId) {
+    SemanticModelPO po =
+        SessionUtils.getWithoutCommit(
+            SemanticModelMetaMapper.class,
+            mapper -> mapper.selectSemanticModelMetaById(semanticModelId));
+    assertNotNull(po);
+    return po;
+  }
+
+  private SemanticModelPO readSemanticModelPO(NameIdentifier identifier, boolean cacheEnabled) {
+    return SessionUtils.getWithoutCommit(
+        SemanticModelMetaMapper.class,
+        mapper ->
+            POStorageReadRouting.getPO(
+                mapper,
+                identifier,
+                SemanticModelMetaService.getInstance().ops(),
+                Entity.EntityType.SEMANTIC_MODEL,
+                cacheEnabled));
+  }
+
+  private List<Integer> activeSnapshotVersions(Long semanticModelId) {
+    String sql =
+        String.format(
+            "SELECT version FROM %s WHERE semantic_model_id = ? AND deleted_at = 0 ORDER BY version",
+            SemanticModelVersionInfoMapper.TABLE_NAME);
+    List<Integer> versions = new ArrayList<>();
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        PreparedStatement statement = connection.prepareStatement(sql)) {
+      statement.setLong(1, semanticModelId);
+      try (ResultSet resultSet = statement.executeQuery()) {
+        while (resultSet.next()) {
+          versions.add(resultSet.getInt(1));
+        }
+      }
+      return versions;
+    } catch (SQLException e) {
+      throw new RuntimeException("Failed to list Semantic Model versions", e);
+    }
+  }
+
+  private int countEntityChanges() {
+    return SessionUtils.getWithoutCommit(
+        EntityChangeLogMapper.class,
+        mapper ->
+            Math.toIntExact(
+                mapper.selectEntityChanges(0, 100).stream()
+                    .filter(
+                        record ->
+                            Entity.EntityType.SEMANTIC_MODEL.name().equals(record.getEntityType()))
+                    .count()));
+  }
+
+  private List<Throwable> insertConcurrently(
+      SemanticModelEntity first,
+      boolean overwriteFirst,
+      SemanticModelEntity second,
+      boolean overwriteSecond)
+      throws Exception {
+    CountDownLatch start = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    try {
+      Future<Throwable> firstResult =
+          executor.submit(() -> insertAfterStart(first, overwriteFirst, start));
+      Future<Throwable> secondResult =
+          executor.submit(() -> insertAfterStart(second, overwriteSecond, start));
+      start.countDown();
+      return Arrays.asList(
+          firstResult.get(30, TimeUnit.SECONDS), secondResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      executor.shutdownNow();
+    }
+  }
+
+  private Throwable insertAfterStart(
+      SemanticModelEntity semanticModel, boolean overwrite, CountDownLatch start) {
+    try {
+      assertTrue(start.await(30, TimeUnit.SECONDS));
+      backend.insert(semanticModel, overwrite);
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
     }
   }
 }

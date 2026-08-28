@@ -68,6 +68,29 @@ public class SemanticModelMetaBaseSQLProvider {
         + " AND smm.deleted_at = 0 AND smvi.deleted_at = 0";
   }
 
+  /** Returns SQL for selecting a current Semantic Model snapshot by stable ID. */
+  public String selectSemanticModelMetaById(@Param("semanticModelId") Long semanticModelId) {
+    return "SELECT"
+        + CURRENT_SNAPSHOT_COLUMNS
+        + " FROM "
+        + TABLE_NAME
+        + " smm INNER JOIN "
+        + VERSION_TABLE_NAME
+        + " smvi ON smm.semantic_model_id = smvi.semantic_model_id"
+        + " AND smm.current_version = smvi.version"
+        + " WHERE smm.semantic_model_id = #{semanticModelId}"
+        + " AND smm.deleted_at = 0 AND smvi.deleted_at = 0";
+  }
+
+  /** Returns SQL for selecting and locking a Semantic Model identity by stable ID. */
+  public String selectSemanticModelMetaByIdForUpdate(
+      @Param("semanticModelId") Long semanticModelId) {
+    return "SELECT semantic_model_id, semantic_model_name, metalake_id, catalog_id, schema_id,"
+        + " current_version, last_version, audit_info, deleted_at FROM "
+        + TABLE_NAME
+        + " WHERE semantic_model_id = #{semanticModelId} AND deleted_at = 0 FOR UPDATE";
+  }
+
   /** Returns SQL for selecting a current Semantic Model by fully qualified name. */
   public String selectSemanticModelByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
@@ -150,8 +173,10 @@ public class SemanticModelMetaBaseSQLProvider {
         + " metalake_id = #{semanticModelMeta.metalakeId},"
         + " catalog_id = #{semanticModelMeta.catalogId},"
         + " schema_id = #{semanticModelMeta.schemaId},"
-        + " current_version = #{semanticModelMeta.currentVersion},"
-        + " last_version = #{semanticModelMeta.lastVersion},"
+        // Keep versions monotonic when an existing Semantic Model is overwritten. Assign
+        // last_version first so both columns advance from the stored current version.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " audit_info = #{semanticModelMeta.auditInfo},"
         + " deleted_at = #{semanticModelMeta.deletedAt}";
   }

@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
+import static org.apache.gravitino.storage.relational.mapper.SemanticModelMetaMapper.TABLE_NAME;
+
 import org.apache.gravitino.storage.relational.mapper.provider.base.SemanticModelMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.SemanticModelPO;
 import org.apache.ibatis.annotations.Param;
@@ -34,8 +36,12 @@ public class SemanticModelMetaPostgreSQLProvider extends SemanticModelMetaBaseSQ
         + " metalake_id = #{semanticModelMeta.metalakeId},"
         + " catalog_id = #{semanticModelMeta.catalogId},"
         + " schema_id = #{semanticModelMeta.schemaId},"
-        + " current_version = #{semanticModelMeta.currentVersion},"
-        + " last_version = #{semanticModelMeta.lastVersion},"
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " audit_info = #{semanticModelMeta.auditInfo},"
         + " deleted_at = #{semanticModelMeta.deletedAt}";
   }
