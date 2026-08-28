@@ -58,14 +58,28 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFac
 public class GravitinoSystemConnector implements Connector {
 
   private final GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory;
+  private final GravitinoSystemTableFactory systemTableFactory;
 
   /**
    * Constructs a new GravitinoSystemConnector.
    *
    * @param gravitinoStoredProcedureFactory the factory for creating stored procedures
+   * @param systemTableFactory the registry of system tables to expose
    */
-  public GravitinoSystemConnector(GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
+  public GravitinoSystemConnector(
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
     this.gravitinoStoredProcedureFactory = gravitinoStoredProcedureFactory;
+    this.systemTableFactory = systemTableFactory;
+  }
+
+  /**
+   * Retrieves the registry of system tables this connector exposes.
+   *
+   * @return the system table factory
+   */
+  protected GravitinoSystemTableFactory getSystemTableFactory() {
+    return systemTableFactory;
   }
 
   @Override
@@ -86,7 +100,7 @@ public class GravitinoSystemConnector implements Connector {
   }
 
   protected ConnectorMetadata createMetadata() {
-    return new GravitinoSystemConnectorMetadata();
+    return new GravitinoSystemConnectorMetadata(systemTableFactory);
   }
 
   @Override
@@ -106,7 +120,7 @@ public class GravitinoSystemConnector implements Connector {
   }
 
   protected ConnectorPageSourceProvider createPageSourceProvider() {
-    return new DatasourceProvider();
+    return new DatasourceProvider(systemTableFactory);
   }
 
   /** The transaction handle for Gravitino system connector. */
@@ -117,6 +131,17 @@ public class GravitinoSystemConnector implements Connector {
 
   /** The datasource provider. */
   public static class DatasourceProvider implements ConnectorPageSourceProvider {
+
+    private final GravitinoSystemTableFactory systemTableFactory;
+
+    /**
+     * Constructs a new DatasourceProvider.
+     *
+     * @param systemTableFactory the registry the page data is read from
+     */
+    public DatasourceProvider(GravitinoSystemTableFactory systemTableFactory) {
+      this.systemTableFactory = systemTableFactory;
+    }
 
     @Override
     public ConnectorPageSource createPageSource(
@@ -129,7 +154,16 @@ public class GravitinoSystemConnector implements Connector {
 
       SchemaTableName tableName =
           ((GravitinoSystemConnectorMetadata.SystemTableHandle) table).getName();
-      return createPageSource(GravitinoSystemTableFactory.loadPageData(tableName));
+      Page page = systemTableFactory.loadPageData(tableName);
+
+      // Project the page down to the requested columns. Trino only expects the columns it asked
+      // for, so handing it the whole row breaks any query that is not a SELECT *.
+      int[] channels = new int[columns.size()];
+      for (int i = 0; i < channels.length; i++) {
+        channels[i] =
+            ((GravitinoSystemConnectorMetadata.SystemColumnHandle) columns.get(i)).getIndex();
+      }
+      return createPageSource(page.getColumns(channels));
     }
 
     protected ConnectorPageSource createPageSource(Page page) {
@@ -183,14 +217,33 @@ public class GravitinoSystemConnector implements Connector {
       return tableName;
     }
 
+    // The system table data lives on the coordinator only: the catalog load loop runs there, and
+    // the registration state it records is never replicated to workers. Set once by the
+    // coordinator's GravitinoConnectorFactory.create(), which necessarily runs before any query
+    // can reach the scheduler, and read by the scheduler through isRemotelyAccessible() and
+    // getAddresses() below. On a real worker JVM it is never set and the split keeps the previous
+    // remotely accessible behaviour; in a single JVM test runner the static is shared with the
+    // coordinator, which is harmless because only the coordinator's scheduler reads it.
+    private static volatile HostAddress coordinatorAddress;
+
+    /**
+     * Sets the coordinator address that system table splits are pinned to.
+     *
+     * @param address the host and port of the Trino coordinator
+     */
+    public static void setCoordinatorAddress(HostAddress address) {
+      coordinatorAddress = address;
+    }
+
     @Override
     public boolean isRemotelyAccessible() {
-      return true;
+      return coordinatorAddress == null;
     }
 
     @Override
     public List<HostAddress> getAddresses() {
-      return Collections.emptyList();
+      HostAddress address = coordinatorAddress;
+      return address == null ? Collections.emptyList() : List.of(address);
     }
   }
 

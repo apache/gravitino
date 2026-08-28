@@ -27,6 +27,9 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
+import io.trino.spi.HostAddress;
+import io.trino.spi.Node;
+import io.trino.spi.NodeManager;
 import io.trino.spi.connector.ConnectorContext;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -68,9 +71,16 @@ public class TestGravitinoConnectorFactoryStart {
     return config;
   }
 
+  @SuppressWarnings("deprecation")
   private static ConnectorContext mockContext() {
     ConnectorContext context = mock(ConnectorContext.class);
     when(context.getSpiVersion()).thenReturn("478");
+    Node node = mock(Node.class);
+    when(node.isCoordinator()).thenReturn(true);
+    when(node.getHostAndPort()).thenReturn(HostAddress.fromParts("127.0.0.1", 8080));
+    NodeManager nodeManager = mock(NodeManager.class);
+    when(nodeManager.getCurrentNode()).thenReturn(node);
+    when(context.getNodeManager()).thenReturn(nodeManager);
     return context;
   }
 
@@ -144,16 +154,16 @@ public class TestGravitinoConnectorFactoryStart {
   }
 
   @Test
-  public void testStartIsAttemptedOnlyOnce() {
+  public void testFailedStartIsRetried() {
     CoordinatorFactory factory = newFactory();
 
     Map<String, String> brokenConfig = staticConfig();
     brokenConfig.put("catalog.config-dir", "/not/exists/catalog");
     assertThrows(Exception.class, () -> factory.create("gravitino", brokenConfig, mockContext()));
 
-    // Everything that makes start() fail is a configuration error, so the next create() must not
-    // try again: a second init() would open another connection and abandon the first one.
-    assertNotNull(factory.create("gravitino", brokenConfig, mockContext()));
+    // A failed initialization must not leave the shared manager marked as started. A later create
+    // retries initialization so a corrected configuration can recover without restarting Trino.
+    assertThrows(Exception.class, () -> factory.create("gravitino", brokenConfig, mockContext()));
   }
 
   @Test

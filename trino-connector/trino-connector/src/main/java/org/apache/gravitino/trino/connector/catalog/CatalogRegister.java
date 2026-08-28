@@ -37,6 +37,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
@@ -82,6 +83,7 @@ public class CatalogRegister {
 
   private Connection connection;
   private boolean isStarted = false;
+  private volatile String lastConnectionError;
   private String catalogStoreDirectory;
   private GravitinoConfig config;
 
@@ -93,11 +95,25 @@ public class CatalogRegister {
     String command = "SELECT 1";
     try (Statement statement = connection.createStatement()) {
       isStarted = statement.execute(command);
+      lastConnectionError = null;
       return isStarted;
     } catch (Exception e) {
-      LOG.warn("Trino server is not started: {}", e.getMessage());
+      // Keep the reason: wrong credentials, a wrong port and a coordinator that is still booting
+      // are indistinguishable to the caller otherwise, and only the first two are actionable.
+      lastConnectionError = e.getMessage() == null ? e.getClass().getName() : e.getMessage();
+      LOG.warn("Trino server is not started: {}", lastConnectionError);
       return false;
     }
+  }
+
+  /**
+   * Retrieves the error from the last failed attempt to reach the Trino server.
+   *
+   * @return the error message, null if the Trino server was reached
+   */
+  @Nullable
+  String getLastConnectionError() {
+    return lastConnectionError;
   }
 
   /**
