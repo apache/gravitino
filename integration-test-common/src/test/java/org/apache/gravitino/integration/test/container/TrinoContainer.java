@@ -22,10 +22,6 @@ import static java.lang.String.format;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -33,10 +29,8 @@ import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.rnorth.ducttape.Preconditions;
@@ -50,15 +44,8 @@ public class TrinoContainer extends BaseContainer {
   public static final String DEFAULT_IMAGE = System.getenv("GRAVITINO_CI_TRINO_DOCKER_IMAGE");
   public static final String HOST_NAME = "gravitino-ci-trino";
   public static final int TRINO_PORT = 8080;
-  public static final int TRINO_HTTPS_PORT = 8443;
 
   static Connection trinoJdbcConnection = null;
-
-  private final int coordinatorPort;
-  private final boolean tlsEnabled;
-  private final String truststorePath;
-  private final String truststorePassword;
-  private final String truststoreType;
 
   public static final String TRINO_CONTAINER_PLUGIN_GRAVITINO_DIR =
       "/usr/lib/trino/plugin/gravitino";
@@ -74,18 +61,8 @@ public class TrinoContainer extends BaseContainer {
       Map<String, String> extraHosts,
       Map<String, String> filesToMount,
       Map<String, String> envVars,
-      Optional<Network> network,
-      int coordinatorPort,
-      boolean tlsEnabled,
-      String truststorePath,
-      String truststorePassword,
-      String truststoreType) {
+      Optional<Network> network) {
     super(image, hostName, ports, extraHosts, filesToMount, envVars, network);
-    this.coordinatorPort = coordinatorPort;
-    this.tlsEnabled = tlsEnabled;
-    this.truststorePath = truststorePath;
-    this.truststorePassword = truststorePassword;
-    this.truststoreType = truststoreType;
   }
 
   @Override
@@ -96,7 +73,6 @@ public class TrinoContainer extends BaseContainer {
 
   @Override
   public void start() {
-    LOG.info("Starting Trino container with image {}", container.getDockerImageName());
     super.start();
 
     Preconditions.check("Initialization Trino JDBC connect failed!", initTrinoJdbcConnection());
@@ -135,23 +111,15 @@ public class TrinoContainer extends BaseContainer {
   }
 
   public boolean initTrinoJdbcConnection() {
-    final String dbUrl = String.format("jdbc:trino://127.0.0.1:%d", getMappedPort(coordinatorPort));
-    Properties properties = new Properties();
-    properties.setProperty("user", "admin");
-    if (tlsEnabled) {
-      properties.setProperty("SSL", "true");
-      properties.setProperty("SSLVerification", "FULL");
-      properties.setProperty("SSLTrustStorePath", truststorePath);
-      properties.setProperty("SSLTrustStorePassword", truststorePassword);
-      properties.setProperty("SSLTrustStoreType", truststoreType);
-    }
+    final String dbUrl =
+        String.format("jdbc:trino://127.0.0.1:%d", getMappedPort(TrinoContainer.TRINO_PORT));
 
     long now = System.currentTimeMillis();
     boolean result = false;
 
     while (!result && System.currentTimeMillis() - now <= 20000) {
       try {
-        trinoJdbcConnection = DriverManager.getConnection(dbUrl, properties);
+        trinoJdbcConnection = DriverManager.getConnection(dbUrl, "admin", "");
         result = true;
       } catch (SQLException e) {
         LOG.error(e.getMessage(), e);
@@ -233,11 +201,6 @@ public class TrinoContainer extends BaseContainer {
     protected String trinoConfDir;
     protected String metalakeName;
     protected String hiveContainerIP;
-    protected int coordinatorPort = TRINO_PORT;
-    protected boolean tlsEnabled;
-    protected String truststorePath = "";
-    protected String truststorePassword = "";
-    protected String truststoreType = "PKCS12";
 
     private Builder() {
       this.image = DEFAULT_IMAGE;
@@ -260,58 +223,10 @@ public class TrinoContainer extends BaseContainer {
       return self;
     }
 
-    /**
-     * Configures the container and its test JDBC client to use HTTPS.
-     *
-     * @param truststorePath truststore path on the test host
-     * @param truststorePassword truststore password
-     * @param truststoreType truststore type, for example PKCS12
-     * @return this builder
-     */
-    public Builder withTls(
-        String truststorePath, String truststorePassword, String truststoreType) {
-      this.coordinatorPort = TRINO_HTTPS_PORT;
-      this.tlsEnabled = true;
-      this.truststorePath = truststorePath;
-      this.truststorePassword = truststorePassword;
-      this.truststoreType = truststoreType;
-      this.exposePorts =
-          ImmutableSet.<Integer>builder().addAll(this.exposePorts).add(TRINO_HTTPS_PORT).build();
-      return self;
-    }
-
     @Override
     public TrinoContainer build() {
-      Map<String, String> mounts = new HashMap<>(filesToMount);
-      if (trinoConfDir != null && !trinoConfDir.isEmpty()) {
-        addTrinoConfigFiles(mounts);
-      }
       return new TrinoContainer(
-          image,
-          hostName,
-          exposePorts,
-          extraHosts,
-          mounts,
-          envVars,
-          network,
-          coordinatorPort,
-          tlsEnabled,
-          truststorePath,
-          truststorePassword,
-          truststoreType);
-    }
-
-    private void addTrinoConfigFiles(Map<String, String> mounts) {
-      Path configDirectory = Path.of(trinoConfDir);
-      try (var paths = Files.walk(configDirectory)) {
-        paths
-            .filter(Files::isRegularFile)
-            .forEach(
-                path ->
-                    mounts.put("/etc/trino/" + configDirectory.relativize(path), path.toString()));
-      } catch (IOException e) {
-        throw new UncheckedIOException("Failed to read Trino configuration directory", e);
-      }
+          image, hostName, exposePorts, extraHosts, filesToMount, envVars, network);
     }
   }
 }
