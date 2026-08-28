@@ -143,13 +143,7 @@ class TestRelationalCatalog(IntegrationTestEnv):
         self.assertIsNotNone(table)
         self.assertEqual(table.name(), TestRelationalCatalog.TABLE_NAME)
         self.assertEqual(table.comment(), TestRelationalCatalog.TABLE_COMMENT)
-<<<<<<< HEAD
         self.assertEqual(table.properties(), TestRelationalCatalog.TABLE_PROPERTIES)
-=======
-        self.assert_properties_equal(
-            TestRelationalCatalog.TABLE_PROPERTIES, table.properties()
-        )
->>>>>>> 12ddb8789 ([#12669] improvement(core): Use entityStore.update() for job status transitions (#12675))
         self.assertEqual(len(table.columns()), 3)
 
         columns = table.columns()

@@ -147,7 +147,6 @@ public class JobPO {
           .withJobTemplateName(oldJobPO.jobTemplateName())
           .withJobExecutionId(newJobEntity.jobExecutionId())
           .withJobRunStatus(newJobEntity.status().name())
-          .withJobStartedAt(newJobEntity.startedAt())
           .withJobFinishedAt(newJobEntity.finishedAt())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newJobEntity.auditInfo()))
           .withCurrentVersion(currentVersion)
