@@ -76,6 +76,7 @@ import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.EntityStoreFactory;
 import org.apache.gravitino.GravitinoEnv;
@@ -105,6 +106,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchFilesetException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NonEmptySchemaException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
 import org.apache.gravitino.file.FileInfo;
 import org.apache.gravitino.file.Fileset;
@@ -3384,6 +3386,115 @@ public class TestFilesetCatalogOperations {
             null,
             TEST_ROOT_PATH + "/fileset39",
             TEST_ROOT_PATH + "/fileset39"));
+  }
+
+  @Test
+  public void testDropFilesetKeepsFilesWhenMetadataDropIsRejected() throws IOException {
+    String schemaName = "schema_drop_rejected";
+    String filesetName = "fileset_drop_rejected";
+    String catalogPath = TEST_ROOT_PATH + "/catalog_drop_rejected";
+    createSchema(schemaName, "comment", catalogPath, null);
+    Fileset fileset =
+        createFileset(filesetName, schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
+
+    Path filesetPath = new Path(fileset.storageLocation());
+    FileSystem fs = filesetPath.getFileSystem(new Configuration());
+    Assertions.assertTrue(fs.exists(filesetPath));
+
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+    EntityStore rejectingStore = Mockito.spy(store);
+    Mockito.doThrow(new OptimisticLockException("fileset was modified concurrently"))
+        .when(rejectingStore)
+        .deleteAndGet(
+            Mockito.eq(filesetIdent),
+            Mockito.eq(Entity.EntityType.FILESET),
+            Mockito.eq(FilesetEntity.class),
+            Mockito.any());
+
+    try (FilesetCatalogOperations ops =
+        new FilesetCatalogOperations(rejectingStore, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      Assertions.assertThrows(OptimisticLockException.class, () -> ops.dropFileset(filesetIdent));
+    }
+
+    // The drop was refused, so the fileset row still advertises this location. Deleting the files
+    // anyway would leave that row pointing at data that is gone.
+    Assertions.assertTrue(fs.exists(filesetPath));
+    Assertions.assertEquals(
+        filesetName,
+        store.get(filesetIdent, Entity.EntityType.FILESET, FilesetEntity.class).name());
+
+    fs.delete(filesetPath, true);
+  }
+
+  @Test
+  public void testDropFilesetRollsBackMetadataWhenStorageDeletionFails() throws IOException {
+    String schemaName = "schema_drop_storage_failure";
+    String filesetName = "fileset_drop_storage_failure";
+    String catalogPath = TEST_ROOT_PATH + "/catalog_drop_storage_failure";
+    createSchema(schemaName, "comment", catalogPath, null);
+    Fileset fileset =
+        createFileset(filesetName, schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+
+    FileSystem failingFileSystem = Mockito.mock(FileSystem.class);
+    when(failingFileSystem.exists(any(Path.class))).thenReturn(true);
+    when(failingFileSystem.delete(any(Path.class), Mockito.eq(true)))
+        .thenThrow(new IOException("permission denied"));
+
+    try (FilesetCatalogOperations ops =
+        Mockito.spy(new FilesetCatalogOperations(store, secretManager))) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      doReturn(failingFileSystem).when(ops).getFileSystemWithCache(any(Path.class), any(Map.class));
+
+      RuntimeException failure =
+          Assertions.assertThrows(RuntimeException.class, () -> ops.dropFileset(filesetIdent));
+      Assertions.assertTrue(failure.getMessage().contains("Failed to delete fileset"));
+    }
+
+    // The failed physical cleanup aborts the outer transaction, so the fileset remains visible and
+    // a caller can repair its filesystem permissions and retry the drop.
+    FilesetEntity survivingFileset =
+        store.get(filesetIdent, Entity.EntityType.FILESET, FilesetEntity.class);
+    Assertions.assertEquals(fileset.storageLocation(), survivingFileset.storageLocation());
+
+    store.delete(filesetIdent, Entity.EntityType.FILESET);
+    new Path(fileset.storageLocation())
+        .getFileSystem(new Configuration())
+        .delete(new Path(fileset.storageLocation()), true);
+  }
+
+  @Test
+  public void testDropFilesetSucceedsWhenTheLocationDisappearsFirst() throws IOException {
+    String schemaName = "schema_drop_vanished";
+    String filesetName = "fileset_drop_vanished";
+    String catalogPath = TEST_ROOT_PATH + "/catalog_drop_vanished";
+    createSchema(schemaName, "comment", catalogPath, null);
+    Fileset fileset =
+        createFileset(filesetName, schemaName, "comment", Fileset.Type.MANAGED, catalogPath, null);
+
+    Path filesetPath = new Path(fileset.storageLocation());
+    FileSystem fs = filesetPath.getFileSystem(new Configuration());
+    Assertions.assertTrue(fs.exists(filesetPath));
+    // Somebody else removed the location already. A drop that finds nothing left to delete has
+    // nothing to complain about.
+    Assertions.assertTrue(fs.delete(filesetPath, true));
+
+    NameIdentifier filesetIdent = NameIdentifier.of("m1", "c1", schemaName, filesetName);
+    try (FilesetCatalogOperations ops = new FilesetCatalogOperations(store, secretManager)) {
+      ops.initialize(
+          ImmutableMap.of(LOCATION, catalogPath),
+          randomCatalogInfo("m1", "c1"),
+          FILESET_PROPERTIES_METADATA);
+      Assertions.assertTrue(ops.dropFileset(filesetIdent));
+      Assertions.assertFalse(ops.dropFileset(filesetIdent), "fileset should be non-existent");
+    }
   }
 
   private Schema createSchema(String name, String comment, String catalogPath, String schemaPath)

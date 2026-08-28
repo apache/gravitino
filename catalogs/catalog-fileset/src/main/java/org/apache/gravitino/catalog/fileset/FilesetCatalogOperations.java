@@ -39,6 +39,7 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -729,56 +730,72 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
   @Override
   public boolean dropFileset(NameIdentifier ident) {
     try {
-      FilesetEntity filesetEntity =
-          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-
-      // For managed fileset, we should delete the related files.
-      if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        AtomicReference<IOException> exception = new AtomicReference<>();
-        Map<String, Path> storageLocations =
-            Maps.transformValues(filesetEntity.storageLocations(), Path::new);
-        storageLocations.forEach(
-            (locationName, location) -> {
-              try {
-                Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
-                FileSystem fs = getFileSystemWithCache(location, fsConf);
-                if (fs.exists(location)) {
-                  if (!fs.delete(location, true)) {
-                    LOG.warn(
-                        "Failed to delete fileset {} location {} with location name {}",
-                        ident,
-                        location,
-                        locationName);
+      // The relational store runs this cleanup after the metadata CAS wins but before committing
+      // its transaction. The callback therefore sees the exact deleted snapshot, and an I/O
+      // failure can still restore the metadata so the caller may fix permissions and retry.
+      //
+      // The price is that the recursive storage delete runs inside that transaction, holding the
+      // fileset rows and a pooled connection for as long as the filesystem takes. Dropping a
+      // fileset with a very large tree is therefore a slow write for that fileset, and enough
+      // concurrent drops can hold up the connection pool.
+      Optional<FilesetEntity> deletedFileset =
+          store.deleteAndGet(
+              ident,
+              Entity.EntityType.FILESET,
+              FilesetEntity.class,
+              filesetEntity -> {
+                if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
+                  try {
+                    deleteManagedFilesetStorage(ident, filesetEntity);
+                  } catch (IOException ioe) {
+                    throw new UncheckedIOException(ioe);
                   }
-                } else {
-                  LOG.warn(
-                      "Fileset {} location {} with location name {} does not exist",
-                      ident,
-                      location,
-                      locationName);
                 }
-              } catch (IOException ioe) {
-                LOG.warn(
-                    "Failed to delete fileset {} location {} with location name {}",
-                    ident,
-                    location,
-                    locationName,
-                    ioe);
-                exception.set(ioe);
-              }
-            });
-        if (exception.get() != null) {
-          throw exception.get();
-        }
-      }
-
-      return store.delete(ident, Entity.EntityType.FILESET);
+              });
+      return deletedFileset.isPresent();
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
       return false;
+    } catch (UncheckedIOException uioe) {
+      throw new RuntimeException("Failed to delete fileset " + ident, uioe.getCause());
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete fileset " + ident, ioe);
+    }
+  }
+
+  /**
+   * Removes the storage of a managed fileset while its metadata delete can still be rolled back.
+   *
+   * <p>The first location that cannot be removed stops the loop, so the drop is rejected before it
+   * takes away more data than it already has. The locations removed up to that point are gone for
+   * good, but attempting the remaining ones would only widen that gap.
+   */
+  private void deleteManagedFilesetStorage(NameIdentifier ident, FilesetEntity filesetEntity)
+      throws IOException {
+    Map<String, Path> storageLocations =
+        Maps.transformValues(filesetEntity.storageLocations(), Path::new);
+    for (Map.Entry<String, Path> entry : storageLocations.entrySet()) {
+      String locationName = entry.getKey();
+      Path location = entry.getValue();
+      Map<String, String> fsConf =
+          mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
+      FileSystem fs = getFileSystemWithCache(location, fsConf);
+      if (!fs.exists(location)) {
+        LOG.warn(
+            "Fileset {} location {} with location name {} does not exist",
+            ident,
+            location,
+            locationName);
+        continue;
+      }
+      if (!fs.delete(location, true) && fs.exists(location)) {
+        // A false return also covers a location that somebody else removed between the check above
+        // and this call. Only a location that is still there is a reason to reject the drop.
+        throw new IOException(
+            String.format(
+                "Failed to delete fileset %s location %s with location name %s",
+                ident, location, locationName));
+      }
     }
   }
 
