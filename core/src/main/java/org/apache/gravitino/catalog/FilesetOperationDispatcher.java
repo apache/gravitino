@@ -18,12 +18,15 @@
  */
 package org.apache.gravitino.catalog;
 
+import static org.apache.gravitino.Entity.EntityType.FILESET;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -39,9 +42,12 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
+import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
@@ -154,7 +160,8 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       throws NoSuchSchemaException, FilesetAlreadyExistsException {
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
     long uid = idGenerator.nextId();
-    Map<String, String> entityProperties = SecretPropertyUtils.copyEntityProperties(properties);
+    Map<String, String> entityProperties =
+        SecretPropertyUtils.copyEntityProperties(properties, secretBindings, secretReferences);
     List<SecretMaterial> secretMaterials =
         secretManager.assembleSecretMaterials(
             properties, entityProperties, "fileset", uid, secretBindings, secretReferences);
@@ -167,7 +174,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                   return null;
                 }),
         IllegalArgumentException.class);
-    secretManager.writeSecrets(secretMaterials);
     StringIdentifier stringId = StringIdentifier.fromId(uid);
     // Same split as CatalogManager: create/storage properties keep secret URNs. Connectors that
     // need plaintext for runtime (e.g. Fileset FS) resolve at the conf boundary — see
@@ -175,6 +181,10 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     Map<String, String> updatedProperties =
         StringIdentifier.newPropertiesWithId(stringId, entityProperties);
 
+    // Write secrets before create: paths that resolve URNs (e.g. mergeUpLevelConfigurations for FS
+    // mkdir, catalog createBaseCatalog) require secrets to exist first. Roll back on any create
+    // failure (same pattern as CatalogManager / SchemaOperationDispatcher).
+    secretManager.writeSecrets(secretMaterials);
     try {
       Fileset createdFileset =
           TreeLockUtils.doWithTreeLock(
@@ -223,7 +233,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
   @Override
   public Fileset alterFileset(NameIdentifier ident, FilesetChange... changes)
       throws NoSuchFilesetException, IllegalArgumentException {
-    validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
     NameIdentifier catalogIdent = getCatalogIdentifier(ident);
 
     boolean containsRenameFileset =
@@ -235,12 +244,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
         TreeLockUtils.doWithTreeLock(
             nameIdentifierForLock,
             LockType.WRITE,
-            () ->
-                doWithCatalog(
-                    catalogIdent,
-                    c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
-                    NoSuchFilesetException.class,
-                    IllegalArgumentException.class));
+            () -> alterFilesetUnderLock(ident, catalogIdent, changes));
 
     return EntityCombinedFileset.of(alteredFileset)
         .withHiddenProperties(
@@ -248,6 +252,78 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 alteredFileset.properties()));
+  }
+
+  private Fileset alterFilesetUnderLock(
+      NameIdentifier ident, NameIdentifier catalogIdent, FilesetChange... changes) {
+    validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
+    if (usesFilesetCatalogEntityStore(catalogIdent)) {
+      return doWithCatalog(
+          catalogIdent,
+          c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
+          NoSuchFilesetException.class,
+          IllegalArgumentException.class);
+    }
+    return alterFilesetWithPreparedSecrets(ident, catalogIdent, changes);
+  }
+
+  private boolean usesFilesetCatalogEntityStore(NameIdentifier catalogIdent) {
+    return doWithCatalog(
+        catalogIdent, c -> "fileset".equals(c.catalog().provider()), NoSuchFilesetException.class);
+  }
+
+  private Fileset alterFilesetWithPreparedSecrets(
+      NameIdentifier ident, NameIdentifier catalogIdent, FilesetChange... changes) {
+    Fileset currentFileset =
+        doWithCatalog(
+            catalogIdent,
+            c -> c.doWithFilesetOps(f -> f.loadFileset(ident)),
+            NoSuchFilesetException.class);
+    // Prefer FilesetEntity properties for secret URNs (catalog loadFileset may omit them).
+    FilesetEntity filesetEntity = getEntity(ident, FILESET, FilesetEntity.class);
+    Map<String, String> currentProperties;
+    if (filesetEntity != null
+        && filesetEntity.properties() != null
+        && !filesetEntity.properties().isEmpty()) {
+      currentProperties = new HashMap<>(filesetEntity.properties());
+    } else if (currentFileset.properties() != null) {
+      currentProperties = new HashMap<>(currentFileset.properties());
+    } else {
+      currentProperties = new HashMap<>();
+    }
+
+    StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
+    long filesetId;
+    if (currentStringId != null) {
+      filesetId = currentStringId.id();
+    } else if (filesetEntity != null) {
+      filesetId = filesetEntity.id();
+    } else {
+      filesetId = 0L;
+    }
+
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    boolean alterCommitted = false;
+    try {
+      Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+          SecretAlterChanges.prepareFilesetChanges(
+              secretManager, currentProperties, filesetId, changes);
+      writtenSecretMaterials.set(secretResult.getRight());
+      FilesetChange[] effectiveChanges = secretResult.getLeft();
+
+      Fileset altered =
+          doWithCatalog(
+              catalogIdent,
+              c -> c.doWithFilesetOps(f -> f.alterFileset(ident, effectiveChanges)),
+              NoSuchFilesetException.class,
+              IllegalArgumentException.class);
+      alterCommitted = true;
+      return altered;
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
+    }
   }
 
   /**
