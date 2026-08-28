@@ -385,13 +385,12 @@ public class TestJobMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateJobIgnoresRuntimeJobTemplateChange() throws IOException {
-    // The runtime job template is fixed at job creation and never changes afterwards, so
-    // updateJobMeta's SQL deliberately omits the runtime_job_template column from its SET
-    // clause (the same way it already omits job_template_id) rather than rewriting it from
-    // JobPO.updateJobPO()'s output on every status transition. This proves that guarantee holds
-    // even when the updater lambda actively tries to change the value, not just when it omits
-    // it - the persisted column must be untouched by the UPDATE statement either way.
+  public void testUpdateJobPersistsRuntimeJobTemplateChange() throws IOException {
+    // Unlike jobTemplateName, this storage layer does not enforce that the runtime job template
+    // never changes - it persists whatever the updater lambda's returned entity says, the same
+    // way it persists status/timestamps/audit info. Keeping the resolved template unchanged
+    // across status transitions is JobManager's responsibility (its updater functions always
+    // carry the existing value forward), not something guarded here.
     BaseMetalake metalake =
         createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
     backend.insert(metalake, false);
@@ -406,7 +405,7 @@ public class TestJobMetaService extends TestJDBCBackend {
     JobEntity job =
         JobEntity.builder()
             .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withJobExecutionId("job-execution-update-ignores-template")
+            .withJobExecutionId("job-execution-update-changes-template")
             .withJobTemplateName(jobTemplate.name())
             .withStatus(JobHandle.Status.QUEUED)
             .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
@@ -417,9 +416,9 @@ public class TestJobMetaService extends TestJDBCBackend {
             .build();
     JobMetaService.getInstance().insertJob(job, false);
 
-    String attemptedRuntimeJobTemplateJson =
+    String newRuntimeJobTemplateJson =
         "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\","
-            + "\"arguments\":[\"tampered\"]}";
+            + "\"arguments\":[\"resolved\"]}";
     JobEntity updatedJob =
         JobMetaService.getInstance()
             .updateJob(
@@ -434,19 +433,16 @@ public class TestJobMetaService extends TestJDBCBackend {
                         .withAuditInfo(oldJob.auditInfo())
                         .withStartedAt(System.currentTimeMillis())
                         .withFinishedAt(oldJob.finishedAt())
-                        .withRuntimeJobTemplate(attemptedRuntimeJobTemplateJson)
+                        .withRuntimeJobTemplate(newRuntimeJobTemplateJson)
                         .build());
+    Assertions.assertEquals(newRuntimeJobTemplateJson, updatedJob.runtimeJobTemplate());
 
-    // The value returned directly by the updater lambda reflects what the caller asked for -
-    // JobMetaService.updateJob() does not re-derive its return value from what was persisted.
-    Assertions.assertEquals(attemptedRuntimeJobTemplateJson, updatedJob.runtimeJobTemplate());
-
-    // What's actually stored must be untouched, regardless of what the lambda tried to write.
+    // The change must actually be persisted, not just returned.
     JobEntity persistedJob =
         JobMetaService.getInstance()
             .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
     Assertions.assertEquals(JobHandle.Status.STARTED, persistedJob.status());
-    Assertions.assertEquals(originalRuntimeJobTemplateJson, persistedJob.runtimeJobTemplate());
+    Assertions.assertEquals(newRuntimeJobTemplateJson, persistedJob.runtimeJobTemplate());
   }
 
   @TestTemplate

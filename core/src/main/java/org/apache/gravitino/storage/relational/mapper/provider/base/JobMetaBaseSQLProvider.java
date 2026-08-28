@@ -152,6 +152,7 @@ public class JobMetaBaseSQLProvider {
         + " job_run_status = #{newJobMeta.jobRunStatus},"
         + " job_started_at = #{newJobMeta.jobStartedAt},"
         + " job_finished_at = #{newJobMeta.jobFinishedAt},"
+        + " runtime_job_template = #{newJobMeta.runtimeJobTemplate},"
         + " audit_info = #{newJobMeta.auditInfo},"
         + " current_version = #{newJobMeta.currentVersion},"
         + " last_version = #{newJobMeta.lastVersion}"

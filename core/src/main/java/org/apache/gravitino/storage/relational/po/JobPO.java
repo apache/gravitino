@@ -134,10 +134,13 @@ public class JobPO {
 
   /**
    * Builds the {@link JobPO} to persist for an update, carrying forward the identity fields ({@code
-   * jobRunId}, {@code jobTemplateName}, {@code runtimeJobTemplate}) from the old PO since a job's
-   * template (and its resolved runtime form) is immutable once the job is created, and bumping the
-   * version counters. This does not perform any optimistic-concurrency check; the caller is
-   * responsible for any such guarantee.
+   * jobRunId}, {@code jobTemplateName}) from the old PO since a job's template is immutable once
+   * the job is created, and bumping the version counters. Unlike those identity fields, {@code
+   * runtimeJobTemplate} is taken from {@code newJobEntity} rather than carried forward from the old
+   * PO - this layer stores whatever the caller passes, it does not enforce that the resolved
+   * runtime template never changes. That invariant is the caller's responsibility (see {@code
+   * JobManager}'s updater functions, which always carry the existing value forward). This does not
+   * perform any optimistic-concurrency check; the caller is responsible for any such guarantee.
    *
    * @param oldJobPO the existing {@link JobPO} being updated
    * @param newJobEntity the {@link JobEntity} with the updated status/timestamps/audit info
@@ -156,7 +159,7 @@ public class JobPO {
           .withJobRunStatus(newJobEntity.status().name())
           .withJobStartedAt(newJobEntity.startedAt())
           .withJobFinishedAt(newJobEntity.finishedAt())
-          .withRuntimeJobTemplate(oldJobPO.runtimeJobTemplate())
+          .withRuntimeJobTemplate(newJobEntity.runtimeJobTemplate())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newJobEntity.auditInfo()))
           .withCurrentVersion(currentVersion)
           .withLastVersion(lastVersion)
