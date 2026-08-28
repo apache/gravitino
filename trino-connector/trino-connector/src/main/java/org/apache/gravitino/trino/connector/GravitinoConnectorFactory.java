@@ -19,6 +19,7 @@
 package org.apache.gravitino.trino.connector;
 
 import static io.trino.spi.StandardErrorCode.NOT_SUPPORTED;
+import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_ILLEGAL_ARGUMENT;
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -29,7 +30,12 @@ import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
 import io.trino.spi.connector.ConnectorFactory;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
@@ -47,6 +53,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private static final Logger LOG = Logger.get(GravitinoConnectorFactory.class);
   private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
   private static final int MAX_SUPPORT_TRINO_SPI_VERSION = Integer.MAX_VALUE;
+  private static final Pattern TRINO_SPI_VERSION_PATTERN = Pattern.compile("^(\\d+)");
+  private static final Set<String> SECURITY_SENSITIVE_PROPERTY_SUFFIXES =
+      Set.of("password", "secret", "token", "credential", "accesskey", "secretkey", "privatekey");
   /** The default connector name. */
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
@@ -141,6 +150,17 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     }
   }
 
+  // Note: this method is not annotated with @Override because it does not exist in the
+  // ConnectorFactory interface of the baseline open-source Trino SPI version this connector
+  // compiles against. Some newer Trino/Starburst SPI versions declare it as an abstract method,
+  // where it is dispatched at runtime by signature, providing cross-version compatibility.
+  public Set<String> getSecuritySensitivePropertyNames(
+      String catalogName, Map<String, String> config, ConnectorContext context) {
+    return config.keySet().stream()
+        .filter(GravitinoConnectorFactory::isSecuritySensitivePropertyName)
+        .collect(Collectors.toUnmodifiableSet());
+  }
+
   protected GravitinoConnector createConnector(CatalogConnectorContext connectorContext) {
     throw new TrinoException(NOT_SUPPORTED, "Should be overridden in subclass");
   }
@@ -156,7 +176,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private void checkTrinoSpiVersion(ConnectorContext context, GravitinoConfig config) {
     String spiVersion = context.getSpiVersion();
-    trinoVersion = Integer.parseInt(spiVersion);
+    trinoVersion = parseTrinoSpiVersion(spiVersion);
 
     // check catalog name with metalake are supported in this trino version
     if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
@@ -187,6 +207,32 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
                   + "To bypass this check, set gravitino.trino.skip-version-validation=true",
               trinoVersion, getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_UNSUPPORTED_TRINO_VERSION, errmsg);
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isSecuritySensitivePropertyName(String propertyName) {
+    String normalizedPropertyName = propertyName.toLowerCase(Locale.ROOT).replaceAll("[._-]", "");
+    return SECURITY_SENSITIVE_PROPERTY_SUFFIXES.stream().anyMatch(normalizedPropertyName::endsWith);
+  }
+
+  @VisibleForTesting
+  static int parseTrinoSpiVersion(String spiVersion) {
+    Matcher matcher = TRINO_SPI_VERSION_PATTERN.matcher(spiVersion);
+    if (!matcher.find()) {
+      throw new TrinoException(
+          GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format("Invalid Trino SPI version '%s': expected leading digits", spiVersion));
+    }
+
+    try {
+      return Integer.parseInt(matcher.group(1));
+    } catch (NumberFormatException e) {
+      throw new TrinoException(
+          GRAVITINO_ILLEGAL_ARGUMENT,
+          String.format(
+              "Invalid Trino SPI version '%s': numeric version is out of range", spiVersion),
+          e);
     }
   }
 
