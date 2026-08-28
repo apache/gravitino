@@ -454,6 +454,53 @@ class TestRefreshableBearerAuth(_OAuthHttpTestCase):
         self.assertEqual(seen, ["Bearer t1", "Bearer t2"])
         self.assertEqual(calls["token"], 2)
 
+    def test_401_retry_sets_do_not_exceed_max_limit(self):
+        """After many clock-skew 401 retries, retained tokens stay <= 10."""
+        max_retained = 10
+        cycles = 20
+        calls = {"token": 0, "expect_401": False}
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            if request.method == "POST":
+                calls["token"] += 1
+                return httpx.Response(
+                    200,
+                    json={
+                        "access_token": f"tok-{calls['token']}",
+                        "expires_in": 3600,
+                    },
+                )
+            if calls["expect_401"]:
+                calls["expect_401"] = False
+                return httpx.Response(401)
+            return httpx.Response(200, json={"ok": True})
+
+        auth = self._auth(handler)
+
+        async def _run() -> None:
+            async with httpx.AsyncClient(
+                auth=auth,
+                transport=auth._test_transport,
+                base_url="https://gravitino.example",
+            ) as client:
+                for _ in range(cycles):
+                    await client.get("/api")
+                    calls["expect_401"] = True
+                    response = await client.get("/api")
+                    self.assertEqual(response.status_code, 200)
+                    auth.invalidate()
+
+        asyncio.run(_run())
+        retained = len(auth._retried_tokens) + len(auth._rejected_tokens)
+        self.assertLessEqual(
+            retained,
+            max_retained,
+            "401 token sets exceeded max limit "
+            f"{max_retained}: retained={retained} "
+            f"retried={auth._retried_tokens!r} "
+            f"rejected={auth._rejected_tokens!r}",
+        )
+
     def test_401_retry_replays_streaming_request_body(self):
         seen_bodies = []
         primed = {"done": False}

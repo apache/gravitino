@@ -133,7 +133,7 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         retry_token, _ = self._apply_token(request)
         response = yield request
         if response.status_code == 401:
-            self._rejected_tokens.add(retry_token)
+            self._rejected_tokens = {retry_token}
 
     async def async_auth_flow(
         self, request: httpx.Request
@@ -152,7 +152,7 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
         retry_token, _ = await self._apply_token_async(request)
         response = yield request
         if response.status_code == 401:
-            self._rejected_tokens.add(retry_token)
+            self._rejected_tokens = {retry_token}
 
     def _configure_client(self, client: httpx.Client) -> None:
         """Do not send HTTP Basic; id and secret go in the form body."""
@@ -240,13 +240,16 @@ class RefreshableBearerAuth(OAuth2ClientCredentials):
             self.invalidate()
 
     def _begin_401_retry(self, token: str, fetched: bool) -> bool:
-        """Reserve a single 401 retry for this token; skip hopeless cases."""
+        """Reserve a single 401 retry for this token; skip hopeless cases.
+
+        Sets hold only the current token. Historical JWTs are not retained.
+        """
         if fetched:
-            self._rejected_tokens.add(token)
+            self._rejected_tokens = {token}
             return False
         if token in self._rejected_tokens or token in self._retried_tokens:
             return False
-        self._retried_tokens.add(token)
+        self._retried_tokens = {token}
         return True
 
     def _apply_token(self, request: httpx.Request) -> tuple[str, bool]:
