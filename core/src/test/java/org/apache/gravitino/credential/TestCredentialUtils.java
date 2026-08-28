@@ -23,6 +23,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
 import java.util.Set;
+import org.apache.gravitino.storage.GCSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -62,5 +64,58 @@ public class TestCredentialUtils {
         CredentialUtils.getCredentialProvidersByOrder(
             () -> filesetProperties, () -> schemaProperties, () -> catalogProperties);
     Assertions.assertEquals(credentialProviders, ImmutableSet.of("a", "b"));
+  }
+
+  @Test
+  void testGetStorageCredentialProviders() {
+    // Static S3 credentials are inferred as the s3-secret-key provider.
+    Assertions.assertEquals(
+        ImmutableSet.of(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE),
+        CredentialUtils.getStorageCredentialProviders(
+            ImmutableMap.of(
+                S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+                "ak",
+                S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+                "sk")));
+
+    // A GCS service account file is inferred as the gcs-token provider.
+    Assertions.assertEquals(
+        ImmutableSet.of(GCSTokenCredential.GCS_TOKEN_CREDENTIAL_TYPE),
+        CredentialUtils.getStorageCredentialProviders(
+            ImmutableMap.of(GCSProperties.GRAVITINO_GCS_SERVICE_ACCOUNT_FILE, "/path/to/file")));
+
+    // Non-credential properties yield no provider.
+    Assertions.assertTrue(
+        CredentialUtils.getStorageCredentialProviders(
+                ImmutableMap.of(S3Properties.GRAVITINO_S3_ENDPOINT, "endpoint"))
+            .isEmpty());
+  }
+
+  @Test
+  void testGetCredentialProvidersByOrderInfersStaticCredentials() {
+    // No explicit credential-providers anywhere: infer from the static S3 credentials.
+    Map<String, String> catalogProperties =
+        ImmutableMap.of(
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+            "ak",
+            S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+            "sk");
+    Assertions.assertEquals(
+        ImmutableSet.of(S3SecretKeyCredential.S3_SECRET_KEY_CREDENTIAL_TYPE),
+        CredentialUtils.getCredentialProvidersByOrder(
+            ImmutableMap::of, ImmutableMap::of, () -> catalogProperties));
+
+    // An explicit credential-providers setting takes precedence over inference.
+    Map<String, String> explicitProperties =
+        ImmutableMap.of(
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            "a",
+            S3Properties.GRAVITINO_S3_ACCESS_KEY_ID,
+            "ak",
+            S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY,
+            "sk");
+    Assertions.assertEquals(
+        ImmutableSet.of("a"),
+        CredentialUtils.getCredentialProvidersByOrder(() -> explicitProperties));
   }
 }

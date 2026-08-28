@@ -91,8 +91,7 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
     def operations(self):
         return self._operations
 
-    @staticmethod
-    def _with_exception_translation(operation: FilesetDataOperation):
+    def _with_exception_translation(self, operation: FilesetDataOperation):
         """
         Decorator to translate fileset metadata not found exceptions into FileNotFoundError.
         :param operation: The operation being performed.
@@ -115,6 +114,21 @@ class GravitinoVirtualFileSystem(fsspec.AbstractFileSystem):
                     message = f"Cannot find location name during {operation}"
                     logger.warning("%s, %s", message, str(e))
                     raise FileNotFoundError(message) from e
+                except PermissionError as e:
+                    # Credential failures (e.g. missing AKSK) surface as PermissionError. When the
+                    # client neither provides static credentials nor enables credential vending, the
+                    # server-side credentials are hidden and unreachable, so guide the user to the
+                    # right configuration.
+                    if not self._operations.enable_credential_vending:
+                        message = (
+                            f"Access denied during {operation}. If this fileset relies on "
+                            f"server-side credentials, set "
+                            f"'{GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING}=True', or "
+                            f"provide the storage credentials in the client configuration."
+                        )
+                        logger.warning("%s, %s", message, str(e))
+                        raise PermissionError(message) from e
+                    raise
 
             return wrapper
 
