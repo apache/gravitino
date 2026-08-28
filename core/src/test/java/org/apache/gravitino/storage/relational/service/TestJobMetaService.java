@@ -382,32 +382,71 @@ public class TestJobMetaService extends TestJDBCBackend {
             .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobOverwrite.name()));
     Assertions.assertEquals(
         updatedRuntimeJobTemplateJson, retrievedOverwrittenJob.runtimeJobTemplate());
+  }
 
-    // updateJob() must also carry the runtime job template forward unchanged in what gets
-    // persisted, even if the caller's updater lambda omits it (mirroring jobTemplateName, which
-    // JobPO.updateJobPO() also always carries forward from the old PO regardless of what the
-    // lambda produces) - this exercises the JobPO.updateJobPO() path rather than insertJob()'s
-    // overwrite path above.
-    JobMetaService.getInstance()
-        .updateJob(
-            NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
-            (JobEntity oldJob) ->
-                JobEntity.builder()
-                    .withId(oldJob.id())
-                    .withJobExecutionId(oldJob.jobExecutionId())
-                    .withJobTemplateName(oldJob.jobTemplateName())
-                    .withNamespace(oldJob.namespace())
-                    .withStatus(JobHandle.Status.SUCCEEDED)
-                    .withAuditInfo(oldJob.auditInfo())
-                    .withStartedAt(oldJob.startedAt())
-                    .withFinishedAt(System.currentTimeMillis())
-                    .build());
+  @TestTemplate
+  public void testUpdateJobIgnoresRuntimeJobTemplateChange() throws IOException {
+    // The runtime job template is fixed at job creation and never changes afterwards, so
+    // updateJobMeta's SQL deliberately omits the runtime_job_template column from its SET
+    // clause (the same way it already omits job_template_id) rather than rewriting it from
+    // JobPO.updateJobPO()'s output on every status transition. This proves that guarantee holds
+    // even when the updater lambda actively tries to change the value, not just when it omits
+    // it - the persisted column must be untouched by the UPDATE statement either way.
+    BaseMetalake metalake =
+        createBaseMakeLake(RandomIdGenerator.INSTANCE.nextId(), METALAKE_NAME, AUDIT_INFO);
+    backend.insert(metalake, false);
 
-    JobEntity persistedUpdatedJob =
+    JobTemplateEntity jobTemplate =
+        TestJobTemplateMetaService.newShellJobTemplateEntity(
+            "test_job_template", "test_comment", METALAKE_NAME);
+    JobTemplateMetaService.getInstance().insertJobTemplate(jobTemplate, false);
+
+    String originalRuntimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\"}";
+    JobEntity job =
+        JobEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withJobExecutionId("job-execution-update-ignores-template")
+            .withJobTemplateName(jobTemplate.name())
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
+            .withAuditInfo(AUDIT_INFO)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(originalRuntimeJobTemplateJson)
+            .build();
+    JobMetaService.getInstance().insertJob(job, false);
+
+    String attemptedRuntimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\","
+            + "\"arguments\":[\"tampered\"]}";
+    JobEntity updatedJob =
+        JobMetaService.getInstance()
+            .updateJob(
+                NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+                (JobEntity oldJob) ->
+                    JobEntity.builder()
+                        .withId(oldJob.id())
+                        .withJobExecutionId(oldJob.jobExecutionId())
+                        .withJobTemplateName(oldJob.jobTemplateName())
+                        .withNamespace(oldJob.namespace())
+                        .withStatus(JobHandle.Status.STARTED)
+                        .withAuditInfo(oldJob.auditInfo())
+                        .withStartedAt(System.currentTimeMillis())
+                        .withFinishedAt(oldJob.finishedAt())
+                        .withRuntimeJobTemplate(attemptedRuntimeJobTemplateJson)
+                        .build());
+
+    // The value returned directly by the updater lambda reflects what the caller asked for -
+    // JobMetaService.updateJob() does not re-derive its return value from what was persisted.
+    Assertions.assertEquals(attemptedRuntimeJobTemplateJson, updatedJob.runtimeJobTemplate());
+
+    // What's actually stored must be untouched, regardless of what the lambda tried to write.
+    JobEntity persistedJob =
         JobMetaService.getInstance()
             .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
-    Assertions.assertEquals(
-        updatedRuntimeJobTemplateJson, persistedUpdatedJob.runtimeJobTemplate());
+    Assertions.assertEquals(JobHandle.Status.STARTED, persistedJob.status());
+    Assertions.assertEquals(originalRuntimeJobTemplateJson, persistedJob.runtimeJobTemplate());
   }
 
   @TestTemplate
