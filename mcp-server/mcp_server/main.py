@@ -20,7 +20,19 @@ import logging
 import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
+<<<<<<< HEAD
 from mcp_server.server import GravitinoMCPServer
+=======
+from mcp_server.server import (
+    GravitinoMCPServer,
+    log_service_identity_fallback_policy,
+)
+from mcp_server.tools import SUPPORTED_TOOL_TAGS
+>>>>>>> 32b72866d ([#12530] feat(mcp-server): fetch and refresh OAuth client-credentials tokens (#12531))
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in ("1", "true", "yes")
 
 
 def do_main():
@@ -34,8 +46,19 @@ def do_main():
         token=args.token,
         tls_cert=args.tls_cert,
         tls_key=args.tls_key,
+        oauth_token_endpoint=args.oauth_token_endpoint,
+        oauth_client_id=args.oauth_client_id,
+        oauth_client_secret=args.oauth_client_secret,
+        oauth_scope=args.oauth_scope,
+        no_service_identity_fallback=args.no_service_identity_fallback,
     )
     _init_logging(setting)
+    try:
+        setting.validate_oauth()
+    except ValueError as exc:
+        logging.error("%s", exc)
+        raise SystemExit(1) from None
+    log_service_identity_fallback_policy(setting)
     logging.info("Gravitino MCP server setting: %s", setting)
     server = GravitinoMCPServer(setting)
     server.run()
@@ -120,7 +143,48 @@ def _parse_args():
         "incoming request carries no Authorization header "
         "(per-request identity takes priority). "
         "Can also be set via the GRAVITINO_TOKEN environment variable. "
-        "When omitted, requests are sent without authentication.",
+        "When omitted, requests are sent without authentication. "
+        "Takes precedence over OAuth client-credentials flags.",
+    )
+
+    parser.add_argument(
+        "--oauth-token-endpoint",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_TOKEN_ENDPOINT", ""),
+        help="OAuth2 token endpoint for client-credentials (service identity). "
+        "Requires --oauth-client-id and --oauth-client-secret. "
+        "Can also be set via GRAVITINO_OAUTH_TOKEN_ENDPOINT.",
+    )
+    parser.add_argument(
+        "--oauth-client-id",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_CLIENT_ID", ""),
+        help="OAuth2 client id for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_CLIENT_ID.",
+    )
+    parser.add_argument(
+        "--oauth-client-secret",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_CLIENT_SECRET", ""),
+        help="OAuth2 client secret for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_CLIENT_SECRET.",
+    )
+    parser.add_argument(
+        "--oauth-scope",
+        type=str,
+        default=os.environ.get("GRAVITINO_OAUTH_SCOPE", ""),
+        help="Optional OAuth2 scope for client-credentials. "
+        "Can also be set via GRAVITINO_OAUTH_SCOPE.",
+    )
+
+    parser.add_argument(
+        "--no-service-identity-fallback",
+        action="store_true",
+        default=_env_truthy("GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK"),
+        help="HTTP only: reject incoming requests that omit Authorization "
+        "when OAuth client-credentials or --token is configured, instead of "
+        "using the service identity. Ignored for stdio transport. Can also "
+        "be enabled via GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK.",
     )
 
     parser.add_argument(
