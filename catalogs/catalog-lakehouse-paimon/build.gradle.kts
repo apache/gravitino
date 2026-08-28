@@ -28,6 +28,14 @@ val scalaVersion: String = project.properties["scalaVersion"] as? String ?: extr
 val sparkVersion: String = libs.versions.spark35.get()
 val sparkMajorVersion: String = sparkVersion.substringBeforeLast(".")
 val paimonVersion: String = libs.versions.paimon.get()
+val s3aTestRuntime by configurations.creating {
+  isCanBeConsumed = false
+  isCanBeResolved = true
+}
+
+configurations.testRuntimeOnly {
+  extendsFrom(s3aTestRuntime)
+}
 
 dependencies {
   compileOnly(project(":api"))
@@ -210,10 +218,32 @@ dependencies {
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
 
-  // Hadoop S3A is an optional filesystem for Paimon catalogs.
-  testRuntimeOnly(libs.hadoop3.aws)
+  // Keep optional Hadoop S3A dependencies available only to tests.
+  s3aTestRuntime(libs.hadoop3.aws)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
+
+val s3aTestLibDirectory =
+  "$rootDir/distribution/package-all/catalogs/lakehouse-paimon/libs"
+val copyS3ATestDependencies =
+  tasks.register("copyS3ATestDependencies") {
+    doLast {
+      copy {
+        from(s3aTestRuntime) {
+          include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+        }
+        into(s3aTestLibDirectory)
+      }
+    }
+  }
+val cleanS3ATestDependencies =
+  tasks.register<Delete>("cleanS3ATestDependencies") {
+    delete(
+      fileTree(s3aTestLibDirectory) {
+        include("hadoop-aws-*.jar", "aws-java-sdk-bundle-*.jar")
+      }
+    )
+  }
 
 tasks {
   register("runtimeJars", Copy::class) {
@@ -267,6 +297,11 @@ tasks.test {
     exclude("**/integration/test/**")
   } else {
     dependsOn(tasks.jar)
+  }
+
+  if (project.properties["testMode"] == "deploy") {
+    dependsOn(copyS3ATestDependencies)
+    finalizedBy(cleanS3ATestDependencies)
   }
 }
 
