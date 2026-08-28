@@ -105,10 +105,6 @@ public class CatalogPaimonS3AIT extends BaseIT {
         String.format(
             "http://localhost:%d",
             localStackContainer.getMappedPort(GravitinoLocalStackContainer.PORT)));
-    catalogProperties.put(S3A_PROPERTY_PREFIX + "impl", "org.apache.hadoop.fs.s3a.S3AFileSystem");
-    catalogProperties.put(
-        S3A_PROPERTY_PREFIX + "aws.credentials.provider",
-        "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider");
     catalogProperties.put(S3A_PROPERTY_PREFIX + "path.style.access", "true");
     catalogProperties.put(S3A_PROPERTY_PREFIX + "connection.ssl.enabled", "false");
 

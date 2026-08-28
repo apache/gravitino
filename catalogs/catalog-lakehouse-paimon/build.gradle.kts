@@ -133,7 +133,6 @@ dependencies {
   implementation(libs.hadoop3.mapreduce.client.core) {
     exclude("*")
   }
-  runtimeOnly(libs.hadoop3.aws)
 
   // Required by Paimon HiveCatalog#createView, which calls hive ql metadata Table APIs.
   runtimeOnly(libs.hive2.exec) {
@@ -211,6 +210,8 @@ dependencies {
   testImplementation(libs.testcontainers.localstack)
   testImplementation(libs.testcontainers.mysql)
 
+  // Hadoop S3A is an optional filesystem for Paimon catalogs.
+  testRuntimeOnly(libs.hadoop3.aws)
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
