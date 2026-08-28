@@ -49,6 +49,7 @@ import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
+import org.apache.gravitino.dto.policy.PolicyAssociationSelectorDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
 import org.apache.gravitino.dto.requests.CatalogSetRequest;
 import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
@@ -61,6 +62,7 @@ import org.apache.gravitino.dto.requests.JobTemplateUpdatesRequest;
 import org.apache.gravitino.dto.requests.OwnerSetRequest;
 import org.apache.gravitino.dto.requests.PolicyCreateRequest;
 import org.apache.gravitino.dto.requests.PolicySetRequest;
+import org.apache.gravitino.dto.requests.PolicyTagAddRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdateRequest;
 import org.apache.gravitino.dto.requests.PolicyUpdatesRequest;
 import org.apache.gravitino.dto.requests.PrivilegeGrantRequest;
@@ -86,11 +88,14 @@ import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
 import org.apache.gravitino.dto.responses.NameListResponse;
 import org.apache.gravitino.dto.responses.OwnerResponse;
+import org.apache.gravitino.dto.responses.PolicyForTagAssociationListResponse;
 import org.apache.gravitino.dto.responses.PolicyListResponse;
 import org.apache.gravitino.dto.responses.PolicyResponse;
+import org.apache.gravitino.dto.responses.PolicyTagAssociationResponse;
 import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.dto.responses.RoleResponse;
 import org.apache.gravitino.dto.responses.SetResponse;
+import org.apache.gravitino.dto.responses.TagForPolicyAssociationListResponse;
 import org.apache.gravitino.dto.responses.TagListResponse;
 import org.apache.gravitino.dto.responses.TagResponse;
 import org.apache.gravitino.dto.responses.UserListResponse;
@@ -126,9 +131,11 @@ import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.JobTemplateChange;
 import org.apache.gravitino.job.SupportsJobs;
 import org.apache.gravitino.policy.Policy;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyOperations;
+import org.apache.gravitino.policy.PolicyTagAssociation;
 import org.apache.gravitino.rest.RESTUtils;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretReference;
@@ -727,6 +734,65 @@ public class GravitinoMetalake extends MetalakeDTO
     return resp.dropped();
   }
 
+  @Override
+  public PolicyTagAssociation[] listPolicyAssociationsForTag(String tagName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
+    PolicyForTagAssociationListResponse response =
+        restClient.get(
+            policyTagPath(tagName),
+            ImmutableMap.of("details", "true"),
+            PolicyForTagAssociationListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    response.validate();
+    Tag tag = getTag(tagName);
+    return Arrays.stream(response.getAssociations())
+        .map(
+            association ->
+                new GenericPolicyTagAssociation(
+                    new GenericPolicy(association.getPolicy(), restClient, this.name()),
+                    tag,
+                    association.getSelector().toSelector()))
+        .toArray(PolicyTagAssociation[]::new);
+  }
+
+  @Override
+  public PolicyTagAssociation addPolicyForTag(
+      String tagName, String policyName, PolicyAssociationSelector selector) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyName), "policy name must not be null or empty");
+    PolicyTagAddRequest request =
+        new PolicyTagAddRequest(PolicyAssociationSelectorDTO.fromSelector(selector));
+    PolicyTagAssociationResponse response =
+        restClient.post(
+            policyTagPath(tagName) + "/" + RESTUtils.encodeString(policyName),
+            request,
+            PolicyTagAssociationResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.tagErrorHandler());
+    response.validate();
+    return new GenericPolicyTagAssociation(
+        getPolicy(response.getPolicy()),
+        getTag(response.getTag()),
+        response.getSelector().toSelector());
+  }
+
+  @Override
+  public void removePolicyFromTag(String tagName, String policyName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(tagName), "tag name must not be null or empty");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyName), "policy name must not be null or empty");
+    restClient.delete(
+        policyTagPath(tagName) + "/" + RESTUtils.encodeString(policyName),
+        BaseResponse.class,
+        Collections.emptyMap(),
+        ErrorHandlers.tagErrorHandler());
+  }
+
   /**
    * List all the policies under the current metalake.
    *
@@ -903,6 +969,43 @@ public class GravitinoMetalake extends MetalakeDTO
             ErrorHandlers.policyErrorHandler());
     resp.validate();
     return resp.dropped();
+  }
+
+  @Override
+  public PolicyTagAssociation[] listTagAssociationsForPolicy(String policyName) {
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(policyName), "policy name must not be null or empty");
+    TagForPolicyAssociationListResponse response =
+        restClient.get(
+            tagPolicyPath(policyName),
+            ImmutableMap.of("details", "true"),
+            TagForPolicyAssociationListResponse.class,
+            Collections.emptyMap(),
+            ErrorHandlers.policyErrorHandler());
+    response.validate();
+    Policy policy = getPolicy(policyName);
+    return Arrays.stream(response.getAssociations())
+        .map(
+            association ->
+                new GenericPolicyTagAssociation(
+                    policy,
+                    new GenericTag(association.getTag(), restClient, this.name()),
+                    association.getSelector().toSelector()))
+        .toArray(PolicyTagAssociation[]::new);
+  }
+
+  private String policyTagPath(String tagName) {
+    return String.format(API_METALAKES_TAGS_PATH, RESTUtils.encodeString(this.name()))
+        + "/"
+        + RESTUtils.encodeString(tagName)
+        + "/policies";
+  }
+
+  private String tagPolicyPath(String policyName) {
+    return String.format(API_METALAKES_POLICIES_PATH, RESTUtils.encodeString(this.name()))
+        + "/"
+        + RESTUtils.encodeString(policyName)
+        + "/tags";
   }
 
   /**

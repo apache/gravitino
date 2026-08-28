@@ -71,6 +71,7 @@ public class PolicyManager implements PolicyDispatcher {
 
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
+  private final ObjectPolicyResolver objectPolicyResolver;
 
   public PolicyManager(IdGenerator idGenerator, EntityStore entityStore) {
     if (!(entityStore instanceof SupportsRelationOperations)) {
@@ -83,6 +84,7 @@ public class PolicyManager implements PolicyDispatcher {
 
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
+    this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
   }
 
   @Override
@@ -295,12 +297,10 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
-    return listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject);
+    return objectPolicyResolver.resolve(metalake, metadataObject);
   }
 
   @Override
@@ -393,35 +393,6 @@ public class PolicyManager implements PolicyDispatcher {
       throw new NoSuchMetadataObjectException(
           e, "Failed to get policy for metadata object %s due to not found", metadataObject);
     }
-  }
-
-  private PolicyEntity[] listDirectPoliciesForMetadataObject(
-      NameIdentifier entityIdent, Entity.EntityType entityType, MetadataObject metadataObject) {
-    return TreeLockUtils.doWithTreeLock(
-        entityIdent,
-        LockType.READ,
-        () -> {
-          try {
-            return entityStore
-                .relationOperations()
-                .listEntitiesByRelation(
-                    SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-                    entityIdent,
-                    entityType,
-                    true /* allFields */)
-                .stream()
-                .map(entity -> (PolicyEntity) entity)
-                .toArray(PolicyEntity[]::new);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchMetadataObjectException(
-                e,
-                "Failed to list policies for metadata object %s due to not found",
-                metadataObject);
-          } catch (IOException e) {
-            LOG.error("Failed to list policies for metadata object {}", metadataObject, e);
-            throw new RuntimeException(e);
-          }
-        });
   }
 
   private PolicyEntity getPolicyWithoutLock(String metalake, String policyName) {
