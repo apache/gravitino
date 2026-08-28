@@ -22,12 +22,10 @@ import static org.apache.gravitino.Entity.EntityType.FILESET;
 import static org.apache.gravitino.catalog.PropertiesMetadataHelpers.validatePropertyForCreate;
 import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
@@ -45,9 +43,11 @@ import org.apache.gravitino.file.FilesetChange;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
@@ -256,6 +256,24 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
 
   private Fileset alterFilesetUnderLock(
       NameIdentifier ident, NameIdentifier catalogIdent, FilesetChange... changes) {
+    validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
+    if (usesFilesetCatalogEntityStore(catalogIdent)) {
+      return doWithCatalog(
+          catalogIdent,
+          c -> c.doWithFilesetOps(f -> f.alterFileset(ident, changes)),
+          NoSuchFilesetException.class,
+          IllegalArgumentException.class);
+    }
+    return alterFilesetWithPreparedSecrets(ident, catalogIdent, changes);
+  }
+
+  private boolean usesFilesetCatalogEntityStore(NameIdentifier catalogIdent) {
+    return doWithCatalog(
+        catalogIdent, c -> "fileset".equals(c.catalog().provider()), NoSuchFilesetException.class);
+  }
+
+  private Fileset alterFilesetWithPreparedSecrets(
+      NameIdentifier ident, NameIdentifier catalogIdent, FilesetChange... changes) {
     Fileset currentFileset =
         doWithCatalog(
             catalogIdent,
@@ -274,8 +292,6 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       currentProperties = new HashMap<>();
     }
 
-    validateAlterProperties(ident, HasPropertyMetadata::filesetPropertiesMetadata, changes);
-
     StringIdentifier currentStringId = getStringIdFromProperties(currentProperties);
     long filesetId;
     if (currentStringId != null) {
@@ -286,12 +302,13 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       filesetId = 0L;
     }
 
-    List<SecretMaterial> writtenSecretMaterials = List.of();
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
     boolean alterCommitted = false;
     try {
       Pair<FilesetChange[], List<SecretMaterial>> secretResult =
-          prepareFilesetSecretChanges(currentProperties, filesetId, changes);
-      writtenSecretMaterials = secretResult.getRight();
+          SecretAlterChanges.prepareFilesetChanges(
+              secretManager, currentProperties, filesetId, changes);
+      writtenSecretMaterials.set(secretResult.getRight());
       FilesetChange[] effectiveChanges = secretResult.getLeft();
 
       Fileset altered =
@@ -304,7 +321,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
       return altered;
     } finally {
       if (!alterCommitted) {
-        secretManager.rollbackSecrets(writtenSecretMaterials);
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
       }
     }
   }
@@ -372,55 +389,5 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                 getCatalogIdentifier(ident),
                 c -> c.doWithFilesetOps(f -> f.getFileLocation(ident, subPath, locationName)),
                 NonEmptyEntityException.class));
-  }
-
-  /**
-   * Rewrites fileset changes that involve secrets into plain setProperty / removeProperty, writing
-   * secrets as needed. Rolls back any written materials if preparation fails.
-   *
-   * @param currentProperties current fileset properties (may be null)
-   * @param entityId fileset entity id
-   * @param changes fileset changes
-   * @return effective changes and written write-through materials
-   */
-  private Pair<FilesetChange[], List<SecretMaterial>> prepareFilesetSecretChanges(
-      @Nullable Map<String, String> currentProperties, long entityId, FilesetChange... changes) {
-    Map<String, String> properties =
-        currentProperties == null ? new HashMap<>() : new HashMap<>(currentProperties);
-    List<FilesetChange> out = new ArrayList<>(changes.length);
-    List<SecretMaterial> written = new ArrayList<>();
-    try {
-      for (FilesetChange change : changes) {
-        if (change instanceof FilesetChange.SetSecretBinding) {
-          FilesetChange.SetSecretBinding c = (FilesetChange.SetSecretBinding) change;
-          String urn =
-              secretManager.alterSetSecretBinding(
-                  properties, "fileset", entityId, c.getProperty(), c.getBinding(), written);
-          out.add(FilesetChange.setProperty(c.getProperty(), urn));
-        } else if (change instanceof FilesetChange.SetSecretReference) {
-          FilesetChange.SetSecretReference c = (FilesetChange.SetSecretReference) change;
-          String urn =
-              secretManager.alterSetSecretReference(
-                  properties, "fileset", entityId, c.getProperty(), c.getReference());
-          out.add(FilesetChange.setProperty(c.getProperty(), urn));
-        } else if (change instanceof FilesetChange.SetProperty) {
-          FilesetChange.SetProperty c = (FilesetChange.SetProperty) change;
-          String value =
-              secretManager.alterSetProperty(
-                  properties, "fileset", entityId, c.getProperty(), c.getValue());
-          out.add(FilesetChange.setProperty(c.getProperty(), value));
-        } else if (change instanceof FilesetChange.RemoveProperty) {
-          FilesetChange.RemoveProperty c = (FilesetChange.RemoveProperty) change;
-          secretManager.alterRemoveProperty(properties, "fileset", entityId, c.getProperty());
-          out.add(change);
-        } else {
-          out.add(change);
-        }
-      }
-      return Pair.of(out.toArray(new FilesetChange[0]), List.copyOf(written));
-    } catch (RuntimeException e) {
-      secretManager.rollbackSecrets(written);
-      throw e;
-    }
   }
 }

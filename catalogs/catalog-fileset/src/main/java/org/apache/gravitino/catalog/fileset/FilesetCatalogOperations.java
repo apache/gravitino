@@ -66,6 +66,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -115,7 +116,10 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -679,14 +683,26 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
     }
 
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    boolean alterCommitted = false;
     try {
       FilesetEntity updatedFilesetEntity =
           store.update(
               ident,
               FilesetEntity.class,
               Entity.EntityType.FILESET,
-              e -> updateFilesetEntity(ident, e, changes));
-
+              existing -> {
+                Map<String, String> currentProperties =
+                    existing.properties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.properties());
+                Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+                    SecretAlterChanges.prepareFilesetChanges(
+                        secretManager, currentProperties, existing.id(), changes);
+                writtenSecretMaterials.set(secretResult.getRight());
+                return updateFilesetEntity(ident, existing, secretResult.getLeft());
+              });
+      alterCommitted = true;
       return FilesetImpl.builder()
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())
@@ -703,6 +719,10 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // This is happened when renaming a fileset to an existing fileset name.
       throw new RuntimeException(
           "Fileset with the same name " + ident.name() + " already exists", aee);
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
     }
   }
 
