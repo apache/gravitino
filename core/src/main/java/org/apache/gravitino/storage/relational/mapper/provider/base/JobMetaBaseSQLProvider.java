@@ -138,6 +138,23 @@ public class JobMetaBaseSQLProvider {
         + " AND jrm.deleted_at = 0 AND mm.deleted_at = 0 AND jtm.deleted_at = 0";
   }
 
+  public String updateJobMeta(
+      @Param("newJobMeta") JobPO newJobPO, @Param("oldJobMeta") JobPO oldJobPO) {
+    return "UPDATE "
+        + JobMetaMapper.TABLE_NAME
+        + " SET job_execution_id = #{newJobMeta.jobExecutionId},"
+        + " job_run_status = #{newJobMeta.jobRunStatus},"
+        + " job_started_at = #{newJobMeta.jobStartedAt},"
+        + " job_finished_at = #{newJobMeta.jobFinishedAt},"
+        + " audit_info = #{newJobMeta.auditInfo},"
+        + " current_version = #{newJobMeta.currentVersion},"
+        + " last_version = #{newJobMeta.lastVersion}"
+        + " WHERE job_run_id = #{oldJobMeta.jobRunId}"
+        + " AND current_version = #{oldJobMeta.currentVersion}"
+        + " AND last_version = #{oldJobMeta.lastVersion}"
+        + " AND deleted_at = 0";
+  }
+
   public String softDeleteJobMetaByMetalakeAndTemplate(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {
