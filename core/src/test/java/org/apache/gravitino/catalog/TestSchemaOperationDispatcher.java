@@ -467,6 +467,10 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
                   SecretConstants.ATTR_PROPERTY_KEY, "k2"));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+      Assertions.assertFalse(
+          entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of()));
