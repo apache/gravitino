@@ -29,7 +29,12 @@ class RESTClientFactory:
 
     @classmethod
     def create_rest_client(
-        cls, metalake_name: str, uri: str, authorization: str = ""
+        cls,
+        metalake_name: str,
+        uri: str,
+        authorization: str = "",
+        *,
+        auth=None,
     ) -> "PlainRESTClientOperation":
         """
         Create a new rest client instance with the specified parameters.
@@ -40,11 +45,14 @@ class RESTClientFactory:
             authorization: Full Authorization header value forwarded verbatim
                 (e.g. "Bearer <token>" or "Basic <base64(user:dummy)>").
                 Empty string means anonymous.
+            auth: Optional httpx auth hook. ``None`` for static or anonymous.
 
         Returns:
             New instance of the configured rest client class
         """
-        return cls._rest_client_class(metalake_name, uri, authorization)
+        return cls._rest_client_class(
+            metalake_name, uri, authorization, auth=auth
+        )
 
     @classmethod
     def set_rest_client(cls, rest_client_class: type) -> None:
