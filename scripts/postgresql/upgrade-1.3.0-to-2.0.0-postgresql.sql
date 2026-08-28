@@ -73,6 +73,9 @@ COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relati
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
 
+ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
+COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
+
 CREATE TABLE IF NOT EXISTS semantic_model_meta (
     semantic_model_id BIGINT NOT NULL,
     semantic_model_name VARCHAR(128) NOT NULL,

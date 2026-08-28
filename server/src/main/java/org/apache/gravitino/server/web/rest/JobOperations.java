@@ -518,7 +518,8 @@ public class JobOperations {
         DTOConverters.toDTO(jobEntity.auditInfo()),
         jobEntity.auditInfo().createTime(),
         jobEntity.startedAtAsInstant(),
-        jobEntity.finishedAtAsInstant());
+        jobEntity.finishedAtAsInstant(),
+        DTOConverters.fromRuntimeJobTemplateJson(jobEntity.runtimeJobTemplate(), jobEntity.name()));
   }
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {

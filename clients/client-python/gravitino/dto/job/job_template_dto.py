@@ -97,16 +97,24 @@ class JobTemplateDTO(DataClassJsonMixin, ABC):
             raise ValueError('"executable" is required and cannot be empty')
 
     @classmethod
-    def from_json(
-        cls, s: str, infer_missing: bool = False, **kwargs
+    def from_dict_by_type(
+        cls, data: Dict, infer_missing: bool = False
     ) -> "JobTemplateDTO":
-        """Creates a JobTemplateDTO from a JSON string."""
-        data = json.loads(s)
+        """Creates a JobTemplateDTO from a dict, dispatching to the concrete subclass based
+        on the "jobType" field.
+        """
         job_type = JobType.job_type_deserialize(data.get("jobType"))
         subclass = JOB_TYPE_TEMPLATE_MAPPING.get(job_type)
         if not subclass:
             raise ValueError(f"Unsupported job type: {job_type}")
         return subclass.from_dict(data, infer_missing=infer_missing)
+
+    @classmethod
+    def from_json(
+        cls, s: str, infer_missing: bool = False, **kwargs
+    ) -> "JobTemplateDTO":
+        """Creates a JobTemplateDTO from a JSON string."""
+        return cls.from_dict_by_type(json.loads(s), infer_missing=infer_missing)
 
 
 JOB_TYPE_TEMPLATE_MAPPING: Dict[JobType, Type["JobTemplateDTO"]] = {}

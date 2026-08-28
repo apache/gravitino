@@ -20,6 +20,7 @@ package org.apache.gravitino.dto.util;
 
 import static org.apache.gravitino.rel.expressions.transforms.Transforms.NAME_OF_IDENTITY;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
@@ -97,6 +98,7 @@ import org.apache.gravitino.function.Function;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.job.ShellJobTemplate;
 import org.apache.gravitino.job.SparkJobTemplate;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.messaging.Topic;
 import org.apache.gravitino.model.Model;
 import org.apache.gravitino.model.ModelVersion;
@@ -1410,6 +1412,79 @@ public class DTOConverters {
       default:
         throw new IllegalArgumentException(
             "Unsupported job template type: " + jobTemplateDTO.jobType());
+    }
+  }
+
+  /**
+   * Converts a JobTemplate to a JobTemplateDTO.
+   *
+   * @param jobTemplate The job template to be converted.
+   * @param audit The audit information to attach to the DTO. A bare {@link JobTemplate} carries no
+   *     audit info of its own, so the caller supplies it (e.g. the originating template entity's
+   *     audit info, when serializing a resolved runtime template).
+   * @return The job template DTO.
+   */
+  public static JobTemplateDTO toDTO(JobTemplate jobTemplate, AuditDTO audit) {
+    switch (jobTemplate.jobType()) {
+      case SHELL:
+        ShellJobTemplate shellJobTemplate = (ShellJobTemplate) jobTemplate;
+        return ShellJobTemplateDTO.builder()
+            .withName(shellJobTemplate.name())
+            .withComment(shellJobTemplate.comment())
+            .withJobType(shellJobTemplate.jobType())
+            .withExecutable(shellJobTemplate.executable())
+            .withArguments(shellJobTemplate.arguments())
+            .withEnvironments(shellJobTemplate.environments())
+            .withCustomFields(shellJobTemplate.customFields())
+            .withScripts(shellJobTemplate.scripts())
+            .withAudit(audit)
+            .build();
+
+      case SPARK:
+        SparkJobTemplate sparkJobTemplate = (SparkJobTemplate) jobTemplate;
+        return SparkJobTemplateDTO.builder()
+            .withName(sparkJobTemplate.name())
+            .withComment(sparkJobTemplate.comment())
+            .withJobType(sparkJobTemplate.jobType())
+            .withExecutable(sparkJobTemplate.executable())
+            .withArguments(sparkJobTemplate.arguments())
+            .withEnvironments(sparkJobTemplate.environments())
+            .withCustomFields(sparkJobTemplate.customFields())
+            .withClassName(sparkJobTemplate.className())
+            .withJars(sparkJobTemplate.jars())
+            .withFiles(sparkJobTemplate.files())
+            .withArchives(sparkJobTemplate.archives())
+            .withConfigs(sparkJobTemplate.configs())
+            .withAudit(audit)
+            .build();
+
+      default:
+        throw new IllegalArgumentException(
+            "Unsupported job template type: " + jobTemplate.jobType());
+    }
+  }
+
+  /**
+   * Deserializes a job entity's stored runtime job template JSON, if any, back into a {@link
+   * JobTemplateDTO}. {@link JobTemplateDTO}'s {@code @JsonTypeInfo} handles the Shell/Spark
+   * dispatch automatically.
+   *
+   * @param runtimeJobTemplateJson The serialized runtime job template, or null if the job has none.
+   * @param jobName The name of the job the template belongs to, used in the error message on
+   *     failure.
+   * @return The deserialized job template DTO, or null if runtimeJobTemplateJson is null.
+   */
+  public static JobTemplateDTO fromRuntimeJobTemplateJson(
+      String runtimeJobTemplateJson, String jobName) {
+    if (runtimeJobTemplateJson == null) {
+      return null;
+    }
+
+    try {
+      return JsonUtils.anyFieldMapper().readValue(runtimeJobTemplateJson, JobTemplateDTO.class);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException(
+          String.format("Failed to deserialize the runtime job template for job %s", jobName), e);
     }
   }
 

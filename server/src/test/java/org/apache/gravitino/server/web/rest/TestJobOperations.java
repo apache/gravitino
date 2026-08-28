@@ -47,6 +47,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.dto.job.JobDTO;
 import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.job.ShellJobTemplateDTO;
 import org.apache.gravitino.dto.job.ShellTemplateUpdateDTO;
 import org.apache.gravitino.dto.requests.JobRunRequest;
 import org.apache.gravitino.dto.requests.JobTemplateRegisterRequest;
@@ -1187,6 +1188,44 @@ public class TestJobOperations extends JerseyTest {
     JobDTO jobDTO = JobOperations.toDTO(job);
     Assertions.assertEquals(job.auditInfo().createTime(), jobDTO.queuedAt());
     Assertions.assertNotNull(jobDTO.queuedAt());
+  }
+
+  @Test
+  public void testToDTORuntimeJobTemplate() {
+    // No runtime job template stored (e.g. a job run before this field was introduced) - must
+    // round-trip as null rather than failing to convert.
+    JobEntity jobWithoutTemplate = newJobEntity("shell_template_1", JobHandle.Status.QUEUED);
+    JobDTO jobDTOWithoutTemplate = JobOperations.toDTO(jobWithoutTemplate);
+    Assertions.assertNull(jobDTOWithoutTemplate.runtimeJobTemplate());
+
+    // A stored runtime job template must be deserialized back into a JobTemplateDTO, with
+    // Shell/Spark dispatch handled automatically by JobTemplateDTO's @JsonTypeInfo.
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"shell_template_1\",\"comment\":\"resolved\","
+            + "\"executable\":\"/bin/echo\",\"arguments\":[\"resolved-arg\"]}";
+    JobEntity jobWithTemplate =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-with-template")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_template_1")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    JobDTO jobDTO = JobOperations.toDTO(jobWithTemplate);
+
+    Assertions.assertNotNull(jobDTO.runtimeJobTemplate());
+    Assertions.assertInstanceOf(ShellJobTemplateDTO.class, jobDTO.runtimeJobTemplate());
+    ShellJobTemplateDTO runtimeJobTemplateDTO = (ShellJobTemplateDTO) jobDTO.runtimeJobTemplate();
+    Assertions.assertEquals("shell_template_1", runtimeJobTemplateDTO.name());
+    Assertions.assertEquals("resolved", runtimeJobTemplateDTO.comment());
+    Assertions.assertEquals("/bin/echo", runtimeJobTemplateDTO.executable());
+    Assertions.assertEquals(Lists.newArrayList("resolved-arg"), runtimeJobTemplateDTO.arguments());
   }
 
   private String jobTemplatePath() {

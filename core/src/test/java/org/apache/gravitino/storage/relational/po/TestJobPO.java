@@ -202,7 +202,63 @@ public class TestJobPO {
   }
 
   @Test
+  public void testJobPORuntimeJobTemplateDefaultsToNull() {
+    // runtimeJobTemplate is optional, unlike startedAt/finishedAt - jobs run before this field
+    // was introduced have no resolved template to backfill, so it must round-trip as null when
+    // not set, without JobPO's constructor rejecting it.
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .build();
+
+    JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(1L);
+    JobPO jobPO = JobPO.initializeJobPO(jobEntity, builder);
+    JobEntity resultEntity = JobPO.fromJobPO(jobPO, NamespaceUtil.ofJob("test"));
+
+    Assertions.assertNull(jobPO.runtimeJobTemplate());
+    Assertions.assertNull(resultEntity.runtimeJobTemplate());
+  }
+
+  @Test
+  public void testJobPORuntimeJobTemplate() {
+    // initializeJobPO must trust the resolved template already set on the entity by the caller
+    // (JobManager, at runJob time), and fromJobPO must round-trip it unchanged.
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test-job-template\",\"executable\":\"/bin/echo\"}";
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
+            .build();
+
+    JobPO.JobPOBuilder builder = JobPO.builder().withMetalakeId(1L);
+    JobPO jobPO = JobPO.initializeJobPO(jobEntity, builder);
+    JobEntity resultEntity = JobPO.fromJobPO(jobPO, NamespaceUtil.ofJob("test"));
+
+    Assertions.assertEquals(runtimeJobTemplateJson, jobPO.runtimeJobTemplate());
+    Assertions.assertEquals(runtimeJobTemplateJson, resultEntity.runtimeJobTemplate());
+  }
+
+  @Test
   public void testUpdateJobPO() {
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"test-job-template\",\"executable\":\"/bin/echo\"}";
     JobEntity oldEntity =
         JobEntity.builder()
             .withId(1L)
@@ -214,6 +270,7 @@ public class TestJobPO {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .withStartedAt(0L)
             .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
             .build();
 
     JobPO.JobPOBuilder initBuilder = JobPO.builder().withMetalakeId(1L);
@@ -229,7 +286,9 @@ public class TestJobPO {
             .build();
 
     // Deliberately try to change jobTemplateName - updateJobPO must ignore it and keep the old
-    // PO's value, since a job's template is immutable once the job is created.
+    // PO's value, since a job's template is immutable once the job is created. Likewise omit
+    // runtimeJobTemplate from newEntity - updateJobPO must carry forward the old PO's value since
+    // the resolved runtime template is fixed at job creation and never changes.
     JobEntity newEntity =
         JobEntity.builder()
             .withId(oldEntity.id())
@@ -251,6 +310,7 @@ public class TestJobPO {
     Assertions.assertEquals(JobHandle.Status.STARTED.name(), newJobPO.jobRunStatus());
     Assertions.assertEquals(startedAt, newJobPO.jobStartedAt());
     Assertions.assertEquals(0L, newJobPO.jobFinishedAt());
+    Assertions.assertEquals(runtimeJobTemplateJson, newJobPO.runtimeJobTemplate());
     Assertions.assertEquals(oldJobPO.currentVersion() + 1, newJobPO.currentVersion());
     Assertions.assertEquals(oldJobPO.lastVersion() + 1, newJobPO.lastVersion());
 
@@ -258,6 +318,7 @@ public class TestJobPO {
     Assertions.assertEquals(JobHandle.Status.STARTED, resultEntity.status());
     Assertions.assertEquals(startedAt, resultEntity.startedAt());
     Assertions.assertEquals("test-job-template", resultEntity.jobTemplateName());
+    Assertions.assertEquals(runtimeJobTemplateJson, resultEntity.runtimeJobTemplate());
     Assertions.assertEquals(
         updatedAuditInfo.lastModifier(), resultEntity.auditInfo().lastModifier());
   }

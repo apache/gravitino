@@ -23,7 +23,10 @@ import java.time.Instant;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.annotation.DeveloperApi;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
+import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.meta.JobEntity;
 
 /**
@@ -44,19 +47,23 @@ public final class JobInfo {
 
   private final Instant finishedAt;
 
+  private final JobTemplate runtimeJobTemplate;
+
   private JobInfo(
       String jobId,
       String jobTemplateName,
       JobHandle.Status jobStatus,
       Audit audit,
       Instant startedAt,
-      Instant finishedAt) {
+      Instant finishedAt,
+      JobTemplate runtimeJobTemplate) {
     this.jobId = jobId;
     this.jobTemplateName = jobTemplateName;
     this.jobStatus = jobStatus;
     this.audit = audit;
     this.startedAt = startedAt;
     this.finishedAt = finishedAt;
+    this.runtimeJobTemplate = runtimeJobTemplate;
   }
 
   /**
@@ -72,7 +79,18 @@ public final class JobInfo {
         jobEntity.status(),
         jobEntity.auditInfo(),
         jobEntity.startedAtAsInstant(),
-        jobEntity.finishedAtAsInstant());
+        jobEntity.finishedAtAsInstant(),
+        toRuntimeJobTemplate(jobEntity));
+  }
+
+  /**
+   * Deserializes the job entity's stored runtime job template JSON, if any, back into a {@link
+   * JobTemplate}.
+   */
+  private static JobTemplate toRuntimeJobTemplate(JobEntity jobEntity) {
+    JobTemplateDTO runtimeJobTemplateDTO =
+        DTOConverters.fromRuntimeJobTemplateJson(jobEntity.runtimeJobTemplate(), jobEntity.name());
+    return runtimeJobTemplateDTO == null ? null : DTOConverters.fromDTO(runtimeJobTemplateDTO);
   }
 
   /**
@@ -139,5 +157,16 @@ public final class JobInfo {
   @Nullable
   public Instant finishedAt() {
     return finishedAt;
+  }
+
+  /**
+   * Returns the resolved job template that was actually submitted for execution, with placeholders
+   * replaced and referenced files downloaded.
+   *
+   * @return the runtime job template, or null for jobs run before this field was introduced
+   */
+  @Nullable
+  public JobTemplate runtimeJobTemplate() {
+    return runtimeJobTemplate;
   }
 }
