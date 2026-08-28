@@ -51,7 +51,7 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFac
 public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = Logger.get(GravitinoConnectorFactory.class);
-  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
+  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 440;
   private static final int MAX_SUPPORT_TRINO_SPI_VERSION = Integer.MAX_VALUE;
   private static final Pattern TRINO_SPI_VERSION_PATTERN = Pattern.compile("^(\\d+)");
   private static final Set<String> SECURITY_SENSITIVE_PROPERTY_SUFFIXES =
