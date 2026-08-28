@@ -533,6 +533,15 @@ public class JobManager implements JobOperationDispatcher {
   }
 
   private JobEntity toCancellingJobEntity(JobEntity latestJobEntity) {
+    // The external cancel call happens before this locked update, so a concurrent status poll
+    // can persist a terminal status (or another cancelJob() call can already have moved the job
+    // to CANCELLING) in the gap between the pre-cancel snapshot and this re-fetch. Never regress
+    // the latest entity out of a terminal state, or overwrite an already-CANCELLING one.
+    if (isFinishedStatus(latestJobEntity.status())
+        || latestJobEntity.status() == JobHandle.Status.CANCELLING) {
+      return latestJobEntity;
+    }
+
     return JobEntity.builder()
         .withId(latestJobEntity.id())
         .withJobExecutionId(latestJobEntity.jobExecutionId())

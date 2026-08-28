@@ -629,6 +629,70 @@ public class TestJobManager {
   }
 
   @Test
+  public void testCancelJobDoesNotRegressConcurrentlyFinishedJob() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    // getJob() observes the job as QUEUED (active), so the external cancel call fires. But by
+    // the time entityStore.update() re-fetches the entity, a concurrent status poll has already
+    // persisted a terminal status - that must not be regressed back to CANCELLING.
+    JobEntity queuedSnapshot = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    when(jobManager.getJob(metalake, queuedSnapshot.name())).thenReturn(queuedSnapshot);
+    doNothing().when(jobExecutor).cancelJob(queuedSnapshot.jobExecutionId());
+
+    JobEntity latestSucceeded =
+        JobEntity.builder()
+            .withId(queuedSnapshot.id())
+            .withJobExecutionId(queuedSnapshot.jobExecutionId())
+            .withNamespace(queuedSnapshot.namespace())
+            .withJobTemplateName(queuedSnapshot.jobTemplateName())
+            .withStatus(JobHandle.Status.SUCCEEDED)
+            .withAuditInfo(queuedSnapshot.auditInfo())
+            .withStartedAt(12345L)
+            .withFinishedAt(67890L)
+            .build();
+    stubEntityStoreUpdateToApply(latestSucceeded);
+
+    JobEntity result = jobManager.cancelJob(metalake, queuedSnapshot.name());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, result.status());
+    Assertions.assertEquals(12345L, result.startedAt());
+    Assertions.assertEquals(67890L, result.finishedAt());
+  }
+
+  @Test
+  public void testCancelJobDoesNotRegressAlreadyCancellingJob() throws IOException {
+    mockedMetalake
+        .when(() -> MetalakeManager.checkMetalake(metalakeIdent, entityStore))
+        .thenAnswer(a -> null);
+
+    // A concurrent cancelJob() call already moved the job to CANCELLING between the getJob()
+    // snapshot and this update; re-applying CANCELLING here must not stamp a fresh
+    // lastModifiedTime over the entity the other writer already wrote.
+    JobEntity queuedSnapshot = newJobEntity("shell_job", JobHandle.Status.QUEUED);
+    when(jobManager.getJob(metalake, queuedSnapshot.name())).thenReturn(queuedSnapshot);
+    doNothing().when(jobExecutor).cancelJob(queuedSnapshot.jobExecutionId());
+
+    JobEntity latestCancelling =
+        JobEntity.builder()
+            .withId(queuedSnapshot.id())
+            .withJobExecutionId(queuedSnapshot.jobExecutionId())
+            .withNamespace(queuedSnapshot.namespace())
+            .withJobTemplateName(queuedSnapshot.jobTemplateName())
+            .withStatus(JobHandle.Status.CANCELLING)
+            .withAuditInfo(queuedSnapshot.auditInfo())
+            .withStartedAt(12345L)
+            .withFinishedAt(0L)
+            .build();
+    stubEntityStoreUpdateToApply(latestCancelling);
+
+    JobEntity result = jobManager.cancelJob(metalake, queuedSnapshot.name());
+    Assertions.assertEquals(JobHandle.Status.CANCELLING, result.status());
+    Assertions.assertEquals(12345L, result.startedAt());
+    Assertions.assertEquals(0L, result.finishedAt());
+  }
+
+  @Test
   public void testPullJobStatus() throws IOException {
     JobEntity job = newJobEntity("shell_job", JobHandle.Status.QUEUED);
     BaseMetalake mockMetalake =
