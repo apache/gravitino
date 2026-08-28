@@ -1585,6 +1585,16 @@ public class TestCatalogManager {
               .get(PROPERTY_KEY4);
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+
+      manager.alterCatalog(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
+      Assertions.assertFalse(
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .containsKey(PROPERTY_KEY4));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+
       Assertions.assertTrue(manager.dropCatalog(ident, true));
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
