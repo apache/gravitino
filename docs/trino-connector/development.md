@@ -309,7 +309,7 @@ If a compile error occurs due to `The following artifacts could not be resolved:
    ```
 
    :::note
-   Remove `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not listed in `plugin.bundles`.
+   Remove `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not listed in `plugin.bundles`. For the Hive plugin, use `plugin/trino-hive/pom.xml`.
    :::
 
 8. Start the Trino server and connect to the Gravitino server.
