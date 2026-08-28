@@ -383,26 +383,31 @@ public class TestJobMetaService extends TestJDBCBackend {
     Assertions.assertEquals(
         updatedRuntimeJobTemplateJson, retrievedOverwrittenJob.runtimeJobTemplate());
 
-    // updateJob() must also carry the runtime job template forward unchanged, since it is fixed
-    // at job creation - this exercises the JobPO.updateJobPO() path rather than insertJob()'s
+    // updateJob() must also carry the runtime job template forward unchanged in what gets
+    // persisted, even if the caller's updater lambda omits it (mirroring jobTemplateName, which
+    // JobPO.updateJobPO() also always carries forward from the old PO regardless of what the
+    // lambda produces) - this exercises the JobPO.updateJobPO() path rather than insertJob()'s
     // overwrite path above.
-    JobEntity updatedJob =
+    JobMetaService.getInstance()
+        .updateJob(
+            NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
+            (JobEntity oldJob) ->
+                JobEntity.builder()
+                    .withId(oldJob.id())
+                    .withJobExecutionId(oldJob.jobExecutionId())
+                    .withJobTemplateName(oldJob.jobTemplateName())
+                    .withNamespace(oldJob.namespace())
+                    .withStatus(JobHandle.Status.SUCCEEDED)
+                    .withAuditInfo(oldJob.auditInfo())
+                    .withStartedAt(oldJob.startedAt())
+                    .withFinishedAt(System.currentTimeMillis())
+                    .build());
+
+    JobEntity persistedUpdatedJob =
         JobMetaService.getInstance()
-            .updateJob(
-                NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()),
-                (JobEntity oldJob) ->
-                    JobEntity.builder()
-                        .withId(oldJob.id())
-                        .withJobExecutionId(oldJob.jobExecutionId())
-                        .withJobTemplateName(oldJob.jobTemplateName())
-                        .withNamespace(oldJob.namespace())
-                        .withStatus(JobHandle.Status.SUCCEEDED)
-                        .withAuditInfo(oldJob.auditInfo())
-                        .withStartedAt(oldJob.startedAt())
-                        .withFinishedAt(System.currentTimeMillis())
-                        .build());
+            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
     Assertions.assertEquals(
-        updatedRuntimeJobTemplateJson, updatedJob.runtimeJobTemplate());
+        updatedRuntimeJobTemplateJson, persistedUpdatedJob.runtimeJobTemplate());
   }
 
   @TestTemplate
@@ -467,65 +472,6 @@ public class TestJobMetaService extends TestJDBCBackend {
             JobMetaService.getInstance()
                 .updateJob(
                     NameIdentifierUtil.ofJob(METALAKE_NAME, JobHandle.JOB_ID_PREFIX), e -> e));
-=======
-    String runtimeJobTemplateJson =
-        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\"}";
-    JobEntity job =
-        JobEntity.builder()
-            .withId(RandomIdGenerator.INSTANCE.nextId())
-            .withJobExecutionId("job-execution-runtime-template")
-            .withJobTemplateName(jobTemplate.name())
-            .withStatus(JobHandle.Status.QUEUED)
-            .withNamespace(NamespaceUtil.ofJob(METALAKE_NAME))
-            .withAuditInfo(AUDIT_INFO)
-            .withStartedAt(0L)
-            .withFinishedAt(0L)
-            .withRuntimeJobTemplate(runtimeJobTemplateJson)
-            .build();
-    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(job, false));
-
-    JobEntity retrievedJob =
-        JobMetaService.getInstance()
-            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, job.name()));
-    Assertions.assertEquals(runtimeJobTemplateJson, retrievedJob.runtimeJobTemplate());
-    Assertions.assertEquals(job, retrievedJob);
-
-    // A job inserted without a runtime job template (e.g. a row from before this field existed)
-    // must round-trip as null rather than failing to insert/select.
-    JobEntity jobWithoutTemplate =
-        TestJobTemplateMetaService.newJobEntity(
-            jobTemplate.name(), JobHandle.Status.QUEUED, METALAKE_NAME);
-    Assertions.assertDoesNotThrow(
-        () -> JobMetaService.getInstance().insertJob(jobWithoutTemplate, false));
-    JobEntity retrievedJobWithoutTemplate =
-        JobMetaService.getInstance()
-            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobWithoutTemplate.name()));
-    Assertions.assertNull(retrievedJobWithoutTemplate.runtimeJobTemplate());
-
-    // Overwriting a job must also overwrite its stored runtime job template.
-    String updatedRuntimeJobTemplateJson =
-        "{\"jobType\":\"shell\",\"name\":\"test_job_template\",\"executable\":\"/bin/echo\","
-            + "\"arguments\":[\"resolved\"]}";
-    JobEntity jobOverwrite =
-        JobEntity.builder()
-            .withId(job.id())
-            .withJobExecutionId(job.jobExecutionId())
-            .withStatus(JobHandle.Status.STARTED)
-            .withNamespace(job.namespace())
-            .withAuditInfo(job.auditInfo())
-            .withJobTemplateName(job.jobTemplateName())
-            .withStartedAt(System.currentTimeMillis())
-            .withFinishedAt(0L)
-            .withRuntimeJobTemplate(updatedRuntimeJobTemplateJson)
-            .build();
-    Assertions.assertDoesNotThrow(() -> JobMetaService.getInstance().insertJob(jobOverwrite, true));
-
-    JobEntity retrievedOverwrittenJob =
-        JobMetaService.getInstance()
-            .getJobByIdentifier(NameIdentifierUtil.ofJob(METALAKE_NAME, jobOverwrite.name()));
-    Assertions.assertEquals(
-        updatedRuntimeJobTemplateJson, retrievedOverwrittenJob.runtimeJobTemplate());
->>>>>>> 8b9c558e1 ([#12676] feat(job): Persist and expose the resolved runtime job template)
   }
 
   @Test
