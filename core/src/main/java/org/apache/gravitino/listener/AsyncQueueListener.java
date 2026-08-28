@@ -53,6 +53,7 @@ public class AsyncQueueListener implements EventListenerPlugin {
   private final AtomicBoolean stopped = new AtomicBoolean(false);
   private final AtomicLong dropEventCounters = new AtomicLong(0);
   private final AtomicLong lastDropEventCounters = new AtomicLong(0);
+  private final Object dropEventLogLock = new Object();
   private Instant lastRecordDropEventTime = Instant.EPOCH;
   private final String asyncQueueListenerName;
   private final int highWatermarkThreshold;
@@ -144,22 +145,26 @@ public class AsyncQueueListener implements EventListenerPlugin {
   }
 
   private void logDropEventsIfNecessary() {
-    long currentDropEvents = dropEventCounters.incrementAndGet();
-    long lastDropEvents = lastDropEventCounters.get();
-    // dropEvents may less than zero in such conditions:
-    // 1. Thread A increment dropEventCounters
-    // 2. Thread B increment dropEventCounters and update lastDropEventCounters
-    // 3. Thread A get lastDropEventCounters
-    long dropEvents = currentDropEvents - lastDropEvents;
-    if (dropEvents > 0 && Instant.now().isAfter(lastRecordDropEventTime.plusSeconds(60))) {
-      if (lastDropEventCounters.compareAndSet(lastDropEvents, currentDropEvents)) {
-        LOG.warn(
-            "{} drop {} events since {}",
-            asyncQueueListenerName,
-            dropEvents,
-            lastRecordDropEventTime);
-        lastRecordDropEventTime = Instant.now();
+    long dropEventsToLog = 0;
+    Instant previousRecordTime = null;
+    synchronized (dropEventLogLock) {
+      long currentDropEvents = dropEventCounters.incrementAndGet();
+      long lastDropEvents = lastDropEventCounters.get();
+      long dropEvents = currentDropEvents - lastDropEvents;
+      Instant now = Instant.now();
+      if (dropEvents > 0 && now.isAfter(lastRecordDropEventTime.plusSeconds(60))) {
+        lastDropEventCounters.set(currentDropEvents);
+        dropEventsToLog = dropEvents;
+        previousRecordTime = lastRecordDropEventTime;
+        lastRecordDropEventTime = now;
       }
+    }
+    if (dropEventsToLog > 0) {
+      LOG.warn(
+          "{} drop {} events since {}",
+          asyncQueueListenerName,
+          dropEventsToLog,
+          previousRecordTime);
     }
   }
 
