@@ -2198,6 +2198,30 @@ public class TestJcasbinAuthorizer {
   }
 
   @Test
+  public void testHasSetOwnerPermissionAllowsSchemaAndCatalogOwner() throws Exception {
+    MetadataObject metalakeObject =
+        MetadataObjects.of(ImmutableList.of(METALAKE), MetadataObject.Type.METALAKE);
+    metadataIdConverterMockedStatic
+        .when(() -> MetadataIdConverter.getID(eq(metalakeObject), eq(METALAKE)))
+        .thenReturn(Optional.of(USER_METALAKE_ID));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("SCHEMA")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    when(ownerMetaMapper.selectOwnerByMetadataObjectIdAndType(eq(CATALOG_ID), eq("CATALOG")))
+        .thenReturn(new OwnerInfo(USER_ID, "USER"));
+    getOwnerRelCache(jcasbinAuthorizer).invalidateAll();
+
+    try {
+      assertTrue(
+          jcasbinAuthorizer.hasSetOwnerPermission(
+              METALAKE, "SCHEMA", "testCatalog.testSchema", new AuthorizationRequestContext()));
+    } finally {
+      metadataIdConverterMockedStatic
+          .when(() -> MetadataIdConverter.getID(eq(metalakeObject), eq(METALAKE)))
+          .thenReturn(Optional.of(CATALOG_ID));
+    }
+  }
+
+  @Test
   public void testHasSetOwnerPermissionRejectsDenyUseCatalogForTableOwner() throws Exception {
     makeCompletableFutureUseCurrentThread(jcasbinAuthorizer);
 
