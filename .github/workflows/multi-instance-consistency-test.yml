@@ -91,6 +91,9 @@ jobs:
           # about a second and never spends this, so a generous value buys
           # resilience to CI scheduling hiccups at no cost on green runs.
           AWAIT_TIMEOUT_SECS: 30
+          # Every cacheable entity type must expose a warm stale value in at
+          # least one round before its target converges through the change log.
+          PER_TYPE_STALE_CONTROL_ROUNDS: 3
           RUN_RESTART_TEST: true
         run: bash dev/ci/test_multi_instance_entity_cache_consistency.sh
 

@@ -29,14 +29,16 @@
 # Step 3 retries instead of sleeping for a fixed interval. Every consistency
 # assertion here is positive ("the target eventually converges"), so retrying
 # can only remove timing flakiness, never mask a regression: a cache that is
-# never invalidated still fails when the deadline expires. The one exception is
-# the stale-read control below, which asserts a *negative* and therefore must
-# read at a fixed instant.
+# never invalidated still fails when the deadline expires. The exceptions are
+# the stale-read controls, which assert a *negative* and therefore read at a
+# fixed instant across several rounds.
 #
-# The stale-read control section is what makes the rest of the suite meaningful.
-# Without it, a run with the entity cache switched off would pass every case
-# while proving nothing, because "B serves the new value" is also what an
-# uncached B does. The control proves B really did hold a stale copy first.
+# The stale-read controls are what make the rest of the suite meaningful.
+# Without them, a run with the entity cache switched off for one entity type
+# would pass that type's convergence cases while proving nothing, because "B
+# serves the new value" is also what an uncached B does. Every cacheable type
+# therefore has a repeated negative control that proves the target really held
+# a stale copy first; a reverse TAG control proves the same for node A.
 #
 # Assertions on externally backed entities need care. For Iceberg tables/views/
 # schemas and Kafka topics, a load merges live catalog state with the stored
@@ -51,17 +53,18 @@
 #
 # Two properties of that field drive how the cases are written. It is null until
 # the first alter (creation sets only creator and createTime), so each such
-# section primes it once before the case starts. And it is unusable across a
-# same-name recreate, where the reloaded entity comes back null; see the note in
-# the TABLE recreate case.
+# section primes it once before the case starts. And it is unreliable across a
+# same-name recreate: tables, views, and schemas can reload with an empty audit
+# block. Those recreate scenarios are external-backend E2E checks, not cache
+# assertions; the type-level alter controls prove their entity caches instead.
 #
 # Covered cache entity types and mutations:
 #   METALAKE  alter, rename, disable/enable, drop
 #   CATALOG   alter, rename, disable/enable, drop
-#   SCHEMA    alter, rapid alters, drop/recreate, cascade drop, multi-level hierarchy
+#   SCHEMA    alter, rapid alters, cascade drop, multi-level hierarchy
 #   TABLE     alter (rename/drop/recreate are external-backend E2E only; see their notes)
 #   TOPIC     alter (drop is external-backend E2E only)
-#   VIEW      alter, drop/recreate (rename is external-backend E2E only)
+#   VIEW      alter (rename/drop/recreate are external-backend E2E only)
 #   FILESET   alter, rename, drop
 #   TAG       alter, rename, drop
 #   POLICY    alter, rename, disable/enable, drop
@@ -93,6 +96,11 @@ AWAIT_INTERVAL_SECS="${AWAIT_INTERVAL_SECS:-0.2}"
 # interval); several rounds make a false alarm negligible while still failing
 # hard when no round ever sees a stale value.
 STALE_CONTROL_ROUNDS="${STALE_CONTROL_ROUNDS:-5}"
+# Each cacheable entity type gets its own warm-cache proof. Repeating the
+# immediate stale read makes the proof tolerant of the poller occasionally
+# winning the mutation/read race without allowing a cold or bypassed cache to
+# pass: a cold target observes the new value in every round.
+PER_TYPE_STALE_CONTROL_ROUNDS="${PER_TYPE_STALE_CONTROL_ROUNDS:-3}"
 RUN_RESTART_TEST="${RUN_RESTART_TEST:-false}"
 
 SUFFIX="$(date +%s)_$$"
@@ -145,7 +153,10 @@ RESTART_TAG="restart_tag_${SUFFIX}"
 PASS=0
 FAIL=0
 CONSISTENCY_CASES=0
+CACHE_PROOF_CASES=0
+EXPECTED_CACHE_PROOF_CASES=11
 FAILED_TESTS=()
+CACHE_PROOFS=()
 HTTP_CODE=""
 RESPONSE_BODY=""
 JOB_ID=""
@@ -360,6 +371,120 @@ read_field() {
   printf '%s' "$RESPONSE_BODY" | jq -r "$filter" 2>/dev/null
 }
 
+record_cache_proof() {
+  CACHE_PROOF_CASES=$((CACHE_PROOF_CASES + 1))
+  CACHE_PROOFS+=("$1")
+  pass "$1: target served a warm stale entry before change-log invalidation"
+}
+
+# stale_value_control <description> <direction> <source> <target> <method>
+#   <mutation_path> <read_path> <filter> <original_value> <body_template>
+#   <probe_prefix>
+#
+# Proves that a native entity type is really cached on the target node. The
+# body template must contain __VALUE__; the last round restores original_value
+# so the regular lifecycle cases can retain their simple, readable baselines.
+stale_value_control() {
+  local desc="$1" direction="$2" source="$3" target="$4" method="$5"
+  local mutation_path="$6" read_path="$7" filter="$8" original_value="$9"
+  local body_template="${10}" probe_prefix="${11}"
+  local current_value="$original_value" new_value body observed round
+  local stale_observed=0
+
+  consistency_case "$desc"
+  for round in $(seq 1 "$PER_TYPE_STALE_CONTROL_ROUNDS"); do
+    if ((round == PER_TYPE_STALE_CONTROL_ROUNDS)); then
+      new_value="$original_value"
+    else
+      new_value="${probe_prefix}-v${round}"
+    fi
+
+    prewarm_value "${direction} round ${round}: target caches ${current_value}" \
+      "$target" "$read_path" "$filter" "$current_value"
+    body="${body_template//__VALUE__/$new_value}"
+    api "$source" "$method" "$mutation_path" "$body"
+    expect_http "${direction} round ${round}: source changes value to ${new_value}" 200
+    CASE_MUTATION_STARTED=true
+
+    observed=$(read_field "$target" "$read_path" "$filter")
+    if [[ "$observed" == "$current_value" ]]; then
+      stale_observed=$((stale_observed + 1))
+      printf '    %s round %d: target still served cached %s\n' \
+        "$direction" "$round" "$current_value"
+    else
+      printf '    %s round %d: target already served %s (poller won the race)\n' \
+        "$direction" "$round" "$observed"
+    fi
+
+    await_value "${direction} round ${round}: target converges on ${new_value}" \
+      "$target" "$read_path" "$filter" "$new_value"
+    current_value="$new_value"
+  done
+
+  if ((stale_observed > 0)); then
+    record_cache_proof "$direction $desc"
+  else
+    fail "$direction $desc never served a stale value in ${PER_TYPE_STALE_CONTROL_ROUNDS} rounds — the target may be cold or bypassing this entity cache"
+  fi
+}
+
+# stale_changed_control <description> <direction> <source> <target> <method>
+#   <mutation_path> <read_path> <audit_filter> <body_template> <probe_prefix>
+#   <final_value>
+#
+# Externally backed fields come from the catalog and can change while the
+# Gravitino entity cache is cold. This variant observes an entity-store audit
+# field instead: the immediate read must retain the old audit in at least one
+# round, and every round must later move after the poller invalidates the key.
+stale_changed_control() {
+  local desc="$1" direction="$2" source="$3" target="$4" method="$5"
+  local mutation_path="$6" read_path="$7" audit_filter="$8"
+  local body_template="$9" probe_prefix="${10}" final_value="${11}"
+  local baseline new_value body observed round
+  local stale_observed=0
+
+  consistency_case "$desc"
+  for round in $(seq 1 "$PER_TYPE_STALE_CONTROL_ROUNDS"); do
+    prewarm_http "${direction} round ${round}: target loads the entity before mutation" \
+      "$target" "$read_path" 200
+    baseline=$(read_field "$target" "$read_path" "$audit_filter")
+    if [[ -z "$baseline" || "$baseline" == "null" ]]; then
+      fail "${direction} $desc round ${round}: no audit baseline at ${audit_filter}"
+      CASE_MUTATION_STARTED=true
+      continue
+    fi
+
+    if ((round == PER_TYPE_STALE_CONTROL_ROUNDS)); then
+      new_value="$final_value"
+    else
+      new_value="${probe_prefix}-v${round}"
+    fi
+    body="${body_template//__VALUE__/$new_value}"
+    api "$source" "$method" "$mutation_path" "$body"
+    expect_http "${direction} round ${round}: source changes the external entity" 200
+    CASE_MUTATION_STARTED=true
+
+    observed=$(read_field "$target" "$read_path" "$audit_filter")
+    if [[ "$observed" == "$baseline" ]]; then
+      stale_observed=$((stale_observed + 1))
+      printf '    %s round %d: target still served cached audit %s\n' \
+        "$direction" "$round" "$baseline"
+    else
+      printf '    %s round %d: target audit already moved to %s (poller won the race)\n' \
+        "$direction" "$round" "$observed"
+    fi
+
+    await_changed "${direction} round ${round}: target reloads the changed entity" \
+      "$target" "$read_path" "$audit_filter" "$baseline"
+  done
+
+  if ((stale_observed > 0)); then
+    record_cache_proof "$direction $desc"
+  else
+    fail "$direction $desc never served a stale audit in ${PER_TYPE_STALE_CONTROL_ROUNDS} rounds — the target may be cold or bypassing this entity cache"
+  fi
+}
+
 consistency_case() {
   CONSISTENCY_CASES=$((CONSISTENCY_CASES + 1))
   CASE_PREWARMED=false
@@ -455,6 +580,13 @@ for command_name in curl jq; do
   fi
 done
 
+if [[ "$PER_TYPE_STALE_CONTROL_ROUNDS" =~ ^[0-9]+$ ]] \
+  && ((PER_TYPE_STALE_CONTROL_ROUNDS >= 2)); then
+  pass "per-type stale control runs at least twice"
+else
+  fail "PER_TYPE_STALE_CONTROL_ROUNDS must be an integer >= 2"
+fi
+
 api "$INSTANCE_A" GET /api/version
 expect_http "instance A is reachable" 200
 api "$INSTANCE_B" GET /api/version
@@ -467,6 +599,14 @@ fi
 section "METALAKE cache: alter, rename, disable/enable, and drop"
 mutate_a "create lifecycle metalake on A" POST /api/metalakes \
   "{\"name\":\"${LIFECYCLE_METALAKE}\",\"comment\":\"metalake-old\",\"properties\":{}}"
+
+stale_value_control "METALAKE cache residency" "METALAKE A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${LIFECYCLE_METALAKE}" \
+  "/api/metalakes/${LIFECYCLE_METALAKE}" \
+  '.metalake.comment' metalake-old \
+  '{"updates":[{"@type":"updateComment","newComment":"__VALUE__"}]}' \
+  metalake-proof
 
 consistency_case "METALAKE alter propagates A -> B"
 prewarm_value "B caches the old metalake before A alters it" "$INSTANCE_B" \
@@ -590,7 +730,7 @@ for round in $(seq 1 "$STALE_CONTROL_ROUNDS"); do
 done
 
 if ((STALE_OBSERVED > 0)); then
-  pass "B served a stale cached value in ${STALE_OBSERVED}/${STALE_CONTROL_ROUNDS} rounds (entity cache is live)"
+  record_cache_proof "TAG A -> B cache residency (${STALE_OBSERVED}/${STALE_CONTROL_ROUNDS} stale rounds)"
 else
   fail "B never served a stale value in ${STALE_CONTROL_ROUNDS} rounds — the entity cache is not caching, so every convergence assertion in this suite is vacuous"
 fi
@@ -600,6 +740,14 @@ mutate_a "drop stale-read control tag" DELETE "/api/metalakes/${MAIN_METALAKE}/t
 section "CATALOG cache: alter, rename, disable/enable, rebuild, and drop"
 mutate_a "create lifecycle catalog on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" \
   "{\"name\":\"${LIFECYCLE_CATALOG}\",\"type\":\"FILESET\",\"comment\":\"catalog-old\",\"properties\":{\"disable-filesystem-ops\":\"true\"}}"
+
+stale_value_control "CATALOG cache residency" "CATALOG A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${LIFECYCLE_CATALOG}" \
+  '.catalog.comment' catalog-old \
+  '{"updates":[{"@type":"updateComment","newComment":"__VALUE__"}]}' \
+  catalog-proof
 
 consistency_case "CATALOG alter propagates A -> B"
 prewarm_value "B caches the old catalog before A alters it" "$INSTANCE_B" \
@@ -687,13 +835,13 @@ mutate_a "create Kafka catalog" POST "/api/metalakes/${MAIN_METALAKE}/catalogs" 
 # assertions would hold even with the cache disabled. The audit block is served
 # by the entity store (EntityCombined*#auditInfo() lets the entity's audit
 # overwrite the catalog's), so it is the only field here that can prove B
-# stopped serving a cached entity. Alters bump audit.lastModifiedTime and a
-# same-name recreate produces a new audit.createTime. Cache consistency cases
-# therefore pair their catalog-side assertion with an audit-side one; operations
-# without a reliable audit signal are labeled as external-backend E2E checks.
+# stopped serving a cached entity. Alters bump audit.lastModifiedTime, so cache
+# consistency cases pair their catalog-side assertion with an audit-side one.
+# Same-name recreates can return an empty audit block and are therefore labeled
+# as external-backend E2E checks rather than cache assertions.
 # ---------------------------------------------------------------------------
 
-section "SCHEMA cache: alter and drop/recreate"
+section "SCHEMA cache: alter; external-backend recreate E2E"
 mutate_a "create Iceberg schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas" \
   "{\"name\":\"${SCHEMA_NAME}\",\"comment\":\"schema-old\",\"properties\":{}}"
 # Creating an entity sets only creator and createTime, so audit.lastModifiedTime
@@ -701,6 +849,14 @@ mutate_a "create Iceberg schema on A" POST "/api/metalakes/${MAIN_METALAKE}/cata
 # baseline to mean anything, so prime the field here, outside the case.
 mutate_a "prime schema audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
+
+stale_changed_control "SCHEMA cache residency" "SCHEMA A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
+  '.schema.audit.lastModifiedTime' \
+  '{"updates":[{"@type":"setProperty","property":"cache-proof","value":"__VALUE__"}]}' \
+  schema-proof schema-proof-final
 
 consistency_case "SCHEMA alter propagates A -> B"
 prewarm_value "B caches the old schema before A alters it" "$INSTANCE_B" \
@@ -742,6 +898,14 @@ mutate_a "create Iceberg table on A" POST "/api/metalakes/${MAIN_METALAKE}/catal
 # Prime audit.lastModifiedTime; see the note in the SCHEMA section.
 mutate_a "prime table audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
   '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
+
+stale_changed_control "TABLE cache residency" "TABLE A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${TABLE_NAME}" \
+  '.table.audit.lastModifiedTime' \
+  '{"updates":[{"@type":"setProperty","property":"cache-proof","value":"__VALUE__"}]}' \
+  table-proof table-proof-final
 
 consistency_case "TABLE alter propagates A -> B"
 prewarm_value "B caches the old table before A alters it" "$INSTANCE_B" \
@@ -798,12 +962,20 @@ await_value "B loads the second table generation" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}" '.table.comment' table-generation-2
 mutate_a "remove recreate-probe table" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/tables/${RECREATE_TABLE}?purge=true"
 
-section "VIEW cache: alter and drop/recreate"
+section "VIEW cache: alter; external-backend recreate E2E"
 mutate_a "create Iceberg view on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views" \
   "{\"name\":\"${VIEW_NAME}\",\"comment\":\"view-old\",\"columns\":[{\"name\":\"id\",\"type\":\"integer\",\"nullable\":false}],\"representations\":[{\"type\":\"sql\",\"dialect\":\"spark\",\"sql\":\"SELECT 1 AS id\"}],\"properties\":{}}"
 # Prime audit.lastModifiedTime; see the note in the SCHEMA section.
 mutate_a "prime view audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
   '{"updates":[{"@type":"setProperty","property":"audit-prime","value":"1"}]}'
+
+stale_changed_control "VIEW cache residency" "VIEW A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${VIEW_NAME}" \
+  '.view.audit.lastModifiedTime' \
+  '{"updates":[{"@type":"setProperty","property":"cache-proof","value":"__VALUE__"}]}' \
+  view-proof view-proof-final
 
 consistency_case "VIEW alter propagates A -> B"
 prewarm_value "B caches the old view before A alters it" "$INSTANCE_B" \
@@ -831,13 +1003,10 @@ await_http "B invalidates the old view name" "$INSTANCE_B" \
 await_value "B loads the renamed view" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" '.view.name' "$RENAMED_VIEW"
 
-consistency_case "VIEW drop plus same-name recreate evicts the old entity"
+section "VIEW external backend E2E: drop plus same-name recreate"
 prewarm_value "B caches the renamed view before A drops it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
   '.view.name' "$RENAMED_VIEW"
-STALE_VIEW_CREATED=$(read_field "$INSTANCE_B" \
-  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
-  '.view.audit.createTime')
 mutate_a "drop view on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}"
 await_http "B invalidates dropped view" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" 404
@@ -846,19 +1015,13 @@ mutate_a "recreate the dropped view name on A" POST "/api/metalakes/${MAIN_METAL
 await_value "B loads the replacement view" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
   '.view.comment' view-generation-2
-await_changed "B does not reuse the dropped view entity" "$INSTANCE_B" \
-  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}" \
-  '.view.audit.createTime' "$STALE_VIEW_CREATED"
 mutate_a "remove the replacement view" DELETE \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}/views/${RENAMED_VIEW}"
 
-consistency_case "SCHEMA drop plus same-name recreate evicts the old entity"
+section "SCHEMA external backend E2E: drop plus same-name recreate"
 prewarm_value "B caches the schema immediately before A drops it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '.schema.properties["rapid-key"]' schema-v3
-STALE_SCHEMA_CREATED=$(read_field "$INSTANCE_B" \
-  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
-  '.schema.audit.createTime')
 mutate_a "drop the warmed schema on A" DELETE "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}"
 await_http "B invalidates dropped schema" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" 404
@@ -867,9 +1030,6 @@ mutate_a "recreate the dropped schema name on A" POST "/api/metalakes/${MAIN_MET
 await_value "B loads the replacement schema" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
   '.schema.comment' schema-generation-2
-await_changed "B does not reuse the dropped schema entity" "$INSTANCE_B" \
-  "/api/metalakes/${MAIN_METALAKE}/catalogs/${ICEBERG_CATALOG}/schemas/${SCHEMA_NAME}" \
-  '.schema.audit.createTime' "$STALE_SCHEMA_CREATED"
 
 section "SCHEMA cascade: invalidate descendant entity caches"
 mutate_a "create cascade schema on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas" \
@@ -1075,6 +1235,14 @@ mutate_a "create fileset schema on A" POST "/api/metalakes/${MAIN_METALAKE}/cata
 mutate_a "create fileset on A" POST "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets" \
   "{\"name\":\"${FILESET_NAME}\",\"type\":\"EXTERNAL\",\"comment\":\"fileset-old\",\"storageLocation\":\"file:///tmp/gravitino-fileset-${SUFFIX}\",\"properties\":{}}"
 
+stale_value_control "FILESET cache residency" "FILESET A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}" \
+  '.fileset.comment' fileset-old \
+  '{"updates":[{"@type":"updateComment","newComment":"__VALUE__"}]}' \
+  fileset-proof
+
 consistency_case "FILESET alter propagates A -> B"
 prewarm_value "B caches the old fileset before A alters it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/catalogs/${FILESET_CATALOG}/schemas/${FILESET_SCHEMA}/filesets/${FILESET_NAME}" \
@@ -1125,6 +1293,14 @@ mutate_a "create Kafka topic on A" POST "/api/metalakes/${MAIN_METALAKE}/catalog
 # comment rather than an arbitrary property.
 mutate_a "prime topic audit on A" PUT "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
   '{"updates":[{"@type":"updateComment","newComment":"topic-old"}]}'
+
+stale_changed_control "TOPIC cache residency" "TOPIC A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
+  "/api/metalakes/${MAIN_METALAKE}/catalogs/${KAFKA_CATALOG}/schemas/default/topics/${TOPIC_NAME}" \
+  '.topic.audit.lastModifiedTime' \
+  '{"updates":[{"@type":"updateComment","newComment":"__VALUE__"}]}' \
+  topic-proof topic-old
 
 consistency_case "TOPIC alter propagates A -> B"
 prewarm_value "B caches the old topic before A alters it" "$INSTANCE_B" \
@@ -1211,6 +1387,14 @@ POLICY_BODY=$(jq -nc --arg name "$POLICY_NAME" \
   '{name:$name,comment:"policy-old",policyType:"custom",enabled:true,content:{customRules:{retentionDays:30},supportedObjectTypes:["CATALOG","SCHEMA","TABLE"],properties:{owner:"platform"}}}')
 mutate_a "create policy on A" POST "/api/metalakes/${MAIN_METALAKE}/policies" "$POLICY_BODY"
 
+stale_value_control "POLICY cache residency" "POLICY A -> B" \
+  "$INSTANCE_A" "$INSTANCE_B" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}" \
+  "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}" \
+  '.policy.comment' policy-old \
+  '{"updates":[{"@type":"updateComment","newComment":"__VALUE__"}]}' \
+  policy-proof
+
 consistency_case "POLICY alter propagates A -> B"
 prewarm_value "B caches the old policy before A alters it" "$INSTANCE_B" \
   "/api/metalakes/${MAIN_METALAKE}/policies/${POLICY_NAME}" '.policy.comment' policy-old
@@ -1253,6 +1437,14 @@ await_http "B invalidates dropped policy" "$INSTANCE_B" \
 section "Reverse direction: mutate B and invalidate warmed caches on A"
 mutate_a "create reverse-direction tag" POST "/api/metalakes/${MAIN_METALAKE}/tags" \
   "{\"name\":\"${REVERSE_TAG}\",\"comment\":\"reverse-tag-old\",\"properties\":{}}"
+
+stale_value_control "TAG reverse-direction cache residency" "TAG B -> A" \
+  "$INSTANCE_B" "$INSTANCE_A" PUT \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}" \
+  "/api/metalakes/${MAIN_METALAKE}/tags/${REVERSE_TAG}" \
+  '.tag.comment' reverse-tag-old \
+  '{"updates":[{"@type":"updateComment","newComment":"__VALUE__"}]}' \
+  reverse-tag-proof
 
 consistency_case "TAG alter propagates B -> A"
 prewarm_value "A caches the old tag before B alters it" "$INSTANCE_A" \
@@ -1365,23 +1557,46 @@ JOB_TEMPLATE_BODY=$(jq -nc --arg name "$JOB_TEMPLATE" --arg executable "$JOB_SCR
   '{jobTemplate:{name:$name,jobType:"shell",comment:"Job cache test",executable:$executable,arguments:[],environments:{},customFields:{},scripts:[]}}')
 mutate_a "register job template on A" POST "/api/metalakes/${MAIN_METALAKE}/jobs/templates" "$JOB_TEMPLATE_BODY"
 
-api "$INSTANCE_A" POST "/api/metalakes/${MAIN_METALAKE}/jobs/runs" \
-  "{\"jobTemplateName\":\"${JOB_TEMPLATE}\",\"jobConf\":{}}"
-expect_http "run job on A" 200
-JOB_ID=$(printf '%s' "$RESPONSE_BODY" | jq -r '.job.jobId // empty')
-if [[ -n "$JOB_ID" ]]; then
-  pass "job id returned"
-else
-  fail "job id returned — Body: $(body_snippet)"
-fi
+consistency_case "JOB cancellation invalidates a warm target cache"
+JOB_STALE_OBSERVED=0
+for round in $(seq 1 "$PER_TYPE_STALE_CONTROL_ROUNDS"); do
+  api "$INSTANCE_A" POST "/api/metalakes/${MAIN_METALAKE}/jobs/runs" \
+    "{\"jobTemplateName\":\"${JOB_TEMPLATE}\",\"jobConf\":{}}"
+  expect_http "JOB A -> B round ${round}: run job on A" 200
+  JOB_ID=$(printf '%s' "$RESPONSE_BODY" | jq -r '.job.jobId // empty')
+  if [[ -z "$JOB_ID" ]]; then
+    fail "JOB A -> B round ${round}: job id returned — Body: $(body_snippet)"
+    CASE_MUTATION_STARTED=true
+    continue
+  fi
 
-if [[ -n "$JOB_ID" ]]; then
-  consistency_case "JOB cancellation status propagates A -> B"
-  prewarm_one_of "B caches the running job before A cancels it" "$INSTANCE_B" \
+  prewarm_one_of "JOB A -> B round ${round}: B caches the running job" "$INSTANCE_B" \
     "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}" '.job.status' queued started
-  mutate_a "cancel job on A" POST "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}"
-  await_one_of "B sees altered job status" "$INSTANCE_B" \
+  STALE_JOB_STATUS=$(printf '%s' "$RESPONSE_BODY" | jq -r '.job.status // empty')
+
+  api "$INSTANCE_A" POST "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}"
+  expect_http "JOB A -> B round ${round}: cancel job on A" 200
+  CASE_MUTATION_STARTED=true
+
+  OBSERVED_JOB_STATUS=$(read_field "$INSTANCE_B" \
+    "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}" '.job.status')
+  if [[ -n "$STALE_JOB_STATUS" && "$OBSERVED_JOB_STATUS" == "$STALE_JOB_STATUS" ]]; then
+    JOB_STALE_OBSERVED=$((JOB_STALE_OBSERVED + 1))
+    printf '    JOB A -> B round %d: B still served cached status %s\n' \
+      "$round" "$STALE_JOB_STATUS"
+  else
+    printf '    JOB A -> B round %d: B already served %s (poller won the race)\n' \
+      "$round" "$OBSERVED_JOB_STATUS"
+  fi
+
+  await_one_of "JOB A -> B round ${round}: B sees canceled job status" "$INSTANCE_B" \
     "/api/metalakes/${MAIN_METALAKE}/jobs/runs/${JOB_ID}" '.job.status' cancelling canceled
+done
+
+if ((JOB_STALE_OBSERVED > 0)); then
+  record_cache_proof "JOB A -> B cache residency (${JOB_STALE_OBSERVED}/${PER_TYPE_STALE_CONTROL_ROUNDS} stale rounds)"
+else
+  fail "JOB A -> B never served a stale status in ${PER_TYPE_STALE_CONTROL_ROUNDS} rounds — B may be cold or bypassing the JOB cache"
 fi
 
 if [[ "$RUN_RESTART_TEST" == "true" ]]; then
@@ -1421,7 +1636,14 @@ if [[ "$RUN_RESTART_TEST" == "true" ]]; then
 fi
 
 section "Summary"
+if ((CACHE_PROOF_CASES == EXPECTED_CACHE_PROOF_CASES)); then
+  pass "all ${EXPECTED_CACHE_PROOF_CASES} required warm-cache proofs executed"
+else
+  fail "expected ${EXPECTED_CACHE_PROOF_CASES} warm-cache proofs, executed ${CACHE_PROOF_CASES}"
+fi
 printf 'Consistency cases executed: %d\n' "$CONSISTENCY_CASES"
+printf 'Warm-cache proofs executed: %d\n' "$CACHE_PROOF_CASES"
+printf '  - %s\n' "${CACHE_PROOFS[@]}"
 printf 'Assertions passed: %d\nAssertions failed: %d\n' "$PASS" "$FAIL"
 if ((FAIL > 0)); then
   printf '\nFailed assertions:\n'
