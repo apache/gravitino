@@ -187,6 +187,21 @@ class DTOConverters {
       return new CatalogUpdateRequest.RemoveCatalogPropertyRequest(
           ((CatalogChange.RemoveProperty) change).getProperty());
 
+    } else if (change instanceof CatalogChange.SetSecretBinding) {
+      CatalogChange.SetSecretBinding setSecretBinding = (CatalogChange.SetSecretBinding) change;
+      return new CatalogUpdateRequest.SetCatalogSecretBindingRequest(
+          setSecretBinding.getProperty(),
+          setSecretBinding.getBinding().provider(),
+          setSecretBinding.getBinding().plaintext());
+
+    } else if (change instanceof CatalogChange.SetSecretReference) {
+      CatalogChange.SetSecretReference setSecretReference =
+          (CatalogChange.SetSecretReference) change;
+      return new CatalogUpdateRequest.SetCatalogSecretReferenceRequest(
+          setSecretReference.getProperty(),
+          setSecretReference.getReference().provider(),
+          setSecretReference.getReference().attributes());
+
     } else {
       throw new IllegalArgumentException(
           "Unknown change type: " + change.getClass().getSimpleName());
@@ -202,6 +217,20 @@ class DTOConverters {
     } else if (change instanceof SchemaChange.RemoveProperty) {
       return new SchemaUpdateRequest.RemoveSchemaPropertyRequest(
           ((SchemaChange.RemoveProperty) change).getProperty());
+
+    } else if (change instanceof SchemaChange.SetSecretBinding) {
+      SchemaChange.SetSecretBinding setSecretBinding = (SchemaChange.SetSecretBinding) change;
+      return new SchemaUpdateRequest.SetSchemaSecretBindingRequest(
+          setSecretBinding.getProperty(),
+          setSecretBinding.getBinding().provider(),
+          setSecretBinding.getBinding().plaintext());
+
+    } else if (change instanceof SchemaChange.SetSecretReference) {
+      SchemaChange.SetSecretReference setSecretReference = (SchemaChange.SetSecretReference) change;
+      return new SchemaUpdateRequest.SetSchemaSecretReferenceRequest(
+          setSecretReference.getProperty(),
+          setSecretReference.getReference().provider(),
+          setSecretReference.getReference().attributes());
 
     } else {
       throw new IllegalArgumentException(

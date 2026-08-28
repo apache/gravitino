@@ -25,6 +25,8 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -33,6 +35,8 @@ import java.io.IOException
 import java.util.Locale
 
 Locale.setDefault(Locale.US)
+
+abstract class SharedTestEnvironmentLock : BuildService<BuildServiceParameters.None>
 
 plugins {
   `maven-publish`
@@ -59,6 +63,13 @@ plugins {
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
+}
+
+val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
+  "sharedTestEnvironmentLock",
+  SharedTestEnvironmentLock::class
+) {
+  maxParallelUsages.set(1)
 }
 
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
@@ -677,7 +688,11 @@ subprojects {
       showCauses = true
       showStackTraces = true
     }
-    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
+    // Distinct outputs let Gradle execute independent test tasks in parallel.
+    val testReportPath = path.removePrefix(":").replace(':', '/')
+    reports.html.outputLocation.set(
+      rootProject.layout.buildDirectory.dir("reports/tests/$testReportPath")
+    )
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
       val extraArgs = project.property("extraJvmArgs") as List<String>
@@ -1253,6 +1268,22 @@ gradle.projectsEvaluated {
     subprojectJarOutputDirs.map { it.get().asFile.toPath().toAbsolutePath().normalize() }
 
   allprojects {
+    val runsIntegrationTestsOnly = rootProject.hasProperty("skipTests")
+    val hasDockerTests =
+      rootProject.extra["dockerTest"] == true && fileTree("src/test") {
+        include("**/*.java", "**/*.kt")
+      }.any { it.readText().contains("gravitino-docker-test") }
+
+    // Integration tests in different projects share the same Gravitino server, database,
+    // containers, and configuration files. Running them together lets one test stop or reset
+    // resources while another test is still using them. Normal builds keep independent unit tests
+    // parallel and serialize only projects that contain Docker-tagged tests.
+    if (runsIntegrationTestsOnly || hasDockerTests) {
+      tasks.withType<Test>().configureEach {
+        usesService(sharedTestEnvironmentLock)
+      }
+    }
+
     tasks.withType<Jar>().configureEach {
       mustRunAfter(cleanDistributionPackageTask)
     }

@@ -33,7 +33,7 @@ from mcp_server.client.view_operation import ViewOperation
 
 
 class MockOperation(GravitinoOperation):
-    def __init__(self, metalake, uri, authorization=""):
+    def __init__(self, metalake, uri, authorization="", *, auth=None):
         pass
 
     def as_table_operation(self) -> TableOperation:
