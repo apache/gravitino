@@ -40,18 +40,26 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
+import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
+import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.PolicyAssociationSelectorSerde;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -225,6 +233,115 @@ public class TagManager implements TagDispatcher {
   public MetadataObject[] listMetadataObjectsForTag(String metalake, String name)
       throws NoSuchTagException {
     return listMetadataObjectsForTag(metalake, name, null);
+  }
+
+  @Override
+  public RelationalEntity<?>[] listPolicyAssociationsForTag(String metalake, String name) {
+    NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, name);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        tagIdentifier,
+        LockType.READ,
+        () -> {
+          loadTag(metalake, name);
+          try {
+            return entityStore
+                .relationOperations()
+                .batchListEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    Collections.singletonList(tagIdentifier),
+                    Entity.EntityType.TAG)
+                .toArray(new RelationalEntity<?>[0]);
+          } catch (IOException e) {
+            LOG.error(
+                "Failed to list policy associations for tag {} under metalake {}",
+                name,
+                metalake,
+                e);
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
+  @Override
+  public void addPolicyForTag(
+      String metalake, String tagName, String policyName, PolicyAssociationSelector selector) {
+    NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
+    NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    TreeLockUtils.doWithTreeLock(
+        tagIdentifier,
+        LockType.WRITE,
+        () -> {
+          TagEntity tag = loadTag(metalake, tagName);
+          loadPolicy(metalake, policyName);
+          validatePolicyAssociationSelector(tag, selector);
+          RelationUpdate update =
+              RelationUpdate.of(
+                  SupportsRelationOperations.Type.POLICY_TAG_REL,
+                  tagIdentifier,
+                  Entity.EntityType.TAG,
+                  new RelationEdgeTarget[] {
+                    RelationEdgeTarget.of(
+                        policyIdentifier,
+                        Entity.EntityType.POLICY,
+                        PolicyAssociationSelectorSerde.serialize(selector))
+                  },
+                  new RelationEdgeTarget[0]);
+          try {
+            return entityStore.relationOperations().updateEntityRelations(update);
+          } catch (EntityAlreadyExistsException e) {
+            throw new PolicyAlreadyAssociatedException(
+                e,
+                "Policy %s is already associated with tag %s under metalake %s",
+                policyName,
+                tagName,
+                metalake);
+          } catch (IOException e) {
+            LOG.error(
+                "Failed to add policy {} for tag {} under metalake {}",
+                policyName,
+                tagName,
+                metalake,
+                e);
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
+  @Override
+  public void removePolicyFromTag(String metalake, String tagName, String policyName) {
+    NameIdentifier tagIdentifier = NameIdentifierUtil.ofTag(metalake, tagName);
+    NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    TreeLockUtils.doWithTreeLock(
+        tagIdentifier,
+        LockType.WRITE,
+        () -> {
+          loadTag(metalake, tagName);
+          loadPolicy(metalake, policyName);
+          RelationUpdate update =
+              RelationUpdate.of(
+                  SupportsRelationOperations.Type.POLICY_TAG_REL,
+                  tagIdentifier,
+                  Entity.EntityType.TAG,
+                  new RelationEdgeTarget[0],
+                  new RelationEdgeTarget[] {
+                    RelationEdgeTarget.of(policyIdentifier, Entity.EntityType.POLICY, null)
+                  });
+          try {
+            entityStore.relationOperations().updateEntityRelations(update);
+          } catch (IOException e) {
+            LOG.error(
+                "Failed to remove policy {} from tag {} under metalake {}",
+                policyName,
+                tagName,
+                metalake,
+                e);
+            throw new RuntimeException(e);
+          }
+          return null;
+        });
   }
 
   @Override
@@ -459,6 +576,63 @@ public class TagManager implements TagDispatcher {
             .toArray(String[]::new);
       default:
         throw new IllegalArgumentException("Unknown tag value constraint: " + normalizedConstraint);
+    }
+  }
+
+  private TagEntity loadTag(String metalake, String tagName) {
+    try {
+      return entityStore.get(
+          NameIdentifierUtil.ofTag(metalake, tagName), Entity.EntityType.TAG, TagEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTagException(
+          e, "Tag with name %s under metalake %s does not exist", tagName, metalake);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private PolicyEntity loadPolicy(String metalake, String policyName) {
+    try {
+      return entityStore.get(
+          NameIdentifierUtil.ofPolicy(metalake, policyName),
+          Entity.EntityType.POLICY,
+          PolicyEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchPolicyException(
+          e, "Policy with name %s under metalake %s does not exist", policyName, metalake);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private static void validatePolicyAssociationSelector(
+      TagEntity tag, PolicyAssociationSelector selector) {
+    Preconditions.checkArgument(selector != null, "Selector cannot be null");
+    if (selector instanceof AllValuesSelector) {
+      return;
+    }
+
+    Preconditions.checkArgument(
+        selector instanceof TagValueSelector,
+        "Unsupported policy association selector type: %s",
+        selector.type());
+    String selectorValue = ((TagValueSelector) selector).value();
+    TagValueConstraint constraint = tag.valueConstraint();
+    switch (constraint.type()) {
+      case ANY_VALUE:
+        return;
+      case NO_VALUE:
+        throw new IllegalArgumentException(
+            String.format("Tag %s does not accept assignment values", tag.name()));
+      case ALLOWED_VALUES:
+        Preconditions.checkArgument(
+            Arrays.asList(constraint.allowedValues()).contains(selectorValue),
+            "Selector value %s is not allowed for tag %s",
+            selectorValue,
+            tag.name());
+        return;
+      default:
+        throw new IllegalArgumentException("Unknown tag value constraint: " + constraint);
     }
   }
 
