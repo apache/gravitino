@@ -20,15 +20,10 @@ import logging
 import os
 
 from mcp_server.core.setting import DefaultSetting, Setting
-<<<<<<< HEAD
-from mcp_server.server import GravitinoMCPServer
-=======
 from mcp_server.server import (
     GravitinoMCPServer,
     log_service_identity_fallback_policy,
 )
-from mcp_server.tools import SUPPORTED_TOOL_TAGS
->>>>>>> 32b72866d ([#12530] feat(mcp-server): fetch and refresh OAuth client-credentials tokens (#12531))
 
 
 def _env_truthy(name: str) -> bool:
