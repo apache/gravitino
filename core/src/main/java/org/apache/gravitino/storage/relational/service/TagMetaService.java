@@ -49,6 +49,7 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
@@ -504,6 +505,7 @@ public class TagMetaService {
   public int deleteTagMetasByLegacyTimeline(long legacyTimeline, int limit) {
     int[] tagDeletedCount = new int[] {0};
     int[] tagMetadataObjectRelDeletedCount = new int[] {0};
+    int[] policyTagRelDeletedCount = new int[] {0};
 
     SessionUtils.doMultipleWithCommit(
         () ->
@@ -515,9 +517,14 @@ public class TagMetaService {
             tagMetadataObjectRelDeletedCount[0] =
                 SessionUtils.getWithoutCommit(
                     TagMetadataObjectRelMapper.class,
-                    mapper -> mapper.deleteTagEntityRelsByLegacyTimeline(legacyTimeline, limit)));
+                    mapper -> mapper.deleteTagEntityRelsByLegacyTimeline(legacyTimeline, limit)),
+        () ->
+            policyTagRelDeletedCount[0] =
+                SessionUtils.getWithoutCommit(
+                    PolicyTagRelMapper.class,
+                    mapper -> mapper.deleteByLegacyTimeline(legacyTimeline, limit)));
 
-    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0];
+    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] + policyTagRelDeletedCount[0];
   }
 
   private static List<TagEntity> tagPOsToTagEntities(List<TagPO> tagPOs, Namespace namespace) {

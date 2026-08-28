@@ -43,6 +43,8 @@ public interface SupportsRelationOperations {
     POLICY_METADATA_OBJECT_REL,
     /** Metadata object to tag relationship */
     TAG_METADATA_OBJECT_REL,
+    /** Policy to tag relationship */
+    POLICY_TAG_REL,
   }
 
   /**
@@ -291,6 +293,10 @@ public interface SupportsRelationOperations {
         return Entity.EntityType.POLICY;
       case TAG_METADATA_OBJECT_REL:
         return Entity.EntityType.TAG;
+      case POLICY_TAG_REL:
+        return srcEntityType == Entity.EntityType.TAG
+            ? Entity.EntityType.POLICY
+            : Entity.EntityType.TAG;
       default:
         return srcEntityType;
     }
