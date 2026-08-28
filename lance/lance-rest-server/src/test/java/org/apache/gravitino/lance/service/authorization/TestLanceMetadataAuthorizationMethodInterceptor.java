@@ -185,6 +185,27 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  void testOverwriteIsRecognizedWhateverSpacingTheClientSends() throws Throwable {
+    allow(Privilege.Name.CREATE_CATALOG, Privilege.Name.USE_CATALOG, Privilege.Name.CREATE_SCHEMA);
+
+    // The create operation reads the mode through CommonUtil.normalizeToken, which trims and
+    // upper-cases, so all of these reach it as OVERWRITE. Authorization has to read the mode the
+    // same way: a token this interceptor fails to recognize is authorized as a plain create, and
+    // the create privileges above would then be enough to replace a namespace owned by somebody
+    // else.
+    for (String mode : new String[] {" overwrite", "overwrite ", " OverWrite ", "\toverwrite\n"}) {
+      assertErrorResponse(
+          interceptor.invoke(createInvocation(CATALOG, "$", mode)),
+          Response.Status.FORBIDDEN,
+          "mode '" + mode + "' must be authorized as an overwrite");
+      assertErrorResponse(
+          interceptor.invoke(createInvocation(CATALOG + "$" + SCHEMA, "$", mode)),
+          Response.Status.FORBIDDEN,
+          "mode '" + mode + "' must be authorized as an overwrite");
+    }
+  }
+
+  @Test
   void testOwnerMayOverwriteAndDropNamespaces() throws Throwable {
     when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
     allow(Privilege.Name.USE_CATALOG);
@@ -252,8 +273,12 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   }
 
   private void assertErrorResponse(Object result, Response.Status expectedStatus) {
+    assertErrorResponse(result, expectedStatus, null);
+  }
+
+  private void assertErrorResponse(Object result, Response.Status expectedStatus, String message) {
     Response response = assertInstanceOf(Response.class, result);
-    assertEquals(expectedStatus.getStatusCode(), response.getStatus());
+    assertEquals(expectedStatus.getStatusCode(), response.getStatus(), message);
     assertInstanceOf(ErrorResponse.class, response.getEntity());
   }
 

@@ -23,7 +23,6 @@ import static org.apache.commons.lang3.exception.ExceptionUtils.getStackTrace;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.HashMap;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
@@ -36,6 +35,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.ops.gravitino.CommonUtil;
 import org.apache.gravitino.lance.common.ops.gravitino.ObjectIdentifier;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
@@ -175,7 +175,7 @@ public class LanceMetadataAuthorizationMethodInterceptor
    */
   private static final class CreateNamespaceAuthzHandler implements AuthorizationHandler {
 
-    private static final String OVERWRITE_MODE = "overwrite";
+    private static final String OVERWRITE_MODE = "OVERWRITE";
 
     private final CreateNamespaceRequest request;
     private boolean overwriteAuthorized;
@@ -219,8 +219,12 @@ public class LanceMetadataAuthorizationMethodInterceptor
     }
 
     private boolean isOverwrite() {
-      String mode = request.getMode();
-      return mode != null && OVERWRITE_MODE.equals(mode.toLowerCase(Locale.ROOT));
+      // Read the mode through the same normalization the create operation applies, so a token the
+      // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
+      // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
+      // would not match, and a caller holding only a create privilege could replace a namespace
+      // owned by somebody else.
+      return OVERWRITE_MODE.equals(CommonUtil.normalizeToken(request.getMode()));
     }
   }
 
