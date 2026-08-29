@@ -378,12 +378,13 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (catalogCredentialManager == null) {
       synchronized (this) {
         if (catalogCredentialManager == null) {
-          Preconditions.checkState(secretManager != null, "secretManager is not set");
-          // Entity storage keeps secret URNs; credential vending must return plaintext so
-          // getCredentials / JdbcCredential (and other static-key providers) are usable by clients.
+          // Entity storage may keep secret URNs; resolve them when SecretManager is available so
+          // getCredentials / JdbcCredential (and other static-key providers) return plaintext.
           Map<String, String> props = propertiesWithCredentialProviders();
-          this.catalogCredentialManager =
-              new CatalogCredentialManager(name(), secretManager.toPlaintextProperties(props));
+          if (secretManager != null) {
+            props = secretManager.toPlaintextProperties(props);
+          }
+          this.catalogCredentialManager = new CatalogCredentialManager(name(), props);
         }
       }
     }
