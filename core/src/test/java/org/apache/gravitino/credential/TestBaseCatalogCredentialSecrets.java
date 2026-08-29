@@ -19,34 +19,100 @@
 package org.apache.gravitino.credential;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Properties;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.Config;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.secret.SecretConstants;
+import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretProviderRegistry;
+import org.apache.gravitino.secret.SecretUrn;
+import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that catalog credential vending uses catalog conf (plaintext) rather than raw entity
- * properties that may still store secret URNs.
+ * Verifies that {@code propertiesWithCredentialProviders} resolves entity secret URNs to plaintext
+ * via the catalog's {@link SecretManager}.
  */
 public class TestBaseCatalogCredentialSecrets {
 
   @Test
-  void testCatalogCredentialManagerUsesPlaintextConfOverEntityUrn() {
-    String urn = "urn:gravitino-secret:memory:catalog:1:jdbc-password";
-    Map<String, String> entityProps = new HashMap<>();
-    entityProps.put(CredentialConstants.CREDENTIAL_PROVIDERS, JdbcCredential.JDBC_CREDENTIAL_TYPE);
-    entityProps.put(JdbcCredential.GRAVITINO_JDBC_USER, "iceberg");
-    entityProps.put(JdbcCredential.GRAVITINO_JDBC_PASSWORD, urn);
+  void testPropertiesWithCredentialProvidersResolvesEntityUrn() throws Exception {
+    try (SecretManager secretManager = memorySecretManager()) {
+      SecretUrn urn =
+          SecretUrn.buildWriteThrough(
+              "memory",
+              Map.of(
+                  SecretConstants.ATTR_ENTITY_TYPE,
+                  "catalog",
+                  SecretConstants.ATTR_ENTITY_ID,
+                  "1",
+                  SecretConstants.ATTR_PROPERTY_KEY,
+                  "jdbc-password"));
+      secretManager.writeSecrets(java.util.List.of(new SecretMaterial(urn, "plain-jdbc-pass")));
 
-    // CatalogManager sets conf via SecretManager.toPlaintextProperties(entity props).
-    Map<String, String> confProps = new HashMap<>(entityProps);
-    confProps.put(JdbcCredential.GRAVITINO_JDBC_PASSWORD, "plain-jdbc-pass");
+      Map<String, String> entityProps =
+          Map.of(
+              CredentialConstants.CREDENTIAL_PROVIDERS,
+              JdbcCredential.JDBC_CREDENTIAL_TYPE,
+              JdbcCredential.GRAVITINO_JDBC_USER,
+              "iceberg",
+              JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+              urn.toString());
+
+      CatalogEntity entity =
+          CatalogEntity.builder()
+              .withId(1L)
+              .withName("jdbc-secret-catalog")
+              .withNamespace(Namespace.of("metalake"))
+              .withType(Catalog.Type.RELATIONAL)
+              .withProvider("test")
+              .withProperties(entityProps)
+              .withAuditInfo(
+                  AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+              .build();
+
+      TestCatalog catalog =
+          new TestCatalog()
+              .withCatalogEntity(entity)
+              .withCatalogConf(entityProps)
+              .withSecretManager(secretManager);
+
+      Assertions.assertEquals(
+          "plain-jdbc-pass",
+          catalog.propertiesWithCredentialProviders().get(JdbcCredential.GRAVITINO_JDBC_PASSWORD));
+
+      Optional<Credential> credential =
+          catalog
+              .catalogCredentialManager()
+              .getCredential(
+                  JdbcCredential.JDBC_CREDENTIAL_TYPE, new CatalogCredentialContext("user"));
+
+      Assertions.assertTrue(credential.isPresent());
+      JdbcCredential jdbc = (JdbcCredential) credential.get();
+      Assertions.assertEquals("iceberg", jdbc.jdbcUser());
+      Assertions.assertEquals("plain-jdbc-pass", jdbc.jdbcPassword());
+    }
+  }
+
+  @Test
+  void testPropertiesWithCredentialProvidersWithoutSecretManagerKeepsUrn() {
+    String urn = "urn:gravitino-secret:memory:catalog:1:jdbc-password";
+    Map<String, String> entityProps =
+        Map.of(
+            CredentialConstants.CREDENTIAL_PROVIDERS,
+            JdbcCredential.JDBC_CREDENTIAL_TYPE,
+            JdbcCredential.GRAVITINO_JDBC_USER,
+            "iceberg",
+            JdbcCredential.GRAVITINO_JDBC_PASSWORD,
+            urn);
 
     CatalogEntity entity =
         CatalogEntity.builder()
@@ -60,22 +126,23 @@ public class TestBaseCatalogCredentialSecrets {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
 
-    TestCatalog catalog = new TestCatalog().withCatalogEntity(entity).withCatalogConf(confProps);
+    TestCatalog catalog = new TestCatalog().withCatalogEntity(entity).withCatalogConf(entityProps);
 
     Assertions.assertEquals(
-        "plain-jdbc-pass",
+        urn,
         catalog.propertiesWithCredentialProviders().get(JdbcCredential.GRAVITINO_JDBC_PASSWORD));
+  }
 
-    Optional<Credential> credential =
-        catalog
-            .catalogCredentialManager()
-            .getCredential(
-                JdbcCredential.JDBC_CREDENTIAL_TYPE, new CatalogCredentialContext("user"));
-
-    Assertions.assertTrue(credential.isPresent());
-    Assertions.assertInstanceOf(JdbcCredential.class, credential.get());
-    JdbcCredential jdbc = (JdbcCredential) credential.get();
-    Assertions.assertEquals("iceberg", jdbc.jdbcUser());
-    Assertions.assertEquals("plain-jdbc-pass", jdbc.jdbcPassword());
+  private static SecretManager memorySecretManager() {
+    Config config = new Config(false) {};
+    Properties properties = new Properties();
+    properties.setProperty(SecretProviderRegistry.GRAVITINO_SECRET_PROVIDERS, "memory");
+    properties.setProperty(
+        SecretProviderRegistry.GRAVITINO_SECRET_PROVIDER_PREFIX
+            + "memory."
+            + SecretProviderRegistry.CLASS_NAME,
+        InMemorySecretsProvider.class.getName());
+    config.loadFromProperties(properties);
+    return new SecretManager(config);
   }
 }
