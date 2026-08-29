@@ -47,7 +47,9 @@ def get_gravitino_server_version(**kwargs):
         return False
 
 
-def check_gravitino_server_status(max_attempts: int = 30, interval_secs: float = 1.0, **kwargs) -> bool:
+def check_gravitino_server_status(
+    max_attempts: int = 30, interval_secs: float = 1.0, **kwargs
+) -> bool:
     """Poll until the Gravitino server answers /api/version, or give up.
 
     ``gravitino.sh restart`` returns as soon as the JVM process is up; Jetty can
