@@ -70,5 +70,23 @@ public class ClickHouseConstants {
 
     // Key for max unique values (N) in set(N) data-skipping index properties.
     public static final String SET_MAX_VALUES = "set_max_values";
+
+    /** The name of the data skipping index type for ngrambf_v1 in ClickHouse. */
+    public static final String DATA_SKIPPING_NGRAMBFV1 = "ngrambf_v1";
+
+    /** The name of the data skipping index type for tokenbf_v1 in ClickHouse. */
+    public static final String DATA_SKIPPING_TOKENBFV1 = "tokenbf_v1";
+
+    /** Property key for bloom filter size in ngrambf_v1 and tokenbf_v1 index properties. */
+    public static final String BLOOM_FILTER_SIZE = "bloom_filter_size";
+
+    /** Property key for the number of hash functions in ngrambf_v1 and tokenbf_v1 properties. */
+    public static final String HASH_FUNCTIONS = "hash_functions";
+
+    /** Property key for the random seed in ngrambf_v1 and tokenbf_v1 index properties. */
+    public static final String RANDOM_SEED = "random_seed";
+
+    /** Property key for the n-gram size in ngrambf_v1 index properties. */
+    public static final String NGRAM_SIZE = "ngram_size";
   }
 }

@@ -23,6 +23,7 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrd
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +33,7 @@ import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefault
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseExceptionConverter;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseTypeConverter;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
+import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.expressions.FunctionExpression;
 import org.apache.gravitino.rel.expressions.NamedReference;
@@ -473,5 +475,139 @@ public class TestClickHouseTableOperationsUnit {
         Assertions.assertThrows(
             IllegalArgumentException.class, () -> newOps().callGenerateCreateTableSql(properties));
     Assertions.assertTrue(exception.getMessage().contains("balanced"));
+  }
+
+  @Test
+  void testGetIndexesFailsOnMalformedParameterizedIndexMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn(null);
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_bad"));
+    Assertions.assertTrue(exception.getMessage().contains("type_full"));
+  }
+
+  @Test
+  void testGetIndexesSkipsUnsupportedExpressionForParameterizedIndex() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad_expr", "idx_valid");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("cityHash64(col_1) % 16", "col_2");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertEquals("idx_valid", indexes.get(0).name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TOKENBFV1, indexes.get(0).type());
+    Assertions.assertArrayEquals(new String[][] {{"col_2"}}, indexes.get(0).fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "0"),
+        indexes.get(0).properties());
+  }
+
+  @Test
+  void testGetIndexesFallsBackWhenTypeFullColumnIsMissing() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, false);
+    Mockito.when(legacySecondaryRs.getString("name")).thenReturn("idx_legacy");
+    Mockito.when(legacySecondaryRs.getString("type")).thenReturn("ngrambf_v1(3, 512, 3, 0)");
+    Mockito.when(legacySecondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_NGRAMBFV1, indexes.get(0).type());
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        indexes.get(0).properties());
+  }
+
+  @Test
+  void testGetIndexesDoesNotFallbackForOtherSqlErrors() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Connection reset by peer"));
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getCause() instanceof SQLException);
+    Mockito.verify(connection, Mockito.times(2)).prepareStatement(Mockito.anyString());
   }
 }

@@ -32,17 +32,22 @@ import org.aopalliance.intercept.MethodInterceptor;
 import org.aopalliance.intercept.MethodInvocation;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.lance.common.ops.NamespaceWrapper;
+import org.apache.gravitino.lance.common.ops.gravitino.CommonUtil;
 import org.apache.gravitino.lance.common.ops.gravitino.ObjectIdentifier;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor;
 import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 import org.lance.namespace.errors.InvalidInputException;
 import org.lance.namespace.errors.LanceNamespaceException;
 import org.lance.namespace.errors.PermissionDeniedException;
+import org.lance.namespace.model.CreateNamespaceRequest;
 
 /** Resolves Lance namespace IDs and maps shared authorization failures to Lance REST responses. */
 public class LanceMetadataAuthorizationMethodInterceptor
@@ -109,6 +114,27 @@ public class LanceMetadataAuthorizationMethodInterceptor
     return new AuthorizationTarget(identifiers, Entity.EntityType.CATALOG);
   }
 
+  /**
+   * Returns the handler that authorizes an overwrite of an existing namespace. Overwrite is the
+   * only Lance namespace write whose required privileges are carried in the request body rather
+   * than in the request path, so it cannot be expressed by the method annotation alone.
+   *
+   * @param method invoked protocol method
+   * @param parameters invoked method parameters
+   * @param args invoked method arguments
+   * @return the overwrite handler when the request carries a create-namespace body
+   */
+  @Override
+  protected Optional<AuthorizationHandler> createAuthorizationHandler(
+      Method method, Parameter[] parameters, Object[] args) {
+    for (Object arg : args) {
+      if (arg instanceof CreateNamespaceRequest) {
+        return Optional.of(new CreateNamespaceAuthzHandler((CreateNamespaceRequest) arg));
+      }
+    }
+    return Optional.empty();
+  }
+
   @Override
   protected boolean shouldSkipExpressionEvaluation(AuthorizationTarget target) {
     // The root has no privilege-bearing Lance object. The shared pipeline still validates the
@@ -135,6 +161,71 @@ public class LanceMetadataAuthorizationMethodInterceptor
       exception = new RuntimeException(throwable);
     }
     return LanceExceptionMapper.toRESTResponse(namespaceId, exception);
+  }
+
+  /**
+   * Authorizes a create-namespace request whose mode overwrites an existing namespace.
+   *
+   * <p>An overwrite replaces the properties of a namespace that already exists, so it is a
+   * modification rather than a creation and is authorized against {@link
+   * LanceAuthorizationExpressions#MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION}. The mode alone
+   * decides this, without probing whether the namespace exists: an existence probe at authorization
+   * time would race with the create that follows it, and the resulting privilege requirement would
+   * depend on that race.
+   */
+  private static final class CreateNamespaceAuthzHandler implements AuthorizationHandler {
+
+    private static final String OVERWRITE_MODE = "OVERWRITE";
+
+    private final CreateNamespaceRequest request;
+    private boolean overwriteAuthorized;
+
+    private CreateNamespaceAuthzHandler(CreateNamespaceRequest request) {
+      this.request = request;
+    }
+
+    @Override
+    public void process(Map<Entity.EntityType, NameIdentifier> nameIdentifierMap) {
+      if (!isOverwrite()) {
+        return;
+      }
+
+      // A namespace that is being overwritten already exists, so the create expression on the
+      // method must not be evaluated: it would let CREATE_CATALOG or CREATE_SCHEMA replace an
+      // object the caller does not own.
+      overwriteAuthorized = true;
+      Entity.EntityType entityType =
+          nameIdentifierMap.containsKey(Entity.EntityType.SCHEMA)
+              ? Entity.EntityType.SCHEMA
+              : Entity.EntityType.CATALOG;
+      boolean authorized =
+          new AuthorizationExpressionEvaluator(
+                  LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION)
+              .evaluate(
+                  nameIdentifierMap,
+                  new HashMap<>(),
+                  new AuthorizationRequestContext(),
+                  Optional.of(entityType.name()));
+      if (!authorized) {
+        throw new ForbiddenException(
+            "User '%s' is not authorized to overwrite the namespace '%s'",
+            PrincipalUtils.getCurrentUserName(), nameIdentifierMap.get(entityType));
+      }
+    }
+
+    @Override
+    public boolean authorizationCompleted() {
+      return overwriteAuthorized;
+    }
+
+    private boolean isOverwrite() {
+      // Read the mode through the same normalization the create operation applies, so a token the
+      // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
+      // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
+      // would not match, and a caller holding only a create privilege could replace a namespace
+      // owned by somebody else.
+      return OVERWRITE_MODE.equals(CommonUtil.normalizeToken(request.getMode()));
+    }
   }
 
   private Map<Entity.EntityType, NameIdentifier> baseIdentifiers() {
