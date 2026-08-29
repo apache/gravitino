@@ -60,8 +60,7 @@ public class TestBaseCatalogCredentialSecrets {
                 AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
             .build();
 
-    TestCatalog catalog =
-        new TestCatalog().withCatalogEntity(entity).withCatalogConf(confProps);
+    TestCatalog catalog = new TestCatalog().withCatalogEntity(entity).withCatalogConf(confProps);
 
     Assertions.assertEquals(
         "plain-jdbc-pass",

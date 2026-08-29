@@ -497,8 +497,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   public Map<String, String> propertiesWithCredentialProviders() {
     // Prefer conf: createBaseCatalog sets it via SecretManager.toPlaintextProperties so credential
     // vending receives plaintext. Fall back to entity props when conf is unset (e.g. unit tests).
-    Map<String, String> props =
-        Maps.newHashMap(conf != null ? conf : entity().getProperties());
+    Map<String, String> props = Maps.newHashMap(conf != null ? conf : entity().getProperties());
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
       return props;
     }
