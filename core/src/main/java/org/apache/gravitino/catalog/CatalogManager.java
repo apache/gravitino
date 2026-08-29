@@ -1437,8 +1437,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
     catalog
         .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
-        .withCatalogEntity(entity)
-        .withSecretManager(secretManager);
+        .withCatalogEntity(entity);
     catalog.initAuthorizationPluginInstance(classLoader, metalakeEntity.id());
     return catalog;
   }
