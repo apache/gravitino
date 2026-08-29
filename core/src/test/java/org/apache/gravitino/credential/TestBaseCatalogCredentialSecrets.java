@@ -22,10 +22,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Properties;
-import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
-import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.meta.AuditInfo;
@@ -36,7 +34,6 @@ import org.apache.gravitino.secret.SecretMaterial;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.secret.SecretUrn;
 import org.apache.gravitino.secret.memory.InMemorySecretsProvider;
-import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -46,16 +43,9 @@ import org.junit.jupiter.api.Test;
  */
 public class TestBaseCatalogCredentialSecrets {
 
-  @AfterEach
-  public void tearDown() throws IllegalAccessException {
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", null, true);
-  }
-
   @Test
   void testCatalogCredentialManagerResolvesJdbcPasswordUrn() throws Exception {
     try (SecretManager secretManager = memorySecretManager()) {
-      FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", secretManager, true);
-
       SecretUrn urn =
           SecretUrn.buildWriteThrough(
               "memory",
@@ -89,7 +79,11 @@ public class TestBaseCatalogCredentialSecrets {
                   AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
               .build();
 
-      TestCatalog catalog = new TestCatalog().withCatalogEntity(entity).withCatalogConf(props);
+      TestCatalog catalog =
+          new TestCatalog()
+              .withCatalogEntity(entity)
+              .withCatalogConf(props)
+              .withSecretManager(secretManager);
 
       Optional<Credential> credential =
           catalog

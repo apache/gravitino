@@ -88,6 +88,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
 
   private Map<String, String> conf;
 
+  private SecretManager secretManager;
+
   private volatile CatalogOperations ops;
 
   private volatile Capability capability;
@@ -376,10 +378,10 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (catalogCredentialManager == null) {
       synchronized (this) {
         if (catalogCredentialManager == null) {
+          Preconditions.checkState(secretManager != null, "secretManager is not set");
           // Entity storage keeps secret URNs; credential vending must return plaintext so
           // getCredentials / JdbcCredential (and other static-key providers) are usable by clients.
           Map<String, String> props = propertiesWithCredentialProviders();
-          SecretManager secretManager = GravitinoEnv.getInstance().secretManager();
           this.catalogCredentialManager =
               new CatalogCredentialManager(name(), secretManager.toPlaintextProperties(props));
         }
@@ -432,12 +434,32 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
+   * Sets the {@link SecretManager} used to resolve secret URNs for this catalog.
+   *
+   * @param secretManager The SecretManager instance.
+   * @return The instance of the concrete subclass of BaseCatalog.
+   */
+  public T withSecretManager(SecretManager secretManager) {
+    this.secretManager = secretManager;
+    return (T) this;
+  }
+
+  /**
    * Retrieves the CatalogEntity associated with this catalog.
    *
    * @return The CatalogEntity instance.
    */
   public CatalogEntity entity() {
     return entity;
+  }
+
+  /**
+   * Retrieves the {@link SecretManager} associated with this catalog.
+   *
+   * @return The SecretManager instance.
+   */
+  public SecretManager secretManager() {
+    return secretManager;
   }
 
   @Override
