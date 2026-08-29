@@ -48,6 +48,7 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -375,8 +376,12 @@ public abstract class BaseCatalog<T extends BaseCatalog>
     if (catalogCredentialManager == null) {
       synchronized (this) {
         if (catalogCredentialManager == null) {
+          // Entity storage keeps secret URNs; credential vending must return plaintext so
+          // getCredentials / JdbcCredential (and other static-key providers) are usable by clients.
+          Map<String, String> props = propertiesWithCredentialProviders();
+          SecretManager secretManager = GravitinoEnv.getInstance().secretManager();
           this.catalogCredentialManager =
-              new CatalogCredentialManager(name(), propertiesWithCredentialProviders());
+              new CatalogCredentialManager(name(), secretManager.toPlaintextProperties(props));
         }
       }
     }
