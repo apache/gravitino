@@ -126,6 +126,38 @@ public class JobPO {
     }
   }
 
+  /**
+   * Builds the {@link JobPO} to persist for an update, carrying forward the identity fields ({@code
+   * jobRunId}, {@code jobTemplateName}) from the old PO since a job's template is immutable, and
+   * bumping the version counters. This does not perform any optimistic-concurrency check; the
+   * caller is responsible for any such guarantee.
+   *
+   * @param oldJobPO the existing {@link JobPO} being updated
+   * @param newJobEntity the {@link JobEntity} with the updated status/timestamps/audit info
+   * @param builder the builder to populate, pre-configured with the {@code metalakeId}
+   * @return the {@code JobPO} object with updated fields
+   */
+  public static JobPO updateJobPO(JobPO oldJobPO, JobEntity newJobEntity, JobPOBuilder builder) {
+    try {
+      Long lastVersion = oldJobPO.lastVersion() + 1;
+      Long currentVersion = lastVersion;
+
+      return builder
+          .withJobRunId(oldJobPO.jobRunId())
+          .withJobTemplateName(oldJobPO.jobTemplateName())
+          .withJobExecutionId(newJobEntity.jobExecutionId())
+          .withJobRunStatus(newJobEntity.status().name())
+          .withJobFinishedAt(newJobEntity.finishedAt())
+          .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newJobEntity.auditInfo()))
+          .withCurrentVersion(currentVersion)
+          .withLastVersion(lastVersion)
+          .withDeletedAt(DEFAULT_DELETED_AT)
+          .build();
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize job entity", e);
+    }
+  }
+
   public static JobEntity fromJobPO(JobPO jobPO, Namespace namespace) {
     try {
       return JobEntity.builder()

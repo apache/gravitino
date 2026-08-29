@@ -141,4 +141,62 @@ public class TestJobPO {
     Assertions.assertEquals(jobEntity.namespace(), resultEntity.namespace());
     Assertions.assertEquals(jobEntity.auditInfo().creator(), resultEntity.auditInfo().creator());
   }
+
+  @Test
+  public void testUpdateJobPO() {
+    JobEntity oldEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withFinishedAt(0L)
+            .build();
+
+    JobPO.JobPOBuilder initBuilder = JobPO.builder().withMetalakeId(1L);
+    JobPO oldJobPO = JobPO.initializeJobPO(oldEntity, initBuilder);
+
+    long finishedAt = Instant.now().toEpochMilli();
+    AuditInfo updatedAuditInfo =
+        AuditInfo.builder()
+            .withCreator(oldEntity.auditInfo().creator())
+            .withCreateTime(oldEntity.auditInfo().createTime())
+            .withLastModifier("updater")
+            .withLastModifiedTime(Instant.now())
+            .build();
+
+    // Deliberately try to change jobTemplateName - updateJobPO must ignore it and keep the old
+    // PO's value, since a job's template is immutable once the job is created.
+    JobEntity newEntity =
+        JobEntity.builder()
+            .withId(oldEntity.id())
+            .withJobExecutionId("job-execution-2")
+            .withJobTemplateName("a-different-job-template")
+            .withStatus(JobHandle.Status.SUCCEEDED)
+            .withNamespace(oldEntity.namespace())
+            .withAuditInfo(updatedAuditInfo)
+            .withFinishedAt(finishedAt)
+            .build();
+
+    JobPO.JobPOBuilder updateBuilder = JobPO.builder().withMetalakeId(oldJobPO.metalakeId());
+    JobPO newJobPO = JobPO.updateJobPO(oldJobPO, newEntity, updateBuilder);
+
+    Assertions.assertEquals(oldJobPO.jobRunId(), newJobPO.jobRunId());
+    Assertions.assertEquals(oldJobPO.jobTemplateName(), newJobPO.jobTemplateName());
+    Assertions.assertEquals("job-execution-2", newJobPO.jobExecutionId());
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED.name(), newJobPO.jobRunStatus());
+    Assertions.assertEquals(finishedAt, newJobPO.jobFinishedAt());
+    Assertions.assertEquals(oldJobPO.currentVersion() + 1, newJobPO.currentVersion());
+    Assertions.assertEquals(oldJobPO.lastVersion() + 1, newJobPO.lastVersion());
+
+    JobEntity resultEntity = JobPO.fromJobPO(newJobPO, NamespaceUtil.ofJob("test"));
+    Assertions.assertEquals(JobHandle.Status.SUCCEEDED, resultEntity.status());
+    Assertions.assertEquals(finishedAt, resultEntity.finishedAt());
+    Assertions.assertEquals("test-job-template", resultEntity.jobTemplateName());
+    Assertions.assertEquals(
+        updatedAuditInfo.lastModifier(), resultEntity.auditInfo().lastModifier());
+  }
 }

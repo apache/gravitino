@@ -259,6 +259,8 @@ public class JDBCBackend implements RelationalBackend {
         return (E) PolicyMetaService.getInstance().updatePolicy(ident, updater);
       case JOB_TEMPLATE:
         return (E) JobTemplateMetaService.getInstance().updateJobTemplate(ident, updater);
+      case JOB:
+        return (E) JobMetaService.getInstance().updateJob(ident, updater);
       case VIEW:
         return (E) ViewMetaService.getInstance().updateView(ident, updater);
       default:
