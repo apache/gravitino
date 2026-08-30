@@ -50,7 +50,17 @@ public class TopicMetaSQLProviderFactory {
 
   static class TopicMetaMySQLProvider extends TopicMetaBaseSQLProvider {}
 
-  static class TopicMetaH2Provider extends TopicMetaBaseSQLProvider {}
+  static class TopicMetaH2Provider extends TopicMetaBaseSQLProvider {
+
+    /** {@inheritDoc} */
+    @Override
+    protected String overwriteVersionAssignments() {
+      // H2 evaluates both right-hand sides against the row before the update, so each assignment
+      // must calculate the next version independently.
+      return " current_version = GREATEST(current_version, last_version) + 1,"
+          + " last_version = GREATEST(current_version, last_version) + 1,";
+    }
+  }
 
   public static String insertTopicMeta(@Param("topicMeta") TopicPO topicPO) {
     return getProvider().insertTopicMeta(topicPO);

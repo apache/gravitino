@@ -280,6 +280,28 @@ public class TestTopicMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteAdvancesBeyondBothVersionMarkers() throws IOException {
+    TopicEntity topic = createTopic("topic_overwrite_mismatched_versions", "original");
+    TopicMetaService.getInstance().insertTopic(topic, false);
+    TopicPO initialPO = getTopicPO(topic.id());
+    TopicPO inconsistentLegacyPO = copyTopicPOWithVersions(initialPO, 3L, 5L);
+    SessionUtils.doWithCommit(
+        TopicMetaMapper.class,
+        mapper ->
+            Assertions.assertEquals(1, mapper.updateTopicMeta(inconsistentLegacyPO, initialPO)));
+
+    TopicEntity replacement = copyTopic(topic, topic.name(), "replacement");
+    TopicMetaService.getInstance().insertTopic(replacement, true);
+
+    TopicPO currentPO = getTopicPO(topic.id());
+    Assertions.assertEquals(6L, currentPO.getCurrentVersion());
+    Assertions.assertEquals(6L, currentPO.getLastVersion());
+    Assertions.assertEquals(
+        "replacement",
+        TopicMetaService.getInstance().getTopicByIdentifier(topic.nameIdentifier()).comment());
+  }
+
+  @TestTemplate
   public void testAlterReportsNoSuchWhenDeletedConcurrently() throws IOException {
     TopicEntity topic = createTopic("topic_alter_deleted", "original");
     TopicMetaService.getInstance().insertTopic(topic, false);
@@ -500,6 +522,22 @@ public class TestTopicMetaService extends TestJDBCBackend {
   private TopicPO getTopicPO(Long topicId) {
     return SessionUtils.getWithoutCommit(
         TopicMetaMapper.class, mapper -> mapper.selectTopicMetaById(topicId));
+  }
+
+  private TopicPO copyTopicPOWithVersions(TopicPO source, Long currentVersion, Long lastVersion) {
+    return TopicPO.builder()
+        .withTopicId(source.getTopicId())
+        .withTopicName(source.getTopicName())
+        .withMetalakeId(source.getMetalakeId())
+        .withCatalogId(source.getCatalogId())
+        .withSchemaId(source.getSchemaId())
+        .withComment(source.getComment())
+        .withProperties(source.getProperties())
+        .withAuditInfo(source.getAuditInfo())
+        .withCurrentVersion(currentVersion)
+        .withLastVersion(lastVersion)
+        .withDeletedAt(source.getDeletedAt())
+        .build();
   }
 
   private void updateTopicUnchecked(

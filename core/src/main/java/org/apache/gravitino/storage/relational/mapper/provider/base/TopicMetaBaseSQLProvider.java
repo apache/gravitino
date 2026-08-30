@@ -78,11 +78,7 @@ public class TopicMetaBaseSQLProvider {
         + " comment = #{topicMeta.comment},"
         + " properties = #{topicMeta.properties},"
         + " audit_info = #{topicMeta.auditInfo},"
-        // An overwrite is a concurrent write too. Advance from the stored value so an existing
-        // topic never returns to the initial version carried by the incoming create request.
-        // MySQL evaluates assignments from left to right, so update last_version first.
-        + " last_version = current_version + 1,"
-        + " current_version = current_version + 1,"
+        + overwriteVersionAssignments()
         + " deleted_at = #{topicMeta.deletedAt}";
   }
 
@@ -359,5 +355,19 @@ public class TopicMetaBaseSQLProvider {
         + " )"
         + " AND tm.deleted_at = 0 AND sm.deleted_at = 0 AND cm.deleted_at = 0 AND mm.deleted_at = 0"
         + "</script>";
+  }
+
+  /**
+   * Returns MySQL assignments that advance an overwritten topic beyond both stored version markers.
+   *
+   * <p>MySQL evaluates assignments from left to right. Updating {@code current_version} first lets
+   * {@code last_version} copy the same newly computed value without evaluating the maximum again
+   * against a partially updated row.
+   *
+   * @return the overwrite version assignments
+   */
+  protected String overwriteVersionAssignments() {
+    return " current_version = GREATEST(current_version, last_version) + 1,"
+        + " last_version = current_version,";
   }
 }

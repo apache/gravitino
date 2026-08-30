@@ -27,18 +27,20 @@ class TestTopicMetaPostgreSQLProvider {
   private static final TopicMetaPostgreSQLProvider PROVIDER = new TopicMetaPostgreSQLProvider();
 
   @Test
-  void testOverwriteAdvancesStoredVersion() {
+  void testOverwriteAdvancesBeyondBothStoredVersions() {
     String sql = PROVIDER.insertTopicMetaOnDuplicateKeyUpdate(null);
     String conflictClause = sql.substring(sql.indexOf(" ON CONFLICT"));
+    String nextVersionExpression =
+        "GREATEST("
+            + TopicMetaMapper.TABLE_NAME
+            + ".current_version, "
+            + TopicMetaMapper.TABLE_NAME
+            + ".last_version) + 1";
 
     Assertions.assertTrue(
         conflictClause.startsWith(" ON CONFLICT (schema_id, topic_name, deleted_at)"));
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "current_version = " + TopicMetaMapper.TABLE_NAME + ".current_version + 1"));
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "last_version = " + TopicMetaMapper.TABLE_NAME + ".current_version + 1"));
+    Assertions.assertTrue(conflictClause.contains("current_version = " + nextVersionExpression));
+    Assertions.assertTrue(conflictClause.contains("last_version = " + nextVersionExpression));
     Assertions.assertFalse(conflictClause.contains("#{topicMeta.currentVersion}"));
     Assertions.assertFalse(conflictClause.contains("#{topicMeta.lastVersion}"));
   }

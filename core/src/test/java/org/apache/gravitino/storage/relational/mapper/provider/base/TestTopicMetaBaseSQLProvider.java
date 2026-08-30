@@ -26,14 +26,15 @@ class TestTopicMetaBaseSQLProvider {
   private static final TopicMetaBaseSQLProvider PROVIDER = new TopicMetaBaseSQLProvider();
 
   @Test
-  void testOverwriteAdvancesStoredVersion() {
+  void testOverwriteAdvancesBeyondBothStoredVersions() {
     String sql = PROVIDER.insertTopicMetaOnDuplicateKeyUpdate(null);
     String updateClause = sql.substring(sql.indexOf(" ON DUPLICATE KEY UPDATE"));
 
-    Assertions.assertTrue(updateClause.contains("last_version = current_version + 1"));
-    Assertions.assertTrue(updateClause.contains("current_version = current_version + 1"));
     Assertions.assertTrue(
-        updateClause.indexOf("last_version =") < updateClause.indexOf("current_version ="));
+        updateClause.contains("current_version = GREATEST(current_version, last_version) + 1"));
+    Assertions.assertTrue(updateClause.contains("last_version = current_version"));
+    Assertions.assertTrue(
+        updateClause.indexOf("current_version =") < updateClause.indexOf("last_version ="));
     Assertions.assertFalse(updateClause.contains("#{topicMeta.currentVersion}"));
     Assertions.assertFalse(updateClause.contains("#{topicMeta.lastVersion}"));
   }

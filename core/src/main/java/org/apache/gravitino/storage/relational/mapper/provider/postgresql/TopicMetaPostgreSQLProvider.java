@@ -96,14 +96,21 @@ public class TopicMetaPostgreSQLProvider extends TopicMetaBaseSQLProvider {
         + " comment = #{topicMeta.comment},"
         + " properties = #{topicMeta.properties},"
         + " audit_info = #{topicMeta.auditInfo},"
-        // PostgreSQL needs the table name here to distinguish the stored version from the row that
-        // caused the conflict.
+        // PostgreSQL evaluates both assignments against the stored row. Qualifying the columns
+        // distinguishes them from the row that caused the conflict, and taking the larger marker
+        // prevents an inconsistent legacy row from moving either version backwards.
         + " current_version = "
+        + "GREATEST("
         + TABLE_NAME
-        + ".current_version + 1,"
+        + ".current_version, "
+        + TABLE_NAME
+        + ".last_version) + 1,"
         + " last_version = "
+        + "GREATEST("
         + TABLE_NAME
-        + ".current_version + 1,"
+        + ".current_version, "
+        + TABLE_NAME
+        + ".last_version) + 1,"
         + " deleted_at = #{topicMeta.deletedAt}";
   }
 
