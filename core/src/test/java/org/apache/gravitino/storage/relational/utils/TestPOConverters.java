@@ -760,11 +760,8 @@ public class TestPOConverters {
         FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
 
-    // map has updated
-    boolean checkNeedUpdate1 =
-        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPOs(), updatedFileset);
-    FilesetPO updatePO1 =
-        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, checkNeedUpdate1);
+    // A content change advances the version and writes a complete new snapshot.
+    FilesetPO updatePO1 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, null);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -783,11 +780,9 @@ public class TestPOConverters {
             .readValue(updatePO1.getFilesetVersionPOs().get(0).getProperties(), Map.class);
     assertEquals("value1", updatedProperties.get("key"));
 
-    // will not update version, but update the fileset name
-    boolean checkNeedUpdate2 =
-        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPOs(), updatedFileset1);
-    FilesetPO updatePO2 =
-        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, checkNeedUpdate2);
+    // Metadata-only changes must also advance the OCC token. Reads join the version table through
+    // current_version, so the converter writes the unchanged content as a new complete snapshot.
+    FilesetPO updatePO2 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, null);
     Map<String, String> storageLocations2 =
         updatePO2.getFilesetVersionPOs().stream()
             .collect(
@@ -795,10 +790,17 @@ public class TestPOConverters {
                     FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
     assertEquals(filesetEntity.storageLocation(), storageLocations2.get(LOCATION_NAME_UNKNOWN));
     assertEquals(filesetEntity.storageLocations(), storageLocations2);
-    assertEquals(1, updatePO2.getCurrentVersion());
-    assertEquals(1, updatePO2.getLastVersion());
-    assertEquals(1, updatePO2.getFilesetVersionPOs().get(0).getVersion());
+    assertEquals(2, updatePO2.getCurrentVersion());
+    assertEquals(2, updatePO2.getLastVersion());
+    assertEquals(2, updatePO2.getFilesetVersionPOs().get(0).getVersion());
     assertEquals("test1", updatePO2.getFilesetName());
+
+    // A snapshot stored above the version the metadata row records must not be rebuilt: the next
+    // version starts above every snapshot the fileset still owns.
+    FilesetPO updatePO3 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, 7L);
+    assertEquals(8, updatePO3.getCurrentVersion());
+    assertEquals(8, updatePO3.getLastVersion());
+    assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
   }
 
   @Test

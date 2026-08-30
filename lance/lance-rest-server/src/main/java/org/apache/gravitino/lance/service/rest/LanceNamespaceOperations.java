@@ -19,8 +19,10 @@
 package org.apache.gravitino.lance.service.rest;
 
 import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_NAMESPACE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_NAMESPACE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.CAN_ACCESS_METADATA;
-import static org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants.PROBE_SCHEMA_AUTHORIZATION_EXPRESSION;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
@@ -55,14 +57,6 @@ import org.lance.namespace.model.ListTablesResponse;
 public class LanceNamespaceOperations {
 
   private static final String ROOT_NAMESPACE_ID = "";
-
-  // Catalog probes use normal catalog access. Schema probes additionally permit CREATE_SCHEMA,
-  // because clients commonly check existence immediately before creating a schema.
-  private static final String PROBE_NAMESPACE_AUTHORIZATION_EXPRESSION =
-      CAN_ACCESS_METADATA
-          + " || (entityType == 'SCHEMA' && ("
-          + PROBE_SCHEMA_AUTHORIZATION_EXPRESSION
-          + "))";
 
   private final NamespaceWrapper lanceNamespace;
 
@@ -131,6 +125,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/create")
   @Timed(name = "create-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-namespaces", absolute = true)
+  @AuthorizationExpression(expression = CREATE_NAMESPACE_AUTHORIZATION_EXPRESSION)
   public Response createNamespace(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,
@@ -154,6 +149,7 @@ public class LanceNamespaceOperations {
   @Path("/{id}/drop")
   @Timed(name = "drop-namespaces." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-namespaces", absolute = true)
+  @AuthorizationExpression(expression = MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION)
   public Response dropNamespace(
       @PathParam("id") String namespaceId,
       @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) @QueryParam("delimiter") String delimiter,

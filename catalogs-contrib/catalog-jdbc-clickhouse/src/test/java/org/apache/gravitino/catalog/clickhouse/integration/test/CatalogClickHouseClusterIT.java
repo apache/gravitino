@@ -546,6 +546,96 @@ public class CatalogClickHouseClusterIT extends BaseIT {
   }
 
   @Test
+  public void testNgrambfAndTokenbfIndexesOnCluster() {
+    String tableName = GravitinoITUtils.genRandomName("ck_cluster_skip_idx");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> ngramProperties =
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0");
+    Map<String, String> tokenProperties =
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "0",
+            "granularity", "4");
+
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram",
+              new String[][] {{"col_3"}},
+              ngramProperties),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_token",
+              new String[][] {{"col_3"}},
+              tokenProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    assertIndexMetadata(
+        loaded.index(), "idx_ngram", Index.IndexType.DATA_SKIPPING_NGRAMBFV1, ngramProperties);
+    assertIndexMetadata(
+        loaded.index(), "idx_token", Index.IndexType.DATA_SKIPPING_TOKENBFV1, tokenProperties);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+            "idx_ngram_alter",
+            new String[][] {{"col_3"}},
+            ngramProperties),
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+            "idx_token_alter",
+            new String[][] {{"col_3"}},
+            tokenProperties));
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    assertIndexMetadata(
+        altered.index(),
+        "idx_ngram_alter",
+        Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+        ngramProperties);
+    assertIndexMetadata(
+        altered.index(),
+        "idx_token_alter",
+        Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+        tokenProperties);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.deleteIndex("idx_ngram", false),
+        TableChange.deleteIndex("idx_token", false),
+        TableChange.deleteIndex("idx_ngram_alter", false),
+        TableChange.deleteIndex("idx_token_alter", false));
+  }
+
+  private void assertIndexMetadata(
+      Index[] indexes, String name, Index.IndexType type, Map<String, String> properties) {
+    Index index =
+        Arrays.stream(indexes)
+            .filter(candidate -> Objects.equals(name, candidate.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing index " + name));
+    Assertions.assertEquals(type, index.type());
+    Assertions.assertTrue(Arrays.deepEquals(new String[][] {{"col_3"}}, index.fieldNames()));
+    Assertions.assertEquals(properties, index.properties());
+  }
+
+  @Test
   public void testDropTableOnCluster() {
     String dropTableName = GravitinoITUtils.genRandomName("ck_cluster_drop_tbl");
     NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, dropTableName);
