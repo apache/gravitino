@@ -48,6 +48,7 @@ import org.apache.gravitino.credential.S3SecretKeyCredential;
 import org.apache.gravitino.exceptions.CatalogNotInUseException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.storage.AzureProperties;
 import org.apache.gravitino.storage.GCSProperties;
 import org.apache.gravitino.storage.OSSProperties;
@@ -86,6 +87,8 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   private CatalogEntity entity;
 
   private Map<String, String> conf;
+
+  private SecretManager secretManager;
 
   private volatile CatalogOperations ops;
 
@@ -427,6 +430,17 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   }
 
   /**
+   * Sets the {@link SecretManager} used to resolve secret URNs for this catalog.
+   *
+   * @param secretManager The SecretManager instance; may be null when secrets are not configured.
+   * @return The instance of the concrete subclass of BaseCatalog.
+   */
+  public T withSecretManager(SecretManager secretManager) {
+    this.secretManager = secretManager;
+    return (T) this;
+  }
+
+  /**
    * Retrieves the CatalogEntity associated with this catalog.
    *
    * @return The CatalogEntity instance.
@@ -488,13 +502,19 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   /**
    * Retrieves the properties of the catalog including credential providers. Detects storage and
    * catalog-specific credential providers from the raw entity properties (including hidden ones)
-   * and injects them before {@link CatalogCredentialManager} is initialized. Subclasses may
-   * override {@link #addCatalogSpecificCredentialProviders} to add additional providers.
+   * and injects them before {@link CatalogCredentialManager} is initialized. When a {@link
+   * SecretManager} is set, secret URN values are resolved to plaintext so credential vending can
+   * use them. Subclasses may override {@link #addCatalogSpecificCredentialProviders} to add
+   * additional providers.
    *
-   * @return A map of raw properties with credential providers set.
+   * @return A map of properties with credential providers set.
    */
   public Map<String, String> propertiesWithCredentialProviders() {
+    // Entity storage keeps secret URNs; resolve to plaintext when SecretManager is available.
     Map<String, String> props = Maps.newHashMap(entity().getProperties());
+    if (secretManager != null) {
+      props = Maps.newHashMap(secretManager.toPlaintextProperties(props));
+    }
     if (StringUtils.isNotBlank(props.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
       return props;
     }
