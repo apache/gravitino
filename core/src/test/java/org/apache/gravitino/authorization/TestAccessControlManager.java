@@ -66,6 +66,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -464,6 +465,30 @@ public class TestAccessControlManager {
   }
 
   @Test
+  public void testBulkCreateRoles() {
+    List<BulkItemResult<Role>> results =
+        accessControlManager.createRoles(
+            METALAKE,
+            Lists.newArrayList(
+                new RoleAdd(
+                    "bulk_role_1",
+                    ImmutableMap.of("key1", "value1"),
+                    Lists.newArrayList(
+                        SecurableObjects.ofCatalog(
+                            "catalog", Lists.newArrayList(Privileges.UseCatalog.allow())))),
+                new RoleAdd("bulk_role_2", null, Collections.emptyList()),
+                new RoleAdd("bulk_role_1", null, Collections.emptyList())));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_role_1", results.get(0).value().get().name());
+    testProperties(ImmutableMap.of("key1", "value1"), results.get(0).value().get().properties());
+    Assertions.assertTrue(results.get(1).succeeded());
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof RoleAlreadyExistsException);
+  }
+
+  @Test
   public void testLoadRole() {
     Map<String, String> props = ImmutableMap.of("k1", "v1");
 
@@ -509,6 +534,21 @@ public class TestAccessControlManager {
     // Test drop non-existed role
     boolean dropped1 = accessControlManager.deleteRole(METALAKE, "no-exist");
     Assertions.assertFalse(dropped1);
+  }
+
+  @Test
+  public void testBulkDeleteRoles() {
+    accessControlManager.createRole(METALAKE, "bulk_delete_role", null, Collections.emptyList());
+
+    List<BulkItemResult<String>> results =
+        accessControlManager.deleteRoles(
+            METALAKE, Lists.newArrayList("bulk_delete_role", "missing_bulk_role"));
+
+    Assertions.assertEquals(2, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_delete_role", results.get(0).name());
+    Assertions.assertFalse(results.get(1).succeeded());
+    Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchRoleException);
   }
 
   @Test

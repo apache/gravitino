@@ -20,9 +20,13 @@ package org.apache.gravitino.server.web.rest;
 
 import com.codahale.metrics.annotation.ResponseMetered;
 import com.codahale.metrics.annotation.Timed;
+import com.google.common.collect.Sets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.POST;
@@ -36,31 +40,50 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Group;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
+import org.apache.gravitino.authorization.Privilege;
+import org.apache.gravitino.authorization.Role;
+import org.apache.gravitino.authorization.SecurableObject;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.authorization.User;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.BulkManager;
 import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.dto.authorization.GroupDTO;
+import org.apache.gravitino.dto.authorization.PrivilegeDTO;
+import org.apache.gravitino.dto.authorization.RoleDTO;
+import org.apache.gravitino.dto.authorization.SecurableObjectDTO;
 import org.apache.gravitino.dto.authorization.UserDTO;
 import org.apache.gravitino.dto.requests.BulkGroupAddRequest;
 import org.apache.gravitino.dto.requests.BulkRemoveRequest;
+import org.apache.gravitino.dto.requests.BulkRoleAddRequest;
 import org.apache.gravitino.dto.requests.BulkUserAddRequest;
+import org.apache.gravitino.dto.requests.RoleCreateRequest;
 import org.apache.gravitino.dto.responses.BulkError;
 import org.apache.gravitino.dto.responses.BulkGroupResponse;
 import org.apache.gravitino.dto.responses.BulkRemoveResponse;
+import org.apache.gravitino.dto.responses.BulkRoleResponse;
 import org.apache.gravitino.dto.responses.BulkSummary;
 import org.apache.gravitino.dto.responses.BulkUserResponse;
 import org.apache.gravitino.dto.util.DTOConverters;
+import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.exceptions.IllegalMetadataObjectException;
+import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.metalake.MetalakeManager;
 import org.apache.gravitino.metrics.MetricNames;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
 import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
 import org.apache.gravitino.server.web.Utils;
+import org.apache.gravitino.utils.MetadataObjectUtil;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.gravitino.utils.PrincipalUtils;
 
 /** Provides best-effort bulk APIs for metalake access-control entities. */
 @NameBindings.AccessControlInterfaces
@@ -69,7 +92,10 @@ public class BulkOperations {
 
   private static final String USERS_FIELD_NAME = "users";
   private static final String GROUPS_FIELD_NAME = "groups";
+  private static final String ROLES_FIELD_NAME = "roles";
   private static final String NAMES_FIELD_NAME = "names";
+  private static final String DELETE_ROLE_AUTHORIZATION_EXPRESSION =
+      "METALAKE::OWNER || ROLE::OWNER";
 
   private final BulkManager bulkManager;
   private final AccessControlDispatcher accessControlDispatcher;
@@ -281,5 +307,212 @@ public class BulkOperations {
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(OperationType.REMOVE, "", metalake, e);
     }
+  }
+
+  /**
+   * Adds roles in bulk.
+   *
+   * @param metalake The metalake name.
+   * @param request The bulk role add request.
+   * @return The bulk role response.
+   */
+  @POST
+  @Path("roles/add")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "bulk-add-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "bulk-add-role", absolute = true)
+  @AuthorizationExpression(expression = "METALAKE::OWNER || METALAKE::CREATE_ROLE")
+  public Response addRoles(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      BulkRoleAddRequest request) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            bulkManager.checkBulkSize(ROLES_FIELD_NAME, request.getRoles().length);
+            MetalakeManager.checkMetalakeInUse(metalake);
+
+            List<RoleAdd> roles = new ArrayList<>();
+            List<Integer> originalIndexes = new ArrayList<>();
+            List<BulkItemResult<Role>> results = new ArrayList<>();
+            for (int index = 0; index < request.getRoles().length; index++) {
+              try {
+                roles.add(toRoleAdd(metalake, request.getRoles()[index]));
+                originalIndexes.add(index);
+              } catch (Exception e) {
+                results.add(BulkItemResult.failure(index, request.getRoles()[index].getName(), e));
+              }
+            }
+            results.addAll(
+                remapRoleResults(
+                    accessControlDispatcher.createRoles(metalake, roles), originalIndexes));
+            results.sort(Comparator.comparingInt(BulkItemResult::index));
+
+            RoleDTO[] rolesResponse =
+                results.stream()
+                    .filter(BulkItemResult::succeeded)
+                    .map(result -> DTOConverters.toDTO(result.value().get()))
+                    .toArray(RoleDTO[]::new);
+            BulkError[] errors =
+                results.stream()
+                    .filter(result -> !result.succeeded())
+                    .map(bulkManager::toBulkError)
+                    .toArray(BulkError[]::new);
+            return Utils.ok(
+                new BulkRoleResponse(
+                    rolesResponse,
+                    errors,
+                    new BulkSummary(results.size(), rolesResponse.length, errors.length)));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRoleException(OperationType.CREATE, "", metalake, e);
+    }
+  }
+
+  /**
+   * Removes roles in bulk.
+   *
+   * @param metalake The metalake name.
+   * @param request The bulk remove request.
+   * @return The bulk remove response.
+   */
+  @POST
+  @Path("roles/remove")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "bulk-remove-role." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "bulk-remove-role", absolute = true)
+  @AuthorizationExpression(expression = "")
+  public Response removeRoles(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      BulkRemoveRequest request) {
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            bulkManager.checkBulkSize(NAMES_FIELD_NAME, request.getNames().length);
+            MetalakeManager.checkMetalakeInUse(metalake);
+
+            List<String> roles = new ArrayList<>();
+            List<Integer> originalIndexes = new ArrayList<>();
+            List<BulkItemResult<String>> results = new ArrayList<>();
+            for (int index = 0; index < request.getNames().length; index++) {
+              String role = request.getNames()[index];
+              try {
+                checkDeleteRoleAuthorization(metalake, role);
+                roles.add(role);
+                originalIndexes.add(index);
+              } catch (Exception e) {
+                results.add(BulkItemResult.failure(index, role, e));
+              }
+            }
+            results.addAll(
+                remapStringResults(
+                    accessControlDispatcher.deleteRoles(metalake, roles), originalIndexes));
+            results.sort(Comparator.comparingInt(BulkItemResult::index));
+
+            String[] names =
+                results.stream()
+                    .filter(BulkItemResult::succeeded)
+                    .map(BulkItemResult::name)
+                    .toArray(String[]::new);
+            BulkError[] errors =
+                results.stream()
+                    .filter(result -> !result.succeeded())
+                    .map(bulkManager::toBulkError)
+                    .toArray(BulkError[]::new);
+            return Utils.ok(
+                new BulkRemoveResponse(
+                    names, errors, new BulkSummary(results.size(), names.length, errors.length)));
+          });
+    } catch (Exception e) {
+      return ExceptionHandlers.handleRoleException(OperationType.DELETE, "", metalake, e);
+    }
+  }
+
+  private RoleAdd toRoleAdd(String metalake, RoleCreateRequest request) {
+    Set<MetadataObject> metadataObjects = Sets.newHashSet();
+    for (SecurableObjectDTO object : request.getSecurableObjects()) {
+      MetadataObject metadataObject = MetadataObjects.parse(object.getFullName(), object.type());
+      if (metadataObjects.contains(metadataObject)) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Doesn't support specifying duplicated securable objects %s type %s",
+                object.fullName(), object.type()));
+      } else {
+        metadataObjects.add(metadataObject);
+      }
+
+      Set<Privilege> privileges = Sets.newHashSet(object.privileges());
+      AuthorizationUtils.checkDuplicatedNamePrivilege(privileges);
+      try {
+        for (Privilege privilege : object.privileges()) {
+          AuthorizationUtils.checkPrivilege((PrivilegeDTO) privilege, object, metalake);
+        }
+        MetadataObjectUtil.checkMetadataObject(metalake, object);
+      } catch (NoSuchMetadataObjectException nsm) {
+        throw new IllegalMetadataObjectException(nsm);
+      }
+    }
+
+    List<SecurableObject> securableObjects =
+        Arrays.stream(request.getSecurableObjects())
+            .map(
+                securableObjectDTO ->
+                    SecurableObjects.parse(
+                        securableObjectDTO.fullName(),
+                        securableObjectDTO.type(),
+                        securableObjectDTO.privileges().stream()
+                            .map(
+                                privilege ->
+                                    DTOConverters.fromPrivilegeDTO((PrivilegeDTO) privilege))
+                            .collect(Collectors.toList())))
+            .collect(Collectors.toList());
+    return new RoleAdd(request.getName(), request.getProperties(), securableObjects);
+  }
+
+  private void checkDeleteRoleAuthorization(String metalake, String role) {
+    boolean allowed =
+        MetadataAuthzHelper.checkAccess(
+            NameIdentifierUtil.ofRole(metalake, role),
+            Entity.EntityType.ROLE,
+            DELETE_ROLE_AUTHORIZATION_EXPRESSION);
+    if (!allowed) {
+      throw new ForbiddenException(
+          "User '%s' is not authorized to perform operation '%s' on metadata '%s' with expression '%s'",
+          PrincipalUtils.getCurrentUserName(),
+          "removeRoles",
+          NameIdentifierUtil.ofRole(metalake, role),
+          DELETE_ROLE_AUTHORIZATION_EXPRESSION);
+    }
+  }
+
+  private List<BulkItemResult<Role>> remapRoleResults(
+      List<BulkItemResult<Role>> results, List<Integer> originalIndexes) {
+    return results.stream()
+        .map(
+            result ->
+                result.succeeded()
+                    ? BulkItemResult.success(
+                        originalIndexes.get(result.index()), result.name(), result.value().get())
+                    : BulkItemResult.<Role>failure(
+                        originalIndexes.get(result.index()), result.name(), result.error().get()))
+        .collect(Collectors.toList());
+  }
+
+  private List<BulkItemResult<String>> remapStringResults(
+      List<BulkItemResult<String>> results, List<Integer> originalIndexes) {
+    return results.stream()
+        .map(
+            result ->
+                result.succeeded()
+                    ? BulkItemResult.<String>success(
+                        originalIndexes.get(result.index()), result.name())
+                    : BulkItemResult.<String>failure(
+                        originalIndexes.get(result.index()), result.name(), result.error().get()))
+        .collect(Collectors.toList());
   }
 }

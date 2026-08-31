@@ -30,6 +30,7 @@ import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.bulk.BulkItemResult;
 import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.RoleAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -456,6 +457,29 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+  public List<BulkItemResult<Role>> createRoles(String metalake, List<RoleAdd> roles)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<Role>> results = Lists.newArrayListWithCapacity(roles.size());
+          for (int index = 0; index < roles.size(); index++) {
+            RoleAdd role = roles.get(index);
+            try {
+              Role createdRole =
+                  roleManager.createRole(
+                      metalake, role.name(), role.properties(), role.securableObjects());
+              results.add(BulkItemResult.success(index, role.name(), createdRole));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, role.name(), e));
+            }
+          }
+          return results;
+        });
+  }
+
+  @Override
   public Role getRole(String metalake, String role)
       throws NoSuchRoleException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
@@ -470,6 +494,33 @@ public class AccessControlManager implements AccessControlDispatcher {
         NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
         LockType.WRITE,
         () -> roleManager.deleteRole(metalake, role));
+  }
+
+  @Override
+  public List<BulkItemResult<String>> deleteRoles(String metalake, List<String> roles)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofRoleNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<String>> results = Lists.newArrayListWithCapacity(roles.size());
+          for (int index = 0; index < roles.size(); index++) {
+            String role = roles.get(index);
+            try {
+              boolean deleted = roleManager.deleteRole(metalake, role);
+              if (!deleted) {
+                results.add(
+                    BulkItemResult.failure(
+                        index, role, new NoSuchRoleException("Role does not exist: %s", role)));
+                continue;
+              }
+              results.add(BulkItemResult.success(index, role));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, role, e));
+            }
+          }
+          return results;
+        });
   }
 
   @Override

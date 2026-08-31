@@ -187,6 +187,90 @@ paths:
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
+  /bulk/metalakes/{metalake}/roles/add:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Add roles in bulk
+      operationId: bulkAddRoles
+      description: Adds roles in best-effort mode. Failed items are returned in the top-level errors array. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRoleAddRequest"
+            examples:
+              BulkRoleAddRequest:
+                $ref: "#/components/examples/BulkRoleAddRequest"
+      responses:
+        "200":
+          description: Returns successfully added roles and item-level errors
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkRoleResponse"
+              examples:
+                BulkRoleResponse:
+                  $ref: "#/components/examples/BulkRoleResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
+  /bulk/metalakes/{metalake}/roles/remove:
+    parameters:
+      - $ref: "./openapi.yaml#/components/parameters/metalake"
+
+    post:
+      tags:
+        - access control
+      summary: Remove roles in bulk
+      operationId: bulkRemoveRoles
+      description: Removes roles in best-effort mode. Failed items are returned in the top-level errors array. Role names in the same request must be unique. The maximum request size is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BulkRemoveRequest"
+            examples:
+              BulkRemoveRequest:
+                $ref: "#/components/examples/BulkRemoveRolesRequest"
+      responses:
+        "200":
+          description: Returns successfully removed names and item-level errors
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "#/components/schemas/BulkRemoveResponse"
+              examples:
+                BulkRemoveResponse:
+                  $ref: "#/components/examples/BulkRemoveRolesResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "404":
+          description: Not Found - The specified metalake does not exist
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
+              examples:
+                NoSuchMetalakeException:
+                  $ref: "./metalakes.yaml#/components/examples/NoSuchMetalakeException"
+        "5xx":
+          $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
+
 components:
 
   schemas:
@@ -213,6 +297,18 @@ components:
           description: The maximum length is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
           items:
             $ref: "./groups.yaml#/components/schemas/GroupAddRequest"
+
+    BulkRoleAddRequest:
+      type: object
+      required:
+        - roles
+      properties:
+        roles:
+          type: array
+          minItems: 1
+          description: The maximum length is controlled by `gravitino.server.bulk.maxItems`, which defaults to 100.
+          items:
+            $ref: "./roles.yaml#/components/schemas/RoleCreateRequest"
 
     BulkRemoveRequest:
       type: object
@@ -313,6 +409,28 @@ components:
         summary:
           $ref: "#/components/schemas/BulkSummary"
 
+    BulkRoleResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: Status code of the response
+          enum:
+            - 0
+        roles:
+          type: array
+          description: Successfully added roles
+          items:
+            $ref: "./roles.yaml#/components/schemas/Role"
+        errors:
+          type: array
+          description: Item-level errors
+          items:
+            $ref: "#/components/schemas/BulkError"
+        summary:
+          $ref: "#/components/schemas/BulkSummary"
+
     BulkRemoveResponse:
       type: object
       properties:
@@ -357,9 +475,22 @@ components:
         ]
       }
 
+    BulkRoleAddRequest:
+      value: {
+        "roles": [
+          {"name": "developer", "properties": {}, "securableObjects": []},
+          {"name": "operator", "properties": {}, "securableObjects": []}
+        ]
+      }
+
     BulkRemoveGroupsRequest:
       value: {
         "names": ["engineers", "analysts", "ghost"]
+      }
+
+    BulkRemoveRolesRequest:
+      value: {
+        "names": ["developer", "operator", "ghost"]
       }
 
     BulkUserResponse:
@@ -431,6 +562,28 @@ components:
         "summary": {"total": 2, "succeeded": 1, "failed": 1}
       }
 
+    BulkRoleResponse:
+      value: {
+        "code": 0,
+        "roles": [
+          {
+            "name": "developer",
+            "properties": {},
+            "securableObjects": []
+          }
+        ],
+        "errors": [
+          {
+            "index": 1,
+            "name": "operator",
+            "code": 1004,
+            "type": "RoleAlreadyExistsException",
+            "message": "Role already exists: operator"
+          }
+        ],
+        "summary": {"total": 2, "succeeded": 1, "failed": 1}
+      }
+
     BulkRemoveGroupsResponse:
       value: {
         "code": 0,
@@ -442,6 +595,22 @@ components:
             "code": 1003,
             "type": "NoSuchGroupException",
             "message": "Group does not exist: ghost"
+          }
+        ],
+        "summary": {"total": 3, "succeeded": 2, "failed": 1}
+      }
+
+    BulkRemoveRolesResponse:
+      value: {
+        "code": 0,
+        "names": ["developer", "operator"],
+        "errors": [
+          {
+            "index": 2,
+            "name": "ghost",
+            "code": 1003,
+            "type": "NoSuchRoleException",
+            "message": "Role does not exist: ghost"
           }
         ],
         "summary": {"total": 3, "succeeded": 2, "failed": 1}
