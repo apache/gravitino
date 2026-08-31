@@ -231,7 +231,7 @@ public class GravitinoConfig {
   private static final ConfigEntry GRAVITINO_TRINO_SKIP_VERSION_VALIDATION =
       new ConfigEntry(
           "gravitino.trino.skip-version-validation",
-          "When true, skips Trino version validation and logs a warning instead of throwing an error. Gravitino supports Trino versions 435-439; other versions are untested.",
+          "When true, skips Trino version validation and logs a warning instead of throwing an error. Gravitino supports Trino versions 440-478; other versions are untested.",
           "false",
           false);
 
