@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy;
+package org.apache.gravitino.json;
 
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
@@ -30,9 +30,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import java.io.IOException;
-import org.apache.gravitino.json.JsonUtils;
+import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 
-/** Serializes and deserializes policy-to-tag selectors. */
+/** JSON serializer and deserializer for policy-to-tag selectors. */
 public final class PolicyAssociationSelectorSerde {
 
   private static final String TYPE = "type";

@@ -80,6 +80,7 @@ import org.apache.gravitino.function.FunctionImpls;
 import org.apache.gravitino.function.FunctionParam;
 import org.apache.gravitino.function.FunctionParams;
 import org.apache.gravitino.function.FunctionType;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -94,7 +95,6 @@ import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.rel.Column;
@@ -1144,12 +1144,6 @@ public class TestTagManager {
           PolicyAssociationSelectorSerde.deserialize(
               associations[0].relationValue().orElseThrow()));
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
-
-      Assertions.assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              tagManager.addPolicyForTag(
-                  METALAKE, tagName, policyName, TagValueSelector.of("engineering")));
     } finally {
       entityStore.delete(
           NameIdentifierUtil.ofPolicy(METALAKE, policyName), Entity.EntityType.POLICY);

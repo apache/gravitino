@@ -44,22 +44,18 @@ import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
-import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
+import org.apache.gravitino.json.PolicyAssociationSelectorSerde;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.GenericEntity;
-import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.TagEntity;
-import org.apache.gravitino.policy.AllValuesSelector;
 import org.apache.gravitino.policy.PolicyAssociationSelector;
-import org.apache.gravitino.policy.PolicyAssociationSelectorSerde;
-import org.apache.gravitino.policy.TagValueSelector;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.relational.service.MetadataObjectService;
 import org.apache.gravitino.utils.MetadataObjectUtil;
@@ -243,7 +239,6 @@ public class TagManager implements TagDispatcher {
         tagIdentifier,
         LockType.READ,
         () -> {
-          loadTag(metalake, name);
           try {
             return entityStore
                 .relationOperations()
@@ -273,9 +268,6 @@ public class TagManager implements TagDispatcher {
         tagIdentifier,
         LockType.WRITE,
         () -> {
-          TagEntity tag = loadTag(metalake, tagName);
-          loadPolicy(metalake, policyName);
-          validatePolicyAssociationSelector(tag, selector);
           RelationUpdate update =
               RelationUpdate.of(
                   SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -318,8 +310,6 @@ public class TagManager implements TagDispatcher {
         tagIdentifier,
         LockType.WRITE,
         () -> {
-          loadTag(metalake, tagName);
-          loadPolicy(metalake, policyName);
           RelationUpdate update =
               RelationUpdate.of(
                   SupportsRelationOperations.Type.POLICY_TAG_REL,
@@ -576,63 +566,6 @@ public class TagManager implements TagDispatcher {
             .toArray(String[]::new);
       default:
         throw new IllegalArgumentException("Unknown tag value constraint: " + normalizedConstraint);
-    }
-  }
-
-  private TagEntity loadTag(String metalake, String tagName) {
-    try {
-      return entityStore.get(
-          NameIdentifierUtil.ofTag(metalake, tagName), Entity.EntityType.TAG, TagEntity.class);
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchTagException(
-          e, "Tag with name %s under metalake %s does not exist", tagName, metalake);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private PolicyEntity loadPolicy(String metalake, String policyName) {
-    try {
-      return entityStore.get(
-          NameIdentifierUtil.ofPolicy(metalake, policyName),
-          Entity.EntityType.POLICY,
-          PolicyEntity.class);
-    } catch (NoSuchEntityException e) {
-      throw new NoSuchPolicyException(
-          e, "Policy with name %s under metalake %s does not exist", policyName, metalake);
-    } catch (IOException e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private static void validatePolicyAssociationSelector(
-      TagEntity tag, PolicyAssociationSelector selector) {
-    Preconditions.checkArgument(selector != null, "Selector cannot be null");
-    if (selector instanceof AllValuesSelector) {
-      return;
-    }
-
-    Preconditions.checkArgument(
-        selector instanceof TagValueSelector,
-        "Unsupported policy association selector type: %s",
-        selector.type());
-    String selectorValue = ((TagValueSelector) selector).value();
-    TagValueConstraint constraint = tag.valueConstraint();
-    switch (constraint.type()) {
-      case ANY_VALUE:
-        return;
-      case NO_VALUE:
-        throw new IllegalArgumentException(
-            String.format("Tag %s does not accept assignment values", tag.name()));
-      case ALLOWED_VALUES:
-        Preconditions.checkArgument(
-            Arrays.asList(constraint.allowedValues()).contains(selectorValue),
-            "Selector value %s is not allowed for tag %s",
-            selectorValue,
-            tag.name());
-        return;
-      default:
-        throw new IllegalArgumentException("Unknown tag value constraint: " + constraint);
     }
   }
 

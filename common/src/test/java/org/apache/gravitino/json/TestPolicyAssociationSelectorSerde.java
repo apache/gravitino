@@ -16,8 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.policy;
+package org.apache.gravitino.json;
 
+import org.apache.gravitino.policy.AllValuesSelector;
+import org.apache.gravitino.policy.PolicyAssociationSelector;
+import org.apache.gravitino.policy.TagValueSelector;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
