@@ -114,16 +114,32 @@ flink = "1.18.0"
 flink18 = "1.18.0"
 flink119 = "1.19.0"
 flink120 = "1.20.0"
+flink21 = "2.1.3"
 flinkjdbc = "3.2.0-1.18"
 flinkjdbc18 = "3.2.0-1.18"
 flinkjdbc119 = "3.3.0-1.19"
 flinkjdbc120 = "3.3.0-1.20"
+# flink-connector-jdbc was restructured starting with the 4.x line: the monolithic
+# flink-connector-jdbc artifact was split into flink-connector-jdbc-core plus one artifact per
+# database (flink-connector-jdbc-mysql, flink-connector-jdbc-postgres, ...), and this split line
+# is what publishes real Flink 2.x builds.
+flinkjdbc21 = "4.1.0-2.1"
+# flink-connector-hive has not published a build targeting the Flink 2.x line yet either;
+# reuse the newest externalized release (built against 1.20) until an official 2.x build ships.
+flinkHive21 = "3.0.0-1.20"
+# flink-connector-jdbc-core (Flink 2.1) transitively pulls openlineage-sql-java:1.32.0, whose
+# bundled, unrelocated org.apache.commons.lang3.SystemProperties predates the getUserName(String)
+# overload and shadows the real commons-lang3 on the classpath. Force this newer release, which
+# ships an up-to-date bundled copy.
+openlineageSqlJava21 = "1.52.0"
 iceberg4flink18 = "1.9.2"
 iceberg4flink119 = "1.10.2"
 iceberg4flink120 = "1.11.0"
+iceberg4flink21 = "1.11.0"
 paimon4flink18 = "1.2.0"
 paimon4flink119 = "1.2.0"
 paimon4flink120 = "1.2.0"
+paimon4flink21 = "1.4.1"
 # cglib upgraded from 2. to 3.3.0 for Java 17 compatibility.
 # Explicit ASM dependency (9.8) is required due to cglib's internal use and Java 17 module system.
 cglib = "3.3.0"
@@ -359,6 +375,11 @@ flinkjdbc = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='
 flinkjdbc18 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc18'}
 flinkjdbc119 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc119'}
 flinkjdbc120 = {group='org.apache.flink',name='flink-connector-jdbc', version.ref='flinkjdbc120'}
+flinkjdbc21-core = {group='org.apache.flink',name='flink-connector-jdbc-core', version.ref='flinkjdbc21'}
+flinkjdbc21-mysql = {group='org.apache.flink',name='flink-connector-jdbc-mysql', version.ref='flinkjdbc21'}
+flinkjdbc21-postgres = {group='org.apache.flink',name='flink-connector-jdbc-postgres', version.ref='flinkjdbc21'}
+flinkHive21 = {group='org.apache.flink',name='flink-connector-hive_2.12', version.ref='flinkHive21'}
+openlineageSqlJava21 = {group='io.openlineage',name='openlineage-sql-java', version.ref='openlineageSqlJava21'}
 concurrent-trees = { group = "com.googlecode.concurrent-trees", name = "concurrent-trees", version.ref = "concurrent-trees" }
 jcasbin = { group='org.casbin', name='jcasbin', version.ref="jcasbin" }
 openlineage-java= { group = "io.openlineage", name = "openlineage-java", version.ref = "openlineage" }

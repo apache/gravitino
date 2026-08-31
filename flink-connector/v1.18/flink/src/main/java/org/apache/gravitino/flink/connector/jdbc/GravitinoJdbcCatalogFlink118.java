@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.flink.connector.jdbc;
 
+import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.factories.CatalogFactory;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
@@ -33,6 +34,17 @@ public class GravitinoJdbcCatalogFlink118 extends GravitinoJdbcCatalog {
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
     super(context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
+  }
+
+  @Override
+  @SuppressWarnings("deprecation")
+  protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
+    // JdbcCatalogFactory is deprecated in Flink 1.18's jdbc connector but has no non-deprecated
+    // replacement yet; referenced by FQN so the deprecation warning stays suppressible here
+    // instead of leaking to an unsuppressible import-level warning.
+    return (AbstractCatalog)
+        new org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory()
+            .createCatalog(context);
   }
 
   @Override

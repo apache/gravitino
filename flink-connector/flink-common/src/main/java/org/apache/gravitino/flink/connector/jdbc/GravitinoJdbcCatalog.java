@@ -24,8 +24,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.flink.configuration.ReadableConfig;
-import org.apache.flink.connector.jdbc.catalog.factory.JdbcCatalogFactory;
-import org.apache.flink.connector.jdbc.table.JdbcDynamicTableFactory;
 import org.apache.flink.table.catalog.AbstractCatalog;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.flink.table.factories.CatalogFactory;
@@ -42,7 +40,7 @@ import org.apache.gravitino.flink.connector.catalog.BaseCatalog;
  * The GravitinoJdbcCatalog class is an implementation of the BaseCatalog class that is used to
  * proxy the JdbcCatalog class.
  */
-public class GravitinoJdbcCatalog extends BaseCatalog {
+public abstract class GravitinoJdbcCatalog extends BaseCatalog {
 
   private final CatalogFactory.Context context;
   private AbstractCatalog jdbcCatalog;
@@ -131,14 +129,13 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   /**
    * Creates the inner Flink JDBC catalog from the given context. Subclasses for different Flink
-   * versions override this to use the version-specific {@code JdbcCatalogFactory}.
+   * versions implement this because {@code JdbcCatalogFactory}'s package moved (and, starting with
+   * the 4.x line, the artifact itself was split by database) across Flink connector releases.
    *
    * @param context the catalog factory context with credentials already injected
    * @return the created inner catalog
    */
-  protected AbstractCatalog createInnerCatalog(CatalogFactory.Context context) {
-    return (AbstractCatalog) new JdbcCatalogFactory().createCatalog(context);
-  }
+  protected abstract AbstractCatalog createInnerCatalog(CatalogFactory.Context context);
 
   @Override
   protected AbstractCatalog realCatalog() {
@@ -147,7 +144,7 @@ public class GravitinoJdbcCatalog extends BaseCatalog {
 
   @Override
   public Optional<Factory> getFactory() {
-    return Optional.of(new JdbcDynamicTableFactory());
+    return Optional.of(catalogCompat().jdbcDynamicTableFactory());
   }
 
   /**

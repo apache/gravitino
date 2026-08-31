@@ -17,26 +17,15 @@
  * under the License.
  */
 
-package org.apache.gravitino.flink.connector.utils;
+package org.apache.gravitino.flink.connector.hive;
 
-import java.util.List;
-import java.util.Map;
-import org.apache.flink.table.api.Schema;
-import org.apache.flink.table.catalog.CatalogPropertiesUtil;
-import org.apache.flink.table.catalog.CatalogTable;
-import org.apache.flink.table.catalog.ResolvedCatalogTable;
+import org.apache.gravitino.flink.connector.utils.CatalogCompat;
+import org.apache.gravitino.flink.connector.utils.CatalogCompatFlink21;
 
-public enum DefaultCatalogCompat implements CatalogCompat {
-  INSTANCE;
+public class TestFlinkGenericTableUtilFlink21 extends TestFlinkGenericTableUtil {
 
   @Override
-  public CatalogTable createCatalogTable(
-      Schema schema, String comment, List<String> partitionKeys, Map<String, String> options) {
-    return CatalogTable.of(schema, comment, partitionKeys, options);
-  }
-
-  @Override
-  public Map<String, String> serializeCatalogTable(ResolvedCatalogTable resolvedTable) {
-    return CatalogPropertiesUtil.serializeCatalogTable(resolvedTable);
+  protected CatalogCompat catalogCompat() {
+    return CatalogCompatFlink21.INSTANCE;
   }
 }

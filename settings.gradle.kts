@@ -83,9 +83,11 @@ if (!skipTrinoConnector) {
   println("Skipping trino-connector modules since skipTrinoConnector is set to true")
 }
 include("spark-connector:spark-common")
+// flink-common's sources are also compiled directly into each flink-connector:flink-*
+// module's own sourceSet (not consumed as a jar dependency), so it is not gated by scalaVersion.
+include("flink-connector:flink-common")
 if (scalaVersion == "2.12") {
-  // flink only support scala 2.12
-  include("flink-connector:flink-common")
+  // flink 1.x only supports scala 2.12
   include(
     "flink-connector:flink-1.18",
     "flink-connector:flink-runtime-1.18",
@@ -104,6 +106,11 @@ if (scalaVersion == "2.12") {
   project(":flink-connector:flink-runtime-1.20").projectDir =
     file("flink-connector/v1.20/flink-runtime")
 }
+// Flink 2.x removed the Scala APIs entirely, so the flink-2.1 modules are not gated by scalaVersion.
+include("flink-connector:flink-2.1", "flink-connector:flink-runtime-2.1")
+project(":flink-connector:flink-2.1").projectDir = file("flink-connector/v2.1/flink")
+project(":flink-connector:flink-runtime-2.1").projectDir =
+  file("flink-connector/v2.1/flink-runtime")
 include("spark-connector:spark-3.3", "spark-connector:spark-runtime-3.3")
 project(":spark-connector:spark-3.3").projectDir = file("spark-connector/v3.3/spark")
 project(":spark-connector:spark-runtime-3.3").projectDir = file("spark-connector/v3.3/spark-runtime")

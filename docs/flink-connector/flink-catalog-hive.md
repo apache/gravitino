@@ -52,6 +52,8 @@ https://nightlies.apache.org/flink/flink-docs-stable/docs/connectors/table/hive/
 
 * Hive metastore 2.x
 * HDFS 2.x or 3.x
+* Flink 1.18, 1.19, or 1.20 (the Hive catalog is not supported on Flink 2.x yet — see
+  [Flink Connector prerequisites](flink-connector.md#prerequisites))
 
 ## SQL Example
 

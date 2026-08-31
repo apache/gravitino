@@ -60,8 +60,10 @@ public abstract class GravitinoJdbcCatalogFactory implements BaseCatalogFactory 
       String defaultDatabase,
       SchemaAndTablePropertiesConverter schemaAndTablePropertiesConverter,
       PartitionConverter partitionConverter) {
-    return new GravitinoJdbcCatalog(
-        context, defaultDatabase, schemaAndTablePropertiesConverter, partitionConverter);
+    // GravitinoJdbcCatalog is abstract (its inner-catalog construction differs per Flink
+    // version); every concrete, version-specific factory overrides this hook.
+    throw new UnsupportedOperationException(
+        "newCatalog() must be overridden by a Flink version-specific catalog factory");
   }
 
   @Override
