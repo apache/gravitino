@@ -26,6 +26,7 @@ import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
@@ -219,6 +220,92 @@ public class CatalogDoris4xIT extends BaseIT {
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(() -> assertEquals(0, tc.loadTable(tid).index().length));
+  }
+
+  @Test
+  void testAlterColumnTypePreservesDefaultValue() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_alter_type_preserves_default"));
+    Column defaultedColumn =
+        Column.of(
+            colName2,
+            Types.VarCharType.of(10),
+            "defaulted column",
+            false,
+            false,
+            Literals.of("seed", Types.VarCharType.of(10)));
+
+    tc.createTable(
+        tid,
+        new Column[] {
+          Column.of(colName1, Types.LongType.get(), "pk", false, false, null), defaultedColumn
+        },
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    tc.alterTable(
+        tid, TableChange.updateColumnType(new String[] {colName2}, Types.VarCharType.of(20)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), colName2);
+              assertEquals(Types.VarCharType.of(20), updatedColumn.dataType());
+              assertEquals(
+                  Literals.of("seed", Types.VarCharType.of(20)), updatedColumn.defaultValue());
+            });
+  }
+
+  @Test
+  void testAlterColumnTypeRejectsInvalidConversionWithDefaultValue() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_alter_type_rejects_invalid"));
+    Column defaultedColumn =
+        Column.of(
+            colName2,
+            Types.VarCharType.of(10),
+            "defaulted column",
+            false,
+            false,
+            Literals.of("true", Types.VarCharType.of(10)));
+
+    tc.createTable(
+        tid,
+        new Column[] {
+          Column.of(colName1, Types.LongType.get(), "pk", false, false, null), defaultedColumn
+        },
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    RuntimeException exception =
+        assertThrows(
+            RuntimeException.class,
+            () ->
+                tc.alterTable(
+                    tid,
+                    TableChange.updateColumnType(
+                        new String[] {colName2}, Types.BooleanType.get())));
+
+    assertTrue(
+        exception.getMessage().contains("Can not change VARCHAR to BOOLEAN"),
+        exception.getMessage());
+    Column unchangedColumn = findColumn(tc.loadTable(tid), colName2);
+    assertEquals(Types.VarCharType.of(10), unchangedColumn.dataType());
+    assertEquals(Literals.of("true", Types.VarCharType.of(10)), unchangedColumn.defaultValue());
   }
 
   @Test

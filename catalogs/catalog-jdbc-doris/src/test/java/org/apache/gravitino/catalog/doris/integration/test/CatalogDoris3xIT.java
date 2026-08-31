@@ -30,6 +30,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -95,6 +99,7 @@ public class CatalogDoris3xIT extends BaseIT {
 
   private GravitinoMetalake metalake;
   private Catalog catalog;
+  private String jdbcUrl;
 
   @BeforeAll
   public void startup() throws IOException {
@@ -125,7 +130,7 @@ public class CatalogDoris3xIT extends BaseIT {
 
   private void createCatalog() {
     DorisContainer dorisContainer = containerSuite.getDorisContainer(DorisImageName.VERSION_3_0);
-    String jdbcUrl =
+    jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/",
             dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort());
@@ -218,6 +223,53 @@ public class CatalogDoris3xIT extends BaseIT {
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(() -> assertEquals(0, tc.loadTable(tid).index().length));
+  }
+
+  @Test
+  void testAlterColumnTypePreservesDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_preserves_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String distributionColumnName = "dist_key";
+    String valueColumnName = "agg_value";
+    String createSql =
+        String.format(
+            "CREATE TABLE `%s` ("
+                + "`%s` INT NOT NULL DEFAULT \"7\", "
+                + "`%s` BIGINT NOT NULL, "
+                + "`%s` BIGINT SUM DEFAULT \"0\""
+                + ") AGGREGATE KEY(`%s`, `%s`) "
+                + "DISTRIBUTED BY HASH(`%s`) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName,
+            colName1,
+            distributionColumnName,
+            valueColumnName,
+            colName1,
+            distributionColumnName,
+            distributionColumnName);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    Column originalColumn = findColumn(tc.loadTable(tid), colName1);
+    assertEquals(Types.IntegerType.get(), originalColumn.dataType());
+    assertEquals(Literals.integerLiteral(7), originalColumn.defaultValue());
+
+    tc.alterTable(tid, TableChange.updateColumnType(new String[] {colName1}, Types.LongType.get()));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), colName1);
+              assertEquals(Types.LongType.get(), updatedColumn.dataType());
+              assertEquals(Literals.longLiteral(7L), updatedColumn.defaultValue());
+            });
   }
 
   @Test
