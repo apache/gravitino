@@ -113,8 +113,7 @@ public class CatalogConnectorManager {
    * @param client the Gravitino admin client
    */
   public void config(GravitinoConfig config, GravitinoAdminClient client) {
-    Preconditions.checkArgument(config != null, "config must not be null");
-    this.config = config;
+    updateConfig(config);
     if (client == null) {
       String authType =
           config.getClientConfig().getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "none");
@@ -141,6 +140,20 @@ public class CatalogConnectorManager {
     } else {
       this.gravitinoClient = client;
     }
+  }
+
+  /**
+   * Updates the Gravitino configuration, leaving the Gravitino client untouched.
+   *
+   * <p>Used to re-apply the configuration of the static connector when a dynamic connector created
+   * the manager first, so that the catalog register is started with the `trino.jdbc.*` settings
+   * that are only present in the static configuration.
+   *
+   * @param config the Gravitino configuration
+   */
+  public void updateConfig(GravitinoConfig config) {
+    Preconditions.checkArgument(config != null, "config must not be null");
+    this.config = config;
     this.metadataUpdateIntervalSecond = Integer.parseInt(config.getMetadataRefreshIntervalSecond());
     this.targetMetalake = config.getMetalake();
   }
