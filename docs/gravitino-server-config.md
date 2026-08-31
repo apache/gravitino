@@ -526,6 +526,53 @@ That configuration builds three clients: two instances of one custom AWS factory
 Azure factory. Further `gravitino.kms.provider.<name>.*` keys are factory properties, not a closed
 schema; each factory documents the keys it accepts.
 
+### Entity Secrets
+
+Entity secrets keep connection secrets such as `jdbc-password` or cloud static keys out of plaintext
+entity property storage. The server registers named `SecretProvider` instances from
+`gravitino.conf`. Create and alter requests reference those names through `secretBindings` and
+`secretReferences` (and the matching alter `@type`s). The entity store keeps a URN string for each
+secret property. This is separate from [Key Management](#key-management), which configures KMS
+clients for key operations rather than entity property secrets.
+
+The list is empty by default, and then the server has no secrets providers. Create or alter calls
+that need a provider fail until you name at least one. Naming a provider without a `className`, or
+with a class the server cannot construct as a `SecretProvider`, fails startup. Apache Gravitino
+ships an in-memory provider for tests and local use. It is not durable and is not for production.
+
+| Configuration Item                            | Description                                                                                                                                                             | Default Value |
+|-----------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gravitino.secret.providers`                  | Comma-separated secrets-provider instance names. Each name must match `[A-Za-z0-9][A-Za-z0-9_-]*`. Duplicates fail startup.                                            | (empty)       |
+| `gravitino.secret.provider.<name>.className`  | Required `SecretProvider` implementation class for that instance. The class must have a no-arg constructor.                                                             | (none)        |
+| `gravitino.secret.provider.<name>.uri`        | Optional non-secret endpoint advertised by `GET /configs/secrets/providers`. Not used by the in-memory provider.                                                        | (none)        |
+| `gravitino.secret.provider.<name>.<key>`      | Any other property under that name is passed to `SecretProvider.initialize` (except `className`). Nested dots in `<key>` are allowed.                                   | (none)        |
+
+Every name in `providers` needs a matching `.className`. Bindings and references on catalog,
+schema, and fileset APIs use the instance name from this list as their `provider` field, not the
+implementation class name.
+
+```text
+# conf/gravitino.conf
+gravitino.secret.providers = memory
+
+gravitino.secret.provider.memory.className = org.apache.gravitino.secret.memory.InMemorySecretsProvider
+```
+
+That configuration registers one provider named `memory` of type `memory`. List configured
+providers (name, type, and optional `uri` only) with:
+
+```shell
+curl http://localhost:8090/configs/secrets/providers
+```
+
+With a provider registered, create a catalog, schema, or fileset with `secretBindings` (write the
+plaintext through the provider and store a URN) or `secretReferences` (store a locator URN without
+writing material). Alter supports `setSecretBinding` and `setSecretReference`. GET and list omit
+secret property keys. Resolve plaintext for connectors with the object's secrets API, documented in
+the OpenAPI under `/metalakes/{metalake}/objects/{metadataObjectType}/{metadataObjectFullName}/secrets`.
+[Credential Vending](security/credential-vending.md) resolves secret URNs when initializing
+credential providers so vended static credentials are plaintext rather than URNs.
+
 ## Catalog Properties
 
 Catalog properties configure one catalog rather than the server. They come from two places: a
@@ -701,6 +748,8 @@ in `conf/gravitino-env.sh`.
   into the underlying systems through Apache Ranger or a native permission model
 - [Credential Vending](security/credential-vending.md), for issuing temporary storage credentials to
   engines instead of distributing long-lived keys
+- [Entity Secrets](#entity-secrets), for `gravitino.secret.*` providers that store connection secrets
+  as URNs on catalog, schema, and fileset properties
 - [HTTPS](security/how-to-use-https.md), for the `gravitino.server.webserver.*` key store, trust
   store, and client certificate properties
 - [CORS](security/how-to-use-cors.md), for letting browser clients served from another origin call

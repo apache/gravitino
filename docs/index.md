@@ -215,6 +215,9 @@ Gravitino provides security configurations for Gravitino, including HTTPS, authe
 * [Local users and groups](./security/local-users-and-groups.md): operator guide for the local user store behind HTTP Basic authentication, including service admin setup and `/api/idp` management APIs.
 * [Access Control](./security/access-control.md): provides access control configurations.
 * [CORS](./security/how-to-use-cors.md): provides CORS configurations.
+* [Entity secrets](./gravitino-server-config.md#entity-secrets): configures `gravitino.secret.*`
+  providers so catalog, schema, and fileset connection secrets are stored as URNs rather than
+  plaintext.
 
 ### Gravitino MCP Server
 

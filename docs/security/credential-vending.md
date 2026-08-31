@@ -449,6 +449,14 @@ The Gravitino Spark and Flink connectors call this for you and inject the return
 
 Over the IRC, a credential is vended for writing when the caller is entitled to modify the table, and for reading otherwise. Narrowing the caller's roles with the `X-Gravitino-Active-Roles` header narrows this as well, so a caller whose active roles no longer carry `MODIFY_TABLE` is vended a read-only credential. See [Narrowing Access with Active Roles](access-control.md#narrowing-access-with-active-roles).
 
+## Entity Secrets
+
+Catalog properties used by credential providers, such as `jdbc-password` or static cloud keys, can
+be stored as entity secret URNs instead of plaintext. Configure secrets providers with
+`gravitino.secret.*` as described in
+[Entity Secrets](../gravitino-server-config.md#entity-secrets). When credential vending initializes
+providers, the server resolves those URNs to plaintext so clients receive usable credentials.
+
 ## Custom Credentials
 
 Gravitino supports custom credentials. You can implement the `org.apache.gravitino.credential.CredentialProvider` interface to support custom credentials, and place the corresponding jar in the classpath of the IRC or the Fileset catalog.
