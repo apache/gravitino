@@ -44,6 +44,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergRestUriDiscovery;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
 
@@ -74,9 +75,7 @@ public class CatalogConnectorManager {
 
   private String targetMetalake;
   private final Map<String, GravitinoMetalake> metalakes = new ConcurrentHashMap<>();
-  // Tracks which metalakes' Iceberg REST discovery is currently failing, so a failure is logged
-  // at WARN only on the transition into/out of that state rather than on every poll.
-  private final Set<String> icebergRestDiscoveryFailing = ConcurrentHashMap.newKeySet();
+  private final IcebergRestUriDiscovery icebergRestUriDiscovery = new IcebergRestUriDiscovery();
 
   private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
@@ -161,6 +160,9 @@ public class CatalogConnectorManager {
     this.config = config;
     this.metadataUpdateIntervalSecond = Integer.parseInt(config.getMetadataRefreshIntervalSecond());
     this.targetMetalake = config.getMetalake();
+    // Parsed eagerly so a misconfigured value fails startup instead of surfacing every poll as an
+    // unrelated "Load Metalake failed" error.
+    config.isIcebergRestRoutingEnabled();
   }
 
   /**
@@ -201,10 +203,7 @@ public class CatalogConnectorManager {
         try {
           GravitinoMetalake metalake = metalakes.get(usedMetalake);
           LOG.debug("Load metalake: %s", usedMetalake);
-          if (config.isIcebergRestRoutingEnabled()
-              && StringUtils.isBlank(config.getManualIcebergRestUri(usedMetalake))) {
-            refreshIcebergRestUri(usedMetalake);
-          }
+          icebergRestUriDiscovery.refresh(usedMetalake, config, gravitinoClient);
           loadCatalogs(metalake);
         } catch (Exception e) {
           LOG.error(e, "Load Metalake %s failed.", usedMetalake);
@@ -212,35 +211,6 @@ public class CatalogConnectorManager {
       }
     } catch (Exception e) {
       LOG.error(e, "Error when loading metalake");
-    }
-  }
-
-  /**
-   * Asks the Gravitino server whether it has an Iceberg REST server running for this metalake, and
-   * caches the answer on the shared {@link GravitinoConfig} for {@code IcebergConnectorAdapter} to
-   * read on the next catalog load. Failures — including talking to a Gravitino server older than
-   * this endpoint — must not interrupt catalog loading, so they are swallowed here; Iceberg
-   * catalogs simply keep their last known routing decision until the next successful poll. A
-   * failure is logged at ERROR on every poll because routing through Iceberg REST is required when
-   * enabled. Catalog loading continues so that unrelated catalogs remain available.
-   */
-  private void refreshIcebergRestUri(String metalakeName) {
-    try {
-      config.setDiscoveredIcebergRestUri(
-          metalakeName, gravitinoClient.icebergRestServiceUri(metalakeName).orElse(null));
-      if (icebergRestDiscoveryFailing.remove(metalakeName)) {
-        LOG.info("Iceberg REST service discovery for metalake %s recovered.", metalakeName);
-      }
-    } catch (Exception e) {
-      icebergRestDiscoveryFailing.add(metalakeName);
-      LOG.error(
-          e,
-          "Failed to query the Iceberg REST service endpoint for metalake %s; Iceberg catalogs "
-              + "without a configured REST endpoint cannot be registered until discovery "
-              + "recovers. Set gravitino.iceberg.rest-uri explicitly, upgrade the Gravitino "
-              + "server to one that supports discovery, or disable Iceberg REST routing with "
-              + "gravitino.iceberg.rest-routing-enabled=false to use legacy backend translation.",
-          metalakeName);
     }
   }
 

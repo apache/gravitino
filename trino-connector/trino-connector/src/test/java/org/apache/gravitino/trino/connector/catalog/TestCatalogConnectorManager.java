@@ -200,6 +200,24 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testConfigRejectsInvalidIcebergRestRoutingEnabledAtStartup() throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true",
+                "gravitino.iceberg.rest-routing-enabled", "yes"));
+
+    assertThrows(TrinoException.class, () -> manager.config(config, client));
+  }
+
+  @Test
   public void testIcebergRestRoutingDisabledSkipsDiscovery() throws Exception {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
