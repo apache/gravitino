@@ -30,11 +30,11 @@ import lombok.ToString;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.dto.semantic.SemanticModelDefinitionDTO;
 import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.NamespacedEntityId;
 import org.apache.gravitino.meta.SemanticModelEntity;
-import org.apache.gravitino.semantic.SemanticModelDefinition;
 import org.apache.gravitino.storage.relational.service.EntityIdService;
 
 /** The persistent object for Semantic Model identity metadata and its current version snapshot. */
@@ -110,8 +110,9 @@ public class SemanticModelPO {
       SemanticModelPO semanticModelPO, Namespace namespace) {
     try {
       SemanticModelVersionInfoPO versionPO = semanticModelPO.getSemanticModelVersionInfoPO();
-      SemanticModelDefinition definition =
-          SemanticModelDefinitionSerDe.deserialize(versionPO.semanticModelDefinition());
+      SemanticModelDefinitionDTO definitionDTO =
+          JsonUtils.anyFieldMapper()
+              .readValue(versionPO.semanticModelDefinition(), SemanticModelDefinitionDTO.class);
       Map<String, String> properties =
           versionPO.properties() == null
               ? Collections.emptyMap()
@@ -127,7 +128,7 @@ public class SemanticModelPO {
           .withName(versionPO.semanticModelName())
           .withNamespace(namespace)
           .withComment(versionPO.semanticModelComment())
-          .withDefinition(definition)
+          .withDefinition(definitionDTO.toDefinition())
           .withProperties(properties)
           .withAuditInfo(
               JsonUtils.anyFieldMapper().readValue(semanticModelPO.getAuditInfo(), AuditInfo.class))
@@ -163,7 +164,9 @@ public class SemanticModelPO {
       Integer version) {
     try {
       String definitionJson =
-          SemanticModelDefinitionSerDe.serialize(semanticModelEntity.definition());
+          JsonUtils.anyFieldMapper()
+              .writeValueAsString(
+                  SemanticModelDefinitionDTO.fromDefinition(semanticModelEntity.definition()));
       String propertiesJson =
           semanticModelEntity.properties().isEmpty()
               ? null
