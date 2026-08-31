@@ -806,18 +806,30 @@ public class TestPOConverters {
   }
 
   @Test
-  public void testUpdateUserPOVersion() {
+  public void testUpdateUserPOVersionUsesCurrentVersion() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     UserEntity user =
         UserEntity.builder().withId(1L).withName("user").withAuditInfo(auditInfo).build();
-    UserPO userPO =
+    UserPO initialUserPO =
         POConverters.initializeUserPOWithVersion(user, UserPO.builder().withMetalakeId(1L));
+    UserPO userPO =
+        UserPO.builder()
+            .withUserId(initialUserPO.getUserId())
+            .withUserName(initialUserPO.getUserName())
+            .withMetalakeId(initialUserPO.getMetalakeId())
+            .withExternalId(initialUserPO.getExternalId())
+            .withEnabled(initialUserPO.getEnabled())
+            .withAuditInfo(initialUserPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialUserPO.getDeletedAt())
+            .build();
 
     UserPO updatedUserPO = POConverters.updateUserPOWithVersion(userPO, user);
 
-    assertEquals(2, updatedUserPO.getCurrentVersion());
-    assertEquals(2, updatedUserPO.getLastVersion());
+    assertEquals(8, updatedUserPO.getCurrentVersion());
+    assertEquals(8, updatedUserPO.getLastVersion());
   }
 
   @Test

@@ -959,12 +959,11 @@ public class POConverters {
    * Update UserPO version
    *
    * @param oldUserPO the old UserPO object
-   * @param newUser the new TableEntity object
+   * @param newUser the new UserEntity object
    * @return UserPO object with updated version
    */
   public static UserPO updateUserPOWithVersion(UserPO oldUserPO, UserEntity newUser) {
-    Long lastVersion = oldUserPO.getLastVersion();
-    Long nextVersion = lastVersion + 1;
+    Long nextVersion = oldUserPO.getCurrentVersion() + 1;
     try {
       return UserPO.builder()
           .withUserId(oldUserPO.getUserId())
