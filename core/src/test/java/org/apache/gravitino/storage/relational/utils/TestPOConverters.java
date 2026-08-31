@@ -54,6 +54,7 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.StatisticEntity;
@@ -86,6 +87,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
+import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
@@ -721,6 +723,21 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("test", updatePO.getTableName());
+  }
+
+  @Test
+  public void testUpdateRolePOVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    RoleEntity role =
+        RoleEntity.builder().withId(1L).withName("role").withAuditInfo(auditInfo).build();
+    RolePO rolePO =
+        POConverters.initializeRolePOWithVersion(role, RolePO.builder().withMetalakeId(1L));
+
+    RolePO updatedRolePO = POConverters.updateRolePOWithVersion(rolePO, role);
+
+    assertEquals(2, updatedRolePO.getCurrentVersion());
+    assertEquals(2, updatedRolePO.getLastVersion());
   }
 
   @Test
