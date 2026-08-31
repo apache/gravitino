@@ -340,6 +340,17 @@ public class CatalogRegister {
     return redactJsonSecrets(redactSqlSecrets(createCatalogCommand));
   }
 
+  // Some JDBC drivers echo the failing statement back in the exception message, which for a
+  // failed CREATE CATALOG would otherwise carry its embedded credentials into every caller and
+  // log line downstream. The original exception is deliberately not kept as the cause, since a
+  // logged stack trace prints causes' messages too and would defeat the redaction.
+  private static SQLException redactedSqlException(SQLException e) {
+    String message = e.getMessage() == null ? null : redactSecrets(e.getMessage());
+    SQLException redacted = new SQLException(message, e.getSQLState(), e.getErrorCode());
+    redacted.setStackTrace(e.getStackTrace());
+    return redacted;
+  }
+
   private static String redactSqlSecrets(String createCatalogCommand) {
     Matcher matcher = SECRET_PROPERTY_PATTERN.matcher(createCatalogCommand);
     StringBuffer redacted = new StringBuffer();
@@ -400,7 +411,11 @@ public class CatalogRegister {
       executeSql(createCatalogCommand);
       LOG.info("Register catalog %s successfully: %s", name, redactSecrets(createCatalogCommand));
     } catch (SQLException e) {
-      throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, e.getMessage(), e);
+      // Some JDBC drivers echo the failing statement back in their error message; redact it the
+      // same way the retry-loop log does, so a syntax or duplicate-catalog error on a CREATE
+      // CATALOG statement never surfaces its embedded credentials to the caller.
+      String message = e.getMessage() == null ? e.toString() : redactSecrets(e.getMessage());
+      throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
       LOG.error(e, message);
@@ -456,7 +471,7 @@ public class CatalogRegister {
           statement.execute(sql);
           return;
         } catch (SQLException e) {
-          throw e;
+          throw redactedSqlException(e);
         } catch (Exception e) {
           failedException = e;
           LOG.warn(e, "Failed to execute command: %s", redactSecrets(sql));

@@ -165,6 +165,20 @@ public class TestIcebergRESTServiceOperations {
   }
 
   @Test
+  public void testExplicitIPv6HostIsBracketed() {
+    IcebergRESTServiceOperations ops =
+        newOps(true, withDynamicProvider(ImmutableMap.of("host", "::1")), "gravitino-host");
+    assertEquals("http://[::1]:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
+  public void testWildcardHostFallsBackToIPv6RequestServerName() {
+    IcebergRESTServiceOperations ops =
+        newOps(true, withDynamicProvider(ImmutableMap.of("host", "::")), "::1");
+    assertEquals("http://[::1]:9001/iceberg", uriOf(ops.getIcebergRestServiceUri("")));
+  }
+
+  @Test
   public void testBlankHostIsTreatedAsWildcard() {
     IcebergRESTServiceOperations ops =
         newOps(true, withDynamicProvider(ImmutableMap.of()), "gravitino-host");
