@@ -16,23 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.trino.connector;
 
-import org.apache.gravitino.client.GravitinoAdminClient;
+package org.apache.gravitino.cos.credential.policy;
 
-/** Trino plugin endpoint, using java spi mechanism */
-public class GravitinoPlugin435 extends GravitinoPlugin {
+/** CAM policy statement {@code effect} constants. Only {@code allow} is used today. */
+public class Effect {
+  public static final String ALLOW = "allow";
 
-  public GravitinoPlugin435() {
-    super();
-  }
-
-  public GravitinoPlugin435(GravitinoAdminClient client) {
-    super(client);
-  }
-
-  @Override
-  protected GravitinoConnectorFactory createConnectorFactory(GravitinoAdminClient client) {
-    return new GravitinoConnectorFactory435(client);
-  }
+  private Effect() {}
 }

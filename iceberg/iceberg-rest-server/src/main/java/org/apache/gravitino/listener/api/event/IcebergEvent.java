@@ -55,6 +55,6 @@ public abstract class IcebergEvent extends Event {
 
   @Override
   public Map<String, String> customInfo() {
-    return icebergRequestContext.httpHeaders();
+    return icebergRequestContext.customInfo();
   }
 }

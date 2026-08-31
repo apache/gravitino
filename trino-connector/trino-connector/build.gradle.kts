@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import net.ltgt.gradle.errorprone.errorprone
+
 plugins {
   id("java")
   id("idea")
@@ -29,6 +31,18 @@ repositories {
 val minSupportedTrinoVersionProperty = providers.gradleProperty("minSupportedTrinoVersion")
 val trinoVersionProperty = providers.gradleProperty("trinoVersion").orElse(minSupportedTrinoVersionProperty)
 val trinoVersion = trinoVersionProperty.map { it.trim().toInt() }.get()
+
+// Trino 440+'s trino-spi is compiled for JDK 21+, so this module needs the same JDK 24
+// toolchain the versioned trino-connector-<range> modules use. Error Prone is incompatible
+// with that toolchain, so it is disabled here too, matching those modules' own override.
+java {
+  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
+}
+
+tasks.withType<JavaCompile>().configureEach {
+  options.errorprone.isEnabled.set(false)
+  options.release.set(17)
+}
 
 dependencies {
   implementation(project(":catalogs:catalog-common"))

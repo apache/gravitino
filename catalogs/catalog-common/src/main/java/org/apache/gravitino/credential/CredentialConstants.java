@@ -41,6 +41,7 @@ public class CredentialConstants {
       "s3-credential-list-location-prefix";
 
   public static final String OSS_TOKEN_EXPIRE_IN_SECS = "oss-token-expire-in-secs";
+  public static final String COS_TOKEN_EXPIRE_IN_SECS = "cos-token-expire-in-secs";
   public static final String ADLS_TOKEN_EXPIRE_IN_SECS = "adls-token-expire-in-secs";
 
   /** The HTTP header used to get the credential from fileset location */
