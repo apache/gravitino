@@ -27,6 +27,8 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.catalog.property.PropertyConverter;
 import org.apache.gravitino.credential.Credential;
 import org.apache.gravitino.credential.JdbcCredential;
+import org.apache.gravitino.credential.S3SecretKeyCredential;
+import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Assertions;
@@ -136,7 +138,7 @@ public class TestIcebergCatalogPropertyConverter {
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
             name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
-    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
+    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter(icebergRestUnavailableConfig());
 
     Map<String, String> config =
         adapter.buildInternalConnectorConfig(
@@ -176,7 +178,7 @@ public class TestIcebergCatalogPropertyConverter {
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
             name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
-    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
+    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter(icebergRestUnavailableConfig());
 
     Map<String, String> config =
         adapter.buildInternalConnectorConfig(
@@ -213,7 +215,7 @@ public class TestIcebergCatalogPropertyConverter {
     Catalog mockCatalog =
         TestGravitinoCatalog.mockCatalog(
             name, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
-    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter();
+    IcebergConnectorAdapter adapter = new IcebergConnectorAdapter(icebergRestUnavailableConfig());
 
     Map<String, String> config =
         adapter.buildInternalConnectorConfig(
@@ -223,5 +225,579 @@ public class TestIcebergCatalogPropertyConverter {
     Assertions.assertEquals(config.get("iceberg.catalog.type"), "jdbc");
     Assertions.assertEquals(config.get("iceberg.jdbc-catalog.connection-user"), "root");
     Assertions.assertEquals(config.get("iceberg.jdbc-catalog.connection-password"), "ds123");
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesRoutesJdbcBackendThroughIcebergRest() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("catalog-backend", "jdbc")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .put("jdbc-user", "iceberg")
+            .put("jdbc-password", "secret")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .put("s3-region", "us-east-1")
+            .put("credential-providers", "s3-token")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
+
+    Assertions.assertEquals("rest", config.get("iceberg.catalog.type"));
+    Assertions.assertEquals(
+        "http://localhost:9001/iceberg", config.get("iceberg.rest-catalog.uri"));
+    Assertions.assertEquals("catalog1", config.get("iceberg.rest-catalog.prefix"));
+    // The initial GET /v1/config selects the catalog by `warehouse`, not by `prefix`.
+    Assertions.assertEquals("catalog1", config.get("iceberg.rest-catalog.warehouse"));
+    Assertions.assertEquals("true", config.get("iceberg.rest-catalog.vended-credentials-enabled"));
+
+    // The JDBC backend is how Gravitino stores the metadata; it must not reach Trino.
+    Assertions.assertNull(config.get("iceberg.jdbc-catalog.connection-url"));
+    Assertions.assertNull(config.get("iceberg.jdbc-catalog.connection-user"));
+    Assertions.assertNull(config.get("iceberg.jdbc-catalog.connection-password"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesRoutesHiveBackendThroughIcebergRest() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "thrift://localhost:9083")
+            .put("catalog-backend", "hive")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
+
+    Assertions.assertEquals("rest", config.get("iceberg.catalog.type"));
+    Assertions.assertEquals("catalog1", config.get("iceberg.rest-catalog.prefix"));
+    Assertions.assertNull(config.get("hive.metastore.uri"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesKeepsRestBackendEndpoint() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "http://other-irc:9001/iceberg")
+            .put("catalog-backend", "rest")
+            .put("warehouse", "gt_iceberg_rest")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
+
+    Assertions.assertEquals("rest", config.get("iceberg.catalog.type"));
+    Assertions.assertEquals(
+        "http://other-irc:9001/iceberg", config.get("iceberg.rest-catalog.uri"));
+    Assertions.assertEquals("gt_iceberg_rest", config.get("iceberg.rest-catalog.warehouse"));
+    Assertions.assertNull(config.get("iceberg.rest-catalog.prefix"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesWithIcebergRestDisabled() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("catalog-backend", "jdbc")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig("catalog1", properties, icebergRestUnavailableConfig());
+
+    Assertions.assertEquals("jdbc", config.get("iceberg.catalog.type"));
+    Assertions.assertEquals(
+        "jdbc:postgresql://localhost:5432/iceberg",
+        config.get("iceberg.jdbc-catalog.connection-url"));
+    Assertions.assertNull(config.get("iceberg.rest-catalog.uri"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesFailsWhenNoIcebergRestUriIsAvailable() {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("catalog-backend", "jdbc")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "test"));
+
+    TrinoException exception =
+        Assertions.assertThrows(
+            TrinoException.class, () -> buildConnectorConfig("catalog1", properties, config));
+    Assertions.assertTrue(exception.getMessage().contains("no Iceberg REST endpoint is available"));
+  }
+
+  @Test
+  public void testBuildIcebergRestPropertiesThrowsOnBlankUri() {
+    // buildIcebergRestProperties keeps its own defensive check even though
+    // IcebergConnectorAdapter's routing gate means callers can no longer reach it with a blank
+    // URI under normal operation.
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "catalog1",
+            "lakehouse-iceberg",
+            "test catalog",
+            Catalog.Type.RELATIONAL,
+            ImmutableMap.of("catalog-backend", "jdbc"));
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+    IcebergCatalogPropertyConverter converter = new IcebergCatalogPropertyConverter();
+
+    Assertions.assertThrows(
+        TrinoException.class,
+        () -> converter.buildIcebergRestProperties(catalog, icebergRestUnavailableConfig(), ""));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesRoutesThroughDiscoveredIcebergRestUri() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    // No manual gravitino.iceberg.rest-uri: only a per-metalake value discovered from the
+    // Gravitino server, embedded onto the catalog exactly as CatalogRegister does before
+    // registering it — this is the only way a worker (which never runs discovery itself) can see
+    // the same routing decision as the coordinator.
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg"),
+            /* embedDiscovery= */ true);
+
+    Assertions.assertEquals("rest", config.get("iceberg.catalog.type"));
+    Assertions.assertEquals(
+        "http://discovered:9001/iceberg", config.get("iceberg.rest-catalog.uri"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesRejectsDiscoveryForOtherMetalakes() {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    // Discovery reported an endpoint for a different metalake than the one this catalog belongs
+    // to (the mock catalog's metalake is "test"); embedDiscoveredIcebergRestUri must not embed it.
+    Assertions.assertThrows(
+        TrinoException.class,
+        () ->
+            buildConnectorConfig(
+                "catalog1",
+                properties,
+                icebergRestDiscoveredConfig("other_metalake", "http://other:9001/iceberg"),
+                /* embedDiscovery= */ true));
+  }
+
+  @Test
+  public void testDiscoveredUriUnusedWithoutEmbedding() {
+    // A worker never runs discovery, so its own GravitinoConfig never has a discovered value
+    // populated — this asserts that IcebergConnectorAdapter really does read the routing signal
+    // from the catalog, not from GravitinoConfig's discovered map directly.
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    Assertions.assertThrows(
+        TrinoException.class,
+        () ->
+            buildConnectorConfig(
+                "catalog1",
+                properties,
+                icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg"),
+                /* embedDiscovery= */ false));
+  }
+
+  @Test
+  public void testManualUriWinsOverDiscoveredUri() throws Exception {
+    // Both a manual gravitino.iceberg.rest-uri and a discovered per-metalake URI are set; the
+    // manual override must win, matching IcebergConnectorAdapter.buildInternalConnectorConfig's
+    // documented precedence.
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    GravitinoConfig config = icebergRestConfiguredConfig(ImmutableMap.of());
+    config.setDiscoveredIcebergRestUri("test", "http://discovered:9001/iceberg");
+
+    Map<String, String> connectorConfig =
+        buildConnectorConfig("catalog1", properties, config, /* embedDiscovery= */ true);
+
+    Assertions.assertEquals("rest", connectorConfig.get("iceberg.catalog.type"));
+    Assertions.assertEquals(
+        "http://localhost:9001/iceberg", connectorConfig.get("iceberg.rest-catalog.uri"));
+  }
+
+  @Test
+  public void testEmbedDiscoveredIcebergRestUriDoesNotAffectNonIcebergCatalog() {
+    // CatalogRegister calls embedDiscoveredIcebergRestUri unconditionally for every catalog being
+    // registered, not just Iceberg ones, so this guard is load-bearing: a Hive/MySQL/etc. catalog
+    // must never end up carrying the synthetic discovered-URI property.
+    GravitinoConfig config = icebergRestDiscoveredConfig("test", "http://discovered:9001/iceberg");
+    Catalog mockHiveCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "hive_catalog", "hive", "test catalog", Catalog.Type.RELATIONAL, ImmutableMap.of());
+    GravitinoCatalog hiveCatalog = new GravitinoCatalog("test", mockHiveCatalog);
+
+    GravitinoCatalog result =
+        IcebergConnectorAdapter.embedDiscoveredIcebergRestUri(hiveCatalog, config);
+
+    Assertions.assertEquals(hiveCatalog.getProperties(), result.getProperties());
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesWithIcebergRestAuthentication() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .build();
+    GravitinoConfig gravitinoConfig =
+        icebergRestConfiguredConfig(
+            ImmutableMap.of(
+                "gravitino.iceberg.rest-catalog.security", "OAUTH2",
+                "gravitino.iceberg.rest-catalog.oauth2.credential", "client_id:client_secret",
+                "gravitino.iceberg.rest-catalog.uri", "http://ignored:9001/iceberg"));
+
+    Map<String, String> config = buildConnectorConfig("catalog1", properties, gravitinoConfig);
+
+    Assertions.assertEquals("OAUTH2", config.get("iceberg.rest-catalog.security"));
+    Assertions.assertEquals(
+        "client_id:client_secret", config.get("iceberg.rest-catalog.oauth2.credential"));
+    // The endpoint the connector routes to cannot be overridden by the pass-through prefix.
+    Assertions.assertEquals(
+        "http://localhost:9001/iceberg", config.get("iceberg.rest-catalog.uri"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesForwardsSessionUser() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestConfiguredConfig(
+                ImmutableMap.of("gravitino.client.session.forwardUser", "true")));
+    Assertions.assertEquals("USER", config.get("iceberg.rest-catalog.session"));
+
+    Map<String, String> explicitConfig =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestConfiguredConfig(
+                ImmutableMap.of(
+                    "gravitino.client.session.forwardUser", "true",
+                    "gravitino.iceberg.rest-catalog.session", "NONE")));
+    Assertions.assertEquals("NONE", explicitConfig.get("iceberg.rest-catalog.session"));
+
+    Map<String, String> defaultConfig =
+        buildConnectorConfig(
+            "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertNull(defaultConfig.get("iceberg.rest-catalog.session"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesStorageDetection() throws Exception {
+    Map<String, String> s3Config =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of(
+                "catalog-backend", "jdbc",
+                "warehouse", "s3://bucket/warehouse/",
+                "s3-region", "us-east-1",
+                "s3-endpoint", "http://minio:9000"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertEquals("true", s3Config.get("fs.native-s3.enabled"));
+    Assertions.assertEquals("us-east-1", s3Config.get("s3.region"));
+    Assertions.assertEquals("http://minio:9000", s3Config.get("s3.endpoint"));
+    Assertions.assertEquals("true", s3Config.get("fs.hadoop.enabled"));
+
+    Map<String, String> gcsConfig =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of("catalog-backend", "jdbc", "warehouse", "gs://bucket/warehouse/"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertEquals("true", gcsConfig.get("fs.native-gcs.enabled"));
+    Assertions.assertNull(gcsConfig.get("fs.native-s3.enabled"));
+
+    Map<String, String> azureConfig =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of(
+                "catalog-backend", "jdbc", "warehouse", "abfss://container@account/warehouse/"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertEquals("true", azureConfig.get("fs.native-azure.enabled"));
+
+    Map<String, String> hdfsConfig =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of("catalog-backend", "jdbc", "warehouse", "hdfs://namenode:9000/wh"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertEquals("true", hdfsConfig.get("fs.hadoop.enabled"));
+    Assertions.assertNull(hdfsConfig.get("fs.native-s3.enabled"));
+    Assertions.assertNull(hdfsConfig.get("fs.native-gcs.enabled"));
+    Assertions.assertNull(hdfsConfig.get("fs.native-azure.enabled"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesIcebergRestKeepsCatalogBypass() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .put("trino.bypass.iceberg.table-statistics-enabled", "true")
+            .put("trino.bypass.fs.native-s3.enabled", "false")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
+
+    Assertions.assertEquals("true", config.get("iceberg.table-statistics-enabled"));
+    // A catalog can override a derived default, so a Trino release renaming it is not a blocker.
+    Assertions.assertEquals("false", config.get("fs.native-s3.enabled"));
+  }
+
+  @SuppressWarnings("unchecked")
+  private static Map<String, String> buildConnectorConfig(
+      String catalogName, Map<String, String> properties, GravitinoConfig gravitinoConfig)
+      throws Exception {
+    return buildConnectorConfig(catalogName, properties, gravitinoConfig, new Credential[0]);
+  }
+
+  @Test
+  public void testIcebergRestPathIgnoresCatalogLevelCredentials() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("uri", "jdbc:postgresql://localhost:5432/iceberg")
+            .put("jdbc-driver", "org.postgresql.Driver")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .build();
+    Credential[] credentials = {
+      new JdbcCredential("root", "ds123"), new S3SecretKeyCredential("AKIAEXAMPLE", "secret")
+    };
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()), credentials);
+
+    // The REST protocol vends a fresh credential per table access, so the catalog-level snapshot
+    // must not be pinned into the connector config.
+    Assertions.assertNull(config.get("iceberg.jdbc-catalog.connection-user"));
+    Assertions.assertNull(config.get("iceberg.jdbc-catalog.connection-password"));
+    Assertions.assertNull(config.get("hive.s3.aws-access-key"));
+    Assertions.assertNull(config.get("hive.s3.aws-secret-key"));
+    Assertions.assertEquals("true", config.get("iceberg.rest-catalog.vended-credentials-enabled"));
+
+    // The backend path still applies them.
+    Map<String, String> legacyConfig =
+        buildConnectorConfig("catalog1", properties, icebergRestUnavailableConfig(), credentials);
+    Assertions.assertEquals("root", legacyConfig.get("iceberg.jdbc-catalog.connection-user"));
+    Assertions.assertEquals("AKIAEXAMPLE", legacyConfig.get("hive.s3.aws-access-key"));
+  }
+
+  @Test
+  public void testIcebergRestReservedPropertiesResistCatalogOverride() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .put("trino.bypass.iceberg.catalog.type", "jdbc")
+            .put("trino.bypass.iceberg.rest-catalog.uri", "http://elsewhere:9001/iceberg")
+            .put("trino.bypass.iceberg.rest-catalog.prefix", "other_catalog")
+            .put("trino.bypass.iceberg.rest-catalog.warehouse", "other_catalog")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1", properties, icebergRestConfiguredConfig(ImmutableMap.of()));
+
+    // A catalog property must never redirect the connector at another endpoint or catalog.
+    Assertions.assertEquals("rest", config.get("iceberg.catalog.type"));
+    Assertions.assertEquals(
+        "http://localhost:9001/iceberg", config.get("iceberg.rest-catalog.uri"));
+    Assertions.assertEquals("catalog1", config.get("iceberg.rest-catalog.prefix"));
+    Assertions.assertEquals("catalog1", config.get("iceberg.rest-catalog.warehouse"));
+  }
+
+  @Test
+  public void testConnectorRestCatalogConfigOverridesCatalogBypass() throws Exception {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put("catalog-backend", "jdbc")
+            .put("warehouse", "s3://bucket/warehouse/")
+            .put("trino.bypass.iceberg.rest-catalog.security", "NONE")
+            .build();
+
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1",
+            properties,
+            icebergRestConfiguredConfig(
+                ImmutableMap.of("gravitino.iceberg.rest-catalog.security", "OAUTH2")));
+
+    // Cluster-level operational settings outrank per-catalog properties.
+    Assertions.assertEquals("OAUTH2", config.get("iceberg.rest-catalog.security"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesStorageDetectionEdgeCases() throws Exception {
+    // s3a/s3n aliases and an uppercase scheme all resolve to the native S3 file system.
+    for (String warehouse : new String[] {"s3a://bucket/wh", "s3n://bucket/wh", "S3://bucket/wh"}) {
+      Map<String, String> config =
+          buildConnectorConfig(
+              "catalog1",
+              ImmutableMap.of("catalog-backend", "jdbc", "warehouse", warehouse),
+              icebergRestConfiguredConfig(ImmutableMap.of()));
+      Assertions.assertEquals(
+          "true", config.get("fs.native-s3.enabled"), "warehouse: " + warehouse);
+    }
+
+    // A warehouse without a scheme is a plain path and stays on the Hadoop file system.
+    Map<String, String> schemeless =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of("catalog-backend", "jdbc", "warehouse", "gt_iceberg_rest"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertEquals("true", schemeless.get("fs.hadoop.enabled"));
+    Assertions.assertNull(schemeless.get("fs.native-s3.enabled"));
+
+    // No warehouse at all.
+    Map<String, String> noWarehouse =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of("catalog-backend", "jdbc"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertEquals("true", noWarehouse.get("fs.hadoop.enabled"));
+    Assertions.assertNull(noWarehouse.get("fs.native-s3.enabled"));
+    Assertions.assertNull(noWarehouse.get("fs.native-gcs.enabled"));
+    Assertions.assertNull(noWarehouse.get("fs.native-azure.enabled"));
+
+    // oss:// has no Trino native file system, so nothing is enabled beyond Hadoop.
+    Map<String, String> oss =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of(
+                "catalog-backend", "jdbc",
+                "warehouse", "oss://bucket/wh",
+                "credential-providers", "oss-token"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+    Assertions.assertEquals("true", oss.get("fs.hadoop.enabled"));
+    Assertions.assertNull(oss.get("fs.native-s3.enabled"));
+  }
+
+  @Test
+  public void testBuildConnectorPropertiesCopiesS3PathStyleAccess() throws Exception {
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of(
+                "catalog-backend", "jdbc",
+                "warehouse", "s3://bucket/wh",
+                "s3-endpoint", "http://minio:9000",
+                "s3-path-style-access", "true"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+
+    // S3-compatible stores such as MinIO need path-style addressing to resolve the bucket.
+    Assertions.assertEquals("true", config.get("s3.path-style-access"));
+    Assertions.assertEquals("http://minio:9000", config.get("s3.endpoint"));
+  }
+
+  @Test
+  public void testRestBackendIsNotReRoutedRegardlessOfCase() throws Exception {
+    Map<String, String> config =
+        buildConnectorConfig(
+            "catalog1",
+            ImmutableMap.of("catalog-backend", "REST", "uri", "http://other-irc:9001/iceberg"),
+            icebergRestConfiguredConfig(ImmutableMap.of()));
+
+    Assertions.assertEquals(
+        "http://other-irc:9001/iceberg", config.get("iceberg.rest-catalog.uri"));
+    Assertions.assertNull(config.get("iceberg.rest-catalog.prefix"));
+  }
+
+  private static Map<String, String> buildConnectorConfig(
+      String catalogName,
+      Map<String, String> properties,
+      GravitinoConfig gravitinoConfig,
+      Credential[] credentials)
+      throws Exception {
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            catalogName, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
+    return new IcebergConnectorAdapter(gravitinoConfig)
+        .buildInternalConnectorConfig(new GravitinoCatalog("test", mockCatalog), credentials);
+  }
+
+  /**
+   * Like {@link #buildConnectorConfig(String, Map, GravitinoConfig, Credential[])}, but for
+   * discovered-endpoint scenarios: {@code embedDiscovery} mirrors what {@code CatalogRegister} does
+   * before registering a catalog, so a discovered value only reaches the adapter the same way it
+   * would on a real node — through the catalog, never by reading {@code GravitinoConfig}'s
+   * discovered map directly.
+   */
+  private static Map<String, String> buildConnectorConfig(
+      String catalogName,
+      Map<String, String> properties,
+      GravitinoConfig gravitinoConfig,
+      boolean embedDiscovery)
+      throws Exception {
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            catalogName, "lakehouse-iceberg", "test catalog", Catalog.Type.RELATIONAL, properties);
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+    if (embedDiscovery) {
+      catalog = IcebergConnectorAdapter.embedDiscoveredIcebergRestUri(catalog, gravitinoConfig);
+    }
+    return new IcebergConnectorAdapter(gravitinoConfig)
+        .buildInternalConnectorConfig(catalog, new Credential[0]);
+  }
+
+  private static GravitinoConfig icebergRestUnavailableConfig() {
+    return new GravitinoConfig(
+        ImmutableMap.of(
+            "gravitino.metalake", "test",
+            "gravitino.iceberg.rest-routing-enabled", "false"));
+  }
+
+  private static GravitinoConfig icebergRestConfiguredConfig(Map<String, String> extraConfig) {
+    return new GravitinoConfig(
+        ImmutableMap.<String, String>builder()
+            .put("gravitino.metalake", "test")
+            .put("gravitino.iceberg.rest-uri", "http://localhost:9001/iceberg")
+            .putAll(extraConfig)
+            .build());
+  }
+
+  private static GravitinoConfig icebergRestDiscoveredConfig(String metalake, String uri) {
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", metalake));
+    config.setDiscoveredIcebergRestUri(metalake, uri);
+    return config;
   }
 }
