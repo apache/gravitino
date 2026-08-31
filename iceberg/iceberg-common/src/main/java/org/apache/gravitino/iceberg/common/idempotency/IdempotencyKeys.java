@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.iceberg.common.idempotency;
 
+import java.util.Locale;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -82,5 +83,25 @@ public final class IdempotencyKeys {
               + " is illegal, the Iceberg REST spec requires a UUIDv7 in string form (RFC 9562), "
               + "for example 017f22e2-79b0-7cc3-98c4-dc0c0c07398f");
     }
+  }
+
+  /**
+   * Validates the value and returns it in the lower-case form used for storage and comparison.
+   *
+   * <p>RFC 9562 section 4 defines the hexadecimal digits of a UUID as case-insensitive on input
+   * while specifying lower case on output, so {@code 017F22E2-...} and {@code 017f22e2-...} name
+   * the same key. A client that retries with a differently-cased key is retrying the same logical
+   * operation, and folding the case here is what keeps that retry from being taken for a new
+   * request and re-running the mutation. It also keeps a database-backed store correct under a
+   * case-sensitive collation such as {@code utf8mb4_bin}, since only the folded form is ever
+   * written.
+   *
+   * @param idempotencyKey the raw header value, may be {@code null}
+   * @return the key folded to lower case
+   * @throws IllegalArgumentException if the value is not a valid RFC 9562 UUIDv7
+   */
+  public static String canonicalize(String idempotencyKey) {
+    validate(idempotencyKey);
+    return idempotencyKey.toLowerCase(Locale.ROOT);
   }
 }

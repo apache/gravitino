@@ -85,7 +85,8 @@ public class TestIdempotencyStoreFactory {
     }
 
     @Override
-    public ReserveResult reserve(String idempotencyKey, String operationBinding, long expiresAtMs) {
+    public ReserveResult reserve(
+        String idempotencyKey, String operationBinding, long claim, long expiresAtMs) {
       return ReserveResult.RESERVED;
     }
 
@@ -95,10 +96,11 @@ public class TestIdempotencyStoreFactory {
     }
 
     @Override
-    public void finalizeRecord(String idempotencyKey, int httpStatus, String responseSummary) {}
+    public void finalizeRecord(
+        String idempotencyKey, long claim, int httpStatus, String responseSummary) {}
 
     @Override
-    public void release(String idempotencyKey) {}
+    public void release(String idempotencyKey, long claim) {}
 
     @Override
     public int purgeExpired(long beforeMs) {

@@ -74,4 +74,20 @@ public class TestIdempotencyKeys {
   void testNilUuidIsRejected() {
     Assertions.assertFalse(IdempotencyKeys.isValid("00000000-0000-0000-0000-000000000000"));
   }
+
+  @Test
+  void testCanonicalizeFoldsCase() {
+    String expected = "017f22e2-79b0-7cc3-98c4-dc0c0c07398f";
+    Assertions.assertEquals(
+        expected, IdempotencyKeys.canonicalize("017F22E2-79B0-7CC3-98C4-DC0C0C07398F"));
+    Assertions.assertEquals(expected, IdempotencyKeys.canonicalize(expected));
+    Assertions.assertEquals(
+        expected, IdempotencyKeys.canonicalize("017f22E2-79b0-7CC3-98c4-DC0c0c07398F"));
+  }
+
+  @Test
+  void testCanonicalizeRejectsAnInvalidKey() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> IdempotencyKeys.canonicalize("not-a-uuid"));
+  }
 }

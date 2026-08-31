@@ -34,6 +34,17 @@ import javax.annotation.Nullable;
  * see the same storage, since that is the only thing standing between a retried request and a
  * duplicate mutation.
  *
+ * <p>A reservation does not always survive until its owner finishes: a bounded store can drop it
+ * under memory pressure, and a purge can remove it once it expires. The key is then free, and
+ * another caller can reserve it while the first is still running. Every call that mutates an
+ * existing record therefore carries the {@code claim} its caller reserved with, and implementations
+ * must ignore the call when the stored claim differs, so a caller that has lost its reservation
+ * cannot finalize or release a record that now belongs to someone else.
+ *
+ * <p>Keys are compared in the folded form returned by {@link IdempotencyKeys#canonicalize}, so
+ * implementations must canonicalize before reading or writing storage rather than trusting the
+ * caller to have done it.
+ *
  * <p>Implementations must be thread-safe and are expected to have a public no-argument constructor
  * so they can be loaded by class name.
  */
@@ -60,11 +71,14 @@ public interface IdempotencyStore extends Closeable {
    * @param idempotencyKey the client-provided UUIDv7 key
    * @param operationBinding request identity, for example {@code POST
    *     /v1/cat1/namespaces/ns1/tables}
+   * @param claim a fencing token identifying this attempt, which the caller must generate afresh
+   *     for every reservation and pass back to {@link #finalizeRecord} and {@link #release}
    * @param expiresAtMs time after which the record may be purged, in unix epoch millis
    * @return {@link ReserveResult#RESERVED} if newly claimed, {@link ReserveResult#DUPLICATE} if a
    *     record for this key already exists
    */
-  ReserveResult reserve(String idempotencyKey, String operationBinding, long expiresAtMs);
+  ReserveResult reserve(
+      String idempotencyKey, String operationBinding, long claim, long expiresAtMs);
 
   /**
    * Loads a finalized record for replay.
@@ -78,21 +92,29 @@ public interface IdempotencyStore extends Closeable {
   /**
    * Marks a reserved key finalized, storing the response replayed to later retries.
    *
-   * <p>A record that has already expired or been purged is not resurrected; the call is a no-op.
+   * <p>The call is a no-op when the record has already expired or been purged, so it is not
+   * resurrected, and when the stored claim differs, so a caller that has lost its reservation
+   * cannot overwrite the record of whoever holds the key now.
    *
    * @param idempotencyKey the client-provided key
+   * @param claim the claim this caller reserved with
    * @param httpStatus HTTP status of the original response
    * @param responseSummary serialized response body, {@code null} for responses without a body
    */
-  void finalizeRecord(String idempotencyKey, int httpStatus, @Nullable String responseSummary);
+  void finalizeRecord(
+      String idempotencyKey, long claim, int httpStatus, @Nullable String responseSummary);
 
   /**
    * Releases a reservation so the client can retry with the same key. Called when the mutation
    * failed in a way the Iceberg REST spec treats as retryable, which is any {@code 5xx} response.
    *
+   * <p>The call is a no-op when the stored claim differs, so a caller that has lost its reservation
+   * cannot free a key another caller is currently executing under.
+   *
    * @param idempotencyKey the client-provided key
+   * @param claim the claim this caller reserved with
    */
-  void release(String idempotencyKey);
+  void release(String idempotencyKey, long claim);
 
   /**
    * Purges records whose reuse window has elapsed.
