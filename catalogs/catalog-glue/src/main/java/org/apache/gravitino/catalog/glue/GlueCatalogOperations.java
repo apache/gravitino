@@ -37,7 +37,6 @@ import java.util.function.Consumer;
 import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
@@ -70,6 +69,7 @@ import org.apache.gravitino.utils.PrincipalUtils;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.core.exception.SdkException;
 import software.amazon.awssdk.services.glue.GlueClient;
 import software.amazon.awssdk.services.glue.model.CreateDatabaseRequest;
 import software.amazon.awssdk.services.glue.model.CreateTableRequest;
@@ -155,18 +155,12 @@ public class GlueCatalogOperations implements CatalogOperations, SupportsSchemas
   }
 
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties)
-      throws Exception {
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       GetDatabasesRequest.Builder req = GetDatabasesRequest.builder().maxResults(1);
       applyCatalogId(catalogId, req::catalogId);
       glueClient.getDatabases(req.build());
-    } catch (GlueException e) {
+    } catch (SdkException e) {
       throw new ConnectionFailedException(e, "Failed to connect to AWS Glue: %s", e.getMessage());
     }
   }

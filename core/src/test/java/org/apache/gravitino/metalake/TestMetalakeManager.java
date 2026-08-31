@@ -26,24 +26,31 @@ import static org.mockito.Mockito.doReturn;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.catalog.CatalogManager;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.MetalakeAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.lock.LockManager;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore;
 import org.apache.gravitino.storage.memory.TestMemoryEntityStore.InMemoryEntityStore;
@@ -259,12 +266,52 @@ public class TestMetalakeManager {
     metalakeManager.dropMetalake(ident3, true);
   }
 
+  @Test
+  public void testForceDropMetalakeAfterDisableDropsLeftoverCatalogs() throws Exception {
+    // Mirrors IT tearDown: disableMetalake then dropMetalake(force=true) while a catalog entity
+    // may still remain. CatalogManager.dropCatalog requires metalake-in-use on the catalog.
+    InMemoryEntityStore store = new InMemoryEntityStore();
+    store.initialize(config);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    Mockito.when(catalogManager.dropCatalog(Mockito.any(NameIdentifier.class), Mockito.eq(true)))
+        .thenReturn(true);
+    Mockito.doNothing()
+        .when(catalogManager)
+        .setMetalakeInUseStatus(Mockito.any(NameIdentifier.class), Mockito.anyBoolean());
+
+    FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", catalogManager, true);
+    MetalakeManager manager = new MetalakeManager(store, new RandomIdGenerator(), catalogManager);
+
+    NameIdentifier metalakeIdent = NameIdentifier.of("force_drop_leftover_ml");
+    manager.createMetalake(metalakeIdent, "comment", ImmutableMap.of());
+    store.put(
+        CatalogEntity.builder()
+            .withId(99L)
+            .withName("leftover_catalog")
+            .withNamespace(Namespace.of(metalakeIdent.name()))
+            .withType(Catalog.Type.RELATIONAL)
+            .withProvider("test")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build(),
+        true);
+
+    manager.disableMetalake(metalakeIdent);
+    Assertions.assertTrue(manager.dropMetalake(metalakeIdent, true));
+    Mockito.verify(catalogManager)
+        .dropCatalog(NameIdentifier.of(metalakeIdent.name(), "leftover_catalog"), true);
+
+    store.close();
+  }
+
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertTrue(
+        !testProps.containsKey(StringIdentifier.ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(testProps.get(StringIdentifier.ID_KEY)));
   }
 }

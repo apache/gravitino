@@ -56,10 +56,12 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.TestColumn;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.lock.LockManager;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ColumnEntity;
@@ -159,7 +161,9 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertNotNull(tableEntity);
     Assertions.assertEquals("table1", tableEntity.name());
 
-    Assertions.assertFalse(table1.properties().containsKey(ID_KEY));
+    Assertions.assertTrue(
+        !table1.properties().containsKey(ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(table1.properties().get(ID_KEY)));
 
     Optional<NameIdentifier> ident1 =
         Arrays.stream(tableOperationDispatcher.listTables(tableNs))
@@ -490,7 +494,17 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertEquals("test", alteredTable3.auditInfo().creator());
     Assertions.assertEquals("test", alteredTable3.auditInfo().lastModifier());
 
-    // Case 4: Test if the table entity is not matched
+    // Case 4: The external alter has already succeeded, so an internal mirror conflict is
+    // best-effort. Returning an error here could make the client apply the external change twice.
+    reset(entityStore);
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .update(any(), any(), any(), any());
+    Table alteredTable4 = tableOperationDispatcher.alterTable(tableIdent, changes);
+    Assertions.assertEquals("test", alteredTable4.auditInfo().creator());
+    Assertions.assertEquals("test", alteredTable4.auditInfo().lastModifier());
+
+    // Case 5: Test if the table entity is not matched.
     reset(entityStore);
     TableEntity unmatchedEntity =
         TableEntity.builder()
@@ -501,10 +515,10 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
                 AuditInfo.builder().withCreator("gravitino").withCreateTime(Instant.now()).build())
             .build();
     doReturn(unmatchedEntity).when(entityStore).update(any(), any(), any(), any());
-    Table alteredTable4 = tableOperationDispatcher.alterTable(tableIdent, changes);
+    Table alteredTable5 = tableOperationDispatcher.alterTable(tableIdent, changes);
     // Audit info is gotten from the catalog, not from the entity store
-    Assertions.assertEquals("test", alteredTable4.auditInfo().creator());
-    Assertions.assertEquals("test", alteredTable4.auditInfo().lastModifier());
+    Assertions.assertEquals("test", alteredTable5.auditInfo().creator());
+    Assertions.assertEquals("test", alteredTable5.auditInfo().lastModifier());
   }
 
   @Test
@@ -612,6 +626,40 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     doThrow(new IOException()).when(entityStore).delete(any(), any(), anyBoolean());
     Assertions.assertThrows(
         RuntimeException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    reset(entityStore);
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> tableOperationDispatcher.dropTable(tableIdent));
+  }
+
+  @Test
+  public void testPurgeTablePropagatesOptimisticLockConflict() throws IOException {
+    NameIdentifier tableIdent =
+        NameIdentifier.of(metalake, catalog, "schema_purge_occ", "table_purge_occ");
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableIdent.namespace().levels()), "comment", props);
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+
+    reset(entityStore);
+    doThrow(new OptimisticLockException("mock conflict"))
+        .when(entityStore)
+        .delete(any(), any(), anyBoolean());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class, () -> tableOperationDispatcher.purgeTable(tableIdent));
   }
 
   @Test
@@ -1244,6 +1292,38 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
           Assertions.assertEquals(e.autoIncrement(), actualColumn.autoIncrement());
           Assertions.assertEquals(e.defaultValue(), actualColumn.defaultValue());
         });
+  }
+
+  @Test
+  public void testCreateAndAlterTableRejectMaskedPlaceholder() {
+    Namespace tableNs = Namespace.of(metalake, catalog, "schema_masked_table");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(tableNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    NameIdentifier tableIdent = NameIdentifier.of(tableNs, "table_masked");
+    Column[] columns =
+        new Column[] {
+          TestColumn.builder()
+              .withName("col1")
+              .withPosition(0)
+              .withType(Types.StringType.get())
+              .build()
+        };
+    Map<String, String> createProps =
+        ImmutableMap.of("k1", HiddenPropertyMaskUtils.MASKED_VALUE, "k2", "v2");
+    testMaskedPlaceholderRejected(
+        () ->
+            tableOperationDispatcher.createTable(
+                tableIdent, columns, "comment", createProps, new Transform[0]),
+        "k1");
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    tableOperationDispatcher.createTable(tableIdent, columns, "comment", props, new Transform[0]);
+    testMaskedPlaceholderRejected(
+        () ->
+            tableOperationDispatcher.alterTable(
+                tableIdent, TableChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
+        "k3");
   }
 
   private void putSchemaEntity(NameIdentifier ident) throws IOException {

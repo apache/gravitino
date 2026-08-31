@@ -52,6 +52,8 @@ import org.apache.gravitino.dto.responses.CatalogListResponse;
 import org.apache.gravitino.dto.responses.CatalogResponse;
 import org.apache.gravitino.dto.responses.DropResponse;
 import org.apache.gravitino.dto.responses.EntityListResponse;
+import org.apache.gravitino.dto.secret.SecretBindingDTO;
+import org.apache.gravitino.dto.secret.SecretReferenceDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
@@ -154,7 +156,9 @@ public class CatalogOperations {
                     request.getType(),
                     request.getProvider(),
                     request.getComment(),
-                    request.getProperties());
+                    request.getProperties(),
+                    SecretBindingDTO.toSecretBindings(request.getSecretBindings()),
+                    SecretReferenceDTO.toSecretReferences(request.getSecretReferences()));
             Response response = Utils.ok(new CatalogResponse(DTOConverters.toDTO(catalog)));
             LOG.info("Catalog created: {}.{}", metalake, catalog.name());
             return response;
@@ -200,6 +204,38 @@ public class CatalogOperations {
     } catch (Exception e) {
       LOG.info("Failed to test connection for catalog: {}.{}", metalake, request.getName());
       return ExceptionHandlers.handleTestConnectionException(e);
+    }
+  }
+
+  @POST
+  @Path("{catalog}/testConnection")
+  @Produces("application/vnd.gravitino.v1+json")
+  @Timed(name = "test-existing-connection." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @AuthorizationExpression(
+      expression = "ANY(OWNER, METALAKE, CATALOG)",
+      accessMetadataType = MetadataObject.Type.CATALOG)
+  @ResponseMetered(name = "test-existing-connection", absolute = true)
+  public Response testExistingConnection(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
+          String catalogName) {
+    LOG.info("Received test connection request for existing catalog: {}.{}", metalake, catalogName);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            NameIdentifier ident = NameIdentifierUtil.ofCatalog(metalake, catalogName);
+            catalogDispatcher.testConnection(ident);
+            LOG.info(
+                "Successfully tested connection for existing catalog: {}.{}",
+                metalake,
+                catalogName);
+            return Utils.ok(new BaseResponse());
+          });
+    } catch (Exception e) {
+      LOG.info("Failed to test connection for existing catalog: {}.{}", metalake, catalogName);
+      return ExceptionHandlers.handleExistingCatalogTestConnectionException(e);
     }
   }
 

@@ -24,9 +24,11 @@ import com.qcloud.cos.auth.COSCredentials;
 import java.net.URI;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.catalog.hadoop.fs.GravitinoFileSystemCredentialsProvider;
+import org.apache.gravitino.catalog.hadoop.fs.InMemoryFileSystemCredentialsProvider;
 import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.Credential;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.CosNConfigKeys;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,6 +68,30 @@ public class TestCOSCredentialsProvider {
     Assertions.assertTrue(credentials instanceof BasicCOSCredentials);
     Assertions.assertEquals("test-ak", credentials.getCOSAccessKeyId());
     Assertions.assertEquals("test-sk", credentials.getCOSSecretKey());
+  }
+
+  @Test
+  void testRefreshWithInMemoryCredentialProvider() {
+    Credential[] credentials = new Credential[] {new COSSecretKeyCredential("test-ak", "test-sk")};
+    String handle = InMemoryFileSystemCredentialsProvider.register(credentials);
+    try {
+      Configuration conf = new Configuration(false);
+      conf.set(
+          GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
+          InMemoryFileSystemCredentialsProvider.class.getCanonicalName());
+      conf.set(InMemoryFileSystemCredentialsProvider.CREDENTIAL_HANDLE, handle);
+      new COSFileSystemProvider().getFileSystemCredentialConf(credentials).forEach(conf::set);
+      Assertions.assertEquals(
+          COSCredentialsProvider.class.getCanonicalName(),
+          conf.get(CosNConfigKeys.COSN_CREDENTIALS_PROVIDER));
+
+      COSCredentials actual = new COSCredentialsProvider(COS_URI, conf).getCredentials();
+
+      Assertions.assertEquals("test-ak", actual.getCOSAccessKeyId());
+      Assertions.assertEquals("test-sk", actual.getCOSSecretKey());
+    } finally {
+      InMemoryFileSystemCredentialsProvider.unregister(handle);
+    }
   }
 
   @Test

@@ -203,6 +203,27 @@ class TestAuditMiddlewareIntegration(unittest.TestCase):
         record = json.loads(self.log_records[0])
         self.assertEqual(record["principal"], "bearer:abcdef12")
 
+    def test_principal_falls_back_to_oauth_client_id(self):
+        """With no request header, OAuth client-credentials is attributable."""
+        RESTClientFactory.set_rest_client(MockOperation)
+        server = GravitinoMCPServer(
+            Setting(
+                "mock_metalake",
+                oauth_token_endpoint="https://idp/token",
+                oauth_client_id="mcp-service",
+                oauth_client_secret="s",
+            )
+        )
+
+        async def _run():
+            async with Client(server.mcp) as client:
+                await client.call_tool("get_list_of_catalogs")
+
+        asyncio.run(_run())
+
+        record = json.loads(self.log_records[0])
+        self.assertEqual(record["principal"], "oauth:mcp-serv")
+
     def test_failed_tool_call_emits_deny_record(self):
         """A tool call that raises an exception produces an audit record with outcome=deny."""
 

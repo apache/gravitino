@@ -51,6 +51,7 @@ import java.io.File;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
@@ -65,6 +66,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.kafka.embedded.KafkaClusterEmbedded;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.PropertiesMetadata;
+import org.apache.gravitino.exceptions.ConnectionFailedException;
 import org.apache.gravitino.exceptions.NoSuchSchemaException;
 import org.apache.gravitino.exceptions.NoSuchTopicException;
 import org.apache.gravitino.exceptions.TopicAlreadyExistsException;
@@ -76,6 +78,9 @@ import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.kafka.clients.admin.AdminClient;
+import org.apache.kafka.clients.admin.ListTopicsResult;
+import org.apache.kafka.common.KafkaFuture;
 import org.apache.kafka.common.config.TopicConfig;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
@@ -572,5 +577,29 @@ public class TestKafkaCatalogOperations extends KafkaClusterEmbedded {
                 "kafka",
                 "comment",
                 ImmutableMap.of()));
+  }
+
+  @Test
+  public void testConnectionPreservesInterruptStatus() throws Exception {
+    AdminClient adminClient = Mockito.mock(AdminClient.class);
+    ListTopicsResult listTopicsResult = Mockito.mock(ListTopicsResult.class);
+    @SuppressWarnings("unchecked")
+    KafkaFuture<Set<String>> namesFuture = Mockito.mock(KafkaFuture.class);
+    when(adminClient.listTopics()).thenReturn(listTopicsResult);
+    when(listTopicsResult.names()).thenReturn(namesFuture);
+    when(namesFuture.get()).thenThrow(new InterruptedException("interrupted"));
+
+    KafkaCatalogOperations operations = new KafkaCatalogOperations(store, idGenerator);
+    FieldUtils.writeField(operations, "adminClient", adminClient, true);
+
+    Thread.interrupted();
+    try {
+      Assertions.assertThrows(
+          ConnectionFailedException.class,
+          () -> operations.testConnection(NameIdentifier.of("metalake", "catalog")));
+      Assertions.assertTrue(Thread.currentThread().isInterrupted());
+    } finally {
+      Thread.interrupted();
+    }
   }
 }

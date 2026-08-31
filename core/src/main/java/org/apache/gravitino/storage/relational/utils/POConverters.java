@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
@@ -701,43 +702,47 @@ public class POConverters {
    *
    * @param oldFilesetPO the existing {@link FilesetPO} containing the current and last version data
    * @param newFileset the {@link FilesetEntity} with updated metadata and storage locations
-   * @param needUpdateVersion true to increment and update version fields; false to keep versions
-   *     unchanged
+   * @param maxStoredVersion the highest version the fileset still has a stored snapshot for, or
+   *     {@code null} when it has none
    * @return {@code FilesetPO} object with updated version
    * @throws RuntimeException if JSON serialization of properties fails
    */
   public static FilesetPO updateFilesetPOWithVersion(
-      FilesetPO oldFilesetPO, FilesetEntity newFileset, boolean needUpdateVersion) {
+      FilesetPO oldFilesetPO, FilesetEntity newFileset, @Nullable Long maxStoredVersion) {
     try {
-      Long lastVersion = oldFilesetPO.getLastVersion();
-      Long currentVersion;
-      List<FilesetVersionPO> newFilesetVersionPOs;
-      // Will set the version to the last version + 1
-      if (needUpdateVersion) {
-        lastVersion++;
-        currentVersion = lastVersion;
-        String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
-        newFilesetVersionPOs =
-            newFileset.storageLocations().entrySet().stream()
-                .map(
-                    entry ->
-                        FilesetVersionPO.builder()
-                            .withMetalakeId(oldFilesetPO.getMetalakeId())
-                            .withCatalogId(oldFilesetPO.getCatalogId())
-                            .withSchemaId(oldFilesetPO.getSchemaId())
-                            .withFilesetId(newFileset.id())
-                            .withVersion(currentVersion)
-                            .withFilesetComment(newFileset.comment())
-                            .withLocationName(entry.getKey())
-                            .withStorageLocation(entry.getValue())
-                            .withProperties(props)
-                            .withDeletedAt(DEFAULT_DELETED_AT)
-                            .build())
-                .collect(Collectors.toList());
-      } else {
-        currentVersion = oldFilesetPO.getCurrentVersion();
-        newFilesetVersionPOs = oldFilesetPO.getFilesetVersionPOs();
+      // Every successful fileset alter advances the OCC token. The current version is also the
+      // value used by reads to find the fileset details, so even a rename or audit-only change
+      // needs a complete snapshot at the new version. Alters that change nothing therefore still
+      // write one row per storage location; the version retention job is what removes them again.
+      //
+      // The stored snapshots are taken into account as well, because a fileset written before the
+      // version reset was fixed can carry snapshots newer than the version its metadata row
+      // records. Starting from the metadata row alone would rebuild a version that already exists
+      // and collide with the unique key over (fileset_id, version, storage_location_name).
+      long previousVersion =
+          Math.max(oldFilesetPO.getLastVersion(), oldFilesetPO.getCurrentVersion());
+      if (maxStoredVersion != null) {
+        previousVersion = Math.max(previousVersion, maxStoredVersion);
       }
+      Long currentVersion = previousVersion + 1;
+      String props = JsonUtils.anyFieldMapper().writeValueAsString(newFileset.properties());
+      List<FilesetVersionPO> newFilesetVersionPOs =
+          newFileset.storageLocations().entrySet().stream()
+              .map(
+                  entry ->
+                      FilesetVersionPO.builder()
+                          .withMetalakeId(oldFilesetPO.getMetalakeId())
+                          .withCatalogId(oldFilesetPO.getCatalogId())
+                          .withSchemaId(oldFilesetPO.getSchemaId())
+                          .withFilesetId(newFileset.id())
+                          .withVersion(currentVersion)
+                          .withFilesetComment(newFileset.comment())
+                          .withLocationName(entry.getKey())
+                          .withStorageLocation(entry.getValue())
+                          .withProperties(props)
+                          .withDeletedAt(DEFAULT_DELETED_AT)
+                          .build())
+              .collect(Collectors.toList());
       return FilesetPO.builder()
           .withFilesetId(newFileset.id())
           .withFilesetName(newFileset.name())
@@ -747,37 +752,12 @@ public class POConverters {
           .withType(newFileset.filesetType().name())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newFileset.auditInfo()))
           .withCurrentVersion(currentVersion)
-          .withLastVersion(lastVersion)
+          .withLastVersion(currentVersion)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .withFilesetVersionPOs(newFilesetVersionPOs)
           .build();
     } catch (JsonProcessingException e) {
       throw new RuntimeException("Failed to serialize json object:", e);
-    }
-  }
-
-  public static boolean checkFilesetVersionNeedUpdate(
-      List<FilesetVersionPO> oldFilesetVersionPOs, FilesetEntity newFileset) {
-    Map<String, String> storageLocations =
-        oldFilesetVersionPOs.stream()
-            .collect(
-                Collectors.toMap(
-                    FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
-    if (!StringUtils.equals(oldFilesetVersionPOs.get(0).getFilesetComment(), newFileset.comment())
-        || !Objects.equals(storageLocations, newFileset.storageLocations())) {
-      return true;
-    }
-
-    try {
-      Map<String, String> oldProperties =
-          JsonUtils.anyFieldMapper()
-              .readValue(oldFilesetVersionPOs.get(0).getProperties(), Map.class);
-      if (oldProperties == null) {
-        return newFileset.properties() != null;
-      }
-      return !oldProperties.equals(newFileset.properties());
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to deserialize json object:", e);
     }
   }
 

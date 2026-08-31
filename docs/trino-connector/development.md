@@ -175,27 +175,14 @@ Change `localhost`, `port`, and the names of metalake and catalogs to match your
         </dependency>
 
         <dependency>
+            <groupId>io.airlift</groupId>
+            <artifactId>log</artifactId>
+        </dependency>
+
+        <dependency>
             <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-            <version>2.0.9</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-slf4j2-impl</artifactId>
-            <version>2.22.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-api</artifactId>
-            <version>2.22.0</version>
-        </dependency>
-
-        <dependency>
-            <groupId>org.apache.logging.log4j</groupId>
-            <artifactId>log4j-core</artifactId>
-            <version>2.22.0</version>
+            <artifactId>slf4j-jdk14</artifactId>
+            <version>2.0.17</version>
         </dependency>
 
         <dependency>
@@ -322,7 +309,7 @@ If a compile error occurs due to `The following artifacts could not be resolved:
    ```
 
    :::note
-   Remove `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not listed in `plugin.bundles`. For the Hive plugin, use `plugin/trino-hive/pom.xml` for Trino 435 and later; for earlier versions, use `plugin/trino-hive-hadoop2/pom.xml`.
+   Remove `/etc/catalogs/xxx.properties` if the corresponding `plugin/trino-xxx/pom.xml` is not listed in `plugin.bundles`. For the Hive plugin, use `plugin/trino-hive/pom.xml`.
    :::
 
 8. Start the Trino server and connect to the Gravitino server.

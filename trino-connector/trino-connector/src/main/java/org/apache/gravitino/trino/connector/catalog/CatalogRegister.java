@@ -23,6 +23,7 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYN
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
+import io.airlift.log.Logger;
 import io.trino.jdbc.TrinoDriver;
 import io.trino.spi.TrinoException;
 import java.io.File;
@@ -42,8 +43,6 @@ import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class dynamically register the Catalog managed by Apache Gravitino into Trino using Trino
@@ -51,7 +50,7 @@ import org.slf4j.LoggerFactory;
  */
 public class CatalogRegister {
 
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogRegister.class);
+  private static final Logger LOG = Logger.get(CatalogRegister.class);
 
   private static final int EXECUTE_QUERY_MAX_RETRIES = 6;
   private static final int EXECUTE_QUERY_BACKOFF_TIME_SECOND = 5;
@@ -89,7 +88,7 @@ public class CatalogRegister {
       isStarted = statement.execute(command);
       return isStarted;
     } catch (Exception e) {
-      LOG.warn("Trino server is not started: {}", e.getMessage());
+      LOG.warn("Trino server is not started: %s", e.getMessage());
       return false;
     }
   }
@@ -197,13 +196,13 @@ public class CatalogRegister {
     Map<String, String> extraProperties = config.getTrinoJdbcExtraProperties();
     if (!extraProperties.isEmpty()) {
       // Log the names only, the values may contain credentials.
-      LOG.debug("Applying extra Trino JDBC properties: {}", extraProperties.keySet());
+      LOG.debug("Applying extra Trino JDBC properties: %s", extraProperties.keySet());
       extraProperties.keySet().stream()
           .filter(key -> key.startsWith("SSL") && properties.containsKey(key))
           .forEach(
               key ->
                   LOG.warn(
-                      "Extra Trino JDBC property '{}' overrides the TLS setting derived from the "
+                      "Extra Trino JDBC property '%s' overrides the TLS setting derived from the "
                           + "dedicated configuration and is applied without validation",
                       key));
       properties.putAll(extraProperties);
@@ -399,12 +398,12 @@ public class CatalogRegister {
       }
       String createCatalogCommand = generateCreateCatalogCommand(name, catalog);
       executeSql(createCatalogCommand);
-      LOG.info("Register catalog {} successfully: {}", name, redactSecrets(createCatalogCommand));
+      LOG.info("Register catalog %s successfully: %s", name, redactSecrets(createCatalogCommand));
     } catch (SQLException e) {
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, e.getMessage(), e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
-      LOG.error(message, e);
+      LOG.error(e, message);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
@@ -434,7 +433,7 @@ public class CatalogRegister {
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn("Failed to execute command: {}", showCatalogCommand, e);
+          LOG.warn(e, "Failed to execute command: %s", showCatalogCommand);
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
@@ -460,7 +459,7 @@ public class CatalogRegister {
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn("Failed to execute command: {}", redactSecrets(sql), e);
+          LOG.warn(e, "Failed to execute command: %s", redactSecrets(sql));
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
@@ -479,15 +478,15 @@ public class CatalogRegister {
   public void unregisterCatalog(String name) {
     try {
       if (!checkCatalogExist(name)) {
-        LOG.warn("Catalog {} does not exist", name);
+        LOG.warn("Catalog %s does not exist", name);
         return;
       }
       String dropCatalogCommand = generateDropCatalogCommand(name);
       executeSql(dropCatalogCommand);
-      LOG.info("Unregister catalog {} successfully: {}", name, dropCatalogCommand);
+      LOG.info("Unregister catalog %s successfully: %s", name, dropCatalogCommand);
     } catch (Exception e) {
       String message = String.format("Failed to unregister catalog %s", name);
-      LOG.error(message, e);
+      LOG.error(e, message);
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
@@ -499,7 +498,7 @@ public class CatalogRegister {
         connection.close();
       }
     } catch (SQLException e) {
-      LOG.error("Failed to close connection", e);
+      LOG.error(e, "Failed to close connection");
     }
   }
 }

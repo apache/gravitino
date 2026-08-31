@@ -20,9 +20,11 @@ package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +46,6 @@ import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class has the following main functions:
@@ -58,7 +58,7 @@ import org.slf4j.LoggerFactory;
  * </pre>
  */
 public class CatalogConnectorManager {
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
+  private static final Logger LOG = Logger.get(CatalogConnectorManager.class);
 
   private static final int NUMBER_EXECUTOR_THREAD = 1;
   private static final int LOAD_METALAKE_TIMEOUT = 60;
@@ -107,7 +107,7 @@ public class CatalogConnectorManager {
             .setNameFormat("gravitino-connector-schedule-%d")
             .setUncaughtExceptionHandler(
                 (thread, throwable) ->
-                    LOG.warn("{} uncaught exception:", thread.getName(), throwable))
+                    LOG.warn(throwable, "%s uncaught exception:", thread.getName()))
             .build());
   }
 
@@ -122,7 +122,7 @@ public class CatalogConnectorManager {
     if (client == null) {
       String authType =
           config.getClientConfig().getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "none");
-      LOG.info("Building Gravitino client with authType: {}", authType);
+      LOG.info("Building Gravitino client with authType: %s", authType);
       try {
         this.gravitinoClient = GravitinoAuthProvider.build(config);
       } catch (IllegalArgumentException e) {
@@ -200,18 +200,18 @@ public class CatalogConnectorManager {
       for (String usedMetalake : usedMetalakes) {
         try {
           GravitinoMetalake metalake = metalakes.get(usedMetalake);
-          LOG.debug("Load metalake: {}", usedMetalake);
+          LOG.debug("Load metalake: %s", usedMetalake);
           if (config.isIcebergRestRoutingEnabled()
               && StringUtils.isBlank(config.getManualIcebergRestUri(usedMetalake))) {
             refreshIcebergRestUri(usedMetalake);
           }
           loadCatalogs(metalake);
         } catch (Exception e) {
-          LOG.error("Load Metalake {} failed.", usedMetalake, e);
+          LOG.error(e, "Load Metalake %s failed.", usedMetalake);
         }
       }
     } catch (Exception e) {
-      LOG.error("Error when loading metalake", e);
+      LOG.error(e, "Error when loading metalake");
     }
   }
 
@@ -229,18 +229,18 @@ public class CatalogConnectorManager {
       config.setDiscoveredIcebergRestUri(
           metalakeName, gravitinoClient.icebergRestServiceUri(metalakeName).orElse(null));
       if (icebergRestDiscoveryFailing.remove(metalakeName)) {
-        LOG.info("Iceberg REST service discovery for metalake {} recovered.", metalakeName);
+        LOG.info("Iceberg REST service discovery for metalake %s recovered.", metalakeName);
       }
     } catch (Exception e) {
       icebergRestDiscoveryFailing.add(metalakeName);
       LOG.error(
-          "Failed to query the Iceberg REST service endpoint for metalake {}; Iceberg catalogs "
+          e,
+          "Failed to query the Iceberg REST service endpoint for metalake %s; Iceberg catalogs "
               + "without a configured REST endpoint cannot be registered until discovery "
               + "recovers. Set gravitino.iceberg.rest-uri explicitly, upgrade the Gravitino "
               + "server to one that supports discovery, or disable Iceberg REST routing with "
               + "gravitino.iceberg.rest-routing-enabled=false to use legacy backend translation.",
-          metalakeName,
-          e);
+          metalakeName);
     }
   }
 
@@ -269,11 +269,11 @@ public class CatalogConnectorManager {
               .filter(id -> !skipCatalog(getTrinoCatalogName(metalake.name(), id)))
               .collect(Collectors.toList());
     } catch (Exception e) {
-      LOG.error("Failed to list catalogs in metalake {}.", metalake.name(), e);
+      LOG.error(e, "Failed to list catalogs in metalake %s.", metalake.name());
       return;
     }
 
-    LOG.debug("Load metalake {}'s catalogs. catalogs: {}.", metalake.name(), catalogNames);
+    LOG.debug("Load metalake %s's catalogs. catalogs: %s.", metalake.name(), catalogNames);
 
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings =
@@ -289,7 +289,7 @@ public class CatalogConnectorManager {
         try {
           unloadCatalog(entry.getValue().getCatalog());
         } catch (Exception e) {
-          LOG.error("Failed to remove catalog {}.", entry.getKey(), e);
+          LOG.error(e, "Failed to remove catalog %s.", entry.getKey());
         }
       }
     }
@@ -300,7 +300,9 @@ public class CatalogConnectorManager {
             (String catalogName) -> {
               try {
                 Catalog catalog = metalake.loadCatalog(catalogName);
-                GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalake.name(), catalog);
+                Map<String, String> properties = propsWithSecrets(catalog);
+                GravitinoCatalog gravitinoCatalog =
+                    new GravitinoCatalog(metalake.name(), catalog, properties);
                 if (catalogConnectors.containsKey(getTrinoCatalogName(gravitinoCatalog))) {
                   // Reload catalogs that have been updated in Gravitino server.
                   reloadCatalog(gravitinoCatalog);
@@ -314,13 +316,11 @@ public class CatalogConnectorManager {
                 }
               } catch (UnsupportedOperationException e) {
                 LOG.warn(
-                    "Unsupported catalog type for catalog {} in metalake {}: {}",
-                    catalogName,
-                    metalake.name(),
-                    e.getMessage());
+                    "Unsupported catalog type for catalog %s in metalake %s: %s",
+                    catalogName, metalake.name(), e.getMessage());
               } catch (Exception e) {
                 LOG.error(
-                    "Failed to load metalake {}'s catalog {}.", metalake.name(), catalogName, e);
+                    e, "Failed to load metalake %s's catalog %s.", metalake.name(), catalogName);
               }
             });
   }
@@ -341,12 +341,12 @@ public class CatalogConnectorManager {
     catalogConnectors.remove(catalogFullName);
 
     loadCatalogImpl(catalog);
-    LOG.info("Update catalog '{}' in metalake {} successfully.", catalog, catalog.getMetalake());
+    LOG.info("Update catalog '%s' in metalake %s successfully.", catalog, catalog.getMetalake());
   }
 
   private void loadCatalog(GravitinoCatalog catalog) {
     loadCatalogImpl(catalog);
-    LOG.info("Load catalog {} in metalake {} successfully.", catalog, catalog.getMetalake());
+    LOG.info("Load catalog %s in metalake %s successfully.", catalog, catalog.getMetalake());
   }
 
   private void loadCatalogImpl(GravitinoCatalog catalog) {
@@ -355,7 +355,7 @@ public class CatalogConnectorManager {
     } catch (Exception e) {
       String message =
           String.format("Failed to create internal catalog connector. The catalog is: %s", catalog);
-      LOG.error(message, e);
+      LOG.error(e, message);
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR, message, e);
     }
@@ -366,9 +366,8 @@ public class CatalogConnectorManager {
     catalogRegister.unregisterCatalog(catalogFullName);
     catalogConnectors.remove(catalogFullName);
     LOG.info(
-        "Remove catalog '{}' in metalake {} successfully.",
-        catalog.getName(),
-        catalog.getMetalake());
+        "Remove catalog '%s' in metalake %s successfully.",
+        catalog.getName(), catalog.getMetalake());
   }
 
   /**
@@ -477,10 +476,10 @@ public class CatalogConnectorManager {
       CatalogConnectorContext connectorContext = builder.build();
       String fullCatalogName = getTrinoCatalogName(catalog);
       catalogConnectors.put(fullCatalogName, connectorContext);
-      LOG.info("Create connector {} successful", connectorName);
+      LOG.info("Create connector %s successful", connectorName);
       return connectorContext;
     } catch (Exception e) {
-      LOG.error("Failed to create connector: {}", connectorName, e);
+      LOG.error(e, "Failed to create connector: %s", connectorName);
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
           "Failed to create connector: " + connectorName,
@@ -519,11 +518,19 @@ public class CatalogConnectorManager {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {
         LOG.debug(
-            "Skip catalog {} with config `gravitino.trino.skip-catalog-patterns`.", catalogName);
+            "Skip catalog %s with config `gravitino.trino.skip-catalog-patterns`.", catalogName);
         return true;
       }
     }
     return false;
+  }
+
+  /** Visible catalog properties overlaid with {@code getSecrets()}. */
+  static Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    props.putAll(catalog.supportsSecrets().getSecrets());
+    return props;
   }
 
   public interface TrinoCatalogNameHandler {
