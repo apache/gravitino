@@ -18,9 +18,11 @@
  */
 package org.apache.gravitino.catalog.doris.converter;
 
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_OF_CURRENT_TIMESTAMP;
 
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
+import org.apache.gravitino.rel.expressions.UnparsedExpression;
 import org.apache.gravitino.rel.expressions.literals.Literal;
 import org.apache.gravitino.rel.expressions.literals.Literals;
 import org.apache.gravitino.rel.types.Types;
@@ -137,5 +139,44 @@ public class TestDorisColumnDefaultValueConverter {
     Assertions.assertEquals(
         Literals.of("owner's a\"\"b \"value\"\\path", Types.VarCharType.of(255)),
         CONVERTER.toGravitino(varcharType, "owner's a\"\"b \"value\"\\\\path", false, false));
+  }
+
+  /** Verifies loaded literal and native expression defaults use MODIFY COLUMN SQL forms. */
+  @Test
+  public void testModifyColumnSerializesLoadedDefaultValues() {
+    Assertions.assertNull(
+        CONVERTER.fromGravitinoForColumnDefinition(DEFAULT_VALUE_NOT_SET, false, false));
+    Assertions.assertEquals(
+        "NULL", CONVERTER.fromGravitinoForColumnDefinition(Literals.NULL, false, false));
+    Assertions.assertEquals(
+        "7", CONVERTER.fromGravitinoForColumnDefinition(Literals.integerLiteral(7), false, false));
+    Assertions.assertEquals(
+        "CURRENT_TIMESTAMP",
+        CONVERTER.fromGravitinoForColumnDefinition(
+            DEFAULT_VALUE_OF_CURRENT_TIMESTAMP, false, false));
+    Assertions.assertEquals(
+        "CURRENT_DATE",
+        CONVERTER.fromGravitinoForColumnDefinition(
+            UnparsedExpression.of("CURRENT_DATE"), false, false));
+
+    Assertions.assertEquals(
+        "\"owner's \\\"value\\\"\\\\path\"",
+        CONVERTER.fromGravitinoForColumnDefinition(
+            Literals.of("owner's \"value\"\\path", Types.VarCharType.of(255)), false, false));
+  }
+
+  /** Verifies adjacent backslash and quote escaping for Doris 3.x and 4.x. */
+  @Test
+  public void testModifyColumnEscapesAdjacentBackslashAndQuoteByDorisVersion() {
+    String defaultValue = "prefix" + "\\" + "\"" + "suffix";
+
+    Assertions.assertEquals(
+        "\"" + "prefix" + "\\".repeat(3) + "\"suffix\"",
+        CONVERTER.fromGravitinoForColumnDefinition(
+            Literals.of(defaultValue, Types.VarCharType.of(255)), false, false));
+    Assertions.assertEquals(
+        "\"" + "prefix" + "\\".repeat(7) + "\"suffix\"",
+        CONVERTER.fromGravitinoForColumnDefinition(
+            Literals.of(defaultValue, Types.VarCharType.of(255)), true, true));
   }
 }
