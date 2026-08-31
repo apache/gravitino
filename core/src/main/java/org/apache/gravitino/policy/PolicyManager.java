@@ -500,12 +500,14 @@ public class PolicyManager implements PolicyDispatcher {
 
         if (policyType != Policy.BuiltInType.CUSTOM) {
           // cannot change the supported object types for built-in policies
+          Set<String> oldTypes = policyEntity.content().supportedObjectTypes();
+          Set<String> newTypes = updateContent.getContent().supportedObjectTypes();
           Preconditions.checkArgument(
-              Sets.difference(
-                      policyEntity.content().supportedObjectTypes(),
-                      updateContent.getContent().supportedObjectTypes())
-                  .isEmpty(),
-              "Policy content type mismatch: expected %s but got %s");
+              Sets.difference(oldTypes, newTypes).isEmpty()
+                  && Sets.difference(newTypes, oldTypes).isEmpty(),
+              "Policy supported object types cannot be changed for built-in policies: %s -> %s",
+              oldTypes,
+              newTypes);
         }
 
         newContent = updateContent.getContent();
