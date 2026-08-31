@@ -1245,8 +1245,7 @@ public class POConverters {
    * @return GroupPO object with updated version
    */
   public static GroupPO updateGroupPOWithVersion(GroupPO oldGroupPO, GroupEntity newGroup) {
-    Long lastVersion = oldGroupPO.getLastVersion();
-    Long nextVersion = lastVersion + 1;
+    Long nextVersion = oldGroupPO.getCurrentVersion() + 1;
     try {
       return GroupPO.builder()
           .withGroupId(oldGroupPO.getGroupId())

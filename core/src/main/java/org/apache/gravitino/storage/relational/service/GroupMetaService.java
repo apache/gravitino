@@ -187,7 +187,7 @@ public class GroupMetaService {
       }
 
       GroupPO.Builder builder = GroupPO.builder().withMetalakeId(metalakePO.getMetalakeId());
-      GroupPO GroupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
+      GroupPO groupPO = POConverters.initializeGroupPOWithVersion(groupEntity, builder);
 
       List<Long> roleIds = Optional.ofNullable(groupEntity.roleIds()).orElse(Lists.newArrayList());
       List<GroupRoleRelPO> groupRoleRelPOS =
@@ -200,9 +200,9 @@ public class GroupMetaService {
                   GroupMetaMapper.class,
                   mapper -> {
                     if (overwritten) {
-                      mapper.insertGroupMetaOnDuplicateKeyUpdate(GroupPO);
+                      mapper.insertGroupMetaOnDuplicateKeyUpdate(groupPO);
                     } else {
-                      mapper.insertGroupMeta(GroupPO);
+                      mapper.insertGroupMeta(groupPO);
                     }
                   }),
           () -> {

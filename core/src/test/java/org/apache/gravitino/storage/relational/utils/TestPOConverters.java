@@ -806,18 +806,29 @@ public class TestPOConverters {
   }
 
   @Test
-  public void testUpdateGroupPOVersion() {
+  public void testUpdateGroupPOVersionUsesCurrentVersion() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     GroupEntity group =
         GroupEntity.builder().withId(2L).withName("group").withAuditInfo(auditInfo).build();
-    GroupPO groupPO =
+    GroupPO initialGroupPO =
         POConverters.initializeGroupPOWithVersion(group, GroupPO.builder().withMetalakeId(1L));
+    GroupPO groupPO =
+        GroupPO.builder()
+            .withGroupId(initialGroupPO.getGroupId())
+            .withGroupName(initialGroupPO.getGroupName())
+            .withMetalakeId(initialGroupPO.getMetalakeId())
+            .withExternalId(initialGroupPO.getExternalId())
+            .withAuditInfo(initialGroupPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialGroupPO.getDeletedAt())
+            .build();
 
     GroupPO updatedGroupPO = POConverters.updateGroupPOWithVersion(groupPO, group);
 
-    assertEquals(2, updatedGroupPO.getCurrentVersion());
-    assertEquals(2, updatedGroupPO.getLastVersion());
+    assertEquals(8, updatedGroupPO.getCurrentVersion());
+    assertEquals(8, updatedGroupPO.getLastVersion());
   }
 
   @Test
