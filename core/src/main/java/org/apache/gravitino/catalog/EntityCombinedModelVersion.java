@@ -33,7 +33,10 @@ public final class EntityCombinedModelVersion implements ModelVersion {
 
   private final ModelVersionEntity modelVersionEntity;
 
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   private EntityCombinedModelVersion(
       ModelVersion modelVersion, ModelVersionEntity modelVersionEntity) {
@@ -50,8 +53,22 @@ public final class EntityCombinedModelVersion implements ModelVersion {
     return new EntityCombinedModelVersion(modelVersion, null);
   }
 
-  public EntityCombinedModelVersion withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+  public EntityCombinedModelVersion withHiddenProperties(Set<String> keysToMask) {
+    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
+    this.keysToOmit = Collections.emptySet();
+    return this;
+  }
+
+  public EntityCombinedModelVersion withHiddenProperties(
+      Map.Entry<Set<String>, Set<String>> classified) {
+    if (classified == null) {
+      this.keysToMask = Collections.emptySet();
+      this.keysToOmit = Collections.emptySet();
+    } else {
+      this.keysToMask = classified.getKey() == null ? Collections.emptySet() : classified.getKey();
+      this.keysToOmit =
+          classified.getValue() == null ? Collections.emptySet() : classified.getValue();
+    }
     return this;
   }
 
@@ -69,7 +86,8 @@ public final class EntityCombinedModelVersion implements ModelVersion {
   public Map<String, String> properties() {
     return modelVersion.properties() == null
         ? null
-        : HiddenPropertyMaskUtils.maskHiddenProperties(modelVersion.properties(), hiddenProperties);
+        : HiddenPropertyMaskUtils.maskHiddenProperties(
+            modelVersion.properties(), keysToMask, keysToOmit);
   }
 
   @Override

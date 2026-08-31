@@ -33,7 +33,10 @@ public final class EntityCombinedModel implements Model {
 
   private final ModelEntity modelEntity;
 
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   private EntityCombinedModel(Model model, ModelEntity modelEntity) {
     this.model = model;
@@ -56,8 +59,21 @@ public final class EntityCombinedModel implements Model {
     return new EntityCombinedModel(model, null);
   }
 
-  public EntityCombinedModel withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties;
+  public EntityCombinedModel withHiddenProperties(Set<String> keysToMask) {
+    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
+    this.keysToOmit = Collections.emptySet();
+    return this;
+  }
+
+  public EntityCombinedModel withHiddenProperties(Map.Entry<Set<String>, Set<String>> classified) {
+    if (classified == null) {
+      this.keysToMask = Collections.emptySet();
+      this.keysToOmit = Collections.emptySet();
+    } else {
+      this.keysToMask = classified.getKey() == null ? Collections.emptySet() : classified.getKey();
+      this.keysToOmit =
+          classified.getValue() == null ? Collections.emptySet() : classified.getValue();
+    }
     return this;
   }
 
@@ -75,7 +91,7 @@ public final class EntityCombinedModel implements Model {
   public Map<String, String> properties() {
     return model.properties() == null
         ? null
-        : HiddenPropertyMaskUtils.maskHiddenProperties(model.properties(), hiddenProperties);
+        : HiddenPropertyMaskUtils.maskHiddenProperties(model.properties(), keysToMask, keysToOmit);
   }
 
   @Override

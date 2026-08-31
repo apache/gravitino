@@ -37,8 +37,10 @@ public class EntityCombinedTopic implements Topic {
   private final Topic topic;
   private final TopicEntity topicEntity;
 
-  // Property keys whose values are masked in API responses.
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -69,8 +71,21 @@ public class EntityCombinedTopic implements Topic {
     return new EntityCombinedTopic(topic, null);
   }
 
-  public EntityCombinedTopic withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
+  public EntityCombinedTopic withHiddenProperties(Set<String> keysToMask) {
+    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
+    this.keysToOmit = Collections.emptySet();
+    return this;
+  }
+
+  public EntityCombinedTopic withHiddenProperties(Map.Entry<Set<String>, Set<String>> classified) {
+    if (classified == null) {
+      this.keysToMask = Collections.emptySet();
+      this.keysToOmit = Collections.emptySet();
+    } else {
+      this.keysToMask = classified.getKey() == null ? Collections.emptySet() : classified.getKey();
+      this.keysToOmit =
+          classified.getValue() == null ? Collections.emptySet() : classified.getValue();
+    }
     return this;
   }
 
@@ -91,7 +106,7 @@ public class EntityCombinedTopic implements Topic {
 
   @Override
   public Map<String, String> properties() {
-    return HiddenPropertyMaskUtils.maskHiddenProperties(topic.properties(), hiddenProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(topic.properties(), keysToMask, keysToOmit);
   }
 
   @Override

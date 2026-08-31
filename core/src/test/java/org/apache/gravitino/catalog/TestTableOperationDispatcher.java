@@ -161,9 +161,7 @@ public class TestTableOperationDispatcher extends TestOperationDispatcher {
     Assertions.assertNotNull(tableEntity);
     Assertions.assertEquals("table1", tableEntity.name());
 
-    Assertions.assertTrue(
-        !table1.properties().containsKey(ID_KEY)
-            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(table1.properties().get(ID_KEY)));
+    Assertions.assertFalse(table1.properties().containsKey(ID_KEY));
 
     Optional<NameIdentifier> ident1 =
         Arrays.stream(tableOperationDispatcher.listTables(tableNs))

@@ -40,8 +40,10 @@ public final class EntityCombinedView implements View {
 
   @Nullable private final ViewEntity viewEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -67,8 +69,21 @@ public final class EntityCombinedView implements View {
     return this;
   }
 
-  public EntityCombinedView withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
+  public EntityCombinedView withHiddenProperties(Set<String> keysToMask) {
+    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
+    this.keysToOmit = Collections.emptySet();
+    return this;
+  }
+
+  public EntityCombinedView withHiddenProperties(Map.Entry<Set<String>, Set<String>> classified) {
+    if (classified == null) {
+      this.keysToMask = Collections.emptySet();
+      this.keysToOmit = Collections.emptySet();
+    } else {
+      this.keysToMask = classified.getKey() == null ? Collections.emptySet() : classified.getKey();
+      this.keysToOmit =
+          classified.getValue() == null ? Collections.emptySet() : classified.getValue();
+    }
     return this;
   }
 
@@ -108,7 +123,7 @@ public final class EntityCombinedView implements View {
     if (props == null) {
       return Collections.emptyMap();
     }
-    return HiddenPropertyMaskUtils.maskHiddenProperties(props, hiddenProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(props, keysToMask, keysToOmit);
   }
 
   @Override

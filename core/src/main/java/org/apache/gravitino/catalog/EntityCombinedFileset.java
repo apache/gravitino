@@ -33,8 +33,10 @@ public final class EntityCombinedFileset implements Fileset {
 
   private final FilesetEntity filesetEntity;
 
-  // Sets of properties that should be hidden from the user.
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   private EntityCombinedFileset(Fileset fileset, FilesetEntity filesetEntity) {
     this.fileset = fileset;
@@ -57,8 +59,22 @@ public final class EntityCombinedFileset implements Fileset {
     return new EntityCombinedFileset(fileset, null);
   }
 
-  public EntityCombinedFileset withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties != null ? hiddenProperties : Collections.emptySet();
+  public EntityCombinedFileset withHiddenProperties(Set<String> keysToMask) {
+    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
+    this.keysToOmit = Collections.emptySet();
+    return this;
+  }
+
+  public EntityCombinedFileset withHiddenProperties(
+      Map.Entry<Set<String>, Set<String>> classified) {
+    if (classified == null) {
+      this.keysToMask = Collections.emptySet();
+      this.keysToOmit = Collections.emptySet();
+    } else {
+      this.keysToMask = classified.getKey() == null ? Collections.emptySet() : classified.getKey();
+      this.keysToOmit =
+          classified.getValue() == null ? Collections.emptySet() : classified.getValue();
+    }
     return this;
   }
 
@@ -84,7 +100,8 @@ public final class EntityCombinedFileset implements Fileset {
 
   @Override
   public Map<String, String> properties() {
-    return HiddenPropertyMaskUtils.maskHiddenProperties(fileset.properties(), hiddenProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(
+        fileset.properties(), keysToMask, keysToOmit);
   }
 
   @Override
