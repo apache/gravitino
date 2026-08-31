@@ -111,7 +111,10 @@ public class AuthorizationUtils {
           Privilege.Name.CREATE_FILESET, Privilege.Name.WRITE_FILESET, Privilege.Name.READ_FILESET);
   private static final Set<Privilege.Name> TABLE_PRIVILEGES =
       Sets.immutableEnumSet(
-          Privilege.Name.CREATE_TABLE, Privilege.Name.MODIFY_TABLE, Privilege.Name.SELECT_TABLE);
+          Privilege.Name.CREATE_TABLE,
+          Privilege.Name.MODIFY_TABLE,
+          Privilege.Name.SELECT_TABLE,
+          Privilege.Name.PROBE_TABLE_LIKE);
   private static final Set<Privilege.Name> TOPIC_PRIVILEGES =
       Sets.immutableEnumSet(
           Privilege.Name.CREATE_TOPIC, Privilege.Name.PRODUCE_TOPIC, Privilege.Name.CONSUME_TOPIC);
@@ -732,19 +735,21 @@ public class AuthorizationUtils {
 
             case FILESET:
               if ("fileset".equals(catalogObj.provider())) {
-                if (schema.properties().containsKey(FILESET_SCHEMA_LOCATION)) {
-                  String schemaLocation = schema.properties().get(FILESET_SCHEMA_LOCATION);
-                  if (StringUtils.isNotBlank(schemaLocation)) {
+                String schemaLocation =
+                    schema.properties() == null
+                        ? null
+                        : schema.properties().get(FILESET_SCHEMA_LOCATION);
+                if (StringUtils.isNotBlank(schemaLocation)) {
+                  locations.add(schemaLocation);
+                } else if (catalogObj.properties() != null
+                    && catalogObj.properties().containsKey(FILESET_CATALOG_LOCATION)) {
+                  String catalogLocation = catalogObj.properties().get(FILESET_CATALOG_LOCATION);
+                  if (StringUtils.isNotBlank(catalogLocation)) {
+                    schemaLocation = catalogLocation + "/" + schema.name();
                     locations.add(schemaLocation);
-                  } else if (catalogObj.properties().containsKey(FILESET_CATALOG_LOCATION)) {
-                    String catalogLocation = catalogObj.properties().get(FILESET_CATALOG_LOCATION);
-                    if (StringUtils.isNotBlank(catalogLocation)) {
-                      schemaLocation = catalogLocation + "/" + schema.name();
-                      locations.add(schemaLocation);
-                    }
-                  } else {
-                    LOG.warn("Schema {} location is not found", ident);
                   }
+                } else {
+                  LOG.warn("Schema {} location is not found", ident);
                 }
               }
               break;

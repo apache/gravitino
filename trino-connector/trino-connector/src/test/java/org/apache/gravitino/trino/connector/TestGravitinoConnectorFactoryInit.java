@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -35,7 +36,7 @@ import org.junit.jupiter.api.Test;
 public class TestGravitinoConnectorFactoryInit {
 
   @Test
-  public void testFailedInitializationIsRetriedOnTheNextCreate() {
+  public void testFailedStartIsNotRetriedOnTheNextCreate() {
     GravitinoConnectorFactory factory =
         new GravitinoConnectorFactory(mock(GravitinoAdminClient.class));
     Map<String, String> config =
@@ -49,10 +50,9 @@ public class TestGravitinoConnectorFactoryInit {
 
     assertThrows(TrinoException.class, () -> factory.create("gravitino", config, mockContext()));
 
-    // The second attempt must fail the same way. If the manager was published before the
-    // initialization completed, this call skips the whole block and hands back an entry catalog
-    // whose load loop never started, which looks healthy and registers nothing.
-    assertThrows(TrinoException.class, () -> factory.create("gravitino", config, mockContext()));
+    // Everything that makes start() fail is a configuration error, so the next create() must not
+    // try again: a second init() would open another connection and abandon the first one.
+    assertDoesNotThrow(() -> factory.create("gravitino", config, mockContext()));
   }
 
   @SuppressWarnings("deprecation")

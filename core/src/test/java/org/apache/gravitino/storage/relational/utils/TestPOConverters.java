@@ -371,6 +371,44 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateTopicPOAdvancesOccVersion() throws JsonProcessingException {
+    TopicPO oldTopicPO =
+        createTopicPO(1L, "test", 1L, 1L, 1L, "old comment", ImmutableMap.of("key", "value"));
+    TopicEntity updatedTopic =
+        createTopic(
+            1L,
+            "test",
+            NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "new comment",
+            ImmutableMap.of("key", "new value"));
+
+    TopicPO updatedTopicPO = POConverters.updateTopicPOWithVersion(oldTopicPO, updatedTopic);
+
+    assertEquals(2L, updatedTopicPO.getCurrentVersion());
+    assertEquals(2L, updatedTopicPO.getLastVersion());
+    assertEquals("new comment", updatedTopicPO.getComment());
+    assertEquals(
+        updatedTopic.properties(),
+        JsonUtils.anyFieldMapper().readValue(updatedTopicPO.getProperties(), Map.class));
+
+    TopicPO currentVersionAhead =
+        createTopicPO(
+            1L, "test", 1L, 1L, 1L, "old comment", ImmutableMap.of("key", "value"), 5L, 3L);
+    TopicPO lastVersionAhead =
+        createTopicPO(
+            1L, "test", 1L, 1L, 1L, "old comment", ImmutableMap.of("key", "value"), 3L, 5L);
+
+    // A legacy row with mismatched markers must advance beyond both values, whichever is larger.
+    assertEquals(
+        6L,
+        POConverters.updateTopicPOWithVersion(currentVersionAhead, updatedTopic)
+            .getCurrentVersion());
+    assertEquals(
+        6L,
+        POConverters.updateTopicPOWithVersion(lastVersionAhead, updatedTopic).getCurrentVersion());
+  }
+
+  @Test
   public void testFromMetalakePOs() throws JsonProcessingException {
     MetalakePO metalakePO1 = createMetalakePO(1L, "test", "this is test");
     MetalakePO metalakePO2 = createMetalakePO(2L, "test2", "this is test2");
@@ -700,6 +738,8 @@ public class TestPOConverters {
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
+    assertEquals(2, updatePO.getCurrentVersion());
+    assertEquals(2, updatePO.getLastVersion());
     assertEquals("this is test2", updatePO.getSchemaComment());
   }
 
@@ -758,11 +798,8 @@ public class TestPOConverters {
         FilesetPO.builder().withMetalakeId(1L).withCatalogId(1L).withSchemaId(1L);
     FilesetPO initPO = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
 
-    // map has updated
-    boolean checkNeedUpdate1 =
-        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPOs(), updatedFileset);
-    FilesetPO updatePO1 =
-        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, checkNeedUpdate1);
+    // A content change advances the version and writes a complete new snapshot.
+    FilesetPO updatePO1 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, null);
     assertEquals(1, initPO.getCurrentVersion());
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
@@ -781,11 +818,9 @@ public class TestPOConverters {
             .readValue(updatePO1.getFilesetVersionPOs().get(0).getProperties(), Map.class);
     assertEquals("value1", updatedProperties.get("key"));
 
-    // will not update version, but update the fileset name
-    boolean checkNeedUpdate2 =
-        POConverters.checkFilesetVersionNeedUpdate(initPO.getFilesetVersionPOs(), updatedFileset1);
-    FilesetPO updatePO2 =
-        POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, checkNeedUpdate2);
+    // Metadata-only changes must also advance the OCC token. Reads join the version table through
+    // current_version, so the converter writes the unchanged content as a new complete snapshot.
+    FilesetPO updatePO2 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset1, null);
     Map<String, String> storageLocations2 =
         updatePO2.getFilesetVersionPOs().stream()
             .collect(
@@ -793,10 +828,17 @@ public class TestPOConverters {
                     FilesetVersionPO::getLocationName, FilesetVersionPO::getStorageLocation));
     assertEquals(filesetEntity.storageLocation(), storageLocations2.get(LOCATION_NAME_UNKNOWN));
     assertEquals(filesetEntity.storageLocations(), storageLocations2);
-    assertEquals(1, updatePO2.getCurrentVersion());
-    assertEquals(1, updatePO2.getLastVersion());
-    assertEquals(1, updatePO2.getFilesetVersionPOs().get(0).getVersion());
+    assertEquals(2, updatePO2.getCurrentVersion());
+    assertEquals(2, updatePO2.getLastVersion());
+    assertEquals(2, updatePO2.getFilesetVersionPOs().get(0).getVersion());
     assertEquals("test1", updatePO2.getFilesetName());
+
+    // A snapshot stored above the version the metadata row records must not be rebuilt: the next
+    // version starts above every snapshot the fileset still owns.
+    FilesetPO updatePO3 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, 7L);
+    assertEquals(8, updatePO3.getCurrentVersion());
+    assertEquals(8, updatePO3.getLastVersion());
+    assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
   }
 
   @Test
@@ -953,6 +995,8 @@ public class TestPOConverters {
         JsonUtils.anyFieldMapper().readValue(modelPO.getAuditInfo(), AuditInfo.class);
     assertEquals(auditInfo, resultAuditInfo);
     assertEquals(1, modelPO.getModelLatestVersion());
+    assertEquals(1, modelPO.getCurrentVersion());
+    assertEquals(1, modelPO.getLastVersion());
     assertEquals(0, modelPO.getDeletedAt());
 
     // Test with null fields
@@ -996,6 +1040,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1025,6 +1071,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(null))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1054,6 +1102,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(emptyProperties))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1565,6 +1615,20 @@ public class TestPOConverters {
       String comment,
       Map<String, String> properties)
       throws JsonProcessingException {
+    return createTopicPO(id, name, metalakeId, catalogId, schemaId, comment, properties, 1L, 1L);
+  }
+
+  private static TopicPO createTopicPO(
+      Long id,
+      String name,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      String comment,
+      Map<String, String> properties,
+      Long currentVersion,
+      Long lastVersion)
+      throws JsonProcessingException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     return TopicPO.builder()
@@ -1576,8 +1640,8 @@ public class TestPOConverters {
         .withComment(comment)
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
-        .withCurrentVersion(1L)
-        .withLastVersion(1L)
+        .withCurrentVersion(currentVersion)
+        .withLastVersion(lastVersion)
         .withDeletedAt(0L)
         .build();
   }

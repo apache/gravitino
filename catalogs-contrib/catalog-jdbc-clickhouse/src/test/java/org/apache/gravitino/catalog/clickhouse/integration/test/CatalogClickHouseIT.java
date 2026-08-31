@@ -20,6 +20,9 @@ package org.apache.gravitino.catalog.clickhouse.integration.test;
 
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.REPLACINGMERGETREE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.SUMMINGMERGETREE;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.VERSIONEDCOLLAPSINGMERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.GRAVITINO_ENGINE_KEY;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrders;
 import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
@@ -78,6 +81,7 @@ import org.apache.gravitino.rel.expressions.transforms.Transforms;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.types.Decimal;
+import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.utils.RandomNameUtils;
 import org.junit.jupiter.api.AfterAll;
@@ -271,6 +275,50 @@ public class CatalogClickHouseIT extends BaseIT {
     return properties;
   }
 
+  private static String normalizeEnumFormatting(String value) {
+    StringBuilder normalized = new StringBuilder(value.length());
+    boolean inSingleQuote = false;
+    boolean pendingWhitespace = false;
+    for (int i = 0; i < value.length(); i++) {
+      char current = value.charAt(i);
+      boolean escapedQuote =
+          current == '\''
+              && i > 0
+              && value.charAt(i - 1) == '\\'
+              && (i < 2 || value.charAt(i - 2) != '\\');
+      if (current == '\'' && !escapedQuote) {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+        inSingleQuote = !inSingleQuote;
+      } else if (!inSingleQuote && Character.isWhitespace(current)) {
+        pendingWhitespace = true;
+      } else if (!inSingleQuote && (current == '=' || current == ',')) {
+        pendingWhitespace = false;
+        normalized.append(current);
+      } else {
+        if (pendingWhitespace) {
+          appendWhitespaceUnlessSeparator(normalized);
+          pendingWhitespace = false;
+        }
+        normalized.append(current);
+      }
+    }
+    return normalized.toString().trim();
+  }
+
+  private static void appendWhitespaceUnlessSeparator(StringBuilder builder) {
+    if (builder.length() == 0) {
+      return;
+    }
+    char previous = builder.charAt(builder.length() - 1);
+    if (previous != '=' && previous != ',') {
+      builder.append(' ');
+    }
+  }
+
   @Test
   void testOperationClickhouseSchema() {
     SupportsSchemas schemas = catalog.asSchemas();
@@ -428,8 +476,8 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
-  void testLoadTableFromShowCreateParsing() {
-    String name = GravitinoITUtils.genRandomName("show_create_table");
+  void testLoadTableMetadataFromNativeSql() {
+    String name = GravitinoITUtils.genRandomName("native_table_metadata");
     clickhouseService.executeQuery(
         String.format(
             "CREATE TABLE `%s`.`%s` (\n"
@@ -2836,6 +2884,7 @@ public class CatalogClickHouseIT extends BaseIT {
     // may normalize the enum definition format (e.g., spacing around '=' and ',').
     Assertions.assertTrue(loadedTable.columns()[4].dataType() instanceof Types.ExternalType);
     Assertions.assertTrue(loadedTable.columns()[5].dataType() instanceof Types.ExternalType);
+    // Date32 remains ExternalType so its wider range and catalog type survive round-trip.
     Assertions.assertEquals(Types.ExternalType.of("Date32"), loadedTable.columns()[6].dataType());
   }
 
@@ -2871,5 +2920,445 @@ public class CatalogClickHouseIT extends BaseIT {
                     Distributions.NONE,
                     getSortOrders("id"),
                     Indexes.EMPTY_INDEXES));
+  }
+
+  @Test
+  void testLoadTableWithProjectionUsesTableSortKey() {
+    String name = GravitinoITUtils.genRandomName("proj_normal");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (\n"
+                + "  `id` Int64,\n"
+                + "  `dt` Date,\n"
+                + "  `val` String,\n"
+                + "  PROJECTION p_normal\n"
+                + "  (\n"
+                + "      SELECT *\n"
+                + "      ORDER BY dt\n"
+                + "  )\n"
+                + ")\n"
+                + "ENGINE = MergeTree\n"
+                + "ORDER BY (id, dt)\n"
+                + "SETTINGS index_granularity = 8192",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    SortOrder[] sortOrders = loaded.sortOrder();
+
+    Assertions.assertEquals(2, sortOrders.length);
+    Assertions.assertTrue(
+        sortOrders[0].expression() instanceof NamedReference,
+        "First sort key should be a named reference");
+    Assertions.assertArrayEquals(
+        new String[] {"id"}, ((NamedReference) sortOrders[0].expression()).fieldName());
+    Assertions.assertTrue(sortOrders[1].expression() instanceof NamedReference);
+    Assertions.assertArrayEquals(
+        new String[] {"dt"}, ((NamedReference) sortOrders[1].expression()).fieldName());
+    Assertions.assertEquals(
+        "8192", loaded.properties().get(TableConstants.SETTINGS_PREFIX + "index_granularity"));
+  }
+
+  @Test
+  void testEngineParametersRoundTrip() {
+    // Create a ReplacingMergeTree table with engine parameter via Gravitino API and verify
+    // engine_parameters is preserved on load (round-trip).
+    String name = GravitinoITUtils.genRandomName("engine_params_rpt");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("ts", Types.IntegerType.get(), "version", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, REPLACINGMERGETREE.getValue());
+    properties.put(TableConstants.ENGINE_PARAMETERS, "ts");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "Engine params round-trip test",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "ts",
+        loadedProps.get(TableConstants.ENGINE_PARAMETERS),
+        "engine_parameters 'ts' should survive create→load round-trip");
+
+    // Verify the actual DDL in ClickHouse contains the engine parameter.
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertTrue(
+        createSql.contains("ReplacingMergeTree(ts)"),
+        "SHOW CREATE TABLE should contain ReplacingMergeTree(ts): " + createSql);
+  }
+
+  @Test
+  void testEngineParametersNestedParensRoundTrip() {
+    // SummingMergeTree with multi-column tuple parameter, e.g. SummingMergeTree((a, b)).
+    String name = GravitinoITUtils.genRandomName("engine_params_nested");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("a", Types.IntegerType.get(), "a", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("b", Types.IntegerType.get(), "b", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, SUMMINGMERGETREE.getValue());
+    properties.put(TableConstants.ENGINE_PARAMETERS, "(a, b)");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "Nested parens round-trip",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "(a, b)",
+        loadedProps.get(TableConstants.ENGINE_PARAMETERS),
+        "engine_parameters '(a, b)' should survive round-trip");
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertTrue(
+        createSql.contains("SummingMergeTree((a, b))"),
+        "SHOW CREATE TABLE should contain SummingMergeTree((a, b)): " + createSql);
+  }
+
+  @Test
+  void testEngineParametersMultiParamRoundTrip() {
+    // VersionedCollapsingMergeTree(sign, ver) — multi-parameter engine round-trip.
+    String name = GravitinoITUtils.genRandomName("engine_params_multi");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("sign", Types.ByteType.get(), "sign", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("ver", Types.IntegerType.get(), "ver", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, VERSIONEDCOLLAPSINGMERGETREE.getValue());
+    properties.put(TableConstants.ENGINE_PARAMETERS, "sign, ver");
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            cols,
+            "Multi-param engine round-trip",
+            properties,
+            Distributions.NONE,
+            getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertEquals(
+        "sign, ver",
+        loadedProps.get(TableConstants.ENGINE_PARAMETERS),
+        "engine_parameters 'sign, ver' should survive round-trip");
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, name));
+    Assertions.assertTrue(
+        createSql.contains("VersionedCollapsingMergeTree(sign, ver)"),
+        "SHOW CREATE TABLE should contain VersionedCollapsingMergeTree(sign, ver): " + createSql);
+  }
+
+  @Test
+  void testEngineParamsLoadFromExistingTable() {
+    // Create a table directly in ClickHouse (bypass Gravitino) with engine parameters,
+    // then load via Gravitino and verify engine_parameters is extracted.
+    String name = GravitinoITUtils.genRandomName("engine_params_load");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32, sign Int8) "
+                + "ENGINE = CollapsingMergeTree(sign) ORDER BY id",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Map<String, String> props = loaded.properties();
+    Assertions.assertEquals(
+        "sign",
+        props.get(TableConstants.ENGINE_PARAMETERS),
+        "CollapsingMergeTree(sign) should have engine_parameters='sign'");
+  }
+
+  @Test
+  void testEngineParamsAbsentForParameterizedNonMergeTreeEngine() {
+    String name = GravitinoITUtils.genRandomName("engine_params_join");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` (id Int32, payload String) " + "ENGINE = Join(ANY, LEFT, id)",
+            schemaName, name));
+
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, name));
+    Assertions.assertEquals(ENGINE.JOIN.getValue(), loaded.properties().get(GRAVITINO_ENGINE_KEY));
+    Assertions.assertFalse(
+        loaded.properties().containsKey(TableConstants.ENGINE_PARAMETERS),
+        "Parameterized non-MergeTree engines must not expose engine_parameters");
+  }
+
+  @Test
+  void testEngineParamsAbsentForMergeTree() {
+    // MergeTree has no engine parameters — verify the property is not present.
+    String name = GravitinoITUtils.genRandomName("engine_params_none");
+    NameIdentifier ident = NameIdentifier.of(schemaName, name);
+    Column[] cols =
+        new Column[] {
+          Column.of("id", Types.IntegerType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+
+    Map<String, String> properties = createProperties();
+    properties.put(GRAVITINO_ENGINE_KEY, MERGETREE.getValue());
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident, cols, "No engine params", properties, Distributions.NONE, getSortOrders("id"));
+
+    Table loaded = catalog.asTableCatalog().loadTable(ident);
+    Map<String, String> loadedProps = loaded.properties();
+    Assertions.assertFalse(
+        loadedProps.containsKey(TableConstants.ENGINE_PARAMETERS),
+        "MergeTree should not have engine_parameters property");
+  }
+
+  @Test
+  void testEnumRoundTrip() {
+    // Create a table in ClickHouse with Enum8 and Enum16 columns
+    String tableName = GravitinoITUtils.genRandomName("enum_test");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "id Int32, "
+                + "status Enum8('active' = 1, 'inactive' = 2), "
+                + "priority Enum16('low' = 100, 'medium' = 200, 'high' = 300)"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, tableName));
+
+    // Load through Gravitino and verify column types are ExternalType
+    Table loaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, tableName));
+    Column[] columns = loaded.columns();
+    Assertions.assertEquals(3, columns.length);
+
+    // Enum8 type verification
+    Type enum8Type = columns[1].dataType();
+    Assertions.assertTrue(
+        enum8Type instanceof Types.ExternalType,
+        "Enum8 should map to ExternalType, but got: " + enum8Type.simpleString());
+    Assertions.assertEquals(
+        normalizeEnumFormatting("Enum8('active' = 1, 'inactive' = 2)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()));
+
+    // Enum16 type verification
+    Type enum16Type = columns[2].dataType();
+    Assertions.assertTrue(
+        enum16Type instanceof Types.ExternalType,
+        "Enum16 should map to ExternalType, but got: " + enum16Type.simpleString());
+    Assertions.assertEquals(
+        normalizeEnumFormatting("Enum16('low' = 100, 'medium' = 200, 'high' = 300)"),
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()));
+
+    // Round-trip: recreate table through Gravitino with the loaded schema
+    String rtTableName = GravitinoITUtils.genRandomName("enum_rt");
+    catalog
+        .asTableCatalog()
+        .createTable(
+            NameIdentifier.of(schemaName, rtTableName),
+            columns,
+            "enum round-trip test",
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            new SortOrder[] {SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING)});
+
+    // Verify types survived round-trip
+    Table rtLoaded = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, rtTableName));
+    Column[] rtColumns = rtLoaded.columns();
+    Type rtEnum8 = rtColumns[1].dataType();
+    Type rtEnum16 = rtColumns[2].dataType();
+    Assertions.assertTrue(
+        rtEnum8 instanceof Types.ExternalType, "Enum8 should survive round-trip as ExternalType");
+    Assertions.assertTrue(
+        rtEnum16 instanceof Types.ExternalType, "Enum16 should survive round-trip as ExternalType");
+    Assertions.assertEquals(
+        normalizeEnumFormatting(((Types.ExternalType) enum8Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum8).catalogString()));
+    Assertions.assertEquals(
+        normalizeEnumFormatting(((Types.ExternalType) enum16Type).catalogString()),
+        normalizeEnumFormatting(((Types.ExternalType) rtEnum16).catalogString()));
+
+    // Verify DDL on ClickHouse side contains full enum definitions
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, rtTableName));
+    Assertions.assertNotNull(createSql, "SHOW CREATE TABLE should return a result");
+    String normalizedCreateSql = normalizeEnumFormatting(createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("Enum8('active'=1,'inactive'=2)"),
+        "SHOW CREATE TABLE should contain Enum8 definition: " + createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("Enum16('low'=100,'medium'=200,'high'=300)"),
+        "SHOW CREATE TABLE should contain Enum16 definition: " + createSql);
+  }
+
+  @Test
+  @Tag("gravitino-docker-test")
+  void testCreateAndLoadTableWithNgrambfAndTokenbfIndexes() {
+    String tableName = GravitinoITUtils.genRandomName("ch_ngram_tokenbf_idx_");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    Map<String, String> properties = createProperties();
+    Column[] columns =
+        new Column[] {
+          Column.of(
+              CLICKHOUSE_COL_NAME1,
+              Types.IntegerType.get(),
+              "col_1_comment",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              CLICKHOUSE_COL_NAME3,
+              Types.StringType.get(),
+              "col_3_comment",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+        };
+    SortOrder[] sortOrders = getSortOrders(CLICKHOUSE_COL_NAME1);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Map<String, String> ngramProperties =
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0");
+    Map<String, String> tokenProperties =
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "0",
+            "granularity", "4");
+
+    // Create table with ngrambf_v1 index
+    Index[] indexes =
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+              "idx_ngram",
+              new String[][] {{CLICKHOUSE_COL_NAME3}},
+              ngramProperties),
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+              "idx_token",
+              new String[][] {{CLICKHOUSE_COL_NAME3}},
+              tokenProperties),
+        };
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        table_comment,
+        properties,
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        indexes);
+
+    // Load and verify round-trip
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    Index[] loadedIndexes = loaded.index();
+    Assertions.assertNotNull(loadedIndexes);
+
+    Index loadedNgram =
+        Arrays.stream(loadedIndexes)
+            .filter(idx -> Objects.equals(idx.name(), "idx_ngram"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_NGRAMBFV1, loadedNgram.type());
+    Assertions.assertArrayEquals(new String[][] {{CLICKHOUSE_COL_NAME3}}, loadedNgram.fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        loadedNgram.properties());
+
+    Index loadedToken =
+        Arrays.stream(loadedIndexes)
+            .filter(idx -> Objects.equals(idx.name(), "idx_token"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TOKENBFV1, loadedToken.type());
+    Assertions.assertArrayEquals(new String[][] {{CLICKHOUSE_COL_NAME3}}, loadedToken.fieldNames());
+    Assertions.assertEquals(tokenProperties, loadedToken.properties());
+
+    // Verify that both new index types also work through ALTER TABLE ADD INDEX.
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_NGRAMBFV1,
+            "idx_ngram_alter",
+            new String[][] {{CLICKHOUSE_COL_NAME3}},
+            ngramProperties));
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_TOKENBFV1,
+            "idx_token_alter",
+            new String[][] {{CLICKHOUSE_COL_NAME3}},
+            tokenProperties));
+
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    Index alteredNgram =
+        Arrays.stream(altered.index())
+            .filter(idx -> Objects.equals(idx.name(), "idx_ngram_alter"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_NGRAMBFV1, alteredNgram.type());
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        alteredNgram.properties());
+
+    Index alteredToken =
+        Arrays.stream(altered.index())
+            .filter(idx -> Objects.equals(idx.name(), "idx_token_alter"))
+            .findFirst()
+            .orElseThrow();
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TOKENBFV1, alteredToken.type());
+    Assertions.assertEquals(tokenProperties, alteredToken.properties());
+
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    String normalizedCreateSql = createSql.replaceAll("\\s+", "");
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("ngrambf_v1(3,512,3,0)"),
+        "SHOW CREATE TABLE should retain ngrambf_v1 parameters: " + createSql);
+    Assertions.assertTrue(
+        normalizedCreateSql.contains("tokenbf_v1(256,2,0)"),
+        "SHOW CREATE TABLE should retain tokenbf_v1 parameters: " + createSql);
   }
 }

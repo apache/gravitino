@@ -23,6 +23,8 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.mockStatic;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.lang.reflect.Field;
@@ -318,6 +320,59 @@ public class TestMetadataAuthzHelper {
               catalogs);
 
       Assertions.assertEquals(2, filtered.length);
+    }
+  }
+
+  /**
+   * The verbose catalog listing hands this helper {@code Catalog} objects rather than identifiers,
+   * so it goes through the generic overload. That overload used to skip the short-circuit, which
+   * left every catalog in the metalake on the per-object path.
+   *
+   * <p>Proving which path ran needs care. Comparing the returned elements does not work, because
+   * the metalake-scope grant satisfies the per-object expression too and every catalog comes back
+   * either way. Counting authorizer calls does not work either: the per-request cache in {@link
+   * org.apache.gravitino.authorization.AuthorizationRequestContext} collapses the repeated
+   * metalake-scope check, so the count is the same for three catalogs and for thirty.
+   *
+   * <p>What does separate them is the array itself. The short-circuit hands back the caller's own
+   * array untouched, while the per-object path collects survivors into a new one, so identity says
+   * which branch produced the result.
+   */
+  @Test
+  public void testListShortCircuitAppliesToNonIdentifierResults() {
+    makeCompletableFutureUseCurrentThread();
+    try (MockedStatic<PrincipalUtils> principalUtilsMocked = mockStatic(PrincipalUtils.class);
+        MockedStatic<GravitinoAuthorizerProvider> mockStatic =
+            mockStatic(GravitinoAuthorizerProvider.class)) {
+      principalUtilsMocked
+          .when(PrincipalUtils::getCurrentPrincipal)
+          .thenReturn(new UserPrincipal("tester"));
+      principalUtilsMocked.when(() -> PrincipalUtils.doAs(any(), any())).thenCallRealMethod();
+      GravitinoAuthorizerProvider mockedProvider = mock(GravitinoAuthorizerProvider.class);
+      mockStatic.when(GravitinoAuthorizerProvider::getInstance).thenReturn(mockedProvider);
+      GravitinoAuthorizer authorizer =
+          mockParentGrantAuthorizer(MetadataObject.Type.METALAKE, Privilege.Name.USE_CATALOG);
+      when(mockedProvider.getGravitinoAuthorizer()).thenReturn(authorizer);
+
+      // Stands in for the Catalog objects the verbose listing carries: anything that is not a
+      // NameIdentifier and needs a mapper to become one.
+      String[] catalogNames = new String[] {"c1", "c2", "c3"};
+
+      String[] filtered =
+          MetadataAuthzHelper.filterByExpression(
+              "testMetalake",
+              AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+              Entity.EntityType.CATALOG,
+              catalogNames,
+              name -> NameIdentifierUtil.ofCatalog("testMetalake", name));
+
+      Assertions.assertSame(
+          catalogNames,
+          filtered,
+          "The parent-scope short-circuit must return the caller's array as is; a new array means "
+              + "the per-object authorization loop ran for every catalog");
+      // Only the short-circuit asks this, and it asks once, after the parent grant is confirmed.
+      verify(authorizer, times(1)).hasDenyPolicy(any(), eq("testMetalake"), anySet(), any());
     }
   }
 

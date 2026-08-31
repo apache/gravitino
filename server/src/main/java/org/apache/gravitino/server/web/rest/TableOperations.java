@@ -99,7 +99,7 @@ public class TableOperations {
             idents =
                 MetadataAuthzHelper.filterByExpression(
                     metalake,
-                    AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+                    AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
                     Entity.EntityType.TABLE,
                     idents);
             Response response = Utils.ok(new EntityListResponse(idents));
@@ -129,8 +129,8 @@ public class TableOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TableCreateRequest request) {
-    LOG.info(
-        "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+    String tableName = request == null ? "" : request.getName();
+    LOG.info("Received create table request: {}.{}.{}.{}", metalake, catalog, schema, tableName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -155,8 +155,7 @@ public class TableOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.CREATE, tableName, schema, e);
     }
   }
 
@@ -167,6 +166,8 @@ public class TableOperations {
   @ResponseMetered(name = "load-table", absolute = true)
   @AuthorizationExpression(
       expression = AuthorizationExpressionConstants.LOAD_TABLE_AUTHORIZATION_EXPRESSION,
+      allowCheckExistence =
+          AuthorizationExpressionConstants.PROBE_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
       secondaryExpression = AuthorizationExpressionConstants.MODIFY_TABLE_AUTHORIZATION_EXPRESSION,
       secondaryExpressionCondition = ExpressionCondition.REQUIRED_MODIFY_PRIVILEGES,
       accessMetadataType = MetadataObject.Type.TABLE)

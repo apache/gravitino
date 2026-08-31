@@ -20,9 +20,11 @@ package org.apache.gravitino.trino.connector.catalog;
 
 import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -44,10 +46,10 @@ import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergConnectorAdapter;
+import org.apache.gravitino.trino.connector.catalog.iceberg.IcebergRestUriDiscovery;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.apache.gravitino.trino.connector.security.GravitinoAuthProvider;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * This class has the following main functions:
@@ -60,7 +62,7 @@ import org.slf4j.LoggerFactory;
  * </pre>
  */
 public class CatalogConnectorManager {
-  private static final Logger LOG = LoggerFactory.getLogger(CatalogConnectorManager.class);
+  private static final Logger LOG = Logger.get(CatalogConnectorManager.class);
 
   private static final int NUMBER_EXECUTOR_THREAD = 1;
   private static final int LOAD_METALAKE_TIMEOUT = 60;
@@ -92,6 +94,7 @@ public class CatalogConnectorManager {
 
   private String targetMetalake;
   private final Map<String, GravitinoMetalake> metalakes = new ConcurrentHashMap<>();
+  private final IcebergRestUriDiscovery icebergRestUriDiscovery = new IcebergRestUriDiscovery();
 
   private GravitinoAdminClient gravitinoClient;
   private GravitinoConfig config;
@@ -122,7 +125,7 @@ public class CatalogConnectorManager {
             .setNameFormat("gravitino-connector-schedule-%d")
             .setUncaughtExceptionHandler(
                 (thread, throwable) ->
-                    LOG.warn("{} uncaught exception:", thread.getName(), throwable))
+                    LOG.warn(throwable, "%s uncaught exception:", thread.getName()))
             .build());
   }
 
@@ -133,12 +136,11 @@ public class CatalogConnectorManager {
    * @param client the Gravitino admin client
    */
   public void config(GravitinoConfig config, GravitinoAdminClient client) {
-    Preconditions.checkArgument(config != null, "config must not be null");
-    this.config = config;
+    updateConfig(config);
     if (client == null) {
       String authType =
           config.getClientConfig().getOrDefault(GravitinoAuthProvider.AUTH_TYPE_KEY, "none");
-      LOG.info("Building Gravitino client with authType: {}", authType);
+      LOG.info("Building Gravitino client with authType: %s", authType);
       try {
         this.gravitinoClient = GravitinoAuthProvider.build(config);
       } catch (IllegalArgumentException e) {
@@ -161,8 +163,25 @@ public class CatalogConnectorManager {
     } else {
       this.gravitinoClient = client;
     }
+  }
+
+  /**
+   * Updates the Gravitino configuration, leaving the Gravitino client untouched.
+   *
+   * <p>Used to re-apply the configuration of the static connector when a dynamic connector created
+   * the manager first, so that the catalog register is started with the `trino.jdbc.*` settings
+   * that are only present in the static configuration.
+   *
+   * @param config the Gravitino configuration
+   */
+  public void updateConfig(GravitinoConfig config) {
+    Preconditions.checkArgument(config != null, "config must not be null");
+    this.config = config;
     this.metadataUpdateIntervalSecond = Integer.parseInt(config.getMetadataRefreshIntervalSecond());
     this.targetMetalake = config.getMetalake();
+    // Parsed eagerly so a misconfigured value fails startup instead of surfacing every poll as an
+    // unrelated "Load Metalake failed" error.
+    config.isIcebergRestRoutingEnabled();
   }
 
   /**
@@ -213,7 +232,8 @@ public class CatalogConnectorManager {
       for (String usedMetalake : usedMetalakes) {
         try {
           GravitinoMetalake metalake = metalakes.get(usedMetalake);
-          LOG.debug("Load metalake: {}", usedMetalake);
+          LOG.debug("Load metalake: %s", usedMetalake);
+          icebergRestUriDiscovery.refresh(usedMetalake, config, gravitinoClient);
           loadCatalogs(metalake);
         } catch (Exception e) {
           recordMetalakeError(usedMetalake, e);
@@ -413,7 +433,8 @@ public class CatalogConnectorManager {
       String provider = null;
       try {
         Catalog catalog = metalake.loadCatalog(catalogName);
-        GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalakeName, catalog);
+        Map<String, String> properties = propsWithSecrets(catalog);
+        GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalakeName, catalog, properties);
         provider = gravitinoCatalog.getProvider();
         if (catalogConnectors.containsKey(trinoCatalogName)) {
           // Reload catalogs that have been updated in Gravitino server.
@@ -499,7 +520,12 @@ public class CatalogConnectorManager {
   private void reloadCatalog(GravitinoCatalog catalog) {
     String catalogFullName = getTrinoCatalogName(catalog);
     GravitinoCatalog oldCatalog = catalogConnectors.get(catalogFullName).getCatalog();
-    if (catalog.getLastModifiedTime() <= oldCatalog.getLastModifiedTime()) {
+    // The discovered Iceberg REST endpoint is embedded into the catalog independently of
+    // Gravitino's own lastModifiedTime, so it is checked as a separate reload trigger.
+    boolean icebergRestUriChanged =
+        IcebergConnectorAdapter.hasDiscoveredIcebergRestUriChanged(catalog, oldCatalog, config);
+    if (catalog.getLastModifiedTime() <= oldCatalog.getLastModifiedTime()
+        && !icebergRestUriChanged) {
       return;
     }
 
@@ -507,12 +533,12 @@ public class CatalogConnectorManager {
     catalogConnectors.remove(catalogFullName);
 
     loadCatalogImpl(catalog);
-    LOG.info("Update catalog '{}' in metalake {} successfully.", catalog, catalog.getMetalake());
+    LOG.info("Update catalog '%s' in metalake %s successfully.", catalog, catalog.getMetalake());
   }
 
   private void loadCatalog(GravitinoCatalog catalog) {
     loadCatalogImpl(catalog);
-    LOG.info("Load catalog {} in metalake {} successfully.", catalog, catalog.getMetalake());
+    LOG.info("Load catalog %s in metalake %s successfully.", catalog, catalog.getMetalake());
   }
 
   private void loadCatalogImpl(GravitinoCatalog catalog) {
@@ -533,9 +559,8 @@ public class CatalogConnectorManager {
     catalogConnectors.remove(catalogFullName);
     catalogStates.remove(catalogFullName);
     LOG.info(
-        "Remove catalog '{}' in metalake {} successfully.",
-        catalog.getName(),
-        catalog.getMetalake());
+        "Remove catalog '%s' in metalake %s successfully.",
+        catalog.getName(), catalog.getMetalake());
   }
 
   /**
@@ -738,10 +763,10 @@ public class CatalogConnectorManager {
       CatalogConnectorContext connectorContext = builder.build();
       String fullCatalogName = getTrinoCatalogName(catalog);
       catalogConnectors.put(fullCatalogName, connectorContext);
-      LOG.info("Create connector {} successful", connectorName);
+      LOG.info("Create connector %s successful", connectorName);
       return connectorContext;
     } catch (Exception e) {
-      LOG.error("Failed to create connector: {}", connectorName, e);
+      LOG.error(e, "Failed to create connector: %s", connectorName);
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
           "Failed to create connector: " + connectorName,
@@ -780,11 +805,19 @@ public class CatalogConnectorManager {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {
         LOG.debug(
-            "Skip catalog {} with config `gravitino.trino.skip-catalog-patterns`.", catalogName);
+            "Skip catalog %s with config `gravitino.trino.skip-catalog-patterns`.", catalogName);
         return true;
       }
     }
     return false;
+  }
+
+  /** Visible catalog properties overlaid with {@code getSecrets()}. */
+  static Map<String, String> propsWithSecrets(Catalog catalog) {
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    props.putAll(catalog.supportsSecrets().getSecrets());
+    return props;
   }
 
   public interface TrinoCatalogNameHandler {

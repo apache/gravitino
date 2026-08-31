@@ -178,7 +178,9 @@ class TestRelationalCatalog(IntegrationTestEnv):
         self.assertIsNotNone(table)
         self.assertEqual(table.name(), TestRelationalCatalog.TABLE_NAME)
         self.assertEqual(table.comment(), TestRelationalCatalog.TABLE_COMMENT)
-        self.assertEqual(table.properties(), TestRelationalCatalog.TABLE_PROPERTIES)
+        self.assert_properties_equal(
+            TestRelationalCatalog.TABLE_PROPERTIES, table.properties()
+        )
         self.assertEqual(len(table.columns()), 3)
 
         columns = table.columns()

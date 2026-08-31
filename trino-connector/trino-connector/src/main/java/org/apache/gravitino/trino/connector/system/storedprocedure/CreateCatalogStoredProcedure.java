@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.system.storedprocedure;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
 import io.trino.spi.type.MapType;
@@ -37,8 +38,6 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Stored procedure implementation for creating a new catalog in Gravitino.
@@ -46,7 +45,7 @@ import org.slf4j.LoggerFactory;
  * <p>This procedure allows creating a new catalog with specified properties and provider.
  */
 public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
-  private static final Logger LOG = LoggerFactory.getLogger(CreateCatalogStoredProcedure.class);
+  private static final Logger LOG = Logger.get(CreateCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
@@ -123,7 +122,7 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
                 + catalogConnectorManager.describeRegistrationFailure(metalake, trinoCatalogName));
       }
 
-      LOG.info("Create catalog {} in metalake {} successfully.", catalogName, metalake);
+      LOG.info("Create catalog %s in metalake %s successfully.", catalogName, metalake);
 
     } catch (NoSuchMetalakeException e) {
       throw new TrinoException(

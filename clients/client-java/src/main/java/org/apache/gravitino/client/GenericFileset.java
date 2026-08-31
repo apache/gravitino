@@ -36,19 +36,26 @@ import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.SupportsPolicies;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.tag.SupportsTags;
 import org.apache.gravitino.tag.Tag;
 import org.apache.gravitino.tag.TagValue;
 
 /** Represents a generic fileset. */
 class GenericFileset
-    implements Fileset, SupportsTags, SupportsRoles, SupportsCredentials, SupportsPolicies {
+    implements Fileset,
+        SupportsTags,
+        SupportsRoles,
+        SupportsCredentials,
+        SupportsSecrets,
+        SupportsPolicies {
 
   private final FilesetDTO filesetDTO;
 
   private final MetadataObjectTagOperations objectTagOperations;
   private final MetadataObjectRoleOperations objectRoleOperations;
   private final MetadataObjectCredentialOperations objectCredentialOperations;
+  private final MetadataObjectSecretOperations objectSecretOperations;
   private final MetadataObjectPolicyOperations objectPolicyOperations;
 
   GenericFileset(FilesetDTO filesetDTO, RESTClient restClient, Namespace filesetNs) {
@@ -62,6 +69,8 @@ class GenericFileset
         new MetadataObjectRoleOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectCredentialOperations =
         new MetadataObjectCredentialOperations(filesetNs.level(0), filesetObject, restClient);
+    this.objectSecretOperations =
+        new MetadataObjectSecretOperations(filesetNs.level(0), filesetObject, restClient);
     this.objectPolicyOperations =
         new MetadataObjectPolicyOperations(filesetNs.level(0), filesetObject, restClient);
   }
@@ -114,6 +123,11 @@ class GenericFileset
 
   @Override
   public SupportsCredentials supportsCredentials() {
+    return this;
+  }
+
+  @Override
+  public SupportsSecrets supportsSecrets() {
     return this;
   }
 
@@ -171,6 +185,11 @@ class GenericFileset
   @Override
   public Credential[] getCredentials() {
     return objectCredentialOperations.getCredentials();
+  }
+
+  @Override
+  public Map<String, String> getSecrets() {
+    return objectSecretOperations.getSecrets();
   }
 
   @Override

@@ -28,6 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
@@ -38,10 +41,13 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -516,6 +522,177 @@ public class TestCatalogConnectorManager {
     assertTrue(manager.getMetalakeErrors().isEmpty());
   }
 
+  @Test
+  public void testRefreshIcebergRestUriCachesDiscoveredUri() throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
+    when(client.icebergRestServiceUri("test"))
+        .thenReturn(Optional.of("http://irc-host:9001/iceberg"));
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true"));
+    manager.config(config, client);
+
+    manager.loadMetalakeSync();
+
+    assertEquals("http://irc-host:9001/iceberg", config.getDiscoveredIcebergRestUri("test"));
+  }
+
+  @Test
+  public void testRefreshIcebergRestUriSwallowsFailureAndKeepsCatalogLoadingGoing()
+      throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
+    when(client.icebergRestServiceUri("test"))
+        .thenThrow(new RESTException("simulated: endpoint not found on an older server"));
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true"));
+    manager.config(config, client);
+
+    // A discovery failure must not abort the metalake load (which loads catalogs), and must
+    // leave the discovered URI at its previous value rather than throwing out of loadMetalake.
+    assertDoesNotThrow(manager::loadMetalakeSync);
+    assertEquals("", config.getDiscoveredIcebergRestUri("test"));
+  }
+
+  @Test
+  public void testConfigRejectsInvalidIcebergRestRoutingEnabledAtStartup() throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true",
+                "gravitino.iceberg.rest-routing-enabled", "yes"));
+
+    assertThrows(TrinoException.class, () -> manager.config(config, client));
+  }
+
+  @Test
+  public void testIcebergRestRoutingDisabledSkipsDiscovery() throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true",
+                "gravitino.iceberg.rest-routing-enabled", "false"));
+    manager.config(config, client);
+
+    manager.loadMetalakeSync();
+
+    verify(client, never()).icebergRestServiceUri("test");
+  }
+
+  @Test
+  public void testConfiguredIcebergRestUriSkipsDiscovery() throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true",
+                "gravitino.iceberg.rest-uri", "http://irc-host:9001/iceberg"));
+    manager.config(config, client);
+
+    manager.loadMetalakeSync();
+
+    verify(client, never()).icebergRestServiceUri("test");
+  }
+
+  @Test
+  public void testIcebergRestDiscoveryRetriesAndRecovers() throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
+    when(client.icebergRestServiceUri("test"))
+        .thenThrow(new RESTException("simulated discovery failure"))
+        .thenReturn(Optional.of("http://irc-host:9001/iceberg"));
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true"));
+    manager.config(config, client);
+
+    manager.loadMetalakeSync();
+    manager.loadMetalakeSync();
+
+    verify(client, times(2)).icebergRestServiceUri("test");
+    assertEquals("http://irc-host:9001/iceberg", config.getDiscoveredIcebergRestUri("test"));
+  }
+
+  @Test
+  public void testPropsWithSecrets() {
+    Catalog catalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets())
+        .thenReturn(Map.of("jdbc-password", "secret", "shared", "from-secret"));
+
+    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
+
+    assertEquals("v1", merged.get("visible"));
+    assertEquals("secret", merged.get("jdbc-password"));
+    assertEquals("from-secret", merged.get("shared"));
+  }
+
+  @Test
+  public void testPropsWithSecretsNullProps() {
+    Catalog catalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(catalog.properties()).thenReturn(null);
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets()).thenReturn(Map.of("jdbc-password", "secret"));
+
+    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
+
+    assertEquals("secret", merged.get("jdbc-password"));
+    assertEquals(1, merged.size());
+  }
+
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)
       throws Exception {
     return createManager(createCatalogConnectorFactory(), configMap);
@@ -583,6 +760,9 @@ public class TestCatalogConnectorManager {
     when(catalog.provider()).thenReturn(provider);
     when(catalog.type()).thenReturn(type);
     when(catalog.properties()).thenReturn(ImmutableMap.of());
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(supportsSecrets.getSecrets()).thenReturn(Map.of());
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
     Audit audit = mock(Audit.class);
     when(audit.createTime()).thenReturn(Instant.now());
     when(audit.lastModifiedTime()).thenReturn(null);

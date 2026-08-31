@@ -62,6 +62,7 @@ import org.apache.gravitino.server.web.rest.GroupOperations;
 import org.apache.gravitino.server.web.rest.JobOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectCredentialOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectPolicyOperations;
+import org.apache.gravitino.server.web.rest.MetadataObjectSecretOperations;
 import org.apache.gravitino.server.web.rest.MetadataObjectTagOperations;
 import org.apache.gravitino.server.web.rest.MetalakeOperations;
 import org.apache.gravitino.server.web.rest.ModelOperations;
@@ -115,7 +116,8 @@ public class GravitinoInterceptionService implements InterceptionService {
             PolicyOperations.class.getName(),
             MetadataObjectPolicyOperations.class.getName(),
             JobOperations.class.getName(),
-            MetadataObjectCredentialOperations.class.getName()));
+            MetadataObjectCredentialOperations.class.getName(),
+            MetadataObjectSecretOperations.class.getName()));
   }
 
   @Override
@@ -234,7 +236,8 @@ public class GravitinoInterceptionService implements InterceptionService {
                     parameters,
                     args,
                     secondaryExpression,
-                    secondaryExpressionCondition);
+                    secondaryExpressionCondition,
+                    expressionAnnotation.allowCheckExistence());
             boolean authorizeResult = executor.execute(authorizationRequestContext);
             if (!authorizeResult) {
               MetadataObject.Type type = expressionAnnotation.accessMetadataType();
@@ -309,7 +312,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       String contextualMessage;
       String accessMetadataMessage =
           accessMetadataName != null
-              ? String.format("on metadata '%s'", accessMetadataName.name())
+              ? String.format("on metadata '%s'", accessMetadataName.toString())
               : "";
       if (StringUtils.isNotBlank(errorMessage)) {
         contextualMessage =
