@@ -51,6 +51,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -79,6 +80,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
+import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
@@ -801,6 +803,21 @@ public class TestPOConverters {
     assertEquals(8, updatePO3.getCurrentVersion());
     assertEquals(8, updatePO3.getLastVersion());
     assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
+  }
+
+  @Test
+  public void testUpdateGroupPOVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    GroupEntity group =
+        GroupEntity.builder().withId(2L).withName("group").withAuditInfo(auditInfo).build();
+    GroupPO groupPO =
+        POConverters.initializeGroupPOWithVersion(group, GroupPO.builder().withMetalakeId(1L));
+
+    GroupPO updatedGroupPO = POConverters.updateGroupPOWithVersion(groupPO, group);
+
+    assertEquals(2, updatedGroupPO.getCurrentVersion());
+    assertEquals(2, updatedGroupPO.getLastVersion());
   }
 
   @Test
