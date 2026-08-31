@@ -26,6 +26,7 @@ import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -523,7 +524,31 @@ public class JobOperations {
   }
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {
-    return jobEntities.stream().map(JobOperations::toDTO).collect(Collectors.toList());
+    // A single job with a malformed stored runtime job template must not fail the whole list -
+    // skip that job's runtime job template (logging why) rather than letting the exception from
+    // toDTO() propagate and abort the entire response.
+    List<JobDTO> jobDTOs = new ArrayList<>(jobEntities.size());
+    for (JobEntity jobEntity : jobEntities) {
+      try {
+        jobDTOs.add(toDTO(jobEntity));
+      } catch (Exception e) {
+        LOG.warn(
+            "Failed to convert job {} to DTO, returning it without a runtime job template",
+            jobEntity.name(),
+            e);
+        jobDTOs.add(
+            new JobDTO(
+                jobEntity.name(),
+                jobEntity.jobTemplateName(),
+                jobEntity.status(),
+                DTOConverters.toDTO(jobEntity.auditInfo()),
+                jobEntity.auditInfo().createTime(),
+                jobEntity.startedAtAsInstant(),
+                jobEntity.finishedAtAsInstant(),
+                null));
+      }
+    }
+    return jobDTOs;
   }
 
   @VisibleForTesting

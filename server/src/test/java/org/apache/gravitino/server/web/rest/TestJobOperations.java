@@ -1228,6 +1228,57 @@ public class TestJobOperations extends JerseyTest {
     Assertions.assertEquals(Lists.newArrayList("resolved-arg"), runtimeJobTemplateDTO.arguments());
   }
 
+  @Test
+  public void testListJobsWithMalformedRuntimeJobTemplateDoesNotFailWholeList() {
+    // A single job whose stored runtime job template fails to deserialize (e.g. corrupted or
+    // written by a future, incompatible version) must not fail the entire listJobs response -
+    // it should come back with a null runtimeJobTemplate while every other job is unaffected.
+    String templateName = "shell_template_1";
+    JobEntity healthyJob = newJobEntity(templateName, JobHandle.Status.QUEUED);
+    JobEntity malformedJob =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-malformed")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName(templateName)
+            .withStatus(JobHandle.Status.QUEUED)
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate("{not-valid-json")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    when(jobOperationDispatcher.listJobs(metalake, Optional.empty()))
+        .thenReturn(Lists.newArrayList(healthyJob, malformedJob));
+
+    Response resp =
+        target(jobRunPath())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobListResponse jobListResponse = resp.readEntity(JobListResponse.class);
+    Assertions.assertEquals(0, jobListResponse.getCode());
+    Assertions.assertEquals(2, jobListResponse.getJobs().size());
+
+    JobDTO healthyJobDTO =
+        jobListResponse.getJobs().stream()
+            .filter(dto -> dto.jobId().equals(healthyJob.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Healthy job missing from response"));
+    Assertions.assertEquals(JobOperations.toDTO(healthyJob), healthyJobDTO);
+
+    JobDTO malformedJobDTO =
+        jobListResponse.getJobs().stream()
+            .filter(dto -> dto.jobId().equals(malformedJob.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Malformed job missing from response"));
+    Assertions.assertNull(malformedJobDTO.runtimeJobTemplate());
+    Assertions.assertEquals(JobHandle.Status.QUEUED, malformedJobDTO.status());
+  }
+
   private String jobTemplatePath() {
     return "/metalakes/" + metalake + "/jobs/templates";
   }

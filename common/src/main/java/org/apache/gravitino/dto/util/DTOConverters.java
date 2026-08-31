@@ -1484,7 +1484,10 @@ public class DTOConverters {
       return JsonUtils.anyFieldMapper().readValue(runtimeJobTemplateJson, JobTemplateDTO.class);
     } catch (JsonProcessingException e) {
       throw new RuntimeException(
-          String.format("Failed to deserialize the runtime job template for job %s", jobName), e);
+          String.format(
+              "Failed to deserialize the runtime job template for job %s, raw content: %s",
+              jobName, runtimeJobTemplateJson),
+          e);
     }
   }
 

@@ -337,4 +337,35 @@ public class TestDTOConverters {
     // Round-tripping back through fromDTO must reproduce the original template.
     Assertions.assertEquals(sparkJobTemplate, DTOConverters.fromDTO(jobTemplateDTO));
   }
+
+  @Test
+  public void testFromRuntimeJobTemplateJsonNull() {
+    Assertions.assertNull(DTOConverters.fromRuntimeJobTemplateJson(null, "job-1"));
+  }
+
+  @Test
+  public void testFromRuntimeJobTemplateJson() {
+    String runtimeJobTemplateJson =
+        "{\"jobType\":\"shell\",\"name\":\"shell_template_1\",\"executable\":\"/bin/echo\"}";
+    JobTemplateDTO jobTemplateDTO =
+        DTOConverters.fromRuntimeJobTemplateJson(runtimeJobTemplateJson, "job-1");
+    Assertions.assertInstanceOf(ShellJobTemplateDTO.class, jobTemplateDTO);
+    Assertions.assertEquals("shell_template_1", jobTemplateDTO.name());
+    Assertions.assertEquals("/bin/echo", ((ShellJobTemplateDTO) jobTemplateDTO).executable());
+  }
+
+  @Test
+  public void testFromRuntimeJobTemplateJsonMalformedIncludesRawContentInMessage() {
+    // The raw content must be in the exception message - without it, a caller like listJobs
+    // (which logs the exception but must not surface raw job data to API clients) leaves an
+    // admin with only the job name and no way to tell what was actually wrong with the stored
+    // JSON.
+    String malformedJson = "{not-valid-json";
+    RuntimeException exception =
+        Assertions.assertThrows(
+            RuntimeException.class,
+            () -> DTOConverters.fromRuntimeJobTemplateJson(malformedJson, "job-1"));
+    Assertions.assertTrue(exception.getMessage().contains("job-1"));
+    Assertions.assertTrue(exception.getMessage().contains(malformedJson));
+  }
 }
