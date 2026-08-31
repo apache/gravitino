@@ -108,9 +108,11 @@ import org.apache.gravitino.rel.SupportsPartitions;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.gravitino.rel.ViewCatalog;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.secret.SecretPropertyUtils;
 import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.storage.IdGenerator;
@@ -926,23 +928,7 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
         LockType.WRITE,
         () -> {
           try {
-            CatalogEntity updatedCatalog =
-                store.update(
-                    ident,
-                    CatalogEntity.class,
-                    EntityType.CATALOG,
-                    catalog -> {
-                      CatalogEntity.Builder newCatalogBuilder =
-                          newCatalogBuilder(ident.namespace(), catalog);
-
-                      Map<String, String> newProps =
-                          catalog.getProperties() == null
-                              ? new HashMap<>()
-                              : new HashMap<>(catalog.getProperties());
-                      newCatalogBuilder = updateEntity(newCatalogBuilder, newProps, changes);
-
-                      return newCatalogBuilder.build();
-                    });
+            CatalogEntity updatedCatalog = alterCatalogUnderLock(ident, changes);
             // Invalidate after store.update() so that any background thread that tries to reload
             // the old catalog identifier from the store (after the invalidate) will get
             // NoSuchCatalogException instead of stale data. Invalidating before the update creates
@@ -959,19 +945,64 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
             catalogCache.put(convertedCatalog.nameIdentifier(), newWrapper);
             return newWrapper.catalog();
 
-          } catch (NoSuchEntityException ne) {
-            LOG.warn("Catalog {} does not exist", ident, ne);
-            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
+          } catch (NoSuchCatalogException e) {
+            throw e;
 
           } catch (IllegalArgumentException iae) {
             LOG.warn("Failed to alter catalog {} with unknown change", ident, iae);
             throw iae;
+
+          } catch (NoSuchEntityException ne) {
+            LOG.warn("Catalog {} does not exist", ident, ne);
+            throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
 
           } catch (IOException ioe) {
             LOG.error("Failed to alter catalog {}", ident, ioe);
             throw new RuntimeException(ioe);
           }
         });
+  }
+
+  private CatalogEntity alterCatalogUnderLock(NameIdentifier ident, CatalogChange... changes)
+      throws NoSuchCatalogException, IllegalArgumentException, IOException {
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    boolean alterCommitted = false;
+    try {
+      CatalogEntity updatedCatalog =
+          store.update(
+              ident,
+              CatalogEntity.class,
+              EntityType.CATALOG,
+              existing -> {
+                Map<String, String> currentProperties =
+                    existing.getProperties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.getProperties());
+
+                Pair<CatalogChange[], List<SecretMaterial>> secretResult =
+                    SecretAlterChanges.prepareCatalogChanges(
+                        secretManager, currentProperties, existing.id(), changes);
+                writtenSecretMaterials.set(secretResult.getRight());
+                CatalogChange[] effectiveChanges = secretResult.getLeft();
+
+                CatalogEntity.Builder newCatalogBuilder =
+                    newCatalogBuilder(ident.namespace(), existing);
+
+                Map<String, String> newProps =
+                    existing.getProperties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.getProperties());
+                return updateEntity(newCatalogBuilder, newProps, effectiveChanges).build();
+              });
+      alterCommitted = true;
+      return updatedCatalog;
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchCatalogException(CATALOG_DOES_NOT_EXIST_MSG, ident);
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
+    }
   }
 
   @Override
@@ -1238,6 +1269,15 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
               if (catalogChange instanceof SetProperty) {
                 SetProperty setProperty = (SetProperty) catalogChange;
                 upserts.put(setProperty.getProperty(), setProperty.getValue());
+              } else if (catalogChange instanceof CatalogChange.SetSecretBinding) {
+                CatalogChange.SetSecretBinding setSecretBinding =
+                    (CatalogChange.SetSecretBinding) catalogChange;
+                upserts.put(
+                    setSecretBinding.getProperty(), setSecretBinding.getBinding().plaintext());
+              } else if (catalogChange instanceof CatalogChange.SetSecretReference) {
+                CatalogChange.SetSecretReference setSecretReference =
+                    (CatalogChange.SetSecretReference) catalogChange;
+                upserts.put(setSecretReference.getProperty(), setSecretReference.getProperty());
               } else if (catalogChange instanceof RemoveProperty) {
                 RemoveProperty removeProperty = (RemoveProperty) catalogChange;
                 deletes.put(removeProperty.getProperty(), removeProperty.getProperty());
@@ -1362,8 +1402,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
   }
 
   /**
-   * Get the resolved properties (filter out the hidden properties and add some required default
-   * properties) of the catalog entity.
+   * Get the resolved properties (mask hidden properties and add some required default properties)
+   * of the catalog entity.
    *
    * @param entity The catalog entity.
    * @return The resolved properties.
@@ -1397,7 +1437,8 @@ public class CatalogManager implements CatalogDispatcher, Closeable {
     // Resolve secret URNs to plaintext for connector init only; entity storage keeps URNs.
     catalog
         .withCatalogConf(secretManager.toPlaintextProperties(entity.getProperties()))
-        .withCatalogEntity(entity);
+        .withCatalogEntity(entity)
+        .withSecretManager(secretManager);
     catalog.initAuthorizationPluginInstance(classLoader, metalakeEntity.id());
     return catalog;
   }

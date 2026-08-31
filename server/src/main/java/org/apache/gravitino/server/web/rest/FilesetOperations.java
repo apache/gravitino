@@ -146,12 +146,9 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FilesetCreateRequest request) {
+    String filesetName = request == null ? "" : request.getName();
     LOG.info(
-        "Received create fileset request: {}.{}.{}.{}",
-        metalake,
-        catalog,
-        schema,
-        request.getName());
+        "Received create fileset request: {}.{}.{}.{}", metalake, catalog, schema, filesetName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -184,8 +181,7 @@ public class FilesetOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleFilesetException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleFilesetException(OperationType.CREATE, filesetName, schema, e);
     }
   }
 

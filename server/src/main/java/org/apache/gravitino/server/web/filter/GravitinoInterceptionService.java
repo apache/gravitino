@@ -312,7 +312,7 @@ public class GravitinoInterceptionService implements InterceptionService {
       String contextualMessage;
       String accessMetadataMessage =
           accessMetadataName != null
-              ? String.format("on metadata '%s'", accessMetadataName.name())
+              ? String.format("on metadata '%s'", accessMetadataName.toString())
               : "";
       if (StringUtils.isNotBlank(errorMessage)) {
         contextualMessage =

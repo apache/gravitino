@@ -220,7 +220,7 @@ public class TestSchemaMetaService extends TestJDBCBackend {
 
     CountDownLatch schemaDeleteLocked = new CountDownLatch(1);
     CountDownLatch allowDeleteCommit = new CountDownLatch(1);
-    CountDownLatch entityCreateStarted = new CountDownLatch(1);
+    CountDownLatch childActionStarted = new CountDownLatch(1);
     ExecutorService executor = Executors.newFixedThreadPool(2);
     Future<Throwable> deleteResult =
         executor.submit(
@@ -251,10 +251,10 @@ public class TestSchemaMetaService extends TestJDBCBackend {
             });
     try {
       assertTrue(schemaDeleteLocked.await(30, TimeUnit.SECONDS));
-      Future<Throwable> createResult =
+      Future<Throwable> childActionResult =
           executor.submit(
               () -> {
-                entityCreateStarted.countDown();
+                childActionStarted.countDown();
                 try {
                   // Exercise the real JDBCBackend-to-service path. This test must fail if any
                   // schema-scoped service forgets to take the parent lock in its own transaction.
@@ -264,13 +264,13 @@ public class TestSchemaMetaService extends TestJDBCBackend {
                   return throwable;
                 }
               });
-      assertTrue(entityCreateStarted.await(30, TimeUnit.SECONDS));
-      assertThrows(TimeoutException.class, () -> createResult.get(500, TimeUnit.MILLISECONDS));
+      assertTrue(childActionStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> childActionResult.get(500, TimeUnit.MILLISECONDS));
 
       allowDeleteCommit.countDown();
       Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
       Assertions.assertInstanceOf(
-          NoSuchEntityException.class, createResult.get(30, TimeUnit.SECONDS));
+          NoSuchEntityException.class, childActionResult.get(30, TimeUnit.SECONDS));
     } finally {
       allowDeleteCommit.countDown();
       executor.shutdownNow();

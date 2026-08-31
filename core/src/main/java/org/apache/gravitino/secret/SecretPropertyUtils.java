@@ -133,6 +133,63 @@ public final class SecretPropertyUtils {
   }
 
   /**
+   * Returns whether {@code value} is a write-through secret URN owned by this entity property.
+   *
+   * <p>Write-through URNs use identifier segments {@code entityType:entityId:propertyKey}.
+   *
+   * @param propertyKey the property key
+   * @param value the property value
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId the entity id
+   * @return true when the value is a write-through URN for this entity and property
+   */
+  public static boolean isWriteThroughForEntity(
+      @Nullable String propertyKey, @Nullable String value, String entityType, long entityId) {
+    if (!isSecretProperty(propertyKey, value)) {
+      return false;
+    }
+    try {
+      SecretUrn urn = SecretUrn.parse(value);
+      List<String> segments = urn.identifierSegments();
+      return segments.size() == 3
+          && entityType.equals(segments.get(0))
+          && String.valueOf(entityId).equals(segments.get(1))
+          && propertyKey.equals(segments.get(2));
+    } catch (IllegalArgumentException e) {
+      return false;
+    }
+  }
+
+  /**
+   * Validates alter {@code setProperty} plaintext: rejects blank, masked placeholder, and raw URN
+   * strings.
+   *
+   * @param property the property key
+   * @param value the plaintext value
+   */
+  public static void validateAlterSetPropertyValue(String property, String value) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    Preconditions.checkArgument(StringUtils.isNotBlank(value), "value must not be blank");
+    Preconditions.checkArgument(
+        !"******".equals(value), "setProperty value must not be the masked placeholder ******");
+    Preconditions.checkArgument(
+        !value.startsWith(URN_PREFIX),
+        "setProperty value must not be a secret URN; use setSecretBinding or setSecretReference");
+  }
+
+  /**
+   * Validates alter {@code setSecretBinding} plaintext.
+   *
+   * @param plaintext the plaintext from the binding
+   */
+  public static void validateAlterSecretBindingPlaintext(String plaintext) {
+    Preconditions.checkArgument(plaintext != null, "plaintext must not be null");
+    Preconditions.checkArgument(
+        !"******".equals(plaintext),
+        "setSecretBinding plaintext must not be the masked placeholder ******");
+  }
+
+  /**
    * Returns a mutable property map for create-time assembly, or {@code null} when the caller
    * supplied no properties and no secrets.
    *

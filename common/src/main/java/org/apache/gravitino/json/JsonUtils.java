@@ -49,7 +49,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -1388,13 +1387,27 @@ public class JsonUtils {
     }
   }
 
-  private static StatisticValue<?> getStatisticValue(JsonNode node) throws IOException {
+  private static StatisticValue<?> getStatisticValue(JsonNode node) {
     Preconditions.checkArgument(
         node != null && !node.isNull(), "Cannot parse statistic value from invalid JSON: %s", node);
     if (node.isIntegralNumber()) {
+      // BigInteger nodes are integral as well, and asLong() would wrap them around silently.
+      Preconditions.checkArgument(
+          node.canConvertToLong(),
+          "Statistic value is out of the range of a 64-bit signed integer: %s",
+          node);
       return StatisticValues.longValue(node.asLong());
     } else if (node.isFloatingPointNumber()) {
-      return StatisticValues.doubleValue(node.asDouble());
+      // Jackson parses a literal past the double range into a DoubleNode that already holds
+      // infinity (USE_BIG_DECIMAL_FOR_FLOATS is off), and the serializer would write that back
+      // out as the JSON string "Infinity", so the value would come back as a string.
+      double doubleValue = node.asDouble();
+      Preconditions.checkArgument(
+          Double.isFinite(doubleValue),
+          "Statistic value is out of the range of a 64-bit floating point number, the literal"
+              + " parsed to %s",
+          doubleValue);
+      return StatisticValues.doubleValue(doubleValue);
     } else if (node.isTextual()) {
       return StatisticValues.stringValue(node.asText());
     } else if (node.isBoolean()) {
@@ -1403,10 +1416,7 @@ public class JsonUtils {
       ArrayNode arrayNode = (ArrayNode) node;
       List<StatisticValue<Object>> values = Lists.newArrayListWithCapacity(arrayNode.size());
       for (JsonNode arrayElement : arrayNode) {
-        StatisticValue<?> value = getStatisticValue(arrayElement);
-        if (value != null) {
-          values.add((StatisticValue<Object>) value);
-        }
+        values.add((StatisticValue<Object>) getStatisticValue(arrayElement));
       }
       return StatisticValues.listValue(values);
     } else if (node.isObject()) {
@@ -1414,20 +1424,10 @@ public class JsonUtils {
       Map<String, StatisticValue<?>> map = Maps.newHashMap();
       objectNode
           .fields()
-          .forEachRemaining(
-              entry -> {
-                try {
-                  StatisticValue<?> value = getStatisticValue(entry.getValue());
-                  if (value != null) {
-                    map.put(entry.getKey(), value);
-                  }
-                } catch (IOException e) {
-                  throw new RuntimeException(e);
-                }
-              });
+          .forEachRemaining(entry -> map.put(entry.getKey(), getStatisticValue(entry.getValue())));
       return StatisticValues.objectValue(map);
     } else {
-      throw new UnsupportedEncodingException(
+      throw new IllegalArgumentException(
           String.format("Don't support json node type %s", node.getNodeType()));
     }
   }

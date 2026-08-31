@@ -20,11 +20,15 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
@@ -84,19 +88,7 @@ public class JobMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "getJobByIdentifier")
   public JobEntity getJobByIdentifier(NameIdentifier ident) {
-    String metalakeName = ident.namespace().level(0);
-    long jobRunIdLong = parseJobRunId(ident.name());
-
-    JobPO jobPO =
-        SessionUtils.getWithoutCommit(
-            JobMetaMapper.class,
-            mapper -> mapper.selectJobPOByMetalakeAndRunId(metalakeName, jobRunIdLong));
-    if (jobPO == null) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.JOB.name().toLowerCase(Locale.ROOT),
-          ident.toString());
-    }
+    JobPO jobPO = getJobPO(ident);
     return JobPO.fromJobPO(jobPO, ident.namespace());
   }
 
@@ -125,6 +117,46 @@ public class JobMetaService {
     }
   }
 
+  @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "updateJob")
+  public <E extends Entity & HasIdentifier> JobEntity updateJob(
+      NameIdentifier jobIdent, Function<E, E> updater) throws IOException {
+    JobPO oldJobPO = getJobPO(jobIdent);
+    JobEntity oldJobEntity = JobPO.fromJobPO(oldJobPO, jobIdent.namespace());
+    JobEntity newJobEntity = (JobEntity) updater.apply((E) oldJobEntity);
+    Preconditions.checkArgument(
+        Objects.equals(oldJobEntity.id(), newJobEntity.id()),
+        "The updated job entity id: %s is not equal to the old one: %s, which is unexpected",
+        newJobEntity.id(),
+        oldJobEntity.id());
+
+    JobPO.JobPOBuilder newBuilder = JobPO.builder().withMetalakeId(oldJobPO.metalakeId());
+    JobPO newJobPO = JobPO.updateJobPO(oldJobPO, newJobEntity, newBuilder);
+
+    Integer result;
+    try {
+      result =
+          SessionUtils.doWithCommitAndFetchResult(
+              JobMetaMapper.class, mapper -> mapper.updateJobMeta(newJobPO, oldJobPO));
+    } catch (RuntimeException e) {
+      ExceptionUtils.checkSQLException(e, Entity.EntityType.JOB, oldJobEntity.name());
+      throw e;
+    }
+
+    if (result == null || result == 0) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.JOB.name().toLowerCase(Locale.ROOT),
+          oldJobEntity.name());
+    } else if (result > 1) {
+      throw new IOException(
+          String.format(
+              "Failed to update job: %s, because more than one rows are updated: %d",
+              oldJobEntity.name(), result));
+    } else {
+      return newJobEntity;
+    }
+  }
+
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteJob")
   public boolean deleteJob(NameIdentifier jobIdent) {
     long jobRunIdLong = parseJobRunId(jobIdent.name());
@@ -145,6 +177,23 @@ public class JobMetaService {
     return SessionUtils.doWithCommitAndFetchResult(
         JobMetaMapper.class,
         mapper -> mapper.deleteJobMetasByLegacyTimeline(legacyTimeline, limit));
+  }
+
+  private JobPO getJobPO(NameIdentifier ident) {
+    String metalakeName = ident.namespace().level(0);
+    long jobRunIdLong = parseJobRunId(ident.name());
+
+    JobPO jobPO =
+        SessionUtils.getWithoutCommit(
+            JobMetaMapper.class,
+            mapper -> mapper.selectJobPOByMetalakeAndRunId(metalakeName, jobRunIdLong));
+    if (jobPO == null) {
+      throw new NoSuchEntityException(
+          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+          Entity.EntityType.JOB.name().toLowerCase(Locale.ROOT),
+          ident.toString());
+    }
+    return jobPO;
   }
 
   // Validate and parse a job run identifier of the form "job-<number>";

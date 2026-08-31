@@ -24,6 +24,7 @@ import java.util.Optional;
 import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
@@ -258,6 +259,18 @@ public interface AccessControlDispatcher {
       throws GroupAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+   * Adds groups in bulk.
+   *
+   * @param metalake The Metalake of the Groups.
+   * @param groups The Groups to add.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Groups encounters storage issues.
+   */
+  List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException;
+
+  /**
    * Removes a Group.
    *
    * @param metalake The Metalake of the Group.
@@ -268,6 +281,20 @@ public interface AccessControlDispatcher {
    * @throws RuntimeException If removing the Group encounters storage issues.
    */
   boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException;
+
+  /**
+   * Removes Groups in bulk.
+   *
+   * @param metalake The Metalake of the Groups.
+   * @param groups The names of the Groups.
+   * @param metalakeOwner The Metalake owner.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Groups encounters storage issues.
+   */
+  List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException;
 
   /**
    * Removes a Group by external identifier.

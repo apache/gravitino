@@ -25,6 +25,8 @@ import com.github.jk1.license.render.ReportRenderer
 import com.github.vlsi.gradle.dsl.configureEach
 import net.ltgt.gradle.errorprone.errorprone
 import org.gradle.api.attributes.java.TargetJvmVersion
+import org.gradle.api.services.BuildService
+import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.gradle.internal.hash.ChecksumService
 import org.gradle.internal.os.OperatingSystem
@@ -33,6 +35,8 @@ import java.io.IOException
 import java.util.Locale
 
 Locale.setDefault(Locale.US)
+
+abstract class SharedTestEnvironmentLock : BuildService<BuildServiceParameters.None>
 
 plugins {
   `maven-publish`
@@ -59,6 +63,13 @@ plugins {
   alias(libs.plugins.dependencyLicenseReport)
   alias(libs.plugins.tasktree)
   alias(libs.plugins.errorprone)
+}
+
+val sharedTestEnvironmentLock = gradle.sharedServices.registerIfAbsent(
+  "sharedTestEnvironmentLock",
+  SharedTestEnvironmentLock::class
+) {
+  maxParallelUsages.set(1)
 }
 
 val snappyJavaVersion: String = libs.versions.snappy.java.get()
@@ -157,11 +168,17 @@ allprojects {
           "import\\s+.*\\.org\\.apache\\.commons\\.io\\.([A-Z][a-zA-Z0-9_]*);",
           "import org.apache.commons.io.${'$'}1;"
         )
-        replaceRegex(
-          "Use SLF4J Logger instead of other logging frameworks",
-          "import\\s+.*\\.(Logger|LoggerFactory);",
-          "import org.slf4j.${'$'}1;"
-        )
+        // The trino-connector module logs via io.airlift.log.Logger to match Trino's own
+        // logging so plugin log output routes into Trino's unified log, instead of SLF4J.
+        // integration-test is intentionally excluded from this carve-out: it runs outside
+        // Trino's isolated plugin classloader, so it should keep using SLF4J as normal.
+        if (!project.path.startsWith(":trino-connector:trino-connector")) {
+          replaceRegex(
+            "Use SLF4J Logger instead of other logging frameworks",
+            "import\\s+.*\\.(Logger|LoggerFactory);",
+            "import org.slf4j.${'$'}1;"
+          )
+        }
         replaceRegex(
           "Remove Testcontainers shading",
           "import\\s+org\\.testcontainers\\.shaded\\.([^;]+);",
@@ -671,7 +688,11 @@ subprojects {
       showCauses = true
       showStackTraces = true
     }
-    reports.html.outputLocation.set(file("${rootProject.projectDir}/build/reports/"))
+    // Distinct outputs let Gradle execute independent test tasks in parallel.
+    val testReportPath = path.removePrefix(":").replace(':', '/')
+    reports.html.outputLocation.set(
+      rootProject.layout.buildDirectory.dir("reports/tests/$testReportPath")
+    )
     val skipTests = project.hasProperty("skipTests")
     if (!skipTests) {
       val extraArgs = project.property("extraJvmArgs") as List<String>
@@ -1005,7 +1026,6 @@ tasks {
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
       compileDistribution,
-      ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
       ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
       ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
       ":trino-connector:trino-connector-452-468:assembleTrinoConnector",
@@ -1247,6 +1267,22 @@ gradle.projectsEvaluated {
     subprojectJarOutputDirs.map { it.get().asFile.toPath().toAbsolutePath().normalize() }
 
   allprojects {
+    val runsIntegrationTestsOnly = rootProject.hasProperty("skipTests")
+    val hasDockerTests =
+      rootProject.extra["dockerTest"] == true && fileTree("src/test") {
+        include("**/*.java", "**/*.kt")
+      }.any { it.readText().contains("gravitino-docker-test") }
+
+    // Integration tests in different projects share the same Gravitino server, database,
+    // containers, and configuration files. Running them together lets one test stop or reset
+    // resources while another test is still using them. Normal builds keep independent unit tests
+    // parallel and serialize only projects that contain Docker-tagged tests.
+    if (runsIntegrationTestsOnly || hasDockerTests) {
+      tasks.withType<Test>().configureEach {
+        usesService(sharedTestEnvironmentLock)
+      }
+    }
+
     tasks.withType<Jar>().configureEach {
       mustRunAfter(cleanDistributionPackageTask)
     }

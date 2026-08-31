@@ -55,7 +55,7 @@ class TestSchemaMetaBaseSQLProvider {
     Assertions.assertTrue(sql.endsWith("LIMIT 1"));
   }
 
-  private int countOccurrences(String value, String target) {
+  private static int countOccurrences(String value, String target) {
     return (value.length() - value.replace(target, "").length()) / target.length();
   }
 }

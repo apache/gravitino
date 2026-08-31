@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog;
 
 import static org.apache.gravitino.StringIdentifier.ID_KEY;
+import static org.apache.gravitino.TestCatalog.PROPERTY_HIDDEN_KEY;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY1;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY2;
 import static org.apache.gravitino.TestCatalog.PROPERTY_KEY3;
@@ -61,6 +62,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
@@ -238,6 +240,62 @@ public class TestCatalogManager {
             IllegalArgumentException.class, () -> catalogManager.alterCatalog(ident2, change5));
     Assertions.assertTrue(
         e3.getMessage().contains("Property key6-1 is immutable"), e3.getMessage());
+    reset();
+  }
+
+  @Test
+  void testAlterCatalogRejectsMaskedHiddenProperty() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "masked_hidden");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put(PROPERTY_HIDDEN_KEY, "secret")
+            .put("mock", "mock")
+            .build();
+    catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, provider, "comment", props);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.alterCatalog(
+                    ident,
+                    CatalogChange.setProperty(
+                        PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)));
+
+    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
+    CatalogEntity entity = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
+    Assertions.assertEquals("secret", entity.getProperties().get(PROPERTY_HIDDEN_KEY));
+    reset();
+  }
+
+  @Test
+  void testCreateCatalogRejectsMaskedHiddenProperty() throws IOException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "masked_create");
+    Map<String, String> props =
+        ImmutableMap.<String, String>builder()
+            .put(PROPERTY_KEY1, "value1")
+            .put(PROPERTY_KEY2, "value2")
+            .put(PROPERTY_KEY3, "3")
+            .put(PROPERTY_KEY4, "value4")
+            .put(PROPERTY_KEY5_PREFIX + "1", "value1")
+            .put(PROPERTY_KEY6_PREFIX + "1", "value1")
+            .put(PROPERTY_HIDDEN_KEY, HiddenPropertyMaskUtils.MASKED_VALUE)
+            .put("mock", "mock")
+            .build();
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                catalogManager.createCatalog(
+                    ident, Catalog.Type.RELATIONAL, provider, "comment", props));
+    Assertions.assertTrue(exception.getMessage().contains(PROPERTY_HIDDEN_KEY));
     reset();
   }
 
@@ -1497,7 +1555,10 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertFalse(testProps.containsKey(ID_KEY), "`gravitino.identifier` is missing");
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        testProps.get(ID_KEY),
+        "`gravitino.identifier` should be returned as a masked placeholder");
   }
 
   @Test
@@ -1515,7 +1576,8 @@ public class TestCatalogManager {
               catalogProps(),
               Map.of(PROPERTY_KEY4, new SecretBinding("memory", "s3cr3t")),
               Map.of());
-      Assertions.assertFalse(catalog.properties().containsKey(PROPERTY_KEY4));
+      Assertions.assertEquals(
+          HiddenPropertyMaskUtils.MASKED_VALUE, catalog.properties().get(PROPERTY_KEY4));
       String urn =
           entityStore
               .get(ident, EntityType.CATALOG, CatalogEntity.class)
@@ -1523,6 +1585,16 @@ public class TestCatalogManager {
               .get(PROPERTY_KEY4);
       Assertions.assertTrue(SecretPropertyUtils.isSecretProperty(PROPERTY_KEY4, urn));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(SecretUrn.parse(urn)));
+
+      manager.alterCatalog(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
+      Assertions.assertFalse(
+          entityStore
+              .get(ident, EntityType.CATALOG, CatalogEntity.class)
+              .getProperties()
+              .containsKey(PROPERTY_KEY4));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
+
       Assertions.assertTrue(manager.dropCatalog(ident, true));
       Assertions.assertThrows(
           IllegalArgumentException.class, () -> secrets.readSecret(SecretUrn.parse(urn)));
