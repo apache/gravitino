@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.TreeMap;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 import javax.annotation.Nullable;
 import javax.ws.rs.core.HttpHeaders;
@@ -140,8 +141,9 @@ public class IcebergIdempotencyManager {
       return action.get();
     }
 
+    String key;
     try {
-      IdempotencyKeys.validate(idempotencyKey);
+      key = IdempotencyKeys.canonicalize(idempotencyKey);
     } catch (IllegalArgumentException e) {
       return IcebergExceptionMapper.toRESTResponse(e);
     }
@@ -149,22 +151,25 @@ public class IcebergIdempotencyManager {
     IdempotencyStore idempotencyStore = store.get();
     String binding = truncate(operationBinding);
     long expiresAtMs = System.currentTimeMillis() + keyLifetime.toMillis();
-    if (idempotencyStore.reserve(idempotencyKey, binding, expiresAtMs) == ReserveResult.DUPLICATE) {
-      return replay(idempotencyStore, idempotencyKey, binding);
+    // A fresh claim per attempt, so that if this reservation is dropped underneath us and another
+    // request takes the key, our finalize or release lands on nothing instead of on its record.
+    long claim = ThreadLocalRandom.current().nextLong();
+    if (idempotencyStore.reserve(key, binding, claim, expiresAtMs) == ReserveResult.DUPLICATE) {
+      return replay(idempotencyStore, key, binding);
     }
 
     boolean finalized = false;
     try {
       Response response = action.get();
       if (isFinalizable(response.getStatus())) {
-        finalized = tryFinalize(idempotencyStore, idempotencyKey, response);
+        finalized = tryFinalize(idempotencyStore, key, claim, response);
       }
       return response;
     } finally {
       if (!finalized) {
         // The mutation failed in a way the spec treats as retryable, or its response could not be
         // stored. Either way the key must go back so the client can retry with it.
-        idempotencyStore.release(idempotencyKey);
+        idempotencyStore.release(key, claim);
       }
     }
   }
@@ -251,7 +256,7 @@ public class IcebergIdempotencyManager {
   }
 
   private boolean tryFinalize(
-      IdempotencyStore idempotencyStore, String idempotencyKey, Response response) {
+      IdempotencyStore idempotencyStore, String idempotencyKey, long claim, Response response) {
     String responseSummary;
     try {
       responseSummary = serializeEntity(response.getEntity());
@@ -262,7 +267,7 @@ public class IcebergIdempotencyManager {
           e);
       return false;
     }
-    idempotencyStore.finalizeRecord(idempotencyKey, response.getStatus(), responseSummary);
+    idempotencyStore.finalizeRecord(idempotencyKey, claim, response.getStatus(), responseSummary);
     return true;
   }
 

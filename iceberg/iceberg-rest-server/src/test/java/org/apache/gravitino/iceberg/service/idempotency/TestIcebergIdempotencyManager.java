@@ -41,6 +41,7 @@ import org.mockito.Mockito;
 public class TestIcebergIdempotencyManager {
 
   private static final String KEY = "017f22e2-79b0-7cc3-98c4-dc0c0c07398f";
+  private static final String KEY_UPPER = "017F22E2-79B0-7CC3-98C4-DC0C0C07398F";
   private static final String OTHER_KEY = "017f22e2-79b0-7cc3-98c4-dc0c0c073990";
   private static final String BINDING = "POST v1/cat1/namespaces/ns1/tables";
 
@@ -212,9 +213,25 @@ public class TestIcebergIdempotencyManager {
   }
 
   @Test
+  void testRetryWithADifferentlyCasedKeyReplays() {
+    IcebergIdempotencyManager manager = newManager(ImmutableMap.of());
+    AtomicInteger executions = new AtomicInteger();
+
+    Response first = execute(manager, KEY_UPPER, executions);
+    Response retry = execute(manager, KEY, executions);
+
+    Assertions.assertEquals(200, first.getStatus());
+    Assertions.assertEquals(200, retry.getStatus());
+    Assertions.assertEquals(1, executions.get(), "a case variant is the same key, not a new one");
+    Assertions.assertEquals(first.getEntity(), retry.getEntity());
+  }
+
+  @Test
   void testRetryWhileTheFirstRequestIsRunningIsRetryable() {
     IdempotencyStore store = Mockito.mock(IdempotencyStore.class);
-    Mockito.when(store.reserve(Mockito.anyString(), Mockito.anyString(), Mockito.anyLong()))
+    Mockito.when(
+            store.reserve(
+                Mockito.anyString(), Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
         .thenReturn(ReserveResult.DUPLICATE);
     Mockito.when(store.load(KEY)).thenReturn(Optional.empty());
     IcebergIdempotencyManager manager =
