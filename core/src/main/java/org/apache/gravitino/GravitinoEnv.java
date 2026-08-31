@@ -253,6 +253,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the auxiliary service manager associated with the Gravitino environment.
+   *
+   * @return The auxiliary service manager instance.
+   */
+  public AuxiliaryServiceManager auxServiceManager() {
+    return auxServiceManager;
+  }
+
+  /**
    * Get the EntityStore associated with the Gravitino environment.
    *
    * @return The EntityStore instance.

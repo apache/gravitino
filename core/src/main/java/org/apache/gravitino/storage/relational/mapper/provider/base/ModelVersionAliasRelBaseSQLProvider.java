@@ -28,6 +28,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
 
   public String insertModelVersionAliasRels(
       @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs) {
+    // The model-row reservation increments the allocator before version and alias rows are added.
     return "<script>"
         + "INSERT INTO "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -35,7 +36,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " VALUES "
         + " <foreach collection='modelVersionAliasRel' item='item' separator=','>"
         + " (#{item.modelId},"
-        + " (SELECT model_latest_version FROM "
+        + " (SELECT model_latest_version - 1 FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE model_id = #{item.modelId} AND deleted_at = 0),"
         + " #{item.modelVersionAlias},"
@@ -74,17 +75,18 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+  /**
+   * Returns SQL that soft-deletes every active alias row for a model ID.
+   *
+   * @param modelId the model ID
+   * @return the soft-delete SQL
+   */
+  public String softDeleteModelVersionAliasRelsByModelId(@Param("modelId") Long modelId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " mvar SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE mvar.model_id = ("
-        + " SELECT mm.model_id FROM "
-        + ModelMetaMapper.TABLE_NAME
-        + " mm WHERE mm.schema_id = #{schemaId} AND mm.model_name = #{modelName}"
-        + " AND mm.deleted_at = 0) AND mvar.deleted_at = 0";
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
   public String softDeleteModelVersionAliasRelsByModelIdAndVersion(
@@ -94,20 +96,6 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
         + " WHERE model_id = #{modelId} AND model_version = #{modelVersion} AND deleted_at = 0";
-  }
-
-  public String softDeleteModelVersionAliasRelsByModelIdAndAlias(
-      @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return "UPDATE "
-        + ModelVersionAliasRelMapper.TABLE_NAME
-        + " mvar JOIN ("
-        + " SELECT model_version FROM "
-        + ModelVersionAliasRelMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0)"
-        + " subquery ON mvar.model_version = subquery.model_version"
-        + " SET mvar.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE mvar.model_id = #{modelId} AND mvar.deleted_at = 0";
   }
 
   public String softDeleteModelVersionAliasRelsBySchemaIds(
