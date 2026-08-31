@@ -726,18 +726,29 @@ public class TestPOConverters {
   }
 
   @Test
-  public void testUpdateRolePOVersion() {
+  public void testUpdateRolePOVersionUsesCurrentVersion() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     RoleEntity role =
         RoleEntity.builder().withId(1L).withName("role").withAuditInfo(auditInfo).build();
-    RolePO rolePO =
+    RolePO initialRolePO =
         POConverters.initializeRolePOWithVersion(role, RolePO.builder().withMetalakeId(1L));
+    RolePO rolePO =
+        RolePO.builder()
+            .withRoleId(initialRolePO.getRoleId())
+            .withRoleName(initialRolePO.getRoleName())
+            .withMetalakeId(initialRolePO.getMetalakeId())
+            .withProperties(initialRolePO.getProperties())
+            .withAuditInfo(initialRolePO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialRolePO.getDeletedAt())
+            .build();
 
     RolePO updatedRolePO = POConverters.updateRolePOWithVersion(rolePO, role);
 
-    assertEquals(2, updatedRolePO.getCurrentVersion());
-    assertEquals(2, updatedRolePO.getLastVersion());
+    assertEquals(8, updatedRolePO.getCurrentVersion());
+    assertEquals(8, updatedRolePO.getLastVersion());
   }
 
   @Test

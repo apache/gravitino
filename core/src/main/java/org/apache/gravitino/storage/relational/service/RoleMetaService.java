@@ -179,9 +179,9 @@ public class RoleMetaService {
         securableObjectPOs.add(objectBuilder.build());
       }
 
-      // The role row is written before its securable objects. Concurrent writers then contend on
-      // the role row first and in the same order, so an overwrite that loses the compare-and-set
-      // rolls back without having touched the children of a role another writer already owns.
+      // The role row is written before its securable objects. Concurrent overwrites then contend
+      // on the role row first and replace the child rows only after they are serialized. The role
+      // and its securable objects therefore change atomically, with the last overwrite winning.
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForRoleCreate(metalakePO),
           () ->
