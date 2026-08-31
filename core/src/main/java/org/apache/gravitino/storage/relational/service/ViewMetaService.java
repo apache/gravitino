@@ -105,29 +105,26 @@ public class ViewMetaService {
     try {
       ViewPO po = initializeViewPO(viewEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the view cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      viewEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ViewVersionInfoMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertViewVersionInfoOnDuplicateKeyUpdate(po.getViewVersionInfoPO());
-                    } else {
-                      mapper.insertViewVersionInfo(po.getViewVersionInfoPO());
-                    }
-                  }));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              viewEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      ViewMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      ViewVersionInfoMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertViewVersionInfoOnDuplicateKeyUpdate(
+                              po.getViewVersionInfoPO());
+                        } else {
+                          mapper.insertViewVersionInfo(po.getViewVersionInfoPO());
+                        }
+                      }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.VIEW, viewEntity.nameIdentifier().toString());
@@ -152,21 +149,32 @@ public class ViewMetaService {
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
       ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ViewVersionInfoMapper.class,
-                  mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())),
-          () -> {
-            updateResult.set(
-                SessionUtils.getWithoutCommit(
-                    ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO)));
-            if (updateResult.get() == 0) {
-              throw new RuntimeException("Failed to update the entity: " + ident);
-            }
-          });
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              ident,
+              oldViewPO.getSchemaId(),
+              oldViewPO.getCatalogId(),
+              oldViewPO.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      ViewVersionInfoMapper.class,
+                      mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())),
+              () -> {
+                updateResult.set(
+                    SessionUtils.getWithoutCommit(
+                        ViewMetaMapper.class,
+                        mapper -> ops.updatePO(mapper, newViewPO, oldViewPO)));
+                if (updateResult.get() == 0) {
+                  throw new RuntimeException("Failed to update the entity: " + ident);
+                }
+              });
       return newEntity;
     } catch (RuntimeException re) {
+      // A missing parent is detected before the view update runs, so updateResult is still zero.
+      // Preserve that precise error instead of misreporting it as a view write conflict.
+      if (re instanceof NoSuchEntityException) {
+        throw re;
+      }
       if (updateResult.get() == 0) {
         throw new IOException("Failed to update the entity: " + ident);
       }

@@ -26,7 +26,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -171,56 +170,51 @@ public class FilesetMetaService {
 
       // The schema lock, metadata row, and every storage-location version row share one
       // transaction. A failure in any later step restores all earlier writes.
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the fileset cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      filesetEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetMetaMapper.class,
-                  mapper -> {
-                    FilesetPO storedPO =
-                        overwrite
-                            ? mapper.selectFilesetMetaBySchemaIdAndNameForUpdate(
-                                po.getSchemaId(), po.getFilesetName())
-                            : null;
-                    if (storedPO == null) {
-                      mapper.insertFilesetMeta(po);
-                      return;
-                    }
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              filesetEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetMetaMapper.class,
+                      mapper -> {
+                        FilesetPO storedPO =
+                            overwrite
+                                ? mapper.selectFilesetMetaBySchemaIdAndNameForUpdate(
+                                    po.getSchemaId(), po.getFilesetName())
+                                : null;
+                        if (storedPO == null) {
+                          mapper.insertFilesetMeta(po);
+                          return;
+                        }
 
-                    // Resolve the natural-key overwrite before building its snapshot. This keeps
-                    // the stored ID in both the metadata row and identifier property without a
-                    // post-insert JSON/PO rewrite.
-                    FilesetEntity replacement =
-                        filesetWithPersistedId(filesetEntity, storedPO.getFilesetId());
-                    Long maxStoredVersion =
-                        SessionUtils.getWithoutCommit(
-                            FilesetVersionMapper.class,
-                            versionMapper ->
-                                versionMapper.selectMaxFilesetVersion(storedPO.getFilesetId()));
-                    FilesetPO replacementPO =
-                        POConverters.updateFilesetPOWithVersion(
-                            storedPO, replacement, maxStoredVersion);
-                    Integer updated = mapper.updateFilesetMeta(replacementPO, storedPO);
-                    Preconditions.checkState(
-                        updated != null && updated == 1,
-                        "The overwritten fileset %s in schema %s changed while its row was held",
-                        po.getFilesetName(),
-                        po.getSchemaId());
-                    persistedPO.set(replacementPO);
-                  }),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FilesetVersionMapper.class,
-                  mapper ->
-                      mapper.insertFilesetVersions(persistedPO.get().getFilesetVersionPOs())));
+                        // Resolve the natural-key overwrite before building its snapshot so the
+                        // metadata row and identifier property both keep the stored ID.
+                        FilesetEntity replacement =
+                            filesetWithPersistedId(filesetEntity, storedPO.getFilesetId());
+                        Long maxStoredVersion =
+                            SessionUtils.getWithoutCommit(
+                                FilesetVersionMapper.class,
+                                versionMapper ->
+                                    versionMapper.selectMaxFilesetVersion(storedPO.getFilesetId()));
+                        FilesetPO replacementPO =
+                            POConverters.updateFilesetPOWithVersion(
+                                storedPO, replacement, maxStoredVersion);
+                        Integer updated = mapper.updateFilesetMeta(replacementPO, storedPO);
+                        Preconditions.checkState(
+                            updated != null && updated == 1,
+                            "The overwritten fileset %s in schema %s changed while its row was held",
+                            po.getFilesetName(),
+                            po.getSchemaId());
+                        persistedPO.set(replacementPO);
+                      }),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FilesetVersionMapper.class,
+                      mapper ->
+                          mapper.insertFilesetVersions(persistedPO.get().getFilesetVersionPOs())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, filesetEntity.nameIdentifier().toString());
@@ -244,27 +238,14 @@ public class FilesetMetaService {
         oldFilesetEntity.id());
 
     try {
-      FilesetPO newFilesetPO =
-          POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, null);
-      if (tryUpdateFileset(newFilesetPO, oldFilesetPO)) {
-        return newEntity;
-      }
-
-      // The metadata CAS also rejects a version that already has an active stored snapshot. Only
-      // that uncommon legacy case needs the MAX(version) round trip; normal alters finish above.
-      Long maxStoredVersion =
-          SessionUtils.getWithoutCommit(
-              FilesetVersionMapper.class,
-              mapper -> mapper.selectMaxFilesetVersion(oldFilesetPO.getFilesetId()));
-      if (maxStoredVersion != null
-          && maxStoredVersion >= newFilesetPO.getCurrentVersion()
-          && tryUpdateFileset(
-              POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, maxStoredVersion),
-              oldFilesetPO)) {
-        return newEntity;
-      }
-
-      throw filesetWriteFailure(identifier, oldFilesetPO);
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              identifier,
+              oldFilesetPO.getSchemaId(),
+              oldFilesetPO.getCatalogId(),
+              oldFilesetPO.getMetalakeId(),
+              () -> updateFilesetInTransaction(identifier, newEntity, oldFilesetPO));
+      return newEntity;
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
@@ -477,26 +458,44 @@ public class FilesetMetaService {
     }
   }
 
+  private void updateFilesetInTransaction(
+      NameIdentifier identifier, FilesetEntity newEntity, FilesetPO oldFilesetPO) {
+    FilesetPO newFilesetPO = POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, null);
+    if (tryUpdateFileset(newFilesetPO, oldFilesetPO)) {
+      return;
+    }
+
+    // The metadata CAS also rejects a version that already has an active stored snapshot. Only
+    // that uncommon legacy case needs the MAX(version) round trip; normal alters finish above.
+    Long maxStoredVersion =
+        SessionUtils.getWithoutCommit(
+            FilesetVersionMapper.class,
+            mapper -> mapper.selectMaxFilesetVersion(oldFilesetPO.getFilesetId()));
+    if (maxStoredVersion != null
+        && maxStoredVersion >= newFilesetPO.getCurrentVersion()
+        && tryUpdateFileset(
+            POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, maxStoredVersion),
+            oldFilesetPO)) {
+      return;
+    }
+
+    throw filesetWriteFailure(identifier, oldFilesetPO);
+  }
+
   private boolean tryUpdateFileset(FilesetPO newFilesetPO, FilesetPO oldFilesetPO) {
-    AtomicBoolean updated = new AtomicBoolean(false);
-    SessionUtils.doMultipleWithCommit(
-        () -> {
-          Integer updateCount =
-              SessionUtils.getWithoutCommit(
-                  FilesetMetaMapper.class,
-                  mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
-          updated.set(updateCount != null && updateCount > 0);
-        },
-        () -> {
-          if (updated.get()) {
-            // The metadata row now points to this complete snapshot. It stays in the same
-            // transaction so a failed version insert also restores the metadata version.
-            SessionUtils.doWithoutCommit(
-                FilesetVersionMapper.class,
-                mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs()));
-          }
-        });
-    return updated.get();
+    Integer updateCount =
+        SessionUtils.getWithoutCommit(
+            FilesetMetaMapper.class,
+            mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+    boolean updated = updateCount != null && updateCount > 0;
+    if (updated) {
+      // The metadata row now points to this complete snapshot. The caller's schema transaction
+      // ensures a failed version insert also restores the metadata version.
+      SessionUtils.doWithoutCommit(
+          FilesetVersionMapper.class,
+          mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs()));
+    }
+    return updated;
   }
 
   private FilesetEntity filesetWithPersistedId(FilesetEntity filesetEntity, Long persistedId) {

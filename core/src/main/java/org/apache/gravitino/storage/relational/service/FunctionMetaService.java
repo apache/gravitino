@@ -114,29 +114,26 @@ public class FunctionMetaService {
       fillFunctionPOBuilderParentEntityId(builder, functionEntity.namespace());
       FunctionPO po = initializeFunctionPO(functionEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the function cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      functionEntity.nameIdentifier(),
-                      po.schemaId(),
-                      po.catalogId(),
-                      po.metalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionVersionMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertFunctionVersionMetaOnDuplicateKeyUpdate(po.functionVersionPO());
-                    } else {
-                      mapper.insertFunctionVersionMeta(po.functionVersionPO());
-                    }
-                  }));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              functionEntity.nameIdentifier(),
+              po.schemaId(),
+              po.catalogId(),
+              po.metalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FunctionMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FunctionVersionMetaMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertFunctionVersionMetaOnDuplicateKeyUpdate(
+                              po.functionVersionPO());
+                        } else {
+                          mapper.insertFunctionVersionMeta(po.functionVersionPO());
+                        }
+                      }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FUNCTION, functionEntity.nameIdentifier().toString());
@@ -271,33 +268,29 @@ public class FunctionMetaService {
     try {
       FunctionPO newFunctionPO = updateFunctionPO(oldFunctionPO, newEntity);
       // Insert a new version and update function meta
-      SessionUtils.doMultipleWithCommit(
-          // The function was read before this transaction started. Lock its observed parent again
-          // before writing, so a schema drop cannot finish its function cleanup and then let this
-          // update add a new version below the deleted schema.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      identifier,
-                      oldFunctionPO.schemaId(),
-                      oldFunctionPO.catalogId(),
-                      oldFunctionPO.metalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  FunctionVersionMetaMapper.class,
-                  mapper -> mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())),
-          () -> {
-            int updated =
-                SessionUtils.getWithoutCommit(
-                    FunctionMetaMapper.class,
-                    mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
-            if (updated == 0) {
-              // The version row was inserted earlier in this transaction. Throwing here rolls the
-              // whole transaction back instead of leaving that version without an active function
-              // metadata row.
-              throw ExceptionUtils.concurrentModification(Entity.EntityType.FUNCTION, identifier);
-            }
-          });
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              identifier,
+              oldFunctionPO.schemaId(),
+              oldFunctionPO.catalogId(),
+              oldFunctionPO.metalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      FunctionVersionMetaMapper.class,
+                      mapper ->
+                          mapper.insertFunctionVersionMeta(newFunctionPO.functionVersionPO())),
+              () -> {
+                int updated =
+                    SessionUtils.getWithoutCommit(
+                        FunctionMetaMapper.class,
+                        mapper -> ops.updatePO(mapper, newFunctionPO, oldFunctionPO));
+                if (updated == 0) {
+                  // The version was inserted above. Throwing here rolls it back instead of leaving
+                  // an active version without function metadata.
+                  throw ExceptionUtils.concurrentModification(
+                      Entity.EntityType.FUNCTION, identifier);
+                }
+              });
 
       return newEntity;
     } catch (RuntimeException re) {

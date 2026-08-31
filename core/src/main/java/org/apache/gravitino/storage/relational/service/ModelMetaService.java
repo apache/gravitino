@@ -98,26 +98,22 @@ public class ModelMetaService {
       fillModelPOBuilderParentEntityId(builder, modelEntity.namespace());
       ModelPO po = POConverters.initializeModelPO(modelEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the model cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      modelEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  ModelMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertModelMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertModelMeta(po);
-                    }
-                  }));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              modelEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      ModelMetaMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertModelMetaOnDuplicateKeyUpdate(po);
+                        } else {
+                          mapper.insertModelMeta(po);
+                        }
+                      }));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, modelEntity.nameIdentifier().toString());
@@ -393,26 +389,31 @@ public class ModelMetaService {
 
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      ModelMetaMapper.class,
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              identifier,
+              oldModelPO.getSchemaId(),
+              oldModelPO.getCatalogId(),
+              oldModelPO.getMetalakeId(),
+              () ->
+                  updateResult.set(
+                      SessionUtils.getWithoutCommit(
+                          ModelMetaMapper.class,
+                          mapper ->
+                              mapper.updateModelMeta(
+                                  POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
+              () -> {
+                if (isRenamed && updateResult.get() > 0) {
+                  SessionUtils.doWithoutCommit(
+                      EntityChangeLogMapper.class,
                       mapper ->
-                          mapper.updateModelMeta(
-                              POConverters.updateModelPO(oldModelPO, newEntity), oldModelPO))),
-          () -> {
-            if (isRenamed && updateResult.get() > 0) {
-              SessionUtils.doWithoutCommit(
-                  EntityChangeLogMapper.class,
-                  mapper ->
-                      mapper.insertEntityChange(
-                          metalakeName,
-                          Entity.EntityType.MODEL.name(),
-                          oldFullName,
-                          OperateType.ALTER));
-            }
-          });
+                          mapper.insertEntityChange(
+                              metalakeName,
+                              Entity.EntityType.MODEL.name(),
+                              oldFullName,
+                              OperateType.ALTER));
+                }
+              });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.MODEL, newEntity.nameIdentifier().toString());

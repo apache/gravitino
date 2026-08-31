@@ -22,7 +22,13 @@ import static org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper.TA
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FilesetMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -180,6 +186,31 @@ public class SchemaMetaBaseSQLProvider {
         + " FROM "
         + TABLE_NAME
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+  }
+
+  /** Returns SQL that checks whether an active child exists in the schema. */
+  public String selectActiveChildBySchemaId(@Param("schemaId") Long schemaId) {
+    // Each branch returns only the same literal, so UNION ALL avoids unnecessary duplicate
+    // elimination. LIMIT 1 lets the database stop as soon as any kind of child is found.
+    return "SELECT 1 FROM "
+        + TableMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + ViewMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + FilesetMetaMapper.META_TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + FunctionMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + ModelMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " UNION ALL SELECT 1 FROM "
+        + TopicMetaMapper.TABLE_NAME
+        + " WHERE schema_id = #{schemaId} AND deleted_at = 0"
+        + " LIMIT 1";
   }
 
   /** Returns SQL that selects and locks an active schema by ID. */

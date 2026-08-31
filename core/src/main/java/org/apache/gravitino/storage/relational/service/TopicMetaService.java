@@ -72,26 +72,22 @@ public class TopicMetaService {
       fillTopicPOBuilderParentEntityId(builder, topicEntity.namespace());
       TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
 
-      SessionUtils.doMultipleWithCommit(
-          // Hold the parent schema row until this transaction ends, so the topic cannot be
-          // written below a schema that is being dropped.
-          () ->
-              SchemaMetaService.getInstance()
-                  .lockSchemaForEntityWrite(
-                      topicEntity.nameIdentifier(),
-                      po.getSchemaId(),
-                      po.getCatalogId(),
-                      po.getMetalakeId()),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TopicMetaMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
-                    } else {
-                      mapper.insertTopicMeta(po);
-                    }
-                  }));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              topicEntity.nameIdentifier(),
+              po.getSchemaId(),
+              po.getCatalogId(),
+              po.getMetalakeId(),
+              () ->
+                  SessionUtils.doWithoutCommit(
+                      TopicMetaMapper.class,
+                      mapper -> {
+                        if (overwrite) {
+                          mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
+                        } else {
+                          mapper.insertTopicMeta(po);
+                        }
+                      }));
       // TODO: insert topic dataLayout version after supporting it
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -124,15 +120,20 @@ public class TopicMetaService {
 
     AtomicInteger updateResult = new AtomicInteger(0);
     try {
-      SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      TopicMetaMapper.class,
-                      mapper ->
-                          mapper.updateTopicMeta(
-                              POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity),
-                              oldTopicPO))));
+      SchemaMetaService.getInstance()
+          .doWithSchemaWriteLock(
+              ident,
+              oldTopicPO.getSchemaId(),
+              oldTopicPO.getCatalogId(),
+              oldTopicPO.getMetalakeId(),
+              () ->
+                  updateResult.set(
+                      SessionUtils.getWithoutCommit(
+                          TopicMetaMapper.class,
+                          mapper ->
+                              mapper.updateTopicMeta(
+                                  POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity),
+                                  oldTopicPO))));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, newEntity.nameIdentifier().toString());

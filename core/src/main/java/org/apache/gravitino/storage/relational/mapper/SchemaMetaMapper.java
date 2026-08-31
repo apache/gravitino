@@ -86,6 +86,16 @@ public interface SchemaMetaMapper {
   @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectSchemaMetaById")
   SchemaPO selectSchemaMetaById(@Param("schemaId") Long schemaId);
 
+  /**
+   * Returns one when an active table, view, fileset, function, model, or topic exists in the
+   * schema, and {@code null} otherwise.
+   *
+   * <p>Only a literal is selected because callers need an existence answer, not complete child
+   * metadata. The final limit also lets the database stop as soon as it finds the first child.
+   */
+  @SelectProvider(type = SchemaMetaSQLProviderFactory.class, method = "selectActiveChildBySchemaId")
+  Integer selectActiveChildBySchemaId(@Param("schemaId") Long schemaId);
+
   /** Selects and locks an active schema by ID for the current transaction. */
   @SelectProvider(
       type = SchemaMetaSQLProviderFactory.class,
