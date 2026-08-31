@@ -27,16 +27,11 @@ import org.apache.ibatis.annotations.Param;
 public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRelBaseSQLProvider {
 
   @Override
-  public String softDeleteModelVersionAliasRelsBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+  public String softDeleteModelVersionAliasRelsByModelId(Long modelId) {
     return "UPDATE "
         + ModelVersionAliasRelMapper.TABLE_NAME
-        + " mvar SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE mvar.model_id = ("
-        + " SELECT mm.model_id FROM "
-        + ModelMetaMapper.TABLE_NAME
-        + " mm WHERE mm.schema_id = #{schemaId} AND mm.model_name = #{modelName}"
-        + " AND mm.deleted_at = 0) AND mvar.deleted_at = 0";
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
   @Override
@@ -46,19 +41,6 @@ public class ModelVersionAliasRelPostgreSQLProvider extends ModelVersionAliasRel
         + ModelVersionAliasRelMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE model_id = #{modelId} AND model_version = #{modelVersion} AND deleted_at = 0";
-  }
-
-  @Override
-  public String softDeleteModelVersionAliasRelsByModelIdAndAlias(
-      @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return "UPDATE "
-        + ModelVersionAliasRelMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE model_id = #{modelId} AND model_version = ("
-        + " SELECT model_version FROM "
-        + ModelVersionAliasRelMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
   }
 
   @Override

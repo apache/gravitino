@@ -957,6 +957,8 @@ public class TestPOConverters {
         JsonUtils.anyFieldMapper().readValue(modelPO.getAuditInfo(), AuditInfo.class);
     assertEquals(auditInfo, resultAuditInfo);
     assertEquals(1, modelPO.getModelLatestVersion());
+    assertEquals(1, modelPO.getCurrentVersion());
+    assertEquals(1, modelPO.getLastVersion());
     assertEquals(0, modelPO.getDeletedAt());
 
     // Test with null fields
@@ -1000,6 +1002,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1029,6 +1033,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(null))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1058,6 +1064,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(emptyProperties))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
