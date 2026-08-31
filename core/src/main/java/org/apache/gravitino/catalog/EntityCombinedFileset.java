@@ -59,12 +59,6 @@ public final class EntityCombinedFileset implements Fileset {
     return new EntityCombinedFileset(fileset, null);
   }
 
-  public EntityCombinedFileset withHiddenProperties(Set<String> keysToMask) {
-    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
-    this.keysToOmit = Collections.emptySet();
-    return this;
-  }
-
   public EntityCombinedFileset withHiddenProperties(
       Map.Entry<Set<String>, Set<String>> classified) {
     if (classified == null) {

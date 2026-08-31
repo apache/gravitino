@@ -71,12 +71,6 @@ public class EntityCombinedTopic implements Topic {
     return new EntityCombinedTopic(topic, null);
   }
 
-  public EntityCombinedTopic withHiddenProperties(Set<String> keysToMask) {
-    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
-    this.keysToOmit = Collections.emptySet();
-    return this;
-  }
-
   public EntityCombinedTopic withHiddenProperties(Map.Entry<Set<String>, Set<String>> classified) {
     if (classified == null) {
       this.keysToMask = Collections.emptySet();

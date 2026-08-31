@@ -74,7 +74,8 @@ public class TestEntityCombinedObject {
   @Test
   public void testSchema() {
     EntityCombinedSchema entityCombinedSchema =
-        EntityCombinedSchema.of(originSchema).withHiddenProperties(hiddenProperties);
+        EntityCombinedSchema.of(originSchema)
+            .withHiddenProperties(Map.entry(hiddenProperties, Set.of()));
     Assertions.assertEquals(originSchema.name(), entityCombinedSchema.name());
     Assertions.assertEquals(originSchema.comment(), entityCombinedSchema.comment());
     Map<String, String> filterProp = expectedMaskedProperties(originSchema.properties());
@@ -85,7 +86,8 @@ public class TestEntityCombinedObject {
   @Test
   public void testTopic() {
     EntityCombinedTopic entityCombinedTopic =
-        EntityCombinedTopic.of(originTopic).withHiddenProperties(hiddenProperties);
+        EntityCombinedTopic.of(originTopic)
+            .withHiddenProperties(Map.entry(hiddenProperties, Set.of()));
     Assertions.assertEquals(originTopic.name(), entityCombinedTopic.name());
     Assertions.assertEquals(originTopic.comment(), entityCombinedTopic.comment());
     Map<String, String> filterProp = expectedMaskedProperties(originTopic.properties());
@@ -96,7 +98,8 @@ public class TestEntityCombinedObject {
   @Test
   public void testTable() {
     EntityCombinedTable entityCombinedTable =
-        EntityCombinedTable.of(originTable).withHiddenProperties(hiddenProperties);
+        EntityCombinedTable.of(originTable)
+            .withHiddenProperties(Map.entry(hiddenProperties, Set.of()));
     Assertions.assertEquals(originTable.name(), entityCombinedTable.name());
     Assertions.assertEquals(originTable.comment(), entityCombinedTable.comment());
     Map<String, String> filterProp = expectedMaskedProperties(originTable.properties());
@@ -107,7 +110,8 @@ public class TestEntityCombinedObject {
   @Test
   public void testFileset() {
     EntityCombinedFileset entityCombinedFileset =
-        EntityCombinedFileset.of(originFileset).withHiddenProperties(hiddenProperties);
+        EntityCombinedFileset.of(originFileset)
+            .withHiddenProperties(Map.entry(hiddenProperties, Set.of()));
     Assertions.assertEquals(originFileset.name(), entityCombinedFileset.name());
     Assertions.assertEquals(originFileset.comment(), entityCombinedFileset.comment());
     Map<String, String> filterProp = expectedMaskedProperties(originFileset.properties());
@@ -118,7 +122,8 @@ public class TestEntityCombinedObject {
   @Test
   public void testModel() {
     EntityCombinedModel entityCombinedModel =
-        EntityCombinedModel.of(originModel).withHiddenProperties(hiddenProperties);
+        EntityCombinedModel.of(originModel)
+            .withHiddenProperties(Map.entry(hiddenProperties, Set.of()));
     Assertions.assertEquals(originModel.name(), entityCombinedModel.name());
     Assertions.assertEquals(originModel.comment(), entityCombinedModel.comment());
     Map<String, String> filterProp = expectedMaskedProperties(originModel.properties());
@@ -129,7 +134,8 @@ public class TestEntityCombinedObject {
   @Test
   public void testModelVersion() {
     EntityCombinedModelVersion entityCombinedModelVersion =
-        EntityCombinedModelVersion.of(originModelVersion).withHiddenProperties(hiddenProperties);
+        EntityCombinedModelVersion.of(originModelVersion)
+            .withHiddenProperties(Map.entry(hiddenProperties, Set.of()));
     Assertions.assertEquals(originModelVersion.comment(), entityCombinedModelVersion.comment());
     Map<String, String> filterProp = expectedMaskedProperties(originModelVersion.properties());
     Assertions.assertEquals(filterProp, entityCombinedModelVersion.properties());

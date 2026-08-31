@@ -81,7 +81,8 @@ public class TestEntityCombinedFileset {
     Mockito.when(fileset.properties()).thenReturn(properties);
 
     EntityCombinedFileset entityCombinedFileset =
-        EntityCombinedFileset.of(fileset).withHiddenProperties(ImmutableSet.of("hiddenProp"));
+        EntityCombinedFileset.of(fileset)
+            .withHiddenProperties(Map.entry(ImmutableSet.of("hiddenProp"), Set.of()));
 
     Map<String, String> result = entityCombinedFileset.properties();
 
@@ -91,7 +92,7 @@ public class TestEntityCombinedFileset {
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, result.get("hiddenProp"));
   }
 
-  /** Test that withHiddenProperties() method handles null input correctly. */
+  /** Null classification must not NPE and must leave properties unchanged. */
   @Test
   void testWithHiddenPropertiesNull() {
     Fileset fileset = Mockito.mock(Fileset.class);
@@ -99,7 +100,7 @@ public class TestEntityCombinedFileset {
     Mockito.when(fileset.properties()).thenReturn(properties);
 
     EntityCombinedFileset entityCombinedFileset =
-        EntityCombinedFileset.of(fileset).withHiddenProperties((Set<String>) null);
+        EntityCombinedFileset.of(fileset).withHiddenProperties(null);
 
     // Should not throw NPE and should return all properties
     Assertions.assertEquals(properties, entityCombinedFileset.properties());

@@ -72,12 +72,6 @@ public final class EntityCombinedSchema implements Schema {
     return of(schema, null);
   }
 
-  public EntityCombinedSchema withHiddenProperties(Set<String> keysToMask) {
-    this.keysToMask = keysToMask == null ? Collections.emptySet() : keysToMask;
-    this.keysToOmit = Collections.emptySet();
-    return this;
-  }
-
   public EntityCombinedSchema withHiddenProperties(Map.Entry<Set<String>, Set<String>> classified) {
     if (classified == null) {
       this.keysToMask = Collections.emptySet();
