@@ -1125,7 +1125,8 @@ public class TestTagManager {
       Assertions.assertEquals(tagName, associations[0].source().name());
       Assertions.assertSame(
           AllValuesSelector.get(),
-          PolicyAssociationSelectorSerde.deserialize(associations[0].relationValue().orElse(null)));
+          PolicyAssociationSelectorSerde.deserialize(
+              associations[0].relationValue().orElseThrow()));
 
       Assertions.assertThrows(
           PolicyAlreadyAssociatedException.class,
@@ -1140,7 +1141,8 @@ public class TestTagManager {
       associations = tagManager.listPolicyAssociationsForTag(METALAKE, tagName);
       Assertions.assertEquals(
           TagValueSelector.of("finance"),
-          PolicyAssociationSelectorSerde.deserialize(associations[0].relationValue().orElse(null)));
+          PolicyAssociationSelectorSerde.deserialize(
+              associations[0].relationValue().orElseThrow()));
       tagManager.removePolicyFromTag(METALAKE, tagName, policyName);
 
       Assertions.assertThrows(

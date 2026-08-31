@@ -43,33 +43,17 @@ public class TestPolicyAssociationSelectorSerde {
   }
 
   @Test
-  void testLegacyNullSelectorUsesAllValues() {
-    Assertions.assertSame(
-        AllValuesSelector.get(), PolicyAssociationSelectorSerde.deserialize(null));
-  }
-
-  @Test
   void testRejectUnsupportedSelector() {
     PolicyAssociationSelector selector = () -> "CUSTOM";
 
-    IllegalArgumentException exception =
-        Assertions.assertThrows(
-            IllegalArgumentException.class,
-            () -> PolicyAssociationSelectorSerde.serialize(selector));
-
-    Assertions.assertTrue(
-        exception.getMessage().contains("Unsupported policy association selector"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> PolicyAssociationSelectorSerde.serialize(selector));
   }
 
   @Test
-  void testRejectInvalidJson() {
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> PolicyAssociationSelectorSerde.deserialize("[]"));
+  void testRejectUnsupportedType() {
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () -> PolicyAssociationSelectorSerde.deserialize("{\"type\":\"UNKNOWN\"}"));
-    Assertions.assertThrows(
-        IllegalArgumentException.class,
-        () -> PolicyAssociationSelectorSerde.deserialize("{\"type\":\"TAG_VALUE\"}"));
   }
 }

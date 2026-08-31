@@ -83,6 +83,9 @@ import org.apache.gravitino.metalake.MetalakeDispatcher;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.IdGenerator;
 import org.apache.gravitino.storage.RandomIdGenerator;
+import org.apache.gravitino.tag.TagManager;
+import org.apache.gravitino.tag.TagValue;
+import org.apache.gravitino.tag.TagValueConstraint;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
@@ -110,6 +113,7 @@ public class TestPolicyManager {
 
   private static EntityStore entityStore;
   private static PolicyManager policyManager;
+  private static TagManager tagManager;
 
   @BeforeAll
   public static void setUp() throws IllegalAccessException, IOException {
@@ -118,6 +122,7 @@ public class TestPolicyManager {
     entityStore = EntityStoreFactory.createEntityStore(config);
     entityStore.initialize(config);
     policyManager = new PolicyManager(idGenerator, entityStore);
+    tagManager = new TagManager(idGenerator, entityStore);
 
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", new LockManager(config), true);
     FieldUtils.writeField(
@@ -230,6 +235,8 @@ public class TestPolicyManager {
   public void cleanUp() {
     Arrays.stream(policyManager.listPolicies(METALAKE))
         .forEach(policyName -> policyManager.deletePolicy(METALAKE, policyName));
+    Arrays.stream(tagManager.listTags(METALAKE))
+        .forEach(tagName -> tagManager.deleteTag(METALAKE, tagName));
   }
 
   @Test
@@ -594,6 +601,14 @@ public class TestPolicyManager {
     policyManager.associatePoliciesForMetadataObject(
         METALAKE, tableObject, new String[] {policy1.name()}, null);
 
+    String tagName = "tag_for_policy_test";
+    tagManager.createTag(
+        METALAKE, tagName, null, null, TagValueConstraint.ofAllowedValues("finance"));
+    tagManager.associateTagValuesForMetadataObject(
+        METALAKE, tableObject, new TagValue[] {TagValue.of(tagName, "finance")}, null);
+    tagManager.addPolicyForTag(METALAKE, tagName, policy1.name(), AllValuesSelector.get());
+    tagManager.addPolicyForTag(METALAKE, tagName, policy2.name(), TagValueSelector.of("finance"));
+
     String[] policies = policyManager.listPoliciesForMetadataObject(METALAKE, catalogObject);
     Assertions.assertEquals(3, policies.length);
     Assertions.assertEquals(
@@ -616,13 +631,16 @@ public class TestPolicyManager {
     Assertions.assertEquals(ImmutableSet.of(policy1, policy2), ImmutableSet.copyOf(policiesInfo1));
 
     String[] policies2 = policyManager.listPoliciesForMetadataObject(METALAKE, tableObject);
-    Assertions.assertEquals(1, policies2.length);
-    Assertions.assertEquals(ImmutableSet.of(policyName1), ImmutableSet.copyOf(policies2));
+    Assertions.assertEquals(2, policies2.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policyName1, policyName2), ImmutableSet.copyOf(policies2));
 
     PolicyEntity[] policiesInfo2 =
         policyManager.listPolicyInfosForMetadataObject(METALAKE, tableObject);
-    Assertions.assertEquals(1, policiesInfo2.length);
-    Assertions.assertEquals(ImmutableSet.of(policy1), ImmutableSet.copyOf(policiesInfo2));
+    Assertions.assertEquals(2, policiesInfo2.length);
+    Assertions.assertEquals(ImmutableSet.of(policy1, policy2), ImmutableSet.copyOf(policiesInfo2));
+    Assertions.assertEquals(
+        policy2, policyManager.getPolicyForMetadataObject(METALAKE, tableObject, policyName2));
 
     // List policies for non-existent metadata object
     MetadataObject nonExistentObject =

@@ -18,74 +18,103 @@
  */
 package org.apache.gravitino.policy;
 
+import com.fasterxml.jackson.core.JsonGenerator;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationContext;
+import com.fasterxml.jackson.databind.JsonDeserializer;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import javax.annotation.Nullable;
+import com.fasterxml.jackson.databind.JsonSerializer;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializerProvider;
+import com.fasterxml.jackson.databind.module.SimpleModule;
+import java.io.IOException;
 import org.apache.gravitino.json.JsonUtils;
 
-/** Serializes policy-to-tag selectors into their canonical relation-edge JSON representation. */
+/** Serializes and deserializes policy-to-tag selectors. */
 public final class PolicyAssociationSelectorSerde {
+
+  private static final String TYPE = "type";
+  private static final String VALUE = "value";
+
+  private static final ObjectMapper MAPPER =
+      JsonUtils.anyFieldMapper()
+          .copy()
+          .registerModule(
+              new SimpleModule()
+                  .addSerializer(PolicyAssociationSelector.class, new Serializer())
+                  .addDeserializer(PolicyAssociationSelector.class, new Deserializer()));
 
   private PolicyAssociationSelectorSerde() {}
 
   /**
-   * Serializes a selector using the canonical selector JSON field order.
+   * Serializes a selector.
    *
    * @param selector The selector to serialize.
-   * @return The canonical JSON string.
+   * @return The selector JSON.
    */
   public static String serialize(PolicyAssociationSelector selector) {
-    ObjectNode node = JsonUtils.anyFieldMapper().createObjectNode();
-    node.put("type", selector.type());
-    if (selector instanceof TagValueSelector) {
-      node.put("value", ((TagValueSelector) selector).value());
-    } else if (!(selector instanceof AllValuesSelector)) {
-      throw new IllegalArgumentException("Unsupported policy association selector: " + selector);
-    }
     try {
-      return JsonUtils.anyFieldMapper().writeValueAsString(node);
+      return MAPPER.writerFor(PolicyAssociationSelector.class).writeValueAsString(selector);
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("Failed to serialize policy association selector", e);
     }
   }
 
   /**
-   * Deserializes a canonical selector JSON string.
+   * Deserializes a selector.
    *
-   * <p>A null value is treated as {@link AllValuesSelector} for compatibility with relations
-   * created before selectors became required.
-   *
-   * @param json The selector JSON, or null for a legacy tag-presence relation.
-   * @return The deserialized selector.
+   * @param json The selector JSON.
+   * @return The selector.
    */
-  public static PolicyAssociationSelector deserialize(@Nullable String json) {
-    if (json == null) {
-      return AllValuesSelector.get();
-    }
-
+  public static PolicyAssociationSelector deserialize(String json) {
     try {
-      JsonNode node = JsonUtils.anyFieldMapper().readTree(json);
-      if (!node.isObject()) {
-        throw new IllegalArgumentException("Policy association selector must be a JSON object");
-      }
-      JsonNode type = node.get("type");
-      if (type == null || !type.isTextual()) {
-        throw new IllegalArgumentException("Policy association selector type must be a string");
-      }
-      if (AllValuesSelector.TYPE.equals(type.textValue())) {
-        return AllValuesSelector.get();
-      }
-      if (!TagValueSelector.TYPE.equals(type.textValue())) {
-        throw new IllegalArgumentException("Unsupported policy association selector type: " + type);
-      }
-      JsonNode value = node.get("value");
-      if (value == null || !value.isTextual()) {
-        throw new IllegalArgumentException("TAG_VALUE selector value must be a string");
-      }
-      return TagValueSelector.of(value.textValue());
+      return MAPPER.readValue(json, PolicyAssociationSelector.class);
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("Failed to deserialize policy association selector", e);
+    }
+  }
+
+  /** Serializes a policy association selector. */
+  public static final class Serializer extends JsonSerializer<PolicyAssociationSelector> {
+
+    @Override
+    public void serialize(
+        PolicyAssociationSelector selector,
+        JsonGenerator generator,
+        SerializerProvider serializerProvider)
+        throws IOException {
+      if (!(selector instanceof AllValuesSelector) && !(selector instanceof TagValueSelector)) {
+        throw JsonMappingException.from(
+            generator, "Unsupported policy association selector: " + selector);
+      }
+
+      generator.writeStartObject();
+      generator.writeStringField(TYPE, selector.type());
+      if (selector instanceof TagValueSelector) {
+        generator.writeStringField(VALUE, ((TagValueSelector) selector).value());
+      }
+      generator.writeEndObject();
+    }
+  }
+
+  /** Deserializes a policy association selector. */
+  public static final class Deserializer extends JsonDeserializer<PolicyAssociationSelector> {
+
+    @Override
+    public PolicyAssociationSelector deserialize(
+        JsonParser parser, DeserializationContext deserializationContext) throws IOException {
+      JsonNode node = parser.getCodec().readTree(parser);
+      String type = node.get(TYPE).asText();
+      if (AllValuesSelector.TYPE.equals(type)) {
+        return AllValuesSelector.get();
+      }
+      if (TagValueSelector.TYPE.equals(type)) {
+        return TagValueSelector.of(node.get(VALUE).asText());
+      }
+      throw JsonMappingException.from(
+          parser, "Unsupported policy association selector type: " + type);
     }
   }
 }
