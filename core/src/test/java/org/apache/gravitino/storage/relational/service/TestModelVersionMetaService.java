@@ -55,6 +55,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.po.ModelPO;
+import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -286,6 +287,122 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testDeleteModelVersionRejectsConcurrentAliasReassignment() throws Exception {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity firstVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "first_path"),
+            ImmutableList.of("moving_alias"),
+            "first",
+            properties,
+            AUDIT_INFO);
+    ModelVersionEntity secondVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "second_path"),
+            ImmutableList.of("second_alias"),
+            "second",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(firstVersion);
+    ModelVersionMetaService.getInstance().insertModelVersion(secondVersion);
+    ModelPO modelPO = ModelMetaService.getInstance().getModelPOById(model.id());
+    NameIdentifier aliasIdentifier = getModelVersionIdent(model.nameIdentifier(), "moving_alias");
+
+    Throwable deleteFailure =
+        runAfterConcurrentModelWrite(
+            modelPO,
+            () ->
+                SessionUtils.doWithoutCommit(
+                    ModelVersionAliasRelMapper.class,
+                    mapper -> {
+                      mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
+                          model.id(), firstVersion.version());
+                      mapper.updateModelVersionAliasRel(
+                          ImmutableList.of(
+                              ModelVersionAliasRelPO.builder()
+                                  .withModelId(model.id())
+                                  .withModelVersion(secondVersion.version())
+                                  .withModelVersionAlias("moving_alias")
+                                  .withDeletedAt(0L)
+                                  .build()));
+                    }),
+            () -> ModelVersionMetaService.getInstance().deleteModelVersion(aliasIdentifier));
+    Assertions.assertInstanceOf(OptimisticLockException.class, deleteFailure);
+
+    Assertions.assertEquals(
+        firstVersion.version(),
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(firstVersion.nameIdentifier())
+            .version());
+    Assertions.assertEquals(
+        secondVersion.version(),
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(aliasIdentifier)
+            .version());
+  }
+
+  @TestTemplate
+  public void testDeleteModelVersionLosingRaceToVersionDeleteReturnsFalse() throws Exception {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path"),
+            ImmutableList.of("deleted_alias"),
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+    ModelPO modelPO = ModelMetaService.getInstance().getModelPOById(model.id());
+
+    Throwable deleteFailure =
+        runAfterConcurrentModelWrite(
+            modelPO,
+            () -> {
+              SessionUtils.doWithoutCommit(
+                  ModelVersionMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteModelVersionMetaByModelIdAndVersion(
+                          model.id(), version.version()));
+              SessionUtils.doWithoutCommit(
+                  ModelVersionAliasRelMapper.class,
+                  mapper ->
+                      mapper.softDeleteModelVersionAliasRelsByModelIdAndVersion(
+                          model.id(), version.version()));
+            },
+            () ->
+                Assertions.assertFalse(
+                    ModelVersionMetaService.getInstance()
+                        .deleteModelVersion(version.nameIdentifier())));
+    Assertions.assertNull(deleteFailure);
+  }
+
+  @TestTemplate
   public void testUpdateModelVersionFailsWhenSchemaIsDeletedConcurrently() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     ModelEntity model =
@@ -340,6 +457,112 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
                 ModelVersionMetaMapper.class,
                 mapper -> mapper.listModelVersionMetasByModelId(model.id()))
             .isEmpty());
+  }
+
+  @TestTemplate
+  public void testUpdateModelVersionRejectsConcurrentAliasReassignment() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity firstVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "first_path"),
+            ImmutableList.of("moving_alias"),
+            "first",
+            properties,
+            AUDIT_INFO);
+    ModelVersionEntity secondVersion =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            1,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "second_path"),
+            ImmutableList.of("second_alias"),
+            "second",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(firstVersion);
+    ModelVersionMetaService.getInstance().insertModelVersion(secondVersion);
+
+    NameIdentifier aliasIdentifier = getModelVersionIdent(model.nameIdentifier(), "moving_alias");
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    aliasIdentifier,
+                    current -> {
+                      updateModelVersionUnchecked(
+                          firstVersion.nameIdentifier(),
+                          winner ->
+                              copyModelVersion(winner, winner.comment(), Collections.emptyList()));
+                      updateModelVersionUnchecked(
+                          secondVersion.nameIdentifier(),
+                          winner ->
+                              copyModelVersion(
+                                  winner,
+                                  winner.comment(),
+                                  ImmutableList.of("second_alias", "moving_alias")));
+                      return copyModelVersion((ModelVersionEntity) current, "stale update");
+                    }));
+
+    Assertions.assertEquals(
+        "first",
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(firstVersion.nameIdentifier())
+            .comment());
+    Assertions.assertEquals(
+        secondVersion.version(),
+        ModelVersionMetaService.getInstance()
+            .getModelVersionByIdentifier(aliasIdentifier)
+            .version());
+  }
+
+  @TestTemplate
+  public void testUpdateModelVersionLosingRaceToVersionDeleteReportsMissing() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "path"),
+            ImmutableList.of("deleted_alias"),
+            "version comment",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    version.nameIdentifier(),
+                    current -> {
+                      Assertions.assertTrue(
+                          ModelVersionMetaService.getInstance()
+                              .deleteModelVersion(version.nameIdentifier()));
+                      return copyModelVersion((ModelVersionEntity) current, "stale update");
+                    }));
   }
 
   @TestTemplate
@@ -1335,6 +1558,104 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  void testModelVersionAlterRejectsConcurrentAliasUpdate() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "model_path"),
+            ImmutableList.of("original_alias"),
+            "original",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    version.nameIdentifier(),
+                    current -> {
+                      updateModelVersionUnchecked(
+                          version.nameIdentifier(),
+                          winner ->
+                              copyModelVersion(
+                                  winner, winner.comment(), ImmutableList.of("winner_alias")));
+                      return copyModelVersion(
+                          (ModelVersionEntity) current,
+                          "stale update",
+                          ImmutableList.of("loser_alias"));
+                    }));
+
+    ModelVersionEntity current =
+        ModelVersionMetaService.getInstance().getModelVersionByIdentifier(version.nameIdentifier());
+    Assertions.assertEquals("original", current.comment());
+    Assertions.assertEquals(ImmutableList.of("winner_alias"), current.aliases());
+    assertModelCurrentVersion(model.id(), 3L);
+  }
+
+  @TestTemplate
+  void testModelVersionAlterRejectsConcurrentUriUpdate() throws IOException {
+    createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
+    ModelEntity model =
+        createModelEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            MODEL_NS,
+            randomModelName(),
+            "model comment",
+            0,
+            properties,
+            AUDIT_INFO);
+    ModelMetaService.getInstance().insertModel(model, false);
+    ModelVersionEntity version =
+        createModelVersionEntity(
+            model.nameIdentifier(),
+            0,
+            ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "original_path"),
+            ImmutableList.of("version_alias"),
+            "original",
+            properties,
+            AUDIT_INFO);
+    ModelVersionMetaService.getInstance().insertModelVersion(version);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ModelVersionMetaService.getInstance()
+                .updateModelVersion(
+                    version.nameIdentifier(),
+                    current -> {
+                      updateModelVersionUnchecked(
+                          version.nameIdentifier(),
+                          winner ->
+                              copyModelVersion(
+                                  winner,
+                                  ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "winner_path")));
+                      return copyModelVersion(
+                          (ModelVersionEntity) current,
+                          ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "loser_path"));
+                    }));
+
+    ModelVersionEntity current =
+        ModelVersionMetaService.getInstance().getModelVersionByIdentifier(version.nameIdentifier());
+    Assertions.assertEquals(
+        ImmutableMap.of(ModelVersion.URI_NAME_UNKNOWN, "winner_path"), current.uris());
+    assertModelCurrentVersion(model.id(), 3L);
+  }
+
+  @TestTemplate
   void testAliasConflictRollsBackAggregateVersionAndVersionUpdate() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     ModelEntity model =
@@ -1528,11 +1849,99 @@ public class TestModelVersionMetaService extends TestJDBCBackend {
         version.auditInfo());
   }
 
+  private ModelVersionEntity copyModelVersion(
+      ModelVersionEntity version, Map<String, String> updatedUris) {
+    return createModelVersionEntity(
+        version.modelIdentifier(),
+        version.version(),
+        updatedUris,
+        version.aliases(),
+        version.comment(),
+        version.properties(),
+        version.auditInfo());
+  }
+
   private void updateModelVersionUnchecked(
       NameIdentifier identifier, Function<ModelVersionEntity, ModelVersionEntity> updater) {
     try {
       ModelVersionMetaService.getInstance().updateModelVersion(identifier, updater);
     } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Throwable runAfterConcurrentModelWrite(
+      ModelPO modelPO, Runnable winnerMutation, Runnable loserMutation) throws Exception {
+    CountDownLatch modelLocked = new CountDownLatch(1);
+    CountDownLatch loserReachedModelWrite = new CountDownLatch(1);
+    CountDownLatch allowWinnerMutation = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    ModelMetaService modelMetaService = Mockito.spy(ModelMetaService.getInstance());
+    Mockito.doAnswer(
+            invocation -> {
+              loserReachedModelWrite.countDown();
+              return invocation.callRealMethod();
+            })
+        .when(modelMetaService)
+        .bumpModelVersion(Mockito.any(), Mockito.any());
+    Future<Throwable> winner =
+        executor.submit(
+            () ->
+                runAndCapture(
+                    () ->
+                        SessionUtils.doMultipleWithCommit(
+                            () -> {
+                              int updated =
+                                  SessionUtils.getWithoutCommit(
+                                      ModelMetaMapper.class,
+                                      mapper ->
+                                          mapper.bumpModelVersion(
+                                              modelPO.getModelId(),
+                                              modelPO.getSchemaId(),
+                                              modelPO.getModelName()));
+                              Assertions.assertEquals(1, updated);
+                              modelLocked.countDown();
+                              await(allowWinnerMutation);
+                              winnerMutation.run();
+                            })));
+
+    try {
+      Assertions.assertTrue(modelLocked.await(30, TimeUnit.SECONDS));
+      Future<Throwable> loser =
+          executor.submit(
+              () -> {
+                try (MockedStatic<ModelMetaService> mocked =
+                    Mockito.mockStatic(ModelMetaService.class)) {
+                  mocked.when(ModelMetaService::getInstance).thenReturn(modelMetaService);
+                  return runAndCapture(loserMutation);
+                }
+              });
+      Assertions.assertTrue(loserReachedModelWrite.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(TimeoutException.class, () -> loser.get(500, TimeUnit.MILLISECONDS));
+
+      allowWinnerMutation.countDown();
+      Assertions.assertNull(winner.get(30, TimeUnit.SECONDS));
+      return loser.get(30, TimeUnit.SECONDS);
+    } finally {
+      allowWinnerMutation.countDown();
+      executor.shutdownNow();
+    }
+  }
+
+  private Throwable runAndCapture(Runnable operation) {
+    try {
+      operation.run();
+      return null;
+    } catch (Throwable throwable) {
+      return throwable;
+    }
+  }
+
+  private void await(CountDownLatch latch) {
+    try {
+      Assertions.assertTrue(latch.await(30, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
       throw new RuntimeException(e);
     }
   }

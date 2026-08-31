@@ -120,9 +120,6 @@ public interface ModelMetaMapper {
   Integer deleteModelMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit);
 
-  @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "updateModelLatestVersion")
-  Integer updateModelLatestVersion(@Param("modelId") Long modelId);
-
   /**
    * Advances the concurrency version shared by a model and its child records, as long as the model
    * still exists under the name the caller resolved.
@@ -134,6 +131,23 @@ public interface ModelMetaMapper {
    */
   @UpdateProvider(type = ModelMetaSQLProviderFactory.class, method = "bumpModelVersion")
   Integer bumpModelVersion(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName);
+
+  /**
+   * Advances the shared concurrency version and the version-number allocator in one write, as long
+   * as the model still exists under the name the caller resolved.
+   *
+   * @param modelId the model ID
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
+   * @return the number of changed rows; zero means the model was dropped or renamed away
+   */
+  @UpdateProvider(
+      type = ModelMetaSQLProviderFactory.class,
+      method = "bumpModelVersionAndLatestVersion")
+  Integer bumpModelVersionAndLatestVersion(
       @Param("modelId") Long modelId,
       @Param("schemaId") Long schemaId,
       @Param("modelName") String modelName);

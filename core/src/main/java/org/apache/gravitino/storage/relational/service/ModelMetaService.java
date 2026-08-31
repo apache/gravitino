@@ -167,48 +167,6 @@ public class ModelMetaService {
     return true;
   }
 
-  /**
-   * Deletes a model row only when its concurrency version has not changed since it was read.
-   *
-   * <p>The caller must run this method in the same transaction that removes the model's related
-   * data. This allows any later cleanup failure to restore the model row as well.
-   */
-  void deleteModelWithVersion(NameIdentifier ident, ModelPO observedModelPO) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            ModelMetaMapper.class,
-            mapper ->
-                mapper.softDeleteModelMetaByIdAndVersion(
-                    observedModelPO.getModelId(), observedModelPO.getCurrentVersion()));
-    if (deleted == 0) {
-      throw modelWriteFailure(ident, observedModelPO);
-    }
-  }
-
-  /**
-   * Advances the concurrency version shared by a model, its versions, and its aliases.
-   *
-   * <p>The caller uses this as the first write in a model-version transaction. It takes the model
-   * row, so the model's version writes run one at a time, and a model that was dropped or renamed
-   * away makes this fail before any version or alias row is modified. Version writes append to or
-   * replace rows the caller already resolved, so a version somebody else registered in the meantime
-   * is not a reason to reject this one; a lost update on the same row is still caught where that
-   * row is written.
-   */
-  void bumpModelVersion(NameIdentifier ident, ModelPO observedModelPO) {
-    int updated =
-        SessionUtils.getWithoutCommit(
-            ModelMetaMapper.class,
-            mapper ->
-                mapper.bumpModelVersion(
-                    observedModelPO.getModelId(),
-                    observedModelPO.getSchemaId(),
-                    observedModelPO.getModelName()));
-    if (updated == 0) {
-      throw modelWriteFailure(ident, observedModelPO);
-    }
-  }
-
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteModelMetasByLegacyTimeline")
@@ -448,13 +406,75 @@ public class ModelMetaService {
   }
 
   /**
+   * Deletes a model row only when its concurrency version has not changed since it was read.
+   *
+   * <p>The caller must run this method in the same transaction that removes the model's related
+   * data. This allows any later cleanup failure to restore the model row as well.
+   */
+  void deleteModelWithVersion(NameIdentifier ident, ModelPO observedModelPO) {
+    int deleted =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.softDeleteModelMetaByIdAndVersion(
+                    observedModelPO.getModelId(), observedModelPO.getCurrentVersion()));
+    if (deleted == 0) {
+      throw modelWriteFailure(ident, observedModelPO);
+    }
+  }
+
+  /**
+   * Advances the concurrency version shared by a model, its versions, and its aliases.
+   *
+   * <p>The caller uses this as the first write in a model-version transaction. It takes the model
+   * row, so the model's version writes run one at a time, and a model that was dropped or renamed
+   * away makes this fail before any version or alias row is modified. Version writes append to or
+   * replace rows the caller already resolved, so a version somebody else registered in the meantime
+   * is not a reason to reject this one; a lost update on the same row is still caught where that
+   * row is written.
+   */
+  void bumpModelVersion(NameIdentifier ident, ModelPO observedModelPO) {
+    int updated =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.bumpModelVersion(
+                    observedModelPO.getModelId(),
+                    observedModelPO.getSchemaId(),
+                    observedModelPO.getModelName()));
+    if (updated == 0) {
+      throw modelWriteFailure(ident, observedModelPO);
+    }
+  }
+
+  /**
+   * Advances the shared concurrency version and the model-version allocator in one write.
+   *
+   * <p>This is the model-row reservation for registering a new version. Combining both counters in
+   * one statement avoids taking and updating the same row twice.
+   */
+  void bumpModelVersionAndLatestVersion(NameIdentifier ident, ModelPO observedModelPO) {
+    int updated =
+        SessionUtils.getWithoutCommit(
+            ModelMetaMapper.class,
+            mapper ->
+                mapper.bumpModelVersionAndLatestVersion(
+                    observedModelPO.getModelId(),
+                    observedModelPO.getSchemaId(),
+                    observedModelPO.getModelName()));
+    if (updated == 0) {
+      throw modelWriteFailure(ident, observedModelPO);
+    }
+  }
+
+  /**
    * Explains why a version-checked model write changed no rows.
    *
    * <p>The locking read waits for a competing transaction to finish. If the same model is still at
    * the requested name, only its concurrency version changed and the caller should retry. If it was
    * deleted, renamed, or moved, the requested model no longer exists.
    */
-  RuntimeException modelWriteFailure(NameIdentifier ident, ModelPO observedModelPO) {
+  private RuntimeException modelWriteFailure(NameIdentifier ident, ModelPO observedModelPO) {
     ModelPO currentModelPO =
         SessionUtils.getWithoutCommit(
             ModelMetaMapper.class,

@@ -242,8 +242,7 @@ public class ModelMetaBaseSQLProvider {
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE model_id = #{modelId}"
-        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+        + activeModelVersionWhereClause("modelId", "currentVersion");
   }
 
   public String softDeleteModelMetasByCatalogId(@Param("catalogId") Long catalogId) {
@@ -283,13 +282,6 @@ public class ModelMetaBaseSQLProvider {
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
   }
 
-  public String updateModelLatestVersion(@Param("modelId") Long modelId) {
-    return "UPDATE "
-        + ModelMetaMapper.TABLE_NAME
-        + " SET model_latest_version = model_latest_version + 1"
-        + " WHERE model_id = #{modelId} AND deleted_at = 0";
-  }
-
   /**
    * Returns SQL that advances the shared model concurrency version while the model still exists
    * under the name the caller resolved.
@@ -309,8 +301,26 @@ public class ModelMetaBaseSQLProvider {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET last_version = current_version + 1, current_version = current_version + 1"
-        + " WHERE model_id = #{modelId} AND schema_id = #{schemaId}"
-        + " AND model_name = #{modelName} AND deleted_at = 0";
+        + activeModelIdentityWhereClause();
+  }
+
+  /**
+   * Returns SQL that advances both the shared concurrency version and the version-number allocator.
+   *
+   * @param modelId the model ID
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
+   * @return the version registration SQL
+   */
+  public String bumpModelVersionAndLatestVersion(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName) {
+    return "UPDATE "
+        + ModelMetaMapper.TABLE_NAME
+        + " SET model_latest_version = model_latest_version + 1,"
+        + " last_version = current_version + 1, current_version = current_version + 1"
+        + activeModelIdentityWhereClause();
   }
 
   public String updateModelMeta(
@@ -328,9 +338,7 @@ public class ModelMetaBaseSQLProvider {
         + " last_version = #{newModelMeta.lastVersion},"
         + " audit_info = #{newModelMeta.auditInfo},"
         + " deleted_at = #{newModelMeta.deletedAt}"
-        + " WHERE model_id = #{oldModelMeta.modelId}"
-        + " AND current_version = #{oldModelMeta.currentVersion}"
-        + " AND deleted_at = 0";
+        + activeModelVersionWhereClause("oldModelMeta.modelId", "oldModelMeta.currentVersion");
   }
 
   public String batchSelectModelByIdentifier(
@@ -368,5 +376,25 @@ public class ModelMetaBaseSQLProvider {
         + " )"
         + " AND mm.deleted_at = 0 AND sm.deleted_at = 0 AND cm.deleted_at = 0 AND mlm.deleted_at = 0"
         + "</script>";
+  }
+
+  private String activeModelIdentityWhereClause() {
+    return " WHERE model_id = #{modelId} AND schema_id = #{schemaId}"
+        + " AND model_name = #{modelName} AND deleted_at = 0";
+  }
+
+  /**
+   * Builds the active-model guard shared by version-checked UPDATE statements.
+   *
+   * @param modelIdParam the MyBatis parameter path for the model ID
+   * @param currentVersionParam the MyBatis parameter path for the observed version
+   * @return the SQL WHERE clause
+   */
+  protected String activeModelVersionWhereClause(String modelIdParam, String currentVersionParam) {
+    return " WHERE model_id = #{"
+        + modelIdParam
+        + "} AND current_version = #{"
+        + currentVersionParam
+        + "} AND deleted_at = 0";
   }
 }

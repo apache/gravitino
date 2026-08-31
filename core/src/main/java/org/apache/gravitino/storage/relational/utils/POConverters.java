@@ -1721,8 +1721,7 @@ public class POConverters {
    * @return the model record to store
    */
   public static ModelPO updateModelPO(ModelPO oldModelPO, ModelEntity newModel) {
-    long nextModelVersion =
-        Math.max(oldModelPO.getCurrentVersion(), oldModelPO.getLastVersion()) + 1;
+    long nextModelVersion = oldModelPO.getCurrentVersion() + 1;
     try {
       return ModelPO.builder()
           .withModelId(newModel.id())

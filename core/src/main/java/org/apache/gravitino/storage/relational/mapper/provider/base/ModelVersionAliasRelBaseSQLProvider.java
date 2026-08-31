@@ -28,6 +28,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
 
   public String insertModelVersionAliasRels(
       @Param("modelVersionAliasRel") List<ModelVersionAliasRelPO> modelVersionAliasRelPOs) {
+    // The model-row reservation increments the allocator before version and alias rows are added.
     return "<script>"
         + "INSERT INTO "
         + ModelVersionAliasRelMapper.TABLE_NAME
@@ -35,7 +36,7 @@ public class ModelVersionAliasRelBaseSQLProvider {
         + " VALUES "
         + " <foreach collection='modelVersionAliasRel' item='item' separator=','>"
         + " (#{item.modelId},"
-        + " (SELECT model_latest_version FROM "
+        + " (SELECT model_latest_version - 1 FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE model_id = #{item.modelId} AND deleted_at = 0),"
         + " #{item.modelVersionAlias},"

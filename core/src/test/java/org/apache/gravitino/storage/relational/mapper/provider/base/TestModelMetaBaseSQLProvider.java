@@ -98,6 +98,19 @@ class TestModelMetaBaseSQLProvider {
   }
 
   @Test
+  void testRegistrationAdvancesAllocatorAndAggregateVersionTogether() {
+    String sql = PROVIDER.bumpModelVersionAndLatestVersion(null, null, null);
+
+    Assertions.assertTrue(sql.contains("model_latest_version = model_latest_version + 1"));
+    Assertions.assertTrue(
+        sql.contains("last_version = current_version + 1, current_version = current_version + 1"));
+    Assertions.assertTrue(sql.contains("WHERE model_id = #{modelId}"));
+    Assertions.assertTrue(sql.contains("AND schema_id = #{schemaId}"));
+    Assertions.assertTrue(sql.contains("AND model_name = #{modelName}"));
+    Assertions.assertTrue(sql.endsWith("AND deleted_at = 0"));
+  }
+
+  @Test
   void testEveryModelReadProjectsVersionColumns() {
     List<String> readSqls =
         List.of(

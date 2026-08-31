@@ -66,8 +66,7 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE model_id = #{modelId}"
-        + " AND current_version = #{currentVersion} AND deleted_at = 0";
+        + activeModelVersionWhereClause("modelId", "currentVersion");
   }
 
   @Override

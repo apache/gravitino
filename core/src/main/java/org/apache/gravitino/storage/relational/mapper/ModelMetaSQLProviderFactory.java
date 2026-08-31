@@ -136,10 +136,6 @@ public class ModelMetaSQLProviderFactory {
     return getProvider().deleteModelMetasByLegacyTimeline(legacyTimeline, limit);
   }
 
-  public static String updateModelLatestVersion(@Param("modelId") Long modelId) {
-    return getProvider().updateModelLatestVersion(modelId);
-  }
-
   /**
    * Returns SQL that advances the shared model concurrency version while the model still exists
    * under the name the caller resolved.
@@ -154,6 +150,21 @@ public class ModelMetaSQLProviderFactory {
       @Param("schemaId") Long schemaId,
       @Param("modelName") String modelName) {
     return getProvider().bumpModelVersion(modelId, schemaId, modelName);
+  }
+
+  /**
+   * Returns SQL that advances the shared concurrency version and version-number allocator.
+   *
+   * @param modelId the model ID
+   * @param schemaId the ID of the schema holding the model
+   * @param modelName the model name the caller resolved
+   * @return the version registration SQL
+   */
+  public static String bumpModelVersionAndLatestVersion(
+      @Param("modelId") Long modelId,
+      @Param("schemaId") Long schemaId,
+      @Param("modelName") String modelName) {
+    return getProvider().bumpModelVersionAndLatestVersion(modelId, schemaId, modelName);
   }
 
   public static String updateModelMeta(
