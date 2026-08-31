@@ -453,16 +453,22 @@ public class TestCatalogRegister {
             + "\"gravitino.iceberg.rest-catalog.oauth2.credential\"='client:secretvalue', "
             + "\"gravitino.iceberg.rest-catalog.uri\"='http://irc-host:9001/iceberg', "
             + "\"some.token\"='abc123', "
-            + "\"trino.bypass.password\"='hunter2')";
+            + "\"trino.bypass.password\"='hunter2', "
+            + "\"trino.bypass.passcode\"='letmein', "
+            + "\"trino.bypass.passphrase\"='opensesame')";
 
     String redacted = CatalogRegister.redactSecrets(command);
 
     assertFalse(redacted.contains("secretvalue"));
     assertFalse(redacted.contains("abc123"));
     assertFalse(redacted.contains("hunter2"));
+    assertFalse(redacted.contains("letmein"));
+    assertFalse(redacted.contains("opensesame"));
     assertTrue(redacted.contains("\"gravitino.iceberg.rest-catalog.oauth2.credential\"='***'"));
     assertTrue(redacted.contains("\"some.token\"='***'"));
     assertTrue(redacted.contains("\"trino.bypass.password\"='***'"));
+    assertTrue(redacted.contains("\"trino.bypass.passcode\"='***'"));
+    assertTrue(redacted.contains("\"trino.bypass.passphrase\"='***'"));
     assertTrue(
         redacted.contains("\"gravitino.iceberg.rest-catalog.uri\"='http://irc-host:9001/iceberg'"));
   }

@@ -60,9 +60,15 @@ public class CatalogRegister {
   private static final String SSL_VERIFICATION_NONE = "NONE";
   private static final Set<String> SSL_VERIFICATION_MODES =
       ImmutableSet.of(SSL_VERIFICATION_FULL, SSL_VERIFICATION_CA, SSL_VERIFICATION_NONE);
+  // Best-effort keyword match on the property key; it cannot catch a sensitive value under a name
+  // that doesn't contain one of these words. Kept as a single constant so the SQL and JSON
+  // variants below can't drift apart when a keyword is added.
+  private static final String SECRET_KEY_NAME_PATTERN =
+      "credential|token|secret|password|passphrase|passcode";
+
   private static final Pattern SECRET_PROPERTY_PATTERN =
       Pattern.compile(
-          "\"([^\"]*(?:credential|token|secret|password)[^\"]*)\"\\s*=\\s*'([^']*)'",
+          "\"([^\"]*(?:" + SECRET_KEY_NAME_PATTERN + ")[^\"]*)\"\\s*=\\s*'([^']*)'",
           Pattern.CASE_INSENSITIVE);
 
   // Matches "key":"value" style secret assignments inside the serialized GravitinoCatalog JSON
@@ -70,7 +76,7 @@ public class CatalogRegister {
   // "s3-secret-key":"..."), which SECRET_PROPERTY_PATTERN's SQL-assignment shape does not match.
   private static final Pattern SECRET_JSON_PROPERTY_PATTERN =
       Pattern.compile(
-          "\"([^\"]*(?:credential|token|secret|password)[^\"]*)\"\\s*:\\s*\"([^\"]*)\"",
+          "\"([^\"]*(?:" + SECRET_KEY_NAME_PATTERN + ")[^\"]*)\"\\s*:\\s*\"([^\"]*)\"",
           Pattern.CASE_INSENSITIVE);
 
   private Connection connection;
