@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
+import org.apache.spark.SparkConf;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -196,6 +197,22 @@ public class TestGravitinoIcebergCatalogRestRouting {
 
     Assertions.assertFalse(result.isPresent());
     Assertions.assertFalse(discoveryCalled.get());
+  }
+
+  @Test
+  void testAutoRoutedRestClientConfigStripsPrefixFromRealSparkConf() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(
+        GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_CONFIG_PREFIX + "rest.auth.type", "basic");
+    sparkConf.set(
+        GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_CONFIG_PREFIX + "rest.auth.basic.username",
+        "admin");
+
+    Map<String, String> result =
+        GravitinoIcebergCatalog.getAutoRoutedIcebergRestClientConfig(sparkConf);
+
+    Assertions.assertEquals("basic", result.get("rest.auth.type"));
+    Assertions.assertEquals("admin", result.get("rest.auth.basic.username"));
   }
 
   private static ImmutableMap<String, String> hiveProperties() {

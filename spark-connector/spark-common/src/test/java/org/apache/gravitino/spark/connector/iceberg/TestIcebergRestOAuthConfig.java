@@ -177,6 +177,22 @@ public class TestIcebergRestOAuthConfig {
     Assertions.assertTrue(result.isEmpty());
   }
 
+  @Test
+  void testReuseFailsWhenGravitinoOAuthConfigIsIncomplete() {
+    SparkConf sparkConf = new SparkConf(false);
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "oauth2");
+    sparkConf.set(GravitinoSparkConfig.GRAVITINO_OAUTH2_CREDENTIAL, "alice:secret");
+    // GRAVITINO_OAUTH2_URI/PATH are intentionally left unset, so oauth2-server-uri can't be
+    // derived: this is the default-reuse path, not an explicit override, and must still validate.
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> IcebergRestOAuthConfig.resolve(sparkConf, Collections.emptyMap()));
+
+    Assertions.assertTrue(exception.getMessage().contains("oauth2-server-uri"));
+  }
+
   private SparkConf oauthSparkConf(String serverUri, String tokenPath) {
     SparkConf sparkConf = new SparkConf(false);
     sparkConf.set(GravitinoSparkConfig.GRAVITINO_AUTH_TYPE, "oauth2");

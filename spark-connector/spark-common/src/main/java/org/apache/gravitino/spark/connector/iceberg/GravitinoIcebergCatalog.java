@@ -239,7 +239,7 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     return all;
   }
 
-  private Map<String, String> getAutoRoutedIcebergRestClientConfig(SparkConf sparkConf) {
+  static Map<String, String> getAutoRoutedIcebergRestClientConfig(SparkConf sparkConf) {
     Map<String, String> explicitRestConfig =
         Stream.of(
                 sparkConf.getAllWithPrefix(

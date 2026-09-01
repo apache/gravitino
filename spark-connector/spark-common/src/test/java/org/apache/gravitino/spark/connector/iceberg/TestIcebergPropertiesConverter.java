@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.iceberg;
 
 import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -281,6 +282,35 @@ public class TestIcebergPropertiesConverter {
     Assertions.assertEquals(
         "http://gravitino:9001/iceberg",
         properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_URI));
+  }
+
+  @Test
+  void testReapplyReservedRestPropertiesUndoesSparkOptionsOverride() {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE);
+    Map<String, String> properties =
+        new HashMap<>(
+            icebergPropertiesConverter.buildIcebergRestProperties(
+                "my_catalog",
+                "http://gravitino:9001/iceberg",
+                gravitinoProperties,
+                ImmutableMap.of()));
+
+    // Simulate a Spark-level catalog option redirecting the reserved routing keys, the way
+    // buildAutoRoutedIcebergRestProperties merges `options` in after buildIcebergRestProperties.
+    properties.put(IcebergPropertiesConstants.ICEBERG_CATALOG_URI, "http://attacker-controlled");
+    properties.put(IcebergPropertiesConstants.ICEBERG_REST_CATALOG_PREFIX, "other_catalog");
+
+    icebergPropertiesConverter.reapplyReservedRestProperties(
+        "my_catalog", "http://gravitino:9001/iceberg", properties);
+
+    Assertions.assertEquals(
+        "http://gravitino:9001/iceberg",
+        properties.get(IcebergPropertiesConstants.ICEBERG_CATALOG_URI));
+    Assertions.assertEquals(
+        "my_catalog", properties.get(IcebergPropertiesConstants.ICEBERG_REST_CATALOG_PREFIX));
   }
 
   @Test

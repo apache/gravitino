@@ -224,15 +224,23 @@ spark.sql.gravitino.iceberg.rest.credential   <irc-client-id>:<irc-client-secret
 spark.sql.gravitino.iceberg.rest.scope        iceberg
 ```
 
-The IRC properties take precedence field by field. If an explicit legacy OAuth2 configuration cannot be
-completed from the reused Gravitino configuration, catalog initialization fails and identifies the missing
-properties. Set `spark.sql.gravitino.iceberg.reuseOAuth2=false` when supplying a complete, independent IRC
-authentication configuration or when IRC does not require OAuth2.
+The IRC properties take precedence field by field. This validation also applies when reusing the Gravitino
+configuration by default with no IRC-specific override at all: if the reused configuration itself is
+incomplete, catalog initialization fails and identifies the missing properties. Set
+`spark.sql.gravitino.iceberg.reuseOAuth2=false` when supplying a complete, independent IRC authentication
+configuration or when IRC does not require OAuth2.
+
+:::caution
+Spark's UI redacts environment values whose property name matches `secret|password|token`, which does not
+match `credential`. Both `spark.sql.gravitino.oauth2.credential` and `spark.sql.gravitino.iceberg.rest.credential`
+are shown in plain text on the Spark UI's environment page; set `spark.redaction.regex` to also match
+`credential` if this is a concern.
+:::
 
 Because vended credentials are only consumed by Iceberg's native `FileIO` implementations, make sure the
 warehouse storage jars listed under [Storage](#storage) below are on the Spark classpath; the connector
 derives `io-impl` automatically from the warehouse location's scheme (`s3`/`s3a`/`s3n`, `gs`,
-`abfs`/`abfss`/`wasb`/`wasbs`) unless `io-impl` is already set explicitly on the catalog.
+`abfs`/`abfss`/`wasb`/`wasbs`, `oss`) unless `io-impl` is already set explicitly on the catalog.
 
 ## Storage
 
