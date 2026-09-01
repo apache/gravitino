@@ -28,6 +28,7 @@ import org.apache.ibatis.annotations.ResultMap;
 import org.apache.ibatis.annotations.Results;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.SelectProvider;
+import org.apache.ibatis.annotations.UpdateProvider;
 
 /** A MyBatis mapper for Semantic Model create and load operations. */
 public interface SemanticModelMetaMapper {
@@ -94,6 +95,13 @@ public interface SemanticModelMetaMapper {
   SemanticModelPO selectSemanticModelMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName);
 
+  /** Selects and locks an active Semantic Model identity by schema ID and name. */
+  @SelectProvider(
+      type = SemanticModelMetaSQLProviderFactory.class,
+      method = "selectSemanticModelMetaBySchemaIdAndNameForUpdate")
+  SemanticModelPO selectSemanticModelMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName);
+
   /** Selects a current Semantic Model snapshot by stable ID. */
   @ResultMap("semanticModelPOResultMap")
   @SelectProvider(
@@ -132,4 +140,12 @@ public interface SemanticModelMetaMapper {
       method = "insertSemanticModelMetaOnDuplicateKeyUpdate")
   void insertSemanticModelMetaOnDuplicateKeyUpdate(
       @Param("semanticModelMeta") SemanticModelPO semanticModelPO);
+
+  /** Updates a Semantic Model identity while its current version is unchanged. */
+  @UpdateProvider(
+      type = SemanticModelMetaSQLProviderFactory.class,
+      method = "updateSemanticModelMeta")
+  Integer updateSemanticModelMeta(
+      @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
+      @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO);
 }

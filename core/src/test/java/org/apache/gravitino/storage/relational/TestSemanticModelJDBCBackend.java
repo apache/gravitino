@@ -248,6 +248,26 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteInsertCreatesMissingSemanticModel() throws IOException {
+    Namespace namespace = createParents("overwrite_insert");
+    SemanticModelEntity imported =
+        semanticModel(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            "imported_model",
+            false,
+            ImmutableMap.of("source", "external"));
+
+    backend.insert(imported, true);
+
+    assertEquals(
+        imported, backend.get(imported.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL));
+    assertEquals(1, countRows(SemanticModelMetaMapper.TABLE_NAME, imported.id()));
+    assertEquals(1, countRows(SemanticModelVersionInfoMapper.TABLE_NAME, imported.id()));
+    assertEquals(List.of(1), activeSnapshotVersions(imported.id()));
+  }
+
+  @TestTemplate
   public void testSemanticModelReadRoutesAndEntityIdResolver() throws IOException {
     Namespace namespace = createParents("read_routes");
     SemanticModelEntity semanticModel =

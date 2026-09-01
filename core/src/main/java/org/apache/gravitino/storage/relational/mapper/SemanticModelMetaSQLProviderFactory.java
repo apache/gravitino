@@ -63,6 +63,13 @@ public class SemanticModelMetaSQLProviderFactory {
     return getProvider().selectSemanticModelMetaBySchemaIdAndName(schemaId, semanticModelName);
   }
 
+  /** Provides SQL for selecting and locking a Semantic Model identity by schema ID and name. */
+  public static String selectSemanticModelMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName) {
+    return getProvider()
+        .selectSemanticModelMetaBySchemaIdAndNameForUpdate(schemaId, semanticModelName);
+  }
+
   /** Provides SQL for selecting a Semantic Model by stable ID. */
   public static String selectSemanticModelMetaById(@Param("semanticModelId") Long semanticModelId) {
     return getProvider().selectSemanticModelMetaById(semanticModelId);
@@ -95,5 +102,12 @@ public class SemanticModelMetaSQLProviderFactory {
   public static String insertSemanticModelMetaOnDuplicateKeyUpdate(
       @Param("semanticModelMeta") SemanticModelPO semanticModelPO) {
     return getProvider().insertSemanticModelMetaOnDuplicateKeyUpdate(semanticModelPO);
+  }
+
+  /** Provides SQL for updating a Semantic Model identity when its version is unchanged. */
+  public static String updateSemanticModelMeta(
+      @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
+      @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO) {
+    return getProvider().updateSemanticModelMeta(newSemanticModelPO, oldSemanticModelPO);
   }
 }
