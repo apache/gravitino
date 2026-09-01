@@ -41,6 +41,17 @@ gravitino.server.webserver.threadPoolWorkQueueSize = 100
 gravitino.server.webserver.requestHeaderSize = 131072
 # The response header size of the built-in web server
 gravitino.server.webserver.responseHeaderSize = 131072
+# UI inactivity timeout in milliseconds. The UI environment variable
+# NEXT_PUBLIC_IDLE_TIMEOUT_MS is used when this config is not set.
+# gravitino.ui.sessionIdleTimeoutMs = 900000
+# Maximum UI session duration in milliseconds, regardless of user activity. The UI environment
+# variable NEXT_PUBLIC_MAX_SESSION_DURATION_MS is used when this config is not set.
+# gravitino.ui.sessionMaxDurationMs = 18000000
+# UI warning countdown duration in milliseconds before the inactivity timeout. The UI environment
+# variable NEXT_PUBLIC_IDLE_WARNING_LEAD_MS is used when this config is not set.
+# gravitino.ui.sessionIdleWarningLeadMs = 60000
+# Multiple visibleConfigs are split by commas.
+# gravitino.server.visibleConfigs = gravitino.ui.sessionIdleTimeoutMs,gravitino.ui.sessionMaxDurationMs,gravitino.ui.sessionIdleWarningLeadMs
 
 # THE CONFIGURATION FOR Gravitino ENTITY STORE
 # The entity store to use, we only supports relational
@@ -82,8 +93,7 @@ gravitino.fetchFile.blockUnsafeRemoteUri = true
 # THE CONFIGURATION FOR authorization
 # Whether Gravitino enable authorization or not
 gravitino.authorization.enable = false
-# The admins of Gravitino service, multiple admins are spitted by comma.
-gravitino.server.visibleConfigs=gravitino.authorization.serviceAdmins
+# The admins of Gravitino service, separated by commas.
 gravitino.authorization.serviceAdmins = anonymous
 
 # THE CONFIGURATION FOR AUXILIARY SERVICE

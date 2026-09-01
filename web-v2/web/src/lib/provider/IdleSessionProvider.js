@@ -28,28 +28,19 @@ import { useBroadcastChannel } from '@/lib/hooks/useBroadcastChannel'
 import { logoutAction } from '@/lib/store/auth'
 import IdleSessionContext from './IdleSessionContext'
 import IdleWarningModal from '@/components/IdleWarningModal'
+import { resolveSessionTimeouts } from './sessionTimeoutConfig'
 
 /**
  * Default idle timeout: 15 minutes in milliseconds.
- * Overridable via NEXT_PUBLIC_IDLE_TIMEOUT_MS environment variable.
  */
-const DEFAULT_IDLE_TIMEOUT_MS = (() => {
-  const envVal = process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MS
-  const parsed = envVal ? Number(envVal) : NaN
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15 * 60 * 1000
-})()
+const DEFAULT_IDLE_TIMEOUT_MS = 15 * 60 * 1000
 
 /**
  * Default warning lead time: 60 seconds in milliseconds.
- * Overridable via NEXT_PUBLIC_IDLE_WARNING_LEAD_MS environment variable.
  */
-const DEFAULT_WARNING_LEAD_MS = (() => {
-  const envVal = process.env.NEXT_PUBLIC_IDLE_WARNING_LEAD_MS
-  const parsed = envVal ? Number(envVal) : NaN
+const DEFAULT_WARNING_LEAD_MS = 60 * 1000
 
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 60 * 1000
-})()
+const DEFAULT_MAX_SESSION_DURATION_MS = 5 * 60 * 60 * 1000
 
 /**
  * Converts milliseconds to seconds, rounded up.
@@ -72,17 +63,26 @@ function msToSeconds(ms) {
  * @param {React.ReactNode} props.children
  * @param {number} [props.idleTimeoutMs] - Idle timeout in milliseconds (default: 15 min)
  * @param {number} [props.warningLeadMs] - Warning lead time in milliseconds (default: 60s)
+ * @param {number} [props.maxSessionDurationMs] - Maximum session duration (default: 5 hours)
  */
 export default function IdleSessionProvider({
   children,
   idleTimeoutMs = DEFAULT_IDLE_TIMEOUT_MS,
-  warningLeadMs = DEFAULT_WARNING_LEAD_MS
+  warningLeadMs = DEFAULT_WARNING_LEAD_MS,
+  maxSessionDurationMs = DEFAULT_MAX_SESSION_DURATION_MS
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const dispatch = useAppDispatch()
   const authType = useAppSelector(state => state.auth.authType)
   const authToken = useAppSelector(state => state.auth.authToken)
+  const systemConfig = useAppSelector(state => state.auth.systemConfig)
+
+  const {
+    idleTimeoutMs: resolvedIdleTimeoutMs,
+    warningLeadMs: resolvedWarningLeadMs,
+    maxSessionDurationMs: resolvedMaxSessionDurationMs
+  } = resolveSessionTimeouts(systemConfig, { idleTimeoutMs, warningLeadMs, maxSessionDurationMs })
 
   // Only enable idle timeout when the user is authenticated and not on login page.
   // Fall back to persisted token in localStorage to avoid prematurely treating
@@ -98,7 +98,7 @@ export default function IdleSessionProvider({
   const isLoginPage = pathname.endsWith('/login')
 
   const [state, setState] = useState('active')
-  const [warningCountdown, setWarningCountdown] = useState(msToSeconds(warningLeadMs))
+  const [warningCountdown, setWarningCountdown] = useState(msToSeconds(resolvedWarningLeadMs))
   const loggedOutRef = useRef(false)
   const wasAuthenticatedRef = useRef(isAuthenticated)
 
@@ -107,7 +107,7 @@ export default function IdleSessionProvider({
     resetActivity: resetIdleActivity,
     idleTimeRemaining
   } = useIdleTimeout({
-    idleTimeoutMs: isAuthenticated ? idleTimeoutMs : Number.MAX_SAFE_INTEGER,
+    idleTimeoutMs: isAuthenticated ? resolvedIdleTimeoutMs : Number.MAX_SAFE_INTEGER,
 
     // Pause DOM activity detection during warning state so the modal stays
     // visible until the user explicitly clicks "Stay signed in" or "Sign out now"
@@ -116,13 +116,14 @@ export default function IdleSessionProvider({
 
   // Absolute session duration: forces logout after a fixed time regardless of activity
   const { isExpired: isAbsoluteExpired } = useAbsoluteSessionTimeout({
-    isAuthenticated
+    isAuthenticated,
+    maxDurationMs: resolvedMaxSessionDurationMs
   })
 
   const { sendMessage, onMessage } = useBroadcastChannel()
 
   // Track warning threshold: when idleTimeRemaining drops below warningLeadMs, show warning
-  const warningThreshold = warningLeadMs
+  const warningThreshold = resolvedWarningLeadMs
 
   // State machine transitions
   useEffect(() => {
@@ -190,11 +191,11 @@ export default function IdleSessionProvider({
   const handleStaySignedIn = useCallback(() => {
     setState('active')
     resetIdleActivity()
-    setWarningCountdown(msToSeconds(warningLeadMs))
+    setWarningCountdown(msToSeconds(resolvedWarningLeadMs))
 
     // Broadcast stay_signed_in to other tabs so they also dismiss warning and stay logged in
     sendMessage({ type: 'stay_signed_in', timestamp: Date.now() })
-  }, [resetIdleActivity, warningLeadMs, sendMessage])
+  }, [resetIdleActivity, resolvedWarningLeadMs, sendMessage])
 
   // Cross-tab message handling (IST-REQ-005)
   useEffect(() => {
@@ -204,14 +205,14 @@ export default function IdleSessionProvider({
         resetIdleActivity()
         if (state === 'warning') {
           setState('active')
-          setWarningCountdown(msToSeconds(warningLeadMs))
+          setWarningCountdown(msToSeconds(resolvedWarningLeadMs))
         }
       } else if (message.type === 'stay_signed_in') {
         // Another tab clicked "Stay signed in" — dismiss warning and stay logged in
         resetIdleActivity()
         if (state === 'warning') {
           setState('active')
-          setWarningCountdown(msToSeconds(warningLeadMs))
+          setWarningCountdown(msToSeconds(resolvedWarningLeadMs))
         }
       } else if (message.type === 'logout') {
         // Another tab triggered logout — clear local auth state and redirect
@@ -230,7 +231,7 @@ export default function IdleSessionProvider({
         }
       }
     })
-  }, [onMessage, resetIdleActivity, router, state, warningLeadMs, dispatch])
+  }, [onMessage, resetIdleActivity, router, state, resolvedWarningLeadMs, dispatch])
 
   // Broadcast activity to other tabs when this tab has activity (IST-REQ-005)
   // Only broadcast when idleTimeRemaining jumps UP (indicating a timer reset),
@@ -275,7 +276,7 @@ export default function IdleSessionProvider({
       loggedOutRef.current = false
       setState('active')
       resetIdleActivity()
-      setWarningCountdown(msToSeconds(warningLeadMs))
+      setWarningCountdown(msToSeconds(resolvedWarningLeadMs))
     }
 
     // Broadcast authenticated→unauthenticated transition (e.g., manual logout from user menu)
@@ -285,7 +286,7 @@ export default function IdleSessionProvider({
     }
 
     wasAuthenticatedRef.current = isAuthenticated
-  }, [isAuthenticated, resetIdleActivity, sendMessage, warningLeadMs])
+  }, [isAuthenticated, resetIdleActivity, sendMessage, resolvedWarningLeadMs])
 
   // Context value
   const contextValue = {
