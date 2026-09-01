@@ -29,37 +29,36 @@ Discussion: [#12619](https://github.com/apache/gravitino/discussions/12619)
 
 ## Summary
 
-An access rule is a `Policy` of type `system_access_control` whose `content` carries an action, a
-role condition and a scope. The policy is bound to a tag. Any object carrying that tag becomes
-subject to the rule.
+An access rule is a `Policy` of type `system_access_control` whose `content` carries an action and
+a role condition. The policy is bound to a tag. Any object carrying that tag becomes subject to
+the rule.
 
 ```json
 POST /api/metalakes/prod/policies
 {
-  "name": "analyst_read_certified_finance",
+  "name": "analyst_read_certified",
   "policyType": "system_access_control",
   "enabled": true,
   "content": {
     "action": "SELECT_TABLE",
-    "role":   { "name": "analyst" },
-    "scope":  { "catalog": "lakehouse", "schema": "finance" }
+    "role":   { "name": "analyst" }
   }
 }
 ```
 
 ```
-PUT  /api/metalakes/prod/tags/certified/policies/analyst_read_certified_finance
+PUT  /api/metalakes/prod/tags/certified/policies/analyst_read_certified
      { "selector": { "type": "ALL_VALUES" } }
 
 POST /api/metalakes/prod/objects/TABLE/lakehouse.finance.orders/tags
      { "tagsToAdd": [{ "name": "certified" }] }
 ```
 
-Read together: *members of the role `analyst` may `SELECT` any table under
-`lakehouse.finance` that carries the tag `certified`.*
+Read together: *members of the role `analyst` may `SELECT` any table that carries the tag
+`certified`.*
 
-There is exactly one attachment — the policy-to-tag bind. The role and the scope are values
-inside `content`, not associations. No new user-facing entity, REST resource or client API is
+There is exactly one attachment — the policy-to-tag bind. The role condition is a value inside
+`content`, not an association. No new user-facing entity, REST resource or client API is
 introduced.
 
 ---
@@ -88,7 +87,7 @@ someone remembered to issue.
 
 ### In this version
 
-- A rule of the form *(action, role condition, scope)* bound to a tag.
+- A rule of the form *(action, role condition)* bound to a tag.
 - `ALLOW` only.
 - Roles as the matched condition.
 - Evaluation inside the existing authorization-expression path, composing with RBAC.
@@ -106,6 +105,7 @@ someone remembered to issue.
 | Row filtering and column masking | Distinct policy types; this design governs whole-object decisions. |
 | Cross-tag conditions | A rule matches one tag. Conditions spanning several tags await the `EXPRESSION` selector type in [policy-on-tag.md](policy-on-tag.md). |
 | Column-level decisions | A tag on a column does not affect decisions about its table. |
+| A `scope` field in `content`, restricting a rule to a subtree | Not a security boundary: creating a policy needs metalake-wide `CREATE_POLICY`, so whoever writes the rule sets its reach. It is also not consulted when a tag is applied, so it filters effect rather than preventing a wrong tag. Tag assignment values with a value-sensitive selector cover the one-tag-different-subtrees case. Additive later — absent has always meant metalake-wide. |
 | Replacing RBAC | Baseline privileges, ownership and traversal are unchanged. See [Composition with RBAC](#composition-with-rbac). |
 
 ---
@@ -115,7 +115,7 @@ someone remembered to issue.
 | Option | Pros | Cons | Status |
 |---|---|---|---|
 | **A `system_access_control` policy type bound to a tag** | Reuses the entity, relation, selector and resolver; no new REST or client surface; one governance model to learn | The role condition lives in `content` JSON, so lookup by role needs a derived index rather than a foreign key | **Proposed** |
-| A dedicated `tag_access_policy` entity with action, role and scope as columns | Foreign key on role; indexed lookup; cascade on role deletion falls out of the schema | New table across three dialects, new REST resource, new client and CLI surface, a second governance model alongside policies | Rejected |
+| A dedicated `tag_access_policy` entity with action and role as columns | Foreign key on role; indexed lookup; cascade on role deletion falls out of the schema | New table across three dialects, new REST resource, new client and CLI surface, a second governance model alongside policies | Rejected |
 | Extend RBAC grants with a tag predicate | No new concepts | The grant table is object-identified; a predicate has no object, and every grant read path would change | Rejected |
 | Evaluate tags in an external engine (OPA and similar) | Arbitrary policy language | Moves the decision out of Gravitino, duplicates the tag hierarchy, and cannot use the existing expression path | Rejected |
 
@@ -137,12 +137,10 @@ existing example. `system_access_control` follows the same pattern with a new
 |---|---|---|
 | `action` | `Privilege.Name` | The privilege the rule confers. Must be one of the permitted names — see [Composition with RBAC](#composition-with-rbac) for the exclusions. |
 | `role` | object with `name` | The **condition**. Matched against the caller's expanded roles. |
-| `scope` | object with optional `catalog`, `schema`, `table` | Where the rule may take effect. Omitted means metalake-wide. |
 
 `validate()` rejects at creation rather than at evaluation:
 
 - `action` parses to a permitted `Privilege.Name`.
-- `scope` nests legally — no `schema` without a `catalog`, no `table` without a `schema`.
 - `role` name is non-blank.
 
 Rejecting at write time matters because the alternative failure is silent: a policy naming an
@@ -155,23 +153,12 @@ Whether `validate()` also requires the named role to *exist* is part of
 ### `role` is a condition, not a principal
 
 The rule does not grant anything to `analyst`. It states that *if* the caller holds `analyst`
-among their expanded roles, *and* the object carries `certified`, *and* the object lies under
-`scope`, then `SELECT_TABLE` is satisfied for this request.
+among their expanded roles *and* the object carries `certified`, then `SELECT_TABLE` is satisfied
+for this request.
 
 The distinction matters for two reasons. The rule is not a grant, so it does not appear in the
 role's securable objects and does not participate in grant listing. And a role that is never
 assigned to anyone confers nothing, exactly as an unassigned role does today.
-
-### `scope` is a path check
-
-`scope` narrows where the rule applies. It cannot widen: an object outside the scope is
-unaffected regardless of its tags.
-
-Narrowing `scope` to a single table gives the equivalent of the policy-on-object behaviour being
-removed from the policy subsystem, without reintroducing the object association.
-
-Matching is segment-wise, not string-prefix — `lakehouse.finance` must not match
-`lakehouse.finance_ops`.
 
 ### The tag bind
 
@@ -190,7 +177,7 @@ whether any access rule is satisfied. That requires three things:
 1. the tags effective at the object after nearest-wins resolution
    ([tag-assignment-values.md](tag-assignment-values.md)), including those inherited from ancestors;
 2. the `system_access_control` policies bound to those tags;
-3. for each, whether `role` is among the caller's expanded roles and the object lies under `scope`.
+3. for each, whether `role` is among the caller's expanded roles.
 
 The question is *when* steps 1 and 2 happen. Two options, presented without preference.
 
