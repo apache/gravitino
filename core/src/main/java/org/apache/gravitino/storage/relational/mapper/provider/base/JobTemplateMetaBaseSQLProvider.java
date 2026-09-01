@@ -101,7 +101,6 @@ public class JobTemplateMetaBaseSQLProvider {
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + ".0"
         + " WHERE job_template_name = #{jobTemplateName} AND metalake_id ="
         + " (SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -114,7 +113,6 @@ public class JobTemplateMetaBaseSQLProvider {
         + JobTemplateMetaMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + ".0"
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
