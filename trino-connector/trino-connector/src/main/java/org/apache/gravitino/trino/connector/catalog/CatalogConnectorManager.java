@@ -760,6 +760,18 @@ public class CatalogConnectorManager {
   }
 
   /**
+   * Retrieves the last completed load attempt's success time, error and consecutive failure count
+   * as one consistent snapshot. Unlike calling {@link #getLastSuccessfulLoadTimeMs()}, {@link
+   * #getLastLoadError()} and {@link #getConsecutiveLoadFailures()} separately, this cannot observe
+   * a combination of fields from two different load attempts.
+   *
+   * @return the load outcome
+   */
+  public LoadOutcome getLoadOutcome() {
+    return loadOutcome;
+  }
+
+  /**
    * Retrieves the last error reported by each metalake, keyed by the metalake name.
    *
    * @return the metalake errors, empty if every metalake was loaded successfully
@@ -905,15 +917,50 @@ public class CatalogConnectorManager {
   }
 
   /** Immutable snapshot of the outcome of the last completed load attempt. */
-  private static final class LoadOutcome {
+  public static final class LoadOutcome {
     private final long lastSuccessTimeMs;
     private final String lastError;
     private final long consecutiveFailures;
 
-    LoadOutcome(long lastSuccessTimeMs, String lastError, long consecutiveFailures) {
+    /**
+     * Constructs a new LoadOutcome.
+     *
+     * @param lastSuccessTimeMs the time of the last successful load, 0 if never successful
+     * @param lastError the error that made the last load fail, null if it succeeded
+     * @param consecutiveFailures the number of consecutive failed loads, 0 if the last succeeded
+     */
+    public LoadOutcome(long lastSuccessTimeMs, String lastError, long consecutiveFailures) {
       this.lastSuccessTimeMs = lastSuccessTimeMs;
       this.lastError = lastError;
       this.consecutiveFailures = consecutiveFailures;
+    }
+
+    /**
+     * Retrieves the time of the last successful catalog load.
+     *
+     * @return the time in milliseconds since the epoch, 0 if the load loop never succeeded
+     */
+    public long getLastSuccessTimeMs() {
+      return lastSuccessTimeMs;
+    }
+
+    /**
+     * Retrieves the error that made the last catalog load fail.
+     *
+     * @return the error message, null if the last load succeeded
+     */
+    @Nullable
+    public String getLastError() {
+      return lastError;
+    }
+
+    /**
+     * Retrieves the number of consecutive failed catalog loads.
+     *
+     * @return the failure count, 0 if the last load succeeded
+     */
+    public long getConsecutiveFailures() {
+      return consecutiveFailures;
     }
   }
 }

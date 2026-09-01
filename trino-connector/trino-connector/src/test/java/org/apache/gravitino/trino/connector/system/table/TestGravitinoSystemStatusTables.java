@@ -123,9 +123,8 @@ public class TestGravitinoSystemStatusTables {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
     when(manager.isTrinoStarted()).thenReturn(true);
     when(manager.getLastLoadAttemptTimeMs()).thenReturn(1000L);
-    when(manager.getLastSuccessfulLoadTimeMs()).thenReturn(1000L);
-    when(manager.getConsecutiveLoadFailures()).thenReturn(0L);
-    when(manager.getLastLoadError()).thenReturn(null);
+    when(manager.getLoadOutcome())
+        .thenReturn(new CatalogConnectorManager.LoadOutcome(1000L, null, 0L));
     when(manager.getMetalakeErrors()).thenReturn(Map.of());
 
     Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
@@ -144,9 +143,8 @@ public class TestGravitinoSystemStatusTables {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
     when(manager.isTrinoStarted()).thenReturn(true);
     when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
-    when(manager.getLastSuccessfulLoadTimeMs()).thenReturn(0L);
-    when(manager.getConsecutiveLoadFailures()).thenReturn(3L);
-    when(manager.getLastLoadError()).thenReturn("Connection refused");
+    when(manager.getLoadOutcome())
+        .thenReturn(new CatalogConnectorManager.LoadOutcome(0L, "Connection refused", 3L));
     when(manager.getMetalakeErrors()).thenReturn(Map.of("test", "Connection refused"));
 
     Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();

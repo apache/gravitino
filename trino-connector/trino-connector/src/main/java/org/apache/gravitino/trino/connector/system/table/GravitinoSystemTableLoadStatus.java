@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager.LoadOutcome;
 
 /**
  * An implementation of the load status system table.
@@ -86,12 +87,16 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
     BlockBuilder lastErrorColumnBuilder = VARCHAR.createBlockBuilder(null, 1);
     BlockBuilder metalakeErrorsColumnBuilder = VARCHAR.createBlockBuilder(null, 1);
 
+    // Read once so the three fields below come from the same attempt: reading them through three
+    // separate calls could otherwise mix a fresh success time with a stale error from a load that
+    // completed in between the calls.
+    LoadOutcome loadOutcome = catalogConnectorManager.getLoadOutcome();
+
     BOOLEAN.writeBoolean(trinoStartedColumnBuilder, catalogConnectorManager.isTrinoStarted());
     writeTime(lastAttemptTimeColumnBuilder, catalogConnectorManager.getLastLoadAttemptTimeMs());
-    writeTime(lastSuccessTimeColumnBuilder, catalogConnectorManager.getLastSuccessfulLoadTimeMs());
-    BIGINT.writeLong(
-        consecutiveFailuresColumnBuilder, catalogConnectorManager.getConsecutiveLoadFailures());
-    writeNullableString(lastErrorColumnBuilder, catalogConnectorManager.getLastLoadError());
+    writeTime(lastSuccessTimeColumnBuilder, loadOutcome.getLastSuccessTimeMs());
+    BIGINT.writeLong(consecutiveFailuresColumnBuilder, loadOutcome.getConsecutiveFailures());
+    writeNullableString(lastErrorColumnBuilder, loadOutcome.getLastError());
 
     // The load loop itself is shared by every entry catalog, so the columns above are global.
     // Only the per metalake errors are narrowed to the metalake this connector reports on.
