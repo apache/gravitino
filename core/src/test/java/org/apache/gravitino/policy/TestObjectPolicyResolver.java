@@ -90,6 +90,27 @@ public class TestObjectPolicyResolver {
   }
 
   @Test
+  public void testResolveMissingSelectorAsAllValues() throws Exception {
+    TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("finance"));
+    PolicyEntity policy = policy(10L, "policy", true);
+    when(effectiveTagResolver.resolve(METALAKE, OBJECT)).thenReturn(new TagEntity[] {domain});
+    when(relationOperations.batchListEntitiesByRelation(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            Collections.singletonList(NameIdentifierUtil.ofTag(METALAKE, "domain")),
+            Entity.EntityType.TAG))
+        .thenReturn(
+            Collections.singletonList(
+                new RelationalEntity<>(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    domain.nameIdentifier(),
+                    Entity.EntityType.TAG,
+                    policy,
+                    null)));
+
+    Assertions.assertArrayEquals(new PolicyEntity[] {policy}, resolver.resolve(METALAKE, OBJECT));
+  }
+
+  @Test
   public void testDropNonMatchingSelector() throws Exception {
     TagEntity domain = tag(1L, "domain", TagAssignment.ofValues("engineering"));
     PolicyEntity policy = policy(10L, "policy", true);

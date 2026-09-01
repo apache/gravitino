@@ -59,4 +59,20 @@ public class TestPolicyAssociationSelectorSerde {
         IllegalArgumentException.class,
         () -> PolicyAssociationSelectorSerde.deserialize("{\"type\":\"UNKNOWN\"}"));
   }
+
+  @Test
+  void testRejectMissingRequiredFields() {
+    Assertions.assertThrows(
+        IllegalArgumentException.class, () -> PolicyAssociationSelectorSerde.deserialize("{}"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PolicyAssociationSelectorSerde.deserialize("{\"type\":null}"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> PolicyAssociationSelectorSerde.deserialize("{\"type\":\"TAG_VALUE\"}"));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            PolicyAssociationSelectorSerde.deserialize("{\"type\":\"TAG_VALUE\",\"value\":null}"));
+  }
 }

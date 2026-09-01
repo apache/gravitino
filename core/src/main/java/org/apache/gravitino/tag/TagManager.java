@@ -164,18 +164,7 @@ public class TagManager implements TagDispatcher {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifierUtil.ofTag(metalake, name),
         LockType.READ,
-        () -> {
-          try {
-            return entityStore.get(
-                NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG, TagEntity.class);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchTagException(
-                "Tag with name %s under metalake %s does not exist", name, metalake);
-          } catch (IOException ioe) {
-            LOG.error("Failed to get tag {} under metalake {}", name, metalake, ioe);
-            throw new RuntimeException(ioe);
-          }
-        });
+        () -> getTagWithoutLock(metalake, name));
   }
 
   public Tag alterTag(String metalake, String name, TagChange... changes)
@@ -239,6 +228,7 @@ public class TagManager implements TagDispatcher {
         tagIdentifier,
         LockType.READ,
         () -> {
+          getTagWithoutLock(metalake, name);
           try {
             return entityStore
                 .relationOperations()
@@ -660,6 +650,19 @@ public class TagManager implements TagDispatcher {
                 .withLastModifiedTime(Instant.now())
                 .build())
         .build();
+  }
+
+  private TagEntity getTagWithoutLock(String metalake, String name) {
+    try {
+      return entityStore.get(
+          NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG, TagEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchTagException(
+          e, "Tag with name %s under metalake %s does not exist", name, metalake);
+    } catch (IOException e) {
+      LOG.error("Failed to get tag {} under metalake {}", name, metalake, e);
+      throw new RuntimeException(e);
+    }
   }
 
   /**

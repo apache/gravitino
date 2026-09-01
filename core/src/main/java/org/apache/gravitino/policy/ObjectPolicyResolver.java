@@ -111,7 +111,10 @@ public class ObjectPolicyResolver {
       }
       PolicyEntity policy = (PolicyEntity) relation.targetEntity();
       PolicyAssociationSelector selector =
-          PolicyAssociationSelectorSerde.deserialize(relation.relationValue().orElseThrow());
+          relation
+              .relationValue()
+              .map(PolicyAssociationSelectorSerde::deserialize)
+              .orElseGet(AllValuesSelector::get);
       TagAssignment assignment = tag.assignment().orElseGet(TagAssignment::noValue);
       boolean matches = matches(selector, assignment);
       MatchState state =

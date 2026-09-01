@@ -108,15 +108,25 @@ public final class PolicyAssociationSelectorSerde {
     public PolicyAssociationSelector deserialize(
         JsonParser parser, DeserializationContext deserializationContext) throws IOException {
       JsonNode node = parser.getCodec().readTree(parser);
-      String type = node.get(TYPE).asText();
+      String type = requiredTextField(parser, node, TYPE);
       if (AllValuesSelector.TYPE.equals(type)) {
         return AllValuesSelector.get();
       }
       if (TagValueSelector.TYPE.equals(type)) {
-        return TagValueSelector.of(node.get(VALUE).asText());
+        return TagValueSelector.of(requiredTextField(parser, node, VALUE));
       }
       throw JsonMappingException.from(
           parser, "Unsupported policy association selector type: " + type);
+    }
+
+    private static String requiredTextField(JsonParser parser, JsonNode node, String fieldName)
+        throws JsonMappingException {
+      JsonNode field = node == null ? null : node.get(fieldName);
+      if (field == null || field.isNull() || !field.isTextual()) {
+        throw JsonMappingException.from(
+            parser, "Missing or invalid required selector field: " + fieldName);
+      }
+      return field.asText();
     }
   }
 }

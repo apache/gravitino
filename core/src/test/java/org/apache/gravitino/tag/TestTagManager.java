@@ -1097,6 +1097,8 @@ public class TestTagManager {
   public void testPolicyAssociationsForTag() throws IOException {
     String tagName = "policy_tag";
     String policyName = "policy_for_tag";
+    Assertions.assertThrows(
+        NoSuchTagException.class, () -> tagManager.listPolicyAssociationsForTag(METALAKE, tagName));
     tagManager.createTag(
         METALAKE, tagName, null, null, TagValueConstraint.ofAllowedValues("finance", "risk"));
     PolicyEntity policy =
