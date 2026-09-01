@@ -274,7 +274,7 @@ The danger depends on where the real data comes from.
 
 **Group 1 — the data comes from the connector: table, view, topic, and schemas in external catalogs.** For these, Gravitino does not read the metadata from its own cache. On every load it asks the underlying system (Hive, Iceberg, JDBC, Kafka) for the current object, and uses the cached entity only for Gravitino's own id and audit fields. All nodes ask the same underlying system, so they all see the same thing. If the object was dropped or renamed, the connector call fails right away with a "not found" error. **This whole group is safe — nothing to do.**
 
-**Group 2 — the data comes from Gravitino's own store: metalake, catalog, managed schema, fileset, model, model version, function.** Here the cached entity *is* the answer, so a stale read really can return an old value. We looked at each alter in this group.
+**Group 2 — the data comes from Gravitino's own store: metalake, catalog, managed schema, fileset, model, model version, Semantic Model, function.** Here the cached entity *is* the answer, so a stale read really can return an old value. We looked at each alter in this group.
 
 (Views follow the same rule as tables: their definition is read through the connector on every load, so they sit in Group 1 and are safe.)
 
@@ -291,22 +291,23 @@ Most alters are safe:
 | drop                                               | for Group 1 the connector call fails; for a fileset the file path is gone and access fails                                                            | yes   |
 | catalog changes                                    | already handled today by a separate cross-node signal (`CatalogChangeLogListener`), not by this cache                                                 | yes   |
 
-Five cases are **not** safe — a stale read gives a wrong answer with no error. They are in the model area, functions, or the metalake on/off flag:
+Six cases are **not** safe — a stale read gives a wrong answer with no error. They are in the model area, Semantic Models, functions, or the metalake on/off flag:
 
 | Change                                                                | Why a stale read is wrong, with no error                                                                                                                                                            |
 | --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | model version — update / add / remove URI                             | the URI points to the model files. An old URI silently loads the **wrong model files**.                                                                                                             |
 | model version — update aliases                                        | an alias silently points to the **wrong version**.                                                                                                                                                  |
 | model — latest version (after a new version is added on another node) | "get the latest version" silently returns an **old version**.                                                                                                                                       |
+| Semantic Model — overwrite definition                                | the current version selects the definition used for semantic queries. An old version silently uses the **wrong definition**.                                                                        |
 | function — add / update / remove implementation or definition         | the implementation is the code the function runs. An old copy silently runs the **wrong function code**.                                                                                            |
 | metalake — disable                                                    | a node with a stale copy still thinks the metalake is on and **lets operations run** on a metalake that was turned off. (Turning it back on is safe: a stale node only throws "in use" by mistake.) |
 
 #### What we do about it
 
-A stale read is only a problem for a **per-node** cache, and only for the load-bearing pointers listed above. A **shared** cache (redis) keeps one copy for the whole cluster, so it has no window at all and can safely cache everything. So the handling depends on the cache kind (`coherence()`):
+A stale read is only a problem for a **per-node** cache, and only for the load-bearing content listed above. A **shared** cache (redis) keeps one copy for the whole cluster, so it has no window at all and can safely cache everything. So the handling depends on the cache kind (`coherence()`):
 
-- **Shared cache (redis, `SHARED`): cache everything.** There is no per-node window, so model, model version, and function are cached like any other entity, with no extra work. The writing node clears the one shared copy, and every node sees it at once.
-- **Per-node cache (caffeine, `LOCAL_PER_NODE`): do not cache model, model version, or function.** Each holds a load-bearing pointer (a version URI, the latest version, or the function implementation) that would be silently wrong on another node during the poll window. They are read rarely, so reading them from the DB every time costs little, and it keeps the rule simple — an entity type is either in or out, with no special per-read handling. If they ever get hot, we can revisit.
+- **Shared cache (redis, `SHARED`): cache everything.** There is no per-node window, so model, model version, Semantic Model, and function are cached like any other entity, with no extra work. The writing node clears the one shared copy, and every node sees it at once.
+- **Per-node cache (caffeine, `LOCAL_PER_NODE`): do not cache model, model version, Semantic Model, or function.** Each holds load-bearing content (a version URI, the latest version, a Semantic Model definition, or a function implementation) that would be silently wrong on another node during the poll window. They are read rarely, so reading them from the DB every time costs little, and it keeps the rule simple — an entity type is either in or out, with no special per-read handling. If they ever get hot, we can revisit.
 - **Metalake on/off flag — cached like the rest of the metalake.** Disabling or deleting a metalake is a rare, tenant-level admin action, so we accept the small window instead of adding special handling: the metalake is cached and invalidated across nodes through the change log like any other entity, so after a disable, another node stops allowing operations within one poll interval.
 
 We do **not** need a per-entity version check on the cache: for a point read, checking the DB version costs the same query as just reading the row, so it would buy nothing.
@@ -322,10 +323,11 @@ We do **not** need a per-entity version check on the cache: for a point read, ch
 | tag, policy          | self-contained; a stale read is only cosmetic (old comment/property)                              | cache + change-log invalidation                                        | cache            |
 | job                  | self-contained operational entity; a stale read is only an old job status                         | cache + change-log invalidation                                        | cache            |
 | model, model version | carries a load-bearing pointer (a version's URI, the latest version) that would be wrong if stale | **not cached — read from the DB** (revisit if it gets hot)             | cache            |
+| Semantic Model       | its current version selects the definition used for semantic queries                              | **not cached — read from the DB** (revisit if it gets hot)             | cache            |
 | function             | the cached value *is* the code that runs, so a stale copy would run the wrong code                | **not cached — read from the DB** (revisit if it gets hot)             | cache            |
 | user, group, role    | derived fields (`roleNames`, `securableObjects`) need a reverse lookup                            | not cached                                                             | not cached       |
 
-After this, everything a per-node cache serves is safe or bounded: connector-backed entities are safe by construction; self-contained store entities are only ever cosmetically stale (and a rare metalake disable self-corrects within one poll interval); model / model version / function are read from the DB. A shared cache is safe throughout because it has no window.
+After this, everything a per-node cache serves is safe or bounded: connector-backed entities are safe by construction; self-contained store entities are only ever cosmetically stale (and a rare metalake disable self-corrects within one poll interval); model / model version / Semantic Model / function are read from the DB. A shared cache is safe throughout because it has no window.
 
 #### The staleness promise (SLA)
 

@@ -47,7 +47,6 @@ public class TestBaseEntityCache {
           Entity.EntityType.CATALOG,
           Entity.EntityType.SCHEMA,
           Entity.EntityType.TABLE,
-          Entity.EntityType.SEMANTIC_MODEL,
           Entity.EntityType.TOPIC,
           Entity.EntityType.VIEW,
           Entity.EntityType.FILESET,

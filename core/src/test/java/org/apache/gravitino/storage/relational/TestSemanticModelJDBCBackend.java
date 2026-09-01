@@ -210,7 +210,7 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     assertEquals(2, persisted.getCurrentVersion());
     assertEquals(2, persisted.getLastVersion());
     assertEquals(List.of(1, 2), activeSnapshotVersions(original.id()));
-    assertEquals(1, countEntityChanges());
+    assertEquals(0, countEntityChanges());
   }
 
   @TestTemplate
@@ -370,7 +370,7 @@ public class TestSemanticModelJDBCBackend extends TestJDBCBackend {
     SemanticModelEntity winner =
         backend.get(created.nameIdentifier(), Entity.EntityType.SEMANTIC_MODEL);
     assertTrue(winner.equals(overwriteOne) || winner.equals(overwriteTwo));
-    assertEquals(2, countEntityChanges());
+    assertEquals(0, countEntityChanges());
   }
 
   private Namespace createParents(String prefix) throws IOException {
