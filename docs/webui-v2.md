@@ -50,7 +50,9 @@ gravitino.ui.sessionIdleWarningLeadMs = 60000
 gravitino.server.visibleConfigs = gravitino.ui.sessionIdleTimeoutMs,gravitino.ui.sessionMaxDurationMs,gravitino.ui.sessionIdleWarningLeadMs
 ```
 
-`gravitino.authorization.serviceAdmins` is exposed automatically by `/configs` when authorization is enabled and does not need to be added to `gravitino.server.visibleConfigs`.
+Do not add `gravitino.authorization.serviceAdmins` to `gravitino.server.visibleConfigs`, because
+values returned by the unauthenticated `/configs` endpoint are public. The UI obtains the current
+user's service-administrator status from the authenticated `/api/authn/me` endpoint.
 
 ## Web V2
 
