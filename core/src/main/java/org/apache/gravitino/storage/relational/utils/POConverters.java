@@ -960,14 +960,11 @@ public class POConverters {
    * Update UserPO version
    *
    * @param oldUserPO the old UserPO object
-   * @param newUser the new TableEntity object
+   * @param newUser the new UserEntity object
    * @return UserPO object with updated version
    */
   public static UserPO updateUserPOWithVersion(UserPO oldUserPO, UserEntity newUser) {
-    Long lastVersion = oldUserPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldUserPO.getCurrentVersion() + 1;
     try {
       return UserPO.builder()
           .withUserId(oldUserPO.getUserId())

@@ -61,6 +61,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TableStatisticEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -93,6 +94,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -839,6 +841,33 @@ public class TestPOConverters {
     assertEquals(8, updatePO3.getCurrentVersion());
     assertEquals(8, updatePO3.getLastVersion());
     assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
+  }
+
+  @Test
+  public void testUpdateUserPOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    UserEntity user =
+        UserEntity.builder().withId(1L).withName("user").withAuditInfo(auditInfo).build();
+    UserPO initialUserPO =
+        POConverters.initializeUserPOWithVersion(user, UserPO.builder().withMetalakeId(1L));
+    UserPO userPO =
+        UserPO.builder()
+            .withUserId(initialUserPO.getUserId())
+            .withUserName(initialUserPO.getUserName())
+            .withMetalakeId(initialUserPO.getMetalakeId())
+            .withExternalId(initialUserPO.getExternalId())
+            .withEnabled(initialUserPO.getEnabled())
+            .withAuditInfo(initialUserPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialUserPO.getDeletedAt())
+            .build();
+
+    UserPO updatedUserPO = POConverters.updateUserPOWithVersion(userPO, user);
+
+    assertEquals(8, updatedUserPO.getCurrentVersion());
+    assertEquals(8, updatedUserPO.getLastVersion());
   }
 
   @Test
