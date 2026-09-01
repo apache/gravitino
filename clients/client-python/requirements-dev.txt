@@ -17,7 +17,7 @@
 
 requests==2.32.5
 dataclasses-json==0.6.7
-pylint==4.0.5
+pylint==4.0.8
 black==26.3.1
 twine==6.2.0
 coverage==7.14.3
