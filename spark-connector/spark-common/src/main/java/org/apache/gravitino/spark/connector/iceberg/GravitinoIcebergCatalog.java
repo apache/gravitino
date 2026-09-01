@@ -112,7 +112,8 @@ public class GravitinoIcebergCatalog extends BaseCatalog
   /**
    * Resolves the Iceberg REST server endpoint to route this catalog through, if any. Only hive/jdbc
    * backed catalogs are eligible; a catalog already configured with {@code catalog-backend=rest} or
-   * {@code custom} is left untouched.
+   * {@code custom} is left untouched, and so is a catalog with no {@code catalog-backend} property
+   * at all.
    *
    * <p>An eligible catalog whose warehouse has a native Iceberg FileIO (s3/gs/abfs-family schemes)
    * fails immediately unless {@code credential-providers} is configured: routing replaces any
