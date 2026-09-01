@@ -207,6 +207,14 @@ public class SchemaOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       SchemaUpdatesRequest request) {
     LOG.info("Received alter schema request: {}.{}.{}", metalake, catalog, schema);
+    if (request == null) {
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.ALTER,
+          schema,
+          catalog,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

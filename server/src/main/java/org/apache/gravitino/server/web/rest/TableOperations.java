@@ -212,6 +212,14 @@ public class TableOperations {
       @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       TableUpdatesRequest request) {
     LOG.info("Received alter table request: {}.{}.{}.{}", metalake, catalog, schema, table);
+    if (request == null) {
+      return ExceptionHandlers.handleTableException(
+          OperationType.ALTER,
+          table,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

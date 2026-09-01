@@ -419,6 +419,13 @@ public class ModelOperations {
       ModelVersionLinkRequest request) {
     LOG.info("Received link model version request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.LINK,
+          model,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(
@@ -573,6 +580,13 @@ public class ModelOperations {
         schema,
         model,
         version);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          versionString(model, version),
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -627,6 +641,13 @@ public class ModelOperations {
         schema,
         model,
         alias);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          aliasString(model, alias),
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -673,6 +694,14 @@ public class ModelOperations {
       @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       ModelUpdatesRequest request) {
     LOG.info("Received alter model request: {}.{}.{}.{}", metalake, catalog, schema, model);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          model,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
