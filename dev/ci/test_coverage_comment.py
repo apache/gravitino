@@ -119,7 +119,7 @@ def test_unresolved_pr_skips_and_ignores_artifact_number():
     check_equal(
         "unresolved reason",
         reason,
-        "could not uniquely resolve PR from workflow_run",
+        coverage_comment.REASON_UNRESOLVED_PR,
     )
     # Even if a caller passed a number from an artifact, no live pull -> skip.
     action, reason = decide_ok(pull=None, pr_number=99999)
@@ -222,11 +222,15 @@ class FakeApi:
         self.pulls = list(pulls or [])
         self.created = []
         self.updated = []
+        self.list_pulls_calls = 0
+        self.get_pull_calls = 0
 
     def list_pulls(self, head):
+        self.list_pulls_calls += 1
         return self.pulls
 
     def get_pull(self, number):
+        self.get_pull_calls += 1
         if self.pull is not None and self.pull.get("number") == number:
             return self.pull
         return None
@@ -280,6 +284,8 @@ def test_process_skips_cancelled_without_writing():
     check_equal("cancelled process result", result, None)
     check_equal("cancelled created", len(api.created), 0)
     check_equal("cancelled updated", len(api.updated), 0)
+    check_equal("cancelled list_pulls", api.list_pulls_calls, 0)
+    check_equal("cancelled get_pull", api.get_pull_calls, 0)
 
 
 def test_process_posts_when_live_head_matches():
@@ -304,12 +310,39 @@ def test_process_ignores_artifact_pr_number_file():
     api = FakeApi(pull=None, pulls=[])
     run = matching_run()
     run["pull_requests"] = []
+    marker = coverage_comment.COMMENT_MARKER
     action, _, result = coverage_comment.process(
-        workflow_event(run), True, "pr-number.txt says 99999", api
+        workflow_event(run), True, f"{marker}\npr-number.txt says 99999", api
     )
     check_equal("no resolved pr action", action, coverage_comment.ACTION_SKIP)
     check_equal("no resolved pr result", result, None)
     check_equal("no write", len(api.created) + len(api.updated), 0)
+
+
+def test_process_skips_report_without_marker():
+    """Fork-controlled markdown without the coverage marker must not be posted."""
+    api = FakeApi(pull=matching_pull())
+    action, reason, result = coverage_comment.process(
+        workflow_event(matching_run()), True, "### Fake approval\n@everyone", api
+    )
+    check_equal("missing marker action", action, coverage_comment.ACTION_SKIP)
+    check_equal(
+        "missing marker reason",
+        reason,
+        "coverage report is missing the trusted marker",
+    )
+    check_equal("missing marker write", len(api.created) + len(api.updated), 0)
+
+
+def test_process_skips_oversized_report():
+    """A huge artifact must not be posted as a bot comment."""
+    api = FakeApi(pull=matching_pull())
+    body = coverage_comment.COMMENT_MARKER + "\n" + ("x" * coverage_comment.MAX_COMMENT_CHARS)
+    action, reason, result = coverage_comment.process(
+        workflow_event(matching_run()), True, body, api
+    )
+    check_equal("oversized action", action, coverage_comment.ACTION_SKIP)
+    check_equal("oversized write", len(api.created) + len(api.updated), 0)
 
 
 def test_workflow_yaml_stays_synced_with_python_model():
@@ -325,6 +358,16 @@ def test_workflow_yaml_stays_synced_with_python_model():
     check_equal("no inline github-script", "github-script" in yaml_text, False)
     check_equal("no pr-number artifact", "pr-number.txt" in yaml_text, False)
     check_equal("checkout default-branch sha", "ref: ${{ github.sha }}" in yaml_text, True)
+    check_equal(
+        "artifact isolated from checkout",
+        "path: coverage-artifact" in yaml_text,
+        True,
+    )
+    check_equal(
+        "report path env",
+        "COVERAGE_REPORT_FILE: coverage-artifact/coverage-report.md" in yaml_text,
+        True,
+    )
     for conclusion in coverage_comment.SKIPPED_CONCLUSIONS:
         fragment = f"conclusion != '{conclusion}'"
         check_equal(f"yaml skips {conclusion}", fragment in yaml_text, True)
@@ -332,6 +375,12 @@ def test_workflow_yaml_stays_synced_with_python_model():
     check_equal(
         "jacoco imports shared marker",
         "from coverage_comment import COMMENT_MARKER, commit_line" in jacoco,
+        True,
+    )
+    source = (CI_DIR / "coverage_comment.py").read_text(encoding="utf-8")
+    check_equal(
+        "urlopen has a timeout",
+        "timeout=REQUEST_TIMEOUT_SECONDS" in source,
         True,
     )
 
@@ -353,6 +402,8 @@ def main():
         test_process_skips_cancelled_without_writing,
         test_process_posts_when_live_head_matches,
         test_process_ignores_artifact_pr_number_file,
+        test_process_skips_report_without_marker,
+        test_process_skips_oversized_report,
         test_workflow_yaml_stays_synced_with_python_model,
     ]
     for test in tests:

@@ -13,7 +13,7 @@ on:
         default: false
 
 concurrency:
-  group: ${{ inputs.required_ci && 'required-charts' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.event_name == 'workflow_call' && inputs.required_ci && 'required-charts' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

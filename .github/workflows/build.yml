@@ -20,7 +20,7 @@ on:
       - 'web-v2/**'
 
 concurrency:
-  group: ${{ inputs.required_ci && 'required-build' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.event_name == 'workflow_call' && inputs.required_ci && 'required-build' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel

@@ -45,8 +45,15 @@ def github_ignore_globs():
 
 
 def normalize_path(path):
-    """Normalize a repo-relative path for prefix matching."""
-    return (path or "").replace("\\", "/").lstrip("./")
+    """Normalize a repo-relative path for prefix matching.
+
+    Only a literal ``./`` prefix is removed so ``.github`` and similar
+    dot-directories stay intact. ``str.lstrip("./")`` would strip those.
+    """
+    normalized = (path or "").replace("\\", "/")
+    if normalized.startswith("./"):
+        return normalized[2:]
+    return normalized
 
 
 def is_ignored_path(path):
@@ -65,7 +72,14 @@ def is_build_relevant(path):
 
 
 def has_build_relevant_changes(paths):
-    """Return True when any changed path is outside the old ignore list."""
+    """Return True when any changed path is outside the old ignore list.
+
+    An empty list is relevant (fail closed): a missing file list must not
+    skip compile-check and build while Required CI stays green.
+    """
+    paths = list(paths)
+    if not paths:
+        return True
     return any(is_build_relevant(path) for path in paths)
 
 

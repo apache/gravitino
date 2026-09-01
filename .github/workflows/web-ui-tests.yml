@@ -15,7 +15,7 @@ on:
       - '.github/workflows/web-ui-tests.yml'
 
 concurrency:
-  group: ${{ inputs.required_ci && 'required-web-ui' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.event_name == 'workflow_call' && inputs.required_ci && 'required-web-ui' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:

@@ -302,6 +302,10 @@ def verify_suites():
             raise AssertionError(
                 f"{workflow_name}: standalone concurrency must use github.workflow"
             )
+        if "github.event_name == 'workflow_call' && inputs.required_ci" not in source:
+            raise AssertionError(
+                f"{workflow_name}: push must not evaluate inputs.required_ci"
+            )
         required_keys.append(expected_key)
         if not re.search(r"(?m)^  cancel-in-progress: true$", source):
             raise AssertionError(f"{workflow_name}: missing cancel-in-progress: true")
@@ -326,6 +330,10 @@ def verify_pull_request_inventory():
         source = path.read_text(encoding="utf-8")
         if re.search(r"(?m)^  pull_request:$", source):
             discovered.append(path.name)
+        if re.search(r"(?m)^  pull_request_target:$", source):
+            raise AssertionError(
+                f"{path.name}: pull_request_target is not an allowlisted PR listener"
+            )
     expected = sorted(["required-ci.yml", *STANDALONE_PULL_REQUEST_WORKFLOWS])
     check_equal("pull_request workflow inventory", sorted(discovered), expected)
     if "chart-test.yaml" in discovered:
@@ -368,6 +376,14 @@ def verify_coverage_comment_follows_parent():
     if "python3 dev/ci/coverage_comment.py" not in source:
         raise AssertionError(
             "coverage-comment.yml: skip/post rules must run from coverage_comment.py"
+        )
+    if "path: coverage-artifact" not in source:
+        raise AssertionError(
+            "coverage-comment.yml: must extract the artifact away from the checkout"
+        )
+    if "COVERAGE_REPORT_FILE: coverage-artifact/coverage-report.md" not in source:
+        raise AssertionError(
+            "coverage-comment.yml: must read coverage-report.md from coverage-artifact/"
         )
     if "github-script" in source:
         raise AssertionError(

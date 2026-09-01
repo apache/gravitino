@@ -89,6 +89,33 @@ def test_java_source_runs_full_build():
     check_equal("java build", result["build"], True)
 
 
+def test_empty_file_list_fails_closed():
+    """A missing changed-file list must not skip the required build jobs."""
+    result = build_relevant.decide([], source_changes=False)
+    check_equal("empty relevant", result["build_relevant_changes"], True)
+    check_equal("empty compile-check", result["compile_check"], True)
+    check_equal("empty build", result["build"], False)
+
+
+def test_normalize_keeps_dot_directories():
+    """A leading ``./`` is stripped; ``.github`` must not lose its dot."""
+    check_equal(
+        "./docs/assets",
+        build_relevant.normalize_path("./docs/assets/logo.png"),
+        "docs/assets/logo.png",
+    )
+    check_equal(
+        ".github",
+        build_relevant.normalize_path(".github/workflows/build.yml"),
+        ".github/workflows/build.yml",
+    )
+    result = build_relevant.decide(
+        [".github/workflows/build.yml"],
+        source_changes=True,
+    )
+    check_equal(".github still builds", result["build"], True)
+
+
 def test_prefix_matching_does_not_over_ignore():
     """``web-v2-extra`` and ``docs/assets-backup`` are not the old ignore dirs."""
     check_equal(
@@ -159,6 +186,8 @@ def main():
         test_mixed_web_v2_and_java_still_builds,
         test_non_source_relevant_file_runs_compile_check,
         test_java_source_runs_full_build,
+        test_empty_file_list_fails_closed,
+        test_normalize_keeps_dot_directories,
         test_prefix_matching_does_not_over_ignore,
         test_directory_roots_and_nested_paths_are_ignored,
         test_workflow_yaml_stays_synced_with_python_model,

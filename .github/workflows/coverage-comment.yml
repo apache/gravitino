@@ -16,7 +16,8 @@ name: Coverage Comment
 #
 # Skip/post rules live in dev/ci/coverage_comment.py (same module jacoco_report.py
 # uses for the comment marker and commit SHA line). Do not trust a PR number
-# from the coverage artifact.
+# from the coverage artifact. Download the artifact into coverage-artifact/ so
+# a fork-controlled zip cannot overwrite the trusted sidecar script.
 on:
   workflow_run:
     workflows: ["Required CI"]
@@ -50,6 +51,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: coverage-report
+          path: coverage-artifact
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
@@ -57,4 +59,5 @@ jobs:
       - name: Post or skip coverage comment
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COVERAGE_REPORT_FILE: coverage-artifact/coverage-report.md
         run: python3 dev/ci/coverage_comment.py

@@ -162,9 +162,10 @@ jobs:
         run: python3 dev/ci/test_build_relevant.py
 
   # Aggregate every reusable suite into one check. `if: always()` runs even
-  # when an upstream suite is skipped (path filter), because a skipped suite
-  # reports `success` and must not fail the aggregate. The job fails only if
-  # any suite reports a non-success result.
+  # when a needed job was cancelled or skipped. Inner path filters still make
+  # the reusable call report success, because each child keeps an unconditional
+  # `changes` job. This job fails if any suite result is not success, including
+  # skipped; a skipped call is a missing required check, not a path no-op.
   required_ci:
     name: Required CI
     if: always()

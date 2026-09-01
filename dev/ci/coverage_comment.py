@@ -42,6 +42,9 @@ COVERAGE_REPORT_FILE = "coverage-report.md"
 SKIPPED_CONCLUSIONS = frozenset({"cancelled", "skipped"})
 ACTION_SKIP = "skip"
 ACTION_POST = "post"
+REQUEST_TIMEOUT_SECONDS = 30
+MAX_COMMENT_CHARS = 65536
+REASON_UNRESOLVED_PR = "could not uniquely resolve PR from workflow_run"
 
 
 def commit_line(sha):
@@ -98,6 +101,15 @@ def resolve_pr_number(workflow_run, list_pulls):
     return None
 
 
+def accept_report_body(report_body):
+    """Return whether fork-controlled markdown is safe to post as a bot comment."""
+    if COMMENT_MARKER not in (report_body or ""):
+        return False, "coverage report is missing the trusted marker"
+    if len(report_body) > MAX_COMMENT_CHARS:
+        return False, "coverage report exceeds comment size limit"
+    return True, "ok"
+
+
 def decide(event, conclusion, has_artifact, workflow_run, pull, pr_number):
     """Return ``(action, reason)`` for posting a coverage comment.
 
@@ -111,7 +123,7 @@ def decide(event, conclusion, has_artifact, workflow_run, pull, pr_number):
     if not has_artifact:
         return ACTION_SKIP, "no coverage-report artifact on the Required CI run"
     if not pr_number or pull is None:
-        return ACTION_SKIP, "could not uniquely resolve PR from workflow_run"
+        return ACTION_SKIP, REASON_UNRESOLVED_PR
     run = run_head(workflow_run)
     live = pull_head(pull)
     if run["sha"] != live["sha"] or run["branch"] != live["branch"] or run["repo"] != live["repo"]:
@@ -150,7 +162,9 @@ class GitHubApi:
             },
         )
         try:
-            with urllib.request.urlopen(request) as response:
+            with urllib.request.urlopen(
+                request, timeout=REQUEST_TIMEOUT_SECONDS
+            ) as response:
                 raw = response.read().decode("utf-8")
                 return json.loads(raw) if raw else None
         except urllib.error.HTTPError as exc:
@@ -216,11 +230,30 @@ def process(event, has_artifact, report_body, api):
     """Apply skip/post rules and optionally write the coverage comment.
 
     Returns ``(action, reason, comment_result_or_none)``. Always stays green
-    for skip; GitHub writes happen only on ``ACTION_POST``.
+    for skip; GitHub writes happen only on ``ACTION_POST``. Cheap local
+    skips do not call GitHub.
     """
     run = event.get("workflow_run") or {}
-    pr_number = resolve_pr_number(run, api.list_pulls)
-    pull = api.get_pull(pr_number) if pr_number else None
+    action, reason = decide(
+        event=run.get("event"),
+        conclusion=run.get("conclusion"),
+        has_artifact=has_artifact,
+        workflow_run=run,
+        pull=None,
+        pr_number=None,
+    )
+    if action != ACTION_POST and reason != REASON_UNRESOLVED_PR:
+        log_decision(action, reason)
+        return action, reason, None
+
+    try:
+        pr_number = resolve_pr_number(run, api.list_pulls)
+        pull = api.get_pull(pr_number) if pr_number else None
+    except (RuntimeError, OSError, TimeoutError) as exc:
+        reason = f"github api failed: {exc}"
+        log_decision(ACTION_SKIP, reason)
+        return ACTION_SKIP, reason, None
+
     action, reason = decide(
         event=run.get("event"),
         conclusion=run.get("conclusion"),
@@ -229,9 +262,14 @@ def process(event, has_artifact, report_body, api):
         pull=pull,
         pr_number=pr_number,
     )
-    log_decision(action, reason)
     if action != ACTION_POST:
+        log_decision(action, reason)
         return action, reason, None
+    accepted, body_reason = accept_report_body(report_body)
+    if not accepted:
+        log_decision(ACTION_SKIP, body_reason)
+        return ACTION_SKIP, body_reason, None
+    log_decision(action, reason)
     body = stamp_commit(report_body or "", run.get("head_sha"))
     result = post_or_update(api, pr_number, body)
     print(f"COMMENT={result}")
