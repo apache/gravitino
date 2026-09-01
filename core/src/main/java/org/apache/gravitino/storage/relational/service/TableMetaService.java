@@ -298,15 +298,14 @@ public class TableMetaService {
    * snapshot without copying the production CAS logic.
    */
   void deleteTableWithVersion(NameIdentifier identifier, TablePO observedTablePO) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper ->
-                mapper.softDeleteTableMetasByTableId(
-                    observedTablePO.getTableId(), observedTablePO.getCurrentVersion()));
-    if (deleted == 0) {
-      throw tableWriteFailure(identifier, observedTablePO);
-    }
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                TableMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteTableMetasByTableId(
+                        observedTablePO.getTableId(), observedTablePO.getCurrentVersion())),
+        () -> tableWriteFailure(identifier, observedTablePO));
   }
 
   @Monitored(
@@ -432,29 +431,18 @@ public class TableMetaService {
   }
 
   private RuntimeException tableWriteFailure(NameIdentifier identifier, TablePO observedTablePO) {
-    // A zero-row CAS has two different meanings:
-    // 1. The same table is still here, but another writer changed its version. The caller should
-    //    retry, so return OptimisticLockException.
-    // 2. The table ID was deleted, renamed, or moved away from the requested name. From the
-    //    caller's point of view the requested table no longer exists, so return NoSuchEntity.
-    //
-    // Read by the stable table ID and lock the row. The lock waits for an in-flight writer to
-    // finish, which lets us classify the failure using committed data instead of guessing while
-    // the other transaction is still running.
-    TablePO currentTablePO =
-        SessionUtils.getWithoutCommit(
-            TableMetaMapper.class,
-            mapper -> mapper.selectTableMetaByIdForUpdate(observedTablePO.getTableId()));
-    if (currentTablePO == null
-        || !Objects.equals(currentTablePO.getTableName(), observedTablePO.getTableName())
-        || !Objects.equals(currentTablePO.getSchemaId(), observedTablePO.getSchemaId())
-        || !Objects.equals(currentTablePO.getCatalogId(), observedTablePO.getCatalogId())
-        || !Objects.equals(currentTablePO.getMetalakeId(), observedTablePO.getMetalakeId())) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.TABLE.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.TABLE, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.TABLE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                TableMetaMapper.class,
+                mapper -> mapper.selectTableMetaByIdForUpdate(observedTablePO.getTableId())),
+        null,
+        current ->
+            Objects.equals(current.getTableName(), observedTablePO.getTableName())
+                && Objects.equals(current.getSchemaId(), observedTablePO.getSchemaId())
+                && Objects.equals(current.getCatalogId(), observedTablePO.getCatalogId())
+                && Objects.equals(current.getMetalakeId(), observedTablePO.getMetalakeId()));
   }
 }
