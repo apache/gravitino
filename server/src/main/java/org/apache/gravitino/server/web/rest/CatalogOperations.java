@@ -331,6 +331,14 @@ public class CatalogOperations {
           String catalogName,
       CatalogUpdatesRequest request) {
     LOG.info("Received alter catalog request for catalog: {}.{}", metalakeName, catalogName);
+    if (request == null) {
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.ALTER,
+          catalogName,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

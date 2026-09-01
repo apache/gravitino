@@ -214,6 +214,13 @@ public class TagOperations {
       @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String name,
       TagUpdatesRequest request) {
     LOG.info("Received alter tag request for tag: {} under metalake: {}", name, metalake);
+    if (request == null) {
+      return ExceptionHandlers.handleTagException(
+          OperationType.ALTER,
+          name,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(

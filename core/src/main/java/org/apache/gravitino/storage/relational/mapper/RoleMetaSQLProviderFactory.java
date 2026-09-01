@@ -55,6 +55,11 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().selectRoleMetaByMetalakeIdAndName(metalakeId, roleName);
   }
 
+  /** Returns SQL that selects and locks an active role by ID. */
+  public static String selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId) {
+    return getProvider().selectRoleMetaByIdForUpdate(roleId);
+  }
+
   public static String selectRoleIdByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String name) {
     return getProvider().selectRoleIdByMetalakeIdAndName(metalakeId, name);
@@ -90,8 +95,9 @@ public class RoleMetaSQLProviderFactory {
     return getProvider().updateRoleMeta(newRolePO, oldRolePO);
   }
 
-  public static String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
-    return getProvider().softDeleteRoleMetaByRoleId(roleId);
+  public static String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteRoleMetaByRoleId(roleId, currentVersion);
   }
 
   public static String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

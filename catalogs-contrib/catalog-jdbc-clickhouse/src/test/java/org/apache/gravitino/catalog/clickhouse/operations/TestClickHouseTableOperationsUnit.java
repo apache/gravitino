@@ -24,9 +24,11 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Statement;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.sql.DataSource;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
@@ -88,9 +90,13 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   private ExposedClickHouseTableOperations newOps() {
+    return newOps(null);
+  }
+
+  private ExposedClickHouseTableOperations newOps(DataSource dataSource) {
     ExposedClickHouseTableOperations ops = new ExposedClickHouseTableOperations();
     ops.initialize(
-        null,
+        dataSource,
         new ClickHouseExceptionConverter(),
         new ClickHouseTypeConverter(),
         new ClickHouseColumnDefaultValueConverter(),
@@ -103,7 +109,6 @@ public class TestClickHouseTableOperationsUnit {
     PreparedStatement statement = Mockito.mock(PreparedStatement.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
     Mockito.when(resultSet.next()).thenReturn(true);
-    Mockito.when(resultSet.getString("name")).thenReturn("test_table");
     Mockito.when(resultSet.getString("COMMENT")).thenReturn("");
     Mockito.when(resultSet.getString("ENGINE")).thenReturn(engine);
     Mockito.when(resultSet.getString("engine_full")).thenReturn(engineFull);
@@ -262,6 +267,82 @@ public class TestClickHouseTableOperationsUnit {
 
     Assertions.assertTrue(exception.getMessage().contains("table_name"));
     Assertions.assertTrue(exception.getMessage().contains("db_name"));
+  }
+
+  @Test
+  void testGetTablePropertiesScopesMetadataToCurrentDatabase() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement statement = Mockito.mock(PreparedStatement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+    Mockito.when(connection.prepareStatement(sqlCaptor.capture())).thenReturn(statement);
+    Mockito.when(statement.executeQuery()).thenReturn(resultSet);
+    Mockito.when(resultSet.next()).thenReturn(true);
+    Mockito.when(resultSet.getString("COMMENT")).thenReturn("table comment");
+    Mockito.when(resultSet.getString("ENGINE")).thenReturn(ENGINE.MERGETREE.getValue());
+    Mockito.when(resultSet.getString("engine_full")).thenReturn("MergeTree ORDER BY id");
+
+    ops.callGetTableProperties(connection, "same_name");
+
+    Assertions.assertEquals(
+        "SELECT comment, engine, engine_full FROM system.tables "
+            + "WHERE database = currentDatabase() AND name = ?",
+        sqlCaptor.getValue());
+    Mockito.verify(statement).setString(1, "same_name");
+  }
+
+  @Test
+  void testRenameUsesTrustedClusterMetadata() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster=ck_cluster", "MergeTree");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    ops.rename("db_name", "old-table", "new table");
+
+    Mockito.verify(mocks.connection).setCatalog("db_name");
+    Mockito.verify(mocks.updateStatement)
+        .executeUpdate("RENAME TABLE `old-table` TO `new table` ON CLUSTER `ck_cluster`");
+  }
+
+  @Test
+  void testRenameDoesNotPromoteUnmarkedDistributedTableToClusterScope() throws Exception {
+    // The Distributed engine contains a cluster name, but only the Gravitino comment marker may
+    // authorize cluster-wide DDL.
+    RenameMocks mocks =
+        renameMocks("external table", "Distributed('ck_cluster', 'db', 'remote', id)");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    ops.rename("db_name", "old_table", "new_table");
+
+    Mockito.verify(mocks.updateStatement).executeUpdate("RENAME TABLE `old_table` TO `new_table`");
+  }
+
+  @Test
+  void testRenameRejectsCorruptedClusterMetadataBeforeMutation() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster= ", "MergeTree");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.rename("db_name", "old_table", "new_table"));
+
+    Assertions.assertTrue(exception.getMessage().contains("missing a cluster name"));
+    Mockito.verify(mocks.connection, Mockito.never()).createStatement();
+  }
+
+  @Test
+  void testRenameMapsSqlException() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster=ck_cluster", "MergeTree");
+    SQLException sqlException = new SQLException("rename failed");
+    Mockito.when(mocks.updateStatement.executeUpdate(Mockito.anyString())).thenThrow(sqlException);
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> ops.rename("db_name", "old_table", "new_table"));
+
+    Assertions.assertSame(sqlException, exception.getCause());
   }
 
   // ---------------------------------------------------------------------------
@@ -609,5 +690,39 @@ public class TestClickHouseTableOperationsUnit {
             GravitinoRuntimeException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
     Assertions.assertTrue(exception.getCause() instanceof SQLException);
     Mockito.verify(connection, Mockito.times(2)).prepareStatement(Mockito.anyString());
+  }
+
+  private RenameMocks renameMocks(String storedComment, String engineFull) throws Exception {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement metadataStatement = Mockito.mock(PreparedStatement.class);
+    ResultSet metadataResult = Mockito.mock(ResultSet.class);
+    Statement updateStatement = Mockito.mock(Statement.class);
+
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(metadataStatement);
+    Mockito.when(metadataStatement.executeQuery()).thenReturn(metadataResult);
+    Mockito.when(metadataResult.next()).thenReturn(true);
+    Mockito.when(metadataResult.getString("COMMENT")).thenReturn(storedComment);
+    Mockito.when(metadataResult.getString("ENGINE"))
+        .thenReturn(
+            engineFull.startsWith("Distributed")
+                ? ENGINE.DISTRIBUTED.getValue()
+                : ENGINE.MERGETREE.getValue());
+    Mockito.when(metadataResult.getString("engine_full")).thenReturn(engineFull);
+    Mockito.when(connection.createStatement()).thenReturn(updateStatement);
+    return new RenameMocks(dataSource, connection, updateStatement);
+  }
+
+  private static final class RenameMocks {
+    private final DataSource dataSource;
+    private final Connection connection;
+    private final Statement updateStatement;
+
+    private RenameMocks(DataSource dataSource, Connection connection, Statement updateStatement) {
+      this.dataSource = dataSource;
+      this.connection = connection;
+      this.updateStatement = updateStatement;
+    }
   }
 }
