@@ -32,6 +32,7 @@ import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
 import java.util.Collections;
@@ -43,6 +44,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.integration.test.service.ClickHouseService;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -942,6 +944,48 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     }
   }
 
+  @Test
+  public void testAlterTableSettingsOnCluster() throws Exception {
+    String tableName = GravitinoITUtils.genRandomName("ck_alter_settings_cluster");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    tableCatalog.createTable(
+        tableIdentifier,
+        createColumns(),
+        tableComment,
+        clusterMergeTreeProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        getSortOrders("col_3"),
+        Indexes.EMPTY_INDEXES);
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.setProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout", "3600"));
+    Table modified = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertEquals(
+        "3600",
+        modified.properties().get(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.removeProperty(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+    Table reset = tableCatalog.loadTable(tableIdentifier);
+    Assertions.assertFalse(
+        reset.properties().containsKey(TableConstants.SETTINGS_PREFIX + "merge_with_ttl_timeout"));
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                clickHouseClusterContainer.getJdbcUrl(TEST_DB_NAME),
+                clickHouseClusterContainer.getUsername(),
+                clickHouseClusterContainer.getPassword());
+        Statement statement = connection.createStatement()) {
+      statement.execute("SYSTEM FLUSH LOGS");
+      assertSettingAlterUsesOnCluster(statement, tableName, "MODIFY SETTING");
+      assertSettingAlterUsesOnCluster(statement, tableName, "RESET SETTING");
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Shard key validation IT tests
   // ---------------------------------------------------------------------------
@@ -1191,6 +1235,25 @@ public class CatalogClickHouseClusterIT extends BaseIT {
     } finally {
       tableCatalog.dropTable(distIdent);
       tableCatalog.dropTable(localIdent);
+    }
+  }
+
+  private static void assertSettingAlterUsesOnCluster(
+      Statement statement, String tableName, String command) throws SQLException {
+    try (ResultSet resultSet =
+        statement.executeQuery(
+            String.format(
+                "SELECT query FROM system.query_log "
+                    + "WHERE type = 'QueryFinish' "
+                    + "AND query_kind = 'Alter' "
+                    + "AND query LIKE '%%`%s`%%' "
+                    + "AND query LIKE '%%%s%%' "
+                    + "ORDER BY event_time DESC LIMIT 1",
+                tableName, command))) {
+      Assertions.assertTrue(resultSet.next(), "Should find " + command + " query");
+      String sql = resultSet.getString("query");
+      Assertions.assertTrue(
+          sql.contains("ON CLUSTER"), command + " must include ON CLUSTER, actual: " + sql);
     }
   }
 }

@@ -175,7 +175,7 @@ See [Manage Catalogs and Schemas](./manage-catalogs-and-schemas.md#schema-operat
 | Indexes             | Primary key; data-skipping indexes `DATA_SKIPPING_MINMAX`, `DATA_SKIPPING_BLOOM_FILTER`, `DATA_SKIPPING_SET`, `DATA_SKIPPING_NGRAMBFV1`, and `DATA_SKIPPING_TOKENBFV1` (configurable granularity via `Index.properties()`).                                                                                                                                                                                                                                                                                                                                   |
 | Distribution        | Gravitino enforces `Distributions.NONE`; no custom distribution strategies.                                                                                                                                                                                                                                                                                                                                                                                               |
 | Column defaults     | Supported.                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Unsupported         | Engine change after creation; removing table properties; auto-increment columns.                                                                                                                                                                                                                                                                                                                                                                                          |
+| Unsupported         | Engine and connector-owned property changes after creation; mixing table setting changes with schema changes; auto-increment columns.                                                                                                                                                                                                                                                                                                                                    |
 
 ### Table Column Types
 
@@ -204,7 +204,12 @@ Other ClickHouse types are exposed as [External Type](./tables-and-views.md#exte
 ### Table Properties
 
 :::note
-- `settings.*` keys are passed to the ClickHouse `SETTINGS` clause verbatim.
+- `settings.*` keys are passed to the ClickHouse `SETTINGS` clause during CREATE TABLE. Their
+  values use ClickHouse scalar literal text: numbers and booleans are unquoted, while strings must
+  be valid single-quoted literals.
+- ALTER TABLE supports setting or resetting table-level `settings.*` properties. A request may
+  contain multiple setting operations of the same form, but cannot mix set and remove operations
+  or combine settings with schema, comment, or index changes.
 - The `engine` value is immutable after creation.
 :::
 
@@ -226,12 +231,12 @@ If you need Gravitino to manage an existing cluster database or table, recreate 
 | Property Name             | Description                                                                                              | Default Value | Required | Reserved | Immutable |
 |---------------------------|----------------------------------------------------------------------------------------------------------|---------------|----------|----------|-----------|
 | `engine`                  | Table engine (for example `MergeTree`, `ReplacingMergeTree`, `Distributed`, `Memory`, etc.)              | `MergeTree`   | No       | No       | Yes       |
-| `cluster-name`            | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | No        |
-| `on-cluster`              | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No       | No       | No        |
-| `cluster-remote-database` | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*   | No       | No        |
-| `cluster-remote-table`    | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*   | No       | No        |
-| `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*   | No       | No        |
-| `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<value>`                                         | (none)        | No       | No       | No        |
+| `cluster-name`            | Cluster name used with `ON CLUSTER` and Distributed engine                                               | (none)        | No\*     | No       | Yes       |
+| `on-cluster`              | Use `ON CLUSTER` when creating the table                                                                 | (none)        | No       | No       | Yes       |
+| `cluster-remote-database` | Remote database for `Distributed` engine                                                                 | (none)        | No\*\*   | No       | Yes       |
+| `cluster-remote-table`    | Remote table for `Distributed` engine                                                                    | (none)        | No\*\*   | No       | Yes       |
+| `cluster-sharding-key`    | Sharding key for `Distributed` engine (expression allowed; referenced columns must be non-null integral) | (none)        | No\*\*   | No       | Yes       |
+| `settings.<name>`         | ClickHouse engine setting forwarded as `SETTINGS <name>=<scalar-literal>`; supports settings-only set or remove requests after creation | (none)        | No       | No       | No        |
 
 \* Required when `on-cluster=true` or `engine=Distributed`.  
 \*\* Required when `engine=Distributed`.
@@ -356,10 +361,13 @@ Supported:
 - Delete columns (with `IF EXISTS` support).
 - Add and drop data-skipping indexes; configure custom `GRANULARITY`, `set(N)`, and `ngrambf_v1`/`tokenbf_v1` Bloom-filter parameters via `Index.properties()`. Adding/dropping primary key is not supported.
 - Update table comment.
+- Modify table-level `settings.*` properties with `MODIFY SETTING` and reset them with `RESET SETTING`. Each request must contain only set operations or only remove operations.
 
 Unsupported:
 - Changing engine after creation.
-- Removing table properties or arbitrary `ALTER TABLE ... SETTINGS`.
+- Altering non-`settings.*` table properties.
+- Mixing settings with schema/comment/index changes, or mixing setting modifications and resets in one request.
+- Column-level SETTINGS and quoted-comma SETTINGS load/recreate round-trip.
 - Auto-increment columns.
 
 See [Manage Relational Metadata Using Gravitino](./manage-relational-metadata-using-gravitino.md#table-operations) for common JDBC semantics.
