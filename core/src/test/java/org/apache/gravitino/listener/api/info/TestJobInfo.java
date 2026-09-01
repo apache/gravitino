@@ -139,4 +139,31 @@ public class TestJobInfo {
 
     Assertions.assertEquals(resolvedTemplate, jobInfo.runtimeJobTemplate());
   }
+
+  @Test
+  public void testFromJobEntityWithMalformedRuntimeJobTemplateDoesNotThrow() {
+    // fromJobEntity() is called inside JobEventDispatcher's try block for getJob/runJob/
+    // cancelJob, after the underlying operation has already succeeded - a malformed or
+    // forward-incompatible stored runtime job template (e.g. a job type unknown to this server
+    // version) must not turn that already-completed operation into a failure. It should just be
+    // omitted from the built JobInfo.
+    JobEntity jobEntity =
+        JobEntity.builder()
+            .withId(1L)
+            .withJobExecutionId("job-execution-1")
+            .withJobTemplateName("test-job-template")
+            .withStatus(JobHandle.Status.QUEUED)
+            .withNamespace(NamespaceUtil.ofJob("test"))
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .withStartedAt(0L)
+            .withFinishedAt(0L)
+            .withRuntimeJobTemplate("{not-valid-json")
+            .build();
+
+    JobInfo jobInfo = Assertions.assertDoesNotThrow(() -> JobInfo.fromJobEntity(jobEntity));
+
+    Assertions.assertNull(jobInfo.runtimeJobTemplate());
+    Assertions.assertEquals(jobEntity.name(), jobInfo.jobId());
+  }
 }

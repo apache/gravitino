@@ -28,12 +28,16 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.job.JobHandle;
 import org.apache.gravitino.job.JobTemplate;
 import org.apache.gravitino.meta.JobEntity;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Represents information about a job, including its ID, template name, status, and audit details.
  */
 @DeveloperApi
 public final class JobInfo {
+
+  private static final Logger LOG = LoggerFactory.getLogger(JobInfo.class);
 
   private final String jobId;
 
@@ -85,12 +89,26 @@ public final class JobInfo {
 
   /**
    * Deserializes the job entity's stored runtime job template JSON, if any, back into a {@link
-   * JobTemplate}.
+   * JobTemplate}. This is called from inside the event dispatcher's try block for getJob/runJob/
+   * cancelJob, after the underlying operation has already succeeded (or, for cancelJob, after the
+   * external cancel call and entity update have already happened) - a malformed or
+   * forward-incompatible stored value (e.g. a job type unknown to this server version) must not
+   * turn that already-completed operation into a 500, so failures here are logged and swallowed
+   * rather than propagated.
    */
   private static JobTemplate toRuntimeJobTemplate(JobEntity jobEntity) {
-    JobTemplateDTO runtimeJobTemplateDTO =
-        DTOConverters.fromRuntimeJobTemplateJson(jobEntity.runtimeJobTemplate(), jobEntity.name());
-    return runtimeJobTemplateDTO == null ? null : DTOConverters.fromDTO(runtimeJobTemplateDTO);
+    try {
+      JobTemplateDTO runtimeJobTemplateDTO =
+          DTOConverters.fromRuntimeJobTemplateJson(
+              jobEntity.runtimeJobTemplate(), jobEntity.name());
+      return runtimeJobTemplateDTO == null ? null : DTOConverters.fromDTO(runtimeJobTemplateDTO);
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to build the runtime job template for job {}, omitting it from the event",
+          jobEntity.name(),
+          e);
+      return null;
+    }
   }
 
   /**

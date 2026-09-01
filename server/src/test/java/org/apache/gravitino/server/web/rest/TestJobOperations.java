@@ -1152,6 +1152,42 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
+  public void testCancelJobWithMalformedRuntimeJobTemplateDoesNotFail() {
+    // By the time toDTO() runs here, jobOperationDispatcher.cancelJob() has already cancelled
+    // the job and updated its stored entity - a malformed stored runtime job template must not
+    // turn that already-completed cancellation into a 500 for the caller. The response should
+    // just omit the runtime job template.
+    JobEntity job =
+        JobEntity.builder()
+            .withId(new Random().nextLong())
+            .withJobExecutionId("job-execution-cancel-malformed")
+            .withNamespace(NamespaceUtil.ofJob(metalake))
+            .withJobTemplateName("shell_template_1")
+            .withStatus(JobHandle.Status.CANCELLED)
+            .withStartedAt(0L)
+            .withFinishedAt(Instant.now().toEpochMilli())
+            .withRuntimeJobTemplate("{not-valid-json")
+            .withAuditInfo(
+                AuditInfo.builder().withCreator("test").withCreateTime(Instant.now()).build())
+            .build();
+
+    when(jobOperationDispatcher.cancelJob(metalake, job.name())).thenReturn(job);
+
+    Response resp =
+        target(jobRunPath())
+            .path(job.name())
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(null);
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    JobResponse jobResp = resp.readEntity(JobResponse.class);
+    Assertions.assertEquals(0, jobResp.getCode());
+    Assertions.assertEquals(JobHandle.Status.CANCELLED, jobResp.getJob().status());
+    Assertions.assertNull(jobResp.getJob().runtimeJobTemplate());
+  }
+
+  @Test
   public void testToDTOFinishedAt() {
     // Sentinel value (<= 0) used by the storage layer means "not finished".
     JobEntity sentinelJob = newJobEntity("shell_template_1", JobHandle.Status.STARTED, 0L);

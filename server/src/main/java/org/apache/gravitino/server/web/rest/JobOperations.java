@@ -26,7 +26,6 @@ import com.google.common.collect.Lists;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeParseException;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -520,35 +519,32 @@ public class JobOperations {
         jobEntity.auditInfo().createTime(),
         jobEntity.startedAtAsInstant(),
         jobEntity.finishedAtAsInstant(),
-        DTOConverters.fromRuntimeJobTemplateJson(jobEntity.runtimeJobTemplate(), jobEntity.name()));
+        toRuntimeJobTemplateDTO(jobEntity));
+  }
+
+  /**
+   * Deserializes the job entity's stored runtime job template JSON, if any. A malformed or
+   * forward-incompatible stored value (e.g. a job type unknown to this server version) must not
+   * make the job unreadable or uncancellable through the API - failures here are logged and
+   * swallowed rather than propagated, so callers of {@link #toDTO(JobEntity)} (get/run/cancel/list
+   * job) always get a usable response with just the runtime job template omitted.
+   */
+  private static JobTemplateDTO toRuntimeJobTemplateDTO(JobEntity jobEntity) {
+    try {
+      return DTOConverters.fromRuntimeJobTemplateJson(
+          jobEntity.runtimeJobTemplate(), jobEntity.name());
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to deserialize the runtime job template for job {}, omitting it from the "
+              + "response",
+          jobEntity.name(),
+          e);
+      return null;
+    }
   }
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {
-    // A single job with a malformed stored runtime job template must not fail the whole list -
-    // skip that job's runtime job template (logging why) rather than letting the exception from
-    // toDTO() propagate and abort the entire response.
-    List<JobDTO> jobDTOs = new ArrayList<>(jobEntities.size());
-    for (JobEntity jobEntity : jobEntities) {
-      try {
-        jobDTOs.add(toDTO(jobEntity));
-      } catch (Exception e) {
-        LOG.warn(
-            "Failed to convert job {} to DTO, returning it without a runtime job template",
-            jobEntity.name(),
-            e);
-        jobDTOs.add(
-            new JobDTO(
-                jobEntity.name(),
-                jobEntity.jobTemplateName(),
-                jobEntity.status(),
-                DTOConverters.toDTO(jobEntity.auditInfo()),
-                jobEntity.auditInfo().createTime(),
-                jobEntity.startedAtAsInstant(),
-                jobEntity.finishedAtAsInstant(),
-                null));
-      }
-    }
-    return jobDTOs;
+    return jobEntities.stream().map(JobOperations::toDTO).collect(Collectors.toList());
   }
 
   @VisibleForTesting
