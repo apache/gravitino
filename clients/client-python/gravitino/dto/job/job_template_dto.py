@@ -113,8 +113,13 @@ class JobTemplateDTO(DataClassJsonMixin, ABC):
     def from_json(
         cls, s: str, infer_missing: bool = False, **kwargs
     ) -> "JobTemplateDTO":
-        """Creates a JobTemplateDTO from a JSON string."""
-        return cls.from_dict_by_type(json.loads(s), infer_missing=infer_missing)
+        """Creates a JobTemplateDTO from a JSON string. Any extra keyword arguments are passed
+        through to json.loads (e.g. parse_float, parse_int), matching the base
+        DataClassJsonMixin.from_json contract rather than silently discarding them.
+        """
+        return cls.from_dict_by_type(
+            json.loads(s, **kwargs), infer_missing=infer_missing
+        )
 
 
 JOB_TYPE_TEMPLATE_MAPPING: Dict[JobType, Type["JobTemplateDTO"]] = {}

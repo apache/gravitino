@@ -587,7 +587,9 @@ components:
           nullable: true
           description: The time when the job finished execution, or null if the job has not finished execution yet
         runtimeJobTemplate:
-          description: The resolved job template that was actually submitted for execution, with placeholders replaced and referenced files downloaded. Omitted for jobs run before this field was introduced
+          description: The resolved job template that was actually submitted for execution, with placeholders replaced and referenced files downloaded. Null for jobs run before this field was introduced, or if the stored value could not be read back
+          type: object
+          nullable: true
           allOf:
             - $ref: "#/components/schemas/JobTemplate"
 

@@ -1483,10 +1483,15 @@ public class DTOConverters {
     try {
       return JsonUtils.anyFieldMapper().readValue(runtimeJobTemplateJson, JobTemplateDTO.class);
     } catch (JsonProcessingException e) {
+      // Deliberately excludes the raw JSON content from the message: the resolved template can
+      // carry sensitive values (env vars, custom fields, credentials substituted from jobConf),
+      // and untrusted content in a log/exception message is also a log-injection risk. The
+      // content length plus the cause's own message (which Jackson scopes to the syntax error,
+      // not the full payload) is enough to debug without echoing arbitrary stored data.
       throw new RuntimeException(
           String.format(
-              "Failed to deserialize the runtime job template for job %s, raw content: %s",
-              jobName, runtimeJobTemplateJson),
+              "Failed to deserialize the runtime job template for job %s (%d chars)",
+              jobName, runtimeJobTemplateJson.length()),
           e);
     }
   }

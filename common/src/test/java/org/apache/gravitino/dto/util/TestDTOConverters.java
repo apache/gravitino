@@ -355,17 +355,17 @@ public class TestDTOConverters {
   }
 
   @Test
-  public void testFromRuntimeJobTemplateJsonMalformedIncludesRawContentInMessage() {
-    // The raw content must be in the exception message - without it, a caller like listJobs
-    // (which logs the exception but must not surface raw job data to API clients) leaves an
-    // admin with only the job name and no way to tell what was actually wrong with the stored
-    // JSON.
+  public void testFromRuntimeJobTemplateJsonMalformedMessageOmitsRawContent() {
+    // The message must name the job (for debugging which row is affected) but must not echo the
+    // raw stored content - the resolved template can carry sensitive values (env vars, custom
+    // fields, credentials substituted from jobConf), and untrusted content in a log/exception
+    // message is also a log-injection risk.
     String malformedJson = "{not-valid-json";
     RuntimeException exception =
         Assertions.assertThrows(
             RuntimeException.class,
             () -> DTOConverters.fromRuntimeJobTemplateJson(malformedJson, "job-1"));
     Assertions.assertTrue(exception.getMessage().contains("job-1"));
-    Assertions.assertTrue(exception.getMessage().contains(malformedJson));
+    Assertions.assertFalse(exception.getMessage().contains(malformedJson));
   }
 }
