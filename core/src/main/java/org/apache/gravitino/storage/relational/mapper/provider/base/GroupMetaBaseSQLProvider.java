@@ -138,6 +138,17 @@ public class GroupMetaBaseSQLProvider {
         + " AND deleted_at = 0";
   }
 
+  /** Returns SQL that selects and locks an active group by ID. */
+  public String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
+    return "SELECT group_id as groupId, group_name as groupName,"
+        + " metalake_id as metalakeId, external_id as externalId, audit_info as auditInfo,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + GROUP_TABLE_NAME
+        + " WHERE group_id = #{groupId} AND deleted_at = 0 FOR UPDATE";
+  }
+
   public String selectGroupMetaByMetalakeNameAndExternalId(
       @Param("metalakeName") String metalakeName, @Param("externalId") String externalId) {
     return "SELECT gt.group_id as groupId, gt.group_name as groupName,"
@@ -245,17 +256,21 @@ public class GroupMetaBaseSQLProvider {
         + " metalake_id = #{groupMeta.metalakeId},"
         + " audit_info = #{groupMeta.auditInfo},"
         + " external_id = #{groupMeta.externalId},"
-        + " current_version = #{groupMeta.currentVersion},"
-        + " last_version = #{groupMeta.lastVersion},"
+        // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
+        // cannot pass a later compare-and-set (an ABA conflict).
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{groupMeta.deletedAt}";
   }
 
-  public String softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId) {
+  public String softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + GROUP_TABLE_NAME
         + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
         + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE group_id = #{groupId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -278,11 +293,7 @@ public class GroupMetaBaseSQLProvider {
         + " last_version = #{newGroupMeta.lastVersion},"
         + " deleted_at = #{newGroupMeta.deletedAt}"
         + " WHERE group_id = #{oldGroupMeta.groupId}"
-        + " AND group_name = #{oldGroupMeta.groupName}"
-        + " AND metalake_id = #{oldGroupMeta.metalakeId}"
-        + " AND audit_info = #{oldGroupMeta.auditInfo}"
         + " AND current_version = #{oldGroupMeta.currentVersion}"
-        + " AND last_version = #{oldGroupMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 

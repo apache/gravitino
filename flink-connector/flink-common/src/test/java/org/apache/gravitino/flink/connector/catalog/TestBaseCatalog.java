@@ -38,6 +38,7 @@ import org.apache.flink.table.catalog.ResolvedCatalogView;
 import org.apache.flink.table.catalog.ResolvedSchema;
 import org.apache.flink.table.catalog.TableChange;
 import org.apache.flink.table.catalog.exceptions.CatalogException;
+import org.apache.flink.table.catalog.exceptions.TableNotExistException;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
@@ -414,12 +415,86 @@ public class TestBaseCatalog {
     }
   }
 
+  @Test
+  public void testAlterTableWithEmptyTableChangesSkipsAlterCall() throws Exception {
+    // Flink may invoke alterTable with an empty change list (a no-op alter). The connector must
+    // not forward an empty update list to Gravitino, which would fail server-side with
+    // "updates must not be empty".
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    CatalogBaseTable table =
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+            schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog, table);
+
+    catalog.alterTable(new ObjectPath("db", "tbl"), table, Collections.emptyList(), false);
+
+    Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  public void testAlterTableWithCommentOnlyAndUnchangedCommentSkipsAlterCall() throws Exception {
+    // The two-argument alterTable diffs only the comment. When the comment is unchanged no
+    // TableChange is produced, so the connector must skip the alter call instead of forwarding an
+    // empty update list.
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    CatalogBaseTable table =
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+            schema, "comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(Mockito.mock(AbstractCatalog.class), gravitinoCatalog, table);
+
+    catalog.alterTable(new ObjectPath("db", "tbl"), table, false);
+
+    Mockito.verify(tableCatalog, Mockito.never()).alterTable(Mockito.any(), Mockito.any());
+  }
+
+  @Test
+  public void testAlterTableWithCommentChangeForwardsAlterCall() throws Exception {
+    // A comment change produces a TableChange, so the alter must be forwarded to Gravitino.
+    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
+    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
+    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
+
+    Schema schema = Schema.newBuilder().column("id", DataTypes.INT()).build();
+    CatalogBaseTable existingTable =
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+            schema, "old comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+    CatalogBaseTable newTable =
+        DefaultCatalogCompat.INSTANCE.createCatalogTable(
+            schema, "new comment", ImmutableList.of(), ImmutableMap.of("key", "value"));
+
+    TestableBaseCatalog catalog =
+        new TestableBaseCatalog(
+            Mockito.mock(AbstractCatalog.class), gravitinoCatalog, existingTable);
+
+    catalog.alterTable(new ObjectPath("db", "tbl"), newTable, false);
+
+    Mockito.verify(tableCatalog, Mockito.times(1)).alterTable(Mockito.any(), Mockito.any());
+  }
+
   private static class TestableBaseCatalog extends BaseCatalog {
 
     private final AbstractCatalog delegate;
     private final Catalog gravitinoCatalog;
+    private final CatalogBaseTable existingTable;
 
     TestableBaseCatalog(AbstractCatalog delegate, Catalog gravitinoCatalog) {
+      this(delegate, gravitinoCatalog, null);
+    }
+
+    TestableBaseCatalog(
+        AbstractCatalog delegate, Catalog gravitinoCatalog, CatalogBaseTable existingTable) {
       super(
           "test",
           Collections.emptyMap(),
@@ -428,6 +503,7 @@ public class TestBaseCatalog {
           Mockito.mock(PartitionConverter.class));
       this.delegate = delegate;
       this.gravitinoCatalog = gravitinoCatalog;
+      this.existingTable = existingTable;
     }
 
     @Override
@@ -438,6 +514,19 @@ public class TestBaseCatalog {
     @Override
     protected Catalog catalog() {
       return gravitinoCatalog;
+    }
+
+    @Override
+    public CatalogBaseTable getTable(ObjectPath tablePath) throws TableNotExistException {
+      if (existingTable != null) {
+        return existingTable;
+      }
+      return super.getTable(tablePath);
+    }
+
+    @Override
+    protected void invalidateTable(ObjectPath tablePath) {
+      // No-op: the native cache is not exercised in these unit tests.
     }
   }
 }

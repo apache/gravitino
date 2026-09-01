@@ -20,6 +20,122 @@ To use Iceberg, you need:
   - ORC
   - Parquet (default)
 
+## How Trino Reaches the Catalog
+
+The Gravitino Trino connector loads every `lakehouse-iceberg` catalog through the Gravitino Iceberg
+REST server (IRC), regardless of the catalog's `catalog-backend`. `catalog-backend` describes how
+Gravitino stores the catalog's metadata; it does not decide how the query engine reaches the data.
+
+This is what makes [credential vending](../security/credential-vending.md) work. Trino only consumes
+vended credentials in its `rest` Iceberg catalog type — the `jdbc` and `hive_metastore` types have
+nowhere to put the session token of an STS temporary credential — so a catalog with
+`credential-providers=s3-token` produces no usable credential on those paths. Routing through the
+IRC means every table access gets a freshly issued temporary credential over the Iceberg REST
+protocol.
+
+The connector already connects to the Gravitino server (it is how catalogs are discovered in the
+first place), so it also asks that server whether it has an Iceberg REST server running as an
+[auxiliary service](../iceberg-rest-service.md) for the connector's metalake. By default, a
+non-REST `lakehouse-iceberg` catalog is not registered until an endpoint is discovered or configured
+explicitly. It is retried during every metadata refresh rather than silently falling back and
+disabling credential vending. To retain the behavior from older connector versions, set
+`gravitino.iceberg.rest-routing-enabled=false`; this skips discovery and translates the catalog's
+`catalog-backend` into the corresponding native Trino Iceberg configuration.
+
+Only the coordinator polls the Gravitino server, so the coordinator resolves the endpoint when a
+catalog is registered or refreshed and hands it to every node (coordinator and workers alike)
+as part of that catalog's own definition — the same way Trino replicates any other catalog property
+cluster-wide. A catalog that could not be registered before the IRC started is registered
+automatically after a later discovery poll succeeds; no Trino restart is required.
+
+Set `gravitino.iceberg.rest-uri` to override the discovered endpoint, and it is required — not just
+an override — for a standalone IRC (its own process, not the Gravitino server's auxiliary service):
+the Gravitino server has no way to know a standalone IRC exists, so discovery never finds one. See
+[Limitations](#limitations).
+
+```properties
+connector.name=gravitino
+gravitino.metalake=test
+gravitino.uri=http://gravitino-host:8090
+
+gravitino.iceberg.rest-uri=http://gravitino-host:9001/iceberg
+```
+
+The connector derives everything else from the catalog itself. The Gravitino catalog name is passed
+as both `iceberg.rest-catalog.warehouse` and `iceberg.rest-catalog.prefix` — the Iceberg client
+selects the catalog twice over, first as the query parameter of the `GET /v1/config` call that
+discovers it, then as the path segment of every request after that.
+
+The Trino native file system is derived from the catalog's `warehouse` scheme, because vended
+credentials are only consumed by Trino's native file systems:
+
+| Warehouse scheme                               | Derived properties                                                                                                                                                 |
+|:------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `s3://`, `s3a://`, `s3n://`                    | `fs.native-s3.enabled`, plus `s3.region`, `s3.endpoint` and `s3.path-style-access` where the catalog defines `s3-region`, `s3-endpoint` and `s3-path-style-access` |
+| `gs://`                                        | `fs.native-gcs.enabled`                                                                                                                                            |
+| `abfs://`, `abfss://`, `wasb://`, `wasbs://`   | `fs.native-azure.enabled`                                                                                                                                          |
+| anything else (`hdfs://`, `file://`, `oss://`) | none — only `fs.hadoop.enabled`                                                                                                                                    |
+
+A scheme in the last row has no Trino native file system, so a catalog that vends credentials for it
+cannot have them applied; the connector logs a warning when it detects that combination.
+
+On the Gravitino side, the IRC must run with the dynamic config provider so it can serve catalogs
+defined in Gravitino:
+
+```properties
+gravitino.auxService.names = iceberg-rest
+gravitino.iceberg-rest.catalog-config-provider = dynamic-config-provider
+gravitino.iceberg-rest.gravitino-metalake = test
+```
+
+### Authenticating to the Iceberg REST Server
+
+If the IRC has authentication enabled, the internal Iceberg REST catalog that the connector builds
+must authenticate to it on its own. This is a separate credential from the one the connector uses
+against the main Gravitino server, and it is not reused automatically. Any property prefixed with
+`gravitino.iceberg.rest-catalog.` is passed through to the internal catalog with the prefix
+rewritten to `iceberg.rest-catalog.`:
+
+```properties
+gravitino.iceberg.rest-catalog.security=OAUTH2
+gravitino.iceberg.rest-catalog.oauth2.credential=client_id:client_secret
+gravitino.iceberg.rest-catalog.oauth2.server-uri=http://your-idp/token
+gravitino.iceberg.rest-catalog.oauth2.scope=email
+```
+
+Omitting this block against an authenticated IRC surfaces as an authentication error rather than a
+missing-configuration error, which is easy to misdiagnose.
+
+Four keys are reserved: `iceberg.rest-catalog.uri`, `.warehouse`, `.prefix` and
+`iceberg.catalog.type`. The connector always derives these itself, so setting them through either
+`gravitino.iceberg.rest-catalog.` or a catalog's `trino.bypass.` has no effect — the connector logs
+when it ignores one.
+
+When `gravitino.client.session.forwardUser=true`, the connector also sets
+`iceberg.rest-catalog.session=USER` so that each query carries the end user's identity to the IRC,
+keeping per-user credential vending and per-user authorization intact. Set
+`gravitino.iceberg.rest-catalog.session` explicitly to override it. See
+[Authentication](./authentication.md) for the full setup.
+
+### Limitations
+
+- One IRC serves exactly one metalake, fixed at startup by
+  `gravitino.iceberg-rest.gravitino-metalake`. The Gravitino server only reports the IRC's endpoint
+  for that metalake. In multi-metalake mode (`gravitino.use-single-metalake=false`), a non-REST
+  Iceberg catalog in another metalake therefore requires a metalake-scoped manual URI or remains
+  unregistered while REST routing is enabled.
+- A catalog created with `catalog-backend=rest` keeps pointing at its own configured `uri` and is
+  not re-routed, since it already reaches an Iceberg REST catalog directly.
+- A deployment that does not run the IRC must set
+  `gravitino.iceberg.rest-routing-enabled=false` to translate non-REST `lakehouse-iceberg` catalogs
+  into Trino's `jdbc` or `hive_metastore` catalog types as before.
+- Discovery only works for an IRC running as a Gravitino auxiliary service
+  (`gravitino.auxService.names=iceberg-rest`), embedded in the same process as the Gravitino server.
+  A standalone IRC — its own process, started with `GravitinoIcebergRESTServer` and its own
+  `gravitino-iceberg-rest-server.conf` — never registers with the Gravitino server, so the server
+  has no way to know it exists; the Gravitino server reports no endpoint even while a standalone IRC
+  is running. Set `gravitino.iceberg.rest-uri` manually in this case.
+
 ## Schema Operations
 
 ### Create a Schema

@@ -30,11 +30,12 @@ import org.apache.ibatis.annotations.Param;
 
 public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   @Override
-  public String softDeleteGroupMetaByGroupId(Long groupId) {
+  public String softDeleteGroupMetaByGroupId(Long groupId, Long currentVersion) {
     return "UPDATE "
         + GROUP_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE group_id = #{groupId} AND deleted_at = 0";
+        + " WHERE group_id = #{groupId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
@@ -67,8 +68,13 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " metalake_id = #{groupMeta.metalakeId},"
         + " external_id = #{groupMeta.externalId},"
         + " audit_info = #{groupMeta.auditInfo},"
-        + " current_version = #{groupMeta.currentVersion},"
-        + " last_version = #{groupMeta.lastVersion},"
+        // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
+        + " current_version = "
+        + GROUP_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + GROUP_TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{groupMeta.deletedAt}";
   }
 

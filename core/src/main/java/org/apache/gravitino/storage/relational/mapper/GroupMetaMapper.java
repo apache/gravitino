@@ -53,6 +53,10 @@ public interface GroupMetaMapper {
   GroupPO selectGroupMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("groupName") String name);
 
+  /** Returns and locks an active group by ID for the current transaction. */
+  @SelectProvider(type = GroupMetaSQLProviderFactory.class, method = "selectGroupMetaByIdForUpdate")
+  GroupPO selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId);
+
   @SelectProvider(
       type = GroupMetaSQLProviderFactory.class,
       method = "listExtendedGroupPOsByMetalakeIdAndNames")
@@ -88,8 +92,14 @@ public interface GroupMetaMapper {
       method = "insertGroupMetaOnDuplicateKeyUpdate")
   void insertGroupMetaOnDuplicateKeyUpdate(@Param("groupMeta") GroupPO groupPO);
 
+  /**
+   * Soft-deletes an active group only when its OCC version still matches.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(type = GroupMetaSQLProviderFactory.class, method = "softDeleteGroupMetaByGroupId")
-  void softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId);
+  Integer softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = GroupMetaSQLProviderFactory.class,

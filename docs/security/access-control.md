@@ -276,14 +276,14 @@ bulk operations are authorized once before processing the request. Role removal 
 item because each role can be removed by the metalake owner or by the owner of that role. Bulk
 requests report item-level failures in `errors`.
 
-| API                                                 | Required privilege                         |
-|-----------------------------------------------------|--------------------------------------------|
-| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`  |
-| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`  |
-| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS` |
-| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS` |
-| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`   |
-| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role |
+| API                                                 | Required privilege                                   |
+|-----------------------------------------------------|------------------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`            |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`            |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS`           |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS`           |
+| `POST /api/bulk/metalakes/{metalake}/roles/add`     | `OWNER` of the metalake or `CREATE_ROLE`             |
+| `POST /api/bulk/metalakes/{metalake}/roles/remove`  | `OWNER` of the metalake, or `OWNER` of the role      |
 
 For example, add users in bulk:
 

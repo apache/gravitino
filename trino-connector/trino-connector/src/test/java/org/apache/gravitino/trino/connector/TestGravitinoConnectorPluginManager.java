@@ -18,13 +18,15 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import io.trino.spi.connector.ConnectorNodePartitioningProvider;
+import static org.assertj.core.api.Assertions.assertThat;
 
-/** Trino NodePartitioningProvider implementation with the new split bucket function signature. */
-public class GravitinoNodePartitioningProvider435 extends GravitinoNodePartitioningProvider {
+import org.junit.jupiter.api.Test;
 
-  public GravitinoNodePartitioningProvider435(
-      ConnectorNodePartitioningProvider nodePartitioningProvider) {
-    super(nodePartitioningProvider);
+class TestGravitinoConnectorPluginManager {
+
+  @Test
+  void testStarburstAiModelUsesApplicationClassLoader() {
+    assertThat(GravitinoConnectorPluginManager.PARENT_FIRST_PACKAGES)
+        .contains("io.starburst.ai.model.");
   }
 }

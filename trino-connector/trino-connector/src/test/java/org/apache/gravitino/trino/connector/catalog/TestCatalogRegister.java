@@ -25,19 +25,35 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.startsWith;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
+import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
+import org.apache.gravitino.trino.connector.metadata.TestGravitinoCatalog;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 public class TestCatalogRegister {
+
+  private static final String DISCOVERED_ICEBERG_REST_URI_PROPERTY = "__gravitino.iceberg.rest-uri";
 
   @TempDir private static Path tempDir;
 
@@ -376,5 +392,156 @@ public class TestCatalogRegister {
     assertEquals(GRAVITINO_MISSING_CONFIG.toErrorCode(), e.getErrorCode());
     assertTrue(e.getMessage().contains("does not exist"));
     assertTrue(e.getMessage().contains("trino.jdbc.ssl.truststore.path"));
+  }
+
+  @Test
+  public void testGenerateCreateCatalogCommandEmbedsDiscoveredUriForIcebergCatalog()
+      throws Exception {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test"));
+    config.setDiscoveredIcebergRestUri("test", "http://irc-host:9001/iceberg");
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(config);
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "iceberg_catalog",
+            "lakehouse-iceberg",
+            "test catalog",
+            Catalog.Type.RELATIONAL,
+            Collections.emptyMap());
+
+    String command =
+        catalogRegister.generateCreateCatalogCommand(
+            "iceberg_catalog", new GravitinoCatalog("test", mockCatalog));
+
+    assertTrue(
+        command.contains(
+            "\"" + DISCOVERED_ICEBERG_REST_URI_PROPERTY + "\":\"http://irc-host:9001/iceberg\""));
+  }
+
+  @Test
+  public void testGenerateCreateCatalogCommandDoesNotEmbedUriForNonIcebergCatalog()
+      throws Exception {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test"));
+    config.setDiscoveredIcebergRestUri("test", "http://irc-host:9001/iceberg");
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(config);
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "hive_catalog",
+            "hive",
+            "test catalog",
+            Catalog.Type.RELATIONAL,
+            Collections.emptyMap());
+
+    String command =
+        catalogRegister.generateCreateCatalogCommand(
+            "hive_catalog", new GravitinoCatalog("test", mockCatalog));
+
+    assertFalse(command.contains(DISCOVERED_ICEBERG_REST_URI_PROPERTY));
+  }
+
+  @Test
+  public void testRedactSecretsMasksSecretBearingProperties() {
+    String command =
+        "CREATE CATALOG c USING gravitino WITH ( "
+            + "\"gravitino.iceberg.rest-catalog.oauth2.credential\"='client:secretvalue', "
+            + "\"gravitino.iceberg.rest-catalog.uri\"='http://irc-host:9001/iceberg', "
+            + "\"some.token\"='abc123', "
+            + "\"trino.bypass.password\"='hunter2', "
+            + "\"trino.bypass.passcode\"='letmein', "
+            + "\"trino.bypass.passphrase\"='opensesame')";
+
+    String redacted = CatalogRegister.redactSecrets(command);
+
+    assertFalse(redacted.contains("secretvalue"));
+    assertFalse(redacted.contains("abc123"));
+    assertFalse(redacted.contains("hunter2"));
+    assertFalse(redacted.contains("letmein"));
+    assertFalse(redacted.contains("opensesame"));
+    assertTrue(redacted.contains("\"gravitino.iceberg.rest-catalog.oauth2.credential\"='***'"));
+    assertTrue(redacted.contains("\"some.token\"='***'"));
+    assertTrue(redacted.contains("\"trino.bypass.password\"='***'"));
+    assertTrue(redacted.contains("\"trino.bypass.passcode\"='***'"));
+    assertTrue(redacted.contains("\"trino.bypass.passphrase\"='***'"));
+    assertTrue(
+        redacted.contains("\"gravitino.iceberg.rest-catalog.uri\"='http://irc-host:9001/iceberg'"));
+  }
+
+  @Test
+  public void testRedactSecretsMasksJsonEmbeddedSecrets() {
+    String command =
+        "CREATE CATALOG c USING gravitino WITH ( "
+            + "\"__gravitino.dynamic.connector.catalog.config\"="
+            + "'{\"name\":\"hive_catalog\",\"properties\":"
+            + "{\"jdbc-password\":\"hunter2\",\"s3-secret-key\":\"abc123\",\"jdbc-user\":\"admin\"}}')";
+
+    String redacted = CatalogRegister.redactSecrets(command);
+
+    assertFalse(redacted.contains("hunter2"));
+    assertFalse(redacted.contains("abc123"));
+    assertTrue(redacted.contains("\"jdbc-password\":\"***\""));
+    assertTrue(redacted.contains("\"s3-secret-key\":\"***\""));
+    // Non-secret properties must survive redaction unchanged.
+    assertTrue(redacted.contains("\"jdbc-user\":\"admin\""));
+  }
+
+  @Test
+  public void testRegisterCatalogRedactsSecretsFromSqlExceptionMessage() throws Exception {
+    // Regression test: some JDBC drivers echo the failing statement back in a SQLException
+    // message. registerCatalog must redact that message the same way it redacts its own success
+    // log, so a failed CREATE CATALOG never surfaces the embedded credential to the caller.
+    String secretValue = "hunter2";
+    Statement statement = mock(Statement.class);
+    when(statement.execute(eq("SHOW CATALOGS"))).thenReturn(true);
+    ResultSet resultSet = mock(ResultSet.class);
+    when(statement.getResultSet()).thenReturn(resultSet);
+    when(resultSet.next()).thenReturn(false);
+    when(statement.execute(startsWith("CREATE CATALOG")))
+        .thenThrow(
+            new SQLException(
+                "Query failed: \"gravitino.iceberg.rest-catalog.oauth2.credential\"='"
+                    + secretValue
+                    + "'"));
+
+    Connection connection = mock(Connection.class);
+    when(connection.createStatement()).thenReturn(statement);
+
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test")));
+    setPrivateField(catalogRegister, "connection", connection);
+    setPrivateField(catalogRegister, "catalogStoreDirectory", tempDir.toString());
+
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "hive_catalog", "hive", "test catalog", Catalog.Type.RELATIONAL, Map.of());
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class, () -> catalogRegister.registerCatalog("hive_catalog", catalog));
+
+    // The original driver SQLException carrying the credential is two levels down the cause
+    // chain: registerCatalog's generic wrapper -> executeSql's generic wrapper -> the redacted
+    // SQLException. No exception in that chain may still carry the raw secret.
+    for (Throwable t = e; t != null; t = t.getCause()) {
+      assertFalse(String.valueOf(t.getMessage()).contains(secretValue));
+    }
+    assertTrue(e.getCause().getCause().getMessage().contains("***"));
+  }
+
+  private static void setPrivateField(Object target, String fieldName, Object value)
+      throws Exception {
+    Field field = CatalogRegister.class.getDeclaredField(fieldName);
+    field.setAccessible(true);
+    field.set(target, value);
   }
 }

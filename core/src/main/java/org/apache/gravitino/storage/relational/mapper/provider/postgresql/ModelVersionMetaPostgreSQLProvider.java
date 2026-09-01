@@ -19,8 +19,6 @@
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import java.util.List;
-import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
-import org.apache.gravitino.storage.relational.mapper.ModelVersionAliasRelMapper;
 import org.apache.gravitino.storage.relational.mapper.ModelVersionMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ModelVersionMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ModelVersionPO;
@@ -29,16 +27,11 @@ import org.apache.ibatis.annotations.Param;
 public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLProvider {
 
   @Override
-  public String softDeleteModelVersionsBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+  public String softDeleteModelVersionsByModelId(Long modelId) {
     return "UPDATE "
         + ModelVersionMetaMapper.TABLE_NAME
-        + " mvi SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE mvi.schema_id = #{schemaId} AND mvi.model_id = ("
-        + " SELECT mm.model_id FROM "
-        + ModelMetaMapper.TABLE_NAME
-        + " mm WHERE mm.schema_id = #{schemaId} AND mm.model_name = #{modelName}"
-        + " AND mm.deleted_at = 0) AND mvi.deleted_at = 0";
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE model_id = #{modelId} AND deleted_at = 0";
   }
 
   @Override
@@ -48,19 +41,6 @@ public class ModelVersionMetaPostgreSQLProvider extends ModelVersionMetaBaseSQLP
         + ModelVersionMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
         + " WHERE model_id = #{modelId} AND version = #{modelVersion} AND deleted_at = 0";
-  }
-
-  @Override
-  public String softDeleteModelVersionMetaByModelIdAndAlias(
-      @Param("modelId") Long modelId, @Param("alias") String alias) {
-    return "UPDATE "
-        + ModelVersionMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE model_id = #{modelId} AND version = ("
-        + " SELECT model_version FROM "
-        + ModelVersionAliasRelMapper.TABLE_NAME
-        + " WHERE model_id = #{modelId} AND model_version_alias = #{alias} AND deleted_at = 0)"
-        + " AND deleted_at = 0";
   }
 
   @Override

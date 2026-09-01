@@ -29,11 +29,12 @@ import org.apache.ibatis.annotations.Param;
 
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
-  public String softDeleteUserMetaByUserId(Long userId) {
+  public String softDeleteUserMetaByUserId(Long userId, Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " WHERE user_id = #{userId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
@@ -68,8 +69,13 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " external_id = #{userMeta.externalId},"
         + " enabled = #{userMeta.enabled},"
         + " audit_info = #{userMeta.auditInfo},"
-        + " current_version = #{userMeta.currentVersion},"
-        + " last_version = #{userMeta.lastVersion},"
+        // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
+        + " current_version = "
+        + USER_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + USER_TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{userMeta.deletedAt}";
   }
 

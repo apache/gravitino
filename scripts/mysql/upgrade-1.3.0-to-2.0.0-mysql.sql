@@ -70,6 +70,10 @@ ALTER TABLE `group_role_rel` RENAME INDEX `idx_rid` TO `group_role_rel_idx_rid`;
 ALTER TABLE `tag_relation_meta` RENAME INDEX `idx_mid` TO `tag_relation_meta_idx_mid`;
 ALTER TABLE `model_meta` RENAME INDEX `idx_mid` TO `model_meta_idx_mid`;
 ALTER TABLE `model_meta` RENAME INDEX `idx_cid` TO `model_meta_idx_cid`;
+
+ALTER TABLE `model_meta`
+    ADD COLUMN `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`,
+    ADD COLUMN `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_mid` TO `model_version_info_idx_mid`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_cid` TO `model_version_info_idx_cid`;
 ALTER TABLE `model_version_info` RENAME INDEX `idx_sid` TO `model_version_info_idx_sid`;

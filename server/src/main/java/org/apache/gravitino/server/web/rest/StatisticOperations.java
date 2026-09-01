@@ -154,6 +154,7 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsUpdateRequest request) {
+    String statisticNames = getStatisticNames(request);
     try {
       LOG.info(
           "Received update statistics request for object full name: {} type: {} in the metalake {}",
@@ -194,7 +195,7 @@ public class StatisticOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.UPDATE, getStatisticNames(request), fullName, e);
+          OperationType.UPDATE, statisticNames, fullName, e);
     }
   }
 
@@ -214,6 +215,10 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsDropRequest request) {
+    String statisticNames =
+        request == null || request.getNames() == null
+            ? ""
+            : StringUtils.join(request.getNames(), ",");
     try {
       LOG.info(
           "Received drop statistics request for object full name: {} type: {} in the metalake {}",
@@ -242,7 +247,7 @@ public class StatisticOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleStatisticException(
-          OperationType.DROP, StringUtils.join(request.getNames(), ","), fullName, e);
+          OperationType.DROP, statisticNames, fullName, e);
     }
   }
 
@@ -353,6 +358,7 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsUpdateRequest request) {
+    String partitions = getPartitionNames(request);
     LOG.info("Updating partition statistics for table: {} in the metalake {}", fullName, metalake);
     try {
       return Utils.doAs(
@@ -404,7 +410,6 @@ public class StatisticOperations {
           fullName,
           metalake,
           e);
-      String partitions = getPartitionNames(request);
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.UPDATE, partitions, fullName, e);
     }
@@ -427,6 +432,7 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsDropRequest request) {
+    String partitions = getDropPartitionNames(request);
 
     try {
       return Utils.doAs(
@@ -461,7 +467,6 @@ public class StatisticOperations {
           fullName,
           metalake,
           e);
-      String partitions = getDropPartitionNames(request);
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.DROP, partitions, fullName, e);
     }

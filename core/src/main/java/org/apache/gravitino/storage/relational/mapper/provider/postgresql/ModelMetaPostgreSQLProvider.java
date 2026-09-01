@@ -31,10 +31,12 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
     return "INSERT INTO "
         + ModelMetaMapper.TABLE_NAME
         + " (model_id, model_name, metalake_id, catalog_id, schema_id,"
-        + " model_comment, model_properties, model_latest_version, audit_info, deleted_at)"
+        + " model_comment, model_properties, model_latest_version, current_version, last_version,"
+        + " audit_info, deleted_at)"
         + " VALUES (#{modelMeta.modelId}, #{modelMeta.modelName}, #{modelMeta.metalakeId},"
         + " #{modelMeta.catalogId}, #{modelMeta.schemaId}, #{modelMeta.modelComment},"
-        + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion}, #{modelMeta.auditInfo},"
+        + " #{modelMeta.modelProperties}, #{modelMeta.modelLatestVersion},"
+        + " #{modelMeta.currentVersion}, #{modelMeta.lastVersion}, #{modelMeta.auditInfo},"
         + " #{modelMeta.deletedAt})"
         + " ON CONFLICT (model_id) DO UPDATE SET"
         + " model_name = #{modelMeta.modelName},"
@@ -43,18 +45,28 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
         + " schema_id = #{modelMeta.schemaId},"
         + " model_comment = #{modelMeta.modelComment},"
         + " model_properties = #{modelMeta.modelProperties},"
-        + " model_latest_version = #{modelMeta.modelLatestVersion},"
+        // Use the larger allocator value when an overwrite carries an older model snapshot.
+        + " model_latest_version = GREATEST("
+        + ModelMetaMapper.TABLE_NAME
+        + ".model_latest_version, #{modelMeta.modelLatestVersion}),"
+        // Qualify current_version with the table name so PostgreSQL knows this is the stored value,
+        // not the value from the insert that caused the conflict.
+        + " current_version = "
+        + ModelMetaMapper.TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + ModelMetaMapper.TABLE_NAME
+        + ".current_version + 1,"
         + " audit_info = #{modelMeta.auditInfo},"
         + " deleted_at = #{modelMeta.deletedAt}";
   }
 
   @Override
-  public String softDeleteModelMetaBySchemaIdAndModelName(
-      @Param("schemaId") Long schemaId, @Param("modelName") String modelName) {
+  public String softDeleteModelMetaByIdAndVersion(Long modelId, Long currentVersion) {
     return "UPDATE "
         + ModelMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE schema_id = #{schemaId} AND model_name = #{modelName} AND deleted_at = 0";
+        + activeModelVersionWhereClause("modelId", "currentVersion");
   }
 
   @Override
@@ -95,33 +107,5 @@ public class ModelMetaPostgreSQLProvider extends ModelMetaBaseSQLProvider {
         + " WHERE model_id IN (SELECT model_id FROM "
         + ModelMetaMapper.TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
-  }
-
-  @Override
-  public String updateModelMeta(
-      @Param("newModelMeta") ModelPO newModelPO, @Param("oldModelMeta") ModelPO oldModelPO) {
-    return "UPDATE "
-        + ModelMetaMapper.TABLE_NAME
-        + " SET model_name = #{newModelMeta.modelName},"
-        + " metalake_id = #{newModelMeta.metalakeId},"
-        + " catalog_id = #{newModelMeta.catalogId},"
-        + " schema_id = #{newModelMeta.schemaId},"
-        + " model_comment = #{newModelMeta.modelComment},"
-        + " model_properties = #{newModelMeta.modelProperties},"
-        + " model_latest_version = #{newModelMeta.modelLatestVersion},"
-        + " audit_info = #{newModelMeta.auditInfo},"
-        + " deleted_at = #{newModelMeta.deletedAt}"
-        + " WHERE model_id = #{oldModelMeta.modelId}"
-        + " AND model_name = #{oldModelMeta.modelName}"
-        + " AND metalake_id = #{oldModelMeta.metalakeId}"
-        + " AND catalog_id = #{oldModelMeta.catalogId}"
-        + " AND schema_id = #{oldModelMeta.schemaId}"
-        + " AND (model_comment = #{oldModelMeta.modelComment}"
-        + "   OR (CAST(model_comment AS VARCHAR) IS NULL"
-        + "   AND CAST(#{oldModelMeta.modelComment} AS VARCHAR) IS NULL))"
-        + " AND model_properties = #{oldModelMeta.modelProperties}"
-        + " AND model_latest_version = #{oldModelMeta.modelLatestVersion}"
-        + " AND audit_info = #{oldModelMeta.auditInfo}"
-        + " AND deleted_at = 0";
   }
 }

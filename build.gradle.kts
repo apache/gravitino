@@ -434,16 +434,7 @@ subprojects {
 
   java {
     toolchain {
-      // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
-      // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
-      // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
-      // Trino-connector on macOS.
-      if (project.name == "trino-connector") {
-        if (OperatingSystem.current().isMacOsX) {
-          vendor.set(JvmVendorSpec.AMAZON)
-        }
-        languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (compatibleWithJDK8(project)) {
+      if (compatibleWithJDK8(project)) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
@@ -1026,7 +1017,6 @@ tasks {
   val assembleDistribution by registering(Tar::class) {
     dependsOn(
       compileDistribution,
-      ":trino-connector:trino-connector-435-439:assembleTrinoConnector",
       ":trino-connector:trino-connector-440-445:assembleTrinoConnector",
       ":trino-connector:trino-connector-446-451:assembleTrinoConnector",
       ":trino-connector:trino-connector-452-468:assembleTrinoConnector",

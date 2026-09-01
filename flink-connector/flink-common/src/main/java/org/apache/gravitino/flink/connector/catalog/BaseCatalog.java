@@ -539,11 +539,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
         throw new CatalogException(e);
       }
     } else {
-      catalog()
-          .asTableCatalog()
-          .alterTable(identifier, getGravitinoTableChanges(existingTable, newTable));
-      // Invalidate native catalog cache after successful alter
-      invalidateTable(tablePath);
+      TableChange[] changes = getGravitinoTableChanges(existingTable, newTable);
+      if (alterGravitinoTable(identifier, changes)) {
+        // Invalidate native catalog cache after successful alter
+        invalidateTable(tablePath);
+      }
     }
   }
 
@@ -593,9 +593,11 @@ public abstract class BaseCatalog extends AbstractCatalog {
         throw new CatalogException(e);
       }
     } else {
-      catalog().asTableCatalog().alterTable(identifier, getGravitinoTableChanges(tableChanges));
-      // Invalidate native catalog cache after successful alter
-      invalidateTable(tablePath);
+      TableChange[] changes = getGravitinoTableChanges(tableChanges);
+      if (alterGravitinoTable(identifier, changes)) {
+        // Invalidate native catalog cache after successful alter
+        invalidateTable(tablePath);
+      }
     }
   }
 
@@ -933,6 +935,28 @@ public abstract class BaseCatalog extends AbstractCatalog {
       throw new IllegalArgumentException(
           String.format("Not support ModifyColumn : %s", change.getClass()));
     }
+  }
+
+  /**
+   * Applies the given table changes to the underlying Gravitino table, skipping the call when there
+   * is nothing to change.
+   *
+   * <p>When {@code changes} is empty the resolved table already matches the existing one (for
+   * example, re-applying the same options or a comment-only alter with an unchanged comment).
+   * Gravitino's {@code TableUpdatesRequest.validate} rejects an empty update list with "updates
+   * must not be empty", so a no-op alter must be skipped rather than forwarded.
+   *
+   * @param identifier the identifier of the table to alter
+   * @param changes the Gravitino table changes to apply
+   * @return {@code true} if the alter was forwarded to Gravitino, {@code false} if it was skipped
+   *     because there was nothing to change
+   */
+  private boolean alterGravitinoTable(NameIdentifier identifier, TableChange[] changes) {
+    if (changes.length == 0) {
+      return false;
+    }
+    catalog().asTableCatalog().alterTable(identifier, changes);
+    return true;
   }
 
   @VisibleForTesting
