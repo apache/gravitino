@@ -310,7 +310,7 @@ public class CatalogConnectorManager {
     loadOutcome =
         new LoadOutcome(previous.lastSuccessTimeMs, message, previous.consecutiveFailures + 1);
     if (!changed) {
-      LOG.debug(cause, "Failed to load catalogs from the Gravitino server: %s", message);
+      LOG.warn(cause, "Failed to load catalogs from the Gravitino server: %s", message);
     } else if (trinoStarted) {
       LOG.error(cause, "Failed to load catalogs from the Gravitino server: %s", message);
     } else {
@@ -325,7 +325,7 @@ public class CatalogConnectorManager {
     if (!Objects.equals(previous, message)) {
       LOG.error(cause, "Load metalake %s failed: %s", metalakeName, message);
     } else {
-      LOG.debug(cause, "Load metalake %s failed: %s", metalakeName, message);
+      LOG.warn(cause, "Load metalake %s failed: %s", metalakeName, message);
     }
   }
 

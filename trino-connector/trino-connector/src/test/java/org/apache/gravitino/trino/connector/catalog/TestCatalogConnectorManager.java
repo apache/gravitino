@@ -511,7 +511,6 @@ public class TestCatalogConnectorManager {
     when(audit.lastModifiedTime()).thenReturn(Instant.now());
     when(catalog.auditInfo()).thenReturn(audit);
 
-    // The re-register that follows the unregister fails.
     doThrow(new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Access Denied"))
         .when(fixture.catalogRegister)
         .registerCatalog(any(), any());
