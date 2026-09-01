@@ -57,7 +57,7 @@ public class FutureGrantManager {
 
   public void grantNewlyCreatedCatalog(String metalake, BaseCatalog catalog) {
     try {
-      AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+      AuthorizationPlugin authorizationPlugin = AuthorizationUtils.getAuthorizationPlugin(catalog);
 
       if (authorizationPlugin == null) {
         // If the authorization plugin is null, it means the catalog does not support authorization,

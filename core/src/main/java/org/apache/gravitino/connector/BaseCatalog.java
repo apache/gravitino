@@ -84,6 +84,9 @@ public abstract class BaseCatalog<T extends BaseCatalog>
   // Underlying access control system plugin for this catalog.
   private volatile AuthorizationPlugin authorizationPlugin;
 
+  // Whether an authorization provider is configured for this catalog.
+  private volatile boolean authorizationProviderConfigured;
+
   private CatalogEntity entity;
 
   private Map<String, String> conf;
@@ -271,6 +274,20 @@ public abstract class BaseCatalog<T extends BaseCatalog>
         .walk(frames -> frames.anyMatch(frame -> frame.getMethodName().equals(methodName)));
   }
 
+  /**
+   * Returns whether this catalog is configured with an authorization provider.
+   *
+   * <p>The flag is set when {@link #initAuthorizationPluginInstance(IsolatedClassLoader, long)}
+   * finds an {@code authorization-provider} property, and it stays set for the whole life of the
+   * catalog. {@link #close()} clears the plugin but not this flag, so a {@code null} plugin on a
+   * catalog that reports {@code true} here means the catalog has already been closed.
+   *
+   * @return true if an authorization provider was configured for this catalog.
+   */
+  public boolean isAuthorizationProviderConfigured() {
+    return authorizationProviderConfigured;
+  }
+
   public AuthorizationPlugin getAuthorizationPlugin() {
     if (authorizationPlugin == null) {
       synchronized (this) {
@@ -298,6 +315,7 @@ public abstract class BaseCatalog<T extends BaseCatalog>
             LOG.info("Authorization provider is not set!");
             return;
           }
+          authorizationProviderConfigured = true;
 
           // use try-with-resources to auto-close authorization object if exit with exception
           try (BaseAuthorization<?> authorization =

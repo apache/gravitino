@@ -39,6 +39,7 @@ import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
+import org.apache.gravitino.exceptions.AuthorizationPluginException;
 import org.apache.gravitino.exceptions.IllegalNameIdentifierException;
 import org.apache.gravitino.exceptions.IllegalNamespaceException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -477,5 +478,59 @@ class TestAuthorizationUtils {
     Assertions.assertEquals(MetadataObject.Type.TABLE, removeChange.metadataObject().type());
     Assertions.assertEquals("catalog.schema.table", removeChange.metadataObject().fullName());
     Assertions.assertEquals(locations, removeChange.getLocations());
+  }
+
+  @Test
+  void testGetAuthorizationPluginReturnsNullWhenNoProviderConfigured() {
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(null);
+    Mockito.when(baseCatalog.isAuthorizationProviderConfigured()).thenReturn(false);
+
+    Assertions.assertNull(AuthorizationUtils.getAuthorizationPlugin(baseCatalog));
+  }
+
+  @Test
+  void testGetAuthorizationPluginFailsWhenCatalogWasClosed() {
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(baseCatalog.name()).thenReturn("closed_catalog");
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(null);
+    Mockito.when(baseCatalog.isAuthorizationProviderConfigured()).thenReturn(true);
+
+    AuthorizationPluginException exception =
+        Assertions.assertThrows(
+            AuthorizationPluginException.class,
+            () -> AuthorizationUtils.getAuthorizationPlugin(baseCatalog));
+    Assertions.assertTrue(
+        exception.getMessage().contains("closed_catalog"), exception.getMessage());
+  }
+
+  @Test
+  void testRemovePrivilegesFailsWhenCatalogWasClosed() {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
+    List<String> locations = Lists.newArrayList("/warehouse/schema/table");
+
+    AccessControlDispatcher accessControlDispatcher = Mockito.mock(AccessControlDispatcher.class);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+    CatalogTestUtils.mockDoWithCatalog(catalogManager, baseCatalog);
+    Mockito.when(baseCatalog.name()).thenReturn("catalog");
+    // The catalog was closed by a concurrent cache eviction: the plugin is gone even though the
+    // catalog is configured with an authorization provider.
+    Mockito.when(baseCatalog.getAuthorizationPlugin()).thenReturn(null);
+    Mockito.when(baseCatalog.isAuthorizationProviderConfigured()).thenReturn(true);
+
+    GravitinoEnv envMock = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(envMock.accessControlDispatcher()).thenReturn(accessControlDispatcher);
+    Mockito.when(envMock.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
+
+      Assertions.assertThrows(
+          AuthorizationPluginException.class,
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  ident, Entity.EntityType.TABLE, locations));
+    }
   }
 }

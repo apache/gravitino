@@ -41,6 +41,7 @@ import org.apache.gravitino.Schema;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FilesetDispatcher;
 import org.apache.gravitino.catalog.hive.HiveConstants;
+import org.apache.gravitino.connector.BaseCatalog;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.dto.authorization.PrivilegeDTO;
 import org.apache.gravitino.dto.util.DTOConverters;
@@ -600,6 +601,28 @@ public class AuthorizationUtils {
     return !SKIP_APPLY_TYPES.contains(type);
   }
 
+  /**
+   * Returns the authorization plugin of the given catalog, or null if the catalog is not configured
+   * with an authorization provider.
+   *
+   * <p>A catalog that was configured with an authorization provider but no longer has a plugin may
+   * have been closed. Calling the plugin is then impossible, and silently skipping the call could
+   * leave stale grants in the external authorization system, so this method fails loudly instead.
+   *
+   * @param catalog the leased catalog to read the authorization plugin from.
+   * @return the authorization plugin, or null if none is configured.
+   */
+  static AuthorizationPlugin getAuthorizationPlugin(BaseCatalog<?> catalog) {
+    AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+    if (authorizationPlugin == null && catalog.isAuthorizationProviderConfigured()) {
+      throw new AuthorizationPluginException(
+          "The authorization plugin of catalog %s is unavailable even though an authorization "
+              + "provider is configured; the catalog may have been closed while it was in use",
+          catalog.name());
+    }
+    return authorizationPlugin;
+  }
+
   private static void callAuthorizationPluginImpl(
       BiConsumer<AuthorizationPlugin, String> consumer,
       CatalogManager catalogManager,
@@ -607,7 +630,7 @@ public class AuthorizationUtils {
     catalogManager.doWithCatalog(
         catalogIdent,
         catalog -> {
-          AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+          AuthorizationPlugin authorizationPlugin = getAuthorizationPlugin(catalog);
           if (authorizationPlugin != null) {
             consumer.accept(authorizationPlugin, catalog.name());
           }
@@ -622,7 +645,7 @@ public class AuthorizationUtils {
     catalogManager.doWithCatalog(
         catalogIdent,
         catalog -> {
-          AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
+          AuthorizationPlugin authorizationPlugin = getAuthorizationPlugin(catalog);
           if (authorizationPlugin != null) {
             consumer.accept(authorizationPlugin);
           }
