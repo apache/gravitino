@@ -99,7 +99,10 @@ public class TrinoQueryTestTool {
               + "otherwise fall back to a single-node setup with combined coordinator-worker roles.");
 
       options.addOption(
-          "trino_version", true, "Specify the Trino version to test, the default value is 440.");
+          "trino_version",
+          true,
+          "Specify the Trino version to test. If not specified, the version pinned in the test "
+              + "docker-compose file is used.");
 
       options.addOption(
           "trino_connector_dir",

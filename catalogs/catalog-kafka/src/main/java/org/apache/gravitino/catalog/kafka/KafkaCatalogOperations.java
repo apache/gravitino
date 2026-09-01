@@ -39,7 +39,6 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -185,14 +184,13 @@ public class KafkaCatalogOperations implements CatalogOperations, SupportsSchema
   }
 
   @Override
-  public void testConnection(
-      NameIdentifier catalogIdent,
-      Catalog.Type type,
-      String provider,
-      String comment,
-      Map<String, String> properties) {
+  public void testConnection(NameIdentifier catalogIdent) {
     try {
       adminClient.listTopics().names().get();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new ConnectionFailedException(
+          e, "Failed to run listTopics in Kafka: %s", e.getMessage());
     } catch (Exception e) {
       throw new ConnectionFailedException(
           e, "Failed to run listTopics in Kafka: %s", e.getMessage());

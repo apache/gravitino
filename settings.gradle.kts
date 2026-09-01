@@ -59,11 +59,8 @@ include(
   "clients:client-python",
   "clients:cli"
 )
-if (gradle.startParameter.projectProperties["enableFuse"]?.toBoolean() == true) {
-  include("clients:filesystem-fuse")
-} else {
-  println("Skipping filesystem-fuse module since enableFuse is set to false")
-}
+// clients:filesystem-fuse is deprecated and excluded from the build. The source is kept
+// in-tree for reference; see clients/filesystem-fuse/README.md for details.
 include("iceberg:iceberg-common")
 include("iceberg:iceberg-rest-server")
 include("iceberg:iceberg-rest-trino-it")

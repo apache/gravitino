@@ -38,6 +38,7 @@ import org.apache.gravitino.cache.Coherence;
 import org.apache.gravitino.cache.EntityCache;
 import org.apache.gravitino.cache.NoOpsCache;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.meta.TopicEntity;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,6 +84,31 @@ public class TestRelationalEntityStore {
     InOrder inOrder = Mockito.inOrder(backend, cache);
     inOrder.verify(backend).update(eq(ident), eq(Entity.EntityType.CATALOG), any(Function.class));
     inOrder.verify(cache).invalidate(ident, Entity.EntityType.CATALOG);
+  }
+
+  @Test
+  void testOverwriteInvalidatesCacheAfterBackendInsert()
+      throws IOException, EntityAlreadyExistsException, IllegalAccessException {
+    NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "topic");
+    TopicEntity topic = Mockito.mock(TopicEntity.class);
+    Mockito.when(topic.nameIdentifier()).thenReturn(ident);
+    Mockito.when(topic.type()).thenReturn(Entity.EntityType.TOPIC);
+    NoOpsCache cache = (NoOpsCache) FieldUtils.readField(store, "cache", true);
+
+    Mockito.doAnswer(
+            invocation -> {
+              Mockito.verify(cache, Mockito.never()).invalidate(ident, Entity.EntityType.TOPIC);
+              return null;
+            })
+        .when(backend)
+        .insert(topic, true);
+
+    store.put(topic, true);
+
+    InOrder inOrder = Mockito.inOrder(backend, cache);
+    inOrder.verify(backend).insert(topic, true);
+    inOrder.verify(cache).invalidate(ident, Entity.EntityType.TOPIC);
+    Mockito.verify(cache, Mockito.never()).put(topic);
   }
 
   @Test

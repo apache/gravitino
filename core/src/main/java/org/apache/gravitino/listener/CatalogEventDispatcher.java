@@ -19,6 +19,7 @@
 
 package org.apache.gravitino.listener;
 
+import java.util.Collections;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.CatalogChange;
@@ -53,6 +54,8 @@ import org.apache.gravitino.listener.api.event.LoadCatalogEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogFailureEvent;
 import org.apache.gravitino.listener.api.event.LoadCatalogPreEvent;
 import org.apache.gravitino.listener.api.info.CatalogInfo;
+import org.apache.gravitino.secret.SecretBinding;
+import org.apache.gravitino.secret.SecretReference;
 import org.apache.gravitino.utils.PrincipalUtils;
 
 /**
@@ -137,12 +140,28 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws NoSuchMetalakeException, CatalogAlreadyExistsException {
+    return createCatalog(
+        ident, type, provider, comment, properties, Collections.emptyMap(), Collections.emptyMap());
+  }
+
+  @Override
+  public Catalog createCatalog(
+      NameIdentifier ident,
+      Catalog.Type type,
+      String provider,
+      String comment,
+      Map<String, String> properties,
+      Map<String, SecretBinding> secretBindings,
+      Map<String, SecretReference> secretReferences)
+      throws NoSuchMetalakeException, CatalogAlreadyExistsException {
     CatalogInfo catalogInfo =
         new CatalogInfo(ident.name(), type, provider, comment, properties, null);
     eventBus.dispatchEvent(
         new CreateCatalogPreEvent(PrincipalUtils.getCurrentUserName(), ident, catalogInfo));
     try {
-      Catalog catalog = dispatcher.createCatalog(ident, type, provider, comment, properties);
+      Catalog catalog =
+          dispatcher.createCatalog(
+              ident, type, provider, comment, properties, secretBindings, secretReferences);
       eventBus.dispatchEvent(
           new CreateCatalogEvent(
               PrincipalUtils.getCurrentUserName(), ident, new CatalogInfo(catalog)));
@@ -199,8 +218,14 @@ public class CatalogEventDispatcher implements CatalogDispatcher {
       String comment,
       Map<String, String> properties)
       throws Exception {
-    // TODO: Support event dispatching for testConnection
+    // TODO(#12566): Support event dispatching for testConnection
     dispatcher.testConnection(ident, type, provider, comment, properties);
+  }
+
+  @Override
+  public void testConnection(NameIdentifier ident) throws Exception {
+    // TODO(#12566): Support event dispatching for testConnection
+    dispatcher.testConnection(ident);
   }
 
   @Override

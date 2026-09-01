@@ -33,10 +33,13 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
+import java.util.Map;
 import java.util.Optional;
+import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
@@ -197,6 +200,24 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testConfigRejectsInvalidIcebergRestRoutingEnabledAtStartup() throws Exception {
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    CatalogRegister catalogRegister = mock(CatalogRegister.class);
+
+    CatalogConnectorManager manager =
+        new CatalogConnectorManager(catalogRegister, createCatalogConnectorFactory(), null);
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090",
+                "gravitino.metalake", "test",
+                "gravitino.use-single-metalake", "true",
+                "gravitino.iceberg.rest-routing-enabled", "yes"));
+
+    assertThrows(TrinoException.class, () -> manager.config(config, client));
+  }
+
+  @Test
   public void testIcebergRestRoutingDisabledSkipsDiscovery() throws Exception {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
@@ -267,6 +288,36 @@ public class TestCatalogConnectorManager {
 
     verify(client, times(2)).icebergRestServiceUri("test");
     assertEquals("http://irc-host:9001/iceberg", config.getDiscoveredIcebergRestUri("test"));
+  }
+
+  @Test
+  public void testPropsWithSecrets() {
+    Catalog catalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets())
+        .thenReturn(Map.of("jdbc-password", "secret", "shared", "from-secret"));
+
+    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
+
+    assertEquals("v1", merged.get("visible"));
+    assertEquals("secret", merged.get("jdbc-password"));
+    assertEquals("from-secret", merged.get("shared"));
+  }
+
+  @Test
+  public void testPropsWithSecretsNullProps() {
+    Catalog catalog = mock(Catalog.class);
+    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+    when(catalog.properties()).thenReturn(null);
+    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
+    when(supportsSecrets.getSecrets()).thenReturn(Map.of("jdbc-password", "secret"));
+
+    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
+
+    assertEquals("secret", merged.get("jdbc-password"));
+    assertEquals(1, merged.size());
   }
 
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)

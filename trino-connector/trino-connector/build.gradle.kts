@@ -18,7 +18,6 @@
  */
 
 import net.ltgt.gradle.errorprone.errorprone
-import org.gradle.internal.os.OperatingSystem
 
 plugins {
   id("java")
@@ -33,31 +32,16 @@ val minSupportedTrinoVersionProperty = providers.gradleProperty("minSupportedTri
 val trinoVersionProperty = providers.gradleProperty("trinoVersion").orElse(minSupportedTrinoVersionProperty)
 val trinoVersion = trinoVersionProperty.map { it.trim().toInt() }.get()
 
-if (trinoVersion >= 440) {
-  // Trino 440+'s trino-spi is compiled for JDK 21+, so this module needs the same JDK 24
-  // toolchain the versioned trino-connector-<range> modules use for the same trinoVersion.
-  // Error Prone is incompatible with that toolchain, so it is disabled here too, matching those
-  // modules' own override.
-  java {
-    toolchain.languageVersion.set(JavaLanguageVersion.of(24))
-  }
-  tasks.withType<JavaCompile>().configureEach {
-    options.errorprone.isEnabled.set(false)
-    options.release.set(17)
-  }
-} else {
-  java {
-    toolchain {
-      // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building
-      // trino-connector: It will cause tests of Trino-connector hanging forever on macOS, to
-      // avoid this issue and other vendor-related problems, Gravitino will use the specified
-      // AMAZON OpenJDK 17 to build Trino-connector on macOS.
-      if (OperatingSystem.current().isMacOsX) {
-        vendor.set(JvmVendorSpec.AMAZON)
-      }
-      languageVersion.set(JavaLanguageVersion.of(17))
-    }
-  }
+// Trino 440+'s trino-spi is compiled for JDK 21+, so this module needs the same JDK 24
+// toolchain the versioned trino-connector-<range> modules use. Error Prone is incompatible
+// with that toolchain, so it is disabled here too, matching those modules' own override.
+java {
+  toolchain.languageVersion.set(JavaLanguageVersion.of(24))
+}
+
+tasks.withType<JavaCompile>().configureEach {
+  options.errorprone.isEnabled.set(false)
+  options.release.set(17)
 }
 
 dependencies {
@@ -65,10 +49,11 @@ dependencies {
   implementation(project(":clients:client-java-runtime", configuration = "shadow"))
 
   implementation(libs.airlift.json)
-  implementation(libs.bundles.log4j)
   implementation(libs.commons.collections4)
   implementation(libs.commons.lang3)
   implementation("io.trino:trino-jdbc:$trinoVersion")
+  implementation(libs.airlift.log)
+  implementation(libs.slf4j.jdk14)
   compileOnly(libs.airlift.resolver)
   compileOnly("io.trino:trino-spi:$trinoVersion") {
     exclude("org.apache.logging.log4j")

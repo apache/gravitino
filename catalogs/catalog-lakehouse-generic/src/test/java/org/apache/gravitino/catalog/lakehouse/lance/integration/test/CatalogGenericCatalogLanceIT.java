@@ -154,6 +154,12 @@ public class CatalogGenericCatalogLanceIT extends BaseIT {
   }
 
   @Test
+  void testExistingCatalogConnectionIsUnsupported() {
+    Assertions.assertThrows(
+        UnsupportedOperationException.class, () -> metalake.testConnection(catalogName));
+  }
+
+  @Test
   public void testPurgeTableWhenLocationMissing() throws IOException {
     Column[] columns = createColumns();
     String location = tempDirectory + "/" + GravitinoITUtils.genRandomName(TABLE_PREFIX) + "/";

@@ -69,12 +69,12 @@ discovers it, then as the path segment of every request after that.
 The Trino native file system is derived from the catalog's `warehouse` scheme, because vended
 credentials are only consumed by Trino's native file systems:
 
-| Warehouse scheme                          | Derived properties                                                                                    |
-|:------------------------------------------|:------------------------------------------------------------------------------------------------------|
-| `s3://`, `s3a://`, `s3n://`               | `fs.native-s3.enabled`, plus `s3.region`, `s3.endpoint` and `s3.path-style-access` where the catalog defines `s3-region`, `s3-endpoint` and `s3-path-style-access` |
-| `gs://`                                   | `fs.native-gcs.enabled`                                                                                |
-| `abfs://`, `abfss://`, `wasb://`, `wasbs://` | `fs.native-azure.enabled`                                                                           |
-| anything else (`hdfs://`, `file://`, `oss://`) | none — only `fs.hadoop.enabled`                                                                   |
+| Warehouse scheme                               | Derived properties                                                                                                                                                 |
+|:------------------------------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `s3://`, `s3a://`, `s3n://`                    | `fs.native-s3.enabled`, plus `s3.region`, `s3.endpoint` and `s3.path-style-access` where the catalog defines `s3-region`, `s3-endpoint` and `s3-path-style-access` |
+| `gs://`                                        | `fs.native-gcs.enabled`                                                                                                                                            |
+| `abfs://`, `abfss://`, `wasb://`, `wasbs://`   | `fs.native-azure.enabled`                                                                                                                                          |
+| anything else (`hdfs://`, `file://`, `oss://`) | none — only `fs.hadoop.enabled`                                                                                                                                    |
 
 A scheme in the last row has no Trino native file system, so a catalog that vends credentials for it
 cannot have them applied; the connector logs a warning when it detects that combination.

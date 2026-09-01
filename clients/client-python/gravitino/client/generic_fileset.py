@@ -16,6 +16,7 @@
 # under the License.
 from typing import Dict, List, Optional
 
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.credential.credential import Credential
 from gravitino.api.credential.supports_credentials import SupportsCredentials
 from gravitino.api.secret.supports_secrets import SupportsSecrets
@@ -26,6 +27,9 @@ from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
+)
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
 )
 from gravitino.client.metadata_object_secret_operations import (
     MetadataObjectSecretOperations,
@@ -40,6 +44,7 @@ from gravitino.utils import HTTPClient
 class GenericFileset(
     Fileset,
     SupportsCredentials,
+    SupportsRoles,
     SupportsSecrets,
     SupportsTags,
 ):
@@ -69,6 +74,9 @@ class GenericFileset(
         self._object_tag_operations = MetadataObjectTagOperations(
             full_namespace.level(0), metadata_object, rest_client
         )
+        self._object_role_operations = MetadataObjectRoleOperations(
+            full_namespace.level(0), metadata_object, rest_client
+        )
 
     def name(self) -> str:
         return self._fileset.name()
@@ -94,8 +102,14 @@ class GenericFileset(
     def supports_tags(self) -> SupportsTags:
         return self
 
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
     def get_credentials(self) -> List[Credential]:
         return self._object_credential_operations.get_credentials()
+
+    def list_binding_role_names(self) -> List[str]:
+        return self._object_role_operations.list_binding_role_names()
 
     def support_secrets(self) -> SupportsSecrets:
         return self

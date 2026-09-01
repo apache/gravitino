@@ -163,7 +163,18 @@ public class IcebergRESTServiceOperations {
             config,
             enableHttps ? HTTPS_PORT_KEY : HTTP_PORT_KEY,
             enableHttps ? DEFAULT_HTTPS_PORT : DEFAULT_HTTP_PORT);
-    return String.format("%s://%s:%d/iceberg", scheme, host, port);
+    return String.format("%s://%s:%d/iceberg", scheme, bracketIfIPv6(host), port);
+  }
+
+  // An IPv6 literal host (e.g. "::1", from an explicit config value or from
+  // HttpServletRequest#getServerName()) must be bracketed to form a valid URI authority;
+  // otherwise its colons are parsed as the port separator. A hostname or IPv4 address never
+  // contains a colon, so this only ever fires for IPv6.
+  private static String bracketIfIPv6(String host) {
+    if (host.contains(":") && !host.startsWith("[")) {
+      return "[" + host + "]";
+    }
+    return host;
   }
 
   private static int parsePort(Map<String, String> config, String key, int defaultPort) {

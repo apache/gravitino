@@ -248,6 +248,9 @@ public class IcebergCatalogPropertyConverter extends CatalogPropertyConverter {
     return jdbcProperties;
   }
 
+  // Called before the reserved keys (type/uri/warehouse/prefix) are put into `config` below, so
+  // any value already present at this point came from the catalog's own properties or bypass
+  // config and is about to be silently overwritten; this logs that so it isn't a silent no-op.
   private void warnOnReservedOverrides(GravitinoCatalog catalog, Map<String, String> config) {
     for (String reserved : RESERVED_REST_PROPERTIES) {
       if (config.containsKey(reserved)) {
