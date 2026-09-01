@@ -18,7 +18,7 @@
 #
 [versions]
 awssdk = "2.31.73"
-azure-identity = "1.13.1"
+azure-identity = "1.18.5"
 azure-storage-file-datalake = "12.20.0"
 reactor-netty-http = "1.2.1"
 reactor-netty-core = "1.2.1"
