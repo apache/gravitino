@@ -207,9 +207,8 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
 
   /**
    * Derives the native Iceberg FileIO implementation for a warehouse location, or {@code null} if
-   * the scheme has none (e.g. {@code hdfs://}, {@code file://}, {@code oss://}). Package-private so
-   * the routing decision can check whether a warehouse has a native FileIO without duplicating the
-   * scheme list.
+   * the scheme has none (e.g. {@code hdfs://}, {@code file://}). Package-private so the routing
+   * decision can check whether a warehouse has a native FileIO without duplicating the scheme list.
    */
   static String deriveFileIoImpl(String warehouse) {
     if (StringUtils.isBlank(warehouse) || !warehouse.contains("://")) {
@@ -228,6 +227,8 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
       case "wasb":
       case "wasbs":
         return IcebergPropertiesConstants.ICEBERG_ADLS_FILE_IO_IMPL;
+      case "oss":
+        return IcebergPropertiesConstants.ICEBERG_OSS_FILE_IO_IMPL;
       default:
         return null;
     }
@@ -251,7 +252,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     LOG.warn(
         "Warehouse '{}' has no native Iceberg FileIO for the credentials vended by '{}' to be "
             + "applied to; table access may fail to authenticate unless 'io-impl' is set "
-            + "explicitly. Schemes with a native FileIO: s3/s3a/s3n, gs, abfs/abfss/wasb/wasbs.",
+            + "explicitly. Schemes with a native FileIO: s3/s3a/s3n, gs, abfs/abfss/wasb/wasbs, oss.",
         warehouse,
         gravitinoProperties.get(CredentialConstants.CREDENTIAL_PROVIDERS));
   }

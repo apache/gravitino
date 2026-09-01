@@ -222,6 +222,30 @@ public class TestIcebergPropertiesConverter {
   }
 
   @Test
+  void testIcebergRestPropertiesDerivesNativeFileIoPerScheme() {
+    Assertions.assertEquals(
+        "org.apache.iceberg.gcp.gcs.GCSFileIO", fileIoForWarehouse("gs://bucket/warehouse"));
+    Assertions.assertEquals(
+        "org.apache.iceberg.azure.adlsv2.ADLSFileIO",
+        fileIoForWarehouse("abfss://container@account.dfs.core.windows.net/warehouse"));
+    Assertions.assertEquals(
+        "org.apache.iceberg.aliyun.oss.OSSFileIO", fileIoForWarehouse("oss://bucket/warehouse"));
+  }
+
+  private String fileIoForWarehouse(String warehouse) {
+    Map<String, String> gravitinoProperties =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE,
+            IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_WAREHOUSE,
+            warehouse);
+    Map<String, String> properties =
+        icebergPropertiesConverter.buildIcebergRestProperties(
+            "my_catalog", "http://gravitino:9001/iceberg", gravitinoProperties, ImmutableMap.of());
+    return properties.get(IcebergConstants.IO_IMPL);
+  }
+
+  @Test
   void testIcebergRestPropertiesWarehouseSchemeWithoutNativeFileIo() {
     Map<String, String> gravitinoProperties =
         ImmutableMap.of(

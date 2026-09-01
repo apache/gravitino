@@ -94,6 +94,7 @@ public class IcebergPropertiesConstants {
   static final String ICEBERG_S3_FILE_IO_IMPL = "org.apache.iceberg.aws.s3.S3FileIO";
   static final String ICEBERG_GCS_FILE_IO_IMPL = "org.apache.iceberg.gcp.gcs.GCSFileIO";
   static final String ICEBERG_ADLS_FILE_IO_IMPL = "org.apache.iceberg.azure.adlsv2.ADLSFileIO";
+  static final String ICEBERG_OSS_FILE_IO_IMPL = "org.apache.iceberg.aliyun.oss.OSSFileIO";
 
   static final String ICEBERG_ACCESS_DELEGATION = IcebergConstants.ICEBERG_ACCESS_DELEGATION;
   static final String ICEBERG_ACCESS_DELEGATION_VENDED_CREDENTIALS = "vended-credentials";

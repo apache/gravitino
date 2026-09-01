@@ -175,16 +175,22 @@ public class GravitinoIcebergCatalog extends BaseCatalog
     try {
       discoveredUri = endpointDiscovery.get();
     } catch (RuntimeException e) {
+      // endpointDiscovery can throw for reasons other than connectivity (e.g. a bug in client
+      // bootstrapping), so the exception's own type is included rather than assuming it is
+      // always a reachability/config problem.
       if (!routingExplicitlyEnabled) {
         LOG.warn(
-            "Failed to discover the Iceberg REST endpoint; falling back to legacy Hive/JDBC "
+            "Failed to discover the Iceberg REST endpoint ({}); falling back to legacy Hive/JDBC "
                 + "backend translation. Set {}=true to require Iceberg REST routing.",
+            e.getClass().getSimpleName(),
             GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED,
             e);
         return Optional.empty();
       }
       throw new IllegalStateException(
-          "Failed to discover the Iceberg REST endpoint. Configure "
+          "Failed to discover the Iceberg REST endpoint ("
+              + e.getClass().getSimpleName()
+              + "). Configure "
               + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI
               + ", use a Gravitino server that supports /api/system/iceberg-rest, or set "
               + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
