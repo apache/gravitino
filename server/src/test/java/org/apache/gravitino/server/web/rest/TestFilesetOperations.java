@@ -398,6 +398,17 @@ public class TestFilesetOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterFilesetWithNullRequest() {
+    Response resp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testRenameFileset() {
     FilesetUpdateRequest req = new FilesetUpdateRequest.RenameFilesetRequest("new name");
     Fileset fileset =

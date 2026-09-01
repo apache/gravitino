@@ -253,6 +253,17 @@ public class TestMetalakeOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterMetalakeWithNullRequest() {
+    Response resp =
+        target("/metalakes/test")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testLoadMetalake() {
     String metalakeName = "test";
     Long id = 1L;

@@ -253,6 +253,13 @@ public class JobOperations {
       JobTemplateUpdatesRequest request) {
     LOG.info(
         "Received request to alter job template: {} in metalake: {}", jobTemplateName, metalake);
+    if (request == null) {
+      return ExceptionHandlers.handleJobTemplateException(
+          OperationType.ALTER,
+          jobTemplateName,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(

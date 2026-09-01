@@ -252,6 +252,14 @@ public class FunctionOperations {
           String function,
       FunctionUpdatesRequest request) {
     LOG.info("Received alter function request: {}.{}.{}.{}", metalake, catalog, schema, function);
+    if (request == null) {
+      return ExceptionHandlers.handleFunctionException(
+          OperationType.ALTER,
+          function,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

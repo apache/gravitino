@@ -289,6 +289,14 @@ public class FilesetOperations {
       @PathParam("fileset") @AuthorizationMetadata(type = Entity.EntityType.FILESET) String fileset,
       FilesetUpdatesRequest request) {
     LOG.info("Received alter fileset request: {}.{}.{}.{}", metalake, catalog, schema, fileset);
+    if (request == null) {
+      return ExceptionHandlers.handleFilesetException(
+          OperationType.ALTER,
+          fileset,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
