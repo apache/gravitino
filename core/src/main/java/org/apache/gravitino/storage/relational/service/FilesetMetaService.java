@@ -466,15 +466,14 @@ public class FilesetMetaService {
    * @param observedFilesetPO the fileset row and OCC version observed by the caller
    */
   void deleteFilesetWithVersion(NameIdentifier identifier, FilesetPO observedFilesetPO) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class,
-            mapper ->
-                mapper.softDeleteFilesetMetasByFilesetId(
-                    observedFilesetPO.getFilesetId(), observedFilesetPO.getCurrentVersion()));
-    if (deleted == 0) {
-      throw filesetWriteFailure(identifier, observedFilesetPO);
-    }
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteFilesetMetasByFilesetId(
+                        observedFilesetPO.getFilesetId(), observedFilesetPO.getCurrentVersion())),
+        () -> filesetWriteFailure(identifier, observedFilesetPO));
   }
 
   private boolean tryUpdateFileset(FilesetPO newFilesetPO, FilesetPO oldFilesetPO) {
@@ -553,18 +552,16 @@ public class FilesetMetaService {
     // The failed CAS has already serialized with an in-flight writer. A non-locking natural-key
     // lookup is enough to distinguish a disappeared name from one that still names either the
     // modified fileset or a replacement, without holding another row lock on the failure path.
-    Long currentFilesetId =
-        SessionUtils.getWithoutCommit(
-            FilesetMetaMapper.class,
-            mapper ->
-                mapper.selectFilesetIdBySchemaIdAndName(
-                    observedFilesetPO.getSchemaId(), observedFilesetPO.getFilesetName()));
-    if (currentFilesetId == null) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.FILESET.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.FILESET, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.FILESET,
+        () ->
+            SessionUtils.getWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper ->
+                    mapper.selectFilesetIdBySchemaIdAndName(
+                        observedFilesetPO.getSchemaId(), observedFilesetPO.getFilesetName())),
+        null,
+        null);
   }
 }

@@ -188,13 +188,23 @@ public class TestAuthMappers {
   void testRoleMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertRole(13L, "role13", 1L);
-    roleMetaMapper.softDeleteRoleMetaByRoleId(13L);
+    roleMetaMapper.softDeleteRoleMetaByRoleId(13L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
     roleMetaMapper.touchRoleUpdatedAt(13L);
     long afterUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
 
     Assertions.assertEquals(beforeUpdatedAt, afterUpdatedAt);
+  }
+
+  @Test
+  void testRoleDeleteUsesCurrentVersion() {
+    insertMetalake(1L, "metalake1");
+    insertRole(14L, "role14", 1L);
+
+    Assertions.assertEquals(0, roleMetaMapper.softDeleteRoleMetaByRoleId(14L, 2L));
+    Assertions.assertNotNull(roleMetaMapper.selectRoleMetaByMetalakeIdAndName(1L, "role14"));
+    Assertions.assertEquals(1, roleMetaMapper.softDeleteRoleMetaByRoleId(14L, 1L));
   }
 
   @Test
