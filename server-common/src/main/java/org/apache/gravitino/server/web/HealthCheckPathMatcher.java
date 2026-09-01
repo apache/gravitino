@@ -37,10 +37,9 @@ public class HealthCheckPathMatcher {
    * Returns {@code true} if {@code path} targets a Gravitino health check endpoint.
    *
    * <p>Covers the canonical API path ({@code /api/health} and {@code /api/health/*}) and the
-   * root-level aliases ({@code /health}, {@code /health/*}, {@code /health.html}) that forward to
-   * the canonical paths. During a {@link javax.servlet.RequestDispatcher} forward, {@code
-   * getRequestURI()} returns the original URI rather than the target, so these aliases must be
-   * included here.
+   * root-level health aliases ({@code /health}, {@code /health/*}, {@code /health.html}) that
+   * forward to the canonical paths. Also covers the web UI root ({@code /}) and static resource
+   * paths ({@code /ui/*}) so the login page is reachable without authentication.
    *
    * <p>Subclasses should override this method and call {@code super.isHealthCheckPath(path)} first
    * to preserve the base paths.
@@ -56,6 +55,8 @@ public class HealthCheckPathMatcher {
         || path.startsWith("/health/")
         || path.equals("/health.html")
         || path.equals("/api/health")
-        || path.startsWith("/api/health/");
+        || path.startsWith("/api/health/")
+        || path.equals("/")
+        || path.startsWith("/ui/");
   }
 }
