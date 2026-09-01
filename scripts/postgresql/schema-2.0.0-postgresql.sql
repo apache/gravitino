@@ -843,6 +843,7 @@ CREATE TABLE IF NOT EXISTS job_run_meta (
     job_run_status VARCHAR(64) NOT NULL,
     job_started_at BIGINT NOT NULL DEFAULT 0,
     job_finished_at BIGINT NOT NULL DEFAULT 0,
+    runtime_job_template TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
@@ -861,6 +862,7 @@ COMMENT ON COLUMN job_run_meta.job_execution_id IS 'job execution id';
 COMMENT ON COLUMN job_run_meta.job_run_status IS 'job run status';
 COMMENT ON COLUMN job_run_meta.job_started_at IS 'job run started at';
 COMMENT ON COLUMN job_run_meta.job_finished_at IS 'job run finished at';
+COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 COMMENT ON COLUMN job_run_meta.audit_info IS 'job run audit info';
 COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';
 COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';

@@ -32,7 +32,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
     return "INSERT INTO "
         + JobMetaMapper.TABLE_NAME
         + " (job_run_id, job_template_id, metalake_id,"
-        + " job_execution_id, job_run_status, job_started_at, job_finished_at, audit_info,"
+        + " job_execution_id, job_run_status, job_started_at, job_finished_at,"
+        + " runtime_job_template, audit_info,"
         + " current_version, last_version, deleted_at)"
         + " VALUES (#{jobMeta.jobRunId},"
         + " (SELECT job_template_id FROM "
@@ -41,8 +42,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " AND metalake_id = #{jobMeta.metalakeId} AND deleted_at = 0),"
         + " #{jobMeta.metalakeId}, #{jobMeta.jobExecutionId},"
         + " #{jobMeta.jobRunStatus}, #{jobMeta.jobStartedAt}, #{jobMeta.jobFinishedAt},"
-        + " #{jobMeta.auditInfo}, #{jobMeta.currentVersion}, #{jobMeta.lastVersion},"
-        + " #{jobMeta.deletedAt})"
+        + " #{jobMeta.runtimeJobTemplate}, #{jobMeta.auditInfo}, #{jobMeta.currentVersion},"
+        + " #{jobMeta.lastVersion}, #{jobMeta.deletedAt})"
         + " ON CONFLICT (job_run_id) DO UPDATE SET"
         + " job_template_id = (SELECT job_template_id FROM "
         + JobTemplateMetaMapper.TABLE_NAME
@@ -53,6 +54,7 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
         + " job_run_status = #{jobMeta.jobRunStatus},"
         + " job_started_at = #{jobMeta.jobStartedAt},"
         + " job_finished_at = #{jobMeta.jobFinishedAt},"
+        + " runtime_job_template = #{jobMeta.runtimeJobTemplate},"
         + " audit_info = #{jobMeta.auditInfo},"
         + " current_version = #{jobMeta.currentVersion},"
         + " last_version = #{jobMeta.lastVersion},"
