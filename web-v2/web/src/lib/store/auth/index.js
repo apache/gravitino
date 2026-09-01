@@ -56,8 +56,11 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
 export const getAuthMe = createAsyncThunk('auth/getAuthMe', async () => {
   const [err, res] = await to(getAuthMeApi())
 
-  if (err || !res) {
-    throw new Error(err)
+  if (err) {
+    throw err instanceof Error ? err : new Error(String(err))
+  }
+  if (!res) {
+    throw new Error('The authenticated user endpoint returned an empty response')
   }
 
   return res

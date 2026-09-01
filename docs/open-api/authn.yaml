@@ -24,7 +24,7 @@ paths:
       tags:
         - authentication
       summary: Get the authenticated user
-      operationId: getAuthenticatedPrincipal
+      operationId: getAuthenticatedUser
       description: >
         Returns the server-resolved principal name and service-administrator status for the
         current authenticated user.
