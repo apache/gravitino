@@ -446,6 +446,51 @@ public class TestTagMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testTagCreateIsFencedByParentMetalake() {
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_without_metalake")
+            .withNamespace(NamespaceUtil.ofTag("metalake_that_does_not_exist"))
+            .withComment("initial")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class, () -> tagMetaService.insertTag(tag, false));
+    Assertions.assertThrows(NoSuchEntityException.class, () -> tagMetaService.insertTag(tag, true));
+  }
+
+  @TestTemplate
+  public void testTagOverwriteAndAlterKeepAllowedValues() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_allowed_values_occ")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("initial")
+            .withAllowedValues(new String[] {"dev", "prod"})
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tag, false);
+
+    tagMetaService.insertTag(copyTagWithComment(tag, "overwritten"), true);
+    TagEntity overwritten = tagMetaService.getTagByIdentifier(tag.nameIdentifier());
+    Assertions.assertArrayEquals(
+        new String[] {"dev", "prod"}, overwritten.valueConstraint().allowedValues());
+
+    tagMetaService.updateTag(
+        tag.nameIdentifier(), entity -> copyTagWithComment((TagEntity) entity, "updated"));
+    TagEntity updated = tagMetaService.getTagByIdentifier(tag.nameIdentifier());
+    Assertions.assertEquals("updated", updated.comment());
+    Assertions.assertArrayEquals(
+        new String[] {"dev", "prod"}, updated.valueConstraint().allowedValues());
+  }
+
+  @TestTemplate
   public void testDeleteTag() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
 

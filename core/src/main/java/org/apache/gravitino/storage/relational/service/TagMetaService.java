@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
@@ -183,6 +184,15 @@ public class TagMetaService {
     return deleteTag(identifier, tagPO);
   }
 
+  /**
+   * Deletes the tag the caller observed. The delete is a compare-and-set on the observed version,
+   * so a tag that changed since it was read is rejected instead of being removed, and the dependent
+   * rows are cleaned up in the same transaction as the tag row itself.
+   *
+   * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
+   * use {@link #deleteTag(NameIdentifier)}, which reads it first.
+   */
+  @VisibleForTesting
   boolean deleteTag(NameIdentifier identifier, TagPO tagPO) {
     long tagId = tagPO.getTagId();
 
@@ -380,6 +390,14 @@ public class TagMetaService {
         false /* failOnDuplicateValuelessAssignment */);
   }
 
+  /**
+   * Runs one assignment change in a single transaction, so the tag rows stay locked from the moment
+   * they are read until the relation rows are rewritten and read back. A conflict rolls the whole
+   * change back instead of leaving a half-applied assignment set behind.
+   *
+   * <p>The mapper handed to the callback is unused: the call is only here to open and close the
+   * transaction around work that talks to several mappers.
+   */
   private List<TagEntity> associateTagValuesWithMetadataObject(
       NameIdentifier objectIdent,
       Entity.EntityType objectType,
@@ -399,6 +417,8 @@ public class TagMetaService {
                   tagsToRemove,
                   failOnDuplicateValuelessAssignment);
             } catch (IOException e) {
+              // The callback cannot throw a checked exception, so the IOException raised while
+              // reading a tag's allowed values is carried across the boundary and unwrapped below.
               throw new UncheckedIOException(e);
             }
           });
@@ -678,7 +698,21 @@ public class TagMetaService {
         Arrays.toString(allowedValues));
   }
 
-  void lockMetalakeForTagCreate(MetalakePO observedMetalakePO) {
+  /**
+   * Holds the parent metalake row for the rest of the transaction, so a tag cannot be created under
+   * a metalake that is going away.
+   *
+   * <p>The lock is shared, not exclusive: many tags can be created under the same metalake at the
+   * same time, while dropping the metalake takes an exclusive lock on this row, so a drop and a
+   * create cannot overlap.
+   *
+   * <p>The name is compared again because the ID alone cannot tell a rename apart: the caller
+   * looked the metalake up by name, so a renamed row means the name in the request no longer
+   * exists. The metalake version is deliberately not compared, matching {@code CatalogMetaService}:
+   * holding the row is what makes the create safe, and an unrelated metalake edit that commits in
+   * between would otherwise reject the create for no reason.
+   */
+  private void lockMetalakeForTagCreate(MetalakePO observedMetalakePO) {
     OccWriteSupport.lockParentForChildWrite(
         observedMetalakePO.getMetalakeName(),
         Entity.EntityType.METALAKE,
@@ -716,24 +750,34 @@ public class TagMetaService {
                 && Objects.equals(current.getMetalakeId(), observedTagPO.getMetalakeId()));
   }
 
+  /**
+   * Locks every tag taking part in an assignment change and returns the rows as they are now, so
+   * the assignment cannot be written against a tag that is being renamed or dropped.
+   *
+   * <p>The rows are locked in tag-ID order. Two assignment changes that touch the same tags
+   * therefore take the locks in the same order and queue up instead of deadlocking.
+   *
+   * <p>A tag whose row is gone, or whose name or metalake no longer matches what the caller
+   * resolved by name, is reported as missing: the caller asked for a tag name, and that name no
+   * longer points at this row.
+   */
   private List<TagPO> lockTagsForAssignment(List<TagPO> observedTagPOs) {
     List<TagPO> sortedTagPOs = new ArrayList<>(observedTagPOs);
     sortedTagPOs.sort(Comparator.comparingLong(TagPO::getTagId));
     List<TagPO> lockedTagPOs = new ArrayList<>(sortedTagPOs.size());
     for (TagPO observedTagPO : sortedTagPOs) {
-      TagPO lockedTagPO =
-          SessionUtils.getWithoutCommit(
-              TagMetaMapper.class,
-              mapper -> mapper.selectTagByTagIdForUpdate(observedTagPO.getTagId()));
-      if (lockedTagPO == null
-          || !Objects.equals(lockedTagPO.getTagName(), observedTagPO.getTagName())
-          || !Objects.equals(lockedTagPO.getMetalakeId(), observedTagPO.getMetalakeId())) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.TAG.name().toLowerCase(),
-            observedTagPO.getTagName());
-      }
-      lockedTagPOs.add(lockedTagPO);
+      lockedTagPOs.add(
+          OccWriteSupport.lockParentForChildWrite(
+              observedTagPO.getTagName(),
+              Entity.EntityType.TAG,
+              () ->
+                  SessionUtils.getWithoutCommit(
+                      TagMetaMapper.class,
+                      mapper -> mapper.selectTagByTagIdForUpdate(observedTagPO.getTagId())),
+              null,
+              current ->
+                  Objects.equals(current.getTagName(), observedTagPO.getTagName())
+                      && Objects.equals(current.getMetalakeId(), observedTagPO.getMetalakeId())));
     }
     return lockedTagPOs;
   }
