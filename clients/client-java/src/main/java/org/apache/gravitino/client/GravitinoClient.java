@@ -605,6 +605,18 @@ public class GravitinoClient extends GravitinoClientBase
     getMetalake().testConnection(catalogName);
   }
 
+  /**
+   * Test the connection of an existing catalog with proposed changes without persisting them.
+   *
+   * @param catalogName the name of the existing catalog.
+   * @param changes the proposed changes to apply temporarily.
+   * @throws Exception if the test failed.
+   */
+  @Override
+  public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
+    getMetalake().testConnection(catalogName, changes);
+  }
+
   @Override
   public String[] listTags() throws NoSuchMetalakeException {
     return getMetalake().listTags();

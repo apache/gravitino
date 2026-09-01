@@ -25,11 +25,14 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.MetalakeChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.dto.AuditDTO;
 import org.apache.gravitino.dto.MetalakeDTO;
 import org.apache.gravitino.dto.requests.CatalogCreateRequest;
+import org.apache.gravitino.dto.requests.CatalogUpdateRequest;
+import org.apache.gravitino.dto.requests.CatalogUpdatesRequest;
 import org.apache.gravitino.dto.requests.MetalakeCreateRequest;
 import org.apache.gravitino.dto.requests.MetalakeUpdatesRequest;
 import org.apache.gravitino.dto.responses.BaseResponse;
@@ -323,6 +326,19 @@ public class TestGravitinoAdminClient extends TestBase {
         new BaseResponse(),
         HttpStatus.SC_OK);
     Assertions.assertDoesNotThrow(() -> metaLake.testConnection("catalog"));
+
+    CatalogUpdatesRequest updatesRequest =
+        new CatalogUpdatesRequest(
+            Collections.singletonList(
+                new CatalogUpdateRequest.SetCatalogPropertyRequest("key", "value")));
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        updatesRequest,
+        new BaseResponse(),
+        HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(
+        () -> metaLake.testConnection("catalog", CatalogChange.setProperty("key", "value")));
 
     buildMockResource(
         Method.POST,
