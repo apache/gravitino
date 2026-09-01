@@ -35,12 +35,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -55,7 +58,12 @@ import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
+import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.POConverters;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -415,6 +423,149 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         policyMetaService.getPolicyByIdentifier(
             NameIdentifierUtil.ofPolicy(METALAKE_NAME, "policy1"));
     assertEquals(policyEntity2, loadedPolicyEntity1);
+  }
+
+  @TestTemplate
+  public void testMetadataOnlyPolicyAlterCreatesCompleteSnapshot() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_metadata_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
+
+    AuditInfo updatedAudit =
+        AuditInfo.builder().withCreator("updated-creator").withCreateTime(Instant.now()).build();
+    PolicyEntity metadataOnlyUpdate =
+        copyPolicy(policy, policy.name(), policy.comment(), updatedAudit);
+    policyMetaService.updatePolicy(policy.nameIdentifier(), ignored -> metadataOnlyUpdate);
+
+    PolicyPO updatedPO = getPolicyPO(policy.nameIdentifier());
+    assertEquals(initialPO.getCurrentVersion() + 1, updatedPO.getCurrentVersion().longValue());
+    assertEquals(updatedPO.getCurrentVersion(), updatedPO.getLastVersion());
+    assertEquals(updatedPO.getCurrentVersion(), updatedPO.getPolicyVersionPO().getVersion());
+    assertEquals(policy.comment(), updatedPO.getPolicyVersionPO().getPolicyComment());
+    assertEquals(policy.enabled(), updatedPO.getPolicyVersionPO().isEnabled());
+    assertEquals(
+        initialPO.getPolicyVersionPO().getContent(), updatedPO.getPolicyVersionPO().getContent());
+    assertEquals(2, listPolicyVersions(policy.id()).size());
+  }
+
+  @TestTemplate
+  public void testPolicyOverwriteAdvancesVersionAndRetainsHistory() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_overwrite_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
+
+    PolicyEntity replacement =
+        copyPolicy(policy, "policy_overwrite_occ_renamed", "replacement", policy.auditInfo());
+    policyMetaService.insertPolicy(replacement, true);
+
+    PolicyPO overwrittenPO = getPolicyPO(replacement.nameIdentifier());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
+    assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    assertEquals(2, listPolicyVersions(policy.id()).size());
+    assertEquals(
+        replacement, policyMetaService.getPolicyByIdentifier(replacement.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testPolicyAlterReportsOptimisticLockConflictWithoutOrphanVersion()
+      throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_alter_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            policyMetaService.updatePolicy(
+                policy.nameIdentifier(),
+                entity -> {
+                  PolicyEntity current = (PolicyEntity) entity;
+                  PolicyPO currentPO = getPolicyPO(current.nameIdentifier());
+                  PolicyEntity competing =
+                      copyPolicy(current, current.name(), "competing", current.auditInfo());
+                  PolicyPO competingPO =
+                      POConverters.updatePolicyPOWithVersion(currentPO, competing);
+                  SessionUtils.doMultipleWithCommit(
+                      () ->
+                          assertEquals(
+                              Integer.valueOf(1),
+                              SessionUtils.getWithoutCommit(
+                                  PolicyMetaMapper.class,
+                                  mapper -> mapper.updatePolicyMeta(competingPO, currentPO))),
+                      () ->
+                          SessionUtils.doWithoutCommit(
+                              PolicyVersionMapper.class,
+                              mapper ->
+                                  mapper.insertPolicyVersion(competingPO.getPolicyVersionPO())));
+                  return copyPolicy(current, current.name(), "requested", current.auditInfo());
+                }));
+
+    assertEquals(2, listPolicyVersions(policy.id()).size());
+    assertEquals(
+        "competing", policyMetaService.getPolicyByIdentifier(policy.nameIdentifier()).comment());
+  }
+
+  @TestTemplate
+  public void testStalePolicyDeleteRollsBackRelationshipCleanup() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_policy_delete_occ");
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_delete_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    policyMetaService.associatePoliciesWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {policy.nameIdentifier()},
+        new NameIdentifier[0]);
+    PolicyPO stalePO = getPolicyPO(policy.nameIdentifier());
+    policyMetaService.updatePolicy(
+        policy.nameIdentifier(),
+        entity ->
+            copyPolicy(
+                (PolicyEntity) entity,
+                ((PolicyEntity) entity).name(),
+                "updated",
+                ((PolicyEntity) entity).auditInfo()));
+
+    assertThrows(
+        OptimisticLockException.class,
+        () -> policyMetaService.deletePolicy(policy.nameIdentifier(), stalePO));
+    assertEquals(1, countActivePolicyRel(policy.id()));
+    assertTrue(backend.exists(policy.nameIdentifier(), Entity.EntityType.POLICY));
+    assertEquals(
+        2,
+        listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
+
+    assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
+    assertEquals(0, countActivePolicyRel(policy.id()));
+    assertEquals(
+        0,
+        listPolicyVersions(policy.id()).values().stream().filter(v -> v.longValue() == 0L).count());
   }
 
   @TestTemplate
@@ -1077,5 +1228,27 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     } catch (SQLException se) {
       throw new RuntimeException("SQL execution failed", se);
     }
+  }
+
+  private PolicyPO getPolicyPO(NameIdentifier identifier) {
+    return SessionUtils.getWithoutCommit(
+        PolicyMetaMapper.class,
+        mapper ->
+            mapper.selectPolicyMetaByMetalakeAndName(
+                identifier.namespace().level(0), identifier.name()));
+  }
+
+  private PolicyEntity copyPolicy(
+      PolicyEntity policy, String name, String comment, Audit auditInfo) {
+    return PolicyEntity.builder()
+        .withId(policy.id())
+        .withName(name)
+        .withNamespace(policy.namespace())
+        .withPolicyType(policy.policyType())
+        .withComment(comment)
+        .withEnabled(policy.enabled())
+        .withContent(policy.content())
+        .withAuditInfo((AuditInfo) auditInfo)
+        .build();
   }
 }

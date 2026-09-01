@@ -64,7 +64,6 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
-import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.expressions.Expression;
@@ -761,58 +760,35 @@ public class POConverters {
     }
   }
 
-  public static boolean checkPolicyVersionNeedUpdate(
-      PolicyVersionPO oldPolicyVersionPO, PolicyEntity newPolicy) {
-    if (!StringUtils.equals(oldPolicyVersionPO.getPolicyComment(), newPolicy.comment())
-        || oldPolicyVersionPO.isEnabled() != newPolicy.enabled()) {
-      return true;
-    }
-
+  /**
+   * Builds the next complete policy metadata and content snapshot.
+   *
+   * @param oldPolicyPO The policy row observed by the caller.
+   * @param newPolicy The policy values to persist.
+   * @return The policy row and version snapshot at the next monotonic version.
+   */
+  public static PolicyPO updatePolicyPOWithVersion(PolicyPO oldPolicyPO, PolicyEntity newPolicy) {
     try {
-      PolicyContent oldContent =
-          JsonUtils.anyFieldMapper()
-              .readValue(oldPolicyVersionPO.getContent(), newPolicy.policyType().contentClass());
-      if (oldContent == null) {
-        return newPolicy.content() != null;
-      }
-      return !oldContent.equals(newPolicy.content());
-    } catch (JsonProcessingException e) {
-      throw new RuntimeException("Failed to deserialize json object:", e);
-    }
-  }
-
-  public static PolicyPO updatePolicyPOWithVersion(
-      PolicyPO oldPolicyPO, PolicyEntity newPolicy, boolean needUpdateVersion) {
-    try {
-      Long lastVersion = oldPolicyPO.getLastVersion();
-      Long currentVersion;
-      PolicyVersionPO newPolicyVersionPO;
-      // Will set the version to the last version + 1
-      if (needUpdateVersion) {
-        lastVersion++;
-        currentVersion = lastVersion;
-        newPolicyVersionPO =
-            PolicyVersionPO.builder()
-                .withMetalakeId(oldPolicyPO.getMetalakeId())
-                .withPolicyId(newPolicy.id())
-                .withVersion(currentVersion)
-                .withPolicyComment(newPolicy.comment())
-                .withEnabled(newPolicy.enabled())
-                .withContent(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.content()))
-                .withDeletedAt(DEFAULT_DELETED_AT)
-                .build();
-      } else {
-        currentVersion = oldPolicyPO.getCurrentVersion();
-        newPolicyVersionPO = oldPolicyPO.getPolicyVersionPO();
-      }
+      Long nextVersion =
+          Math.max(oldPolicyPO.getCurrentVersion(), oldPolicyPO.getLastVersion()) + 1;
+      PolicyVersionPO newPolicyVersionPO =
+          PolicyVersionPO.builder()
+              .withMetalakeId(oldPolicyPO.getMetalakeId())
+              .withPolicyId(oldPolicyPO.getPolicyId())
+              .withVersion(nextVersion)
+              .withPolicyComment(newPolicy.comment())
+              .withEnabled(newPolicy.enabled())
+              .withContent(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.content()))
+              .withDeletedAt(DEFAULT_DELETED_AT)
+              .build();
       return PolicyPO.builder()
-          .withPolicyId(newPolicy.id())
+          .withPolicyId(oldPolicyPO.getPolicyId())
           .withPolicyName(newPolicy.name())
           .withPolicyType(newPolicy.policyType().policyType())
           .withMetalakeId(oldPolicyPO.getMetalakeId())
           .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(newPolicy.auditInfo()))
-          .withCurrentVersion(currentVersion)
-          .withLastVersion(lastVersion)
+          .withCurrentVersion(nextVersion)
+          .withLastVersion(nextVersion)
           .withDeletedAt(DEFAULT_DELETED_AT)
           .withPolicyVersionPO(newPolicyVersionPO)
           .build();

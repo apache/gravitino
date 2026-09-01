@@ -136,26 +136,19 @@ public class PolicyMetaBaseSQLProvider {
         + " last_version = #{newPolicyMeta.lastVersion},"
         + " deleted_at = #{newPolicyMeta.deletedAt}"
         + " WHERE policy_id = #{oldPolicyMeta.policyId}"
-        + " AND policy_name = #{oldPolicyMeta.policyName}"
-        + " AND policy_type = #{oldPolicyMeta.policyType}"
-        + " AND metalake_id = #{oldPolicyMeta.metalakeId}"
-        + " AND audit_info = #{oldPolicyMeta.auditInfo}"
         + " AND current_version = #{oldPolicyMeta.currentVersion}"
-        + " AND last_version = #{oldPolicyMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeletePolicyByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
+  /** Returns SQL that soft-deletes a policy using its stable ID and observed OCC version. */
+  public String softDeletePolicyByIdAndVersion(
+      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
-        + " pm SET pm.deleted_at = "
+        + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE pm.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND pm.policy_name = #{policyName} AND pm.deleted_at = 0";
+        + " WHERE policy_id = #{policyId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String deletePolicyMetasByLegacyTimeline(
@@ -183,6 +176,11 @@ public class PolicyMetaBaseSQLProvider {
         + " WHERE"
         + " pm.policy_id = #{policyId}"
         + " AND pm.deleted_at = 0 ";
+  }
+
+  /** Returns SQL that selects and exclusively locks an active policy by ID. */
+  public String selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId) {
+    return selectPolicyByPolicyId(policyId) + " FOR UPDATE";
   }
 
   public String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {

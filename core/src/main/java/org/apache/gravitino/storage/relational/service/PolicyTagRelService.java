@@ -25,6 +25,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -365,7 +367,7 @@ public class PolicyTagRelService {
         .map(target -> target.nameIdentifier().name())
         .forEach(policyNames::add);
     if (policyNames.isEmpty()) {
-      return Collections.emptyMap();
+      return new LinkedHashMap<>();
     }
 
     List<PolicyPO> policies =
@@ -374,8 +376,20 @@ public class PolicyTagRelService {
             mapper ->
                 mapper.listPolicyPOsByMetalakeAndPolicyNames(
                     metalake, new ArrayList<>(policyNames)));
-    Map<String, Long> policyIds =
-        policies.stream().collect(Collectors.toMap(PolicyPO::getPolicyName, PolicyPO::getPolicyId));
+    policies.sort(Comparator.comparingLong(PolicyPO::getPolicyId));
+    Map<String, Long> policyIds = new LinkedHashMap<>();
+    for (PolicyPO observedPolicy : policies) {
+      PolicyPO lockedPolicy =
+          SessionUtils.getWithoutCommit(
+              PolicyMetaMapper.class,
+              mapper -> mapper.selectPolicyByPolicyIdForUpdate(observedPolicy.getPolicyId()));
+      if (lockedPolicy == null
+          || !Objects.equals(lockedPolicy.getPolicyName(), observedPolicy.getPolicyName())
+          || !Objects.equals(lockedPolicy.getMetalakeId(), observedPolicy.getMetalakeId())) {
+        throw noSuchEntity(Entity.EntityType.POLICY, observedPolicy.getPolicyName());
+      }
+      policyIds.put(lockedPolicy.getPolicyName(), lockedPolicy.getPolicyId());
+    }
 
     for (String policyName : policyNames) {
       if (!policyIds.containsKey(policyName)) {

@@ -28,6 +28,14 @@ import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 
 public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvider {
   @Override
+  public String softDeletePolicyVersionsByPolicyId(Long policyId) {
+    return "UPDATE "
+        + POLICY_VERSION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
+  }
+
+  @Override
   public String softDeletePolicyVersionByMetalakeAndPolicyName(
       String metalakeName, String policyName) {
     return "UPDATE "

@@ -77,9 +77,10 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().updatePolicyMeta(newPolicyMeta, oldPolicyMeta);
   }
 
-  public static String softDeletePolicyByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
-    return getProvider().softDeletePolicyByMetalakeAndPolicyName(metalakeName, policyName);
+  /** Delegates a version-checked policy soft delete. */
+  public static String softDeletePolicyByIdAndVersion(
+      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeletePolicyByIdAndVersion(policyId, currentVersion);
   }
 
   public static String deletePolicyMetasByLegacyTimeline(
@@ -98,6 +99,11 @@ public class PolicyMetaSQLProviderFactory {
 
   public static String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return getProvider().selectPolicyByPolicyId(policyId);
+  }
+
+  /** Delegates an exclusive-lock policy query. */
+  public static String selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId) {
+    return getProvider().selectPolicyByPolicyIdForUpdate(policyId);
   }
 
   public static String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {

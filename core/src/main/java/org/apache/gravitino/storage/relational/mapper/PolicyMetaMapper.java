@@ -113,11 +113,18 @@ public interface PolicyMetaMapper {
       @Param("newPolicyMeta") PolicyPO newPolicyMeta,
       @Param("oldPolicyMeta") PolicyPO oldPolicyMeta);
 
+  /**
+   * Soft-deletes an active policy when its OCC version still matches.
+   *
+   * @param policyId The policy ID.
+   * @param currentVersion The version observed by the caller.
+   * @return The number of affected rows.
+   */
   @UpdateProvider(
       type = PolicyMetaSQLProviderFactory.class,
-      method = "softDeletePolicyByMetalakeAndPolicyName")
-  Integer softDeletePolicyByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);
+      method = "softDeletePolicyByIdAndVersion")
+  Integer softDeletePolicyByIdAndVersion(
+      @Param("policyId") Long policyId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = PolicyMetaSQLProviderFactory.class,
@@ -158,6 +165,27 @@ public interface PolicyMetaMapper {
   })
   @SelectProvider(type = PolicyMetaSQLProviderFactory.class, method = "selectPolicyByPolicyId")
   PolicyPO selectPolicyByPolicyId(@Param("policyId") Long policyId);
+
+  /**
+   * Selects and exclusively locks an active policy by ID.
+   *
+   * @param policyId The policy ID.
+   * @return The locked policy, or null if it is not active.
+   */
+  @Results({
+    @Result(property = "policyId", column = "policy_id"),
+    @Result(property = "policyName", column = "policy_name"),
+    @Result(property = "policyType", column = "policy_type"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at")
+  })
+  @SelectProvider(
+      type = PolicyMetaSQLProviderFactory.class,
+      method = "selectPolicyByPolicyIdForUpdate")
+  PolicyPO selectPolicyByPolicyIdForUpdate(@Param("policyId") Long policyId);
 
   @Results({
     @Result(property = "policyId", column = "policy_id"),

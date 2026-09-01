@@ -27,14 +27,13 @@ import org.apache.gravitino.storage.relational.po.PolicyPO;
 public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
 
   @Override
-  public String softDeletePolicyByMetalakeAndPolicyName(String metalakeName, String policyName) {
+  public String softDeletePolicyByIdAndVersion(Long policyId, Long currentVersion) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
-        + " WHERE metalake_id = (SELECT metalake_id FROM "
-        + " metalake_meta mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND policy_name = #{policyName} AND deleted_at = 0";
+        + " WHERE policy_id = #{policyId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   @Override

@@ -44,6 +44,17 @@ public interface PolicyVersionMapper {
   Integer softDeletePolicyVersionByMetalakeAndPolicyName(
       @Param("metalakeName") String metalakeName, @Param("policyName") String policyName);
 
+  /**
+   * Soft-deletes all active content snapshots for a policy.
+   *
+   * @param policyId The policy ID.
+   * @return The number of affected rows.
+   */
+  @UpdateProvider(
+      type = PolicyVersionSQLProviderFactory.class,
+      method = "softDeletePolicyVersionsByPolicyId")
+  Integer softDeletePolicyVersionsByPolicyId(@Param("policyId") Long policyId);
+
   @UpdateProvider(
       type = PolicyVersionSQLProviderFactory.class,
       method = "deletePolicyVersionsByLegacyTimeline")

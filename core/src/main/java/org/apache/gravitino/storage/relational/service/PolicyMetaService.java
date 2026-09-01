@@ -22,9 +22,13 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -38,9 +42,15 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.PolicyMaxVersionPO;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
@@ -93,34 +103,22 @@ public class PolicyMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      Long metalakeId =
-          EntityIdService.getEntityId(NameIdentifier.of(metalakeName), Entity.EntityType.METALAKE);
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
+      }
 
-      PolicyPO.Builder builder = PolicyPO.builder().withMetalakeId(metalakeId);
+      PolicyPO.Builder builder = PolicyPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       PolicyPO policyPO = POConverters.initializePolicyPOWithVersion(policyEntity, builder);
 
-      // insert both policy meta table and policy version table
       SessionUtils.doMultipleWithCommit(
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyMetaMapper.class,
-                  mapper -> {
-                    if (overwritten) {
-                      mapper.insertPolicyMetaOnDuplicateKeyUpdate(policyPO);
-                    } else {
-                      mapper.insertPolicyMeta(policyPO);
-                    }
-                  }),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  PolicyVersionMapper.class,
-                  mapper -> {
-                    if (overwritten) {
-                      mapper.insertPolicyVersionOnDuplicateKeyUpdate(policyPO.getPolicyVersionPO());
-                    } else {
-                      mapper.insertPolicyVersion(policyPO.getPolicyVersionPO());
-                    }
-                  }));
+          () -> lockMetalakeForPolicyCreate(metalakePO),
+          () -> insertPolicyWithoutCommit(policyEntity, policyPO, overwritten));
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, policyEntity.toString());
       throw e;
@@ -143,69 +141,72 @@ public class PolicyMetaService {
         updatedPolicyEntity.id(),
         oldPolicyEntity.id());
 
-    Integer updateResult;
     try {
-      boolean checkNeedUpdateVersion =
-          POConverters.checkPolicyVersionNeedUpdate(
-              oldPolicyPO.getPolicyVersionPO(), updatedPolicyEntity);
       PolicyPO newPolicyPO =
-          POConverters.updatePolicyPOWithVersion(
-              oldPolicyPO, updatedPolicyEntity, checkNeedUpdateVersion);
-      if (checkNeedUpdateVersion) {
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyVersionMapper.class,
-                    mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO())),
-            () ->
-                SessionUtils.doWithoutCommit(
-                    PolicyMetaMapper.class,
-                    mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO)));
-        // we set the updateResult to 1 to indicate that the update is successful
-        updateResult = 1;
-      } else {
-        updateResult =
-            SessionUtils.doWithCommitAndFetchResult(
-                PolicyMetaMapper.class,
-                mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
-      }
+          POConverters.updatePolicyPOWithVersion(oldPolicyPO, updatedPolicyEntity);
+      SessionUtils.doMultipleWithCommit(
+          () -> updatePolicyRootWithVersion(ident, oldPolicyPO, newPolicyPO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyVersionMapper.class,
+                  mapper -> mapper.insertPolicyVersion(newPolicyPO.getPolicyVersionPO())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.POLICY, updatedPolicyEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult > 0) {
-      return updatedPolicyEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + updatedPolicyEntity);
-    }
+    return updatedPolicyEntity;
   }
 
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deletePolicy")
   public boolean deletePolicy(NameIdentifier ident) {
-    String metalakeName = ident.namespace().level(0);
-    int[] policyMetaDeletedCount = new int[] {0};
-    int[] policyVersionDeletedCount = new int[] {0};
+    PolicyPO policyPO;
+    try {
+      policyPO = getPolicyPOByMetalakeAndName(ident.namespace().level(0), ident.name());
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+    return deletePolicy(ident, policyPO);
+  }
 
-    // We should delete meta and version info
+  boolean deletePolicy(NameIdentifier ident, PolicyPO policyPO) {
+    long policyId = policyPO.getPolicyId();
+
     SessionUtils.doMultipleWithCommit(
+        () -> deletePolicyWithVersion(ident, policyPO),
         () ->
-            policyMetaDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    PolicyMetaMapper.class,
-                    mapper ->
-                        mapper.softDeletePolicyByMetalakeAndPolicyName(metalakeName, ident.name())),
+            SessionUtils.doWithoutCommit(
+                PolicyVersionMapper.class,
+                mapper -> mapper.softDeletePolicyVersionsByPolicyId(policyId)),
         () ->
-            policyVersionDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    PolicyVersionMapper.class,
-                    mapper ->
-                        mapper.softDeletePolicyVersionByMetalakeAndPolicyName(
-                            metalakeName, ident.name())));
-    return policyMetaDeletedCount[0] + policyVersionDeletedCount[0] > 0;
+            SessionUtils.doWithoutCommit(
+                PolicyMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeletePolicyMetadataObjectRelsByPolicyId(policyId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                        policyId, MetadataObject.Type.POLICY.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        policyId, MetadataObject.Type.POLICY.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        policyId, MetadataObject.Type.POLICY.name())));
+    return true;
   }
 
   @Monitored(
@@ -313,79 +314,83 @@ public class PolicyMetaService {
       NameIdentifier[] policiesToAdd,
       NameIdentifier[] policiesToRemove)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
-    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
-    String metalake = objectIdent.namespace().level(0);
-
     try {
-      Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
-
-      // Fetch all the policies need to associate with the metadata object.
-      List<String> policyNamesToAdd =
-          Arrays.stream(policiesToAdd).map(NameIdentifier::name).collect(Collectors.toList());
-      List<PolicyPO> policyPOsToAdd =
-          policyNamesToAdd.isEmpty()
-              ? Collections.emptyList()
-              : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToAdd);
-
-      // Fetch all the policies need to remove from the metadata object.
-      List<String> policyNamesToRemove =
-          Arrays.stream(policiesToRemove).map(NameIdentifier::name).collect(Collectors.toList());
-      List<PolicyPO> policyPOsToRemove =
-          policyNamesToRemove.isEmpty()
-              ? Collections.emptyList()
-              : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToRemove);
-
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            // Insert the policy metadata object relations.
-            if (policyPOsToAdd.isEmpty()) {
-              return;
-            }
-
-            List<PolicyMetadataObjectRelPO> policyRelsToAdd =
-                policyPOsToAdd.stream()
-                    .map(
-                        policyPO ->
-                            POConverters.initializePolicyMetadataObjectRelPOWithVersion(
-                                policyPO.getPolicyId(),
-                                metadataObjectId,
-                                metadataObject.type().toString()))
-                    .collect(Collectors.toList());
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper -> mapper.batchInsertPolicyMetadataObjectRels(policyRelsToAdd));
-          },
-          () -> {
-            // Remove the policy metadata object relations.
-            if (policyPOsToRemove.isEmpty()) {
-              return;
-            }
-
-            List<Long> policyIdsToRemove =
-                policyPOsToRemove.stream().map(PolicyPO::getPolicyId).collect(Collectors.toList());
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.batchDeletePolicyMetadataObjectRelsByPolicyIdsAndMetadataObject(
-                        metadataObjectId, metadataObject.type().toString(), policyIdsToRemove));
-          });
-
-      // Fetch all the policies associated with the metadata object after the operation.
-      List<PolicyPO> policyPOs =
-          SessionUtils.getWithoutCommit(
-              PolicyMetadataObjectRelMapper.class,
-              mapper ->
-                  mapper.listPolicyPOsByMetadataObjectIdAndType(
-                      metadataObjectId, metadataObject.type().toString()));
-
-      return policyPOs.stream()
-          .map(policyPO -> POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake)))
-          .collect(Collectors.toList());
-
+      return SessionUtils.doWithCommitAndFetchResult(
+          PolicyMetaMapper.class,
+          ignored ->
+              associatePoliciesWithMetadataObjectWithoutCommit(
+                  objectIdent, objectType, policiesToAdd, policiesToRemove));
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.POLICY, objectIdent.toString());
       throw e;
     }
+  }
+
+  private List<PolicyEntity> associatePoliciesWithMetadataObjectWithoutCommit(
+      NameIdentifier objectIdent,
+      Entity.EntityType objectType,
+      NameIdentifier[] policiesToAdd,
+      NameIdentifier[] policiesToRemove) {
+    MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
+    String metalake = objectIdent.namespace().level(0);
+
+    Long metadataObjectId = EntityIdService.getEntityId(objectIdent, objectType);
+
+    // Fetch all the policies need to associate with the metadata object.
+    List<String> policyNamesToAdd =
+        Arrays.stream(policiesToAdd).map(NameIdentifier::name).collect(Collectors.toList());
+    List<PolicyPO> policyPOsToAdd =
+        policyNamesToAdd.isEmpty()
+            ? Collections.emptyList()
+            : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToAdd);
+
+    // Fetch all the policies need to remove from the metadata object.
+    List<String> policyNamesToRemove =
+        Arrays.stream(policiesToRemove).map(NameIdentifier::name).collect(Collectors.toList());
+    List<PolicyPO> policyPOsToRemove =
+        policyNamesToRemove.isEmpty()
+            ? Collections.emptyList()
+            : getPolicyPOsByMetalakeAndNames(metalake, policyNamesToRemove);
+    Map<Long, PolicyPO> lockedPolicyPOs =
+        lockPoliciesForAssociation(policyPOsToAdd, policyPOsToRemove);
+    policyPOsToAdd = currentPolicyPOs(policyPOsToAdd, lockedPolicyPOs);
+    policyPOsToRemove = currentPolicyPOs(policyPOsToRemove, lockedPolicyPOs);
+
+    if (!policyPOsToAdd.isEmpty()) {
+      List<PolicyMetadataObjectRelPO> policyRelsToAdd =
+          policyPOsToAdd.stream()
+              .map(
+                  policyPO ->
+                      POConverters.initializePolicyMetadataObjectRelPOWithVersion(
+                          policyPO.getPolicyId(),
+                          metadataObjectId,
+                          metadataObject.type().toString()))
+              .collect(Collectors.toList());
+      SessionUtils.doWithoutCommit(
+          PolicyMetadataObjectRelMapper.class,
+          mapper -> mapper.batchInsertPolicyMetadataObjectRels(policyRelsToAdd));
+    }
+    if (!policyPOsToRemove.isEmpty()) {
+      List<Long> policyIdsToRemove =
+          policyPOsToRemove.stream().map(PolicyPO::getPolicyId).collect(Collectors.toList());
+      SessionUtils.doWithoutCommit(
+          PolicyMetadataObjectRelMapper.class,
+          mapper ->
+              mapper.batchDeletePolicyMetadataObjectRelsByPolicyIdsAndMetadataObject(
+                  metadataObjectId, metadataObject.type().toString(), policyIdsToRemove));
+    }
+
+    // Fetch all the policies associated with the metadata object after the operation.
+    List<PolicyPO> policyPOs =
+        SessionUtils.getWithoutCommit(
+            PolicyMetadataObjectRelMapper.class,
+            mapper ->
+                mapper.listPolicyPOsByMetadataObjectIdAndType(
+                    metadataObjectId, metadataObject.type().toString()));
+
+    return policyPOs.stream()
+        .map(policyPO -> POConverters.fromPolicyPO(policyPO, NamespaceUtil.ofPolicy(metalake)))
+        .collect(Collectors.toList());
   }
 
   @Monitored(
@@ -438,6 +443,142 @@ public class PolicyMetaService {
           policyMaxVersion.getVersion());
     }
     return totalDeletedCount;
+  }
+
+  void lockMetalakeForPolicyCreate(MetalakePO observedMetalakePO) {
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  private void insertPolicyWithoutCommit(
+      PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
+    if (!overwritten) {
+      insertNewPolicyWithoutCommit(initializedPolicyPO);
+      return;
+    }
+
+    PolicyPO existingPolicyPO = findAndLockPolicyForOverwrite(initializedPolicyPO);
+    if (existingPolicyPO == null) {
+      insertNewPolicyWithoutCommit(initializedPolicyPO);
+      return;
+    }
+
+    PolicyPO replacementPolicyPO =
+        POConverters.updatePolicyPOWithVersion(existingPolicyPO, policyEntity);
+    updatePolicyRootWithVersion(
+        policyEntity.nameIdentifier(), existingPolicyPO, replacementPolicyPO);
+    SessionUtils.doWithoutCommit(
+        PolicyVersionMapper.class,
+        mapper -> mapper.insertPolicyVersion(replacementPolicyPO.getPolicyVersionPO()));
+  }
+
+  private void insertNewPolicyWithoutCommit(PolicyPO policyPO) {
+    SessionUtils.doWithoutCommit(
+        PolicyMetaMapper.class, mapper -> mapper.insertPolicyMeta(policyPO));
+    SessionUtils.doWithoutCommit(
+        PolicyVersionMapper.class,
+        mapper -> mapper.insertPolicyVersion(policyPO.getPolicyVersionPO()));
+  }
+
+  private PolicyPO findAndLockPolicyForOverwrite(PolicyPO initializedPolicyPO) {
+    PolicyPO existingPolicyPO =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper -> mapper.selectPolicyByPolicyIdForUpdate(initializedPolicyPO.getPolicyId()));
+    if (existingPolicyPO != null) {
+      return existingPolicyPO;
+    }
+
+    PolicyPO sameNamePolicyPO =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper ->
+                mapper.selectPolicyMetaByMetalakeIdAndName(
+                    initializedPolicyPO.getMetalakeId(), initializedPolicyPO.getPolicyName()));
+    if (sameNamePolicyPO == null) {
+      return null;
+    }
+    return SessionUtils.getWithoutCommit(
+        PolicyMetaMapper.class,
+        mapper -> mapper.selectPolicyByPolicyIdForUpdate(sameNamePolicyPO.getPolicyId()));
+  }
+
+  private void updatePolicyRootWithVersion(
+      NameIdentifier identifier, PolicyPO oldPolicyPO, PolicyPO newPolicyPO) {
+    int updated =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class, mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
+    if (updated == 0) {
+      throw policyWriteFailure(identifier, oldPolicyPO);
+    }
+  }
+
+  private void deletePolicyWithVersion(NameIdentifier identifier, PolicyPO observedPolicyPO) {
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                PolicyMetaMapper.class,
+                mapper ->
+                    mapper.softDeletePolicyByIdAndVersion(
+                        observedPolicyPO.getPolicyId(), observedPolicyPO.getCurrentVersion())),
+        () -> policyWriteFailure(identifier, observedPolicyPO));
+  }
+
+  private RuntimeException policyWriteFailure(
+      NameIdentifier identifier, PolicyPO observedPolicyPO) {
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.POLICY,
+        () ->
+            SessionUtils.getWithoutCommit(
+                PolicyMetaMapper.class,
+                mapper -> mapper.selectPolicyByPolicyIdForUpdate(observedPolicyPO.getPolicyId())),
+        null,
+        current ->
+            Objects.equals(current.getPolicyName(), observedPolicyPO.getPolicyName())
+                && Objects.equals(current.getMetalakeId(), observedPolicyPO.getMetalakeId()));
+  }
+
+  private Map<Long, PolicyPO> lockPoliciesForAssociation(
+      List<PolicyPO> policyPOsToAdd, List<PolicyPO> policyPOsToRemove) {
+    Map<Long, PolicyPO> observedPolicyPOs = new LinkedHashMap<>();
+    policyPOsToAdd.forEach(policyPO -> observedPolicyPOs.put(policyPO.getPolicyId(), policyPO));
+    policyPOsToRemove.forEach(policyPO -> observedPolicyPOs.put(policyPO.getPolicyId(), policyPO));
+    List<PolicyPO> sortedPolicyPOs = new ArrayList<>(observedPolicyPOs.values());
+    sortedPolicyPOs.sort(Comparator.comparingLong(PolicyPO::getPolicyId));
+
+    Map<Long, PolicyPO> lockedPolicyPOs = new LinkedHashMap<>();
+    for (PolicyPO observedPolicyPO : sortedPolicyPOs) {
+      PolicyPO lockedPolicyPO =
+          SessionUtils.getWithoutCommit(
+              PolicyMetaMapper.class,
+              mapper -> mapper.selectPolicyByPolicyIdForUpdate(observedPolicyPO.getPolicyId()));
+      if (lockedPolicyPO == null
+          || !Objects.equals(lockedPolicyPO.getPolicyName(), observedPolicyPO.getPolicyName())
+          || !Objects.equals(lockedPolicyPO.getMetalakeId(), observedPolicyPO.getMetalakeId())) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.POLICY.name().toLowerCase(),
+            observedPolicyPO.getPolicyName());
+      }
+      lockedPolicyPOs.put(lockedPolicyPO.getPolicyId(), lockedPolicyPO);
+    }
+    return lockedPolicyPOs;
+  }
+
+  private static List<PolicyPO> currentPolicyPOs(
+      List<PolicyPO> observedPolicyPOs, Map<Long, PolicyPO> lockedPolicyPOs) {
+    return observedPolicyPOs.stream()
+        .map(policyPO -> lockedPolicyPOs.get(policyPO.getPolicyId()))
+        .collect(Collectors.toList());
   }
 
   private PolicyPO getPolicyPOByMetalakeAndName(String metalakeName, String policyName) {

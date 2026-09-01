@@ -75,6 +75,15 @@ public class PolicyVersionBaseSQLProvider {
         + " AND pv.deleted_at = 0";
   }
 
+  /** Returns SQL that soft-deletes every active content snapshot for a policy ID. */
+  public String softDeletePolicyVersionsByPolicyId(@Param("policyId") Long policyId) {
+    return "UPDATE "
+        + POLICY_VERSION_TABLE_NAME
+        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
+        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " WHERE policy_id = #{policyId} AND deleted_at = 0";
+  }
+
   public String deletePolicyVersionsByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "
