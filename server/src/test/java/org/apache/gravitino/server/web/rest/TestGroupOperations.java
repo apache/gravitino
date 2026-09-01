@@ -123,6 +123,17 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAddGroupWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/groups")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testAddGroup() throws IOException {
     GroupAddRequest req = new GroupAddRequest("group1");
     Group group = buildGroup("group1");
@@ -221,9 +232,7 @@ public class TestGroupOperations extends BaseOperationsTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Status.INTERNAL_SERVER_ERROR.getStatusCode(), resp.getStatus());
-    ErrorResponse error = resp.readEntity(ErrorResponse.class);
-    Assertions.assertNotEquals(NullPointerException.class.getSimpleName(), error.getType());
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test
