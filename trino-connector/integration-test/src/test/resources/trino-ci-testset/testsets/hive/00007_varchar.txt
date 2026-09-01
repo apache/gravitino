@@ -10,6 +10,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   external = '******',
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
    location = 'hdfs://%/user/hive/warehouse/varchar_db1.db/tb01',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
@@ -26,6 +27,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   external = '******',
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
    location = 'hdfs://%/user/hive/warehouse/varchar_db1.db/tb02',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
@@ -44,6 +46,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   external = '******',
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
    location = 'hdfs://%/user/hive/warehouse/varchar_db1.db/tb04',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
@@ -60,6 +63,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   external = '******',
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
    location = 'hdfs://%/user/hive/warehouse/varchar_db1.db/tb05',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
@@ -76,6 +80,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   external = '******',
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
    location = 'hdfs://%/user/hive/warehouse/varchar_db1.db/tb06',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',
@@ -92,6 +97,7 @@ CREATE TABLE
 )
 COMMENT ''
 WITH (
+   external = '******',
    input_format = 'org.apache.hadoop.mapred.TextInputFormat',
    location = 'hdfs://%/user/hive/warehouse/varchar_db1.db/tb07',
    output_format = 'org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat',

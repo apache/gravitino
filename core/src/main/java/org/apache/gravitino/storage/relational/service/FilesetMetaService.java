@@ -22,9 +22,12 @@ import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATI
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -33,6 +36,7 @@ import org.apache.gravitino.HasIdentifier;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.NamespacedEntityId;
@@ -163,8 +167,10 @@ public class FilesetMetaService {
       fillFilesetPOBuilderParentEntityId(builder, filesetEntity.namespace());
 
       FilesetPO po = POConverters.initializeFilesetPOWithVersion(filesetEntity, builder);
+      AtomicReference<FilesetPO> persistedPO = new AtomicReference<>(po);
 
-      // insert both fileset meta table and version table
+      // The schema lock, metadata row, and every storage-location version row share one
+      // transaction. A failure in any later step restores all earlier writes.
       SessionUtils.doMultipleWithCommit(
           // Hold the parent schema row until this transaction ends, so the fileset cannot be
           // written below a schema that is being dropped.
@@ -179,22 +185,42 @@ public class FilesetMetaService {
               SessionUtils.doWithoutCommit(
                   FilesetMetaMapper.class,
                   mapper -> {
-                    if (overwrite) {
-                      mapper.insertFilesetMetaOnDuplicateKeyUpdate(po);
-                    } else {
+                    FilesetPO storedPO =
+                        overwrite
+                            ? mapper.selectFilesetMetaBySchemaIdAndNameForUpdate(
+                                po.getSchemaId(), po.getFilesetName())
+                            : null;
+                    if (storedPO == null) {
                       mapper.insertFilesetMeta(po);
+                      return;
                     }
+
+                    // Resolve the natural-key overwrite before building its snapshot. This keeps
+                    // the stored ID in both the metadata row and identifier property without a
+                    // post-insert JSON/PO rewrite.
+                    FilesetEntity replacement =
+                        filesetWithPersistedId(filesetEntity, storedPO.getFilesetId());
+                    Long maxStoredVersion =
+                        SessionUtils.getWithoutCommit(
+                            FilesetVersionMapper.class,
+                            versionMapper ->
+                                versionMapper.selectMaxFilesetVersion(storedPO.getFilesetId()));
+                    FilesetPO replacementPO =
+                        POConverters.updateFilesetPOWithVersion(
+                            storedPO, replacement, maxStoredVersion);
+                    Integer updated = mapper.updateFilesetMeta(replacementPO, storedPO);
+                    Preconditions.checkState(
+                        updated != null && updated == 1,
+                        "The overwritten fileset %s in schema %s changed while its row was held",
+                        po.getFilesetName(),
+                        po.getSchemaId());
+                    persistedPO.set(replacementPO);
                   }),
           () ->
               SessionUtils.doWithoutCommit(
                   FilesetVersionMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertFilesetVersionsOnDuplicateKeyUpdate(po.getFilesetVersionPOs());
-                    } else {
-                      mapper.insertFilesetVersions(po.getFilesetVersionPOs());
-                    }
-                  }));
+                  mapper ->
+                      mapper.insertFilesetVersions(persistedPO.get().getFilesetVersionPOs())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, filesetEntity.nameIdentifier().toString());
@@ -213,70 +239,36 @@ public class FilesetMetaService {
     FilesetEntity newEntity = (FilesetEntity) updater.apply((E) oldFilesetEntity);
     Preconditions.checkArgument(
         Objects.equals(oldFilesetEntity.id(), newEntity.id()),
-        "The updated fileset entity id: %s should be same with the table entity id before: %s",
+        "The updated fileset entity id: %s should be same with the fileset entity id before: %s",
         newEntity.id(),
         oldFilesetEntity.id());
 
-    Integer updateResult;
     try {
-      boolean checkNeedUpdateVersion =
-          POConverters.checkFilesetVersionNeedUpdate(
-              oldFilesetPO.getFilesetVersionPOs(), newEntity);
       FilesetPO newFilesetPO =
-          POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, checkNeedUpdateVersion);
-      if (checkNeedUpdateVersion) {
-        // These operations are performed atomically within a single transaction. The version
-        // insert is protected by a unique constraint on `fileset_id + version + deleted_at`. If
-        // the meta update affects 0 rows (concurrent modification), the transaction is rolled
-        // back — including the version insert — and the update is treated as a conflict.
-        int[] metaUpdateCountRef = new int[1];
-        try {
-          SessionUtils.doMultipleWithCommit(
-              () ->
-                  SessionUtils.doWithoutCommit(
-                      FilesetVersionMapper.class,
-                      mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs())),
-              () -> {
-                metaUpdateCountRef[0] =
-                    SessionUtils.getWithoutCommit(
-                        FilesetMetaMapper.class,
-                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
-                if (metaUpdateCountRef[0] == 0) {
-                  throw new RuntimeException("Failed to update the entity: " + identifier);
-                }
-              });
-          updateResult = 1;
-        } catch (RuntimeException re) {
-          if (metaUpdateCountRef[0] == 0) {
-            // The meta update matched no rows; the transaction was rolled back,
-            // including the version insert above.
-            throw new IOException("Failed to update the entity: " + identifier);
-          } else {
-            ExceptionUtils.checkSQLException(
-                re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
-            throw re;
-          }
-        }
-      } else {
-        int[] metaUpdateCountRef = new int[1];
-        SessionUtils.doMultipleWithCommit(
-            () ->
-                metaUpdateCountRef[0] =
-                    SessionUtils.getWithoutCommit(
-                        FilesetMetaMapper.class,
-                        mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO)));
-        updateResult = metaUpdateCountRef[0];
+          POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, null);
+      if (tryUpdateFileset(newFilesetPO, oldFilesetPO)) {
+        return newEntity;
       }
+
+      // The metadata CAS also rejects a version that already has an active stored snapshot. Only
+      // that uncommon legacy case needs the MAX(version) round trip; normal alters finish above.
+      Long maxStoredVersion =
+          SessionUtils.getWithoutCommit(
+              FilesetVersionMapper.class,
+              mapper -> mapper.selectMaxFilesetVersion(oldFilesetPO.getFilesetId()));
+      if (maxStoredVersion != null
+          && maxStoredVersion >= newFilesetPO.getCurrentVersion()
+          && tryUpdateFileset(
+              POConverters.updateFilesetPOWithVersion(oldFilesetPO, newEntity, maxStoredVersion),
+              oldFilesetPO)) {
+        return newEntity;
+      }
+
+      throw filesetWriteFailure(identifier, oldFilesetPO);
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.FILESET, newEntity.nameIdentifier().toString());
       throw re;
-    }
-
-    if (updateResult > 0) {
-      return newEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + identifier);
     }
   }
 
@@ -284,49 +276,31 @@ public class FilesetMetaService {
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteFileset")
   public boolean deleteFileset(NameIdentifier identifier) {
+    deleteFilesetAndGet(identifier);
+    return true;
+  }
+
+  /**
+   * Deletes a fileset and returns the exact entity snapshot protected by the delete CAS.
+   *
+   * <p>Callers that also remove managed storage use this snapshot rather than a separate earlier
+   * read. Otherwise an alter between the two reads could make metadata deletion succeed for new
+   * locations while physical cleanup still deletes the old locations.
+   *
+   * @param identifier the fileset identifier
+   * @return the fileset snapshot that was deleted
+   */
+  public FilesetEntity deleteFilesetAndGet(NameIdentifier identifier) {
     FilesetPO filesetPO = getFilesetPOByIdentifier(identifier);
-    Long filesetId = filesetPO.getFilesetId();
+    FilesetEntity deletedFileset = POConverters.fromFilesetPO(filesetPO, identifier.namespace());
 
-    // We should delete meta and version info
-    AtomicInteger deleteResult = new AtomicInteger(0);
+    // Delete the root row first and only if it still has the version we read. A stale drop stops
+    // before it can remove versions, tags, policies, or any other related data.
     SessionUtils.doMultipleWithCommit(
-        () ->
-            deleteResult.set(
-                SessionUtils.getWithoutCommit(
-                    FilesetMetaMapper.class,
-                    mapper -> mapper.softDeleteFilesetMetasByFilesetId(filesetId))),
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                FilesetVersionMapper.class,
-                mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId));
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        filesetId, MetadataObject.Type.FILESET.name()));
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name()));
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name()));
-            SessionUtils.doWithoutCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(filesetId));
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        filesetId, MetadataObject.Type.FILESET.name()));
-          }
-        });
+        () -> deleteFilesetWithVersion(identifier, filesetPO),
+        () -> deleteFilesetDependents(filesetPO.getFilesetId()));
 
-    return deleteResult.get() > 0;
+    return deletedFileset;
   }
 
   @Monitored(
@@ -479,5 +453,115 @@ public class FilesetMetaService {
                   filesetNames);
           return POConverters.fromFilesetPOs(filesetPOs, firstIdent.namespace());
         });
+  }
+
+  /**
+   * Soft-deletes the observed fileset metadata row without starting a transaction.
+   *
+   * <p>The caller must run this method in the same transaction as dependent cleanup. Package access
+   * also lets concurrency tests submit a deliberately stale snapshot without duplicating the
+   * production CAS logic.
+   *
+   * @param identifier the fileset identity observed by the caller
+   * @param observedFilesetPO the fileset row and OCC version observed by the caller
+   */
+  void deleteFilesetWithVersion(NameIdentifier identifier, FilesetPO observedFilesetPO) {
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteFilesetMetasByFilesetId(
+                        observedFilesetPO.getFilesetId(), observedFilesetPO.getCurrentVersion())),
+        () -> filesetWriteFailure(identifier, observedFilesetPO));
+  }
+
+  private boolean tryUpdateFileset(FilesetPO newFilesetPO, FilesetPO oldFilesetPO) {
+    AtomicBoolean updated = new AtomicBoolean(false);
+    SessionUtils.doMultipleWithCommit(
+        () -> {
+          Integer updateCount =
+              SessionUtils.getWithoutCommit(
+                  FilesetMetaMapper.class,
+                  mapper -> mapper.updateFilesetMeta(newFilesetPO, oldFilesetPO));
+          updated.set(updateCount != null && updateCount > 0);
+        },
+        () -> {
+          if (updated.get()) {
+            // The metadata row now points to this complete snapshot. It stays in the same
+            // transaction so a failed version insert also restores the metadata version.
+            SessionUtils.doWithoutCommit(
+                FilesetVersionMapper.class,
+                mapper -> mapper.insertFilesetVersions(newFilesetPO.getFilesetVersionPOs()));
+          }
+        });
+    return updated.get();
+  }
+
+  private FilesetEntity filesetWithPersistedId(FilesetEntity filesetEntity, Long persistedId) {
+    Map<String, String> properties = filesetEntity.properties();
+    if (properties != null && properties.containsKey(StringIdentifier.ID_KEY)) {
+      properties = new HashMap<>(properties);
+      properties.put(StringIdentifier.ID_KEY, StringIdentifier.fromId(persistedId).toString());
+    }
+
+    return FilesetEntity.builder()
+        .withId(persistedId)
+        .withName(filesetEntity.name())
+        .withNamespace(filesetEntity.namespace())
+        .withComment(filesetEntity.comment())
+        .withFilesetType(filesetEntity.filesetType())
+        .withStorageLocations(filesetEntity.storageLocations())
+        .withProperties(properties)
+        .withAuditInfo(filesetEntity.auditInfo())
+        .build();
+  }
+
+  private void deleteFilesetDependents(Long filesetId) {
+    // The fileset row has already passed its version check. All cleanup below uses the same
+    // transaction, so either the root and every related row are deleted together, or none are.
+    SessionUtils.doWithoutCommit(
+        FilesetVersionMapper.class,
+        mapper -> mapper.softDeleteFilesetVersionsByFilesetId(filesetId));
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                filesetId, MetadataObject.Type.FILESET.name()));
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(
+                filesetId, MetadataObject.Type.FILESET.name()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                filesetId, MetadataObject.Type.FILESET.name()));
+    SessionUtils.doWithoutCommit(
+        StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(filesetId));
+    SessionUtils.doWithoutCommit(
+        PolicyMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                filesetId, MetadataObject.Type.FILESET.name()));
+  }
+
+  private RuntimeException filesetWriteFailure(
+      NameIdentifier identifier, FilesetPO observedFilesetPO) {
+    // The failed CAS has already serialized with an in-flight writer. A non-locking natural-key
+    // lookup is enough to distinguish a disappeared name from one that still names either the
+    // modified fileset or a replacement, without holding another row lock on the failure path.
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.FILESET,
+        () ->
+            SessionUtils.getWithoutCommit(
+                FilesetMetaMapper.class,
+                mapper ->
+                    mapper.selectFilesetIdBySchemaIdAndName(
+                        observedFilesetPO.getSchemaId(), observedFilesetPO.getFilesetName())),
+        null,
+        null);
   }
 }

@@ -39,6 +39,7 @@ import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -66,6 +67,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.GravitinoEnv;
@@ -115,7 +117,10 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.metrics.MetricsSystem;
 import org.apache.gravitino.metrics.source.FilesetCatalogMetricsSource;
+import org.apache.gravitino.secret.SecretAlterChanges;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretMaterial;
+import org.apache.gravitino.secret.SecretMaterialsHolder;
 import org.apache.gravitino.utils.FilesetUtil;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -679,14 +684,26 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       throw new RuntimeException("Failed to load fileset " + ident, ioe);
     }
 
+    SecretMaterialsHolder writtenSecretMaterials = new SecretMaterialsHolder();
+    boolean alterCommitted = false;
     try {
       FilesetEntity updatedFilesetEntity =
           store.update(
               ident,
               FilesetEntity.class,
               Entity.EntityType.FILESET,
-              e -> updateFilesetEntity(ident, e, changes));
-
+              existing -> {
+                Map<String, String> currentProperties =
+                    existing.properties() == null
+                        ? new HashMap<>()
+                        : new HashMap<>(existing.properties());
+                Pair<FilesetChange[], List<SecretMaterial>> secretResult =
+                    SecretAlterChanges.prepareFilesetChanges(
+                        secretManager, currentProperties, existing.id(), changes);
+                writtenSecretMaterials.set(secretResult.getRight());
+                return updateFilesetEntity(ident, existing, secretResult.getLeft());
+              });
+      alterCommitted = true;
       return FilesetImpl.builder()
           .withName(updatedFilesetEntity.name())
           .withComment(updatedFilesetEntity.comment())
@@ -703,62 +720,82 @@ public class FilesetCatalogOperations extends ManagedSchemaOperations
       // This is happened when renaming a fileset to an existing fileset name.
       throw new RuntimeException(
           "Fileset with the same name " + ident.name() + " already exists", aee);
+    } finally {
+      if (!alterCommitted) {
+        secretManager.rollbackSecrets(writtenSecretMaterials.get());
+      }
     }
   }
 
   @Override
   public boolean dropFileset(NameIdentifier ident) {
     try {
-      FilesetEntity filesetEntity =
-          store.get(ident, Entity.EntityType.FILESET, FilesetEntity.class);
-
-      // For managed fileset, we should delete the related files.
-      if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
-        AtomicReference<IOException> exception = new AtomicReference<>();
-        Map<String, Path> storageLocations =
-            Maps.transformValues(filesetEntity.storageLocations(), Path::new);
-        storageLocations.forEach(
-            (locationName, location) -> {
-              try {
-                Map<String, String> fsConf =
-                    mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
-                FileSystem fs = getFileSystemWithCache(location, fsConf);
-                if (fs.exists(location)) {
-                  if (!fs.delete(location, true)) {
-                    LOG.warn(
-                        "Failed to delete fileset {} location {} with location name {}",
-                        ident,
-                        location,
-                        locationName);
+      // The relational store runs this cleanup after the metadata CAS wins but before committing
+      // its transaction. The callback therefore sees the exact deleted snapshot, and an I/O
+      // failure can still restore the metadata so the caller may fix permissions and retry.
+      //
+      // The price is that the recursive storage delete runs inside that transaction, holding the
+      // fileset rows and a pooled connection for as long as the filesystem takes. Dropping a
+      // fileset with a very large tree is therefore a slow write for that fileset, and enough
+      // concurrent drops can hold up the connection pool.
+      Optional<FilesetEntity> deletedFileset =
+          store.deleteAndGet(
+              ident,
+              Entity.EntityType.FILESET,
+              FilesetEntity.class,
+              filesetEntity -> {
+                if (!disableFSOps && filesetEntity.filesetType() == Fileset.Type.MANAGED) {
+                  try {
+                    deleteManagedFilesetStorage(ident, filesetEntity);
+                  } catch (IOException ioe) {
+                    throw new UncheckedIOException(ioe);
                   }
-                } else {
-                  LOG.warn(
-                      "Fileset {} location {} with location name {} does not exist",
-                      ident,
-                      location,
-                      locationName);
                 }
-              } catch (IOException ioe) {
-                LOG.warn(
-                    "Failed to delete fileset {} location {} with location name {}",
-                    ident,
-                    location,
-                    locationName,
-                    ioe);
-                exception.set(ioe);
-              }
-            });
-        if (exception.get() != null) {
-          throw exception.get();
-        }
-      }
-
-      return store.delete(ident, Entity.EntityType.FILESET);
+              });
+      return deletedFileset.isPresent();
     } catch (NoSuchEntityException ne) {
       LOG.warn("Fileset {} does not exist", ident);
       return false;
+    } catch (UncheckedIOException uioe) {
+      throw new RuntimeException("Failed to delete fileset " + ident, uioe.getCause());
     } catch (IOException ioe) {
       throw new RuntimeException("Failed to delete fileset " + ident, ioe);
+    }
+  }
+
+  /**
+   * Removes the storage of a managed fileset while its metadata delete can still be rolled back.
+   *
+   * <p>The first location that cannot be removed stops the loop, so the drop is rejected before it
+   * takes away more data than it already has. The locations removed up to that point are gone for
+   * good, but attempting the remaining ones would only widen that gap.
+   */
+  private void deleteManagedFilesetStorage(NameIdentifier ident, FilesetEntity filesetEntity)
+      throws IOException {
+    Map<String, Path> storageLocations =
+        Maps.transformValues(filesetEntity.storageLocations(), Path::new);
+    for (Map.Entry<String, Path> entry : storageLocations.entrySet()) {
+      String locationName = entry.getKey();
+      Path location = entry.getValue();
+      Map<String, String> fsConf =
+          mergeUpLevelConfigurations(ident, filesetEntity.properties(), location);
+      FileSystem fs = getFileSystemWithCache(location, fsConf);
+      if (!fs.exists(location)) {
+        LOG.warn(
+            "Fileset {} location {} with location name {} does not exist",
+            ident,
+            location,
+            locationName);
+        continue;
+      }
+      if (!fs.delete(location, true) && fs.exists(location)) {
+        // A false return also covers a location that somebody else removed between the check above
+        // and this call. Only a location that is still there is a reason to reject the drop.
+        throw new IOException(
+            String.format(
+                "Failed to delete fileset %s location %s with location name %s",
+                ident, location, locationName));
+      }
     }
   }
 

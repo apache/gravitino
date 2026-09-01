@@ -369,6 +369,16 @@ class BaseSchemaCatalog(
             )
         if isinstance(change, SchemaChange.RemoveProperty):
             return SchemaUpdateRequest.RemoveSchemaPropertyRequest(change.property())
+        if isinstance(change, SchemaChange.SetSecretBinding):
+            binding = change.binding()
+            return SchemaUpdateRequest.SetSchemaSecretBindingRequest(
+                change.property(), binding.provider, binding.plaintext
+            )
+        if isinstance(change, SchemaChange.SetSecretReference):
+            reference = change.reference()
+            return SchemaUpdateRequest.SetSchemaSecretReferenceRequest(
+                change.property(), reference.provider, reference.attributes
+            )
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def validate(self):

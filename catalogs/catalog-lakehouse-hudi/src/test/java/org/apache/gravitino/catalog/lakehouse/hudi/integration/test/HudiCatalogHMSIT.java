@@ -34,8 +34,10 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.dto.rel.ColumnDTO;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.HiveContainer;
@@ -171,6 +173,7 @@ public class HudiCatalogHMSIT extends BaseIT {
     Assertions.assertEquals(comment, catalog.comment());
     Map<String, String> expectedProperties = new HashMap<>(properties);
     expectedProperties.put(PROPERTY_IN_USE, "true");
+    expectedProperties.put(StringIdentifier.ID_KEY, HiddenPropertyMaskUtils.MASKED_VALUE);
     Assertions.assertEquals(expectedProperties, catalog.properties());
     Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
 

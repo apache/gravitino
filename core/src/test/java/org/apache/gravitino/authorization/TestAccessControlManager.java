@@ -65,10 +65,12 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
 import org.apache.gravitino.bulk.UserAdd;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.CatalogTestUtils;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -296,6 +298,55 @@ public class TestAccessControlManager {
     Assertions.assertEquals("bulk_remove_user", results.get(0).name());
     Assertions.assertFalse(results.get(1).succeeded());
     Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchUserException);
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
+  }
+
+  @Test
+  public void testBulkAddGroups() {
+    List<BulkItemResult<Group>> results =
+        accessControlManager.addGroups(
+            METALAKE,
+            Lists.newArrayList(
+                new GroupAdd("bulk_group_1", "bulk-group-ext-1"),
+                new GroupAdd("bulk_group_2", null),
+                new GroupAdd("bulk_group_1", null)));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_group_1", results.get(0).value().get().name());
+    Assertions.assertEquals("bulk-group-ext-1", results.get(0).value().get().externalId());
+    Assertions.assertTrue(results.get(1).succeeded());
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof GroupAlreadyExistsException);
+  }
+
+  @Test
+  public void testBulkRemoveGroups() {
+    accessControlManager.addGroup(METALAKE, "bulk_remove_group");
+
+    List<BulkItemResult<String>> results =
+        accessControlManager.removeGroups(
+            METALAKE,
+            Lists.newArrayList("bulk_remove_group", "missing_bulk_group", "metalake_owner_group"),
+            Optional.of(
+                new Owner() {
+                  @Override
+                  public String name() {
+                    return "metalake_owner_group";
+                  }
+
+                  @Override
+                  public Type type() {
+                    return Type.GROUP;
+                  }
+                }));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_remove_group", results.get(0).name());
+    Assertions.assertFalse(results.get(1).succeeded());
+    Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchGroupException);
     Assertions.assertFalse(results.get(2).succeeded());
     Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
   }
@@ -769,7 +820,9 @@ public class TestAccessControlManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertTrue(
+        !testProps.containsKey(StringIdentifier.ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(testProps.get(StringIdentifier.ID_KEY)));
   }
 
   @Test

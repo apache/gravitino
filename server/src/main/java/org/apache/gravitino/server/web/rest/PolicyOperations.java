@@ -141,6 +141,7 @@ public class PolicyOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       PolicyCreateRequest request) {
+    String policyName = request == null ? "" : request.getName();
     LOG.info("Received create policy request under metalake: {}", metalake);
 
     try {
@@ -162,8 +163,7 @@ public class PolicyOperations {
             return Utils.ok(new PolicyResponse(toDTO(policy, Optional.empty())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handlePolicyException(OperationType.CREATE, policyName, metalake, e);
     }
   }
 
@@ -205,6 +205,13 @@ public class PolicyOperations {
       @PathParam("policy") @AuthorizationMetadata(type = Entity.EntityType.POLICY) String name,
       PolicyUpdatesRequest request) {
     LOG.info("Received alter policy request for policy: {} under metalake: {}", name, metalake);
+    if (request == null) {
+      return ExceptionHandlers.handlePolicyException(
+          OperationType.ALTER,
+          name,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(

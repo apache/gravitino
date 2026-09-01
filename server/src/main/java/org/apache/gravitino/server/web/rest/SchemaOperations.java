@@ -143,7 +143,8 @@ public class SchemaOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.CREATE_SCHEMA)
           SchemaCreateRequest request) {
-    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
+    String schemaName = request == null ? "" : request.getName();
+    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, schemaName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -164,8 +165,7 @@ public class SchemaOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleSchemaException(
-          OperationType.CREATE, request.getName(), catalog, e);
+      return ExceptionHandlers.handleSchemaException(OperationType.CREATE, schemaName, catalog, e);
     }
   }
 
@@ -214,6 +214,14 @@ public class SchemaOperations {
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       SchemaUpdatesRequest request) {
     LOG.info("Received alter schema request: {}.{}.{}", metalake, catalog, schema);
+    if (request == null) {
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.ALTER,
+          schema,
+          catalog,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

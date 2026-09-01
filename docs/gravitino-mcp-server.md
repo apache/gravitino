@@ -19,7 +19,7 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
 1. Clone the code from GitHub, and change to `mcp-server` directory
 2. Create virtual environment, `uv venv`
 3. Install the required Python packages. `uv pip install -e .`
-4. Add Gravitino MCP server to corresponding LLM tools. Take `cursor` for example, edit `~/.cursor/mcp.json`, use following configuration for local Gravitino MCP server:
+4. Add Gravitino MCP server to corresponding LLM tools. Take Cursor for example, edit `~/.cursor/mcp.json`, use following configuration for local Gravitino MCP server:
 
 ```json
 {
@@ -35,11 +35,19 @@ Gravitino MCP server provides the ability to manage Gravitino metadata for LLM.
         "test",
         "--gravitino-uri",
         "http://127.0.0.1:8090"
-      ]
+      ],
+      "env": {
+        "GRAVITINO_OAUTH_TOKEN_ENDPOINT": "https://idp.example/realms/gravitino/protocol/openid-connect/token",
+        "GRAVITINO_OAUTH_CLIENT_ID": "mcp-service",
+        "GRAVITINO_OAUTH_CLIENT_SECRET": "<secret>",
+        "GRAVITINO_OAUTH_SCOPE": "gravitino"
+      }
     }
   }
 }
 ```
+
+In Cursor stdio mode the MCP process typically receives no `Authorization` header from the client. Set the `GRAVITINO_OAUTH_*` variables (or the matching CLI flags) so MCP fetches a service token with the `client_credentials` grant. Omit `env` to run anonymously, or use `--token` / `GRAVITINO_TOKEN` for a static credential instead.
 
 Or start an HTTP MCP server by `uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 --transport http --mcp-url http://localhost:8000/mcp`, and use the configuration:
 
@@ -134,19 +142,24 @@ Gravitino MCP server supports the following tools, and you could export tool by 
 
 You could config Gravitino MCP server by arguments, `uv run mcp_server -h` shows the detailed information.
 
-| Argument          | Description                                                                      | Default value               | Required |
-|-------------------|----------------------------------------------------------------------------------|-----------------------------|----------|
-| `--metalake`      | The Gravitino metalake name.                                                     | none                        | Yes      |
-| `--gravitino-uri` | The URI of Gravitino server.                                                     | `http://127.0.0.1:8090`     | No       |
-| `--transport`     | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).     | `stdio`                     | No       |
-| `--mcp-url`       | The URL of MCP server if using HTTP transport.                                   | `http://127.0.0.1:8000/mcp` | No       |
-| `--token`         | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication.   | none (anonymous)            | No       |
-| `--tls-cert`      | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.          | none                        | No       |
-| `--tls-key`       | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.         | none                        | No       |
+| Argument                         | Description                                                                                                                     | Default value               | Required |
+|----------------------------------|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------|----------|
+| `--metalake`                     | The Gravitino metalake name.                                                                                                    | none                        | Yes      |
+| `--gravitino-uri`                | The URI of Gravitino server.                                                                                                    | `http://127.0.0.1:8090`     | No       |
+| `--transport`                    | Transport protocol: stdio (local), http / streamable-http (Streamable HTTP).                                                    | `stdio`                     | No       |
+| `--mcp-url`                      | The URL of MCP server if using HTTP transport.                                                                                  | `http://127.0.0.1:8000/mcp` | No       |
+| `--token`                        | Static credential for Gravitino; or set `GRAVITINO_TOKEN`. See Authentication. Wins over OAuth client-credentials.              | none (anonymous)            | No       |
+| `--oauth-token-endpoint`         | OAuth2 token URL for client-credentials. Or `GRAVITINO_OAUTH_TOKEN_ENDPOINT`.                                                   | none                        | No       |
+| `--oauth-client-id`              | OAuth2 client id. Or `GRAVITINO_OAUTH_CLIENT_ID`.                                                                               | none                        | No       |
+| `--oauth-client-secret`          | OAuth2 client secret. Or `GRAVITINO_OAUTH_CLIENT_SECRET`.                                                                       | none                        | No       |
+| `--oauth-scope`                  | Optional OAuth2 scope. Or `GRAVITINO_OAUTH_SCOPE`.                                                                              | none                        | No       |
+| `--no-service-identity-fallback` | HTTP only: reject requests with no `Authorization` when OAuth or `--token` is set. Or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK`. | `false`                     | No       |
+| `--tls-cert`                     | PEM certificate to serve the endpoint over HTTPS. Requires `--tls-key`.                                                         | none                        | No       |
+| `--tls-key`                      | PEM private key to serve the endpoint over HTTPS. Requires `--tls-cert`.                                                        | none                        | No       |
 
 ## Authentication
 
-By default the MCP server talks to Gravitino anonymously. There are two ways to attach an identity, depending on the transport.
+By default the MCP server talks to Gravitino anonymously. There are three ways to authenticate MCP when calling Gravitino.
 
 ### Static startup token (stdio and HTTP)
 
@@ -175,11 +188,40 @@ export GRAVITINO_TOKEN=<your-token>
 uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
 ```
 
-In `stdio` mode this token is used for every request. In HTTP mode it is only the fallback, used when an incoming request does not carry its own `Authorization` header.
+In `stdio` mode this token is used for every request. In HTTP mode it is only the fallback, used when an incoming request does not carry its own `Authorization` header. If both `--token` and OAuth client-credentials are set, `--token` wins.
+
+### OAuth client credentials (service identity)
+
+When Gravitino uses `gravitino.authenticators = oauth`, a pasted Bearer access token in `--token` expires and is not refreshed. For the **service** identity (Cursor stdio, or HTTP when the caller sends no `Authorization` header), configure MCP as an OAuth client of the same identity provider Gravitino trusts.
+
+Set `--oauth-token-endpoint`, `--oauth-client-id`, and `--oauth-client-secret` together, plus optional `--oauth-scope` (or the matching `GRAVITINO_OAUTH_*` environment variables). MCP requests an access token with the `client_credentials` grant, caches it, refreshes before expiry, and retries once on HTTP 401.
+
+In Cursor, put the `GRAVITINO_OAUTH_*` values in the `env` block of `~/.cursor/mcp.json` (see [Usage](#usage)). `--token` / `GRAVITINO_TOKEN` overrides OAuth client-credentials and stays static (no refresh). An incoming HTTP `Authorization` header is forwarded as-is and is not refreshed by MCP.
+
+Gravitino maps the JWT to a metalake principal from claims configured in [`gravitino.authenticator.oauth.principalFields`](./security/how-to-authenticate.md#server-configuration) (often `sub`); that principal may differ from `--oauth-client-id`. It must exist as a metalake user with the needed grants, or tool calls fail with 403.
+
+Prefer environment variables (or the `env` block in `~/.cursor/mcp.json`) for the client secret so it does not appear in `ps` output or shell history:
+
+```shell
+export GRAVITINO_OAUTH_TOKEN_ENDPOINT=https://idp.example/realms/gravitino/protocol/openid-connect/token
+export GRAVITINO_OAUTH_CLIENT_ID=mcp-service
+export GRAVITINO_OAUTH_CLIENT_SECRET=<secret>
+export GRAVITINO_OAUTH_SCOPE=gravitino
+
+uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090
+```
+
+The matching CLI flags (`--oauth-token-endpoint`, `--oauth-client-id`, `--oauth-client-secret`, `--oauth-scope`) work the same way, but avoid passing `--oauth-client-secret` on the command line in production.
+
+This path does not replace per-request user identity in HTTP mode (see below).
 
 ### Per-request identity (HTTP)
 
-When the server runs with HTTP transport, the `Authorization` header of each incoming MCP request is forwarded verbatim to Gravitino. The scheme is preserved, so OAuth2 (`Bearer`), Gravitino simple authentication (`Basic <base64(user:dummy)>`) and others all work. This keeps concurrent sessions from different principals isolated — one principal's identity never leaks into another's calls — and lets Gravitino enforce authorization per caller. The per-request header takes priority over the static `--token`.
+When the server runs with HTTP transport, the `Authorization` header of each incoming MCP request is forwarded verbatim to Gravitino. The scheme is preserved, so OAuth2 (`Bearer`), Gravitino simple authentication (`Basic <base64(user:dummy)>`) and others all work. This keeps concurrent sessions from different principals isolated — one principal's identity never leaks into another's calls — and lets Gravitino enforce authorization per caller. The per-request header takes priority over the static `--token` and over OAuth client-credentials.
+
+**Security warning:** When OAuth client-credentials or `--token` is configured, an HTTP request with **no** `Authorization` header is authenticated as the **service identity**, not as anonymous. With OAuth, that identity refreshes automatically and stays valid for a long time. If the MCP HTTP endpoint is reachable by more than one caller, anyone who omits `Authorization` receives the service principal's full permissions. Use stdio transport for single-user integrations (for example Cursor), bind HTTP to a trusted network, or place the endpoint behind a reverse proxy that requires authentication.
+
+For exposed or multi-caller HTTP deployments, set `--no-service-identity-fallback` (or `GRAVITINO_NO_SERVICE_IDENTITY_FALLBACK=1`) so requests without `Authorization` are rejected instead of using the service identity. The flag is ignored for stdio transport.
 
 Authorization itself is always enforced by Gravitino: the MCP server forwards the identity but does not make access-control decisions of its own.
 
@@ -195,12 +237,12 @@ uv run mcp_server --metalake test --gravitino-uri http://127.0.0.1:8090 \
 
 ## Audit Logging
 
-Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the principal derived from the request's `Authorization` header.
+Every tool invocation is recorded as one structured JSON line in `gravitino-mcp-audit.log` (written to the server's working directory). Each record is attributed to the incoming HTTP `Authorization` header when present; otherwise to the configured service identity (`--token` or OAuth client id).
 
 | Field        | Description                                                                                                                                                                             |
 |--------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `timestamp`  | UTC ISO-8601 time of the call.                                                                                                                                                          |
-| `principal`  | Caller identity: username for `Basic` simple auth, `bearer:<first-8-chars>` for a Bearer token, or `anonymous` when no identity is present.                                             |
+| `principal`  | Caller identity: username for `Basic` simple auth, `bearer:<first-8-chars>` for a Bearer token, `oauth:<first-8-chars-of-client-id>` when OAuth client-credentials is the service identity (stdio or HTTP with no caller header), or `anonymous` when no identity is present. |
 | `tool`       | Name of the invoked MCP tool.                                                                                                                                                           |
 | `outcome`    | `allow` for successful calls, `deny` for failed ones. `deny` is emitted for any tool-call exception (authorization denial being the common case); inspect `error_type` to disambiguate. |
 | `error_type` | Exception class name, present only when `outcome` is `deny`.                                                                                                                            |

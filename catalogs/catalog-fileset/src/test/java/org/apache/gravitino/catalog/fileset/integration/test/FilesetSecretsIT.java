@@ -103,10 +103,11 @@ public class FilesetSecretsIT extends BaseIT {
                 ImmutableMap.of());
 
     Assertions.assertEquals("visible-value", fileset.properties().get("visible-key"));
-    // Default load properties omit secret-manager values; plaintext comes from getSecrets().
-    Assertions.assertFalse(
-        fileset.properties().containsKey("custom-secret"),
-        "secret bindings must not appear in default load properties");
+    // Secret bindings are returned as a masked placeholder in default load properties.
+    Assertions.assertEquals(
+        org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
+        fileset.properties().get("custom-secret"),
+        "secret bindings must appear as masked placeholders in default load properties");
 
     Map<String, String> secrets = fileset.supportsSecrets().getSecrets();
     Assertions.assertEquals("mem-plaintext", secrets.get("custom-secret"));

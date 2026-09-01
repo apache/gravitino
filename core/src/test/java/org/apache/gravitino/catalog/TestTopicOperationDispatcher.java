@@ -47,6 +47,7 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.lock.LockManager;
@@ -273,6 +274,27 @@ public class TestTopicOperationDispatcher extends TestOperationDispatcher {
     topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
     Assertions.assertTrue(entityStore.exists(NameIdentifier.of(topicNs.levels()), SCHEMA));
     Assertions.assertTrue(entityStore.exists(topicIdent, Entity.EntityType.TOPIC));
+  }
+
+  @Test
+  public void testCreateAndAlterTopicRejectMaskedPlaceholder() throws IOException {
+    Namespace topicNs = Namespace.of(metalake, catalog, "schema_masked_topic");
+    NameIdentifier topicIdent = NameIdentifier.of(topicNs, "topic_masked");
+    schemaOperationDispatcher.createSchema(
+        NameIdentifier.of(topicNs.levels()), "comment", ImmutableMap.of("k1", "v1", "k2", "v2"));
+
+    Map<String, String> createProps =
+        ImmutableMap.of("k1", HiddenPropertyMaskUtils.MASKED_VALUE, "k2", "v2");
+    testMaskedPlaceholderRejected(
+        () -> topicOperationDispatcher.createTopic(topicIdent, "comment", null, createProps), "k1");
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    topicOperationDispatcher.createTopic(topicIdent, "comment", null, props);
+    testMaskedPlaceholderRejected(
+        () ->
+            topicOperationDispatcher.alterTopic(
+                topicIdent, TopicChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
+        "k3");
   }
 
   public static SchemaOperationDispatcher getSchemaOperationDispatcher() {

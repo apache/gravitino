@@ -59,6 +59,11 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().selectGroupMetaByMetalakeIdAndName(metalakeId, name);
   }
 
+  /** Returns SQL that selects and locks an active group by ID. */
+  public static String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
+    return getProvider().selectGroupMetaByIdForUpdate(groupId);
+  }
+
   public static String listExtendedGroupPOsByMetalakeIdAndNames(
       @Param("metalakeId") Long metalakeId, @Param("groupNames") List<String> groupNames) {
     return getProvider().listExtendedGroupPOsByMetalakeIdAndNames(metalakeId, groupNames);
@@ -72,8 +77,9 @@ public class GroupMetaSQLProviderFactory {
     return getProvider().insertGroupMetaOnDuplicateKeyUpdate(groupPO);
   }
 
-  public static String softDeleteGroupMetaByGroupId(@Param("groupId") Long groupId) {
-    return getProvider().softDeleteGroupMetaByGroupId(groupId);
+  public static String softDeleteGroupMetaByGroupId(
+      @Param("groupId") Long groupId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteGroupMetaByGroupId(groupId, currentVersion);
   }
 
   public static String softDeleteGroupMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

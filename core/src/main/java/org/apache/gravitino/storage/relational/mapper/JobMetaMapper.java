@@ -50,6 +50,9 @@ public interface JobMetaMapper {
   JobPO selectJobPOByMetalakeAndRunId(
       @Param("metalakeName") String metalakeName, @Param("jobRunId") Long jobRunId);
 
+  @UpdateProvider(type = JobMetaSQLProviderFactory.class, method = "updateJobMeta")
+  Integer updateJobMeta(@Param("newJobMeta") JobPO newJobPO, @Param("oldJobMeta") JobPO oldJobPO);
+
   @UpdateProvider(
       type = JobMetaSQLProviderFactory.class,
       method = "softDeleteJobMetaByMetalakeAndTemplate")

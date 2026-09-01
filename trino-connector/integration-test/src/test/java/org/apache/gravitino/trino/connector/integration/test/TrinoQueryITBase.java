@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector.integration.test;
 
 import static java.lang.Thread.sleep;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,6 +33,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SupportsSchemas;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.exceptions.RESTException;
@@ -96,6 +98,15 @@ public class TrinoQueryITBase {
   private void setEnv() throws Exception {
     baseIT = new BaseIT();
     if (autoStart) {
+      // The Trino connector loads every lakehouse-iceberg catalog through the Iceberg REST server,
+      // so the auxiliary service has to run and serve this test's metalake.
+      baseIT.enableIcebergAuxRestService(
+          ImmutableMap.of(
+              BaseIT.GRAVITINO_ICEBERG_REST_PREFIX
+                  + IcebergConstants.ICEBERG_REST_CATALOG_CONFIG_PROVIDER,
+              IcebergConstants.DYNAMIC_ICEBERG_CATALOG_CONFIG_PROVIDER_NAME,
+              BaseIT.GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_METALAKE,
+              metalakeName));
       baseIT.startIntegrationTest();
       gravitinoClient = baseIT.getGravitinoClient();
       gravitinoUri = String.format("http://127.0.0.1:%d", baseIT.getGravitinoServerPort());

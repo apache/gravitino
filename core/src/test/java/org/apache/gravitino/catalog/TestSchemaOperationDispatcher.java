@@ -48,6 +48,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.SchemaAlreadyExistsException;
@@ -451,7 +452,7 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
       Map<String, SecretBinding> bindings = Map.of("k2", new SecretBinding("memory", "s3cr3t"));
       Schema schema =
           d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of());
-      Assertions.assertFalse(schema.properties().containsKey("k2"));
+      Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, schema.properties().get("k2"));
 
       Schema stored =
           catalogManager
@@ -468,12 +469,33 @@ public class TestSchemaOperationDispatcher extends TestOperationDispatcher {
                   SecretConstants.ATTR_ENTITY_ID, String.valueOf(entity.id()),
                   SecretConstants.ATTR_PROPERTY_KEY, "k2"));
       Assertions.assertEquals("s3cr3t", secrets.readSecret(urn));
+      d.alterSchema(ident, SchemaChange.removeProperty("k2"));
+      Assertions.assertFalse(
+          entityStore.get(ident, SCHEMA, SchemaEntity.class).properties().containsKey("k2"));
+      Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
       Assertions.assertThrows(
           SchemaAlreadyExistsException.class,
           () -> d.createSchema(ident, "comment", ImmutableMap.of("k1", "v1"), bindings, Map.of()));
       Assertions.assertTrue(d.dropSchema(ident, false));
       Assertions.assertThrows(IllegalArgumentException.class, () -> secrets.readSecret(urn));
     }
+  }
+
+  @Test
+  public void testCreateAndAlterSchemaRejectMaskedPlaceholder() {
+    NameIdentifier schemaIdent = NameIdentifier.of(metalake, catalog, "schema_masked");
+    Map<String, String> createProps =
+        ImmutableMap.of("k1", HiddenPropertyMaskUtils.MASKED_VALUE, "k2", "v2");
+    testMaskedPlaceholderRejected(
+        () -> dispatcher.createSchema(schemaIdent, "comment", createProps), "k1");
+
+    Map<String, String> props = ImmutableMap.of("k1", "v1", "k2", "v2");
+    dispatcher.createSchema(schemaIdent, "comment", props);
+    testMaskedPlaceholderRejected(
+        () ->
+            dispatcher.alterSchema(
+                schemaIdent, SchemaChange.setProperty("k3", HiddenPropertyMaskUtils.MASKED_VALUE)),
+        "k3");
   }
 
   private static SecretManager memorySecretManager() {

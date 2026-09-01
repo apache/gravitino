@@ -47,6 +47,10 @@ public interface RoleMetaMapper {
   RolePO selectRoleMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("roleName") String roleName);
 
+  /** Returns and locks an active role by ID for the current transaction. */
+  @SelectProvider(type = RoleMetaSQLProviderFactory.class, method = "selectRoleMetaByIdForUpdate")
+  RolePO selectRoleMetaByIdForUpdate(@Param("roleId") Long roleId);
+
   @SelectProvider(
       type = RoleMetaSQLProviderFactory.class,
       method = "selectRoleIdByMetalakeIdAndName")
@@ -81,8 +85,14 @@ public interface RoleMetaMapper {
   Integer updateRoleMeta(
       @Param("newRoleMeta") RolePO newRolePO, @Param("oldRoleMeta") RolePO oldRolePO);
 
+  /**
+   * Soft-deletes an active role only when its OCC version still matches.
+   *
+   * @return the number of deleted rows
+   */
   @UpdateProvider(type = RoleMetaSQLProviderFactory.class, method = "softDeleteRoleMetaByRoleId")
-  void softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId);
+  Integer softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = RoleMetaSQLProviderFactory.class,

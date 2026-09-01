@@ -350,6 +350,8 @@ CREATE TABLE IF NOT EXISTS `model_meta` (
     `model_comment` CLOB DEFAULT NULL COMMENT 'model comment',
     `model_properties` CLOB DEFAULT NULL COMMENT 'model properties',
     `model_latest_version` INT UNSIGNED DEFAULT 0 COMMENT 'model latest version',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version',
     `audit_info` CLOB NOT NULL COMMENT 'model audit info',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'model deleted at',
     PRIMARY KEY (`model_id`),
@@ -429,6 +431,20 @@ CREATE TABLE IF NOT EXISTS `policy_relation_meta` (
     UNIQUE KEY `uk_pi_mi_mo_del` (`policy_id`, `metadata_object_id`, `metadata_object_type`, `deleted_at`),
     KEY `idx_pid` (`policy_id`),
     KEY `idx_prmid` (`metadata_object_id`)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `selector` CLOB DEFAULT NULL COMMENT 'policy tag selector JSON, NULL matches tag presence',
+    `audit_info` CLOB NOT NULL COMMENT 'policy tag relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy tag relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `policy_tag_relation_meta_uk_pid_tid_del` (`policy_id`, `tag_id`, `deleted_at`),
+    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS `statistic_meta` (

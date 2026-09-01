@@ -124,6 +124,7 @@ public class TopicOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TopicCreateRequest request) {
+    String topicName = request == null ? "" : request.getName();
     LOG.info("Received create topic request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
@@ -150,8 +151,7 @@ public class TopicOperations {
             return response;
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleTopicException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleTopicException(OperationType.CREATE, topicName, schema, e);
     }
   }
 
@@ -208,6 +208,14 @@ public class TopicOperations {
       @PathParam("topic") @AuthorizationMetadata(type = Entity.EntityType.TOPIC) String topic,
       TopicUpdatesRequest request) {
     LOG.info("Received alter topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
+    if (request == null) {
+      return ExceptionHandlers.handleTopicException(
+          OperationType.ALTER,
+          topic,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

@@ -30,7 +30,9 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -97,12 +99,12 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Model model = gravitinoCatalog.asModelCatalog().registerModel(modelIdent, comment, properties);
     Assertions.assertEquals(modelName, model.name());
     Assertions.assertEquals(comment, model.comment());
-    Assertions.assertEquals(properties, model.properties());
+    assertPropertiesEqual(properties, model.properties());
 
     Model loadModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
     Assertions.assertEquals(modelName, loadModel.name());
     Assertions.assertEquals(comment, loadModel.comment());
-    Assertions.assertEquals(properties, loadModel.properties());
+    assertPropertiesEqual(properties, loadModel.properties());
 
     Assertions.assertTrue(gravitinoCatalog.asModelCatalog().modelExists(modelIdent));
 
@@ -208,7 +210,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
     Assertions.assertTrue(
         gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, "alias1"));
 
@@ -353,7 +355,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri1", modelVersions[0].uri());
     Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersions[0].aliases());
     Assertions.assertEquals("comment1", modelVersions[0].comment());
-    Assertions.assertEquals(Collections.emptyMap(), modelVersions[0].properties());
+    assertPropertiesEqual(Collections.emptyMap(), modelVersions[0].properties());
     Assertions.assertTrue(
         gravitinoCatalog.asModelCatalog().modelVersionExists(modelIdent, "alias1"));
 
@@ -396,7 +398,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(uris, modelVersion.uris());
     Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersion.aliases());
     Assertions.assertEquals("comment1", modelVersion.comment());
-    Assertions.assertEquals(Collections.emptyMap(), modelVersion.properties());
+    assertPropertiesEqual(Collections.emptyMap(), modelVersion.properties());
 
     // Test list model versions
     int[] modelVersions = gravitinoCatalog.asModelCatalog().listModelVersions(modelIdent);
@@ -412,7 +414,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(uris, modelVersionInfos[0].uris());
     Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersionInfos[0].aliases());
     Assertions.assertEquals("comment1", modelVersionInfos[0].comment());
-    Assertions.assertEquals(Collections.emptyMap(), modelVersionInfos[0].properties());
+    assertPropertiesEqual(Collections.emptyMap(), modelVersionInfos[0].properties());
 
     // Test delete and list model versions info
     Assertions.assertTrue(gravitinoCatalog.asModelCatalog().deleteModelVersion(modelIdent, 0));
@@ -440,7 +442,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange updateComment = ModelVersionChange.updateComment(versionNewComment);
     ModelVersion updatedModelVersion =
@@ -472,7 +474,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(new String[] {"alias1"}, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange updateComment = ModelVersionChange.updateComment(aliasNewComment);
     ModelVersion updatedModelVersion =
@@ -542,14 +544,14 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
     Assertions.assertEquals(modelName, alteredModel.name());
     Assertions.assertNotEquals(createdModel.properties(), alteredModel.properties());
-    Assertions.assertEquals(newProperties, alteredModel.properties());
+    assertPropertiesEqual(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
 
     // reload model and check properties
     Model reloadedModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
     Assertions.assertEquals(modelName, reloadedModel.name());
     Assertions.assertNotEquals(createdModel.properties(), reloadedModel.properties());
-    Assertions.assertEquals(newProperties, reloadedModel.properties());
+    assertPropertiesEqual(newProperties, reloadedModel.properties());
     Assertions.assertEquals(createdModel.comment(), reloadedModel.comment());
   }
 
@@ -567,13 +569,13 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, addProperty);
 
     Assertions.assertEquals(modelName, alteredModel.name());
-    Assertions.assertEquals(newProperties, alteredModel.properties());
+    assertPropertiesEqual(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
 
     // reload model and check properties
     Model reloadedModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
     Assertions.assertEquals(modelName, reloadedModel.name());
-    Assertions.assertEquals(newProperties, reloadedModel.properties());
+    assertPropertiesEqual(newProperties, reloadedModel.properties());
     Assertions.assertEquals(createdModel.comment(), reloadedModel.comment());
   }
 
@@ -591,13 +593,13 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Model alteredModel = gravitinoCatalog.asModelCatalog().alterModel(modelIdent, addProperty);
 
     Assertions.assertEquals(modelName, alteredModel.name());
-    Assertions.assertEquals(newProperties, alteredModel.properties());
+    assertPropertiesEqual(newProperties, alteredModel.properties());
     Assertions.assertEquals(createdModel.comment(), alteredModel.comment());
 
     // reload model and check properties
     Model reloadedModel = gravitinoCatalog.asModelCatalog().getModel(modelIdent);
     Assertions.assertEquals(modelName, reloadedModel.name());
-    Assertions.assertEquals(newProperties, reloadedModel.properties());
+    assertPropertiesEqual(newProperties, reloadedModel.properties());
     Assertions.assertEquals(createdModel.comment(), reloadedModel.comment());
   }
 
@@ -646,7 +648,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange[] changes = {
       ModelVersionChange.setProperty("key1", "new value"),
@@ -659,7 +661,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
-    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+    assertPropertiesEqual(newProperties, updatedModelVersion.properties());
 
     // reload model version and check properties
     ModelVersion reloadedModelVersion =
@@ -669,7 +671,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
-    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
+    assertPropertiesEqual(newProperties, reloadedModelVersion.properties());
   }
 
   @Test
@@ -694,7 +696,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange[] changes = {
       ModelVersionChange.setProperty("key1", "new value"),
@@ -707,7 +709,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
-    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+    assertPropertiesEqual(newProperties, updatedModelVersion.properties());
 
     // reload model version and check properties
     ModelVersion reloadedModelVersion =
@@ -717,7 +719,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
-    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
+    assertPropertiesEqual(newProperties, reloadedModelVersion.properties());
   }
 
   @Test
@@ -743,7 +745,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(uri, modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals(versionComment, modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange updateUriChange = ModelVersionChange.updateUri(newUri);
     ModelVersion updatedModelVersion =
@@ -786,7 +788,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(uris, modelVersion.uris());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals(versionComment, modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     // Test update uri
     Map<String, String> updatedUris = ImmutableMap.of("n1", "u1-1");
@@ -868,7 +870,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(uri, modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals(versionComment, modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange updateUriChange = ModelVersionChange.updateUri(newUri);
     ModelVersion updatedModelVersion =
@@ -913,7 +915,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange change = ModelVersionChange.removeProperty("key1");
     ModelVersion updatedModelVersion =
@@ -923,7 +925,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
-    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+    assertPropertiesEqual(newProperties, updatedModelVersion.properties());
 
     // reload model version and check properties
     ModelVersion reloadedModelVersion =
@@ -933,7 +935,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
-    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
+    assertPropertiesEqual(newProperties, reloadedModelVersion.properties());
   }
 
   @Test
@@ -957,7 +959,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange change = ModelVersionChange.removeProperty("key1");
     ModelVersion updatedModelVersion =
@@ -967,7 +969,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), updatedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), updatedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), updatedModelVersion.comment());
-    Assertions.assertEquals(newProperties, updatedModelVersion.properties());
+    assertPropertiesEqual(newProperties, updatedModelVersion.properties());
 
     // reload model version and check properties
     ModelVersion reloadedModelVersion =
@@ -977,7 +979,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals(modelVersion.uri(), reloadedModelVersion.uri());
     Assertions.assertArrayEquals(modelVersion.aliases(), reloadedModelVersion.aliases());
     Assertions.assertEquals(modelVersion.comment(), reloadedModelVersion.comment());
-    Assertions.assertEquals(newProperties, reloadedModelVersion.properties());
+    assertPropertiesEqual(newProperties, reloadedModelVersion.properties());
   }
 
   @Test
@@ -999,7 +1001,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(
@@ -1045,7 +1047,7 @@ public class ModelCatalogOperationsIT extends BaseIT {
     Assertions.assertEquals("uri", modelVersion.uri());
     Assertions.assertArrayEquals(aliases, modelVersion.aliases());
     Assertions.assertEquals("comment", modelVersion.comment());
-    Assertions.assertEquals(properties, modelVersion.properties());
+    assertPropertiesEqual(properties, modelVersion.properties());
 
     ModelVersionChange change =
         ModelVersionChange.updateAliases(
@@ -1256,6 +1258,16 @@ public class ModelCatalogOperationsIT extends BaseIT {
         () -> gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", "n3"));
     Assertions.assertEquals(
         "u2", gravitinoCatalog.asModelCatalog().getModelVersionUri(modelIdent1, "alias3", null));
+  }
+
+  private static void assertPropertiesEqual(
+      Map<String, String> expectedUserProps, Map<String, String> actual) {
+    Assertions.assertTrue(
+        !actual.containsKey(StringIdentifier.ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(actual.get(StringIdentifier.ID_KEY)));
+    Map<String, String> actualWithoutId = Maps.newHashMap(actual);
+    actualWithoutId.remove(StringIdentifier.ID_KEY);
+    Assertions.assertEquals(expectedUserProps, actualWithoutId);
   }
 
   private void createMetalake() {

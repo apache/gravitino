@@ -22,6 +22,7 @@ import static org.apache.gravitino.Catalog.Type.FILESET;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
+import java.util.Collections;
 import java.util.List;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
@@ -323,9 +324,7 @@ class TestAuthorizationUtils {
     Catalog catalog = Mockito.mock(Catalog.class);
     Schema schema = Mockito.mock(Schema.class);
 
-    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", ""));
     Mockito.when(schema.name()).thenReturn("testSchema");
-    Mockito.when(catalog.properties()).thenReturn(ImmutableMap.of("location", "catalogLocation"));
     Mockito.when(catalog.provider()).thenReturn("fileset");
     Mockito.when(catalog.type()).thenReturn(FILESET);
     Mockito.when(schemaDispatcher.loadSchema(Mockito.any())).thenReturn(schema);
@@ -338,18 +337,46 @@ class TestAuthorizationUtils {
     FieldUtils.writeField(
         GravitinoEnv.getInstance(), "internalSchemaDispatcher", schemaDispatcher, true);
 
+    // Case 1: Schema has no location property (inherits catalog location)
+    Mockito.when(schema.properties()).thenReturn(Collections.emptyMap());
+    Mockito.when(catalog.properties()).thenReturn(ImmutableMap.of("location", "catalogLocation"));
     List<String> locations =
         AuthorizationUtils.getMetadataObjectLocation(
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("catalogLocation/testSchema", locations.get(0));
 
+    // Case 2: Schema has null properties (inherits catalog location)
+    Mockito.when(schema.properties()).thenReturn(null);
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("catalogLocation/testSchema", locations.get(0));
+
+    // Case 3: Schema location is empty string (falls back to catalog location)
+    Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", ""));
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(1, locations.size());
+    Assertions.assertEquals("catalogLocation/testSchema", locations.get(0));
+
+    // Case 4: Schema has explicit location (takes precedence over catalog location)
     Mockito.when(schema.properties()).thenReturn(ImmutableMap.of("location", "schemaLocation"));
     locations =
         AuthorizationUtils.getMetadataObjectLocation(
             NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
     Assertions.assertEquals(1, locations.size());
     Assertions.assertEquals("schemaLocation", locations.get(0));
+
+    // Case 5: Neither schema nor catalog has location property
+    Mockito.when(schema.properties()).thenReturn(Collections.emptyMap());
+    Mockito.when(catalog.properties()).thenReturn(Collections.emptyMap());
+    locations =
+        AuthorizationUtils.getMetadataObjectLocation(
+            NameIdentifier.of("catalog", "schema", "fileset"), Entity.EntityType.SCHEMA);
+    Assertions.assertEquals(0, locations.size());
   }
 
   @Test

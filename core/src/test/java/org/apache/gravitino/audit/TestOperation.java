@@ -607,6 +607,28 @@ public class TestOperation {
         AuditLog.Operation.fromEvent(authzDenialNullIdentifier));
   }
 
+  /**
+   * {@code Operation.fromEvent} dispatches on event class, and the extras support added a second
+   * constructor to each table event. Pins that events built through the new constructor are still
+   * classified as their operation rather than falling through to {@code UNKNOWN}.
+   */
+  @Test
+  public void testCreateTableWithAuditExtrasKeepsCreateTableOperation() {
+    Event success =
+        new CreateTableEvent(
+            USER, tableIdentifier, tableInfo, ImmutableMap.of("audit.reason", "policy-applied"));
+    Event failure =
+        new CreateTableFailureEvent(
+            USER,
+            tableIdentifier,
+            new Exception("create failed"),
+            tableInfo,
+            ImmutableMap.of("audit.reason", "validation-failed"));
+
+    Assertions.assertEquals(AuditLog.Operation.CREATE_TABLE, AuditLog.Operation.fromEvent(success));
+    Assertions.assertEquals(AuditLog.Operation.CREATE_TABLE, AuditLog.Operation.fromEvent(failure));
+  }
+
   @Test
   public void testHttpRequestFailureEventMapsToUnknownOperation() {
     // HttpRequestFailureEvent has no specific business operation — it always maps to UNKNOWN

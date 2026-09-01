@@ -271,14 +271,16 @@ object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on 
 | Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
 | Job          |                         | Owner                                  | Owner           |                                           |
 
-Bulk user access-control APIs use the same privileges as the matching single-user operations. These
-bulk operations are authorized once before processing the request. Bulk user requests report
-item-level failures in `errors`.
+Bulk access-control APIs use the same privileges as the matching single-entity operations. These
+bulk operations are authorized once before processing the request. Bulk requests report item-level
+failures in `errors`.
 
-| API                                                | Required privilege                        |
-|----------------------------------------------------|-------------------------------------------|
-| `POST /api/bulk/metalakes/{metalake}/users/add`    | `OWNER` of the metalake or `MANAGE_USERS` |
-| `POST /api/bulk/metalakes/{metalake}/users/remove` | `OWNER` of the metalake or `MANAGE_USERS` |
+| API                                                 | Required privilege                         |
+|-----------------------------------------------------|--------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`  |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`  |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS` |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS` |
 
 For example, add users in bulk:
 
@@ -304,6 +306,33 @@ curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/remove" 
   -H "Content-Type: application/json" \
   -d '{
   "names": ["analyst", "developer"]
+}'
+```
+
+For example, add groups in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/groups/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "groups": [
+    {"name": "analysts"},
+    {"name": "developers", "externalId": "developers@example.com"}
+  ]
+}'
+```
+
+Remove groups in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/groups/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analysts", "developers"]
 }'
 ```
 
