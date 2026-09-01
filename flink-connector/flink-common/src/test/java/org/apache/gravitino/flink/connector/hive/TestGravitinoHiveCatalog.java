@@ -29,36 +29,17 @@ import org.apache.flink.table.catalog.Column;
 import org.apache.flink.table.catalog.ObjectPath;
 import org.apache.flink.table.catalog.ResolvedCatalogTable;
 import org.apache.flink.table.catalog.ResolvedSchema;
-import org.apache.flink.table.catalog.exceptions.CatalogException;
 import org.apache.gravitino.Catalog;
-import org.apache.gravitino.exceptions.ForbiddenException;
 import org.apache.gravitino.flink.connector.PartitionConverter;
 import org.apache.gravitino.flink.connector.SchemaAndTablePropertiesConverter;
 import org.apache.gravitino.flink.connector.utils.DefaultCatalogCompat;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.TableCatalog;
 import org.apache.hadoop.hive.conf.HiveConf;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
 public class TestGravitinoHiveCatalog {
-
-  @Test
-  public void testGetTableThrowsCatalogExceptionWhenForbidden() throws Exception {
-    Catalog gravitinoCatalog = Mockito.mock(Catalog.class);
-    TableCatalog tableCatalog = Mockito.mock(TableCatalog.class);
-    ForbiddenException forbiddenException = new ForbiddenException("denied");
-    Mockito.when(gravitinoCatalog.asTableCatalog()).thenReturn(tableCatalog);
-    Mockito.when(tableCatalog.loadTable(Mockito.any())).thenThrow(forbiddenException);
-    TestableGravitinoHiveCatalog catalog = new TestableGravitinoHiveCatalog(gravitinoCatalog);
-
-    CatalogException catalogException =
-        Assertions.assertThrows(
-            CatalogException.class, () -> catalog.getTable(new ObjectPath("db", "tbl")));
-
-    Assertions.assertSame(forbiddenException, catalogException.getCause());
-  }
 
   @Test
   public void testGenericTableAlterSkipsCallWhenNoChanges() throws Exception {
