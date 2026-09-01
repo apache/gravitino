@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.trino.spi.HostAddress;
 import io.trino.spi.Page;
 import io.trino.spi.connector.ConnectorPageSource;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
@@ -64,7 +65,7 @@ public class GravitinoSystemConnector478 extends GravitinoSystemConnector {
   static class GravitinoSplitManager478 extends SplitManager {
 
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
-      return new Split478(tableName);
+      return new Split478(tableName, Split.getCurrentCoordinatorAddress());
     }
   }
 
@@ -82,8 +83,10 @@ public class GravitinoSystemConnector478 extends GravitinoSystemConnector {
   public static class Split478 extends Split {
 
     @JsonCreator
-    public Split478(@JsonProperty("tableName") SchemaTableName tableName) {
-      super(tableName);
+    public Split478(
+        @JsonProperty("tableName") SchemaTableName tableName,
+        @JsonProperty("coordinatorAddress") HostAddress coordinatorAddress) {
+      super(tableName, coordinatorAddress);
     }
   }
 }

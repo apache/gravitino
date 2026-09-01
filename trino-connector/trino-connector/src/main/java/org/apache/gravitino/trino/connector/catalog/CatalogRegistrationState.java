@@ -81,17 +81,13 @@ public final class CatalogRegistrationState {
    */
   public static CatalogRegistrationState succeeded(
       GravitinoCatalog catalog, String trinoCatalogName) {
-    long now = System.currentTimeMillis();
-    return new CatalogRegistrationState(
+    return of(
         catalog.getMetalake(),
         catalog.getName(),
         trinoCatalogName,
         catalog.getProvider(),
         Status.REGISTERED,
-        null,
-        now,
-        now,
-        0);
+        null);
   }
 
   /**
@@ -110,16 +106,7 @@ public final class CatalogRegistrationState {
       String trinoCatalogName,
       @Nullable String provider,
       String error) {
-    return new CatalogRegistrationState(
-        metalake,
-        catalogName,
-        trinoCatalogName,
-        provider,
-        Status.FAILED,
-        error,
-        System.currentTimeMillis(),
-        0,
-        1);
+    return of(metalake, catalogName, trinoCatalogName, provider, Status.FAILED, error);
   }
 
   /**
@@ -134,16 +121,7 @@ public final class CatalogRegistrationState {
    */
   public static CatalogRegistrationState skipped(
       String metalake, String catalogName, String trinoCatalogName, String reason) {
-    return new CatalogRegistrationState(
-        metalake,
-        catalogName,
-        trinoCatalogName,
-        null,
-        Status.SKIPPED,
-        reason,
-        System.currentTimeMillis(),
-        0,
-        0);
+    return of(metalake, catalogName, trinoCatalogName, null, Status.SKIPPED, reason);
   }
 
   /**
@@ -162,16 +140,30 @@ public final class CatalogRegistrationState {
       String trinoCatalogName,
       @Nullable String provider,
       String reason) {
+    return of(metalake, catalogName, trinoCatalogName, provider, Status.UNSUPPORTED, reason);
+  }
+
+  // Shared by the factory methods above: they differ only in status and a couple of fields, and
+  // funneling them through one constructor call keeps a newly added field from being forgotten in
+  // one of several near-identical call sites.
+  private static CatalogRegistrationState of(
+      String metalake,
+      String catalogName,
+      String trinoCatalogName,
+      @Nullable String provider,
+      Status status,
+      @Nullable String lastError) {
+    long now = System.currentTimeMillis();
     return new CatalogRegistrationState(
         metalake,
         catalogName,
         trinoCatalogName,
         provider,
-        Status.UNSUPPORTED,
-        reason,
-        System.currentTimeMillis(),
-        0,
-        0);
+        status,
+        lastError,
+        now,
+        status == Status.REGISTERED ? now : 0,
+        status == Status.FAILED ? 1 : 0);
   }
 
   /**

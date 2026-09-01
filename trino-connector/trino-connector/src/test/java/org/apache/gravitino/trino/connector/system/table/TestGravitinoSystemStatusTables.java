@@ -127,14 +127,14 @@ public class TestGravitinoSystemStatusTables {
     // The registry used to be static, so a second connector in the same JVM took it over and the
     // system tables reported another manager's state. Each factory must now stand alone.
     CatalogConnectorManager first = mock(CatalogConnectorManager.class);
-    when(first.getCatalogRegistrationStates())
+    when(first.getCatalogRegistrationStates("prod"))
         .thenReturn(
             List.of(
                 CatalogRegistrationState.succeeded(
                     new GravitinoCatalog("prod", "memory", "memory", ImmutableMap.of(), 0L),
                     "memory")));
     CatalogConnectorManager second = mock(CatalogConnectorManager.class);
-    when(second.getCatalogRegistrationStates()).thenReturn(List.of());
+    when(second.getCatalogRegistrationStates("prod")).thenReturn(List.of());
 
     GravitinoSystemTableFactory firstFactory = new GravitinoSystemTableFactory(first, "prod");
     GravitinoSystemTableFactory secondFactory = new GravitinoSystemTableFactory(second, "prod");
@@ -153,7 +153,7 @@ public class TestGravitinoSystemStatusTables {
 
   private static Page loadCatalogStatusPage(List<CatalogRegistrationState> states) {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
-    when(manager.getCatalogRegistrationStates()).thenReturn(states);
+    when(manager.getCatalogRegistrationStates("test")).thenReturn(states);
     return new GravitinoSystemTableCatalogStatus(manager, "test").loadPageData();
   }
 

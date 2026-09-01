@@ -84,7 +84,12 @@ public class GravitinoSystemTableCatalog extends GravitinoSystemTable {
               GravitinoMetalake metalake = catalogConnectorManager.getMetalake(metalakeName);
               Catalog[] catalogs = metalake.listCatalogsInfo();
               for (Catalog catalog : catalogs) {
-                if (catalogConnectorManager.skipCatalog(catalog.name())) {
+                // Must match against the same Trino-qualified name the load loop skips against
+                // (quoted "metalake.catalog" in multi-metalake mode), or a skip pattern written
+                // against the qualified name never matches here.
+                String trinoCatalogName =
+                    catalogConnectorManager.getTrinoCatalogName(metalakeName, catalog.name());
+                if (catalogConnectorManager.skipCatalog(trinoCatalogName)) {
                   continue;
                 }
                 if (catalog.type() == Catalog.Type.RELATIONAL) {

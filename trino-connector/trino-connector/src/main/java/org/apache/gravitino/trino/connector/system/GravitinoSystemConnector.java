@@ -195,16 +195,31 @@ public class GravitinoSystemConnector implements Connector {
   /** The split. */
   public abstract static class Split implements ConnectorSplit {
 
+    // The system table data lives on the coordinator only: the catalog load loop runs there, and
+    // the registration state it records is never replicated to workers. Set once by the
+    // coordinator's GravitinoConnectorFactory.create(), which necessarily runs before any query
+    // can reach the scheduler, and read by createSplit() below to bake into every split it
+    // creates. It cannot be relied on directly by isRemotelyAccessible()/getAddresses(): Trino
+    // serializes splits to JSON and may evaluate those methods after deserializing one on a
+    // worker JVM, where this static field was never set. Carrying the address as a serialized
+    // instance field instead makes the pinning survive that trip.
+    private static volatile HostAddress currentCoordinatorAddress;
+
     protected final SchemaTableName tableName;
+    private final HostAddress coordinatorAddress;
 
     /**
-     * Constructs a new Split with the specified table name.
+     * Constructs a new Split with the specified table name and coordinator address.
      *
      * @param tableName the table name
+     * @param coordinatorAddress the host and port of the Trino coordinator, null if unknown
      */
     @JsonCreator
-    public Split(@JsonProperty("tableName") SchemaTableName tableName) {
+    public Split(
+        @JsonProperty("tableName") SchemaTableName tableName,
+        @JsonProperty("coordinatorAddress") HostAddress coordinatorAddress) {
       this.tableName = tableName;
+      this.coordinatorAddress = coordinatorAddress;
     }
 
     /**
@@ -217,22 +232,33 @@ public class GravitinoSystemConnector implements Connector {
       return tableName;
     }
 
-    // The system table data lives on the coordinator only: the catalog load loop runs there, and
-    // the registration state it records is never replicated to workers. Set once by the
-    // coordinator's GravitinoConnectorFactory.create(), which necessarily runs before any query
-    // can reach the scheduler, and read by the scheduler through isRemotelyAccessible() and
-    // getAddresses() below. On a real worker JVM it is never set and the split keeps the previous
-    // remotely accessible behaviour; in a single JVM test runner the static is shared with the
-    // coordinator, which is harmless because only the coordinator's scheduler reads it.
-    private static volatile HostAddress coordinatorAddress;
+    /**
+     * Retrieves the coordinator address this split is pinned to.
+     *
+     * @return the host and port of the Trino coordinator, null if unknown
+     */
+    @JsonProperty
+    public HostAddress getCoordinatorAddress() {
+      return coordinatorAddress;
+    }
 
     /**
-     * Sets the coordinator address that system table splits are pinned to.
+     * Sets the coordinator address that new system table splits are pinned to.
      *
      * @param address the host and port of the Trino coordinator
      */
     public static void setCoordinatorAddress(HostAddress address) {
-      coordinatorAddress = address;
+      currentCoordinatorAddress = address;
+    }
+
+    /**
+     * Retrieves the coordinator address recorded by {@link #setCoordinatorAddress(HostAddress)} in
+     * this JVM, for {@code createSplit()} implementations to bake into new splits.
+     *
+     * @return the host and port of the Trino coordinator, null if unknown in this JVM
+     */
+    public static HostAddress getCurrentCoordinatorAddress() {
+      return currentCoordinatorAddress;
     }
 
     @Override
@@ -242,8 +268,7 @@ public class GravitinoSystemConnector implements Connector {
 
     @Override
     public List<HostAddress> getAddresses() {
-      HostAddress address = coordinatorAddress;
-      return address == null ? Collections.emptyList() : List.of(address);
+      return coordinatorAddress == null ? Collections.emptyList() : List.of(coordinatorAddress);
     }
   }
 

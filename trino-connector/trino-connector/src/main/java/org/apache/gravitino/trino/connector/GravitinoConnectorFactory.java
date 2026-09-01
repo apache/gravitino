@@ -60,7 +60,6 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   /** The default connector name. */
   public static final String DEFAULT_CONNECTOR_NAME = "gravitino";
 
-  @SuppressWarnings("UnusedVariable")
   private CatalogConnectorManager catalogConnectorManager;
 
   private boolean catalogConnectorManagerStartTriggered = false;

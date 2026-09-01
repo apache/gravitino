@@ -78,9 +78,7 @@ public class GravitinoSystemTableCatalogStatus extends GravitinoSystemTable {
     // The load loop is shared by every entry catalog in this Trino, so report only the metalake
     // this connector is configured with.
     List<CatalogRegistrationState> states =
-        catalogConnectorManager.getCatalogRegistrationStates().stream()
-            .filter(state -> state.getMetalake().equals(metalake))
-            .toList();
+        catalogConnectorManager.getCatalogRegistrationStates(metalake);
     int size = states.size();
 
     BlockBuilder metalakeColumnBuilder = VARCHAR.createBlockBuilder(null, size);
