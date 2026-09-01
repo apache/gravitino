@@ -45,6 +45,7 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.PagedResult;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
@@ -57,9 +58,12 @@ import org.apache.gravitino.meta.TopicEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.RoleMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.RolePO;
+import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.storage.relational.po.auth.AuthPrefetchRow;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
@@ -833,7 +837,7 @@ class TestUserMetaService extends TestJDBCBackend {
     Assertions.assertEquals("creator", grantRevokeUser.auditInfo().creator());
     Assertions.assertEquals("grantRevokeUser", grantRevokeUser.auditInfo().lastModifier());
 
-    Function<UserEntity, UserEntity> noUpdater =
+    Function<UserEntity, UserEntity> metadataUpdater =
         user -> {
           AuditInfo updateAuditInfo =
               AuditInfo.builder()
@@ -855,17 +859,17 @@ class TestUserMetaService extends TestJDBCBackend {
               .withAuditInfo(updateAuditInfo)
               .build();
         };
-    Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), noUpdater));
-    UserEntity noUpdaterUser =
+    Assertions.assertNotNull(userMetaService.updateUser(user1.nameIdentifier(), metadataUpdater));
+    UserEntity metadataUpdatedUser =
         UserMetaService.getInstance().getUserByIdentifier(user1.nameIdentifier());
-    Assertions.assertEquals(user1.id(), noUpdaterUser.id());
-    Assertions.assertEquals(user1.name(), noUpdaterUser.name());
+    Assertions.assertEquals(user1.id(), metadataUpdatedUser.id());
+    Assertions.assertEquals(user1.name(), metadataUpdatedUser.name());
     Assertions.assertEquals(
-        Sets.newHashSet("role1", "role4"), Sets.newHashSet(noUpdaterUser.roleNames()));
+        Sets.newHashSet("role1", "role4"), Sets.newHashSet(metadataUpdatedUser.roleNames()));
     Assertions.assertEquals(
-        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(noUpdaterUser.roleIds()));
-    Assertions.assertEquals("creator", noUpdaterUser.auditInfo().creator());
-    Assertions.assertEquals("grantRevokeUser", noUpdaterUser.auditInfo().lastModifier());
+        Sets.newHashSet(role1.id(), role4.id()), Sets.newHashSet(metadataUpdatedUser.roleIds()));
+    Assertions.assertEquals("creator", metadataUpdatedUser.auditInfo().creator());
+    Assertions.assertEquals("noUpdateUser", metadataUpdatedUser.auditInfo().lastModifier());
 
     // Delete a role, the user entity won't contain this role.
     RoleMetaService.getInstance().deleteRole(role1.nameIdentifier());
@@ -1467,9 +1471,244 @@ class TestUserMetaService extends TestJDBCBackend {
         () -> svc.insertUser(userWithExtId("u2", "ext-1"), false));
   }
 
+  @TestTemplate
+  void testCreateLocksMetalakeWithoutChangingVersion() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    UserMetaService service = UserMetaService.getInstance();
+    MetalakePO beforeCreate = getMetalakePO();
+    UserEntity user = userWithExtId("fenced-user", "fenced-user-ext-id");
+
+    service.insertUser(user, false);
+
+    MetalakePO afterCreate = getMetalakePO();
+    assertEquals(beforeCreate.getCurrentVersion(), afterCreate.getCurrentVersion());
+    assertEquals(beforeCreate.getLastVersion(), afterCreate.getLastVersion());
+
+    UserEntity duplicate = userWithExtId(user.name(), "another-ext-id");
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> service.insertUser(duplicate, false));
+
+    MetalakePO afterFailedCreate = getMetalakePO();
+    assertEquals(afterCreate.getCurrentVersion(), afterFailedCreate.getCurrentVersion());
+    assertEquals(afterCreate.getLastVersion(), afterFailedCreate.getLastVersion());
+  }
+
+  @TestTemplate
+  void testOverwriteInsertAdvancesVersion() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("overwrite-user", "overwrite-user-ext-id");
+    service.insertUser(user, false);
+    UserPO initialPO = getUserPO(user.name());
+
+    service.insertUser(user, true);
+
+    UserPO overwrittenPO = getUserPO(user.name());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion());
+    assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            UserMetaMapper.class,
+            mapper -> mapper.softDeleteUserMetaByUserId(user.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
+  void testMetadataOnlyUpdateUsesOcc() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("metadata-only-user", "metadata-only-ext-id");
+    service.insertUser(user, false);
+    UserPO beforeUpdate = getUserPO(user.name());
+
+    service.updateUser(user.nameIdentifier(), enabledUpdater(false));
+
+    UserPO afterUpdate = getUserPO(user.name());
+    assertEquals(beforeUpdate.getCurrentVersion() + 1, afterUpdate.getCurrentVersion());
+    assertFalse(service.getUserByIdentifier(user.nameIdentifier()).enabled());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateUser(
+                user.nameIdentifier(),
+                (UserEntity oldUser) -> {
+                  advanceUserVersion(user.id());
+                  return enabledUpdater(true).apply(oldUser);
+                }));
+    assertFalse(service.getUserByIdentifier(user.nameIdentifier()).enabled());
+  }
+
+  @TestTemplate
+  void testStaleDeleteReportsConflict() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("stale-delete-user", "stale-delete-ext-id");
+    service.insertUser(user, false);
+    UserPO staleUserPO = getUserPO(user.name());
+    advanceUserVersion(user.id());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteUserWithVersion(user.nameIdentifier(), staleUserPO));
+    assertEquals(user.id(), service.getUserByIdentifier(user.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  void testAlterReportsNoSuchWhenUserIsDeletedConcurrently() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("deleted-during-alter", "deleted-during-alter-ext-id");
+    service.insertUser(user, false);
+
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            service.updateUser(
+                user.nameIdentifier(),
+                (UserEntity oldUser) -> {
+                  service.deleteUser(user.nameIdentifier());
+                  return enabledUpdater(false).apply(oldUser);
+                }));
+  }
+
+  @TestTemplate
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, "catalog");
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            "catalog");
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            "catalog");
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(metalakeName),
+            "concurrent-user",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    UserMetaService.getInstance().insertUser(user, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            UserMetaService.getInstance()
+                .updateUser(
+                    user.nameIdentifier(),
+                    (UserEntity oldUser) -> {
+                      advanceUserVersion(user.id());
+                      List<String> roleNames = Lists.newArrayList(oldUser.roleNames());
+                      List<Long> roleIds = Lists.newArrayList(oldUser.roleIds());
+                      roleNames.add(role2.name());
+                      roleIds.add(role2.id());
+                      return UserEntity.builder()
+                          .withId(oldUser.id())
+                          .withName(oldUser.name())
+                          .withNamespace(oldUser.namespace())
+                          .withExternalId(oldUser.externalId())
+                          .withEnabled(oldUser.enabled())
+                          .withRoleNames(roleNames)
+                          .withRoleIds(roleIds)
+                          .withAuditInfo(oldUser.auditInfo())
+                          .build();
+                    }));
+
+    UserEntity storedUser =
+        UserMetaService.getInstance().getUserByIdentifier(user.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedUser.roleIds()));
+  }
+
+  @TestTemplate
+  void testConcurrentExternalIdUpdateRollsBackOnConflict() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("concurrent-user", "concurrent-ext-id");
+    service.insertUser(user, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateUserByExternalId(
+                userExtIdent(user.externalId()),
+                (UserEntity oldUser) -> {
+                  advanceUserVersion(user.id());
+                  return UserEntity.builder()
+                      .withId(oldUser.id())
+                      .withName(oldUser.name())
+                      .withNamespace(oldUser.namespace())
+                      .withExternalId(oldUser.externalId())
+                      .withEnabled(false)
+                      .withRoleNames(oldUser.roleNames())
+                      .withRoleIds(oldUser.roleIds())
+                      .withAuditInfo(oldUser.auditInfo())
+                      .build();
+                }));
+
+    assertTrue(queryEnabledByExtId(user.externalId()));
+  }
+
+  @TestTemplate
+  void testConcurrentByIdUpdateRollsBackOnConflict() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("concurrent-by-id-user", "concurrent-by-id-ext-id");
+    service.insertUser(user, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            service.updateUserById(
+                metalakeName,
+                user.id(),
+                (UserEntity oldUser) -> {
+                  advanceUserVersion(user.id());
+                  return UserEntity.builder()
+                      .withId(oldUser.id())
+                      .withName(oldUser.name())
+                      .withNamespace(oldUser.namespace())
+                      .withExternalId(oldUser.externalId())
+                      .withEnabled(false)
+                      .withRoleNames(oldUser.roleNames())
+                      .withRoleIds(oldUser.roleIds())
+                      .withAuditInfo(oldUser.auditInfo())
+                      .build();
+                }));
+
+    assertTrue(queryEnabledByExtId(user.externalId()));
+  }
+
+  @TestTemplate
+  void testDeleteUserById() throws IOException {
+    UserMetaService service = userMetaService();
+    UserEntity user = userWithExtId("delete-by-id-user", "delete-by-id-ext-id");
+    service.insertUser(user, false);
+
+    assertTrue(service.deleteUserById(metalakeName, user.id()));
+    assertFalse(service.deleteUserById(metalakeName, user.id()));
+  }
+
   private UserMetaService userMetaService() throws IOException {
     createAndInsertMakeLake(metalakeName);
     return UserMetaService.getInstance();
+  }
+
+  private MetalakePO getMetalakePO() {
+    return SessionUtils.getWithoutCommit(
+        MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+  }
+
+  private UserPO getUserPO(String userName) {
+    MetalakePO metalakePO = getMetalakePO();
+    return SessionUtils.getWithoutCommit(
+        UserMetaMapper.class,
+        mapper -> mapper.selectUserMetaByMetalakeIdAndName(metalakePO.getMetalakeId(), userName));
   }
 
   private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
@@ -1576,5 +1815,20 @@ class TestUserMetaService extends TestJDBCBackend {
       throw new RuntimeException("SQL execution failed", e);
     }
     return count;
+  }
+
+  private void advanceUserVersion(long userId) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement()) {
+      assertEquals(
+          1,
+          statement.executeUpdate(
+              "UPDATE user_meta SET current_version = current_version + 1 WHERE user_id = "
+                  + userId));
+    } catch (SQLException e) {
+      throw new RuntimeException("Advance user version failed", e);
+    }
   }
 }
