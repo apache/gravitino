@@ -174,6 +174,14 @@ public class ViewOperations {
       @PathParam("view") String view,
       ViewUpdatesRequest request) {
     LOG.info("Received alter view request: {}.{}.{}.{}", metalake, catalog, schema, view);
+    if (request == null) {
+      return ExceptionHandlers.handleViewException(
+          OperationType.ALTER,
+          view,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

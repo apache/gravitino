@@ -208,6 +208,14 @@ public class TopicOperations {
       @PathParam("topic") @AuthorizationMetadata(type = Entity.EntityType.TOPIC) String topic,
       TopicUpdatesRequest request) {
     LOG.info("Received alter topic request: {}.{}.{}.{}", metalake, catalog, schema, topic);
+    if (request == null) {
+      return ExceptionHandlers.handleTopicException(
+          OperationType.ALTER,
+          topic,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

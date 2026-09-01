@@ -516,6 +516,18 @@ public class TestJobOperations extends JerseyTest {
   }
 
   @Test
+  public void testAlterJobTemplateWithNullRequest() {
+    Response resp =
+        target(jobTemplatePath())
+            .path("shell_template_1")
+            .request(APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], APPLICATION_JSON_TYPE));
+
+    BaseOperationsTest.assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testAlterJobTemplate() {
     String templateName = "shell_template_1";
     JobTemplateEntity template = newShellJobTemplateEntity(templateName, "Updated comment");

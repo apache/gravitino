@@ -335,6 +335,17 @@ public class TestViewOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterViewWithNullRequest() {
+    Response resp =
+        target(viewPath(metalake, catalog, schema) + "/view1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept(VND_V1_JSON)
+            .put(Entity.entity(new byte[0], VND_V1_JSON));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testRenameView() {
     ViewUpdateRequest req = new ViewUpdateRequest.RenameViewRequest("view2");
     View view = mockView("view2", "comment", ImmutableMap.of(), "trino", "SELECT 1");
