@@ -538,6 +538,53 @@ public class TestCatalogRegister {
     assertTrue(e.getCause().getCause().getMessage().contains("***"));
   }
 
+  @Test
+  public void testRegisterCatalogKeepsDeepCauseUnrelatedToSecretsThroughRedaction()
+      throws Exception {
+    // Regression test: redaction previously discarded the whole cause chain along with the
+    // top-level message, so a deep cause unrelated to credentials (e.g. a connector's own
+    // configuration validation error) never reached the caller either.
+    Statement statement = mock(Statement.class);
+    when(statement.execute(eq("SHOW CATALOGS"))).thenReturn(true);
+    ResultSet resultSet = mock(ResultSet.class);
+    when(statement.getResultSet()).thenReturn(resultSet);
+    when(resultSet.next()).thenReturn(false);
+
+    RuntimeException deepCause =
+        new RuntimeException("Configuration property 'unknown-direct-key' was not used");
+    SQLException sqlException =
+        new SQLException("Query failed: Failed to create connector: memory1", null, 0, deepCause);
+    when(statement.execute(startsWith("CREATE CATALOG"))).thenThrow(sqlException);
+
+    Connection connection = mock(Connection.class);
+    when(connection.createStatement()).thenReturn(statement);
+
+    CatalogRegister catalogRegister = new CatalogRegister();
+    catalogRegister.setConfigForTesting(
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.uri", "http://127.0.0.1:8090", "gravitino.metalake", "test")));
+    setPrivateField(catalogRegister, "connection", connection);
+    setPrivateField(catalogRegister, "catalogStoreDirectory", tempDir.toString());
+
+    Catalog mockCatalog =
+        TestGravitinoCatalog.mockCatalog(
+            "hive_catalog", "hive", "test catalog", Catalog.Type.RELATIONAL, Map.of());
+    GravitinoCatalog catalog = new GravitinoCatalog("test", mockCatalog);
+
+    TrinoException e =
+        assertThrows(
+            TrinoException.class, () -> catalogRegister.registerCatalog("hive_catalog", catalog));
+
+    boolean deepCauseSurvived = false;
+    for (Throwable t = e; t != null; t = t.getCause()) {
+      if (String.valueOf(t.getMessage()).contains("unknown-direct-key")) {
+        deepCauseSurvived = true;
+      }
+    }
+    assertTrue(deepCauseSurvived, "the deep, credential-free cause must survive redaction");
+  }
+
   private static void setPrivateField(Object target, String fieldName, Object value)
       throws Exception {
     Field field = CatalogRegister.class.getDeclaredField(fieldName);

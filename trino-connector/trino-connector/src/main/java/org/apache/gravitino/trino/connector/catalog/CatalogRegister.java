@@ -364,12 +364,32 @@ public class CatalogRegister {
 
   // Some JDBC drivers echo the failing statement back in the exception message, which for a
   // failed CREATE CATALOG would otherwise carry its embedded credentials into every caller and
-  // log line downstream. The original exception is deliberately not kept as the cause, since a
-  // logged stack trace prints causes' messages too and would defeat the redaction.
+  // log line downstream. Every level of the cause chain is rebuilt with its message redacted,
+  // rather than discarded outright, so a deep cause unrelated to credentials (e.g. a connector's
+  // own configuration validation error) still reaches the caller.
   private static SQLException redactedSqlException(SQLException e) {
-    String message = e.getMessage() == null ? null : redactSecrets(e.getMessage());
-    SQLException redacted = new SQLException(message, e.getSQLState(), e.getErrorCode());
+    Throwable redactedCause = e.getCause() == null ? null : redactThrowableChain(e.getCause());
+    SQLException redacted =
+        new SQLException(
+            e.getMessage() == null ? null : redactSecrets(e.getMessage()),
+            e.getSQLState(),
+            e.getErrorCode(),
+            redactedCause);
     redacted.setStackTrace(e.getStackTrace());
+    return redacted;
+  }
+
+  private static Throwable redactThrowableChain(Throwable t) {
+    // Guards against a cause cycle the same way toErrorMessage() in CatalogConnectorManager does.
+    Throwable cause = t.getCause();
+    Throwable redactedCause = (cause == null || cause == t) ? null : redactThrowableChain(cause);
+    // Rebuilt as a plain RuntimeException rather than the original type: most exception classes
+    // don't expose a (String message, Throwable cause) constructor, and nothing downstream of
+    // this redaction inspects the exception's type, only its message chain.
+    RuntimeException redacted =
+        new RuntimeException(
+            t.getMessage() == null ? null : redactSecrets(t.getMessage()), redactedCause);
+    redacted.setStackTrace(t.getStackTrace());
     return redacted;
   }
 

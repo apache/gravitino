@@ -112,9 +112,9 @@ public class TestCatalogConnectorManager {
             () ->
                 manager.createCatalogConnectorContext(
                     "test1", otherConnectorConfig, mockContext()));
-    assertEquals(GravitinoErrorCode.GRAVITINO_OPERATION_FAILED.toErrorCode(), error.getErrorCode());
-    assertTrue(error.getMessage().contains("Failed to create connector"));
-    assertTrue(error.getCause().getMessage().contains("Multiple metalakes are not supported"));
+    assertEquals(
+        GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION.toErrorCode(), error.getErrorCode());
+    assertTrue(error.getMessage().contains("Multiple metalakes are not supported"));
   }
 
   @Test

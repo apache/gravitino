@@ -839,6 +839,12 @@ public class CatalogConnectorManager {
       catalogConnectors.put(fullCatalogName, connectorContext);
       LOG.info("Create connector %s successful", connectorName);
       return connectorContext;
+    } catch (TrinoException e) {
+      // Already carries a specific error code and message from wherever it was thrown (e.g. the
+      // metalake mismatch check above, or connector instantiation failing several layers down);
+      // wrapping it again here would only bury that detail under a second, less specific layer.
+      LOG.error(e, "Failed to create connector: %s", connectorName);
+      throw e;
     } catch (Exception e) {
       LOG.error(e, "Failed to create connector: %s", connectorName);
       throw new TrinoException(
