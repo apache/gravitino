@@ -35,6 +35,7 @@ sources and asserts the contract this PR relies on:
 - coverage-comment listens for the Required CI parent, not a standalone build run
 - coverage-comment runs the Python skip/post model, not inline github-script
 - coverage-comment rejects cancelled runs and does not trust a fork PR-number artifact
+- build restores the old docs-assets / web-v2 pull_request ignore via build_relevant.py
 """
 
 import re
@@ -199,6 +200,10 @@ def verify_parent():
         raise AssertionError(
             "required-ci.yml: must run the coverage-comment model tests in CI"
         )
+    if "python3 dev/ci/test_build_relevant.py" not in source:
+        raise AssertionError(
+            "required-ci.yml: must run the build-relevant path model tests in CI"
+        )
     if "- contract" not in required_ci:
         raise AssertionError("required-ci.yml: Required CI does not need contract")
 
@@ -256,6 +261,28 @@ def verify_suites():
                 raise AssertionError(
                     "chart-test.yaml: lint-test must skip when chart paths miss"
                 )
+
+        if job_id == "build":
+            if "python3 dev/ci/build_relevant.py" not in source:
+                raise AssertionError(
+                    "build.yml: skip/run rules must run from build_relevant.py"
+                )
+            compile_check = job_block(source, "compile-check")
+            build_job = job_block(source, "build")
+            if "build_relevant_changes == 'true'" not in compile_check:
+                raise AssertionError(
+                    "build.yml: compile-check must skip docs-assets/web-v2-only PRs"
+                )
+            if "source_changes != 'true'" not in compile_check:
+                raise AssertionError(
+                    "build.yml: compile-check is the non-source assemble path"
+                )
+            if "build_relevant_changes == 'true'" not in build_job:
+                raise AssertionError(
+                    "build.yml: build must skip docs-assets/web-v2-only PRs"
+                )
+            if "source_changes == 'true'" not in build_job:
+                raise AssertionError("build.yml: build is the source path")
 
         expected_key = REQUIRED_CONCURRENCY_KEYS[job_id]
         group = re.search(r"(?m)^  group: (.+)$", source)

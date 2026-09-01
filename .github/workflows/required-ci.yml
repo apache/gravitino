@@ -158,6 +158,8 @@ jobs:
         run: python3 dev/ci/test_required_ci.py
       - name: Check coverage-comment model
         run: python3 dev/ci/test_coverage_comment.py
+      - name: Check build-relevant path model
+        run: python3 dev/ci/test_build_relevant.py
 
   # Aggregate every reusable suite into one check. `if: always()` runs even
   # when an upstream suite is skipped (path filter), because a skipped suite
