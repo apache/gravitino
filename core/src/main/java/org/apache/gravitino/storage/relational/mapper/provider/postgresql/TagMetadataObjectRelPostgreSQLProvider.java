@@ -40,6 +40,14 @@ import org.apache.ibatis.annotations.Param;
 
 public class TagMetadataObjectRelPostgreSQLProvider extends TagMetadataObjectRelBaseSQLProvider {
   @Override
+  public String softDeleteTagMetadataObjectRelsByTagId(Long tagId) {
+    return "UPDATE "
+        + TAG_METADATA_OBJECT_RELATION_TABLE_NAME
+        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " WHERE tag_id = #{tagId} AND deleted_at = 0";
+  }
+
+  @Override
   public String batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
       Long metadataObjectId, String metadataObjectType, List<TagMetadataObjectRelPO> tagRelPOs) {
     return "<script>"

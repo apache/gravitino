@@ -83,9 +83,10 @@ public class TagMetaSQLProviderFactory {
     return getProvider().updateTagMeta(newTagPO, oldTagPO);
   }
 
-  public static String softDeleteTagMetaByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
-    return getProvider().softDeleteTagMetaByMetalakeAndTagName(metalakeName, tagName);
+  /** Delegates a version-checked tag soft delete. */
+  public static String softDeleteTagMetaByIdAndVersion(
+      @Param("tagId") Long tagId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteTagMetaByIdAndVersion(tagId, currentVersion);
   }
 
   public static String softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

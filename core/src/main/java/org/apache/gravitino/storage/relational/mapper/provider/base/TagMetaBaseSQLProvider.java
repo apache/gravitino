@@ -148,8 +148,10 @@ public class TagMetaBaseSQLProvider {
         + " properties = #{tagMeta.properties},"
         + " allowed_values = #{tagMeta.allowedValues},"
         + " audit_info = #{tagMeta.auditInfo},"
-        + " current_version = #{tagMeta.currentVersion},"
-        + " last_version = #{tagMeta.lastVersion},"
+        // Preserve the stored OCC sequence when an overwrite replaces the payload. Assign
+        // last_version first because MySQL evaluates assignments from left to right.
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{tagMeta.deletedAt}";
   }
 
@@ -166,28 +168,19 @@ public class TagMetaBaseSQLProvider {
         + " last_version = #{newTagMeta.lastVersion},"
         + " deleted_at = #{newTagMeta.deletedAt}"
         + " WHERE tag_id = #{oldTagMeta.tagId}"
-        + " AND metalake_id = #{oldTagMeta.metalakeId}"
-        + " AND tag_name = #{oldTagMeta.tagName}"
-        + " AND (tag_comment = #{oldTagMeta.comment}"
-        + "   OR (tag_comment IS NULL and #{oldTagMeta.comment} IS NULL))"
-        + " AND properties = #{oldTagMeta.properties}"
-        + " AND audit_info = #{oldTagMeta.auditInfo}"
         + " AND current_version = #{oldTagMeta.currentVersion}"
-        + " AND last_version = #{oldTagMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
-  public String softDeleteTagMetaByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
+  /** Returns SQL that soft-deletes a tag using its stable ID and observed OCC version. */
+  public String softDeleteTagMetaByIdAndVersion(
+      @Param("tagId") Long tagId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " tm SET tm.deleted_at = "
+        + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE tm.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND tm.tag_name = #{tagName} AND tm.deleted_at = 0";
+        + " WHERE tag_id = #{tagId} AND current_version = #{currentVersion}"
+        + " AND deleted_at = 0";
   }
 
   public String softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
@@ -211,6 +204,7 @@ public class TagMetaBaseSQLProvider {
         + " metalake_id as metalakeId,"
         + " tag_comment as comment,"
         + " properties as properties,"
+        + " allowed_values as allowedValues,"
         + " audit_info as auditInfo,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion,"
@@ -225,6 +219,7 @@ public class TagMetaBaseSQLProvider {
         + " metalake_id as metalakeId,"
         + " tag_comment as comment,"
         + " properties as properties,"
+        + " allowed_values as allowedValues,"
         + " audit_info as auditInfo,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion,"
@@ -245,6 +240,7 @@ public class TagMetaBaseSQLProvider {
         + " metalake_id as metalakeId,"
         + " tag_comment as comment,"
         + " properties as properties,"
+        + " allowed_values as allowedValues,"
         + " audit_info as auditInfo,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion,"
@@ -267,6 +263,7 @@ public class TagMetaBaseSQLProvider {
         + " tm.metalake_id as metalakeId,"
         + " tm.tag_comment as comment,"
         + " tm.properties as properties,"
+        + " tm.allowed_values as allowedValues,"
         + " tm.audit_info as auditInfo,"
         + " tm.current_version as currentVersion,"
         + " tm.last_version as lastVersion,"

@@ -24,9 +24,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -49,9 +51,14 @@ import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.metrics.Monitored;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMapper;
 import org.apache.gravitino.storage.relational.mapper.PolicyTagRelMapper;
+import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
@@ -100,20 +107,31 @@ public class TagMetaService {
     String metalakeName = ns.level(0);
 
     try {
-      Long metalakeId = MetalakeMetaService.getInstance().getMetalakeIdByName(metalakeName);
+      MetalakePO metalakePO =
+          SessionUtils.getWithoutCommit(
+              MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+      if (metalakePO == null) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.METALAKE.name().toLowerCase(),
+            metalakeName);
+      }
 
-      TagPO.Builder builder = TagPO.builder().withMetalakeId(metalakeId);
+      TagPO.Builder builder = TagPO.builder().withMetalakeId(metalakePO.getMetalakeId());
       TagPO tagPO = POConverters.initializeTagPOWithVersion(tagEntity, builder);
 
-      SessionUtils.doWithCommit(
-          TagMetaMapper.class,
-          mapper -> {
-            if (overwritten) {
-              mapper.insertTagMetaOnDuplicateKeyUpdate(tagPO);
-            } else {
-              mapper.insertTagMeta(tagPO);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          () -> lockMetalakeForTagCreate(metalakePO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetaMapper.class,
+                  mapper -> {
+                    if (overwritten) {
+                      mapper.insertTagMetaOnDuplicateKeyUpdate(tagPO);
+                    } else {
+                      mapper.insertTagMeta(tagPO);
+                    }
+                  }));
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, tagEntity.toString());
       throw e;
@@ -143,7 +161,7 @@ public class TagMetaService {
                       POConverters.updateTagPOWithVersion(tagPO, updatedTagEntity), tagPO));
 
       if (result == null || result == 0) {
-        throw new IOException("Failed to update the entity: " + identifier);
+        throw tagWriteFailure(identifier, tagPO);
       }
 
       return updatedTagEntity;
@@ -156,27 +174,47 @@ public class TagMetaService {
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTag")
   public boolean deleteTag(NameIdentifier identifier) {
-    String metalakeName = identifier.namespace().level(0);
-    int[] tagDeletedCount = new int[] {0};
-    int[] tagMetadataObjectRelDeletedCount = new int[] {0};
+    TagPO tagPO;
+    try {
+      tagPO = getTagPOByMetalakeAndName(identifier.namespace().level(0), identifier.name());
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
+    return deleteTag(identifier, tagPO);
+  }
+
+  boolean deleteTag(NameIdentifier identifier, TagPO tagPO) {
+    long tagId = tagPO.getTagId();
 
     SessionUtils.doMultipleWithCommit(
+        () -> deleteTagWithVersion(identifier, tagPO),
         () ->
-            tagDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    TagMetaMapper.class,
-                    mapper ->
-                        mapper.softDeleteTagMetaByMetalakeAndTagName(
-                            metalakeName, identifier.name())),
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tagId)),
         () ->
-            tagMetadataObjectRelDeletedCount[0] =
-                SessionUtils.getWithoutCommit(
-                    TagMetadataObjectRelMapper.class,
-                    mapper ->
-                        mapper.softDeleteTagMetadataObjectRelsByMetalakeAndTagName(
-                            metalakeName, identifier.name())));
+            SessionUtils.doWithoutCommit(
+                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                PolicyMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                        tagId, MetadataObject.Type.TAG.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        tagId, MetadataObject.Type.TAG.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        tagId, MetadataObject.Type.TAG.name())));
 
-    return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] > 0;
+    return true;
   }
 
   @Monitored(
@@ -349,6 +387,33 @@ public class TagMetaService {
       TagValue[] tagsToRemove,
       boolean failOnDuplicateValuelessAssignment)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
+    try {
+      return SessionUtils.doWithCommitAndFetchResult(
+          TagMetaMapper.class,
+          ignored -> {
+            try {
+              return associateTagValuesWithMetadataObjectWithoutCommit(
+                  objectIdent,
+                  objectType,
+                  tagsToAdd,
+                  tagsToRemove,
+                  failOnDuplicateValuelessAssignment);
+            } catch (IOException e) {
+              throw new UncheckedIOException(e);
+            }
+          });
+    } catch (UncheckedIOException e) {
+      throw e.getCause();
+    }
+  }
+
+  private List<TagEntity> associateTagValuesWithMetadataObjectWithoutCommit(
+      NameIdentifier objectIdent,
+      Entity.EntityType objectType,
+      TagValue[] tagsToAdd,
+      TagValue[] tagsToRemove,
+      boolean failOnDuplicateValuelessAssignment)
+      throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
     MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(objectIdent, objectType);
     String metalake = objectIdent.namespace().level(0);
 
@@ -366,6 +431,7 @@ public class TagMetaService {
           tagNamesToUpdate.isEmpty()
               ? Collections.emptyList()
               : getTagPOsByMetalakeAndNames(metalake, tagNamesToUpdate);
+      tagPOsToUpdate = lockTagsForAssignment(tagPOsToUpdate);
       Map<String, TagPO> tagPOsByName = tagPOsByName(tagPOsToUpdate);
 
       List<TagPO> currentTagPOs =
@@ -451,38 +517,25 @@ public class TagMetaService {
                 tagValueToAdd.value().orElse(null)));
       }
 
-      SessionUtils.doMultipleWithCommit(
-          () -> {
-            if (tagIdsToRemove.isEmpty()) {
-              return;
-            }
-
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.batchDeleteTagMetadataObjectRelsByTagIdsAndMetadataObject(
-                        metadataObjectId, metadataObject.type().toString(), tagIdsToRemove));
-          },
-          () -> {
-            if (tagRelsToRemove.isEmpty()) {
-              return;
-            }
-
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
-                        metadataObjectId, metadataObject.type().toString(), tagRelsToRemove));
-          },
-          () -> {
-            if (tagRelsToAdd.isEmpty()) {
-              return;
-            }
-
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper -> mapper.batchInsertTagMetadataObjectRels(tagRelsToAdd));
-          });
+      if (!tagIdsToRemove.isEmpty()) {
+        SessionUtils.doWithoutCommit(
+            TagMetadataObjectRelMapper.class,
+            mapper ->
+                mapper.batchDeleteTagMetadataObjectRelsByTagIdsAndMetadataObject(
+                    metadataObjectId, metadataObject.type().toString(), tagIdsToRemove));
+      }
+      if (!tagRelsToRemove.isEmpty()) {
+        SessionUtils.doWithoutCommit(
+            TagMetadataObjectRelMapper.class,
+            mapper ->
+                mapper.batchDeleteTagMetadataObjectRelsByTagIdsAndValuesAndMetadataObject(
+                    metadataObjectId, metadataObject.type().toString(), tagRelsToRemove));
+      }
+      if (!tagRelsToAdd.isEmpty()) {
+        SessionUtils.doWithoutCommit(
+            TagMetadataObjectRelMapper.class,
+            mapper -> mapper.batchInsertTagMetadataObjectRels(tagRelsToAdd));
+      }
 
       List<TagPO> tagPOs =
           SessionUtils.getWithoutCommit(
@@ -623,6 +676,66 @@ public class TagMetaService {
         tagValue.name(),
         tagValue.value().get(),
         Arrays.toString(allowedValues));
+  }
+
+  void lockMetalakeForTagCreate(MetalakePO observedMetalakePO) {
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  private void deleteTagWithVersion(NameIdentifier identifier, TagPO observedTagPO) {
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                TagMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteTagMetaByIdAndVersion(
+                        observedTagPO.getTagId(), observedTagPO.getCurrentVersion())),
+        () -> tagWriteFailure(identifier, observedTagPO));
+  }
+
+  private RuntimeException tagWriteFailure(NameIdentifier identifier, TagPO observedTagPO) {
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.TAG,
+        () ->
+            SessionUtils.getWithoutCommit(
+                TagMetaMapper.class,
+                mapper -> mapper.selectTagByTagIdForUpdate(observedTagPO.getTagId())),
+        null,
+        current ->
+            Objects.equals(current.getTagName(), observedTagPO.getTagName())
+                && Objects.equals(current.getMetalakeId(), observedTagPO.getMetalakeId()));
+  }
+
+  private List<TagPO> lockTagsForAssignment(List<TagPO> observedTagPOs) {
+    List<TagPO> sortedTagPOs = new ArrayList<>(observedTagPOs);
+    sortedTagPOs.sort(Comparator.comparingLong(TagPO::getTagId));
+    List<TagPO> lockedTagPOs = new ArrayList<>(sortedTagPOs.size());
+    for (TagPO observedTagPO : sortedTagPOs) {
+      TagPO lockedTagPO =
+          SessionUtils.getWithoutCommit(
+              TagMetaMapper.class,
+              mapper -> mapper.selectTagByTagIdForUpdate(observedTagPO.getTagId()));
+      if (lockedTagPO == null
+          || !Objects.equals(lockedTagPO.getTagName(), observedTagPO.getTagName())
+          || !Objects.equals(lockedTagPO.getMetalakeId(), observedTagPO.getMetalakeId())) {
+        throw new NoSuchEntityException(
+            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
+            Entity.EntityType.TAG.name().toLowerCase(),
+            observedTagPO.getTagName());
+      }
+      lockedTagPOs.add(lockedTagPO);
+    }
+    return lockedTagPOs;
   }
 
   private TagPO getTagPOByMetalakeAndName(String metalakeName, String tagName) {

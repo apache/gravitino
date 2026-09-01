@@ -1423,10 +1423,7 @@ public class POConverters {
   }
 
   public static TagPO updateTagPOWithVersion(TagPO oldTagPO, TagEntity newEntity) {
-    Long lastVersion = oldTagPO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldTagPO.getCurrentVersion() + 1;
     try {
       return TagPO.builder()
           .withTagId(oldTagPO.getTagId())

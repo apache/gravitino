@@ -64,11 +64,18 @@ public interface TagMetaMapper {
   @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "updateTagMeta")
   Integer updateTagMeta(@Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO);
 
+  /**
+   * Soft-deletes an active tag when its OCC version still matches.
+   *
+   * @param tagId The tag ID.
+   * @param currentVersion The version observed by the caller.
+   * @return The number of affected rows.
+   */
   @UpdateProvider(
       type = TagMetaSQLProviderFactory.class,
-      method = "softDeleteTagMetaByMetalakeAndTagName")
-  Integer softDeleteTagMetaByMetalakeAndTagName(
-      @Param("metalakeName") String metalakeName, @Param("tagName") String tagName);
+      method = "softDeleteTagMetaByIdAndVersion")
+  Integer softDeleteTagMetaByIdAndVersion(
+      @Param("tagId") Long tagId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "softDeleteTagMetasByMetalakeId")
   void softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId);
