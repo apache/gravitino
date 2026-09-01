@@ -52,6 +52,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.utils.DorisUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -61,6 +62,7 @@ import org.apache.gravitino.exceptions.NoSuchColumnException;
 import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.TableChange;
+import org.apache.gravitino.rel.expressions.Expression;
 import org.apache.gravitino.rel.expressions.distributions.Distribution;
 import org.apache.gravitino.rel.expressions.distributions.Strategy;
 import org.apache.gravitino.rel.expressions.literals.Literal;
@@ -258,6 +260,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (!hasAutoIncrement) {
       return;
     }
+    String version = getDorisVersion("AUTO_INCREMENT compatibility check");
+    if (!isVersionAtLeast(version, 2, 1, 0)) {
+      throw new UnsupportedOperationException(
+          "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
+    }
+  }
+
+  private String getDorisVersion(String purpose) {
     Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
     String version = null;
     // SELECT VERSION() returns the MySQL protocol version (e.g. "5.7.99"), not the Doris version.
@@ -284,21 +294,22 @@ public class DorisTableOperations extends JdbcTableOperations {
       }
     } catch (SQLException e) {
       throw new UnsupportedOperationException(
-          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
+          "Unable to determine Doris version for "
+              + purpose
+              + ". "
               + "Ensure the connection user has permission to execute SHOW FRONTENDS "
               + "and the Doris FE is reachable.",
           e);
     }
     if (version == null) {
       throw new UnsupportedOperationException(
-          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
+          "Unable to determine Doris version for "
+              + purpose
+              + ". "
               + "Ensure the connection user has permission to execute SHOW FRONTENDS "
               + "and the Doris FE is reachable.");
     }
-    if (!isVersionAtLeast(version, 2, 1, 0)) {
-      throw new UnsupportedOperationException(
-          "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
-    }
+    return version;
   }
 
   @VisibleForTesting
@@ -733,6 +744,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
     List<String> alterSql = new ArrayList<>();
+    Optional<String> addColumnDorisVersion =
+        Arrays.stream(changes)
+                .filter(TableChange.AddColumn.class::isInstance)
+                .map(TableChange.AddColumn.class::cast)
+                .map(TableChange.AddColumn::getDefaultValue)
+                .anyMatch(DorisTableOperations::requiresVersionAwareAddColumnEscaping)
+            ? Optional.of(getDorisVersion("ADD COLUMN default literal compatibility check"))
+            : Optional.empty();
     for (int i = 0; i < changes.length; i++) {
       TableChange change = changes[i];
       if (change instanceof TableChange.UpdateComment) {
@@ -746,7 +765,7 @@ public class DorisTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.AddColumn) {
         TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
-        alterSql.add(addColumnFieldDefinition(addColumn));
+        alterSql.add(addColumnFieldDefinition(addColumn, addColumnDorisVersion));
       } else if (change instanceof TableChange.RenameColumn) {
         throw new IllegalArgumentException("Rename column is not supported yet");
       } else if (change instanceof TableChange.UpdateColumnType) {
@@ -855,7 +874,8 @@ public class DorisTableOperations extends JdbcTableOperations {
         "MODIFY COLUMN `%s` COMMENT '%s'", col, escapeSqlLiteral(newComment, '\''));
   }
 
-  private String addColumnFieldDefinition(TableChange.AddColumn addColumn) {
+  private String addColumnFieldDefinition(
+      TableChange.AddColumn addColumn, Optional<String> dorisVersion) {
     String dataType = typeConverter.fromGravitino(addColumn.getDataType());
     if (addColumn.fieldName().length > 1) {
       throw new UnsupportedOperationException("Doris does not support nested column names.");
@@ -875,6 +895,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (!addColumn.isNullable()) {
       columnDefinition.append("NOT NULL ");
     }
+
+    if (!DEFAULT_VALUE_NOT_SET.equals(addColumn.getDefaultValue())) {
+      columnDefinition
+          .append("DEFAULT ")
+          .append(serializeAddColumnDefaultValue(addColumn.getDefaultValue(), dorisVersion))
+          .append(SPACE);
+    }
+
     // Append comment if available
     if (StringUtils.isNotEmpty(addColumn.getComment())) {
       columnDefinition
@@ -899,6 +927,35 @@ public class DorisTableOperations extends JdbcTableOperations {
       throw new IllegalArgumentException("Invalid column position.");
     }
     return columnDefinition.toString();
+  }
+
+  private static boolean requiresVersionAwareAddColumnEscaping(Expression defaultValue) {
+    if (!(defaultValue instanceof Literal)) {
+      return false;
+    }
+    Object value = ((Literal<?>) defaultValue).value();
+    if (value == null) {
+      return false;
+    }
+    return String.valueOf(value).contains("\\");
+  }
+
+  private String serializeAddColumnDefaultValue(
+      Expression defaultValue, Optional<String> dorisVersion) {
+    Preconditions.checkState(
+        columnDefaultValueConverter instanceof DorisColumnDefaultValueConverter,
+        "DorisColumnDefaultValueConverter is required for Doris ADD COLUMN");
+    DorisColumnDefaultValueConverter converter =
+        (DorisColumnDefaultValueConverter) columnDefaultValueConverter;
+    boolean requiresDoubleEscaping =
+        dorisVersion
+            .map(
+                version ->
+                    isVersionAtLeast(version, 3, 0, 0) && !isVersionAtLeast(version, 4, 0, 0))
+            .orElse(false);
+    return requiresDoubleEscaping
+        ? converter.fromGravitinoForAddColumn(defaultValue, true)
+        : converter.fromGravitinoForAddColumn(defaultValue, false);
   }
 
   private String updateColumnPositionFieldDefinition(
