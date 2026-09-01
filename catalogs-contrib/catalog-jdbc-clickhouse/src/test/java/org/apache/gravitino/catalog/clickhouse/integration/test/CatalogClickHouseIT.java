@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.catalog.clickhouse.integration.test;
 
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.GRANULARITY;
+import static org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.IndexConstants.SET_MAX_VALUES;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.MERGETREE;
 import static org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE.REPLACINGMERGETREE;
@@ -615,6 +617,121 @@ public class CatalogClickHouseIT extends BaseIT {
                     idx.type() == Index.IndexType.DATA_SKIPPING_SET
                         && idx.name().equals("idx_userid_set")
                         && Arrays.deepEquals(idx.fieldNames(), new String[][] {{"user_id"}})));
+  }
+
+  @Test
+  void testSetIndexParameterReadbackLifecycle() {
+    TableCatalog tableCatalog = catalog.asTableCatalog();
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of("value", Types.StringType.get(), "value", false, false, DEFAULT_VALUE_NOT_SET)
+        };
+    SortOrder[] sortOrders = getSortOrders("id");
+    Map<String, String> setProperties = Map.of(SET_MAX_VALUES, "100", GRANULARITY, "3");
+
+    String tableName = GravitinoITUtils.genRandomName("set_readback");
+    NameIdentifier tableIdentifier = NameIdentifier.of(schemaName, tableName);
+    tableCatalog.createTable(
+        tableIdentifier,
+        columns,
+        "SET index readback",
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_SET,
+              "idx_set",
+              new String[][] {{"value"}},
+              setProperties)
+        });
+
+    Table loaded = tableCatalog.loadTable(tableIdentifier);
+    assertSetIndexMetadata(loaded, "idx_set", setProperties);
+    assertSetIndexDdl(tableName, "set(100)", "GRANULARITY 3");
+    Index[] loadedIndexes = loaded.index();
+
+    String recreatedTableName = GravitinoITUtils.genRandomName("set_recreated");
+    NameIdentifier recreatedIdentifier = NameIdentifier.of(schemaName, recreatedTableName);
+    tableCatalog.createTable(
+        recreatedIdentifier,
+        columns,
+        "SET index recreated",
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        loadedIndexes);
+    Table recreated = tableCatalog.loadTable(recreatedIdentifier);
+    assertSetIndexMetadata(recreated, "idx_set", setProperties);
+    assertSetIndexDdl(recreatedTableName, "set(100)", "GRANULARITY 3");
+
+    tableCatalog.alterTable(
+        tableIdentifier,
+        TableChange.addIndex(
+            Index.IndexType.DATA_SKIPPING_SET,
+            "idx_set_alter",
+            new String[][] {{"value"}},
+            setProperties));
+    Table altered = tableCatalog.loadTable(tableIdentifier);
+    assertSetIndexMetadata(altered, "idx_set_alter", setProperties);
+    assertSetIndexDdl(tableName, "set(100)", "GRANULARITY 3");
+
+    String defaultTableName = GravitinoITUtils.genRandomName("set_default");
+    NameIdentifier defaultIdentifier = NameIdentifier.of(schemaName, defaultTableName);
+    tableCatalog.createTable(
+        defaultIdentifier,
+        columns,
+        "SET index default",
+        createProperties(),
+        Transforms.EMPTY_TRANSFORM,
+        Distributions.NONE,
+        sortOrders,
+        new Index[] {
+          Indexes.of(
+              Index.IndexType.DATA_SKIPPING_SET, "idx_set_default", new String[][] {{"value"}})
+        });
+    Table defaultLoaded = tableCatalog.loadTable(defaultIdentifier);
+    assertSetIndexMetadata(defaultLoaded, "idx_set_default", Map.of());
+    assertSetIndexDdl(defaultTableName, "set(0)");
+
+    String nativeTableName = GravitinoITUtils.genRandomName("set_native");
+    clickhouseService.executeQuery(
+        String.format(
+            "CREATE TABLE `%s`.`%s` ("
+                + "  `id` UInt64,"
+                + "  `value` String,"
+                + "  INDEX `idx_native_set` `value` TYPE set(100) GRANULARITY 3"
+                + ") ENGINE = MergeTree ORDER BY id",
+            schemaName, nativeTableName));
+    Table nativeLoaded = tableCatalog.loadTable(NameIdentifier.of(schemaName, nativeTableName));
+    assertSetIndexMetadata(nativeLoaded, "idx_native_set", setProperties);
+  }
+
+  private void assertSetIndexMetadata(
+      Table table, String indexName, Map<String, String> expectedProperties) {
+    Index index =
+        Arrays.stream(table.index())
+            .filter(candidate -> Objects.equals(indexName, candidate.name()))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing index " + indexName));
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_SET, index.type());
+    Assertions.assertArrayEquals(new String[][] {{"value"}}, index.fieldNames());
+    Assertions.assertEquals(expectedProperties, index.properties());
+  }
+
+  private void assertSetIndexDdl(String tableName, String... expectedFragments) {
+    String createSql =
+        clickhouseService.executeQueryForResult(
+            String.format("SHOW CREATE TABLE `%s`.`%s`", schemaName, tableName));
+    String normalizedCreateSql = createSql.replaceAll("\\s+", "");
+    for (String expectedFragment : expectedFragments) {
+      Assertions.assertTrue(
+          normalizedCreateSql.contains(expectedFragment.replaceAll("\\s+", "")),
+          "SHOW CREATE TABLE should contain " + expectedFragment + ": " + createSql);
+    }
   }
 
   @Test

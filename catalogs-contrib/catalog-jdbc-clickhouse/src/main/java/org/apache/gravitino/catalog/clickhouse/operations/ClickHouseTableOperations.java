@@ -37,6 +37,7 @@ import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.math.BigInteger;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
@@ -100,6 +101,12 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       "Clickhouse does not support nested column names.";
   /** Default GRANULARITY for data skipping indexes, matching ClickHouse's own default. */
   private static final long DEFAULT_INDEX_GRANULARITY = 1;
+
+  private static final BigInteger MIN_SET_MAX_VALUES = BigInteger.ZERO;
+  private static final BigInteger MAX_SET_MAX_VALUES = BigInteger.valueOf(Integer.MAX_VALUE);
+  private static final String SET_MAX_VALUES_RANGE =
+      "[%s, %s]".formatted(MIN_SET_MAX_VALUES, MAX_SET_MAX_VALUES);
+  private static final Pattern SET_MAX_VALUES_PATTERN = Pattern.compile("[+-]?[0-9]+");
 
   private static final Set<ENGINE> GENERIC_ENGINE_PARAMETER_ENGINES =
       Collections.unmodifiableSet(
@@ -1700,9 +1707,43 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           String expression = resultSet.getString("expr");
           long granularity = resultSet.getLong("granularity");
           Index.IndexType indexType;
-          String[][] fields;
           try {
             indexType = getClickHouseIndexType(type);
+          } catch (IllegalArgumentException e) {
+            LOG.warn(
+                "Skip unsupported data skipping index {} for {}.{} with type {} "
+                    + "(parameter metadata={}) and expression {}",
+                name,
+                databaseName,
+                tableName,
+                type,
+                parameterSource,
+                expression,
+                e);
+            continue;
+          }
+
+          Map<String, String> parameterProperties = Collections.emptyMap();
+          if (indexType == Index.IndexType.DATA_SKIPPING_SET) {
+            try {
+              parameterProperties =
+                  parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
+            } catch (IllegalArgumentException e) {
+              throw new IllegalArgumentException(
+                  "Failed to load data skipping index '%s' from %s.%s with %s '%s': %s"
+                      .formatted(
+                          name,
+                          databaseName,
+                          tableName,
+                          parameterSourceName,
+                          parameterSource,
+                          e.getMessage()),
+                  e);
+            }
+          }
+
+          String[][] fields;
+          try {
             fields = parseIndexFields(expression);
           } catch (IllegalArgumentException e) {
             LOG.warn(
@@ -1721,6 +1762,24 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
             continue;
           }
 
+          if (isParameterizedBloomFilterIndex(indexType)) {
+            try {
+              parameterProperties =
+                  parseIndexPropertiesForQuery(indexType, parameterSource, name, !includesTypeFull);
+            } catch (IllegalArgumentException e) {
+              throw new IllegalArgumentException(
+                  "Failed to load data skipping index '%s' from %s.%s with %s '%s': %s"
+                      .formatted(
+                          name,
+                          databaseName,
+                          tableName,
+                          parameterSourceName,
+                          parameterSource,
+                          e.getMessage()),
+                  e);
+            }
+          }
+
           // Only include granularity in properties when it differs from the default,
           // so that indexes created without explicit granularity have empty properties
           // and match the original creation state (avoids false index-change diffs).
@@ -1728,20 +1787,9 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
           if (granularity != DEFAULT_INDEX_GRANULARITY) {
             properties.put(GRANULARITY, String.valueOf(granularity));
           }
-          Map<String, String> bloomFilterProperties;
-          try {
-            bloomFilterProperties =
-                parseBloomFilterPropertiesForQuery(
-                    indexType, parameterSource, name, !includesTypeFull);
-          } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException(
-                "Failed to load data skipping index '%s' from %s.%s with %s '%s'"
-                    .formatted(name, databaseName, tableName, parameterSourceName, parameterSource),
-                e);
-          }
           if (!includesTypeFull
               && isParameterizedBloomFilterIndex(indexType)
-              && bloomFilterProperties.isEmpty()) {
+              && parameterProperties.isEmpty()) {
             LOG.warn(
                 "Legacy ClickHouse metadata does not expose bloom-filter parameters for "
                     + "{} index '{}' on {}.{}; loaded Index.properties() is incomplete",
@@ -1750,7 +1798,18 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
                 databaseName,
                 tableName);
           }
-          properties.putAll(bloomFilterProperties);
+          if (!includesTypeFull
+              && indexType == Index.IndexType.DATA_SKIPPING_SET
+              && parameterProperties.isEmpty()
+              && !StringUtils.contains(parameterSource, "(")) {
+            LOG.warn(
+                "Legacy ClickHouse metadata does not expose SET max-values parameters for "
+                    + "SET index '{}' on {}.{}; loaded Index.properties() is incomplete",
+                name,
+                databaseName,
+                tableName);
+          }
+          properties.putAll(parameterProperties);
           secondaryIndexes.add(Indexes.of(indexType, name, fields, properties));
         }
       }
@@ -1773,6 +1832,107 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
       }
     }
     return false;
+  }
+
+  /**
+   * Parses the single positional parameter returned by ClickHouse for a SET data skipping index.
+   *
+   * @param indexType the mapped Gravitino index type
+   * @param typeFull the complete ClickHouse index type expression
+   * @param indexName the index name for validation messages
+   * @return the SET index properties, or an empty map for non-SET index types and {@code set(0)}
+   * @throws IllegalArgumentException if a SET index has malformed or out-of-range parameters
+   */
+  @VisibleForTesting
+  static Map<String, String> parseSetProperties(
+      Index.IndexType indexType, String typeFull, String indexName) {
+    if (indexType != Index.IndexType.DATA_SKIPPING_SET) {
+      return Collections.emptyMap();
+    }
+
+    String normalizedTypeFull = StringUtils.trimToEmpty(typeFull);
+    int paramsStart = normalizedTypeFull.indexOf('(');
+    int paramsEnd = normalizedTypeFull.lastIndexOf(')');
+    Preconditions.checkArgument(
+        paramsStart > 0 && paramsEnd == normalizedTypeFull.length() - 1,
+        "Invalid SET metadata '%s' for index '%s'",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        StringUtils.equalsIgnoreCase(
+            DATA_SKIPPING_SET, normalizedTypeFull.substring(0, paramsStart).trim()),
+        "SET metadata '%s' does not match SET index '%s'",
+        typeFull,
+        indexName);
+
+    String[] params = normalizedTypeFull.substring(paramsStart + 1, paramsEnd).split(",", -1);
+    Preconditions.checkArgument(
+        params.length == 1,
+        "Invalid SET metadata '%s' for SET index '%s': expected one parameter but got %s",
+        typeFull,
+        indexName,
+        params.length);
+
+    String rawValue = params[0].trim();
+    Preconditions.checkArgument(
+        !rawValue.isEmpty(),
+        "Invalid SET metadata '%s' for SET index '%s': set_max_values is required",
+        typeFull,
+        indexName);
+    Preconditions.checkArgument(
+        SET_MAX_VALUES_PATTERN.matcher(rawValue).matches(),
+        "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is not a valid decimal integer",
+        typeFull,
+        indexName,
+        rawValue);
+    BigInteger value;
+    try {
+      value = new BigInteger(rawValue);
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is not a valid decimal integer"
+              .formatted(typeFull, indexName, rawValue),
+          e);
+    }
+
+    if (value.compareTo(MIN_SET_MAX_VALUES) < 0 || value.compareTo(MAX_SET_MAX_VALUES) > 0) {
+      throw new IllegalArgumentException(
+          "Invalid SET metadata '%s' for SET index '%s': set_max_values '%s' is outside supported range %s"
+              .formatted(typeFull, indexName, rawValue, SET_MAX_VALUES_RANGE));
+    }
+    if (value.equals(MIN_SET_MAX_VALUES)) {
+      return Collections.emptyMap();
+    }
+    return Map.of(SET_MAX_VALUES, value.toString());
+  }
+
+  private static Map<String, String> parseIndexPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    switch (indexType) {
+      case DATA_SKIPPING_SET:
+        return parseSetPropertiesForQuery(
+            indexType, parameterSource, indexName, allowBareLegacyType);
+      case DATA_SKIPPING_NGRAMBFV1:
+      case DATA_SKIPPING_TOKENBFV1:
+        return parseBloomFilterPropertiesForQuery(
+            indexType, parameterSource, indexName, allowBareLegacyType);
+      default:
+        return Collections.emptyMap();
+    }
+  }
+
+  private static Map<String, String> parseSetPropertiesForQuery(
+      Index.IndexType indexType,
+      String parameterSource,
+      String indexName,
+      boolean allowBareLegacyType) {
+    if (allowBareLegacyType && !StringUtils.contains(parameterSource, "(")) {
+      return Collections.emptyMap();
+    }
+    return parseSetProperties(indexType, parameterSource, indexName);
   }
 
   /**
