@@ -22,7 +22,7 @@ import toast from 'react-hot-toast'
 
 import { to, isProdEnv } from '@/lib/utils'
 
-import { getAuthConfigsApi, loginApi, basicLoginApi } from '@/lib/api/auth'
+import { getAuthConfigsApi, getAuthMeApi, loginApi, basicLoginApi } from '@/lib/api/auth'
 
 import { initialVersion } from '@/lib/store/sys'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
@@ -33,7 +33,6 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
   let oauthUrl = null
   let authType = null
   let anthEnable = null
-  let serviceAdmins = null
   const [err, res] = await to(getAuthConfigsApi())
 
   if (err || !res) {
@@ -45,14 +44,23 @@ export const getAuthConfigs = createAsyncThunk('auth/getAuthConfigs', async () =
   // ** get the first authenticator from the response. response example: "[simple, oauth]"
   authType = res['gravitino.authenticators'][0].trim()
   anthEnable = res['gravitino.authorization.enable']
-  serviceAdmins = res['gravitino.authorization.serviceAdmins']
 
   localStorage.setItem('oauthUrl', oauthUrl)
 
   // Persist authType for axios interceptor to avoid circular dependency with Redux store
   localStorage.setItem('authType', authType)
 
-  return { oauthUrl, authType, anthEnable, serviceAdmins, systemConfig: res }
+  return { oauthUrl, authType, anthEnable, systemConfig: res }
+})
+
+export const getAuthMe = createAsyncThunk('auth/getAuthMe', async () => {
+  const [err, res] = await to(getAuthMeApi())
+
+  if (err || !res) {
+    throw new Error(err)
+  }
+
+  return res
 })
 
 export const refreshToken = createAsyncThunk('auth/refreshToken', async (data, { getState, dispatch }) => {
@@ -91,6 +99,7 @@ export const loginAction = createAsyncThunk('auth/loginAction', async ({ params,
   localStorage.setItem('expiredIn', expires_in)
   dispatch(setAuthToken(access_token))
   dispatch(setExpiredIn(expires_in))
+  await dispatch(getAuthMe())
   await dispatch(initialVersion())
 
   router.push('/metalakes')
@@ -121,6 +130,7 @@ export const basicLoginAction = createAsyncThunk(
     sessionStorage.removeItem('expiredIn') // Basic auth does not have an expiration time
 
     dispatch(setAuthToken(basicToken))
+    await dispatch(getAuthMe())
     await dispatch(initialVersion())
     router.push('/metalakes')
 
@@ -239,7 +249,7 @@ export const authSlice = createSlice({
     expiredIn: typeof window !== 'undefined' ? localStorage.getItem('expiredIn') : null,
     intervalId: null,
     anthEnable: null,
-    serviceAdmins: null,
+    isServiceAdmin: false,
     systemConfig: null,
     authUser: null
   },
@@ -267,6 +277,7 @@ export const authSlice = createSlice({
         sessionStorage.setItem('simpleAuthUser', JSON.stringify(action.payload))
       } else {
         sessionStorage.removeItem('simpleAuthUser')
+        state.isServiceAdmin = false
       }
       state.authUser = action.payload
     }
@@ -276,8 +287,24 @@ export const authSlice = createSlice({
       state.oauthUrl = action.payload.oauthUrl
       state.authType = action.payload.authType
       state.anthEnable = action.payload.anthEnable
-      state.serviceAdmins = action.payload.serviceAdmins
       state.systemConfig = action.payload.systemConfig
+    })
+    builder.addCase(getAuthMe.fulfilled, (state, action) => {
+      if (action.payload?.principal) {
+        const authUser = {
+          ...(state.authUser || {}),
+          name: action.payload.principal,
+          type: state.authUser?.type || 'user'
+        }
+
+        sessionStorage.setItem('simpleAuthUser', JSON.stringify(authUser))
+        state.authUser = authUser
+      }
+
+      state.isServiceAdmin = action.payload?.serviceAdmin === true
+    })
+    builder.addCase(getAuthMe.rejected, state => {
+      state.isServiceAdmin = false
     })
     builder.addCase(refreshToken.fulfilled, (state, action) => {
       localStorage.setItem('accessToken', action.payload.token)
