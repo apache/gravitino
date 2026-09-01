@@ -24,6 +24,7 @@ import static io.trino.spi.type.VarcharType.VARCHAR;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.airlift.log.Logger;
 import io.trino.spi.Page;
 import io.trino.spi.block.BlockBuilder;
 import io.trino.spi.connector.ColumnMetadata;
@@ -33,8 +34,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * An implementation of the load status system table.
@@ -45,7 +44,7 @@ import org.slf4j.LoggerFactory;
  */
 public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoSystemTableLoadStatus.class);
+  private static final Logger LOG = Logger.get(GravitinoSystemTableLoadStatus.class);
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   /** The name of the load status system table. */
@@ -109,7 +108,7 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
       } catch (JsonProcessingException e) {
         // Degrade rather than fail: this table is what a user reads while diagnosing a broken
         // load loop, and one unserializable column must not take last_error down with it.
-        LOG.warn("Failed to serialize the metalake errors", e);
+        LOG.warn(e, "Failed to serialize the metalake errors");
         VARCHAR.writeString(metalakeErrorsColumnBuilder, new TreeMap<>(metalakeErrors).toString());
       }
     }

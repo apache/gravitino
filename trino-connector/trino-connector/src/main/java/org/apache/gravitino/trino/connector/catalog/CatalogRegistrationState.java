@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector.catalog;
 
+import com.google.common.base.Preconditions;
 import javax.annotation.Nullable;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 
@@ -153,6 +154,13 @@ public final class CatalogRegistrationState {
       @Nullable String provider,
       Status status,
       @Nullable String lastError) {
+    Preconditions.checkArgument(metalake != null, "metalake must not be null");
+    Preconditions.checkArgument(catalogName != null, "catalogName must not be null");
+    Preconditions.checkArgument(trinoCatalogName != null, "trinoCatalogName must not be null");
+    Preconditions.checkArgument(
+        status == Status.REGISTERED || lastError != null,
+        "lastError must not be null for status %s",
+        status);
     long now = System.currentTimeMillis();
     return new CatalogRegistrationState(
         metalake,
@@ -183,14 +191,19 @@ public final class CatalogRegistrationState {
     // Consecutive failures only accumulate while the catalog keeps failing. Any other status
     // interrupts the run, and its own count is already zero.
     long failures = status == Status.FAILED ? previous.failureCount + 1 : failureCount;
-    if (successTime == lastSuccessTimeMs && failures == failureCount) {
+    // A failure that happens before the provider is known (e.g. metalake.loadCatalog() itself
+    // throws) must not blank out a provider a previous attempt already discovered.
+    String effectiveProvider = provider != null ? provider : previous.provider;
+    if (successTime == lastSuccessTimeMs
+        && failures == failureCount
+        && effectiveProvider == provider) {
       return this;
     }
     return new CatalogRegistrationState(
         metalake,
         catalogName,
         trinoCatalogName,
-        provider,
+        effectiveProvider,
         status,
         lastError,
         lastAttemptTimeMs,

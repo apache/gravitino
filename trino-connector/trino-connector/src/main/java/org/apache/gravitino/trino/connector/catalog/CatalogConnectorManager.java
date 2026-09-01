@@ -310,12 +310,12 @@ public class CatalogConnectorManager {
     loadOutcome =
         new LoadOutcome(previous.lastSuccessTimeMs, message, previous.consecutiveFailures + 1);
     if (!changed) {
-      LOG.debug("Failed to load catalogs from the Gravitino server: {}", message, cause);
+      LOG.debug(cause, "Failed to load catalogs from the Gravitino server: %s", message);
     } else if (trinoStarted) {
-      LOG.error("Failed to load catalogs from the Gravitino server: {}", message, cause);
+      LOG.error(cause, "Failed to load catalogs from the Gravitino server: %s", message);
     } else {
       // Trino not being up yet is the normal state during startup, not an error.
-      LOG.info("{}", message);
+      LOG.info("%s", message);
     }
   }
 
@@ -323,9 +323,9 @@ public class CatalogConnectorManager {
     String message = toErrorMessage(cause);
     String previous = metalakeErrors.put(metalakeName, message);
     if (!Objects.equals(previous, message)) {
-      LOG.error("Load metalake {} failed: {}", metalakeName, message, cause);
+      LOG.error(cause, "Load metalake %s failed: %s", metalakeName, message);
     } else {
-      LOG.debug("Load metalake {} failed: {}", metalakeName, message, cause);
+      LOG.debug(cause, "Load metalake %s failed: %s", metalakeName, message);
     }
   }
 
@@ -410,7 +410,7 @@ public class CatalogConnectorManager {
       catalogNames.add(catalogName);
     }
 
-    LOG.debug("Load metalake {}'s catalogs. catalogs: {}.", metalakeName, catalogNames);
+    LOG.debug("Load metalake %s's catalogs. catalogs: %s.", metalakeName, catalogNames);
 
     // Delete those catalogs that have been deleted in Gravitino server
     Set<String> catalogNameStrings = new HashSet<>();
@@ -510,14 +510,20 @@ public class CatalogConnectorManager {
                 metalakeName, catalogName, trinoCatalogName, provider, toErrorMessage(e)),
             e);
       } catch (Exception e) {
-        if (alreadyRegistered) {
+        // reloadCatalog() unregisters the old connector before re-registering; if the
+        // re-register then fails, the catalog is no longer in catalogConnectors even though
+        // alreadyRegistered was true when this iteration started. Re-check the live map instead
+        // of trusting the pre-try snapshot, or a reload failure gets reported as "still
+        // registered" when the catalog has actually dropped out of Trino.
+        boolean stillRegistered = catalogConnectors.containsKey(trinoCatalogName);
+        if (alreadyRegistered && stillRegistered) {
           // The catalog is still registered and visible via SHOW CATALOGS; a transient failure to
           // refresh it must not flip it to FAILED and hide that it is still usable.
           LOG.warn(
-              "Failed to refresh already-registered catalog {}: {}",
+              e,
+              "Failed to refresh already-registered catalog %s: %s",
               trinoCatalogName,
-              toErrorMessage(e),
-              e);
+              toErrorMessage(e));
         } else {
           recordCatalogState(
               CatalogRegistrationState.failed(
@@ -544,24 +550,22 @@ public class CatalogConnectorManager {
             || previous.getStatus() != state.getStatus()
             || !Objects.equals(previous.getLastError(), state.getLastError());
     if (!changed) {
-      LOG.debug("Catalog {} registration state unchanged: {}", state.getTrinoCatalogName(), state);
+      LOG.debug("Catalog %s registration state unchanged: %s", state.getTrinoCatalogName(), state);
       return;
     }
 
     if (state.getStatus() == CatalogRegistrationState.Status.REGISTERED) {
-      LOG.info("Catalog {} is registered in Trino.", state.getTrinoCatalogName());
+      LOG.info("Catalog %s is registered in Trino.", state.getTrinoCatalogName());
     } else if (state.getStatus() == CatalogRegistrationState.Status.FAILED) {
       LOG.error(
-          "Failed to register catalog {} in Trino: {}",
+          cause,
+          "Failed to register catalog %s in Trino: %s",
           state.getTrinoCatalogName(),
-          state.getLastError(),
-          cause);
+          state.getLastError());
     } else {
       LOG.warn(
-          "Catalog {} is not registered in Trino ({}): {}",
-          state.getTrinoCatalogName(),
-          state.getStatus(),
-          state.getLastError());
+          "Catalog %s is not registered in Trino (%s): %s",
+          state.getTrinoCatalogName(), state.getStatus(), state.getLastError());
     }
   }
 
@@ -595,7 +599,10 @@ public class CatalogConnectorManager {
     } catch (Exception e) {
       String message =
           String.format("Failed to create internal catalog connector. The catalog is: %s", catalog);
-      LOG.debug(message, e);
+      // Debug only: the caller always rethrows and, when this leaves a catalog unregistered,
+      // records it via recordCatalogState() which logs the full cause chain at ERROR. Logging
+      // it again here at ERROR would duplicate that.
+      LOG.debug(e, message);
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_CREATE_INTERNAL_CONNECTOR_ERROR, message, e);
     }
@@ -682,11 +689,13 @@ public class CatalogConnectorManager {
 
   /**
    * Retrieves a snapshot of the registration state of every Gravitino catalog seen by the load
-   * loop.
+   * loop. Package-private: production callers always know which metalake they report on and use
+   * {@link #getCatalogRegistrationStates(String)}; this exists for tests that assert on the whole
+   * set of tracked catalogs.
    *
    * @return the registration states
    */
-  public List<CatalogRegistrationState> getCatalogRegistrationStates() {
+  List<CatalogRegistrationState> getCatalogRegistrationStates() {
     return List.copyOf(catalogStates.values());
   }
 

@@ -100,7 +100,7 @@ public class CatalogRegister {
       // Keep the reason: wrong credentials, a wrong port and a coordinator that is still booting
       // are indistinguishable to the caller otherwise, and only the first two are actionable.
       lastConnectionError = e.getMessage() == null ? e.getClass().getName() : e.getMessage();
-      LOG.warn("Trino server is not started: {}", lastConnectionError);
+      LOG.warn("Trino server is not started: %s", lastConnectionError);
       return false;
     }
   }

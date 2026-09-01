@@ -30,14 +30,50 @@ import static org.mockito.Mockito.when;
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.Page;
 import io.trino.spi.block.Block;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import org.apache.gravitino.Audit;
+import org.apache.gravitino.Catalog;
+import org.apache.gravitino.client.GravitinoMetalake;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.catalog.CatalogRegistrationState;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.junit.jupiter.api.Test;
 
 public class TestGravitinoSystemStatusTables {
+
+  @Test
+  public void testCatalogTableReportsOnlyItsOwnMetalakeInMultiMetalakeMode() {
+    // gravitino.system.catalog must report only its entry catalog's metalake, not every metalake
+    // the manager happens to have loaded.
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    when(manager.getUsedMetalakes()).thenReturn(Set.of("prod", "dev"));
+
+    GravitinoMetalake prodMetalake = mock(GravitinoMetalake.class);
+    Catalog prodCatalog = mock(Catalog.class);
+    when(prodCatalog.name()).thenReturn("memory");
+    when(prodCatalog.provider()).thenReturn("memory");
+    when(prodCatalog.type()).thenReturn(Catalog.Type.RELATIONAL);
+    when(prodCatalog.properties()).thenReturn(Map.of());
+    Audit audit = mock(Audit.class);
+    when(audit.createTime()).thenReturn(Instant.now());
+    when(prodCatalog.auditInfo()).thenReturn(audit);
+    when(prodMetalake.listCatalogsInfo()).thenReturn(new Catalog[] {prodCatalog});
+    when(manager.getMetalake("prod")).thenReturn(prodMetalake);
+    when(manager.getTrinoCatalogName("prod", "memory")).thenReturn("memory");
+    when(manager.skipCatalog("memory")).thenReturn(false);
+
+    // "dev" is a used metalake too, but this table instance is scoped to "prod" and must not
+    // even look at "dev": leaving its mock unstubbed means any access throws or returns null,
+    // which would surface as a test failure instead of silently leaking dev's catalogs in.
+
+    Page page = new GravitinoSystemTableCatalog(manager, "prod").loadPageData();
+
+    assertEquals(1, page.getPositionCount());
+    assertEquals("memory", varchar(page, 0));
+  }
 
   @Test
   public void testCatalogStatusTableRendersRegisteredCatalog() {

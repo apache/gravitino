@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.trino.connector;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -33,6 +34,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.gravitino.client.GravitinoAdminClient;
+import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -160,6 +162,22 @@ public class TestGravitinoConnectorFactoryStart {
     // Everything that makes start() fail is a configuration error, so the next create() must not
     // try again: a second init() would open another connection and abandon the first one.
     assertNotNull(factory.create("gravitino", brokenConfig, mockContext()));
+    // The retry must not just avoid throwing: the load loop actually has to start this time, or a
+    // catalog whose init previously failed would stay unregistered forever.
+    assertTrue(factory.isCatalogConnectorManagerStartTriggered());
+  }
+
+  @Test
+  public void testStaticConnectorPinsSplitsToTheCoordinator() {
+    CoordinatorFactory factory = newFactory();
+
+    assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
+
+    // The registration state the system tables report lives only on the coordinator, so its
+    // splits must be pinned to the address CoordinatorFactory reports for this node.
+    assertEquals(
+        HostAddress.fromParts("127.0.0.1", 1),
+        GravitinoSystemConnector.Split.getCurrentCoordinatorAddress());
   }
 
   @Test

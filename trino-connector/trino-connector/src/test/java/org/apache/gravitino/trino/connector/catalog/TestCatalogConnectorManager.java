@@ -256,6 +256,26 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testFailureBeforeProviderIsKnownKeepsPreviousProvider() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+    assertEquals("memory", singleState(manager).getProvider());
+
+    // The next attempt fails before the provider can even be read off the catalog.
+    Mockito.doThrow(new RuntimeException("Connection reset"))
+        .when(fixture.metalake)
+        .loadCatalog("memory");
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.FAILED, state.getStatus());
+    // The provider a previous successful attempt discovered must not be blanked out.
+    assertEquals("memory", state.getProvider());
+  }
+
+  @Test
   public void testSkippedCatalogIsRecorded() throws Exception {
     LoadFixture fixture = new LoadFixture();
     fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
@@ -468,6 +488,42 @@ public class TestCatalogConnectorManager {
     CatalogRegistrationState state = singleState(manager);
     assertEquals(CatalogRegistrationState.Status.FAILED, state.getStatus());
     assertTrue(state.getLastError().contains("could not be unregistered"));
+  }
+
+  @Test
+  public void testReloadFailureAfterUnregisterIsRecordedAsFailed() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    // Trino already has a live connector for this catalog, built from an older version.
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L));
+
+    // The Gravitino server now reports a newer version, so the load loop takes the reload path:
+    // reloadCatalog() unregisters the old connector before attempting to re-register it.
+    Audit audit = mock(Audit.class);
+    when(audit.createTime()).thenReturn(Instant.now());
+    when(audit.lastModifiedTime()).thenReturn(Instant.now());
+    when(catalog.auditInfo()).thenReturn(audit);
+
+    // The re-register that follows the unregister fails.
+    doThrow(new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Access Denied"))
+        .when(fixture.catalogRegister)
+        .registerCatalog(any(), any());
+
+    manager.loadMetalakeSync();
+
+    // The old connector is genuinely gone from Trino now; the state must say FAILED with the
+    // real cause instead of assuming the catalog is still usable.
+    assertFalse(manager.catalogConnectorExist("memory"));
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.FAILED, state.getStatus());
+    assertTrue(state.getLastError().contains("Access Denied"));
   }
 
   @Test

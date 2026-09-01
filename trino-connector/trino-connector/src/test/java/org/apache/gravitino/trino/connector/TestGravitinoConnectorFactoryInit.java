@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -53,6 +54,9 @@ public class TestGravitinoConnectorFactoryInit {
     // Everything that makes start() fail is a configuration error, so the next create() must not
     // try again: a second init() would open another connection and abandon the first one.
     assertDoesNotThrow(() -> factory.create("gravitino", config, mockContext()));
+    // Not throwing is not enough: the load loop must actually start this time, or a catalog whose
+    // init previously failed would stay unregistered forever.
+    assertTrue(factory.isCatalogConnectorManagerStartTriggered());
   }
 
   @SuppressWarnings("deprecation")
