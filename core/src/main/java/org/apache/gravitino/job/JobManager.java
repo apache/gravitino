@@ -21,6 +21,7 @@ package org.apache.gravitino.job;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -49,11 +50,14 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -443,6 +447,19 @@ public class JobManager implements JobOperationDispatcher {
     // also downloading any necessary files from the URIs specified in the job template.
     JobTemplate jobTemplate = createRuntimeJobTemplate(jobTemplateEntity, jobConf, jobStagingDir);
 
+    // Serialize the resolved (placeholder-replaced) job template so callers can later see exactly
+    // what was submitted for execution, not just the original template. This is done before
+    // submission so that a serialization failure never leaves a job running on the executor
+    // without a corresponding JobEntity.
+    JobTemplateDTO runtimeJobTemplateDTO =
+        DTOConverters.toDTO(jobTemplate, DTOConverters.toDTO(jobTemplateEntity.auditInfo()));
+    String runtimeJobTemplateJson;
+    try {
+      runtimeJobTemplateJson = JsonUtils.anyFieldMapper().writeValueAsString(runtimeJobTemplateDTO);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize the runtime job template", e);
+    }
+
     // Submit the job template to the job executor
     String jobExecutionId;
     try {
@@ -468,6 +485,7 @@ public class JobManager implements JobOperationDispatcher {
             // A newly submitted job is queued, not started or finished yet.
             .withStartedAt(0L)
             .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
             .build();
 
     try {
@@ -559,6 +577,8 @@ public class JobManager implements JobOperationDispatcher {
         // job already had.
         .withStartedAt(latestJobEntity.startedAt())
         .withFinishedAt(latestJobEntity.finishedAt())
+        // The runtime job template is fixed at job creation and never changes.
+        .withRuntimeJobTemplate(latestJobEntity.runtimeJobTemplate())
         .build();
   }
 
@@ -729,6 +749,8 @@ public class JobManager implements JobOperationDispatcher {
                 .build())
         .withStartedAt(startedAt)
         .withFinishedAt(finishedAt)
+        // The runtime job template is fixed at job creation and never changes.
+        .withRuntimeJobTemplate(latestJobEntity.runtimeJobTemplate())
         .build();
   }
 

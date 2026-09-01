@@ -43,6 +43,7 @@ import org.apache.gravitino.dto.responses.JobListResponse;
 import org.apache.gravitino.dto.responses.JobResponse;
 import org.apache.gravitino.dto.responses.JobTemplateListResponse;
 import org.apache.gravitino.dto.responses.JobTemplateResponse;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.MetalakeNotInUseException;
@@ -316,6 +317,27 @@ public class TestSupportsJobs extends TestBase {
   }
 
   @Test
+  public void testGetJobWithRuntimeJobTemplate() throws JsonProcessingException {
+    String jobId = "job-1";
+    String jobTemplateName = "shell-job-template";
+    JobTemplateDTO runtimeJobTemplateDTO = newShellJobTemplateDTO(jobTemplateName);
+    JobDTO expectedJob =
+        newJobDTO(jobId, jobTemplateName, Instant.now(), Instant.now(), runtimeJobTemplateDTO);
+    JobResponse resp = new JobResponse(expectedJob);
+
+    buildMockResource(Method.GET, jobRunsPath() + "/" + jobId, null, resp, HttpStatus.SC_OK);
+
+    JobHandle actualHandle = metalake.getJob(jobId);
+    compare(expectedJob, actualHandle);
+
+    // The handle must expose the resolved runtime template as an api-level JobTemplate (not the
+    // wire DTO), converted via DTOConverters.fromDTO.
+    JobTemplate runtimeJobTemplate = actualHandle.runtimeJobTemplate();
+    Assertions.assertNotNull(runtimeJobTemplate);
+    Assertions.assertEquals(DTOConverters.fromDTO(runtimeJobTemplateDTO), runtimeJobTemplate);
+  }
+
+  @Test
   public void testRunJob() throws JsonProcessingException {
     String jobTemplateName = "shell-job-template";
     String jobId = "job-1";
@@ -364,6 +386,11 @@ public class TestSupportsJobs extends TestBase {
     Assertions.assertEquals(expected.queuedAt(), actual.queuedAt());
     Assertions.assertEquals(expected.startedAt(), actual.startedAt());
     Assertions.assertEquals(expected.finishedAt(), actual.finishedAt());
+    JobTemplate expectedRuntimeJobTemplate =
+        expected.runtimeJobTemplate() == null
+            ? null
+            : DTOConverters.fromDTO(expected.runtimeJobTemplate());
+    Assertions.assertEquals(expectedRuntimeJobTemplate, actual.runtimeJobTemplate());
   }
 
   private String jobTemplatesPath() {
@@ -414,6 +441,15 @@ public class TestSupportsJobs extends TestBase {
 
   private JobDTO newJobDTO(
       String jobId, String templateName, Instant startedAt, Instant finishedAt) {
+    return newJobDTO(jobId, templateName, startedAt, finishedAt, null);
+  }
+
+  private JobDTO newJobDTO(
+      String jobId,
+      String templateName,
+      Instant startedAt,
+      Instant finishedAt,
+      JobTemplateDTO runtimeJobTemplate) {
     Instant now = Instant.now();
     return new JobDTO(
         jobId,
@@ -422,6 +458,7 @@ public class TestSupportsJobs extends TestBase {
         AuditDTO.builder().withCreator("test").withCreateTime(now).build(),
         now,
         startedAt,
-        finishedAt);
+        finishedAt,
+        runtimeJobTemplate);
   }
 }

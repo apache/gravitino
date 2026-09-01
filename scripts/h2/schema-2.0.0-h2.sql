@@ -487,6 +487,7 @@ CREATE TABLE IF NOT EXISTS `job_run_meta` (
     `job_run_status` varchar(64) NOT NULL COMMENT 'job run status',
     `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at',
     `job_finished_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job finished at',
+    `runtime_job_template` CLOB DEFAULT NULL COMMENT 'job run runtime job template',
     `audit_info` CLOB NOT NULL COMMENT 'job run audit info',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'job run last version',

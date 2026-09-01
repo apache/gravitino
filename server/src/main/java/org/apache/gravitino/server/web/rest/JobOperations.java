@@ -525,7 +525,29 @@ public class JobOperations {
         DTOConverters.toDTO(jobEntity.auditInfo()),
         jobEntity.auditInfo().createTime(),
         jobEntity.startedAtAsInstant(),
-        jobEntity.finishedAtAsInstant());
+        jobEntity.finishedAtAsInstant(),
+        toRuntimeJobTemplateDTO(jobEntity));
+  }
+
+  /**
+   * Deserializes the job entity's stored runtime job template JSON, if any. A malformed or
+   * forward-incompatible stored value (e.g. a job type unknown to this server version) must not
+   * make the job unreadable or uncancellable through the API - failures here are logged and
+   * swallowed rather than propagated, so callers of {@link #toDTO(JobEntity)} (get/run/cancel/list
+   * job) always get a usable response with just the runtime job template omitted.
+   */
+  private static JobTemplateDTO toRuntimeJobTemplateDTO(JobEntity jobEntity) {
+    try {
+      return DTOConverters.fromRuntimeJobTemplateJson(
+          jobEntity.runtimeJobTemplate(), jobEntity.name());
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to deserialize the runtime job template for job {}, omitting it from the "
+              + "response",
+          jobEntity.name(),
+          e);
+      return null;
+    }
   }
 
   private static List<JobDTO> toJobDTOs(List<JobEntity> jobEntities) {
