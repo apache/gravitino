@@ -177,8 +177,8 @@ public class TestCatalogConnectorManager {
     assertTrue(state.getLastSuccessTimeMs() > 0);
 
     assertTrue(manager.isTrinoStarted());
-    assertNull(manager.getLastLoadError());
-    assertEquals(0, manager.getConsecutiveLoadFailures());
+    assertNull(manager.getLoadOutcome().getLastError());
+    assertEquals(0, manager.getLoadOutcome().getConsecutiveFailures());
     assertTrue(manager.getMetalakeErrors().isEmpty());
   }
 
@@ -337,10 +337,11 @@ public class TestCatalogConnectorManager {
     CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
     manager.loadMetalakeSync();
 
-    assertNotNull(manager.getLastLoadError());
-    assertTrue(manager.getLastLoadError().contains("Connection refused"));
-    assertEquals(1, manager.getConsecutiveLoadFailures());
-    assertEquals(0, manager.getLastSuccessfulLoadTimeMs());
+    CatalogConnectorManager.LoadOutcome loadOutcome = manager.getLoadOutcome();
+    assertNotNull(loadOutcome.getLastError());
+    assertTrue(loadOutcome.getLastError().contains("Connection refused"));
+    assertEquals(1, loadOutcome.getConsecutiveFailures());
+    assertEquals(0, loadOutcome.getLastSuccessTimeMs());
     assertTrue(manager.getLastLoadAttemptTimeMs() > 0);
     assertTrue(manager.getCatalogRegistrationStates().isEmpty());
   }
@@ -354,8 +355,9 @@ public class TestCatalogConnectorManager {
     manager.loadMetalakeSync();
 
     assertFalse(manager.isTrinoStarted());
-    assertNotNull(manager.getLastLoadError());
-    assertTrue(manager.getLastLoadError().contains("Waiting for the Trino server"));
+    String lastError = manager.getLoadOutcome().getLastError();
+    assertNotNull(lastError);
+    assertTrue(lastError.contains("Waiting for the Trino server"));
     assertTrue(manager.getCatalogRegistrationStates().isEmpty());
   }
 
@@ -450,16 +452,17 @@ public class TestCatalogConnectorManager {
     manager.loadMetalakeSync();
     assertEquals(1, manager.getMetalakeErrors().size());
     // A metalake that cannot be listed is not a healthy loop.
-    assertNotNull(manager.getLastLoadError());
-    assertEquals(0, manager.getLastSuccessfulLoadTimeMs());
+    assertNotNull(manager.getLoadOutcome().getLastError());
+    assertEquals(0, manager.getLoadOutcome().getLastSuccessTimeMs());
 
     fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
     manager.loadMetalakeSync();
 
     assertTrue(manager.getMetalakeErrors().isEmpty());
-    assertNull(manager.getLastLoadError());
-    assertEquals(0, manager.getConsecutiveLoadFailures());
-    assertTrue(manager.getLastSuccessfulLoadTimeMs() > 0);
+    CatalogConnectorManager.LoadOutcome loadOutcome = manager.getLoadOutcome();
+    assertNull(loadOutcome.getLastError());
+    assertEquals(0, loadOutcome.getConsecutiveFailures());
+    assertTrue(loadOutcome.getLastSuccessTimeMs() > 0);
   }
 
   @Test
@@ -537,8 +540,9 @@ public class TestCatalogConnectorManager {
 
     // "Waiting for Trino" alone would read the same for a misconfiguration that never resolves.
     assertFalse(manager.isTrinoStarted());
-    assertTrue(manager.getLastLoadError().contains("Authentication failed"));
-    assertEquals(1, manager.getConsecutiveLoadFailures());
+    CatalogConnectorManager.LoadOutcome loadOutcome = manager.getLoadOutcome();
+    assertTrue(loadOutcome.getLastError().contains("Authentication failed"));
+    assertEquals(1, loadOutcome.getConsecutiveFailures());
   }
 
   @Test

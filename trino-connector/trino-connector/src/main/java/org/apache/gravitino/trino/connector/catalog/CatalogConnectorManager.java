@@ -732,38 +732,9 @@ public class CatalogConnectorManager {
   }
 
   /**
-   * Retrieves the time of the last successful catalog load.
-   *
-   * @return the time in milliseconds since the epoch, 0 if the load loop never succeeded
-   */
-  public long getLastSuccessfulLoadTimeMs() {
-    return loadOutcome.lastSuccessTimeMs;
-  }
-
-  /**
-   * Retrieves the error that made the last catalog load fail.
-   *
-   * @return the error message, null if the last load succeeded
-   */
-  @Nullable
-  public String getLastLoadError() {
-    return loadOutcome.lastError;
-  }
-
-  /**
-   * Retrieves the number of consecutive failed catalog loads.
-   *
-   * @return the failure count, 0 if the last load succeeded
-   */
-  public long getConsecutiveLoadFailures() {
-    return loadOutcome.consecutiveFailures;
-  }
-
-  /**
    * Retrieves the last completed load attempt's success time, error and consecutive failure count
-   * as one consistent snapshot. Unlike calling {@link #getLastSuccessfulLoadTimeMs()}, {@link
-   * #getLastLoadError()} and {@link #getConsecutiveLoadFailures()} separately, this cannot observe
-   * a combination of fields from two different load attempts.
+   * as one consistent snapshot, so a caller needing more than one of those fields cannot observe a
+   * combination from two different load attempts.
    *
    * @return the load outcome
    */
