@@ -45,6 +45,7 @@ import org.apache.gravitino.server.web.filter.ParameterUtil;
  */
 public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
   private final AuthorizationExpressionEvaluator allowCheckExistenceEvaluator;
+  private final boolean requiresModifyTablePrivilege;
 
   public LoadTableAuthorizationExecutor(
       Parameter[] parameters,
@@ -62,12 +63,15 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
             ? null
             : new AuthorizationExpressionEvaluator(allowCheckExistenceExpression);
 
-    if (!shouldCheckModifyTablePrivilege(secondaryExpression, secondaryExpressionCondition)) {
-      return;
-    }
-
-    String privileges = (String) ParameterUtil.extractFromParameters(parameters, args);
-    if (containsModifyTablePrivilege(privileges)) {
+    boolean supportsModifyTablePrivilege =
+        shouldCheckModifyTablePrivilege(secondaryExpression, secondaryExpressionCondition);
+    String privileges =
+        supportsModifyTablePrivilege
+            ? (String) ParameterUtil.extractFromParameters(parameters, args)
+            : null;
+    this.requiresModifyTablePrivilege =
+        supportsModifyTablePrivilege && containsModifyTablePrivilege(privileges);
+    if (requiresModifyTablePrivilege) {
       this.expression = secondaryExpression;
       this.authorizationExpressionEvaluator =
           new AuthorizationExpressionEvaluator(secondaryExpression);
@@ -78,6 +82,10 @@ public class LoadTableAuthorizationExecutor extends CommonAuthorizerExecutor {
   public boolean execute(AuthorizationRequestContext authorizationRequestContext) throws Exception {
     if (super.execute(authorizationRequestContext)) {
       return true;
+    }
+
+    if (requiresModifyTablePrivilege) {
+      return false;
     }
 
     if (allowCheckExistenceEvaluator == null
