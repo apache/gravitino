@@ -123,6 +123,7 @@ public class CatalogIT extends BaseIT {
     Assertions.assertEquals("hive", catalog.provider());
     Assertions.assertEquals("catalog comment", catalog.comment());
     Assertions.assertTrue(catalog.properties().containsKey("metastore.uris"));
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
 
     metalake.dropCatalog(catalogName, true);
   }

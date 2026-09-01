@@ -448,6 +448,84 @@ public class TestDorisTableOperationsSqlGeneration {
   }
 
   @Test
+  public void testAddIndexDefinitionRejectsUnsupportedFieldShapes() {
+    assertInvalidAddIndex(
+        new String[][] {{"col1"}, {"col2"}},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got 2");
+    assertInvalidAddIndex(
+        new String[][] {{"payload", "nested"}},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got path "
+            + "[payload, nested]");
+    assertInvalidAddIndex(
+        new String[0][],
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got 0");
+    assertInvalidAddIndex(
+        new String[][] {new String[0]},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got path []");
+    assertInvalidAddIndex(
+        new String[][] {null},
+        "Index 'idx_name' supports exactly one top-level field in Doris, but got path null");
+    assertInvalidAddIndex(
+        new String[][] {{" "}}, "Index 'idx_name' requires a non-blank top-level field in Doris");
+    assertInvalidAddIndex(
+        null, "Index 'idx_name' supports exactly one top-level field in Doris, but got null");
+  }
+
+  @Test
+  public void testCreateAndAlterIndexUseSameFieldShapeValidation() {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    TestableDorisTableOperations mockOps = Mockito.spy(ops);
+    Mockito.doAnswer(a -> a.getArgument(0))
+        .when(mockOps)
+        .appendNecessaryProperties(Mockito.anyMap());
+    JdbcColumn idColumn =
+        JdbcColumn.builder()
+            .withName("id")
+            .withType(Types.IntegerType.get())
+            .withNullable(false)
+            .build();
+    Distribution distribution = Distributions.hash(1, NamedReference.field("id"));
+    String[][] fields = {{"id"}, {"other"}};
+    Index[] indexes = {Indexes.of(Index.IndexType.INVERTED, "idx_name", fields)};
+
+    IllegalArgumentException createException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                mockOps.createTableSqlWithIndexes(
+                    "test_table", new JdbcColumn[] {idColumn}, distribution, indexes));
+    IllegalArgumentException alterException =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                mockOps.alterTableSql(
+                    "test_table",
+                    TableChange.addIndex(Index.IndexType.INVERTED, "idx_name", fields)));
+
+    Assertions.assertEquals(createException.getMessage(), alterException.getMessage());
+  }
+
+  @Test
+  public void testInvalidAddIndexDoesNotExecuteJdbcStatement() throws Exception {
+    TestableDorisTableOperations ops = new TestableDorisTableOperations();
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    ops.setDataSource(dataSource);
+
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            ops.alterTable(
+                "database",
+                "test_table",
+                TableChange.addIndex(
+                    Index.IndexType.INVERTED, "idx_name", new String[][] {{"col1"}, {"col2"}})));
+
+    Mockito.verify(connection, Mockito.never()).createStatement();
+  }
+
+  @Test
   public void testAddPrimaryKeyIndexDefinitionThrows() {
     // PRIMARY_KEY cannot be added via ALTER TABLE ADD INDEX in Doris
     TableChange.AddIndex primaryKeyIndex =
@@ -544,6 +622,18 @@ public class TestDorisTableOperationsSqlGeneration {
     Assertions.assertEquals(
         "Properties 'replication_num' and 'replication_allocation' cannot be set at the same time",
         exception.getMessage());
+  }
+
+  private static void assertInvalidAddIndex(String[][] fields, String expectedMessage) {
+    TableChange.AddIndex addIndex =
+        (TableChange.AddIndex) TableChange.addIndex(Index.IndexType.INVERTED, "idx_name", fields);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> DorisTableOperations.addIndexDefinition(addIndex));
+
+    Assertions.assertEquals(expectedMessage, exception.getMessage());
   }
 
   private static DataSource mockBackendDataSource(int aliveBackendCount) throws Exception {

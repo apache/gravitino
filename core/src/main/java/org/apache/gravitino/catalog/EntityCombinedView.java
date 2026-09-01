@@ -21,9 +21,9 @@ package org.apache.gravitino.catalog;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.apache.gravitino.Audit;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ViewEntity;
 import org.apache.gravitino.rel.Column;
@@ -108,10 +108,7 @@ public final class EntityCombinedView implements View {
     if (props == null) {
       return Collections.emptyMap();
     }
-    return props.entrySet().stream()
-        .filter(p -> !hiddenProperties.contains(p.getKey()))
-        .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    return HiddenPropertyMaskUtils.maskHiddenProperties(props, hiddenProperties);
   }
 
   @Override

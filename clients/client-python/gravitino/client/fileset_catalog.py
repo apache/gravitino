@@ -394,6 +394,16 @@ class FilesetCatalog(
             )
         if isinstance(change, FilesetChange.RemoveProperty):
             return FilesetUpdateRequest.RemoveFilesetPropertyRequest(change.property())
+        if isinstance(change, FilesetChange.SetSecretBinding):
+            binding = change.binding()
+            return FilesetUpdateRequest.SetFilesetSecretBindingRequest(
+                change.property(), binding.provider, binding.plaintext
+            )
+        if isinstance(change, FilesetChange.SetSecretReference):
+            reference = change.reference()
+            return FilesetUpdateRequest.SetFilesetSecretReferenceRequest(
+                change.property(), reference.provider, reference.attributes
+            )
         if isinstance(change, FilesetChange.RemoveComment):
             return FilesetUpdateRequest.UpdateFilesetCommentRequest(None)
         raise ValueError(f"Unknown change type: {type(change).__name__}")

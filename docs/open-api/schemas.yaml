@@ -194,6 +194,22 @@ components:
           default: { }
           additionalProperties:
             type: string
+        secretBindings:
+          type: object
+          description: >
+            Optional map of property key to write-through binding. Persisted value
+            becomes a URN.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretBinding"
+        secretReferences:
+          type: object
+          description: >
+            Optional map of property key to secret locator. Server builds and
+            persists the URN. Must not overlap with secretBindings.
+          nullable: true
+          additionalProperties:
+            $ref: "./secrets.yaml#/components/schemas/SecretReference"
 
     Schema:
       type: object
@@ -233,11 +249,15 @@ components:
       oneOf:
         - $ref: "#/components/schemas/SetSchemaPropertyRequest"
         - $ref: "#/components/schemas/RemoveSchemaPropertyRequest"
+        - $ref: "#/components/schemas/SetSchemaSecretBindingRequest"
+        - $ref: "#/components/schemas/SetSchemaSecretReferenceRequest"
       discriminator:
         propertyName: "@type"
         mapping:
           setProperty: "#/components/schemas/SetSchemaPropertyRequest"
           removeProperty: "#/components/schemas/RemoveSchemaPropertyRequest"
+          setSecretBinding: "#/components/schemas/SetSchemaSecretBindingRequest"
+          setSecretReference: "#/components/schemas/SetSchemaSecretReferenceRequest"
 
     SetSchemaPropertyRequest:
       type: object
@@ -277,6 +297,67 @@ components:
       example: {
         "@type": "removeProperty",
         "property": "key2"
+      }
+
+    SetSchemaSecretBindingRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+        - plaintext
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setSecretBinding
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        plaintext:
+          type: string
+          description: Plaintext secret to write through
+          format: password
+      example: {
+        "@type": "setSecretBinding",
+        "property": "password",
+        "provider": "env",
+        "plaintext": "secret-value"
+      }
+
+    SetSchemaSecretReferenceRequest:
+      type: object
+      required:
+        - "@type"
+        - property
+        - provider
+      properties:
+        "@type":
+          type: string
+          enum:
+            - setSecretReference
+        property:
+          type: string
+          description: The property to bind
+        provider:
+          type: string
+          description: Registered secrets-provider instance name
+        attributes:
+          type: object
+          description: Provider-specific locator keys (empty object if none)
+          additionalProperties:
+            type: string
+          default: {}
+      example: {
+        "@type": "setSecretReference",
+        "property": "password",
+        "provider": "vault",
+        "attributes": {
+          "path": "secret/data/my-password"
+        }
       }
 
   responses:

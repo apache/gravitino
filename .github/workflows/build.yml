@@ -169,7 +169,7 @@ jobs:
     strategy:
       matrix:
         java-version: [ 17 ]
-    timeout-minutes: 90
+    timeout-minutes: 120
     needs: changes
     if: >
       needs.changes.outputs.build_relevant_changes == 'true' &&
@@ -211,6 +211,7 @@ jobs:
 
           gradle_args=(
             build
+            --max-workers=2
             -PskipWeb=true
             -PskipITs
             -PskipDockerTests=false

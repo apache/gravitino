@@ -80,6 +80,15 @@ public interface TagMetaMapper {
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagByTagId")
   TagPO selectTagByTagId(@Param("tagId") Long tagId);
 
+  /**
+   * Selects and exclusively locks an active tag by ID.
+   *
+   * @param tagId The tag ID.
+   * @return The locked tag, or null if it is not active.
+   */
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "selectTagByTagIdForUpdate")
+  TagPO selectTagByTagIdForUpdate(@Param("tagId") Long tagId);
+
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByTagIds")
   List<TagPO> listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds);
 

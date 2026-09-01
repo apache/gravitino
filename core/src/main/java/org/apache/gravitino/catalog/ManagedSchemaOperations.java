@@ -19,7 +19,6 @@
 package org.apache.gravitino.catalog;
 
 import com.google.common.base.Preconditions;
-import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -203,37 +202,6 @@ public abstract class ManagedSchemaOperations implements SupportsSchemas {
 
   private SchemaEntity updateSchemaEntity(
       NameIdentifier ident, SchemaEntity schemaEntity, SchemaChange... changes) {
-    Map<String, String> props =
-        schemaEntity.properties() == null
-            ? Maps.newHashMap()
-            : Maps.newHashMap(schemaEntity.properties());
-
-    for (SchemaChange change : changes) {
-      if (change instanceof SchemaChange.SetProperty) {
-        SchemaChange.SetProperty setProperty = (SchemaChange.SetProperty) change;
-        props.put(setProperty.getProperty(), setProperty.getValue());
-      } else if (change instanceof SchemaChange.RemoveProperty) {
-        SchemaChange.RemoveProperty removeProperty = (SchemaChange.RemoveProperty) change;
-        props.remove(removeProperty.getProperty());
-      } else {
-        throw new IllegalArgumentException(
-            "Unsupported schema change: " + change.getClass().getSimpleName());
-      }
-    }
-
-    return SchemaEntity.builder()
-        .withName(schemaEntity.name())
-        .withNamespace(ident.namespace())
-        .withId(schemaEntity.id())
-        .withComment(schemaEntity.comment())
-        .withProperties(props)
-        .withAuditInfo(
-            AuditInfo.builder()
-                .withCreator(schemaEntity.auditInfo().creator())
-                .withCreateTime(schemaEntity.auditInfo().createTime())
-                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                .withLastModifiedTime(Instant.now())
-                .build())
-        .build();
+    return SchemaEntityChanges.apply(ident, schemaEntity, changes);
   }
 }

@@ -16,8 +16,10 @@
 # under the License.
 
 import logging
-from typing import Dict, List, Optional
+from types import MappingProxyType
+from typing import Dict, List, Mapping, Optional
 
+from gravitino.api.authorization.supports_roles import SupportsRoles
 from gravitino.api.catalog import Catalog
 from gravitino.api.function.function import Function
 from gravitino.api.function.function_catalog import FunctionCatalog
@@ -28,6 +30,7 @@ from gravitino.api.metadata_object import MetadataObject
 from gravitino.api.metadata_objects import MetadataObjects
 from gravitino.api.schema import Schema
 from gravitino.api.schema_change import SchemaChange
+from gravitino.api.secret import SecretBinding, SecretReference
 from gravitino.api.supports_schemas import SupportsSchemas
 from gravitino.api.tag.supports_tags import SupportsTags
 from gravitino.api.tag.tag import Tag
@@ -35,6 +38,9 @@ from gravitino.client.function_catalog_operations import FunctionCatalogOperatio
 from gravitino.client.generic_schema import GenericSchema
 from gravitino.client.metadata_object_credential_operations import (
     MetadataObjectCredentialOperations,
+)
+from gravitino.client.metadata_object_role_operations import (
+    MetadataObjectRoleOperations,
 )
 from gravitino.client.metadata_object_secret_operations import (
     MetadataObjectSecretOperations,
@@ -57,13 +63,17 @@ from gravitino.utils import HTTPClient
 
 logger = logging.getLogger(__name__)
 
+_EMPTY_SECRET_BINDINGS: Mapping[str, SecretBinding] = MappingProxyType({})
+_EMPTY_SECRET_REFERENCES: Mapping[str, SecretReference] = MappingProxyType({})
+
 
 class BaseSchemaCatalog(
     CatalogDTO,
     SupportsSchemas,
     FunctionCatalog,
+    SupportsRoles,
     SupportsTags,
-):
+):  # pylint: disable=too-many-ancestors
     """
     BaseSchemaCatalog is the base abstract class for all the catalog with schema. It provides the
     common methods for managing schemas in a catalog. With BaseSchemaCatalog, users can list,
@@ -119,6 +129,9 @@ class BaseSchemaCatalog(
         self._object_tag_operations = MetadataObjectTagOperations(
             catalog_namespace.level(0), metadata_object, rest_client
         )
+        self._object_role_operations = MetadataObjectRoleOperations(
+            catalog_namespace.level(0), metadata_object, rest_client
+        )
 
         self.validate()
 
@@ -171,6 +184,8 @@ class BaseSchemaCatalog(
         schema_name: str = None,
         comment: str = None,
         properties: Dict[str, str] = None,
+        secret_bindings: Mapping[str, SecretBinding] = _EMPTY_SECRET_BINDINGS,
+        secret_references: Mapping[str, SecretReference] = _EMPTY_SECRET_REFERENCES,
     ) -> Schema:
         """Create a new schema with specified identifier, comment and metadata.
 
@@ -178,6 +193,8 @@ class BaseSchemaCatalog(
             schema_name: The name of the schema.
             comment: The comment of the schema.
             properties: The properties of the schema.
+            secret_bindings: Optional property key → binding (provider + plaintext) for write-through.
+            secret_references: Optional property key → locator attributes.
 
         Raises:
             NoSuchCatalogException if the catalog with specified namespace does not exist.
@@ -186,7 +203,13 @@ class BaseSchemaCatalog(
         Returns:
              The created Schema.
         """
-        req = SchemaCreateRequest(encode_string(schema_name), comment, properties)
+        req = SchemaCreateRequest(
+            encode_string(schema_name),
+            comment,
+            properties,
+            secret_bindings,
+            secret_references,
+        )
         req.validate()
 
         resp = self.rest_client.post(
@@ -346,6 +369,16 @@ class BaseSchemaCatalog(
             )
         if isinstance(change, SchemaChange.RemoveProperty):
             return SchemaUpdateRequest.RemoveSchemaPropertyRequest(change.property())
+        if isinstance(change, SchemaChange.SetSecretBinding):
+            binding = change.binding()
+            return SchemaUpdateRequest.SetSchemaSecretBindingRequest(
+                change.property(), binding.provider, binding.plaintext
+            )
+        if isinstance(change, SchemaChange.SetSecretReference):
+            reference = change.reference()
+            return SchemaUpdateRequest.SetSchemaSecretReferenceRequest(
+                change.property(), reference.provider, reference.attributes
+            )
         raise ValueError(f"Unknown change type: {type(change).__name__}")
 
     def validate(self):
@@ -389,3 +422,9 @@ class BaseSchemaCatalog(
 
     def supports_tags(self) -> SupportsTags:
         return self
+
+    def supports_roles(self) -> SupportsRoles:
+        return self
+
+    def list_binding_role_names(self) -> List[str]:
+        return self._object_role_operations.list_binding_role_names()

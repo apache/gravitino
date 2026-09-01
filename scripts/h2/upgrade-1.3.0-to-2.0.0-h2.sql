@@ -28,6 +28,9 @@ CREATE UNIQUE INDEX IF NOT EXISTS `uk_mid_geid_del` ON `group_meta` (`metalake_i
 ALTER TABLE `table_column_version_info`
     ALTER COLUMN `column_comment` VARCHAR(4096) DEFAULT '';
 
+ALTER TABLE `model_meta` ADD COLUMN `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model current version' AFTER `model_latest_version`;
+ALTER TABLE `model_meta` ADD COLUMN `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'model last allocated version' AFTER `current_version`;
+
 ALTER TABLE `tag_meta` ADD COLUMN `allowed_values` CLOB DEFAULT NULL COMMENT 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value' AFTER `properties`;
 
 ALTER TABLE `tag_relation_meta` DROP INDEX `uk_ti_mi_del`;
@@ -40,6 +43,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`
 CREATE INDEX IF NOT EXISTS `idx_tid_value` ON `tag_relation_meta` (`tag_id`, `tag_value`);
 
 ALTER TABLE `job_run_meta` ADD COLUMN `job_started_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'job started at' AFTER `job_run_status`;
+
+CREATE TABLE IF NOT EXISTS `policy_tag_relation_meta` (
+    `id` BIGINT(20) UNSIGNED NOT NULL AUTO_INCREMENT COMMENT 'auto increment id',
+    `policy_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'policy id',
+    `tag_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'tag id',
+    `selector` CLOB DEFAULT NULL COMMENT 'policy tag selector JSON, NULL matches tag presence',
+    `audit_info` CLOB NOT NULL COMMENT 'policy tag relation audit info',
+    `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation current version',
+    `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'policy tag relation last version',
+    `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'policy tag relation deleted at',
+    PRIMARY KEY (`id`),
+    UNIQUE KEY `policy_tag_relation_meta_uk_pid_tid_del` (`policy_id`, `tag_id`, `deleted_at`),
+    KEY `policy_tag_relation_meta_idx_tag_id` (`tag_id`)
+) ENGINE=InnoDB;
+
+ALTER TABLE `job_run_meta` ADD COLUMN `runtime_job_template` CLOB DEFAULT NULL COMMENT 'job run runtime job template' AFTER `job_finished_at`;
 
 CREATE TABLE IF NOT EXISTS `semantic_model_meta` (
     `semantic_model_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'semantic model id',

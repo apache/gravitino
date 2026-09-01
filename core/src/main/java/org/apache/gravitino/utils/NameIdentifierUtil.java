@@ -121,6 +121,20 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Create the semantic model {@link NameIdentifier} with the given parent names.
+   *
+   * @param metalake The metalake name
+   * @param catalog The catalog name
+   * @param schema The schema name
+   * @param semanticModel The semantic model name
+   * @return The created semantic model {@link NameIdentifier}
+   */
+  public static NameIdentifier ofSemanticModel(
+      String metalake, String catalog, String schema, String semanticModel) {
+    return NameIdentifier.of(metalake, catalog, schema, semanticModel);
+  }
+
+  /**
    * Create the tag {@link NameIdentifier} with the given metalake and tag name.
    *
    * @param metalake The metalake name
@@ -506,6 +520,17 @@ public class NameIdentifierUtil {
   }
 
   /**
+   * Check the given {@link NameIdentifier} is a semantic model identifier. Throw an {@link
+   * IllegalNameIdentifierException} if it's not.
+   *
+   * @param ident The semantic model {@link NameIdentifier} to check.
+   */
+  public static void checkSemanticModel(NameIdentifier ident) {
+    NameIdentifier.check(ident != null, "Semantic model identifier must not be null");
+    NamespaceUtil.checkSemanticModel(ident.namespace());
+  }
+
+  /**
    * Check the given {@link NameIdentifier} is a column identifier. Throw an {@link
    * IllegalNameIdentifierException} if it's not.
    *
@@ -631,6 +656,13 @@ public class NameIdentifierUtil {
         checkView(ident);
         String viewParent = dot.join(ident.namespace().level(1), ident.namespace().level(2));
         return MetadataObjects.of(viewParent, ident.name(), MetadataObject.Type.VIEW);
+
+      case SEMANTIC_MODEL:
+        checkSemanticModel(ident);
+        String semanticModelParent =
+            dot.join(ident.namespace().level(1), ident.namespace().level(2));
+        return MetadataObjects.of(
+            semanticModelParent, ident.name(), MetadataObject.Type.SEMANTIC_MODEL);
 
       case COLUMN:
         checkColumn(ident);
@@ -897,6 +929,7 @@ public class NameIdentifierUtil {
 
       case TABLE:
       case VIEW:
+      case SEMANTIC_MODEL:
       case FILESET:
       case MODEL:
       case TOPIC:

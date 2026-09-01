@@ -39,7 +39,7 @@ from mcp_server.core import audit
 from mcp_server.core.context import (
     GravitinoContext,
     _get_request_authorization,
-    startup_authorization,
+    service_fallback_authorization,
 )
 from mcp_server.core.setting import Setting
 from mcp_server.tools import load_tools
@@ -49,9 +49,10 @@ def _get_principal_from_request(fallback_authorization: str = "") -> str:
     """Derive a display principal for audit attribution.
 
     Uses the incoming HTTP request's Authorization header when present;
-    otherwise falls back to the static startup identity (``--token``), which is
-    what actually authenticates the call in stdio mode or in HTTP requests that
-    carry no Authorization header. Returns "anonymous" when neither is set.
+    otherwise falls back to the service identity (``--token`` or OAuth
+    client-credentials), which is what actually authenticates the call in
+    stdio mode or in HTTP requests that carry no Authorization header.
+    Returns "anonymous" when neither is set.
     """
     authorization = _get_request_authorization() or fallback_authorization
     # pylint: disable=protected-access
@@ -105,7 +106,7 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
         # Allowlist mode: disable everything, then re-enable the wanted tags.
         mcp.enable(tags=setting.tags, only=True)
 
-    mcp.add_middleware(AuditMiddleware(startup_authorization(setting)))
+    mcp.add_middleware(AuditMiddleware(service_fallback_authorization(setting)))
     mcp.add_middleware(
         LoggingMiddleware(include_payloads=True, max_payload_length=1000)
     )
@@ -117,6 +118,38 @@ def _create_gravitino_mcp(setting: Setting) -> FastMCP:
         )
     )
     return mcp
+
+
+def log_service_identity_fallback_policy(setting: Setting) -> None:
+    """Log how HTTP requests without Authorization are handled at startup."""
+    if setting.transport == "stdio":
+        if setting.no_service_identity_fallback:
+            logging.info(
+                "--no-service-identity-fallback is ignored for stdio transport"
+            )
+        return
+    if not setting.has_service_identity():
+        return
+    if setting.no_service_identity_fallback:
+        logging.info(
+            "HTTP requests without an Authorization header will be "
+            "rejected (--no-service-identity-fallback)"
+        )
+        return
+    if setting.token.strip():
+        logging.warning(
+            "HTTP requests without an Authorization header will use the "
+            "configured --token service identity. Do not expose this "
+            "endpoint to untrusted callers."
+        )
+        return
+    if setting.has_oauth_client():
+        logging.warning(
+            "HTTP requests without an Authorization header will use the "
+            "OAuth client-credentials service identity (%s). Do not expose "
+            "this endpoint to untrusted callers.",
+            setting.oauth_client_id.strip(),
+        )
 
 
 def _parse_mcp_url(url: str) -> tuple[str, int, str]:

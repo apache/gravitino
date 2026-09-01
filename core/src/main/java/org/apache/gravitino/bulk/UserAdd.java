@@ -19,6 +19,7 @@
 package org.apache.gravitino.bulk;
 
 import javax.annotation.Nullable;
+import org.apache.commons.lang3.StringUtils;
 
 /** Represents one user to add in a bulk operation. */
 public final class UserAdd {
@@ -65,7 +66,7 @@ public final class UserAdd {
    * @return True if the user has an external identifier, otherwise false.
    */
   public boolean hasExternalId() {
-    return externalId != null && !externalId.isEmpty();
+    return StringUtils.isNotBlank(externalId);
   }
 
   /**

@@ -586,6 +586,12 @@ components:
           format: date-time
           nullable: true
           description: The time when the job finished execution, or null if the job has not finished execution yet
+        runtimeJobTemplate:
+          description: The resolved job template that was actually submitted for execution, with placeholders replaced and referenced files downloaded. Null for jobs run before this field was introduced, or if the stored value could not be read back
+          type: object
+          nullable: true
+          allOf:
+            - $ref: "#/components/schemas/JobTemplate"
 
 
     TemplateUpdate:
@@ -1005,7 +1011,23 @@ components:
               },
               "queuedAt": "2025-08-12T02:14:28.205023Z",
               "startedAt": "2025-08-12T02:14:31.098231Z",
-              "finishedAt": "2025-08-12T02:15:03.512847Z"
+              "finishedAt": "2025-08-12T02:15:03.512847Z",
+              "runtimeJobTemplate": {
+                "name": "test_run_get",
+                "jobType": "shell",
+                "comment": "Test shell job template",
+                "executable": "/tmp/gravitino-job-staging/job-12345/test-job.sh",
+                "arguments": ["value1", "value2"],
+                "environments": { },
+                "customFields": { },
+                "scripts": [
+                  "/tmp/gravitino-job-staging/job-12345/common.sh"
+                ],
+                "audit": {
+                  "createTime": "2025-08-12T02:00:00.000000Z",
+                  "creator": "anonymous"
+                }
+              }
             },
             {
               "jobId": "job-67890",
@@ -1043,7 +1065,23 @@ components:
           },
           "queuedAt": "2025-08-12T02:14:28.205023Z",
           "startedAt": "2025-08-12T02:14:31.098231Z",
-          "finishedAt": "2025-08-12T02:15:03.512847Z"
+          "finishedAt": "2025-08-12T02:15:03.512847Z",
+          "runtimeJobTemplate": {
+            "name": "test_run_get",
+            "jobType": "shell",
+            "comment": "Test shell job template",
+            "executable": "/tmp/gravitino-job-staging/job-12345/test-job.sh",
+            "arguments": ["value1", "value2"],
+            "environments": { },
+            "customFields": { },
+            "scripts": [
+              "/tmp/gravitino-job-staging/job-12345/common.sh"
+            ],
+            "audit": {
+              "createTime": "2025-08-12T02:00:00.000000Z",
+              "creator": "anonymous"
+            }
+          }
         }
       }
 
