@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import org.apache.gravitino.storage.relational.mapper.JobMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.JobTemplateMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.JobMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.JobPO;
 import org.apache.ibatis.annotations.Param;
@@ -65,7 +66,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
       @Param("jobTemplateName") String jobTemplateName) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id IN ("
         + " SELECT metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -81,14 +83,16 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   public String softDeleteJobMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteJobMetaByRunId(@Param("jobRunId") Long jobRunId) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE job_run_id = #{jobRunId} AND deleted_at = 0";
   }
 
@@ -96,7 +100,8 @@ public class JobMetaPostgreSQLProvider extends JobMetaBaseSQLProvider {
   public String softDeleteJobMetasByLegacyTimeline(@Param("legacyTimeline") Long legacyTimeline) {
     return "UPDATE "
         + JobMetaMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE job_finished_at < #{legacyTimeline} AND job_finished_at > 0 AND deleted_at = 0";
   }
 
