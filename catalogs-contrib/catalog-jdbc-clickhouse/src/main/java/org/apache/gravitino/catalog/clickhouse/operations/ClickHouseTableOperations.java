@@ -691,67 +691,115 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
   }
 
   @Override
+  public void rename(String databaseName, String oldTableName, String newTableName)
+      throws NoSuchTableException {
+    LOG.info(
+        "Attempting to rename table {}/{} to {}/{}",
+        databaseName,
+        oldTableName,
+        databaseName,
+        newTableName);
+    try (Connection connection = getConnection(databaseName)) {
+      TablePropertiesWithClusterMetadata metadata =
+          loadTablePropertiesWithClusterMetadata(connection, oldTableName);
+      JdbcConnectorUtils.executeUpdate(
+          connection,
+          generateRenameTableSql(
+              oldTableName, newTableName, metadata.hasClusterMetadata(), metadata.clusterName()));
+      LOG.info(
+          "Renamed table {}/{} to {}/{}", databaseName, oldTableName, databaseName, newTableName);
+    } catch (final SQLException se) {
+      throw exceptionMapper.toGravitinoException(se);
+    }
+  }
+
+  @VisibleForTesting
+  String generateRenameTableSql(
+      String oldTableName,
+      String newTableName,
+      boolean hasClusterMetadata,
+      @Nullable String clusterName) {
+    if (hasClusterMetadata) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(clusterName),
+          "ClickHouse cluster metadata for table %s is missing a cluster name",
+          oldTableName);
+      return "RENAME TABLE %s TO %s ON CLUSTER %s"
+          .formatted(
+              quoteIdentifier(oldTableName),
+              quoteIdentifier(newTableName),
+              quoteIdentifier(clusterName));
+    }
+    return "RENAME TABLE %s TO %s"
+        .formatted(quoteIdentifier(oldTableName), quoteIdentifier(newTableName));
+  }
+
+  @Override
   protected Map<String, String> getTableProperties(Connection connection, String tableName)
       throws SQLException {
+    return loadTablePropertiesWithClusterMetadata(connection, tableName).properties();
+  }
+
+  private TablePropertiesWithClusterMetadata loadTablePropertiesWithClusterMetadata(
+      Connection connection, String tableName) throws SQLException {
     try (PreparedStatement statement =
-        connection.prepareStatement("select * from system.tables where name = ? ")) {
+        connection.prepareStatement(
+            "SELECT comment, engine, engine_full FROM system.tables "
+                + "WHERE database = currentDatabase() AND name = ?")) {
       statement.setString(1, tableName);
       try (ResultSet resultSet = statement.executeQuery()) {
-        while (resultSet.next()) {
-          String name = resultSet.getString("name");
-          if (Objects.equals(name, tableName)) {
-            Map<String, String> tableProperties = new HashMap<>();
+        if (!resultSet.next()) {
+          throw new NoSuchTableException(
+              "Table %s does not exist in %s.", tableName, connection.getCatalog());
+        }
 
-            // Extract cluster name embedded in the COMMENT at create time.
-            // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
-            String storedComment = resultSet.getString(COMMENT);
-            String clusterName = ClickHouseClusterUtils.extractClusterFromComment(storedComment);
+        Map<String, String> tableProperties = new HashMap<>();
+
+        // Extract cluster name embedded in the COMMENT at create time.
+        // SHOW CREATE TABLE does not include ON CLUSTER (see ClickHouseClusterUtils).
+        String storedComment = resultSet.getString(COMMENT);
+        boolean hasClusterMetadata = ClickHouseClusterUtils.hasClusterMetadata(storedComment);
+        String clusterName = ClickHouseClusterUtils.extractClusterFromComment(storedComment);
+        tableProperties.put(COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
+        String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
+        String engineFull = resultSet.getString("engine_full");
+        tableProperties.put(GRAVITINO_ENGINE_KEY, engine);
+        if (StringUtils.isNotBlank(clusterName)) {
+          tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
+          tableProperties.put(ClusterConstants.CLUSTER_NAME, clusterName);
+        } else {
+          tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
+        }
+
+        if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
+          Matcher distributedEngineMatcher =
+              DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
+          if (distributedEngineMatcher.matches()) {
+            String distributedClusterName = unquote(distributedEngineMatcher.group(1));
+            tableProperties.put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
             tableProperties.put(
-                COMMENT, ClickHouseClusterUtils.stripClusterMetadata(storedComment));
-            String engine = resultSet.getString(CLICKHOUSE_ENGINE_KEY);
-            String engineFull = resultSet.getString("engine_full");
-            tableProperties.put(GRAVITINO_ENGINE_KEY, engine);
-            if (StringUtils.isNotBlank(clusterName)) {
-              tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(true));
-              tableProperties.put(ClusterConstants.CLUSTER_NAME, clusterName);
-            } else {
-              tableProperties.put(ClusterConstants.ON_CLUSTER, String.valueOf(false));
-            }
-
-            if (StringUtils.equalsIgnoreCase(engine, ENGINE.DISTRIBUTED.getValue())) {
-              Matcher distributedEngineMatcher =
-                  DISTRIBUTED_ENGINE_PATTERN.matcher(StringUtils.trimToEmpty(engineFull));
-              if (distributedEngineMatcher.matches()) {
-                String distributedClusterName = unquote(distributedEngineMatcher.group(1));
-                tableProperties.put(ClusterConstants.CLUSTER_NAME, distributedClusterName);
-                tableProperties.put(
-                    DistributedTableConstants.REMOTE_DATABASE,
-                    unquote(distributedEngineMatcher.group(2)));
-                tableProperties.put(
-                    DistributedTableConstants.REMOTE_TABLE,
-                    unquote(distributedEngineMatcher.group(3)));
-                tableProperties.put(
-                    DistributedTableConstants.SHARDING_KEY,
-                    StringUtils.trim(distributedEngineMatcher.group(4)));
-              }
-            } else if (StringUtils.equalsIgnoreCase(engine, ENGINE.GRAPHITEMERGETREE.getValue())) {
-              String graphiteConfig = extractGraphiteConfig(engineFull);
-              if (StringUtils.isNotBlank(graphiteConfig)) {
-                tableProperties.put(TableConstants.GRAPHITE_CONFIG, graphiteConfig);
-              }
-            } else if (isGenericEngineParameterEngine(engine)) {
-              String engineParams = extractEngineParams(engine, engineFull);
-              if (StringUtils.isNotBlank(engineParams)) {
-                tableProperties.put(TableConstants.ENGINE_PARAMETERS, engineParams);
-              }
-            }
-
-            return Collections.unmodifiableMap(tableProperties);
+                DistributedTableConstants.REMOTE_DATABASE,
+                unquote(distributedEngineMatcher.group(2)));
+            tableProperties.put(
+                DistributedTableConstants.REMOTE_TABLE, unquote(distributedEngineMatcher.group(3)));
+            tableProperties.put(
+                DistributedTableConstants.SHARDING_KEY,
+                StringUtils.trim(distributedEngineMatcher.group(4)));
+          }
+        } else if (StringUtils.equalsIgnoreCase(engine, ENGINE.GRAPHITEMERGETREE.getValue())) {
+          String graphiteConfig = extractGraphiteConfig(engineFull);
+          if (StringUtils.isNotBlank(graphiteConfig)) {
+            tableProperties.put(TableConstants.GRAPHITE_CONFIG, graphiteConfig);
+          }
+        } else if (isGenericEngineParameterEngine(engine)) {
+          String engineParams = extractEngineParams(engine, engineFull);
+          if (StringUtils.isNotBlank(engineParams)) {
+            tableProperties.put(TableConstants.ENGINE_PARAMETERS, engineParams);
           }
         }
 
-        throw new NoSuchTableException(
-            "Table %s does not exist in %s.", tableName, connection.getCatalog());
+        return new TablePropertiesWithClusterMetadata(
+            Collections.unmodifiableMap(tableProperties), hasClusterMetadata, clusterName);
       }
     }
   }
@@ -1604,6 +1652,32 @@ public class ClickHouseTableOperations extends JdbcTableOperations {
 
   private static final class ShowCreateTableMetadata {
     private Transform[] partitioning = Transforms.EMPTY_TRANSFORM;
+  }
+
+  private static final class TablePropertiesWithClusterMetadata {
+    private final Map<String, String> properties;
+    private final boolean hasClusterMetadata;
+    @Nullable private final String clusterName;
+
+    private TablePropertiesWithClusterMetadata(
+        Map<String, String> properties, boolean hasClusterMetadata, @Nullable String clusterName) {
+      this.properties = properties;
+      this.hasClusterMetadata = hasClusterMetadata;
+      this.clusterName = clusterName;
+    }
+
+    private Map<String, String> properties() {
+      return properties;
+    }
+
+    private boolean hasClusterMetadata() {
+      return hasClusterMetadata;
+    }
+
+    @Nullable
+    private String clusterName() {
+      return clusterName;
+    }
   }
 
   @VisibleForTesting

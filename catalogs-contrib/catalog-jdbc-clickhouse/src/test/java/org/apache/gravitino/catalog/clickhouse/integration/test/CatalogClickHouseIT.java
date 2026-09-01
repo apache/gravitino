@@ -48,6 +48,7 @@ import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.SupportsSchemas;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
@@ -1372,6 +1373,21 @@ public class CatalogClickHouseIT extends BaseIT {
         .asTableCatalog()
         .alterTable(NameIdentifier.of(schemaName, tableName), TableChange.rename(alertTableName));
 
+    clickhouseService.executeQuery("SYSTEM FLUSH LOGS");
+    String renameQuery =
+        clickhouseService.executeQueryForResult(
+            String.format(
+                "SELECT query FROM system.query_log "
+                    + "WHERE type = 'QueryFinish' "
+                    + "AND startsWith(query, 'RENAME TABLE') "
+                    + "AND query LIKE '%%`%s`%%' "
+                    + "ORDER BY event_time DESC LIMIT 1",
+                tableName));
+    Assertions.assertNotNull(renameQuery);
+    Assertions.assertTrue(
+        renameQuery.contains("RENAME TABLE `%s` TO `%s`".formatted(tableName, alertTableName)));
+    Assertions.assertFalse(renameQuery.contains("ON CLUSTER"));
+
     catalog
         .asTableCatalog()
         .alterTable(
@@ -1399,6 +1415,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
+    Assertions.assertTrue(table.properties().containsKey(StringIdentifier.ID_KEY));
 
     Assertions.assertEquals(CLICKHOUSE_COL_NAME1, table.columns()[0].name());
     Assertions.assertEquals(Types.IntegerType.get(), table.columns()[0].dataType());

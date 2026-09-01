@@ -23,9 +23,15 @@ import static org.apache.gravitino.catalog.clickhouse.ClickHouseUtils.getSortOrd
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+<<<<<<< HEAD
+=======
+import java.sql.SQLException;
+import java.sql.Statement;
+>>>>>>> 0080137ef ([#12761] fix(clickhouse): Propagate clustered table rename (#12763))
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.sql.DataSource;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseConstants.TableConstants;
 import org.apache.gravitino.catalog.clickhouse.ClickHouseTablePropertiesMetadata.ENGINE;
 import org.apache.gravitino.catalog.clickhouse.converter.ClickHouseColumnDefaultValueConverter;
@@ -86,9 +92,13 @@ public class TestClickHouseTableOperationsUnit {
   }
 
   private ExposedClickHouseTableOperations newOps() {
+    return newOps(null);
+  }
+
+  private ExposedClickHouseTableOperations newOps(DataSource dataSource) {
     ExposedClickHouseTableOperations ops = new ExposedClickHouseTableOperations();
     ops.initialize(
-        null,
+        dataSource,
         new ClickHouseExceptionConverter(),
         new ClickHouseTypeConverter(),
         new ClickHouseColumnDefaultValueConverter(),
@@ -101,7 +111,6 @@ public class TestClickHouseTableOperationsUnit {
     PreparedStatement statement = Mockito.mock(PreparedStatement.class);
     ResultSet resultSet = Mockito.mock(ResultSet.class);
     Mockito.when(resultSet.next()).thenReturn(true);
-    Mockito.when(resultSet.getString("name")).thenReturn("test_table");
     Mockito.when(resultSet.getString("COMMENT")).thenReturn("");
     Mockito.when(resultSet.getString("ENGINE")).thenReturn(engine);
     Mockito.when(resultSet.getString("engine_full")).thenReturn(engineFull);
@@ -261,6 +270,82 @@ public class TestClickHouseTableOperationsUnit {
 
     Assertions.assertTrue(exception.getMessage().contains("table_name"));
     Assertions.assertTrue(exception.getMessage().contains("db_name"));
+  }
+
+  @Test
+  void testGetTablePropertiesScopesMetadataToCurrentDatabase() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement statement = Mockito.mock(PreparedStatement.class);
+    ResultSet resultSet = Mockito.mock(ResultSet.class);
+    ArgumentCaptor<String> sqlCaptor = ArgumentCaptor.forClass(String.class);
+
+    Mockito.when(connection.prepareStatement(sqlCaptor.capture())).thenReturn(statement);
+    Mockito.when(statement.executeQuery()).thenReturn(resultSet);
+    Mockito.when(resultSet.next()).thenReturn(true);
+    Mockito.when(resultSet.getString("COMMENT")).thenReturn("table comment");
+    Mockito.when(resultSet.getString("ENGINE")).thenReturn(ENGINE.MERGETREE.getValue());
+    Mockito.when(resultSet.getString("engine_full")).thenReturn("MergeTree ORDER BY id");
+
+    ops.callGetTableProperties(connection, "same_name");
+
+    Assertions.assertEquals(
+        "SELECT comment, engine, engine_full FROM system.tables "
+            + "WHERE database = currentDatabase() AND name = ?",
+        sqlCaptor.getValue());
+    Mockito.verify(statement).setString(1, "same_name");
+  }
+
+  @Test
+  void testRenameUsesTrustedClusterMetadata() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster=ck_cluster", "MergeTree");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    ops.rename("db_name", "old-table", "new table");
+
+    Mockito.verify(mocks.connection).setCatalog("db_name");
+    Mockito.verify(mocks.updateStatement)
+        .executeUpdate("RENAME TABLE `old-table` TO `new table` ON CLUSTER `ck_cluster`");
+  }
+
+  @Test
+  void testRenameDoesNotPromoteUnmarkedDistributedTableToClusterScope() throws Exception {
+    // The Distributed engine contains a cluster name, but only the Gravitino comment marker may
+    // authorize cluster-wide DDL.
+    RenameMocks mocks =
+        renameMocks("external table", "Distributed('ck_cluster', 'db', 'remote', id)");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    ops.rename("db_name", "old_table", "new_table");
+
+    Mockito.verify(mocks.updateStatement).executeUpdate("RENAME TABLE `old_table` TO `new_table`");
+  }
+
+  @Test
+  void testRenameRejectsCorruptedClusterMetadataBeforeMutation() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster= ", "MergeTree");
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.rename("db_name", "old_table", "new_table"));
+
+    Assertions.assertTrue(exception.getMessage().contains("missing a cluster name"));
+    Mockito.verify(mocks.connection, Mockito.never()).createStatement();
+  }
+
+  @Test
+  void testRenameMapsSqlException() throws Exception {
+    RenameMocks mocks = renameMocks("comment\n[Gravitino] ch.cluster=ck_cluster", "MergeTree");
+    SQLException sqlException = new SQLException("rename failed");
+    Mockito.when(mocks.updateStatement.executeUpdate(Mockito.anyString())).thenThrow(sqlException);
+    ExposedClickHouseTableOperations ops = newOps(mocks.dataSource);
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> ops.rename("db_name", "old_table", "new_table"));
+
+    Assertions.assertSame(sqlException, exception.getCause());
   }
 
   // ---------------------------------------------------------------------------
@@ -475,4 +560,175 @@ public class TestClickHouseTableOperationsUnit {
             IllegalArgumentException.class, () -> newOps().callGenerateCreateTableSql(properties));
     Assertions.assertTrue(exception.getMessage().contains("balanced"));
   }
+<<<<<<< HEAD
+=======
+
+  @Test
+  void testGetIndexesFailsOnMalformedParameterizedIndexMetadata() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1");
+    Mockito.when(secondaryRs.getString("type_full")).thenReturn(null);
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getMessage().contains("idx_bad"));
+    Assertions.assertTrue(exception.getMessage().contains("type_full"));
+  }
+
+  @Test
+  void testGetIndexesSkipsUnsupportedExpressionForParameterizedIndex() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet secondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryRs.next()).thenReturn(true, true, false);
+    Mockito.when(secondaryStmt.executeQuery()).thenReturn(secondaryRs);
+    Mockito.when(secondaryRs.getString("name")).thenReturn("idx_bad_expr", "idx_valid");
+    Mockito.when(secondaryRs.getString("type")).thenReturn("ngrambf_v1", "tokenbf_v1");
+    Mockito.when(secondaryRs.getString("type_full"))
+        .thenReturn("ngrambf_v1(3, 512, 3, 0)", "tokenbf_v1(256, 2, 0)");
+    Mockito.when(secondaryRs.getString("expr")).thenReturn("cityHash64(col_1) % 16", "col_2");
+    Mockito.when(secondaryRs.getLong("granularity")).thenReturn(1L, 1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertEquals("idx_valid", indexes.get(0).name());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_TOKENBFV1, indexes.get(0).type());
+    Assertions.assertArrayEquals(new String[][] {{"col_2"}}, indexes.get(0).fieldNames());
+    Assertions.assertEquals(
+        Map.of(
+            "bloom_filter_size", "256",
+            "hash_functions", "2",
+            "random_seed", "0"),
+        indexes.get(0).properties());
+  }
+
+  @Test
+  void testGetIndexesFallsBackWhenTypeFullColumnIsMissing() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement modernSecondaryStmt = Mockito.mock(PreparedStatement.class);
+    PreparedStatement legacySecondaryStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet legacySecondaryRs = Mockito.mock(ResultSet.class);
+
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(modernSecondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Unknown identifier 'type_full'"));
+    Mockito.when(legacySecondaryStmt.executeQuery()).thenReturn(legacySecondaryRs);
+    Mockito.when(legacySecondaryRs.next()).thenReturn(true, false);
+    Mockito.when(legacySecondaryRs.getString("name")).thenReturn("idx_legacy");
+    Mockito.when(legacySecondaryRs.getString("type")).thenReturn("ngrambf_v1(3, 512, 3, 0)");
+    Mockito.when(legacySecondaryRs.getString("expr")).thenReturn("col_1");
+    Mockito.when(legacySecondaryRs.getLong("granularity")).thenReturn(1L);
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(modernSecondaryStmt)
+        .thenReturn(legacySecondaryStmt);
+
+    List<Index> indexes = ops.callGetIndexes(connection, "db", "tbl");
+
+    Assertions.assertEquals(1, indexes.size());
+    Assertions.assertEquals(Index.IndexType.DATA_SKIPPING_NGRAMBFV1, indexes.get(0).type());
+    Assertions.assertEquals(
+        Map.of(
+            "ngram_size", "3",
+            "bloom_filter_size", "512",
+            "hash_functions", "3",
+            "random_seed", "0"),
+        indexes.get(0).properties());
+  }
+
+  @Test
+  void testGetIndexesDoesNotFallbackForOtherSqlErrors() throws Exception {
+    ExposedClickHouseTableOperations ops = newOps();
+
+    PreparedStatement primaryKeyStmt = Mockito.mock(PreparedStatement.class);
+    ResultSet primaryKeyRs = Mockito.mock(ResultSet.class);
+    PreparedStatement secondaryStmt = Mockito.mock(PreparedStatement.class);
+    Mockito.when(primaryKeyRs.next()).thenReturn(false);
+    Mockito.when(primaryKeyStmt.executeQuery()).thenReturn(primaryKeyRs);
+    Mockito.when(secondaryStmt.executeQuery())
+        .thenThrow(new SQLException("Connection reset by peer"));
+
+    Connection connection = Mockito.mock(Connection.class);
+    Mockito.when(connection.prepareStatement(Mockito.anyString()))
+        .thenReturn(primaryKeyStmt)
+        .thenReturn(secondaryStmt);
+
+    GravitinoRuntimeException exception =
+        Assertions.assertThrows(
+            GravitinoRuntimeException.class, () -> ops.callGetIndexes(connection, "db", "tbl"));
+    Assertions.assertTrue(exception.getCause() instanceof SQLException);
+    Mockito.verify(connection, Mockito.times(2)).prepareStatement(Mockito.anyString());
+  }
+
+  private RenameMocks renameMocks(String storedComment, String engineFull) throws Exception {
+    DataSource dataSource = Mockito.mock(DataSource.class);
+    Connection connection = Mockito.mock(Connection.class);
+    PreparedStatement metadataStatement = Mockito.mock(PreparedStatement.class);
+    ResultSet metadataResult = Mockito.mock(ResultSet.class);
+    Statement updateStatement = Mockito.mock(Statement.class);
+
+    Mockito.when(dataSource.getConnection()).thenReturn(connection);
+    Mockito.when(connection.prepareStatement(Mockito.anyString())).thenReturn(metadataStatement);
+    Mockito.when(metadataStatement.executeQuery()).thenReturn(metadataResult);
+    Mockito.when(metadataResult.next()).thenReturn(true);
+    Mockito.when(metadataResult.getString("COMMENT")).thenReturn(storedComment);
+    Mockito.when(metadataResult.getString("ENGINE"))
+        .thenReturn(
+            engineFull.startsWith("Distributed")
+                ? ENGINE.DISTRIBUTED.getValue()
+                : ENGINE.MERGETREE.getValue());
+    Mockito.when(metadataResult.getString("engine_full")).thenReturn(engineFull);
+    Mockito.when(connection.createStatement()).thenReturn(updateStatement);
+    return new RenameMocks(dataSource, connection, updateStatement);
+  }
+
+  private static final class RenameMocks {
+    private final DataSource dataSource;
+    private final Connection connection;
+    private final Statement updateStatement;
+
+    private RenameMocks(DataSource dataSource, Connection connection, Statement updateStatement) {
+      this.dataSource = dataSource;
+      this.connection = connection;
+      this.updateStatement = updateStatement;
+    }
+  }
+>>>>>>> 0080137ef ([#12761] fix(clickhouse): Propagate clustered table rename (#12763))
 }
