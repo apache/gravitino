@@ -1367,11 +1367,15 @@ public class POConverters {
     }
   }
 
+  /**
+   * Updates a role PO and advances its OCC version.
+   *
+   * @param oldRolePO the role PO carrying the current version
+   * @param newRole the updated role entity
+   * @return a role PO whose current and last versions are advanced
+   */
   public static RolePO updateRolePOWithVersion(RolePO oldRolePO, RoleEntity newRole) {
-    Long lastVersion = oldRolePO.getLastVersion();
-    // TODO: set the version to the last version + 1 when having some fields need be multiple
-    // version
-    Long nextVersion = lastVersion;
+    Long nextVersion = oldRolePO.getCurrentVersion() + 1;
     try {
       return RolePO.builder()
           .withRoleId(oldRolePO.getRoleId())

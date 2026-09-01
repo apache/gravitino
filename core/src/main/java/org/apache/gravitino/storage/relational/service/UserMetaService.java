@@ -207,17 +207,15 @@ public class UserMetaService {
   void deleteUserWithVersion(NameIdentifier identifier, UserPO observedUserPO) {
     Long userId = observedUserPO.getUserId();
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          int deleted =
-              SessionUtils.getWithoutCommit(
-                  UserMetaMapper.class,
-                  mapper ->
-                      mapper.softDeleteUserMetaByUserId(
-                          userId, observedUserPO.getCurrentVersion()));
-          if (deleted == 0) {
-            throw userWriteFailure(identifier, observedUserPO, UserLookup.NAME);
-          }
-        },
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        UserMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteUserMetaByUserId(
+                                userId, observedUserPO.getCurrentVersion())),
+                () -> userWriteFailure(identifier, observedUserPO, UserLookup.NAME)),
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByUserId(userId)),
@@ -600,18 +598,16 @@ public class UserMetaService {
    * create for no reason.
    */
   private void lockMetalakeForUserCreate(MetalakePO observedMetalakePO) {
-    MetalakePO currentMetalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId()));
-    if (currentMetalakePO == null
-        || !Objects.equals(
-            currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          observedMetalakePO.getMetalakeName());
-    }
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
   }
 
   private RuntimeException userWriteFailure(
@@ -620,22 +616,17 @@ public class UserMetaService {
     // The locking read additionally waits for a writer that is still in flight, so a rename or
     // delete that has not committed yet is classified as not-found instead of as a stale-version
     // conflict. The lock is taken on the error path of a transaction that is about to roll back.
-    UserPO currentUserPO = getUserPOByIdForUpdate(observedUserPO.getUserId());
-    boolean missing =
-        currentUserPO == null
-            || !Objects.equals(currentUserPO.getMetalakeId(), observedUserPO.getMetalakeId());
-    if (!missing && lookup == UserLookup.NAME) {
-      missing = !Objects.equals(currentUserPO.getUserName(), observedUserPO.getUserName());
-    } else if (!missing && lookup == UserLookup.EXTERNAL_ID) {
-      missing = !Objects.equals(currentUserPO.getExternalId(), observedUserPO.getExternalId());
-    }
-    if (missing) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.USER.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.USER, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.USER,
+        () -> getUserPOByIdForUpdate(observedUserPO.getUserId()),
+        null,
+        current ->
+            Objects.equals(current.getMetalakeId(), observedUserPO.getMetalakeId())
+                && (lookup != UserLookup.NAME
+                    || Objects.equals(current.getUserName(), observedUserPO.getUserName()))
+                && (lookup != UserLookup.EXTERNAL_ID
+                    || Objects.equals(current.getExternalId(), observedUserPO.getExternalId())));
   }
 
   private UserPO getUserPOByIdForUpdate(long userId) {

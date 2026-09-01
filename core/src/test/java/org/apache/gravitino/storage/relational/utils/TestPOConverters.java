@@ -55,6 +55,7 @@ import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.SchemaVersion;
 import org.apache.gravitino.meta.StatisticEntity;
@@ -89,6 +90,7 @@ import org.apache.gravitino.storage.relational.po.ModelVersionPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
+import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.po.SecurableObjectPO;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
@@ -763,6 +765,32 @@ public class TestPOConverters {
     assertEquals(1, initPO.getLastVersion());
     assertEquals(0, initPO.getDeletedAt());
     assertEquals("test", updatePO.getTableName());
+  }
+
+  @Test
+  public void testUpdateRolePOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    RoleEntity role =
+        RoleEntity.builder().withId(1L).withName("role").withAuditInfo(auditInfo).build();
+    RolePO initialRolePO =
+        POConverters.initializeRolePOWithVersion(role, RolePO.builder().withMetalakeId(1L));
+    RolePO rolePO =
+        RolePO.builder()
+            .withRoleId(initialRolePO.getRoleId())
+            .withRoleName(initialRolePO.getRoleName())
+            .withMetalakeId(initialRolePO.getMetalakeId())
+            .withProperties(initialRolePO.getProperties())
+            .withAuditInfo(initialRolePO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialRolePO.getDeletedAt())
+            .build();
+
+    RolePO updatedRolePO = POConverters.updateRolePOWithVersion(rolePO, role);
+
+    assertEquals(8, updatedRolePO.getCurrentVersion());
+    assertEquals(8, updatedRolePO.getLastVersion());
   }
 
   @Test
