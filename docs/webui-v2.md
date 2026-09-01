@@ -31,6 +31,27 @@ After changing this value, restart the Gravitino server for the change to take e
 <path-to-gravitino>/bin/gravitino.sh restart
 ```
 
+### Session timeout configuration
+
+Web V2 supports server-side configuration of session timeouts. All values are in milliseconds:
+
+| Server configuration | UI environment fallback | Default | Description |
+| --- | --- | ---: | --- |
+| `gravitino.ui.sessionIdleTimeoutMs` | `NEXT_PUBLIC_IDLE_TIMEOUT_MS` | `900000` | Logs the user out after this period without activity. |
+| `gravitino.ui.sessionMaxDurationMs` | `NEXT_PUBLIC_MAX_SESSION_DURATION_MS` | `18000000` | Logs the user out after this total session duration, regardless of activity. |
+| `gravitino.ui.sessionIdleWarningLeadMs` | `NEXT_PUBLIC_IDLE_WARNING_LEAD_MS` | `60000` | Shows the inactivity warning this long before the idle timeout. |
+
+The UI resolves each value in this order: the `/configs` API, the corresponding `NEXT_PUBLIC_*` environment variable, and then the default value. To expose server values through `/configs`, configure the keys in `gravitino.server.visibleConfigs`:
+
+```properties
+gravitino.ui.sessionIdleTimeoutMs = 900000
+gravitino.ui.sessionMaxDurationMs = 18000000
+gravitino.ui.sessionIdleWarningLeadMs = 60000
+gravitino.server.visibleConfigs = gravitino.ui.sessionIdleTimeoutMs,gravitino.ui.sessionMaxDurationMs,gravitino.ui.sessionIdleWarningLeadMs
+```
+
+`gravitino.authorization.serviceAdmins` is exposed automatically by `/configs` when authorization is enabled and does not need to be added to `gravitino.server.visibleConfigs`.
+
 ## Web V2
 
 The sections below describe the Web V2. This is the default UI; set `GRAVITINO_USE_WEB_V2=false` to use the legacy v1 UI.
