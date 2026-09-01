@@ -32,21 +32,27 @@ public class GravitinoSparkConfig {
       GRAVITINO_PREFIX + "enablePaimonSupport";
   public static final String GRAVITINO_CLIENT_CONFIG_PREFIX = GRAVITINO_PREFIX + "client.";
 
-  // Manually overrides the Gravitino Iceberg REST server endpoint that hive/jdbc backed
-  // lakehouse-iceberg catalogs are routed through; takes precedence over auto-discovery.
+  /**
+   * Manually overrides the Gravitino Iceberg REST server endpoint that hive/jdbc backed
+   * lakehouse-iceberg catalogs are routed through; takes precedence over auto-discovery.
+   */
   public static final String GRAVITINO_ICEBERG_REST_URI = GRAVITINO_PREFIX + "iceberg.rest-uri";
 
-  /** Whether hive/jdbc backed Iceberg catalogs must be routed through Iceberg REST. */
+  /** Whether hive/jdbc backed Iceberg catalogs are routed through Iceberg REST. */
   public static final String GRAVITINO_ICEBERG_REST_ROUTING_ENABLED =
       GRAVITINO_PREFIX + "iceberg.rest-routing-enabled";
 
-  // Reuses the Gravitino OAuth2 client configuration for automatically routed Iceberg REST
-  // catalogs. Iceberg obtains and refreshes its own access token with the same client identity.
+  /**
+   * Reuses the Gravitino OAuth2 client configuration for automatically routed Iceberg REST
+   * catalogs. Iceberg obtains and refreshes its own access token with the same client identity.
+   */
   public static final String GRAVITINO_ICEBERG_REUSE_OAUTH2 =
       GRAVITINO_PREFIX + "iceberg.reuseOAuth2";
 
-  // Pass-through prefix for the Iceberg REST client config (e.g. rest.auth.type,
-  // rest.auth.basic.username), applied when a catalog is routed through the Iceberg REST server.
+  /**
+   * Pass-through prefix for the Iceberg REST client config (e.g. rest.auth.type,
+   * rest.auth.basic.username), applied when a catalog is routed through the Iceberg REST server.
+   */
   public static final String GRAVITINO_ICEBERG_REST_CONFIG_PREFIX =
       GRAVITINO_PREFIX + "iceberg.rest.";
 

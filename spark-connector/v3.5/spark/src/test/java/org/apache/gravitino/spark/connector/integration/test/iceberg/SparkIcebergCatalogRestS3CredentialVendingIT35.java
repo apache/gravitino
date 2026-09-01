@@ -74,8 +74,7 @@ public class SparkIcebergCatalogRestS3CredentialVendingIT35 extends BaseIT {
   private static final String SCHEMA = "aws_vending";
   private static final String TABLE = "spark35_test";
   private static final String ROLE = "spark35-irc-role";
-  private static final String AWS_ROLE_ARN =
-      "arn:aws:iam::730335553010:role/gravitino-irc-s3-vending-demo";
+  private static final String AWS_ROLE_ARN = System.getenv("AWS_ROLE_ARN");
 
   private final ContainerSuite containerSuite = ContainerSuite.getInstance();
 

@@ -121,16 +121,29 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     all.putAll(extractSparkBypassProperties(gravitinoProperties));
     all.putAll(icebergRestClientConfig);
 
-    warnOnReservedRestPropertyOverrides(gravitinoCatalogName, all);
+    reapplyReservedRestProperties(gravitinoCatalogName, restUri, all);
+    all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED, "FALSE");
+    return all;
+  }
 
+  /**
+   * Re-derives the reserved routing keys ({@code type}/{@code uri}/{@code warehouse}/{@code
+   * prefix}) on {@code all}, so that a source merged in after {@link #buildIcebergRestProperties}
+   * (e.g. Spark catalog {@code options}) can never redirect a routed catalog.
+   *
+   * @param gravitinoCatalogName the Gravitino catalog name
+   * @param restUri the Iceberg REST server endpoint to route through
+   * @param all the properties to re-derive the reserved keys on, mutated in place
+   */
+  void reapplyReservedRestProperties(
+      String gravitinoCatalogName, String restUri, Map<String, String> all) {
+    warnOnReservedRestPropertyOverrides(gravitinoCatalogName, all);
     all.put(
         IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
         IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
     all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_URI, restUri);
     all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE, gravitinoCatalogName);
     all.put(IcebergPropertiesConstants.ICEBERG_REST_CATALOG_PREFIX, gravitinoCatalogName);
-    all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_CACHE_ENABLED, "FALSE");
-    return all;
   }
 
   private Map<String, String> extractSparkBypassProperties(Map<String, String> properties) {
@@ -150,7 +163,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
       String gravitinoCatalogName, Map<String, String> config) {
     for (String reserved : RESERVED_REST_PROPERTIES) {
       if (config.containsKey(reserved)) {
-        LOG.info(
+        LOG.warn(
             "Property '{}' set on catalog '{}' is ignored; the connector always derives it when "
                 + "routing through the Iceberg REST server.",
             reserved,
@@ -192,7 +205,13 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     return storageProperties;
   }
 
-  private String deriveFileIoImpl(String warehouse) {
+  /**
+   * Derives the native Iceberg FileIO implementation for a warehouse location, or {@code null} if
+   * the scheme has none (e.g. {@code hdfs://}, {@code file://}, {@code oss://}). Package-private so
+   * the routing decision can check whether a warehouse has a native FileIO without duplicating the
+   * scheme list.
+   */
+  static String deriveFileIoImpl(String warehouse) {
     if (StringUtils.isBlank(warehouse) || !warehouse.contains("://")) {
       return null;
     }

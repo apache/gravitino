@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -37,6 +38,8 @@ public class TestGravitinoIcebergCatalogRestRouting {
         ImmutableMap.of(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED, "false");
     AtomicBoolean discoveryCalled = new AtomicBoolean();
 
+    // Routing disabled must skip even the credential-providers check: a catalog with static
+    // credentials is exactly what stays on the legacy path here.
     Optional<String> result =
         GravitinoIcebergCatalog.resolveIcebergRestUri(
             hiveProperties(),
@@ -51,6 +54,30 @@ public class TestGravitinoIcebergCatalogRestRouting {
   }
 
   @Test
+  void testEligibleCatalogWithNativeFileIoAndNoCredentialProvidersFails() {
+    IllegalStateException exception =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                GravitinoIcebergCatalog.resolveIcebergRestUri(
+                    s3HiveProperties(), key -> null, Optional::empty));
+
+    Assertions.assertTrue(
+        exception.getMessage().contains(CredentialConstants.CREDENTIAL_PROVIDERS));
+  }
+
+  @Test
+  void testEligibleCatalogWithoutNativeFileIoSkipsCredentialProvidersCheck() {
+    // hdfs:// has no native Iceberg FileIO, so routing carries no risk of dropping static
+    // credentials even without credential-providers configured.
+    Optional<String> result =
+        GravitinoIcebergCatalog.resolveIcebergRestUri(
+            hiveProperties(), key -> null, () -> Optional.of("http://discovered/iceberg"));
+
+    Assertions.assertEquals("http://discovered/iceberg", result.get());
+  }
+
+  @Test
   void testManualUriTakesPrecedenceOverDiscovery() {
     Map<String, String> sessionConfig =
         ImmutableMap.of(
@@ -59,7 +86,7 @@ public class TestGravitinoIcebergCatalogRestRouting {
 
     Optional<String> result =
         GravitinoIcebergCatalog.resolveIcebergRestUri(
-            hiveProperties(),
+            hivePropertiesWithCredentialProviders(),
             sessionConfig::get,
             () -> {
               discoveryCalled.set(true);
@@ -71,13 +98,25 @@ public class TestGravitinoIcebergCatalogRestRouting {
   }
 
   @Test
-  void testRoutingEnabledRequiresEndpoint() {
+  void testNoEndpointFallsBackToLegacyWhenNotExplicitlyEnabled() {
+    Optional<String> result =
+        GravitinoIcebergCatalog.resolveIcebergRestUri(
+            hivePropertiesWithCredentialProviders(), key -> null, Optional::empty);
+
+    Assertions.assertFalse(result.isPresent());
+  }
+
+  @Test
+  void testNoEndpointFailsWhenRoutingExplicitlyEnabled() {
+    Map<String, String> sessionConfig =
+        ImmutableMap.of(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED, "true");
+
     IllegalStateException exception =
         Assertions.assertThrows(
             IllegalStateException.class,
             () ->
                 GravitinoIcebergCatalog.resolveIcebergRestUri(
-                    hiveProperties(), key -> null, Optional::empty));
+                    hivePropertiesWithCredentialProviders(), sessionConfig::get, Optional::empty));
 
     Assertions.assertTrue(
         exception
@@ -104,7 +143,22 @@ public class TestGravitinoIcebergCatalogRestRouting {
   }
 
   @Test
-  void testDiscoveryFailureIncludesEscapeHatches() {
+  void testDiscoveryFailureFallsBackToLegacyWhenNotExplicitlyEnabled() {
+    Optional<String> result =
+        GravitinoIcebergCatalog.resolveIcebergRestUri(
+            hivePropertiesWithCredentialProviders(),
+            key -> null,
+            () -> {
+              throw new RuntimeException("connection refused");
+            });
+
+    Assertions.assertFalse(result.isPresent());
+  }
+
+  @Test
+  void testDiscoveryFailureFailsWhenRoutingExplicitlyEnabled() {
+    Map<String, String> sessionConfig =
+        ImmutableMap.of(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED, "true");
     RuntimeException discoveryFailure = new RuntimeException("connection refused");
 
     IllegalStateException exception =
@@ -112,8 +166,8 @@ public class TestGravitinoIcebergCatalogRestRouting {
             IllegalStateException.class,
             () ->
                 GravitinoIcebergCatalog.resolveIcebergRestUri(
-                    hiveProperties(),
-                    key -> null,
+                    hivePropertiesWithCredentialProviders(),
+                    sessionConfig::get,
                     () -> {
                       throw discoveryFailure;
                     }));
@@ -146,5 +200,19 @@ public class TestGravitinoIcebergCatalogRestRouting {
 
   private static ImmutableMap<String, String> hiveProperties() {
     return ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "hive");
+  }
+
+  private static ImmutableMap<String, String> hivePropertiesWithCredentialProviders() {
+    return ImmutableMap.of(
+        IcebergConstants.CATALOG_BACKEND,
+        "hive",
+        CredentialConstants.CREDENTIAL_PROVIDERS,
+        "s3-token");
+  }
+
+  private static ImmutableMap<String, String> s3HiveProperties() {
+    return ImmutableMap.of(
+        IcebergConstants.CATALOG_BACKEND, "hive",
+        IcebergConstants.WAREHOUSE, "s3://bucket/path");
   }
 }

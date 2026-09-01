@@ -30,6 +30,13 @@ import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.spark.SparkConf;
 
+/**
+ * Derives the Iceberg REST client's OAuth2 configuration, reusing Gravitino's own OAuth2 client
+ * settings by default. When auth is explicitly set to a non-OAuth2 type, a bearer {@code token} is
+ * supplied, or any other namespaced {@code rest.auth.*} property is present, the caller-supplied
+ * config is treated as already complete and passed through unvalidated; {@link
+ * #validateLegacyOAuth2} only runs on the reuse-from-Gravitino / explicit-legacy-property path.
+ */
 class IcebergRestOAuthConfig {
 
   static final String AUTH_TYPE = "rest.auth.type";
@@ -39,16 +46,10 @@ class IcebergRestOAuthConfig {
   static final String OAUTH2_SERVER_URI = "oauth2-server-uri";
   static final String SCOPE = "scope";
 
-  private static final Set<String> LEGACY_OAUTH_PROPERTIES =
-      ImmutableSet.of(
-          TOKEN,
-          CREDENTIAL,
-          SCOPE,
-          OAUTH2_SERVER_URI,
-          "audience",
-          "resource",
-          "token-refresh-enabled",
-          "token-exchange-enabled");
+  // Properties whose presence alone implies the user is explicitly configuring legacy OAuth2
+  // (triggering validation), as opposed to optional extras that ride along with it. TOKEN is not
+  // included here: it already short-circuits to a plain pass-through above.
+  private static final Set<String> OAUTH2_TRIGGER_PROPERTIES = ImmutableSet.of(CREDENTIAL);
 
   private IcebergRestOAuthConfig() {}
 
@@ -80,7 +81,7 @@ class IcebergRestOAuthConfig {
             && AuthProperties.isOAuth2(authType);
     boolean hasExplicitLegacyOAuth2 =
         StringUtils.equalsIgnoreCase(explicitAuthType, AUTH_TYPE_OAUTH2)
-            || result.keySet().stream().anyMatch(LEGACY_OAUTH_PROPERTIES::contains);
+            || result.keySet().stream().anyMatch(OAUTH2_TRIGGER_PROPERTIES::contains);
     if (!reuseOAuth2 && !hasExplicitLegacyOAuth2) {
       return result;
     }
@@ -112,9 +113,12 @@ class IcebergRestOAuthConfig {
     }
   }
 
+  // scope is intentionally not required: Iceberg itself defaults it to "catalog". The server URI
+  // is required rather than left to Iceberg's own default, so the client credential is never
+  // posted to an unintended token endpoint.
   private static void validateLegacyOAuth2(Map<String, String> config) {
     List<String> missing = new ArrayList<>();
-    for (String key : ImmutableSet.of(AUTH_TYPE, CREDENTIAL, SCOPE, OAUTH2_SERVER_URI)) {
+    for (String key : ImmutableSet.of(AUTH_TYPE, CREDENTIAL, OAUTH2_SERVER_URI)) {
       if (StringUtils.isBlank(config.get(key))) {
         missing.add(key);
       }

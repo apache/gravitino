@@ -99,8 +99,28 @@ public class TestIcebergRestOAuthConfig {
             IllegalArgumentException.class,
             () -> IcebergRestOAuthConfig.resolve(sparkConf, explicit));
 
-    Assertions.assertTrue(exception.getMessage().contains("scope"));
+    // scope is not required: Iceberg itself defaults it. oauth2-server-uri is still required.
     Assertions.assertTrue(exception.getMessage().contains("oauth2-server-uri"));
+  }
+
+  @Test
+  void testOAuthConfigWithoutScopeSucceeds() {
+    SparkConf sparkConf = new SparkConf(false);
+    Map<String, String> explicit =
+        ImmutableMap.of(
+            "credential",
+            "irc:secret",
+            "oauth2-server-uri",
+            "https://irc-identity.example.com/token");
+
+    Map<String, String> result = IcebergRestOAuthConfig.resolve(sparkConf, explicit);
+
+    Assertions.assertEquals("oauth2", result.get(IcebergRestOAuthConfig.AUTH_TYPE));
+    Assertions.assertEquals("irc:secret", result.get(IcebergRestOAuthConfig.CREDENTIAL));
+    Assertions.assertEquals(
+        "https://irc-identity.example.com/token",
+        result.get(IcebergRestOAuthConfig.OAUTH2_SERVER_URI));
+    Assertions.assertFalse(result.containsKey(IcebergRestOAuthConfig.SCOPE));
   }
 
   @Test

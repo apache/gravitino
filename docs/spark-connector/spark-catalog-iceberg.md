@@ -156,15 +156,24 @@ that endpoint instead of talking to the Hive metastore or JDBC database directly
 catalogs whose `catalog-backend` is already `rest` or `custom`.
 
 Routing through the IRC server is the only way to receive short-lived, per-table **vended credentials**
-instead of the static, long-lived secrets (JDBC password, S3/OSS access keys) that would otherwise be
-placed in the Spark Iceberg connector configuration. See [Credential vending](../security/credential-vending.md)
-for how to enable credential vending on the Gravitino server.
+that Iceberg's native REST protocol refreshes automatically. The non-REST path can still inject a single
+vended credential fetched once at catalog initialization (see
+[Credential vending](../security/credential-vending.md)), but it is not refreshed per table access.
 
-REST routing is enabled by default. The endpoint is discovered once, when a catalog is first initialized
-in a Spark session; it is not re-checked afterward. If the server does not expose a discoverable endpoint
-(for example, the `iceberg-rest` auxiliary service is disabled or not configured with
-`catalog-config-provider=dynamic-config-provider`), catalog initialization fails instead of silently using
-the native Hive/JDBC backend.
+REST routing is enabled by default. The endpoint is discovered once per Spark application — for the life
+of the Gravitino Spark plugin, not per `SparkSession` — and is not re-checked afterward.
+
+- If no discoverable endpoint is found (for example, the `iceberg-rest` auxiliary service is disabled or
+  not configured with `catalog-config-provider=dynamic-config-provider`) and routing was left at its
+  default, the connector falls back to the native Hive/JDBC backend and logs a warning. Set
+  `spark.sql.gravitino.iceberg.rest-routing-enabled=true` explicitly to require Iceberg REST routing and
+  fail catalog initialization instead.
+- A catalog whose warehouse uses a scheme with a native Iceberg FileIO (`s3://`, `gs://`, `abfs://`, etc.)
+  must have [credential vending](../security/credential-vending.md) configured (`credential-providers`)
+  before it can be routed: routing replaces any static storage credentials for that FileIO with vended
+  ones, and without credential vending the catalog would lose storage access. Catalog initialization
+  fails with an actionable error if this is not configured. Set `rest-routing-enabled=false` for that
+  catalog to keep using the legacy Hive/JDBC backend instead.
 
 To force a specific endpoint instead of relying on auto-discovery, set:
 
