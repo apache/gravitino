@@ -68,6 +68,21 @@ public class SemanticModelMetaBaseSQLProvider {
         + " AND smm.deleted_at = 0 AND smvi.deleted_at = 0";
   }
 
+  /** Returns SQL for selecting and locking an active Semantic Model identity by natural key. */
+  public String selectSemanticModelMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("semanticModelName") String semanticModelName) {
+    return "SELECT semantic_model_id as semanticModelId,"
+        + " semantic_model_name as semanticModelName, metalake_id as metalakeId,"
+        + " catalog_id as catalogId, schema_id as schemaId,"
+        + " current_version as currentVersion, last_version as lastVersion,"
+        + " audit_info as auditInfo, deleted_at as deletedAt"
+        + " FROM "
+        + TABLE_NAME
+        + " WHERE schema_id = #{schemaId}"
+        + " AND semantic_model_name = #{semanticModelName}"
+        + " AND deleted_at = 0 FOR UPDATE";
+  }
+
   /** Returns SQL for selecting a current Semantic Model snapshot by stable ID. */
   public String selectSemanticModelMetaById(@Param("semanticModelId") Long semanticModelId) {
     return "SELECT"
@@ -179,5 +194,29 @@ public class SemanticModelMetaBaseSQLProvider {
         + " current_version = current_version + 1,"
         + " audit_info = #{semanticModelMeta.auditInfo},"
         + " deleted_at = #{semanticModelMeta.deletedAt}";
+  }
+
+  /** Returns SQL for updating a Semantic Model identity with a version check. */
+  public String updateSemanticModelMeta(
+      @Param("newSemanticModelMeta") SemanticModelPO newSemanticModelPO,
+      @Param("oldSemanticModelMeta") SemanticModelPO oldSemanticModelPO) {
+    return "UPDATE "
+        + TABLE_NAME
+        + " SET semantic_model_name = #{newSemanticModelMeta.semanticModelName},"
+        + " metalake_id = #{newSemanticModelMeta.metalakeId},"
+        + " catalog_id = #{newSemanticModelMeta.catalogId},"
+        + " schema_id = #{newSemanticModelMeta.schemaId},"
+        + " current_version = #{newSemanticModelMeta.currentVersion},"
+        + " last_version = #{newSemanticModelMeta.lastVersion},"
+        + " audit_info = #{newSemanticModelMeta.auditInfo},"
+        + " deleted_at = #{newSemanticModelMeta.deletedAt}"
+        + " WHERE semantic_model_id = #{oldSemanticModelMeta.semanticModelId}"
+        + " AND current_version = #{oldSemanticModelMeta.currentVersion}"
+        + " AND deleted_at = 0"
+        + " AND NOT EXISTS (SELECT 1 FROM "
+        + VERSION_TABLE_NAME
+        + " smvi WHERE smvi.semantic_model_id = #{oldSemanticModelMeta.semanticModelId}"
+        + " AND smvi.version >= #{newSemanticModelMeta.currentVersion}"
+        + " AND smvi.deleted_at = 0)";
   }
 }

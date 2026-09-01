@@ -96,7 +96,7 @@ public class SemanticModelMetaService {
   }
 
   /**
-   * Inserts a Semantic Model identity and its version-one snapshot atomically.
+   * Inserts or overwrites a Semantic Model identity and its snapshot atomically.
    *
    * @param semanticModelEntity The Semantic Model entity.
    * @param overwrite Whether to overwrite rows for the same stable ID or natural key.
@@ -111,9 +111,7 @@ public class SemanticModelMetaService {
     try {
       SemanticModelPO po =
           initializeSemanticModelPO(semanticModelEntity, SemanticModelPO.builder());
-      AtomicReference<SemanticModelPO> persistedPO = new AtomicReference<>();
-      AtomicReference<SemanticModelVersionInfoPO> persistedVersionInfoPO =
-          new AtomicReference<>(po.getSemanticModelVersionInfoPO());
+      AtomicReference<SemanticModelPO> persistedPO = new AtomicReference<>(po);
       SessionUtils.doMultipleWithCommit(
           () ->
               SchemaMetaService.getInstance()
@@ -126,38 +124,33 @@ public class SemanticModelMetaService {
               SessionUtils.doWithoutCommit(
                   SemanticModelMetaMapper.class,
                   mapper -> {
-                    if (overwrite) {
-                      Long persistedId =
-                          mapper.selectSemanticModelIdBySchemaIdAndName(
-                              po.getSchemaId(), po.getSemanticModelName());
-                      SemanticModelPO existingPO =
-                          mapper.selectSemanticModelMetaByIdForUpdate(
-                              persistedId == null ? po.getSemanticModelId() : persistedId);
-                      persistedPO.set(existingPO);
-                      if (existingPO != null) {
-                        persistedVersionInfoPO.set(
-                            versionInfoForOverwrite(
-                                po.getSemanticModelVersionInfoPO(), existingPO));
-                      }
+                    SemanticModelPO storedPO =
+                        overwrite
+                            ? mapper.selectSemanticModelMetaBySchemaIdAndNameForUpdate(
+                                po.getSchemaId(), po.getSemanticModelName())
+                            : null;
+                    if (storedPO == null) {
+                      // Keep a missing-row import strict. Concurrent imports that both observed no
+                      // identity must not turn the losing insert into an overwrite with another ID.
+                      ops.insertPO(mapper, po, false);
+                      return;
                     }
-                    ops.insertPO(
-                        mapper,
-                        persistedPO.get() == null
-                            ? po
-                            : identityForOverwrite(po, persistedPO.get()),
-                        overwrite);
+
+                    SemanticModelPO replacementPO = semanticModelForOverwrite(po, storedPO);
+                    Integer updated = mapper.updateSemanticModelMeta(replacementPO, storedPO);
+                    Preconditions.checkState(
+                        updated != null && updated == 1,
+                        "The overwritten Semantic Model %s in schema %s changed while its row was held",
+                        po.getSemanticModelName(),
+                        po.getSchemaId());
+                    persistedPO.set(replacementPO);
                   }),
           () ->
               SessionUtils.doWithoutCommit(
                   SemanticModelVersionInfoMapper.class,
-                  mapper -> {
-                    if (overwrite) {
-                      mapper.insertSemanticModelVersionInfoOnDuplicateKeyUpdate(
-                          persistedVersionInfoPO.get());
-                    } else {
-                      mapper.insertSemanticModelVersionInfo(po.getSemanticModelVersionInfoPO());
-                    }
-                  }));
+                  mapper ->
+                      mapper.insertSemanticModelVersionInfo(
+                          persistedPO.get().getSemanticModelVersionInfoPO())));
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.SEMANTIC_MODEL, semanticModelEntity.nameIdentifier().toString());
@@ -170,34 +163,38 @@ public class SemanticModelMetaService {
     return ops;
   }
 
-  private static SemanticModelPO identityForOverwrite(
+  private static SemanticModelPO semanticModelForOverwrite(
       SemanticModelPO source, SemanticModelPO persistedPO) {
+    int previousVersion = Math.max(persistedPO.getCurrentVersion(), persistedPO.getLastVersion());
+    Preconditions.checkState(
+        previousVersion < Integer.MAX_VALUE,
+        "Semantic Model %s has exhausted the version range",
+        persistedPO.getSemanticModelId());
+    int nextVersion = previousVersion + 1;
     return SemanticModelPO.builder()
         .withSemanticModelId(persistedPO.getSemanticModelId())
         .withSemanticModelName(source.getSemanticModelName())
-        .withMetalakeId(source.getMetalakeId())
-        .withCatalogId(source.getCatalogId())
-        .withSchemaId(source.getSchemaId())
+        .withMetalakeId(persistedPO.getMetalakeId())
+        .withCatalogId(persistedPO.getCatalogId())
+        .withSchemaId(persistedPO.getSchemaId())
         .withAuditInfo(source.getAuditInfo())
-        .withCurrentVersion(source.getCurrentVersion())
-        .withLastVersion(source.getLastVersion())
+        .withCurrentVersion(nextVersion)
+        .withLastVersion(nextVersion)
         .withDeletedAt(source.getDeletedAt())
-        .withSemanticModelVersionInfoPO(source.getSemanticModelVersionInfoPO())
+        .withSemanticModelVersionInfoPO(
+            versionInfoForOverwrite(
+                source.getSemanticModelVersionInfoPO(), persistedPO, nextVersion))
         .build();
   }
 
   private static SemanticModelVersionInfoPO versionInfoForOverwrite(
-      SemanticModelVersionInfoPO source, SemanticModelPO persistedPO) {
-    Preconditions.checkState(
-        persistedPO.getCurrentVersion() < Integer.MAX_VALUE,
-        "Semantic Model %s has exhausted the version range",
-        persistedPO.getSemanticModelId());
+      SemanticModelVersionInfoPO source, SemanticModelPO persistedPO, int nextVersion) {
     return SemanticModelVersionInfoPO.builder()
         .withMetalakeId(persistedPO.getMetalakeId())
         .withCatalogId(persistedPO.getCatalogId())
         .withSchemaId(persistedPO.getSchemaId())
         .withSemanticModelId(persistedPO.getSemanticModelId())
-        .withVersion(persistedPO.getCurrentVersion() + 1)
+        .withVersion(nextVersion)
         .withSemanticModelName(source.semanticModelName())
         .withSemanticModelComment(source.semanticModelComment())
         .withSemanticModelDefinition(source.semanticModelDefinition())
