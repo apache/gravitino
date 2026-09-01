@@ -63,6 +63,12 @@ github:
     - danhuawang
     - lasdf1234
     - nevzheng
+  # Automatic Copilot review on non-draft PRs targeting the default branch.
+  # See https://github.com/apache/infrastructure-asfyaml#copilot-code-review
+  copilot_code_review:
+    enabled: true
+    review_drafts: false
+    review_on_push: true
 
 notifications:
   commits: commits@gravitino.apache.org

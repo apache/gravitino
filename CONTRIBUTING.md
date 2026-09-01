@@ -156,6 +156,7 @@ Reviewing and triaging helps maintain the project. You can:
 * Write clear commit messages and PR descriptions
 * Link to issues (e.g., `Fixes #123`)
 * Respond to reviewer feedback
+* GitHub Copilot may leave a first-pass review on non-draft PRs. Treat those comments as hints: implement the suggestion, or reply with why you are not taking it. Human reviewers remain responsible for the merge decision. Project-specific Copilot guidance lives in [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
 
 ## 💻 Setting Up Development Environment
 
