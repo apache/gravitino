@@ -101,6 +101,11 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().selectPolicyByPolicyIdForUpdate(policyId);
   }
 
+  /** Delegates a locking read of several policies. */
+  public static String listPolicyPOsByPolicyIdsForUpdate(@Param("policyIds") List<Long> policyIds) {
+    return getProvider().listPolicyPOsByPolicyIdsForUpdate(policyIds);
+  }
+
   public static String listPolicyPOsByPolicyIds(@Param("policyIds") List<Long> policyIds) {
     return getProvider().listPolicyPOsByPolicyIds(policyIds);
   }

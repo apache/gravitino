@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.ResultSet;
@@ -35,12 +36,17 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import org.apache.gravitino.Audit;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.RelationEdgeTarget;
+import org.apache.gravitino.RelationUpdate;
+import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.AuditInfo;
@@ -50,9 +56,12 @@ import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
+import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -468,8 +477,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     policyMetaService.insertPolicy(policy, false);
     PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
 
-    PolicyEntity replacement =
-        copyPolicy(policy, "policy_overwrite_occ_renamed", "replacement", policy.auditInfo());
+    PolicyEntity replacement = copyPolicy(policy, "policy_overwrite_occ_renamed", "replacement");
     policyMetaService.insertPolicy(replacement, true);
 
     PolicyPO overwrittenPO = getPolicyPO(replacement.nameIdentifier());
@@ -501,8 +509,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
                 entity -> {
                   PolicyEntity current = (PolicyEntity) entity;
                   PolicyPO currentPO = getPolicyPO(current.nameIdentifier());
-                  PolicyEntity competing =
-                      copyPolicy(current, current.name(), "competing", current.auditInfo());
+                  PolicyEntity competing = copyPolicy(current, current.name(), "competing");
                   PolicyPO competingPO =
                       POConverters.updatePolicyPOWithVersion(currentPO, competing);
                   SessionUtils.doMultipleWithCommit(
@@ -517,7 +524,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
                               PolicyVersionMapper.class,
                               mapper ->
                                   mapper.insertPolicyVersion(competingPO.getPolicyVersionPO())));
-                  return copyPolicy(current, current.name(), "requested", current.auditInfo());
+                  return copyPolicy(current, current.name(), "requested");
                 }));
 
     assertEquals(2, listPolicyVersions(policy.id()).size());
@@ -545,12 +552,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     PolicyPO stalePO = getPolicyPO(policy.nameIdentifier());
     policyMetaService.updatePolicy(
         policy.nameIdentifier(),
-        entity ->
-            copyPolicy(
-                (PolicyEntity) entity,
-                ((PolicyEntity) entity).name(),
-                "updated",
-                ((PolicyEntity) entity).auditInfo()));
+        entity -> copyPolicy((PolicyEntity) entity, ((PolicyEntity) entity).name(), "updated"));
 
     assertThrows(
         OptimisticLockException.class,
@@ -609,6 +611,93 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(policy.id(), overwrittenPO.getPolicyId().longValue());
     assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
     assertEquals(2, listPolicyVersions(policy.id()).size());
+  }
+
+  @TestTemplate
+  public void testDeletePolicyCleansEveryDependentRelation() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_policy_cascade");
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_cascade_occ",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    policyMetaService.associatePoliciesWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {policy.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    TagEntity tag = createAndInsertTagEntity("tag_policy_cascade", "tag comment", METALAKE_NAME);
+    backend.updateEntityRelations(
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            tag.nameIdentifier(),
+            Entity.EntityType.TAG,
+            new RelationEdgeTarget[] {
+              RelationEdgeTarget.of(
+                  policy.nameIdentifier(),
+                  Entity.EntityType.POLICY,
+                  "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}")
+            },
+            new RelationEdgeTarget[0]));
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            policy.nameIdentifier(),
+            Entity.EntityType.POLICY,
+            new NameIdentifier[] {tag.nameIdentifier()},
+            new NameIdentifier[0]);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user_policy_cascade",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    OwnerMetaService.getInstance()
+        .setOwner(
+            policy.nameIdentifier(), Entity.EntityType.POLICY, user.nameIdentifier(), user.type());
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role_policy_cascade",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofPolicy(
+                    policy.name(), Lists.newArrayList(Privileges.ApplyPolicy.allow()))),
+            null);
+    backend.insert(role, false);
+
+    String policyAsMetadataObject =
+        String.format("metadata_object_id = %d AND metadata_object_type = 'POLICY'", policy.id());
+    assertEquals(1, countActivePolicyRel(policy.id()));
+    assertEquals(1, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    assertEquals(1, countActiveRows("tag_relation_meta", policyAsMetadataObject));
+    assertEquals(1, countActiveRows("owner_meta", policyAsMetadataObject));
+    assertEquals(
+        1,
+        countActiveRows(
+            "role_meta_securable_object",
+            String.format("metadata_object_id = %d AND type = 'POLICY'", policy.id())));
+
+    assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
+
+    assertEquals(0, countActivePolicyRel(policy.id()));
+    assertEquals(0, countActiveRows("policy_tag_relation_meta", "policy_id = " + policy.id()));
+    assertEquals(0, countActiveRows("tag_relation_meta", policyAsMetadataObject));
+    assertEquals(0, countActiveRows("owner_meta", policyAsMetadataObject));
+    assertEquals(
+        0,
+        countActiveRows(
+            "role_meta_securable_object",
+            String.format("metadata_object_id = %d AND type = 'POLICY'", policy.id())));
+    assertEquals(0, listPolicyVersions(policy.id()).values().stream().filter(v -> v == 0L).count());
   }
 
   @TestTemplate
@@ -1234,6 +1323,24 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     return new EntitiesToTest(catalog, schema, table, topic, fileset, model);
   }
 
+  private int countActiveRows(String table, String whereClause) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s AND deleted_at = 0", table, whereClause))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("Doesn't contain data");
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
+  }
+
   private Integer countActivePolicyRel(Long policyId) {
     try (SqlSession sqlSession =
             SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
@@ -1281,8 +1388,13 @@ public class TestPolicyMetaService extends TestJDBCBackend {
                 identifier.namespace().level(0), identifier.name()));
   }
 
+  /** Copies the policy under a new name and comment, keeping the audit info tests create with. */
+  private PolicyEntity copyPolicy(PolicyEntity policy, String name, String comment) {
+    return copyPolicy(policy, name, comment, AUDIT_INFO);
+  }
+
   private PolicyEntity copyPolicy(
-      PolicyEntity policy, String name, String comment, Audit auditInfo) {
+      PolicyEntity policy, String name, String comment, AuditInfo auditInfo) {
     return PolicyEntity.builder()
         .withId(policy.id())
         .withName(name)
@@ -1291,7 +1403,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         .withComment(comment)
         .withEnabled(policy.enabled())
         .withContent(policy.content())
-        .withAuditInfo((AuditInfo) auditInfo)
+        .withAuditInfo(auditInfo)
         .build();
   }
 }

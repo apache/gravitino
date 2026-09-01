@@ -763,6 +763,12 @@ public class POConverters {
   /**
    * Builds the next complete policy metadata and content snapshot.
    *
+   * <p>The row keeps the ID it already has: {@code oldPolicyPO} is the row being replaced, and its
+   * ID is what the version snapshots and every relation row point at. An alter cannot change the
+   * ID, because {@code PolicyMetaService.updatePolicy} rejects an updater that returns a different
+   * one; an overwrite of a name held by another row deliberately updates that row rather than
+   * inserting a second one under the same name, so the ID the caller supplied is dropped.
+   *
    * @param oldPolicyPO The policy row observed by the caller.
    * @param newPolicy The policy values to persist.
    * @return The policy row and version snapshot at the next monotonic version.

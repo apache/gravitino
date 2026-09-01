@@ -26,7 +26,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -605,39 +604,51 @@ public class PolicyMetaService {
    */
   private Map<Long, PolicyPO> lockPoliciesForAssociation(
       List<PolicyPO> policyPOsToAdd, List<PolicyPO> policyPOsToRemove) {
-    Map<Long, PolicyPO> observedPolicyPOs = new LinkedHashMap<>();
-    policyPOsToAdd.forEach(policyPO -> observedPolicyPOs.put(policyPO.getPolicyId(), policyPO));
-    policyPOsToRemove.forEach(policyPO -> observedPolicyPOs.put(policyPO.getPolicyId(), policyPO));
-    List<PolicyPO> sortedPolicyPOs = new ArrayList<>(observedPolicyPOs.values());
-    sortedPolicyPOs.sort(Comparator.comparingLong(PolicyPO::getPolicyId));
-
-    Map<Long, PolicyPO> lockedPolicyPOs = new LinkedHashMap<>();
-    for (PolicyPO observedPolicyPO : sortedPolicyPOs) {
-      PolicyPO lockedPolicyPO = lockPolicy(observedPolicyPO);
-      lockedPolicyPOs.put(lockedPolicyPO.getPolicyId(), lockedPolicyPO);
-    }
-    return lockedPolicyPOs;
+    List<PolicyPO> observedPolicyPOs = new ArrayList<>(policyPOsToAdd);
+    observedPolicyPOs.addAll(policyPOsToRemove);
+    return lockPolicies(observedPolicyPOs);
   }
 
   /**
-   * Locks one policy row and returns it as it is now.
+   * Locks the given policy rows and returns them as they are now, keyed by policy ID.
+   *
+   * <p>The rows are locked by one statement that orders them by policy ID, so callers that touch
+   * overlapping policies take the row locks in the same order and queue up instead of deadlocking,
+   * and a change touching many policies still costs a single round trip.
    *
    * <p>A row that is gone, or whose name or metalake no longer matches what the caller resolved by
    * name, is reported as missing: the caller asked for a policy name, and that name no longer
    * points at this row.
    */
-  static PolicyPO lockPolicy(PolicyPO observedPolicyPO) {
-    return OccWriteSupport.lockParentForChildWrite(
-        observedPolicyPO.getPolicyName(),
-        Entity.EntityType.POLICY,
-        () ->
-            SessionUtils.getWithoutCommit(
-                PolicyMetaMapper.class,
-                mapper -> mapper.selectPolicyByPolicyIdForUpdate(observedPolicyPO.getPolicyId())),
-        null,
-        current ->
-            Objects.equals(current.getPolicyName(), observedPolicyPO.getPolicyName())
-                && Objects.equals(current.getMetalakeId(), observedPolicyPO.getMetalakeId()));
+  static Map<Long, PolicyPO> lockPolicies(List<PolicyPO> observedPolicyPOs) {
+    Map<Long, PolicyPO> observedById = new LinkedHashMap<>();
+    observedPolicyPOs.forEach(policyPO -> observedById.put(policyPO.getPolicyId(), policyPO));
+    if (observedById.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+
+    List<PolicyPO> lockedRows =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper ->
+                mapper.listPolicyPOsByPolicyIdsForUpdate(new ArrayList<>(observedById.keySet())));
+    Map<Long, PolicyPO> lockedById = new LinkedHashMap<>();
+    lockedRows.forEach(policyPO -> lockedById.put(policyPO.getPolicyId(), policyPO));
+
+    Map<Long, PolicyPO> lockedPolicyPOs = new LinkedHashMap<>();
+    for (PolicyPO observedPolicyPO : observedById.values()) {
+      PolicyPO lockedPolicyPO =
+          OccWriteSupport.lockParentForChildWrite(
+              observedPolicyPO.getPolicyName(),
+              Entity.EntityType.POLICY,
+              () -> lockedById.get(observedPolicyPO.getPolicyId()),
+              null,
+              current ->
+                  Objects.equals(current.getPolicyName(), observedPolicyPO.getPolicyName())
+                      && Objects.equals(current.getMetalakeId(), observedPolicyPO.getMetalakeId()));
+      lockedPolicyPOs.put(lockedPolicyPO.getPolicyId(), lockedPolicyPO);
+    }
+    return lockedPolicyPOs;
   }
 
   private static List<PolicyPO> currentPolicyPOs(

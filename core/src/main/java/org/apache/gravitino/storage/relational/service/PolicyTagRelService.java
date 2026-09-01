@@ -25,7 +25,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -381,13 +380,10 @@ public class PolicyTagRelService {
     // Lock the policy rows in policy-ID order so that two relation changes touching the same
     // policies queue up instead of deadlocking. The tag row is locked before this, so every path
     // through this service takes its locks in the same tag-then-policy order.
-    List<PolicyPO> sortedPolicies = new ArrayList<>(policies);
-    sortedPolicies.sort(Comparator.comparingLong(PolicyPO::getPolicyId));
     Map<String, Long> policyIds = new LinkedHashMap<>();
-    for (PolicyPO observedPolicy : sortedPolicies) {
-      PolicyPO lockedPolicy = PolicyMetaService.lockPolicy(observedPolicy);
-      policyIds.put(lockedPolicy.getPolicyName(), lockedPolicy.getPolicyId());
-    }
+    PolicyMetaService.lockPolicies(policies)
+        .values()
+        .forEach(policy -> policyIds.put(policy.getPolicyName(), policy.getPolicyId()));
 
     for (String policyName : policyNames) {
       if (!policyIds.containsKey(policyName)) {
