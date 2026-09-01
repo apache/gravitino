@@ -47,11 +47,6 @@ public class PolicyVersionSQLProviderFactory {
     return POLICY_VERSION_SQL_PROVIDER_MAP.get(jdbcBackendType);
   }
 
-  public static String insertPolicyVersionOnDuplicateKeyUpdate(
-      @Param("policyVersion") PolicyVersionPO policyVersionPO) {
-    return getProvider().insertPolicyVersionOnDuplicateKeyUpdate(policyVersionPO);
-  }
-
   public static String insertPolicyVersion(
       @Param("policyVersion") PolicyVersionPO policyVersionPO) {
     return getProvider().insertPolicyVersion(policyVersionPO);

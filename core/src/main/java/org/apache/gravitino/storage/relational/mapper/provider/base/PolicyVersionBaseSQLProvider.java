@@ -28,23 +28,6 @@ import org.apache.ibatis.annotations.Param;
 
 public class PolicyVersionBaseSQLProvider {
 
-  public String insertPolicyVersionOnDuplicateKeyUpdate(
-      @Param("policyVersion") PolicyVersionPO policyVersion) {
-    return "INSERT INTO "
-        + POLICY_VERSION_TABLE_NAME
-        + " (metalake_id, policy_id, version, policy_comment, enabled, content, deleted_at)"
-        + " VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version}, #{policyVersion.policyComment},"
-        + " #{policyVersion.enabled}, #{policyVersion.content}, #{policyVersion.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " metalake_id = #{policyVersion.metalakeId},"
-        + " policy_id = #{policyVersion.policyId},"
-        + " version = #{policyVersion.version},"
-        + " policy_comment = #{policyVersion.policyComment},"
-        + " enabled = #{policyVersion.enabled},"
-        + " content = #{policyVersion.content},"
-        + " deleted_at = #{policyVersion.deletedAt}";
-  }
-
   public String insertPolicyVersion(@Param("policyVersion") PolicyVersionPO policyVersion) {
     return "INSERT INTO "
         + POLICY_VERSION_TABLE_NAME

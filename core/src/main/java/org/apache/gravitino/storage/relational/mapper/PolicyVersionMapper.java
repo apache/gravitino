@@ -29,12 +29,6 @@ import org.apache.ibatis.annotations.UpdateProvider;
 public interface PolicyVersionMapper {
   String POLICY_VERSION_TABLE_NAME = "policy_version_info";
 
-  @InsertProvider(
-      type = PolicyVersionSQLProviderFactory.class,
-      method = "insertPolicyVersionOnDuplicateKeyUpdate")
-  void insertPolicyVersionOnDuplicateKeyUpdate(
-      @Param("policyVersion") PolicyVersionPO policyVersionPO);
-
   @InsertProvider(type = PolicyVersionSQLProviderFactory.class, method = "insertPolicyVersion")
   void insertPolicyVersion(@Param("policyVersion") PolicyVersionPO policyVersionPO);
 

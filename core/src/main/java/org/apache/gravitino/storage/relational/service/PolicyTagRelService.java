@@ -367,6 +367,8 @@ public class PolicyTagRelService {
         .map(target -> target.nameIdentifier().name())
         .forEach(policyNames::add);
     if (policyNames.isEmpty()) {
+      // A mutable map, like the one built below: returning Collections.emptyMap() here would mix
+      // mutable and immutable return values, which Error Prone rejects.
       return new LinkedHashMap<>();
     }
 
@@ -376,18 +378,14 @@ public class PolicyTagRelService {
             mapper ->
                 mapper.listPolicyPOsByMetalakeAndPolicyNames(
                     metalake, new ArrayList<>(policyNames)));
-    policies.sort(Comparator.comparingLong(PolicyPO::getPolicyId));
+    // Lock the policy rows in policy-ID order so that two relation changes touching the same
+    // policies queue up instead of deadlocking. The tag row is locked before this, so every path
+    // through this service takes its locks in the same tag-then-policy order.
+    List<PolicyPO> sortedPolicies = new ArrayList<>(policies);
+    sortedPolicies.sort(Comparator.comparingLong(PolicyPO::getPolicyId));
     Map<String, Long> policyIds = new LinkedHashMap<>();
-    for (PolicyPO observedPolicy : policies) {
-      PolicyPO lockedPolicy =
-          SessionUtils.getWithoutCommit(
-              PolicyMetaMapper.class,
-              mapper -> mapper.selectPolicyByPolicyIdForUpdate(observedPolicy.getPolicyId()));
-      if (lockedPolicy == null
-          || !Objects.equals(lockedPolicy.getPolicyName(), observedPolicy.getPolicyName())
-          || !Objects.equals(lockedPolicy.getMetalakeId(), observedPolicy.getMetalakeId())) {
-        throw noSuchEntity(Entity.EntityType.POLICY, observedPolicy.getPolicyName());
-      }
+    for (PolicyPO observedPolicy : sortedPolicies) {
+      PolicyPO lockedPolicy = PolicyMetaService.lockPolicy(observedPolicy);
       policyIds.put(lockedPolicy.getPolicyName(), lockedPolicy.getPolicyId());
     }
 

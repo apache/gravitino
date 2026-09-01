@@ -24,7 +24,6 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyVersionBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 
 public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvider {
   @Override
@@ -80,26 +79,5 @@ public class PolicyVersionPostgreSQLProvider extends PolicyVersionBaseSQLProvide
         + " SET deleted_at = "
         + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
-  }
-
-  @Override
-  public String insertPolicyVersionOnDuplicateKeyUpdate(PolicyVersionPO policyVersion) {
-    return "INSERT INTO "
-        + POLICY_VERSION_TABLE_NAME
-        + " (metalake_id, policy_id, version, policy_comment, enabled,"
-        + " content, deleted_at)"
-        + " VALUES ("
-        + " #{policyVersion.metalakeId},"
-        + " #{policyVersion.policyId},"
-        + " #{policyVersion.version},"
-        + " #{policyVersion.policyComment},"
-        + " #{policyVersion.enabled},"
-        + " #{policyVersion.content},"
-        + " #{policyVersion.deletedAt})"
-        + " ON CONFLICT (policy_id, version, deleted_at) DO UPDATE SET"
-        + " policy_comment = #{policyVersion.policyComment},"
-        + " enabled = #{policyVersion.enabled},"
-        + " content = #{policyVersion.content},"
-        + " deleted_at = #{policyVersion.deletedAt}";
   }
 }

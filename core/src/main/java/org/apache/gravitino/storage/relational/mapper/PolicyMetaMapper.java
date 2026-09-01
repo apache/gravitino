@@ -76,11 +76,6 @@ public interface PolicyMetaMapper {
   List<PolicyPO> listPolicyPOsByMetalakeAndPolicyNames(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames);
 
-  @InsertProvider(
-      type = PolicyMetaSQLProviderFactory.class,
-      method = "insertPolicyMetaOnDuplicateKeyUpdate")
-  void insertPolicyMetaOnDuplicateKeyUpdate(@Param("policyMeta") PolicyPO policyPO);
-
   @InsertProvider(type = PolicyMetaSQLProviderFactory.class, method = "insertPolicyMeta")
   void insertPolicyMeta(@Param("policyMeta") PolicyPO policyPO);
 

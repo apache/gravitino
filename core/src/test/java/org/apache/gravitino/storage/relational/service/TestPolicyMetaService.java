@@ -569,6 +569,49 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testPolicyCreateIsFencedByParentMetalake() {
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy("metalake_that_does_not_exist"),
+            "policy_without_metalake",
+            AUDIT_INFO);
+
+    assertThrows(NoSuchEntityException.class, () -> policyMetaService.insertPolicy(policy, false));
+    assertThrows(NoSuchEntityException.class, () -> policyMetaService.insertPolicy(policy, true));
+  }
+
+  @TestTemplate
+  public void testPolicyOverwriteReplacesTheRowHoldingTheName() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_overwrite_by_name",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO initialPO = getPolicyPO(policy.nameIdentifier());
+
+    // A different ID for a name that is already taken replaces the row that holds the name,
+    // instead of inserting a second row for it.
+    PolicyEntity sameNameOtherId =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_overwrite_by_name",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(sameNameOtherId, true);
+
+    PolicyPO overwrittenPO = getPolicyPO(policy.nameIdentifier());
+    assertEquals(policy.id(), overwrittenPO.getPolicyId().longValue());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
+    assertEquals(2, listPolicyVersions(policy.id()).size());
+  }
+
+  @TestTemplate
   public void testDeletePolicy() throws IOException {
     createAndInsertMakeLake(METALAKE_NAME);
 

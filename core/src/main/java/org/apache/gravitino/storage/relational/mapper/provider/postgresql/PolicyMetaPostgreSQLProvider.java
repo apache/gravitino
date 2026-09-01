@@ -22,7 +22,6 @@ import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.PO
 
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.PolicyPO;
 
 public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
 
@@ -52,30 +51,5 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
         + " WHERE policy_id IN (SELECT policy_id FROM "
         + POLICY_META_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit})";
-  }
-
-  @Override
-  public String insertPolicyMetaOnDuplicateKeyUpdate(PolicyPO policyPO) {
-    return "INSERT INTO "
-        + POLICY_META_TABLE_NAME
-        + " (policy_id, policy_name, policy_type, metalake_id,"
-        + " audit_info, current_version, last_version, deleted_at)"
-        + " VALUES ("
-        + " #{policyMeta.policyId},"
-        + " #{policyMeta.policyName},"
-        + " #{policyMeta.policyType},"
-        + " #{policyMeta.metalakeId},"
-        + " #{policyMeta.auditInfo},"
-        + " #{policyMeta.currentVersion},"
-        + " #{policyMeta.lastVersion},"
-        + " #{policyMeta.deletedAt})"
-        + " ON CONFLICT (policy_id) DO UPDATE SET"
-        + " policy_name = #{policyMeta.policyName},"
-        + " policy_type = #{policyMeta.policyType},"
-        + " metalake_id = #{policyMeta.metalakeId},"
-        + " audit_info = #{policyMeta.auditInfo},"
-        + " current_version = #{policyMeta.currentVersion},"
-        + " last_version = #{policyMeta.lastVersion},"
-        + " deleted_at = #{policyMeta.deletedAt}";
   }
 }

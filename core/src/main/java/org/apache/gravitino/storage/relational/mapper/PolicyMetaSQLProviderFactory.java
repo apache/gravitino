@@ -57,11 +57,6 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().listPolicyPOsByMetalakeAndPolicyNames(metalakeName, policyNames);
   }
 
-  public static String insertPolicyMetaOnDuplicateKeyUpdate(
-      @Param("policyMeta") PolicyPO policyPO) {
-    return getProvider().insertPolicyMetaOnDuplicateKeyUpdate(policyPO);
-  }
-
   public static String insertPolicyMeta(@Param("policyMeta") PolicyPO policyPO) {
     return getProvider().insertPolicyMeta(policyPO);
   }

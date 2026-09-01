@@ -74,24 +74,6 @@ public class PolicyMetaBaseSQLProvider {
         + "</script>";
   }
 
-  public String insertPolicyMetaOnDuplicateKeyUpdate(@Param("policyMeta") PolicyPO policyPO) {
-    return "INSERT INTO "
-        + POLICY_META_TABLE_NAME
-        + " (policy_id, policy_name, policy_type, metalake_id,"
-        + " audit_info, current_version, last_version, deleted_at)"
-        + " VALUES (#{policyMeta.policyId}, #{policyMeta.policyName}, #{policyMeta.policyType},"
-        + " #{policyMeta.metalakeId}, #{policyMeta.auditInfo}, #{policyMeta.currentVersion},"
-        + " #{policyMeta.lastVersion}, #{policyMeta.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " policy_name = #{policyMeta.policyName},"
-        + " policy_type = #{policyMeta.policyType},"
-        + " metalake_id = #{policyMeta.metalakeId},"
-        + " audit_info = #{policyMeta.auditInfo},"
-        + " current_version = #{policyMeta.currentVersion},"
-        + " last_version = #{policyMeta.lastVersion},"
-        + " deleted_at = #{policyMeta.deletedAt}";
-  }
-
   public String insertPolicyMeta(@Param("policyMeta") PolicyPO policyPO) {
     return "INSERT INTO "
         + POLICY_META_TABLE_NAME

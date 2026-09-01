@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.service;
 
 import static org.apache.gravitino.metrics.source.MetricsSource.GRAVITINO_RELATIONAL_STORE_METRIC_NAME;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -172,6 +173,16 @@ public class PolicyMetaService {
     return deletePolicy(ident, policyPO);
   }
 
+  /**
+   * Deletes the policy the caller observed. The delete is a compare-and-set on the observed
+   * version, so a policy that changed since it was read is rejected instead of being removed, and
+   * the version snapshots and dependent relations are cleaned up in the same transaction as the
+   * policy row itself.
+   *
+   * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
+   * use {@link #deletePolicy(NameIdentifier)}, which reads it first.
+   */
+  @VisibleForTesting
   boolean deletePolicy(NameIdentifier ident, PolicyPO policyPO) {
     long policyId = policyPO.getPolicyId();
 
@@ -315,6 +326,10 @@ public class PolicyMetaService {
       NameIdentifier[] policiesToRemove)
       throws NoSuchEntityException, EntityAlreadyExistsException, IOException {
     try {
+      // One transaction for the whole association change: the policy rows stay locked from the
+      // moment they are read until the relation rows are rewritten and read back, so a conflict
+      // rolls the whole change back instead of leaving a half-applied association set behind. The
+      // mapper handed to the callback is unused; the call only opens and closes the transaction.
       return SessionUtils.doWithCommitAndFetchResult(
           PolicyMetaMapper.class,
           ignored ->
@@ -445,7 +460,21 @@ public class PolicyMetaService {
     return totalDeletedCount;
   }
 
-  void lockMetalakeForPolicyCreate(MetalakePO observedMetalakePO) {
+  /**
+   * Holds the parent metalake row for the rest of the transaction, so a policy cannot be created
+   * under a metalake that is going away.
+   *
+   * <p>The lock is shared, not exclusive: many policies can be created under the same metalake at
+   * the same time, while dropping the metalake takes an exclusive lock on this row, so a drop and a
+   * create cannot overlap.
+   *
+   * <p>The name is compared again because the ID alone cannot tell a rename apart: the caller
+   * looked the metalake up by name, so a renamed row means the name in the request no longer
+   * exists. The metalake version is deliberately not compared, matching {@code CatalogMetaService}:
+   * holding the row is what makes the create safe, and an unrelated metalake edit that commits in
+   * between would otherwise reject the create for no reason.
+   */
+  private void lockMetalakeForPolicyCreate(MetalakePO observedMetalakePO) {
     OccWriteSupport.lockParentForChildWrite(
         observedMetalakePO.getMetalakeName(),
         Entity.EntityType.METALAKE,
@@ -458,6 +487,20 @@ public class PolicyMetaService {
         current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
   }
 
+  /**
+   * Writes the policy row and its content snapshot.
+   *
+   * <p>An overwrite is not an upsert any more: the existing row is located and locked first, and
+   * the replacement is written as the next version of that row, so the snapshot history survives
+   * the overwrite instead of being reset. When no row is there to replace, the overwrite inserts
+   * like a plain create; a create of the same name that commits in between then surfaces as an
+   * already-exists failure that the caller retries, which is the same outcome the caller would see
+   * had the two requests arrived in the other order.
+   *
+   * <p>An overwrite no longer revives a soft-deleted row that happens to carry the same policy ID.
+   * Such a row keeps the primary key, so the insert is rejected as an already-existing policy,
+   * which is the honest answer: the snapshots and relations of the deleted policy are gone with it.
+   */
   private void insertPolicyWithoutCommit(
       PolicyEntity policyEntity, PolicyPO initializedPolicyPO, boolean overwritten) {
     if (!overwritten) {
@@ -511,12 +554,17 @@ public class PolicyMetaService {
         mapper -> mapper.selectPolicyByPolicyIdForUpdate(sameNamePolicyPO.getPolicyId()));
   }
 
+  /**
+   * Advances the policy row to the next version, keyed on the version the caller observed. A row
+   * that moved on, was renamed away, or was deleted in between matches nothing, and the failure is
+   * classified as a conflict or as a missing policy by {@link #policyWriteFailure}.
+   */
   private void updatePolicyRootWithVersion(
       NameIdentifier identifier, PolicyPO oldPolicyPO, PolicyPO newPolicyPO) {
-    int updated =
+    Integer updated =
         SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class, mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
-    if (updated == 0) {
+    if (updated == null || updated == 0) {
       throw policyWriteFailure(identifier, oldPolicyPO);
     }
   }
@@ -547,6 +595,14 @@ public class PolicyMetaService {
                 && Objects.equals(current.getMetalakeId(), observedPolicyPO.getMetalakeId()));
   }
 
+  /**
+   * Locks every policy taking part in an association change and returns the rows as they are now,
+   * keyed by policy ID, so the association cannot be written against a policy that is being renamed
+   * or dropped.
+   *
+   * <p>The rows are locked in policy-ID order. Two association changes that touch the same policies
+   * therefore take the locks in the same order and queue up instead of deadlocking.
+   */
   private Map<Long, PolicyPO> lockPoliciesForAssociation(
       List<PolicyPO> policyPOsToAdd, List<PolicyPO> policyPOsToRemove) {
     Map<Long, PolicyPO> observedPolicyPOs = new LinkedHashMap<>();
@@ -557,21 +613,31 @@ public class PolicyMetaService {
 
     Map<Long, PolicyPO> lockedPolicyPOs = new LinkedHashMap<>();
     for (PolicyPO observedPolicyPO : sortedPolicyPOs) {
-      PolicyPO lockedPolicyPO =
-          SessionUtils.getWithoutCommit(
-              PolicyMetaMapper.class,
-              mapper -> mapper.selectPolicyByPolicyIdForUpdate(observedPolicyPO.getPolicyId()));
-      if (lockedPolicyPO == null
-          || !Objects.equals(lockedPolicyPO.getPolicyName(), observedPolicyPO.getPolicyName())
-          || !Objects.equals(lockedPolicyPO.getMetalakeId(), observedPolicyPO.getMetalakeId())) {
-        throw new NoSuchEntityException(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-            Entity.EntityType.POLICY.name().toLowerCase(),
-            observedPolicyPO.getPolicyName());
-      }
+      PolicyPO lockedPolicyPO = lockPolicy(observedPolicyPO);
       lockedPolicyPOs.put(lockedPolicyPO.getPolicyId(), lockedPolicyPO);
     }
     return lockedPolicyPOs;
+  }
+
+  /**
+   * Locks one policy row and returns it as it is now.
+   *
+   * <p>A row that is gone, or whose name or metalake no longer matches what the caller resolved by
+   * name, is reported as missing: the caller asked for a policy name, and that name no longer
+   * points at this row.
+   */
+  static PolicyPO lockPolicy(PolicyPO observedPolicyPO) {
+    return OccWriteSupport.lockParentForChildWrite(
+        observedPolicyPO.getPolicyName(),
+        Entity.EntityType.POLICY,
+        () ->
+            SessionUtils.getWithoutCommit(
+                PolicyMetaMapper.class,
+                mapper -> mapper.selectPolicyByPolicyIdForUpdate(observedPolicyPO.getPolicyId())),
+        null,
+        current ->
+            Objects.equals(current.getPolicyName(), observedPolicyPO.getPolicyName())
+                && Objects.equals(current.getMetalakeId(), observedPolicyPO.getMetalakeId()));
   }
 
   private static List<PolicyPO> currentPolicyPOs(
