@@ -219,7 +219,7 @@ public class TestAuthMappers {
   void testUserMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertUser(22L, "user22", 1L);
-    userMetaMapper.softDeleteUserMetaByUserId(22L);
+    userMetaMapper.softDeleteUserMetaByUserId(22L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("user_meta", "user_id", 22L);
     userMetaMapper.touchUserUpdatedAt(22L);
@@ -295,6 +295,16 @@ public class TestAuthMappers {
     Assertions.assertEquals(0, groupMetaMapper.softDeleteGroupMetaByGroupId(33L, 2L));
     Assertions.assertNotNull(groupMetaMapper.selectGroupMetaByMetalakeIdAndName(1L, "group33"));
     Assertions.assertEquals(1, groupMetaMapper.softDeleteGroupMetaByGroupId(33L, 1L));
+  }
+
+  @Test
+  void testUserDeleteUsesCurrentVersion() {
+    insertMetalake(1L, "metalake1");
+    insertUser(23L, "user23", 1L);
+
+    Assertions.assertEquals(0, userMetaMapper.softDeleteUserMetaByUserId(23L, 2L));
+    Assertions.assertNotNull(userMetaMapper.selectUserMetaByMetalakeIdAndName(1L, "user23"));
+    Assertions.assertEquals(1, userMetaMapper.softDeleteUserMetaByUserId(23L, 1L));
   }
 
   @Test
