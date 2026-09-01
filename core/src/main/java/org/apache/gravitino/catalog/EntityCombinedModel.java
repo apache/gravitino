@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.model.Model;
@@ -59,15 +60,10 @@ public final class EntityCombinedModel implements Model {
     return new EntityCombinedModel(model, null);
   }
 
-  public EntityCombinedModel withHiddenProperties(Map.Entry<Set<String>, Set<String>> classified) {
-    if (classified == null) {
-      this.keysToMask = Collections.emptySet();
-      this.keysToOmit = Collections.emptySet();
-    } else {
-      this.keysToMask = classified.getKey() == null ? Collections.emptySet() : classified.getKey();
-      this.keysToOmit =
-          classified.getValue() == null ? Collections.emptySet() : classified.getValue();
-    }
+  public EntityCombinedModel withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 

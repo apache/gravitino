@@ -23,7 +23,6 @@ import static org.apache.gravitino.utils.NameIdentifierUtil.getCatalogIdentifier
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.HasIdentifier;
@@ -32,6 +31,7 @@ import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.connector.PropertiesMetadata;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -141,7 +141,7 @@ public abstract class OperationDispatcher {
     }
   }
 
-  protected Map.Entry<Set<String>, Set<String>> getHiddenPropertyNames(
+  protected MaskAndOmitKeys getMaskAndOmitKeys(
       NameIdentifier catalogIdent,
       ThrowableFunction<HasPropertyMetadata, PropertiesMetadata> provider,
       Map<String, String> properties) {

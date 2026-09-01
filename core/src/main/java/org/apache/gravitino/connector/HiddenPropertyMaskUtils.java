@@ -81,13 +81,13 @@ public final class HiddenPropertyMaskUtils {
   /**
    * Classifies property keys for API responses.
    *
-   * @return entry of {@code (keysToMask, keysToOmit)}
+   * @return keys to mask and keys to omit
    */
-  public static Map.Entry<Set<String>, Set<String>> classifyHiddenProperties(
+  public static MaskAndOmitKeys classifyHiddenProperties(
       @Nullable Map<String, String> properties, PropertiesMetadata metadata) {
     Objects.requireNonNull(metadata, "metadata");
     if (properties == null || properties.isEmpty()) {
-      return Map.entry(Collections.emptySet(), Collections.emptySet());
+      return MaskAndOmitKeys.empty();
     }
 
     Set<String> keysToMask = new HashSet<>();
@@ -106,7 +106,7 @@ public final class HiddenPropertyMaskUtils {
         keysToMask.add(key);
       }
     }
-    return Map.entry(Set.copyOf(keysToMask), Set.copyOf(keysToOmit));
+    return MaskAndOmitKeys.of(Set.copyOf(keysToMask), Set.copyOf(keysToOmit));
   }
 
   /**
@@ -146,12 +146,25 @@ public final class HiddenPropertyMaskUtils {
   }
 
   /**
+   * Like {@link #maskHiddenProperties(Map, Set, Set)} using the given classification.
+   *
+   * @param properties the source properties
+   * @param keys keys to mask and omit
+   * @return a mutable API-response copy
+   */
+  public static Map<String, String> maskHiddenProperties(
+      Map<String, String> properties, @Nullable MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    return maskHiddenProperties(
+        properties, classification.keysToMask(), classification.keysToOmit());
+  }
+
+  /**
    * Returns a mutable API-response copy of {@code properties}: reserved+hidden keys are omitted;
    * other hidden keys and secret-manager URN values are replaced with {@link #MASKED_VALUE}.
    */
   public static Map<String, String> maskHiddenProperties(
       Map<String, String> properties, PropertiesMetadata metadata) {
-    Map.Entry<Set<String>, Set<String>> classified = classifyHiddenProperties(properties, metadata);
-    return maskHiddenProperties(properties, classified.getKey(), classified.getValue());
+    return maskHiddenProperties(properties, classifyHiddenProperties(properties, metadata));
   }
 }

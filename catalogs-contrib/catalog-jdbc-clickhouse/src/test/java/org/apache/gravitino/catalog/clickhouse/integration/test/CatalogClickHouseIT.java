@@ -1460,7 +1460,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
-    Assertions.assertTrue(table.properties().containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertFalse(table.properties().containsKey(StringIdentifier.ID_KEY));
 
     Assertions.assertEquals(CLICKHOUSE_COL_NAME1, table.columns()[0].name());
     Assertions.assertEquals(Types.IntegerType.get(), table.columns()[0].dataType());

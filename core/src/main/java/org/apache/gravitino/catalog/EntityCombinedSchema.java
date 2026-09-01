@@ -25,6 +25,7 @@ import org.apache.gravitino.Audit;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.SchemaEntity;
 
@@ -72,15 +73,10 @@ public final class EntityCombinedSchema implements Schema {
     return of(schema, null);
   }
 
-  public EntityCombinedSchema withHiddenProperties(Map.Entry<Set<String>, Set<String>> classified) {
-    if (classified == null) {
-      this.keysToMask = Collections.emptySet();
-      this.keysToOmit = Collections.emptySet();
-    } else {
-      this.keysToMask = classified.getKey() == null ? Collections.emptySet() : classified.getKey();
-      this.keysToOmit =
-          classified.getValue() == null ? Collections.emptySet() : classified.getValue();
-    }
+  public EntityCombinedSchema withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
