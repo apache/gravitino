@@ -300,6 +300,184 @@ public class TestGravitinoConfig {
     assertTrue(config.isTrinoJdbcSslEnabled());
   }
 
+  @Test
+  public void testIcebergRestConfigDefaults() {
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
+
+    // Nothing configured, and nothing discovered yet.
+    assertEquals("", config.getManualIcebergRestUri("user_001"));
+    assertEquals("", config.getDiscoveredIcebergRestUri("user_001"));
+    assertTrue(config.isIcebergRestRoutingEnabled());
+    assertTrue(config.getIcebergRestCatalogConfig().isEmpty());
+  }
+
+  @Test
+  public void testIcebergRestRoutingCanBeDisabled() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-routing-enabled", "false"));
+
+    assertFalse(config.isIcebergRestRoutingEnabled());
+    assertTrue(
+        config.toCatalogConfig().contains("\"gravitino.iceberg.rest-routing-enabled\"='false'"));
+  }
+
+  @Test
+  public void testIcebergRestRoutingRejectsInvalidBoolean() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-routing-enabled", "yes"));
+
+    assertThrows(TrinoException.class, config::isIcebergRestRoutingEnabled);
+  }
+
+  @Test
+  public void testIcebergRestConfig() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-uri", "http://127.0.0.1:9001/iceberg",
+                "gravitino.iceberg.rest-catalog.security", "OAUTH2",
+                "gravitino.iceberg.rest-catalog.oauth2.credential", "client_id:client_secret"));
+
+    // The unscoped URI is honored as-is in single-metalake mode.
+    assertEquals("http://127.0.0.1:9001/iceberg", config.getManualIcebergRestUri("user_001"));
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals(2, restCatalogConfig.size());
+    assertEquals("OAUTH2", restCatalogConfig.get("iceberg.rest-catalog.security"));
+    assertEquals(
+        "client_id:client_secret", restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+  }
+
+  @Test
+  public void testIcebergRestOAuthDefaultsToGravitinoClientOAuth() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.<String, String>builder()
+                .put("gravitino.metalake", "user_001")
+                .put("gravitino.client.authType", "oauth2")
+                .put("gravitino.client.oauth2.serverUri", "https://oauth.example.com/")
+                .put("gravitino.client.oauth2.path", "/realms/gravitino/token")
+                .put("gravitino.client.oauth2.credential", "shared-client:shared-secret")
+                .put("gravitino.client.oauth2.scope", "openid")
+                .build());
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals("OAUTH2", restCatalogConfig.get("iceberg.rest-catalog.security"));
+    assertEquals(
+        "shared-client:shared-secret",
+        restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+    assertEquals("openid", restCatalogConfig.get("iceberg.rest-catalog.oauth2.scope"));
+    assertEquals(
+        "https://oauth.example.com/realms/gravitino/token",
+        restCatalogConfig.get("iceberg.rest-catalog.oauth2.server-uri"));
+  }
+
+  @Test
+  public void testIcebergRestOAuthOverridesGravitinoClientOAuthByField() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.<String, String>builder()
+                .put("gravitino.metalake", "user_001")
+                .put("gravitino.client.authType", "oauth2")
+                .put("gravitino.client.oauth2.serverUri", "https://oauth.example.com")
+                .put("gravitino.client.oauth2.path", "realms/gravitino/token")
+                .put("gravitino.client.oauth2.credential", "shared-client:shared-secret")
+                .put("gravitino.client.oauth2.scope", "openid")
+                .put("gravitino.iceberg.rest-catalog.oauth2.credential", "irc-client:irc-secret")
+                .put("gravitino.iceberg.rest-catalog.oauth2.scope", "irc-scope")
+                .build());
+
+    Map<String, String> restCatalogConfig = config.getIcebergRestCatalogConfig();
+    assertEquals(
+        "irc-client:irc-secret", restCatalogConfig.get("iceberg.rest-catalog.oauth2.credential"));
+    assertEquals("irc-scope", restCatalogConfig.get("iceberg.rest-catalog.oauth2.scope"));
+    assertEquals(
+        "https://oauth.example.com/realms/gravitino/token",
+        restCatalogConfig.get("iceberg.rest-catalog.oauth2.server-uri"));
+  }
+
+  @Test
+  public void testIcebergRestConfigScopedToMetalakeInMultiMetalakeMode() {
+    ImmutableMap<String, String> configMap =
+        ImmutableMap.of(
+            "gravitino.metalake",
+            "metalake_a",
+            "gravitino.use-single-metalake",
+            "false",
+            "gravitino.iceberg.rest-uri",
+            "http://unscoped:9001/iceberg",
+            "gravitino.iceberg.rest-uri.metalake_a",
+            "http://metalake-a:9001/iceberg");
+    GravitinoConfig config = new GravitinoConfig(configMap);
+
+    // The scoped key wins for the metalake it names.
+    assertEquals("http://metalake-a:9001/iceberg", config.getManualIcebergRestUri("metalake_a"));
+    // The unscoped key is ignored in multi-metalake mode, since it would otherwise misroute every
+    // metalake other than the one the Iceberg REST server actually serves.
+    assertEquals("", config.getManualIcebergRestUri("metalake_b"));
+  }
+
+  @Test
+  public void testDiscoveredIcebergRestUriIsPerMetalake() {
+    GravitinoConfig config = new GravitinoConfig(ImmutableMap.of("gravitino.metalake", "user_001"));
+
+    config.setDiscoveredIcebergRestUri("metalake_a", "http://irc-a:9001/iceberg");
+    config.setDiscoveredIcebergRestUri("metalake_b", "http://irc-b:9001/iceberg");
+
+    assertEquals("http://irc-a:9001/iceberg", config.getDiscoveredIcebergRestUri("metalake_a"));
+    assertEquals("http://irc-b:9001/iceberg", config.getDiscoveredIcebergRestUri("metalake_b"));
+    assertEquals("", config.getDiscoveredIcebergRestUri("metalake_c"));
+    config.setDiscoveredIcebergRestUri("metalake_a", null);
+    assertEquals("", config.getDiscoveredIcebergRestUri("metalake_a"));
+  }
+
+  @Test
+  public void testToCatalogConfigWithIcebergRestProperties() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.iceberg.rest-uri", "http://127.0.0.1:9001/iceberg",
+                "gravitino.iceberg.rest-catalog.security", "OAUTH2"));
+
+    String catalogConfig = config.toCatalogConfig();
+    assertTrue(
+        catalogConfig.contains("\"gravitino.iceberg.rest-uri\"='http://127.0.0.1:9001/iceberg'"));
+    assertTrue(catalogConfig.contains("\"gravitino.iceberg.rest-catalog.security\"='OAUTH2'"));
+  }
+
+  @Test
+  public void testToCatalogConfigPropagatesSecretReferencesInsteadOfSecretValues() {
+    GravitinoConfig config =
+        new GravitinoConfig(
+            ImmutableMap.of(
+                "gravitino.metalake", "user_001",
+                "gravitino.client.oauth2.credential", "client:management-secret",
+                "gravitino.iceberg.rest-catalog.oauth2.credential", "client:irc-secret",
+                "gravitino.dynamic-catalog.environment-variable.gravitino.client.oauth2.credential",
+                    "GRAVITINO_CLIENT_CREDENTIAL",
+                "gravitino.dynamic-catalog.environment-variable.gravitino.iceberg.rest-catalog.oauth2.credential",
+                    "IRC_CLIENT_CREDENTIAL"));
+
+    String catalogConfig = config.toCatalogConfig();
+
+    assertFalse(catalogConfig.contains("management-secret"));
+    assertFalse(catalogConfig.contains("irc-secret"));
+    assertTrue(
+        catalogConfig.contains(
+            "\"gravitino.client.oauth2.credential\"='${ENV:GRAVITINO_CLIENT_CREDENTIAL}'"));
+    assertTrue(
+        catalogConfig.contains(
+            "\"gravitino.iceberg.rest-catalog.oauth2.credential\"='${ENV:IRC_CLIENT_CREDENTIAL}'"));
+  }
+
   private static boolean skipCatalog(String catalogName, GravitinoConfig config) {
     for (Pattern pattern : config.getSkipCatalogPatterns()) {
       if (pattern.matcher(catalogName).matches()) {

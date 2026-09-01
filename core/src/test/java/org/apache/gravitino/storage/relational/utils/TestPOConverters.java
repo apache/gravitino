@@ -51,6 +51,7 @@ import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
@@ -61,6 +62,7 @@ import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TableStatisticEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
@@ -79,6 +81,7 @@ import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.gravitino.storage.relational.po.ColumnPO;
 import org.apache.gravitino.storage.relational.po.FilesetPO;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
+import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.ModelPO;
 import org.apache.gravitino.storage.relational.po.ModelVersionAliasRelPO;
@@ -93,6 +96,7 @@ import org.apache.gravitino.storage.relational.po.TablePO;
 import org.apache.gravitino.storage.relational.po.TagMetadataObjectRelPO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.po.TopicPO;
+import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.junit.jupiter.api.Assertions;
@@ -368,6 +372,44 @@ public class TestPOConverters {
     assertEquals(expectedTopic.auditInfo().creator(), convertedTopic.auditInfo().creator());
     assertEquals(expectedTopic.comment(), convertedTopic.comment());
     assertEquals(expectedTopic.properties(), convertedTopic.properties());
+  }
+
+  @Test
+  public void testUpdateTopicPOAdvancesOccVersion() throws JsonProcessingException {
+    TopicPO oldTopicPO =
+        createTopicPO(1L, "test", 1L, 1L, 1L, "old comment", ImmutableMap.of("key", "value"));
+    TopicEntity updatedTopic =
+        createTopic(
+            1L,
+            "test",
+            NamespaceUtil.ofTopic("test_metalake", "test_catalog", "test_schema"),
+            "new comment",
+            ImmutableMap.of("key", "new value"));
+
+    TopicPO updatedTopicPO = POConverters.updateTopicPOWithVersion(oldTopicPO, updatedTopic);
+
+    assertEquals(2L, updatedTopicPO.getCurrentVersion());
+    assertEquals(2L, updatedTopicPO.getLastVersion());
+    assertEquals("new comment", updatedTopicPO.getComment());
+    assertEquals(
+        updatedTopic.properties(),
+        JsonUtils.anyFieldMapper().readValue(updatedTopicPO.getProperties(), Map.class));
+
+    TopicPO currentVersionAhead =
+        createTopicPO(
+            1L, "test", 1L, 1L, 1L, "old comment", ImmutableMap.of("key", "value"), 5L, 3L);
+    TopicPO lastVersionAhead =
+        createTopicPO(
+            1L, "test", 1L, 1L, 1L, "old comment", ImmutableMap.of("key", "value"), 3L, 5L);
+
+    // A legacy row with mismatched markers must advance beyond both values, whichever is larger.
+    assertEquals(
+        6L,
+        POConverters.updateTopicPOWithVersion(currentVersionAhead, updatedTopic)
+            .getCurrentVersion());
+    assertEquals(
+        6L,
+        POConverters.updateTopicPOWithVersion(lastVersionAhead, updatedTopic).getCurrentVersion());
   }
 
   @Test
@@ -804,6 +846,59 @@ public class TestPOConverters {
   }
 
   @Test
+  public void testUpdateGroupPOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    GroupEntity group =
+        GroupEntity.builder().withId(2L).withName("group").withAuditInfo(auditInfo).build();
+    GroupPO initialGroupPO =
+        POConverters.initializeGroupPOWithVersion(group, GroupPO.builder().withMetalakeId(1L));
+    GroupPO groupPO =
+        GroupPO.builder()
+            .withGroupId(initialGroupPO.getGroupId())
+            .withGroupName(initialGroupPO.getGroupName())
+            .withMetalakeId(initialGroupPO.getMetalakeId())
+            .withExternalId(initialGroupPO.getExternalId())
+            .withAuditInfo(initialGroupPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialGroupPO.getDeletedAt())
+            .build();
+
+    GroupPO updatedGroupPO = POConverters.updateGroupPOWithVersion(groupPO, group);
+
+    assertEquals(8, updatedGroupPO.getCurrentVersion());
+    assertEquals(8, updatedGroupPO.getLastVersion());
+  }
+
+  @Test
+  public void testUpdateUserPOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    UserEntity user =
+        UserEntity.builder().withId(1L).withName("user").withAuditInfo(auditInfo).build();
+    UserPO initialUserPO =
+        POConverters.initializeUserPOWithVersion(user, UserPO.builder().withMetalakeId(1L));
+    UserPO userPO =
+        UserPO.builder()
+            .withUserId(initialUserPO.getUserId())
+            .withUserName(initialUserPO.getUserName())
+            .withMetalakeId(initialUserPO.getMetalakeId())
+            .withExternalId(initialUserPO.getExternalId())
+            .withEnabled(initialUserPO.getEnabled())
+            .withAuditInfo(initialUserPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialUserPO.getDeletedAt())
+            .build();
+
+    UserPO updatedUserPO = POConverters.updateUserPOWithVersion(userPO, user);
+
+    assertEquals(8, updatedUserPO.getCurrentVersion());
+    assertEquals(8, updatedUserPO.getLastVersion());
+  }
+
+  @Test
   public void testFromPolicyPO() throws JsonProcessingException {
     ImmutableSet<MetadataObject.Type> supportedObjectTypes =
         ImmutableSet.of(MetadataObject.Type.TABLE, MetadataObject.Type.SCHEMA);
@@ -957,6 +1052,8 @@ public class TestPOConverters {
         JsonUtils.anyFieldMapper().readValue(modelPO.getAuditInfo(), AuditInfo.class);
     assertEquals(auditInfo, resultAuditInfo);
     assertEquals(1, modelPO.getModelLatestVersion());
+    assertEquals(1, modelPO.getCurrentVersion());
+    assertEquals(1, modelPO.getLastVersion());
     assertEquals(0, modelPO.getDeletedAt());
 
     // Test with null fields
@@ -1000,6 +1097,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1029,6 +1128,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(null))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1058,6 +1159,8 @@ public class TestPOConverters {
             .withModelProperties(JsonUtils.anyFieldMapper().writeValueAsString(emptyProperties))
             .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
             .withModelLatestVersion(1)
+            .withCurrentVersion(1L)
+            .withLastVersion(1L)
             .withDeletedAt(0L)
             .build();
 
@@ -1569,6 +1672,20 @@ public class TestPOConverters {
       String comment,
       Map<String, String> properties)
       throws JsonProcessingException {
+    return createTopicPO(id, name, metalakeId, catalogId, schemaId, comment, properties, 1L, 1L);
+  }
+
+  private static TopicPO createTopicPO(
+      Long id,
+      String name,
+      Long metalakeId,
+      Long catalogId,
+      Long schemaId,
+      String comment,
+      Map<String, String> properties,
+      Long currentVersion,
+      Long lastVersion)
+      throws JsonProcessingException {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
     return TopicPO.builder()
@@ -1580,8 +1697,8 @@ public class TestPOConverters {
         .withComment(comment)
         .withProperties(JsonUtils.anyFieldMapper().writeValueAsString(properties))
         .withAuditInfo(JsonUtils.anyFieldMapper().writeValueAsString(auditInfo))
-        .withCurrentVersion(1L)
-        .withLastVersion(1L)
+        .withCurrentVersion(currentVersion)
+        .withLastVersion(lastVersion)
         .withDeletedAt(0L)
         .build();
   }
