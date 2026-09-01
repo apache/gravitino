@@ -234,18 +234,12 @@ jobs:
             --min-changed 60 \
             --output coverage-report.md
 
-      - name: Save PR number
-        if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
-        run: echo "${{ github.event.pull_request.number }}" > pr-number.txt
-
       - name: Upload Coverage Report
         if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
-          path: |
-            coverage-report.md
-            pr-number.txt
+          path: coverage-report.md
 
       - name: Output Coverage Info
         if: github.event_name == 'pull_request' && steps.coverage.outputs.has_reports == 'true'

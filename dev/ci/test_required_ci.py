@@ -33,6 +33,7 @@ sources and asserts the contract this PR relies on:
 - web-ui and charts path-filter inside the called workflow
 - the contract script runs from Required CI
 - coverage-comment listens for the Required CI parent, not a standalone build run
+- coverage-comment rejects cancelled runs and does not trust a fork PR-number artifact
 """
 
 import re
@@ -336,6 +337,20 @@ def verify_coverage_comment_follows_parent():
         raise AssertionError(
             "coverage-comment.yml: missing skip action when the artifact is absent"
         )
+    if "conclusion != 'cancelled'" not in source:
+        raise AssertionError(
+            "coverage-comment.yml: must reject cancelled superseded Required CI runs"
+        )
+    if "pr-number.txt" in source:
+        raise AssertionError(
+            "coverage-comment.yml: must not trust a fork-controlled PR number artifact"
+        )
+    for fragment in ("head_sha", "head_branch", "head_repository"):
+        if fragment not in source:
+            raise AssertionError(
+                f"coverage-comment.yml: must validate live PR {fragment} against "
+                "workflow_run"
+            )
     parent = REQUIRED_CI_WORKFLOW.read_text(encoding="utf-8")
     if "name: Required CI" not in parent:
         raise AssertionError(

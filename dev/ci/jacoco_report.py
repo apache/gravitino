@@ -252,6 +252,8 @@ def generate_report(overall, modules, source_files, changed_java_files,
 
     # Hidden marker for comment update detection
     lines.append("<!-- coverage-report -->")
+    if head_sha:
+        lines.append(f"Commit `{head_sha}`.")
 
     # Header table (same style as madrapps/jacoco-report)
     lines.append("### Code Coverage Report")
