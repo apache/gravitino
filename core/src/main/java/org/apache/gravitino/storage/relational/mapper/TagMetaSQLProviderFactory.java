@@ -112,6 +112,11 @@ public class TagMetaSQLProviderFactory {
     return getProvider().selectTagByTagIdForUpdate(tagId);
   }
 
+  /** Delegates a locking read of several tags. */
+  public static String listTagPOsByTagIdsForUpdate(@Param("tagIds") List<Long> tagIds) {
+    return getProvider().listTagPOsByTagIdsForUpdate(tagIds);
+  }
+
   public static String listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds) {
     return getProvider().listTagPOsByTagIds(tagIds);
   }

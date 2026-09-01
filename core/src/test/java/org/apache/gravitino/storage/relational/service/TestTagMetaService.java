@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 import java.io.IOException;
 import java.sql.Connection;
@@ -36,12 +37,16 @@ import java.util.List;
 import java.util.Map;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationEdgeTarget;
 import org.apache.gravitino.RelationQuery;
 import org.apache.gravitino.RelationUpdate;
 import org.apache.gravitino.SupportsRelationOperations;
+import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.Privileges;
+import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.meta.BaseMetalake;
@@ -50,10 +55,14 @@ import org.apache.gravitino.meta.ColumnEntity;
 import org.apache.gravitino.meta.FilesetEntity;
 import org.apache.gravitino.meta.GenericEntity;
 import org.apache.gravitino.meta.ModelEntity;
+import org.apache.gravitino.meta.PolicyEntity;
+import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
+import org.apache.gravitino.meta.UserEntity;
+import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
@@ -488,6 +497,119 @@ public class TestTagMetaService extends TestJDBCBackend {
     Assertions.assertEquals("updated", updated.comment());
     Assertions.assertArrayEquals(
         new String[] {"dev", "prod"}, updated.valueConstraint().allowedValues());
+  }
+
+  @TestTemplate
+  public void testDeleteTagCleansEveryDependentRelation() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_tag_cascade");
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_cascade_occ")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("initial")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tag, false);
+    tagMetaService.associateTagsWithMetadataObject(
+        catalog.nameIdentifier(),
+        catalog.type(),
+        new NameIdentifier[] {tag.nameIdentifier()},
+        new NameIdentifier[0]);
+
+    PolicyEntity policy =
+        createAndInsertPolicyEntity(
+            "policy_tag_cascade",
+            "policy comment",
+            PolicyContents.custom(
+                ImmutableMap.of("k", "v"), ImmutableSet.of(MetadataObject.Type.TAG), null),
+            METALAKE_NAME);
+    backend.updateEntityRelations(
+        RelationUpdate.of(
+            SupportsRelationOperations.Type.POLICY_TAG_REL,
+            tag.nameIdentifier(),
+            Entity.EntityType.TAG,
+            new RelationEdgeTarget[] {
+              RelationEdgeTarget.of(
+                  policy.nameIdentifier(),
+                  Entity.EntityType.POLICY,
+                  "{\"type\":\"TAG_VALUE\",\"value\":\"finance\"}")
+            },
+            new RelationEdgeTarget[0]));
+    PolicyMetaService.getInstance()
+        .associatePoliciesWithMetadataObject(
+            tag.nameIdentifier(),
+            Entity.EntityType.TAG,
+            new NameIdentifier[] {policy.nameIdentifier()},
+            new NameIdentifier[0]);
+
+    UserEntity user =
+        createUserEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofUserNamespace(METALAKE_NAME),
+            "user_tag_cascade",
+            AUDIT_INFO);
+    backend.insert(user, false);
+    OwnerMetaService.getInstance()
+        .setOwner(tag.nameIdentifier(), Entity.EntityType.TAG, user.nameIdentifier(), user.type());
+
+    RoleEntity role =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(METALAKE_NAME),
+            "role_tag_cascade",
+            AUDIT_INFO,
+            Lists.newArrayList(
+                SecurableObjects.ofTag(
+                    tag.name(), Lists.newArrayList(Privileges.ApplyTag.allow()))),
+            null);
+    backend.insert(role, false);
+
+    String tagAsMetadataObject =
+        String.format("metadata_object_id = %d AND metadata_object_type = 'TAG'", tag.id());
+    String tagAsSecurableObject =
+        String.format("metadata_object_id = %d AND type = 'TAG'", tag.id());
+    assertEquals(1, countActiveTagRel(tag.id()));
+    assertEquals(1, countActiveRows("policy_tag_relation_meta", "tag_id = " + tag.id()));
+    assertEquals(1, countActiveRows("policy_relation_meta", tagAsMetadataObject));
+    assertEquals(1, countActiveRows("owner_meta", tagAsMetadataObject));
+    assertEquals(1, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
+
+    assertTrue(tagMetaService.deleteTag(tag.nameIdentifier()));
+
+    assertEquals(0, countActiveTagRel(tag.id()));
+    assertEquals(0, countActiveRows("policy_tag_relation_meta", "tag_id = " + tag.id()));
+    assertEquals(0, countActiveRows("policy_relation_meta", tagAsMetadataObject));
+    assertEquals(0, countActiveRows("owner_meta", tagAsMetadataObject));
+    assertEquals(0, countActiveRows("role_meta_securable_object", tagAsSecurableObject));
+  }
+
+  @TestTemplate
+  public void testDeleteOfAlreadyDeletedTagReportsMissingTagNotConflict() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_gone_occ")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("initial")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tag, false);
+    TagPO observedPO =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class, mapper -> mapper.selectTagByTagId(tag.id()));
+    Assertions.assertTrue(tagMetaService.deleteTag(tag.nameIdentifier()));
+
+    // The row the caller observed is gone rather than merely moved on, so the failed
+    // compare-and-set is a missing tag and not a version conflict.
+    Assertions.assertThrows(
+        NoSuchEntityException.class,
+        () -> tagMetaService.deleteTag(tag.nameIdentifier(), observedPO));
+    Assertions.assertFalse(tagMetaService.deleteTag(tag.nameIdentifier()));
   }
 
   @TestTemplate
@@ -1489,6 +1611,24 @@ public class TestTagMetaService extends TestJDBCBackend {
   private boolean containsGenericEntity(
       List<GenericEntity> genericEntities, String name, Entity.EntityType entityType) {
     return genericEntities.stream().anyMatch(e -> e.name().equals(name) && e.type() == entityType);
+  }
+
+  private int countActiveRows(String table, String whereClause) {
+    try (SqlSession sqlSession =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = sqlSession.getConnection();
+        Statement statement = connection.createStatement();
+        ResultSet rs =
+            statement.executeQuery(
+                String.format(
+                    "SELECT count(*) FROM %s WHERE %s AND deleted_at = 0", table, whereClause))) {
+      if (rs.next()) {
+        return rs.getInt(1);
+      }
+      throw new RuntimeException("Doesn't contain data");
+    } catch (SQLException se) {
+      throw new RuntimeException("SQL execution failed", se);
+    }
   }
 
   private Integer countAllTagRel(Long tagId) {

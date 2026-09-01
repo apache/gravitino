@@ -29,7 +29,6 @@ import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -182,49 +181,6 @@ public class TagMetaService {
       return false;
     }
     return deleteTag(identifier, tagPO);
-  }
-
-  /**
-   * Deletes the tag the caller observed. The delete is a compare-and-set on the observed version,
-   * so a tag that changed since it was read is rejected instead of being removed, and the dependent
-   * rows are cleaned up in the same transaction as the tag row itself.
-   *
-   * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
-   * use {@link #deleteTag(NameIdentifier)}, which reads it first.
-   */
-  @VisibleForTesting
-  boolean deleteTag(NameIdentifier identifier, TagPO tagPO) {
-    long tagId = tagPO.getTagId();
-
-    SessionUtils.doMultipleWithCommit(
-        () -> deleteTagWithVersion(identifier, tagPO),
-        () ->
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tagId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        tagId, MetadataObject.Type.TAG.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        tagId, MetadataObject.Type.TAG.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        tagId, MetadataObject.Type.TAG.name())));
-
-    return true;
   }
 
   @Monitored(
@@ -600,6 +556,55 @@ public class TagMetaService {
     return tagDeletedCount[0] + tagMetadataObjectRelDeletedCount[0] + policyTagRelDeletedCount[0];
   }
 
+  /**
+   * Deletes the tag the caller observed. The delete is a compare-and-set on the observed version,
+   * so a tag that changed since it was read is rejected instead of being removed, and the dependent
+   * rows are cleaned up in the same transaction as the tag row itself.
+   *
+   * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
+   * use {@link #deleteTag(NameIdentifier)}, which reads it first.
+   */
+  @VisibleForTesting
+  boolean deleteTag(NameIdentifier identifier, TagPO tagPO) {
+    long tagId = tagPO.getTagId();
+
+    // The version-checked delete of the tag row must stay first: it is what decides whether this
+    // delete wins, and a losing delete throws there and rolls the transaction back before any
+    // dependent row is touched. The cleanups that follow are blanket soft deletes for this tag ID,
+    // so their row counts carry no information -- a tag with no assignments, no policies, no owner
+    // and no securable object legitimately clears zero rows -- and only the delete above is
+    // checked.
+    SessionUtils.doMultipleWithCommit(
+        () -> deleteTagWithVersion(identifier, tagPO),
+        () ->
+            SessionUtils.doWithoutCommit(
+                TagMetadataObjectRelMapper.class,
+                mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tagId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId)),
+        () ->
+            SessionUtils.doWithoutCommit(
+                PolicyMetadataObjectRelMapper.class,
+                mapper ->
+                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                        tagId, MetadataObject.Type.TAG.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                OwnerMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                        tagId, MetadataObject.Type.TAG.name())),
+        () ->
+            SessionUtils.doWithoutCommit(
+                SecurableObjectMapper.class,
+                mapper ->
+                    mapper.softDeleteObjectRelsByMetadataObject(
+                        tagId, MetadataObject.Type.TAG.name())));
+
+    return true;
+  }
+
   private static List<TagEntity> tagPOsToTagEntities(List<TagPO> tagPOs, Namespace namespace) {
     Map<Long, List<TagPO>> tagPOsByTagId = new LinkedHashMap<>();
     for (TagPO tagPO : tagPOs) {
@@ -754,30 +759,49 @@ public class TagMetaService {
    * Locks every tag taking part in an assignment change and returns the rows as they are now, so
    * the assignment cannot be written against a tag that is being renamed or dropped.
    *
-   * <p>The rows are locked in tag-ID order. Two assignment changes that touch the same tags
-   * therefore take the locks in the same order and queue up instead of deadlocking.
-   *
-   * <p>A tag whose row is gone, or whose name or metalake no longer matches what the caller
-   * resolved by name, is reported as missing: the caller asked for a tag name, and that name no
-   * longer points at this row.
+   * <p>See {@link #lockTags} for how the rows are locked and what counts as a missing tag.
    */
   private List<TagPO> lockTagsForAssignment(List<TagPO> observedTagPOs) {
-    List<TagPO> sortedTagPOs = new ArrayList<>(observedTagPOs);
-    sortedTagPOs.sort(Comparator.comparingLong(TagPO::getTagId));
-    List<TagPO> lockedTagPOs = new ArrayList<>(sortedTagPOs.size());
-    for (TagPO observedTagPO : sortedTagPOs) {
-      lockedTagPOs.add(
+    return new ArrayList<>(lockTags(observedTagPOs).values());
+  }
+
+  /**
+   * Locks the given tag rows and returns them as they are now, keyed by tag ID.
+   *
+   * <p>The rows are locked by one statement that orders them by tag ID, so callers that touch
+   * overlapping tags take the row locks in the same order and queue up instead of deadlocking, and
+   * a change touching many tags still costs a single round trip.
+   *
+   * <p>A row that is gone, or whose name or metalake no longer matches what the caller resolved by
+   * name, is reported as missing: the caller asked for a tag name, and that name no longer points
+   * at this row.
+   */
+  static Map<Long, TagPO> lockTags(List<TagPO> observedTagPOs) {
+    Map<Long, TagPO> observedById = new LinkedHashMap<>();
+    observedTagPOs.forEach(tagPO -> observedById.put(tagPO.getTagId(), tagPO));
+    if (observedById.isEmpty()) {
+      return new LinkedHashMap<>();
+    }
+
+    List<TagPO> lockedRows =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper -> mapper.listTagPOsByTagIdsForUpdate(new ArrayList<>(observedById.keySet())));
+    Map<Long, TagPO> lockedById = new LinkedHashMap<>();
+    lockedRows.forEach(tagPO -> lockedById.put(tagPO.getTagId(), tagPO));
+
+    Map<Long, TagPO> lockedTagPOs = new LinkedHashMap<>();
+    for (TagPO observedTagPO : observedById.values()) {
+      TagPO lockedTagPO =
           OccWriteSupport.lockParentForChildWrite(
               observedTagPO.getTagName(),
               Entity.EntityType.TAG,
-              () ->
-                  SessionUtils.getWithoutCommit(
-                      TagMetaMapper.class,
-                      mapper -> mapper.selectTagByTagIdForUpdate(observedTagPO.getTagId())),
+              () -> lockedById.get(observedTagPO.getTagId()),
               null,
               current ->
                   Objects.equals(current.getTagName(), observedTagPO.getTagName())
-                      && Objects.equals(current.getMetalakeId(), observedTagPO.getMetalakeId())));
+                      && Objects.equals(current.getMetalakeId(), observedTagPO.getMetalakeId()));
+      lockedTagPOs.put(lockedTagPO.getTagId(), lockedTagPO);
     }
     return lockedTagPOs;
   }

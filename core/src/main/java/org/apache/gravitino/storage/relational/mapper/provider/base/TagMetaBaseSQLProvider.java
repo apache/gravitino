@@ -256,6 +256,34 @@ public class TagMetaBaseSQLProvider {
         + "</script>";
   }
 
+  /**
+   * Returns SQL that selects and exclusively locks several active tags, ordered by tag ID so that
+   * concurrent callers take the row locks in the same order.
+   */
+  public String listTagPOsByTagIdsForUpdate(@Param("tagIds") List<Long> tagIds) {
+    return "<script>"
+        + "SELECT tag_id as tagId, tag_name as tagName,"
+        + " metalake_id as metalakeId,"
+        + " tag_comment as comment,"
+        + " properties as properties,"
+        + " allowed_values as allowedValues,"
+        + " audit_info as auditInfo,"
+        + " current_version as currentVersion,"
+        + " last_version as lastVersion,"
+        + " deleted_at as deletedAt"
+        + " FROM "
+        + TAG_TABLE_NAME
+        + " WHERE deleted_at = 0"
+        + " AND tag_id IN ("
+        + "<foreach collection='tagIds' item='tagId' separator=','>"
+        + "#{tagId}"
+        + "</foreach>"
+        + ")"
+        + " ORDER BY tag_id"
+        + " FOR UPDATE"
+        + "</script>";
+  }
+
   public String batchSelectTagByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames) {
     return "<script>"

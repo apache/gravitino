@@ -99,6 +99,15 @@ public interface TagMetaMapper {
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByTagIds")
   List<TagPO> listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds);
 
+  /**
+   * Selects and exclusively locks the active tags with the given IDs, in ascending ID order.
+   *
+   * @param tagIds The tag IDs to lock.
+   * @return The locked tags. Tags that are not active are absent from the result.
+   */
+  @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "listTagPOsByTagIdsForUpdate")
+  List<TagPO> listTagPOsByTagIdsForUpdate(@Param("tagIds") List<Long> tagIds);
+
   @SelectProvider(type = TagMetaSQLProviderFactory.class, method = "batchSelectTagByIdentifier")
   List<TagPO> batchSelectTagByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("tagNames") List<String> tagNames);

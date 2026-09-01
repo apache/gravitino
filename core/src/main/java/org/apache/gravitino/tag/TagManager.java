@@ -46,6 +46,7 @@ import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
 import org.apache.gravitino.exceptions.NoSuchTagException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyAssociatedException;
 import org.apache.gravitino.exceptions.TagAlreadyExistsException;
@@ -192,6 +193,16 @@ public class TagManager implements TagDispatcher {
                     .orElse(name);
             throw new TagAlreadyExistsException(
                 e, "Tag with name %s under metalake %s already exists", newName, metalake);
+          } catch (OptimisticLockException ole) {
+            // The store now rejects a stale alter with this exception instead of an IOException,
+            // and the REST layer maps it to a conflict. Log it here so the operator-facing record
+            // still names the tag and the metalake.
+            LOG.warn(
+                "Failed to alter tag {} under metalake {} because it changed concurrently",
+                name,
+                metalake,
+                ole);
+            throw ole;
           } catch (IOException ioe) {
             LOG.error("Failed to alter tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
@@ -208,6 +219,13 @@ public class TagManager implements TagDispatcher {
           try {
             return entityStore.delete(
                 NameIdentifierUtil.ofTag(metalake, name), Entity.EntityType.TAG);
+          } catch (OptimisticLockException ole) {
+            LOG.warn(
+                "Failed to delete tag {} under metalake {} because it changed concurrently",
+                name,
+                metalake,
+                ole);
+            throw ole;
           } catch (IOException ioe) {
             LOG.error("Failed to delete tag {} under metalake {}", name, metalake, ioe);
             throw new RuntimeException(ioe);
