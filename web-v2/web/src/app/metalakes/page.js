@@ -37,6 +37,7 @@ import {
 } from '@/lib/store/metalakes'
 import { to } from '@/lib/utils'
 import { formatToDateTime } from '@/lib/utils/date'
+import { canCreateMetalake } from '@/lib/utils/metalakePermissions'
 import Icons from '@/components/Icons'
 import GetOwner from '@/components/GetOwner'
 import PropertiesContent from '@/components/PropertiesContent'
@@ -70,6 +71,7 @@ const MetalakeList = () => {
   const [ownerRefreshKey, setOwnerRefreshKey] = useState(0)
   const auth = useAppSelector(state => state.auth)
   const { isServiceAdmin, authUser, anthEnable, authType, authToken } = auth
+  const showCreateMetalake = canCreateMetalake(anthEnable, isServiceAdmin)
   const isAuthReady = authType && (authType !== 'oauth' || !!authToken)
   const dispatch = useAppDispatch()
   const store = useAppSelector(state => state.metalakes)
@@ -369,7 +371,7 @@ const MetalakeList = () => {
               placeholder='Search...'
               onChange={onSearchTable}
             />
-            {(isServiceAdmin || !anthEnable) && (
+            {showCreateMetalake && (
               <Button
                 data-refer='create-metalake-btn'
                 type='primary'
