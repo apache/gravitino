@@ -27,6 +27,7 @@ import org.apache.gravitino.Entity.EntityType;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AuthorizationRequestContext;
 import org.apache.gravitino.server.authorization.annotations.IcebergAuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor.AuthorizationHandler;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
@@ -107,9 +108,9 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
   }
 
   /**
-   * Validates authorization for cross-namespace view renames following MySQL privilege model: -
-   * Requires ownership on source view (equivalent to DROP privilege) - Requires CREATE_VIEW
-   * privilege on destination schema
+   * Validates authorization for cross-namespace view renames: ownership is required on the source
+   * view, and {@code CREATE_VIEW} is required on the destination schema. Gravitino does not define
+   * a {@code DROP_VIEW} privilege.
    *
    * @param catalog The catalog name
    * @param metalakeName The metalake name
@@ -134,10 +135,7 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
         EntityType.VIEW,
         NameIdentifierUtil.ofView(metalakeName, catalog, sourceSchema, sourceView));
 
-    String sourceExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && VIEW::OWNER";
+    String sourceExpression = AuthorizationExpressionConstants.VIEW_OWNER_AUTHORIZATION_EXPRESSION;
 
     AuthorizationExpressionEvaluator sourceEvaluator =
         new AuthorizationExpressionEvaluator(sourceExpression);
@@ -162,10 +160,7 @@ public class RenameViewAuthzHandler implements AuthorizationHandler {
     destContext.put(
         EntityType.SCHEMA, NameIdentifierUtil.ofSchema(metalakeName, catalog, destSchema));
 
-    String destExpression =
-        "ANY(OWNER, METALAKE, CATALOG) || "
-            + "SCHEMA_OWNER_WITH_USE_CATALOG || "
-            + "ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_VIEW";
+    String destExpression = AuthorizationExpressionConstants.CREATE_VIEW_AUTHORIZATION_EXPRESSION;
 
     AuthorizationExpressionEvaluator destEvaluator =
         new AuthorizationExpressionEvaluator(destExpression);
