@@ -156,6 +156,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Check Required CI source contract
         run: python3 dev/ci/test_required_ci.py
+      - name: Check coverage-comment model
+        run: python3 dev/ci/test_coverage_comment.py
 
   # Aggregate every reusable suite into one check. `if: always()` runs even
   # when an upstream suite is skipped (path filter), because a skipped suite

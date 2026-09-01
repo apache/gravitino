@@ -14,9 +14,9 @@ name: Coverage Comment
 # workflow_run workflows are loaded from the default branch, so this retarget
 # takes effect after merge; this PR itself still uses main's old listener.
 #
-# Do not trust a PR number from the coverage artifact (fork-controlled).
-# Resolve the PR from workflow_run metadata, then require the live PR head
-# SHA, repo, and branch to match this run before posting.
+# Skip/post rules live in dev/ci/coverage_comment.py (same module jacoco_report.py
+# uses for the comment marker and commit SHA line). Do not trust a PR number
+# from the coverage artifact.
 on:
   workflow_run:
     workflows: ["Required CI"]
@@ -24,19 +24,27 @@ on:
 
 permissions:
   actions: read
+  contents: read
   pull-requests: write
 
 jobs:
   comment:
     runs-on: ubuntu-latest
-    # Any completed PR run of Required CI except cancelled/skipped superseded
-    # runs. Do not require conclusion == success: a red sibling suite (spark,
-    # etc.) must not hide a coverage report that build already uploaded.
+    # Cheap filter matching coverage_comment.SKIPPED_CONCLUSIONS. The Python
+    # model still enforces the same skip so tests and the sidecar stay synced.
+    # Do not require conclusion == success: a red sibling suite must not hide
+    # a coverage report that build already uploaded.
     if: >
       github.event.workflow_run.event == 'pull_request' &&
       github.event.workflow_run.conclusion != 'cancelled' &&
       github.event.workflow_run.conclusion != 'skipped'
     steps:
+      # Default-branch SHA only. Never check out the PR head: this job has
+      # pull-requests: write, so skip/post logic must come from apache/main.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
       - name: Download Coverage Report
         id: download
         uses: actions/download-artifact@v4
@@ -46,97 +54,7 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
         continue-on-error: true
 
-      - name: Skip when no coverage report
-        if: steps.download.outcome != 'success'
-        run: |
-          echo "ACTION=skip"
-          echo "REASON=no coverage-report artifact on the Required CI run"
-          echo "Build path-skipped, failed before upload, or this branch is not yet on the default-branch listener."
-
-      - name: Post Coverage Comment
-        if: steps.download.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const fs = require('fs');
-            const run = context.payload.workflow_run;
-            const owner = context.repo.owner;
-            const repo = context.repo.repo;
-            const runSha = run.head_sha;
-            const runBranch = run.head_branch;
-            const runRepo = run.head_repository && run.head_repository.full_name;
-
-            async function resolveNumber() {
-              const embedded = run.pull_requests || [];
-              if (embedded.length === 1) {
-                return embedded[0].number;
-              }
-              if (!run.head_repository || !run.head_repository.owner) {
-                return null;
-              }
-              const head = `${run.head_repository.owner.login}:${runBranch}`;
-              const { data } = await github.rest.pulls.list({
-                owner,
-                repo,
-                state: 'open',
-                head,
-              });
-              if (data.length === 1) {
-                return data[0].number;
-              }
-              return null;
-            }
-
-            const prNumber = await resolveNumber();
-            if (!prNumber) {
-              core.info('ACTION=skip');
-              core.info('REASON=could not uniquely resolve PR from workflow_run');
-              return;
-            }
-
-            const { data: pr } = await github.rest.pulls.get({
-              owner,
-              repo,
-              pull_number: prNumber,
-            });
-            const prSha = pr.head.sha;
-            const prBranch = pr.head.ref;
-            const prRepo = pr.head.repo && pr.head.repo.full_name;
-            if (prSha !== runSha || prBranch !== runBranch || prRepo !== runRepo) {
-              core.info('ACTION=skip');
-              core.info('REASON=stale or mismatched PR head SHA/repo/branch');
-              core.info(`run sha=${runSha} repo=${runRepo} branch=${runBranch}`);
-              core.info(`pr  sha=${prSha} repo=${prRepo} branch=${prBranch}`);
-              return;
-            }
-
-            let body = fs.readFileSync('coverage-report.md', 'utf8');
-            if (!body.includes(runSha)) {
-              body = body.replace(
-                '<!-- coverage-report -->',
-                `<!-- coverage-report -->\nCommit \`${runSha}\`.`
-              );
-            }
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number: prNumber,
-              per_page: 100,
-            });
-            const existing = comments.find(c => c.body.includes('<!-- coverage-report -->'));
-            if (existing) {
-              await github.rest.issues.updateComment({
-                owner,
-                repo,
-                comment_id: existing.id,
-                body,
-              });
-            } else {
-              await github.rest.issues.createComment({
-                owner,
-                repo,
-                issue_number: prNumber,
-                body,
-              });
-            }
+      - name: Post or skip coverage comment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 dev/ci/coverage_comment.py

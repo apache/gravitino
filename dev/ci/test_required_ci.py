@@ -33,6 +33,7 @@ sources and asserts the contract this PR relies on:
 - web-ui and charts path-filter inside the called workflow
 - the contract script runs from Required CI
 - coverage-comment listens for the Required CI parent, not a standalone build run
+- coverage-comment runs the Python skip/post model, not inline github-script
 - coverage-comment rejects cancelled runs and does not trust a fork PR-number artifact
 """
 
@@ -194,6 +195,10 @@ def verify_parent():
         raise AssertionError(
             "required-ci.yml: must run the source contract check in CI"
         )
+    if "python3 dev/ci/test_coverage_comment.py" not in source:
+        raise AssertionError(
+            "required-ci.yml: must run the coverage-comment model tests in CI"
+        )
     if "- contract" not in required_ci:
         raise AssertionError("required-ci.yml: Required CI does not need contract")
 
@@ -323,7 +328,7 @@ def verify_conflict_marker_standalone():
 
 
 def verify_coverage_comment_follows_parent():
-    """Verify the coverage sidecar waits for Required CI, not standalone build."""
+    """Verify the coverage sidecar waits for Required CI and uses the Python model."""
     source = COVERAGE_COMMENT_WORKFLOW.read_text(encoding="utf-8")
     if 'workflows: ["Required CI"]' not in source:
         raise AssertionError(
@@ -333,24 +338,31 @@ def verify_coverage_comment_follows_parent():
         raise AssertionError(
             "coverage-comment.yml: standalone build is no longer the PR entry point"
         )
-    if "ACTION=skip" not in source:
+    if "python3 dev/ci/coverage_comment.py" not in source:
         raise AssertionError(
-            "coverage-comment.yml: missing skip action when the artifact is absent"
+            "coverage-comment.yml: skip/post rules must run from coverage_comment.py"
+        )
+    if "github-script" in source:
+        raise AssertionError(
+            "coverage-comment.yml: posting logic must not live in inline github-script"
         )
     if "conclusion != 'cancelled'" not in source:
         raise AssertionError(
             "coverage-comment.yml: must reject cancelled superseded Required CI runs"
         )
+    if "conclusion != 'skipped'" not in source:
+        raise AssertionError(
+            "coverage-comment.yml: must reject skipped Required CI runs"
+        )
     if "pr-number.txt" in source:
         raise AssertionError(
             "coverage-comment.yml: must not trust a fork-controlled PR number artifact"
         )
-    for fragment in ("head_sha", "head_branch", "head_repository"):
-        if fragment not in source:
-            raise AssertionError(
-                f"coverage-comment.yml: must validate live PR {fragment} against "
-                "workflow_run"
-            )
+    build = (WORKFLOW_DIR / "build.yml").read_text(encoding="utf-8")
+    if "pr-number.txt" in build:
+        raise AssertionError(
+            "build.yml: must not upload a fork-controlled PR number artifact"
+        )
     parent = REQUIRED_CI_WORKFLOW.read_text(encoding="utf-8")
     if "name: Required CI" not in parent:
         raise AssertionError(
