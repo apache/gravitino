@@ -218,6 +218,13 @@ public class MetalakeOperations {
           String metalakeName,
       MetalakeUpdatesRequest updatesRequest) {
     LOG.info("Received alter metalake request for metalake: {}", metalakeName);
+    if (updatesRequest == null) {
+      return ExceptionHandlers.handleMetalakeException(
+          OperationType.ALTER,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

@@ -304,6 +304,17 @@ public class TestTopicOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterTopicWithNullRequest() {
+    Response resp =
+        target(topicPath(metalake, catalog, schema) + "/topic1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testSetTopicProperties() {
     TopicUpdateRequest req = new TopicUpdateRequest.SetTopicPropertyRequest("key1", "value1");
     Topic topic = mockTopic("topic1", "comment", ImmutableMap.of("key1", "value1"));
