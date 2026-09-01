@@ -264,7 +264,7 @@ public class TestAuthMappers {
   void testGroupMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertGroup(31L, "group31", 1L);
-    groupMetaMapper.softDeleteGroupMetaByGroupId(31L);
+    groupMetaMapper.softDeleteGroupMetaByGroupId(31L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("group_meta", "group_id", 31L);
     groupMetaMapper.touchGroupUpdatedAt(31L);
@@ -285,6 +285,16 @@ public class TestAuthMappers {
     Assertions.assertNotNull(info);
     Assertions.assertEquals(32L, info.getGroupId());
     Assertions.assertEquals(expected, info.getUpdatedAt());
+  }
+
+  @Test
+  void testGroupDeleteUsesCurrentVersion() {
+    insertMetalake(1L, "metalake1");
+    insertGroup(33L, "group33", 1L);
+
+    Assertions.assertEquals(0, groupMetaMapper.softDeleteGroupMetaByGroupId(33L, 2L));
+    Assertions.assertNotNull(groupMetaMapper.selectGroupMetaByMetalakeIdAndName(1L, "group33"));
+    Assertions.assertEquals(1, groupMetaMapper.softDeleteGroupMetaByGroupId(33L, 1L));
   }
 
   @Test
