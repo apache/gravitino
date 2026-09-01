@@ -22,13 +22,16 @@ This script does not contact GitHub. It reads the checked-in workflow
 sources and asserts the contract this PR relies on:
 
 - the parent is the sole pull_request listener for the aggregated suites
-- each suite is reusable via workflow_call + required_ci and keeps push
+- each suite is reusable via workflow_call + required_ci
+- suites that already had push keep it; Test Charts stays PR-only via the parent
 - Required CI is a static always() aggregate that fails on any non-success
 - conflict-marker-check stays standalone and is not part of the aggregate
+- every other pull_request workflow is aggregated or explicitly allowlisted
 - required-mode concurrency keys are unique per suite
 - standalone (push) keys use github.workflow, not a shared 'standalone' literal
 - the parent cancels superseded PR runs
-- web-ui path-filters inside the called workflow
+- web-ui and charts path-filter inside the called workflow
+- the contract script runs from Required CI
 - coverage-comment listens for the Required CI parent, not a standalone build run
 """
 
@@ -57,6 +60,8 @@ SUITE_WORKFLOWS = {
     "maintenance": "maintenance-integration-test.yml",
     "contrib_catalog": "contrib-catalog-test.yml",
     "web_ui": "web-ui-tests.yml",
+    "charts": "chart-test.yaml",
+    "asf_allowlist": "asf-allowlist-check.yml",
 }
 
 REQUIRED_CONCURRENCY_KEYS = {
@@ -74,11 +79,22 @@ REQUIRED_CONCURRENCY_KEYS = {
     "maintenance": "required-maintenance",
     "contrib_catalog": "required-contrib-catalog",
     "web_ui": "required-web-ui",
+    "charts": "required-charts",
+    "asf_allowlist": "required-asf-allowlist",
 }
 
 WORKFLOW_DISPATCH_SUITES = {
     "contrib-catalog-test.yml",
     "idp-basic-test.yml",
+    "asf-allowlist-check.yml",
+}
+
+SUITES_WITHOUT_PUSH = {
+    "chart-test.yaml",
+}
+
+STANDALONE_PULL_REQUEST_WORKFLOWS = {
+    "conflict-marker-check.yml",
 }
 
 
@@ -173,6 +189,13 @@ def verify_parent():
             "required-ci.yml: conflict-marker-check must stay outside the aggregate"
         )
 
+    if "python3 dev/ci/test_required_ci.py" not in source:
+        raise AssertionError(
+            "required-ci.yml: must run the source contract check in CI"
+        )
+    if "- contract" not in required_ci:
+        raise AssertionError("required-ci.yml: Required CI does not need contract")
+
     print(
         f"Verified parent fan-out for {len(SUITE_WORKFLOWS)} suites and "
         "static Required CI name"
@@ -193,7 +216,14 @@ def verify_suites():
             raise AssertionError(
                 f"{workflow_name}: parent must be the only suite PR listener"
             )
-        if not re.search(r"(?m)^  push:$", source):
+        has_push = re.search(r"(?m)^  push:$", source) is not None
+        if workflow_name in SUITES_WITHOUT_PUSH:
+            if has_push:
+                raise AssertionError(
+                    f"{workflow_name}: must not grow a push trigger; parent is the "
+                    "PR entry point"
+                )
+        elif not has_push:
             raise AssertionError(f"{workflow_name}: existing push trigger was removed")
 
         has_dispatch = re.search(r"(?m)^  workflow_dispatch:$", source) is not None
@@ -210,6 +240,16 @@ def verify_suites():
                 raise AssertionError("web-ui-tests.yml: missing web/web/** filter")
             if "needs.changes.outputs.source_changes == 'true'" not in source:
                 raise AssertionError("web-ui-tests.yml: test job must skip when paths miss")
+
+        if job_id == "charts":
+            if "dorny/paths-filter@" not in source:
+                raise AssertionError("chart-test.yaml: missing internal path filter")
+            if "dev/charts/**" not in source:
+                raise AssertionError("chart-test.yaml: missing dev/charts/** filter")
+            if "needs.changes.outputs.source_changes == 'true'" not in source:
+                raise AssertionError(
+                    "chart-test.yaml: lint-test must skip when chart paths miss"
+                )
 
         expected_key = REQUIRED_CONCURRENCY_KEYS[job_id]
         group = re.search(r"(?m)^  group: (.+)$", source)
@@ -239,6 +279,32 @@ def verify_suites():
         len(REQUIRED_CONCURRENCY_KEYS),
     )
     print(f"Verified {len(SUITE_WORKFLOWS)} reusable suite contracts")
+
+
+def workflow_files():
+    """Return every Actions workflow, including *.yaml."""
+    return sorted(WORKFLOW_DIR.glob("*.yml")) + sorted(WORKFLOW_DIR.glob("*.yaml"))
+
+
+def verify_pull_request_inventory():
+    """Every pull_request workflow is the parent, an aggregated suite, or allowlisted."""
+    discovered = []
+    for path in workflow_files():
+        source = path.read_text(encoding="utf-8")
+        if re.search(r"(?m)^  pull_request:$", source):
+            discovered.append(path.name)
+    expected = sorted(["required-ci.yml", *STANDALONE_PULL_REQUEST_WORKFLOWS])
+    check_equal("pull_request workflow inventory", sorted(discovered), expected)
+    if "chart-test.yaml" in discovered:
+        raise AssertionError("chart-test.yaml: must not keep a pull_request trigger")
+    if "asf-allowlist-check.yml" in discovered:
+        raise AssertionError(
+            "asf-allowlist-check.yml: must not keep a pull_request trigger"
+        )
+    print(
+        f"Verified pull_request inventory across {len(workflow_files())} "
+        "yml/yaml workflows"
+    )
 
 
 def verify_conflict_marker_standalone():
@@ -283,6 +349,7 @@ def main():
     simulate_aggregate()
     verify_parent()
     verify_suites()
+    verify_pull_request_inventory()
     verify_conflict_marker_standalone()
     verify_coverage_comment_follows_parent()
     print("Required CI contract check passed without starting CI")

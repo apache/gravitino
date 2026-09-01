@@ -21,7 +21,9 @@
 # `main` ruleset can require, so merges are gated on CI and not on review
 # alone. This parent is the sole pull-request listener; each child suite is
 # invoked via `workflow_call` and keeps its own path-based skip, so a PR that
-# touches only docs no-ops every suite but still reports a green `Required CI`.
+# touches only docs no-ops expensive suites but still reports a green `Required CI`.
+# Test Charts and ASF Allowlist Check are in the aggregate so a later ruleset
+# that requires only `Required CI` plus `conflict-marker-check` still gates them.
 # Each called workflow also appears as its own check in the PR checks panel,
 # so contributors keep per-suite visibility. `push` triggers on the children
 # are unchanged, so branch builds behave exactly as before.
@@ -46,7 +48,7 @@ on:
 concurrency:
   group: required-ci-${{ github.event.pull_request.number || github.ref }}
   # Cancel the superseded PR run. Children already cancel in-progress; the
-  # parent must too or a second push waits out a full stale 14-suite run.
+  # parent must too or a second push waits out a full stale parent run.
   cancel-in-progress: true
 
 jobs:
@@ -134,6 +136,27 @@ jobs:
       required_ci: true
     secrets: inherit
 
+  charts:
+    uses: ./.github/workflows/chart-test.yaml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  asf_allowlist:
+    uses: ./.github/workflows/asf-allowlist-check.yml
+    with:
+      required_ci: true
+    secrets: inherit
+
+  contract:
+    name: Required CI contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Required CI source contract
+        run: python3 dev/ci/test_required_ci.py
+
   # Aggregate every reusable suite into one check. `if: always()` runs even
   # when an upstream suite is skipped (path filter), because a skipped suite
   # reports `success` and must not fail the aggregate. The job fails only if
@@ -156,6 +179,9 @@ jobs:
       - maintenance
       - contrib_catalog
       - web_ui
+      - charts
+      - asf_allowlist
+      - contract
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

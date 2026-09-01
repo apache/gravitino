@@ -1,12 +1,19 @@
 name: Test Charts
 
-# Controls when the workflow will run
+# Triggered by the Required CI orchestrator (workflow_call). Keep the inner
+# changes filter so a non-chart PR no-ops lint-test; the reusable call still
+# reports success so Required CI stays green.
 on:
-  pull_request:
-    branches: [ "main", "branch-*" ]
+  workflow_call:
+    inputs:
+      required_ci:
+        description: Run this suite as part of the Required CI orchestrator.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ inputs.required_ci && 'required-charts' || github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
