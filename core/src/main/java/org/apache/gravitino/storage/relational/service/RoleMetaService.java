@@ -345,17 +345,15 @@ public class RoleMetaService {
   void deleteRoleWithVersion(NameIdentifier identifier, RolePO observedRolePO) {
     Long roleId = observedRolePO.getRoleId();
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          int deleted =
-              SessionUtils.getWithoutCommit(
-                  RoleMetaMapper.class,
-                  mapper ->
-                      mapper.softDeleteRoleMetaByRoleId(
-                          roleId, observedRolePO.getCurrentVersion()));
-          if (deleted == 0) {
-            throw roleWriteFailure(identifier, observedRolePO);
-          }
-        },
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        RoleMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteRoleMetaByRoleId(
+                                roleId, observedRolePO.getCurrentVersion())),
+                () -> roleWriteFailure(identifier, observedRolePO)),
         () ->
             SessionUtils.doWithoutCommit(
                 UserRoleRelMapper.class, mapper -> mapper.softDeleteUserRoleRelByRoleId(roleId)),
@@ -515,18 +513,16 @@ public class RoleMetaService {
    * create for no reason.
    */
   private void lockMetalakeForRoleCreate(MetalakePO observedMetalakePO) {
-    MetalakePO currentMetalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId()));
-    if (currentMetalakePO == null
-        || !Objects.equals(
-            currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          observedMetalakePO.getMetalakeName());
-    }
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
   }
 
   private RuntimeException roleWriteFailure(NameIdentifier identifier, RolePO observedRolePO) {
@@ -534,19 +530,17 @@ public class RoleMetaService {
     // The locking read additionally waits for a writer that is still in flight, so a rename or
     // delete that has not committed yet is classified as not-found instead of as a stale-version
     // conflict. The lock is taken on the error path of a transaction that is about to roll back.
-    RolePO currentRolePO =
-        SessionUtils.getWithoutCommit(
-            RoleMetaMapper.class,
-            mapper -> mapper.selectRoleMetaByIdForUpdate(observedRolePO.getRoleId()));
-    if (currentRolePO == null
-        || !Objects.equals(currentRolePO.getRoleName(), observedRolePO.getRoleName())
-        || !Objects.equals(currentRolePO.getMetalakeId(), observedRolePO.getMetalakeId())) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.ROLE.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.ROLE, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.ROLE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                RoleMetaMapper.class,
+                mapper -> mapper.selectRoleMetaByIdForUpdate(observedRolePO.getRoleId())),
+        null,
+        current ->
+            Objects.equals(current.getRoleName(), observedRolePO.getRoleName())
+                && Objects.equals(current.getMetalakeId(), observedRolePO.getMetalakeId()));
   }
 
   private static MetadataObject.Type getType(String type) {

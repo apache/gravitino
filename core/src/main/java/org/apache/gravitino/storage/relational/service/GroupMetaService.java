@@ -246,17 +246,15 @@ public class GroupMetaService {
   void deleteGroupWithVersion(NameIdentifier identifier, GroupPO observedGroupPO) {
     Long groupId = observedGroupPO.getGroupId();
     SessionUtils.doMultipleWithCommit(
-        () -> {
-          int deleted =
-              SessionUtils.getWithoutCommit(
-                  GroupMetaMapper.class,
-                  mapper ->
-                      mapper.softDeleteGroupMetaByGroupId(
-                          groupId, observedGroupPO.getCurrentVersion()));
-          if (deleted == 0) {
-            throw groupWriteFailure(identifier, observedGroupPO, GroupLookup.NAME);
-          }
-        },
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        GroupMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteGroupMetaByGroupId(
+                                groupId, observedGroupPO.getCurrentVersion())),
+                () -> groupWriteFailure(identifier, observedGroupPO, GroupLookup.NAME)),
         () ->
             SessionUtils.doWithoutCommit(
                 GroupRoleRelMapper.class,
@@ -609,18 +607,16 @@ public class GroupMetaService {
    * create for no reason.
    */
   private void lockMetalakeForGroupCreate(MetalakePO observedMetalakePO) {
-    MetalakePO currentMetalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId()));
-    if (currentMetalakePO == null
-        || !Objects.equals(
-            currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          observedMetalakePO.getMetalakeName());
-    }
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
   }
 
   private RuntimeException groupWriteFailure(
@@ -629,20 +625,15 @@ public class GroupMetaService {
     // The locking read additionally waits for a writer that is still in flight, so a rename or
     // delete that has not committed yet is classified as not-found instead of as a stale-version
     // conflict. The lock is taken on the error path of a transaction that is about to roll back.
-    GroupPO currentGroupPO = getGroupPOByIdForUpdate(observedGroupPO.getGroupId());
-    boolean missing =
-        currentGroupPO == null
-            || !Objects.equals(currentGroupPO.getMetalakeId(), observedGroupPO.getMetalakeId());
-    if (!missing && lookup == GroupLookup.NAME) {
-      missing = !Objects.equals(currentGroupPO.getGroupName(), observedGroupPO.getGroupName());
-    }
-    if (missing) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.GROUP.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.GROUP, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.GROUP,
+        () -> getGroupPOByIdForUpdate(observedGroupPO.getGroupId()),
+        null,
+        current ->
+            Objects.equals(current.getMetalakeId(), observedGroupPO.getMetalakeId())
+                && (lookup != GroupLookup.NAME
+                    || Objects.equals(current.getGroupName(), observedGroupPO.getGroupName())));
   }
 
   private GroupPO getGroupPOByIdForUpdate(long groupId) {
