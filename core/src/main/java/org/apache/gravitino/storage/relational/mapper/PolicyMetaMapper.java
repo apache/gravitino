@@ -148,6 +148,29 @@ public interface PolicyMetaMapper {
   PolicyPO selectPolicyMetaByMetalakeIdAndName(
       @Param("metalakeId") long metalakeId, @Param("policyName") String policyName);
 
+  /**
+   * Selects and exclusively locks an active policy by its natural key.
+   *
+   * @param metalakeId The metalake ID.
+   * @param policyName The policy name.
+   * @return The locked policy, or null if the natural key is not active.
+   */
+  @Results({
+    @Result(property = "policyId", column = "policy_id"),
+    @Result(property = "policyName", column = "policy_name"),
+    @Result(property = "policyType", column = "policy_type"),
+    @Result(property = "metalakeId", column = "metalake_id"),
+    @Result(property = "auditInfo", column = "audit_info"),
+    @Result(property = "currentVersion", column = "current_version"),
+    @Result(property = "lastVersion", column = "last_version"),
+    @Result(property = "deletedAt", column = "deleted_at")
+  })
+  @SelectProvider(
+      type = PolicyMetaSQLProviderFactory.class,
+      method = "selectPolicyMetaByMetalakeIdAndNameForUpdate")
+  PolicyPO selectPolicyMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") long metalakeId, @Param("policyName") String policyName);
+
   @Results({
     @Result(property = "policyId", column = "policy_id"),
     @Result(property = "policyName", column = "policy_name"),

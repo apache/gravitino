@@ -35,6 +35,12 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -611,6 +617,104 @@ public class TestPolicyMetaService extends TestJDBCBackend {
     assertEquals(policy.id(), overwrittenPO.getPolicyId().longValue());
     assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
     assertEquals(2, listPolicyVersions(policy.id()).size());
+  }
+
+  @TestTemplate
+  public void testPolicyOverwriteByNameDoesNotRevertConcurrentRename() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity original =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_overwrite_rename_race",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(original, false);
+    PolicyPO observedPO = getPolicyPO(original.nameIdentifier());
+
+    PolicyEntity renamed = copyPolicy(original, "policy_overwrite_rename_winner", "rename winner");
+    PolicyPO renamedPO = POConverters.updatePolicyPOWithVersion(observedPO, renamed);
+    PolicyEntity replacement =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            original.name(),
+            AUDIT_INFO);
+
+    CountDownLatch renameWritten = new CountDownLatch(1);
+    CountDownLatch allowRenameCommit = new CountDownLatch(1);
+    CountDownLatch overwriteStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> renameResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                PolicyMetaMapper.class,
+                                mapper -> mapper.updatePolicyMeta(renamedPO, observedPO))),
+                    () ->
+                        SessionUtils.doWithoutCommit(
+                            PolicyVersionMapper.class,
+                            mapper -> mapper.insertPolicyVersion(renamedPO.getPolicyVersionPO())),
+                    () -> {
+                      renameWritten.countDown();
+                      await(allowRenameCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      assertTrue(renameWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> overwriteResult =
+          executor.submit(
+              () -> {
+                overwriteStarted.countDown();
+                try {
+                  policyMetaService.insertPolicy(replacement, true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(overwriteStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> overwriteResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowRenameCommit.countDown();
+      Assertions.assertNull(renameResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertNull(overwriteResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowRenameCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    assertEquals(
+        original.id(), policyMetaService.getPolicyByIdentifier(renamed.nameIdentifier()).id());
+    assertEquals(
+        replacement.id(), policyMetaService.getPolicyByIdentifier(original.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  public void testPolicyDeleteReturnsFalseWhenConcurrentDeleteWins() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    PolicyMetaService policyMetaService = PolicyMetaService.getInstance();
+    PolicyEntity policy =
+        createPolicy(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofPolicy(METALAKE_NAME),
+            "policy_concurrent_delete",
+            AUDIT_INFO);
+    policyMetaService.insertPolicy(policy, false);
+    PolicyPO observedPO = getPolicyPO(policy.nameIdentifier());
+
+    assertTrue(policyMetaService.deletePolicy(policy.nameIdentifier()));
+    assertFalse(policyMetaService.deletePolicy(policy.nameIdentifier(), observedPO));
   }
 
   @TestTemplate
@@ -1342,23 +1446,7 @@ public class TestPolicyMetaService extends TestJDBCBackend {
   }
 
   private Integer countActivePolicyRel(Long policyId) {
-    try (SqlSession sqlSession =
-            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
-        Connection connection = sqlSession.getConnection();
-        Statement statement1 = connection.createStatement();
-        ResultSet rs1 =
-            statement1.executeQuery(
-                String.format(
-                    "SELECT count(*) FROM policy_relation_meta WHERE policy_id = %d AND deleted_at = 0",
-                    policyId))) {
-      if (rs1.next()) {
-        return rs1.getInt(1);
-      } else {
-        throw new RuntimeException("Doesn't contain data");
-      }
-    } catch (SQLException se) {
-      throw new RuntimeException("SQL execution failed", se);
-    }
+    return countActiveRows("policy_relation_meta", "policy_id = " + policyId);
   }
 
   private Integer countAllPolicyRel(Long policyId) {
@@ -1405,5 +1493,14 @@ public class TestPolicyMetaService extends TestJDBCBackend {
         .withContent(policy.content())
         .withAuditInfo(auditInfo)
         .build();
+  }
+
+  private void await(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(30, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
   }
 }

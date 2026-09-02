@@ -92,6 +92,12 @@ public class PolicyMetaSQLProviderFactory {
     return getProvider().selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName);
   }
 
+  /** Delegates an exclusive-lock policy query by natural key. */
+  public static String selectPolicyMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
+    return getProvider().selectPolicyMetaByMetalakeIdAndNameForUpdate(metalakeId, policyName);
+  }
+
   public static String selectPolicyByPolicyId(@Param("policyId") Long policyId) {
     return getProvider().selectPolicyByPolicyId(policyId);
   }

@@ -219,6 +219,12 @@ public class PolicyMetaBaseSQLProvider {
         + " AND pm.deleted_at = 0 ";
   }
 
+  /** Returns SQL that selects and exclusively locks an active policy by its natural key. */
+  public String selectPolicyMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("policyName") String policyName) {
+    return selectPolicyMetaByMetalakeIdAndName(metalakeId, policyName) + " FOR UPDATE";
+  }
+
   public String batchSelectPolicyByIdentifier(
       @Param("metalakeName") String metalakeName, @Param("policyNames") List<String> policyNames) {
     return "<script>"

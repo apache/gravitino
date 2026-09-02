@@ -18,10 +18,8 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
-import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.POLICY_META_TABLE_NAME;
 import static org.apache.gravitino.storage.relational.mapper.PolicyVersionMapper.POLICY_VERSION_TABLE_NAME;
 
-import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyVersionPO;
 import org.apache.ibatis.annotations.Param;
@@ -35,27 +33,6 @@ public class PolicyVersionBaseSQLProvider {
         + " VALUES (#{policyVersion.metalakeId}, #{policyVersion.policyId}, #{policyVersion.version},"
         + " #{policyVersion.policyComment}, #{policyVersion.enabled}, #{policyVersion.content},"
         + " #{policyVersion.deletedAt})";
-  }
-
-  public String softDeletePolicyVersionByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
-    return "UPDATE "
-        + POLICY_VERSION_TABLE_NAME
-        + " pv SET pv.deleted_at = "
-        + DatabaseTimeSQL.MYSQL
-        + " WHERE pv.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
-        + " AND pv.policy_id IN ("
-        + " SELECT pm.policy_id FROM "
-        + POLICY_META_TABLE_NAME
-        + " pm WHERE pm.policy_name = #{policyName} AND pm.deleted_at = 0"
-        + " AND pm.metalake_id IN ("
-        + " SELECT mm.metalake_id FROM "
-        + MetalakeMetaMapper.TABLE_NAME
-        + " mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0))"
-        + " AND pv.deleted_at = 0";
   }
 
   /** Returns SQL that soft-deletes every active content snapshot for a policy ID. */

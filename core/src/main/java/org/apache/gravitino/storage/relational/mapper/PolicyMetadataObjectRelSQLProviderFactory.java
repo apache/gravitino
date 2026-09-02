@@ -89,12 +89,6 @@ public class PolicyMetadataObjectRelSQLProviderFactory {
             metadataObjectId, metadataObjectType, policyIds);
   }
 
-  public static String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(
-      @Param("metalakeName") String metalakeName, @Param("policyName") String policyName) {
-    return getProvider()
-        .softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(metalakeName, policyName);
-  }
-
   /** Delegates cleanup of metadata-object relations by policy ID. */
   public static String softDeletePolicyMetadataObjectRelsByPolicyId(
       @Param("policyId") Long policyId) {

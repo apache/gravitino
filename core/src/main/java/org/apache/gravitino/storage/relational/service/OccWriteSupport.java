@@ -116,6 +116,20 @@ public class OccWriteSupport {
   }
 
   /**
+   * Executes a single-row compare-and-set update for an entity guarded by version.
+   *
+   * @param updateOps an operation supplying the number of rows affected by the update
+   * @param onMissSupplier a supplier providing the RuntimeException when zero rows are updated
+   */
+  public static void updateWithVersion(
+      IntSupplier updateOps, Supplier<RuntimeException> onMissSupplier) {
+    int updated = updateOps.getAsInt();
+    if (updated == 0) {
+      throw onMissSupplier.get();
+    }
+  }
+
+  /**
    * Executes a batch soft delete of child entities guarded by their individual versions.
    *
    * <p>If the affected row count does not match the size of the child list, throws a concurrent

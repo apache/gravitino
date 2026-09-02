@@ -176,7 +176,8 @@ public class PolicyMetaService {
    * Deletes the policy the caller observed. The delete is a compare-and-set on the observed
    * version, so a policy that changed since it was read is rejected instead of being removed, and
    * the version snapshots and dependent relations are cleaned up in the same transaction as the
-   * policy row itself.
+   * policy row itself. If another transaction deletes or renames the observed policy first, this
+   * method returns {@code false}, preserving the idempotent delete contract.
    *
    * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
    * use {@link #deletePolicy(NameIdentifier)}, which reads it first.
@@ -185,38 +186,42 @@ public class PolicyMetaService {
   boolean deletePolicy(NameIdentifier ident, PolicyPO policyPO) {
     long policyId = policyPO.getPolicyId();
 
-    SessionUtils.doMultipleWithCommit(
-        () -> deletePolicyWithVersion(ident, policyPO),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyVersionMapper.class,
-                mapper -> mapper.softDeletePolicyVersionsByPolicyId(policyId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeletePolicyMetadataObjectRelsByPolicyId(policyId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        policyId, MetadataObject.Type.POLICY.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        policyId, MetadataObject.Type.POLICY.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        policyId, MetadataObject.Type.POLICY.name())));
-    return true;
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> deletePolicyWithVersion(ident, policyPO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyVersionMapper.class,
+                  mapper -> mapper.softDeletePolicyVersionsByPolicyId(policyId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeletePolicyMetadataObjectRelsByPolicyId(policyId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyTagRelMapper.class, mapper -> mapper.softDeleteByPolicyId(policyId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper ->
+                      mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                          policyId, MetadataObject.Type.POLICY.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                          policyId, MetadataObject.Type.POLICY.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper ->
+                      mapper.softDeleteObjectRelsByMetadataObject(
+                          policyId, MetadataObject.Type.POLICY.name())));
+      return true;
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
   }
 
   @Monitored(
@@ -514,9 +519,10 @@ public class PolicyMetaService {
     }
 
     PolicyPO replacementPolicyPO =
-        POConverters.updatePolicyPOWithVersion(existingPolicyPO, policyEntity);
-    updatePolicyRootWithVersion(
-        policyEntity.nameIdentifier(), existingPolicyPO, replacementPolicyPO);
+        POConverters.updatePolicyPOWithVersion(existingPolicyPO, initializedPolicyPO);
+    NameIdentifier observedIdentifier =
+        NameIdentifier.of(policyEntity.namespace(), existingPolicyPO.getPolicyName());
+    updatePolicyRootWithVersion(observedIdentifier, existingPolicyPO, replacementPolicyPO);
     SessionUtils.doWithoutCommit(
         PolicyVersionMapper.class,
         mapper -> mapper.insertPolicyVersion(replacementPolicyPO.getPolicyVersionPO()));
@@ -531,26 +537,25 @@ public class PolicyMetaService {
   }
 
   private PolicyPO findAndLockPolicyForOverwrite(PolicyPO initializedPolicyPO) {
-    PolicyPO existingPolicyPO =
-        SessionUtils.getWithoutCommit(
-            PolicyMetaMapper.class,
-            mapper -> mapper.selectPolicyByPolicyIdForUpdate(initializedPolicyPO.getPolicyId()));
-    if (existingPolicyPO != null) {
-      return existingPolicyPO;
-    }
-
     PolicyPO sameNamePolicyPO =
         SessionUtils.getWithoutCommit(
             PolicyMetaMapper.class,
             mapper ->
-                mapper.selectPolicyMetaByMetalakeIdAndName(
+                mapper.selectPolicyMetaByMetalakeIdAndNameForUpdate(
                     initializedPolicyPO.getMetalakeId(), initializedPolicyPO.getPolicyName()));
-    if (sameNamePolicyPO == null) {
+    if (sameNamePolicyPO != null) {
+      return sameNamePolicyPO;
+    }
+
+    PolicyPO sameIdPolicyPO =
+        SessionUtils.getWithoutCommit(
+            PolicyMetaMapper.class,
+            mapper -> mapper.selectPolicyByPolicyIdForUpdate(initializedPolicyPO.getPolicyId()));
+    if (sameIdPolicyPO == null
+        || !Objects.equals(sameIdPolicyPO.getMetalakeId(), initializedPolicyPO.getMetalakeId())) {
       return null;
     }
-    return SessionUtils.getWithoutCommit(
-        PolicyMetaMapper.class,
-        mapper -> mapper.selectPolicyByPolicyIdForUpdate(sameNamePolicyPO.getPolicyId()));
+    return sameIdPolicyPO;
   }
 
   /**
@@ -560,12 +565,15 @@ public class PolicyMetaService {
    */
   private void updatePolicyRootWithVersion(
       NameIdentifier identifier, PolicyPO oldPolicyPO, PolicyPO newPolicyPO) {
-    Integer updated =
-        SessionUtils.getWithoutCommit(
-            PolicyMetaMapper.class, mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
-    if (updated == null || updated == 0) {
-      throw policyWriteFailure(identifier, oldPolicyPO);
-    }
+    OccWriteSupport.updateWithVersion(
+        () -> {
+          Integer updated =
+              SessionUtils.getWithoutCommit(
+                  PolicyMetaMapper.class,
+                  mapper -> mapper.updatePolicyMeta(newPolicyPO, oldPolicyPO));
+          return updated == null ? 0 : updated;
+        },
+        () -> policyWriteFailure(identifier, oldPolicyPO));
   }
 
   private void deletePolicyWithVersion(NameIdentifier identifier, PolicyPO observedPolicyPO) {
