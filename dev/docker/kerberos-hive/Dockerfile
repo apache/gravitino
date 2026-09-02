@@ -66,7 +66,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install --fix-missing -yq \
 RUN mkdir /root/.ssh
 RUN cat /dev/zero | ssh-keygen -q -N "" > /dev/null && cat /root/.ssh/id_rsa.pub > /root/.ssh/authorized_keys
 
-COPY packages /tmp/packages
 COPY kdc.conf /etc/krb5kdc/kdc.conf
 COPY kadm5.acl /etc/krb5kdc/kadm5.acl
 COPY krb5.conf /etc/krb5.conf
@@ -118,7 +117,8 @@ RUN echo "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}" >> /etc/environment
 ################################################################################
 # install hadoop
 RUN mkdir ${HADOOP_HOME}
-RUN tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME}
+RUN --mount=type=bind,source=packages,target=/tmp/packages \
+  tar -xz -C ${HADOOP_HOME} --strip-components 1 -f /tmp/packages/${HADOOP_PACKAGE_NAME}
 
 # replace configuration templates
 RUN rm -f ${HADOOP_CONF_DIR}/core-site.xml
@@ -139,7 +139,8 @@ ADD check-status.sh /tmp/check-status.sh
 ################################################################################
 # install hive
 RUN mkdir ${HIVE_HOME}
-RUN tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
+RUN --mount=type=bind,source=packages,target=/tmp/packages \
+  tar -xz -C ${HIVE_HOME} --strip-components 1 -f /tmp/packages/${HIVE_PACKAGE_NAME}
 ADD hive-site.xml ${HIVE_HOME}/conf/hive-site.xml
 RUN mkdir ${HIVE_HOME}/conf1 && cp ${HIVE_HOME}/conf/* ${HIVE_HOME}/conf1/
 ADD hive-site1.xml ${HIVE_HOME}/conf1/hive-site.xml
@@ -157,7 +158,8 @@ RUN sed -i "s/.*bind-address.*/bind-address = 0.0.0.0/" /etc/mysql/mysql.conf.d/
 
 ################################################################################
 # add mysql jdbc driver
-RUN tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
+RUN --mount=type=bind,source=packages,target=/tmp/packages \
+  tar -xz -C ${HIVE_HOME}/lib --strip-components 1 -f /tmp/packages/${JDBC_DIVER_PACKAGE_NAME}
 
 ################################################################################
 # add users and groups
@@ -173,10 +175,6 @@ RUN usermod -a -G mapred gravitino
 
 RUN mkdir /home/gravitino
 RUN chown -R gravitino:hadoop /home/gravitino
-
-################################################################################
-# removed install packages
-RUN rm -rf /tmp/packages
 
 ################################################################################
 # expose port
