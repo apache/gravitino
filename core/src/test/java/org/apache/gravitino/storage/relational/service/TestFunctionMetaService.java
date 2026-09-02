@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -35,6 +36,12 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
@@ -52,7 +59,13 @@ import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.FunctionVersionMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
+import org.apache.gravitino.storage.relational.po.FunctionPO;
+import org.apache.gravitino.storage.relational.po.SchemaPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
@@ -243,6 +256,79 @@ public class TestFunctionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testCreateFunctionWaitsForConcurrentSchemaDelete() throws Exception {
+    SchemaPO observedSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaByFullQualifiedName(metalakeName, catalogName, schemaName));
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            GravitinoITUtils.genRandomName("function_parent_delete_race"),
+            AUDIT_INFO);
+
+    CountDownLatch deleteWritten = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch createStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                SchemaMetaMapper.class,
+                                mapper ->
+                                    mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                        observedSchemaPO.getSchemaId(),
+                                        observedSchemaPO.getCurrentVersion()))),
+                    () -> {
+                      deleteWritten.countDown();
+                      await(allowDeleteCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      assertTrue(deleteWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> createResult =
+          executor.submit(
+              () -> {
+                createStarted.countDown();
+                try {
+                  FunctionMetaService.getInstance().insertFunction(function, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(createStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> createResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Throwable createFailure = createResult.get(30, TimeUnit.SECONDS);
+      assertTrue(createFailure instanceof NoSuchEntityException, String.valueOf(createFailure));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier()));
+  }
+
+  @TestTemplate
   public void testUpdateFunctionFailsWhenSchemaIsDeletedConcurrently() throws IOException {
     String functionName = GravitinoITUtils.genRandomName("test_function");
     Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
@@ -276,7 +362,7 @@ public class TestFunctionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateFunctionRollsBackNewVersionAfterConcurrentDelete() throws IOException {
+  public void testUpdateFunctionReportsNoSuchAfterConcurrentDelete() throws IOException {
     String functionName = GravitinoITUtils.genRandomName("test_function");
     Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
     FunctionEntity function =
@@ -289,7 +375,7 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     FunctionEntity updatedFunction = copyFunctionWithComment(function, "updated comment");
 
     assertThrows(
-        OptimisticLockException.class,
+        NoSuchEntityException.class,
         () ->
             FunctionMetaService.getInstance()
                 .updateFunction(
@@ -306,6 +392,333 @@ public class TestFunctionMetaService extends TestJDBCBackend {
     assertEquals(1, versions.size());
     assertVersionSoftDeleted(versions, 1);
     assertFalse(versions.containsKey(2));
+  }
+
+  @TestTemplate
+  public void testAlterReportsOptimisticLockConflictAndKeepsWinnerVersion() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("function_alter_conflict");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .updateFunction(
+                    function.nameIdentifier(),
+                    entity -> {
+                      try {
+                        FunctionMetaService.getInstance()
+                            .updateFunction(
+                                function.nameIdentifier(),
+                                competing ->
+                                    copyFunctionWithComment(
+                                        (FunctionEntity) competing, "competing update"));
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                      return copyFunctionWithComment((FunctionEntity) entity, "requested update");
+                    }));
+
+    FunctionEntity current =
+        FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier());
+    assertEquals("competing update", current.comment());
+    Map<Integer, Long> versions = listFunctionVersions(function.id());
+    assertEquals(2, versions.size());
+    assertTrue(versions.containsKey(2));
+  }
+
+  @TestTemplate
+  public void testAlterRollsBackRootCasWhenVersionInsertFails() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("function_version_insert_failure");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    FunctionPO originalPO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(function.nameIdentifier());
+    FunctionEntity conflictingVersion = copyFunctionWithComment(function, "conflicting version");
+    FunctionPO conflictingPO =
+        FunctionPO.buildFunctionPO(
+            conflictingVersion,
+            FunctionPO.builder()
+                .withMetalakeId(originalPO.metalakeId())
+                .withCatalogId(originalPO.catalogId())
+                .withSchemaId(originalPO.schemaId())
+                .withFunctionLatestVersion(2)
+                .withFunctionCurrentVersion(2),
+            2);
+    SessionUtils.doWithCommit(
+        FunctionVersionMetaMapper.class,
+        mapper -> mapper.insertFunctionVersionMeta(conflictingPO.functionVersionPO()));
+
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .updateFunction(
+                    function.nameIdentifier(),
+                    entity -> copyFunctionWithComment((FunctionEntity) entity, "must roll back")));
+
+    FunctionPO currentPO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(function.nameIdentifier());
+    assertEquals(1, currentPO.functionCurrentVersion());
+    assertEquals(1, currentPO.functionLatestVersion());
+    assertEquals(
+        function.comment(),
+        FunctionMetaService.getInstance()
+            .getFunctionByIdentifier(function.nameIdentifier())
+            .comment());
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenRenamedConcurrently() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("function_alter_renamed");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    NameIdentifier renamedIdentifier = NameIdentifier.of(namespace, functionName + "_winner");
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .updateFunction(
+                    function.nameIdentifier(),
+                    entity -> {
+                      try {
+                        FunctionMetaService.getInstance()
+                            .updateFunction(
+                                function.nameIdentifier(),
+                                competing ->
+                                    copyFunction(
+                                        (FunctionEntity) competing,
+                                        renamedIdentifier.name(),
+                                        namespace,
+                                        "renamed winner"));
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                      return copyFunctionWithComment((FunctionEntity) entity, "stale update");
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier()));
+    assertEquals(
+        "renamed winner",
+        FunctionMetaService.getInstance().getFunctionByIdentifier(renamedIdentifier).comment());
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenMovedConcurrently() throws IOException {
+    String targetCatalogName = GravitinoITUtils.genRandomName("function_target_catalog");
+    String targetSchemaName = GravitinoITUtils.genRandomName("function_target_schema");
+    createAndInsertCatalog(metalakeName, targetCatalogName);
+    createAndInsertSchema(metalakeName, targetCatalogName, targetSchemaName);
+    String functionName = GravitinoITUtils.genRandomName("function_alter_moved");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    Namespace movedNamespace =
+        NamespaceUtil.ofFunction(metalakeName, targetCatalogName, targetSchemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    NameIdentifier movedIdentifier = NameIdentifier.of(movedNamespace, functionName);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .updateFunction(
+                    function.nameIdentifier(),
+                    entity -> {
+                      try {
+                        FunctionMetaService.getInstance()
+                            .updateFunction(
+                                function.nameIdentifier(),
+                                competing ->
+                                    copyFunction(
+                                        (FunctionEntity) competing,
+                                        functionName,
+                                        movedNamespace,
+                                        "moved winner"));
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                      return copyFunctionWithComment((FunctionEntity) entity, "stale update");
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier()));
+    assertEquals(
+        "moved winner",
+        FunctionMetaService.getInstance().getFunctionByIdentifier(movedIdentifier).comment());
+    SchemaPO targetSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaByFullQualifiedName(
+                    metalakeName, targetCatalogName, targetSchemaName));
+    FunctionPO movedPO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(movedIdentifier);
+    assertEquals(targetSchemaPO.getSchemaId(), movedPO.schemaId());
+    assertEquals(targetSchemaPO.getCatalogId(), movedPO.catalogId());
+    assertEquals(targetSchemaPO.getMetalakeId(), movedPO.metalakeId());
+  }
+
+  @TestTemplate
+  public void testMoveWaitsForConcurrentTargetSchemaDelete() throws Exception {
+    String targetCatalogName = GravitinoITUtils.genRandomName("function_deleted_target_catalog");
+    String targetSchemaName = GravitinoITUtils.genRandomName("function_deleted_target_schema");
+    createAndInsertCatalog(metalakeName, targetCatalogName);
+    createAndInsertSchema(metalakeName, targetCatalogName, targetSchemaName);
+    SchemaPO targetSchemaPO =
+        SessionUtils.getWithoutCommit(
+            SchemaMetaMapper.class,
+            mapper ->
+                mapper.selectSchemaByFullQualifiedName(
+                    metalakeName, targetCatalogName, targetSchemaName));
+    String functionName = GravitinoITUtils.genRandomName("function_target_delete_race");
+    Namespace sourceNamespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    Namespace targetNamespace =
+        NamespaceUtil.ofFunction(metalakeName, targetCatalogName, targetSchemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), sourceNamespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    FunctionEntity moved = copyFunction(function, functionName, targetNamespace, "must not move");
+
+    CountDownLatch deleteWritten = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch moveStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                SchemaMetaMapper.class,
+                                mapper ->
+                                    mapper.softDeleteSchemaMetaBySchemaIdAndVersion(
+                                        targetSchemaPO.getSchemaId(),
+                                        targetSchemaPO.getCurrentVersion()))),
+                    () -> {
+                      deleteWritten.countDown();
+                      await(allowDeleteCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      assertTrue(deleteWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> moveResult =
+          executor.submit(
+              () -> {
+                moveStarted.countDown();
+                try {
+                  FunctionMetaService.getInstance()
+                      .updateFunction(function.nameIdentifier(), ignored -> moved);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(moveStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> moveResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Throwable moveFailure = moveResult.get(30, TimeUnit.SECONDS);
+      assertTrue(moveFailure instanceof NoSuchEntityException, String.valueOf(moveFailure));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    assertEquals(
+        function.comment(),
+        FunctionMetaService.getInstance()
+            .getFunctionByIdentifier(function.nameIdentifier())
+            .comment());
+    assertEquals(1, listFunctionVersions(function.id()).size());
+  }
+
+  @TestTemplate
+  public void testDeleteRejectsStaleVersion() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("function_stale_delete");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("function_occ_tag")
+            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService.getInstance().insertTag(tag, false);
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            function.nameIdentifier(),
+            function.type(),
+            new NameIdentifier[] {tag.nameIdentifier()},
+            new NameIdentifier[0]);
+    FunctionPO stalePO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(function.nameIdentifier());
+
+    FunctionMetaService.getInstance()
+        .updateFunction(
+            function.nameIdentifier(),
+            entity -> copyFunctionWithComment((FunctionEntity) entity, "winning update"));
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .deleteFunctionWithVersion(function.nameIdentifier(), stalePO));
+    assertEquals(
+        "winning update",
+        FunctionMetaService.getInstance()
+            .getFunctionByIdentifier(function.nameIdentifier())
+            .comment());
+    assertEquals(1, countActiveTagRelForMetadataObject(function.id(), "FUNCTION"));
+  }
+
+  @TestTemplate
+  public void testDeleteReportsNoSuchWhenDeletedConcurrently() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("function_delete_deleted");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    FunctionPO stalePO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(function.nameIdentifier());
+
+    FunctionMetaService.getInstance().deleteFunction(function.nameIdentifier());
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            FunctionMetaService.getInstance()
+                .deleteFunctionWithVersion(function.nameIdentifier(), stalePO));
   }
 
   @TestTemplate
@@ -612,6 +1025,148 @@ public class TestFunctionMetaService extends TestJDBCBackend {
         FunctionMetaService.getInstance().getFunctionByIdentifier(functionIdent);
     assertEquals("overwritten comment", loadedFunction.comment());
     assertTrue(loadedFunction.deterministic());
+    FunctionPO overwrittenPO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(functionIdent);
+    assertEquals(2, overwrittenPO.functionCurrentVersion());
+    assertEquals(2, overwrittenPO.functionLatestVersion());
+    assertEquals(2, listFunctionVersions(function.id()).size());
+  }
+
+  @TestTemplate
+  public void testNaturalKeyOverwriteUsesPersistedFunctionId() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("function_natural_key_overwrite");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity original =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(original, false);
+    FunctionEntity replacement =
+        copyFunction(
+            createFunctionEntity(
+                RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO),
+            functionName,
+            namespace,
+            "replacement");
+
+    FunctionMetaService.getInstance().insertFunction(replacement, true);
+
+    FunctionEntity stored =
+        FunctionMetaService.getInstance().getFunctionByIdentifier(original.nameIdentifier());
+    FunctionPO storedPO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(original.nameIdentifier());
+    assertEquals(original.id(), stored.id());
+    assertEquals("replacement", stored.comment());
+    assertEquals(2, storedPO.functionCurrentVersion());
+    assertEquals(2, listFunctionVersions(original.id()).size());
+    assertTrue(listFunctionVersions(replacement.id()).isEmpty());
+  }
+
+  @TestTemplate
+  public void testNormalReadRequiresCurrentVersionRow() throws IOException {
+    String functionName = GravitinoITUtils.genRandomName("function_missing_current_version");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+
+    SessionUtils.doWithCommit(
+        FunctionVersionMetaMapper.class,
+        mapper -> mapper.softDeleteFunctionVersionsByFunctionId(function.id()));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier()));
+  }
+
+  @TestTemplate
+  public void testNaturalKeyOverwriteWaitsForConcurrentRename() throws Exception {
+    String functionName = GravitinoITUtils.genRandomName("function_overwrite_rename_race");
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity original =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(original, false);
+    FunctionPO observedPO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(original.nameIdentifier());
+    FunctionEntity renamed =
+        copyFunction(original, functionName + "_winner", namespace, "rename winner");
+    FunctionPO renamedPO =
+        FunctionPO.buildFunctionPO(
+            renamed,
+            FunctionPO.builder()
+                .withMetalakeId(observedPO.metalakeId())
+                .withCatalogId(observedPO.catalogId())
+                .withSchemaId(observedPO.schemaId())
+                .withFunctionLatestVersion(2)
+                .withFunctionCurrentVersion(2),
+            2);
+    FunctionEntity replacement =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), namespace, functionName, AUDIT_INFO);
+
+    CountDownLatch renameWritten = new CountDownLatch(1);
+    CountDownLatch allowRenameCommit = new CountDownLatch(1);
+    CountDownLatch overwriteStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> renameResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                FunctionMetaMapper.class,
+                                mapper -> mapper.updateFunctionMeta(renamedPO, observedPO))),
+                    () ->
+                        SessionUtils.doWithoutCommit(
+                            FunctionVersionMetaMapper.class,
+                            mapper ->
+                                mapper.insertFunctionVersionMeta(renamedPO.functionVersionPO())),
+                    () -> {
+                      renameWritten.countDown();
+                      await(allowRenameCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      assertTrue(renameWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> overwriteResult =
+          executor.submit(
+              () -> {
+                overwriteStarted.countDown();
+                try {
+                  FunctionMetaService.getInstance().insertFunction(replacement, true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(overwriteStarted.await(30, TimeUnit.SECONDS));
+      assertThrows(TimeoutException.class, () -> overwriteResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowRenameCommit.countDown();
+      assertNull(renameResult.get(30, TimeUnit.SECONDS));
+      assertNull(overwriteResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowRenameCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    assertEquals(
+        original.id(),
+        FunctionMetaService.getInstance().getFunctionByIdentifier(renamed.nameIdentifier()).id());
+    assertEquals(
+        replacement.id(),
+        FunctionMetaService.getInstance()
+            .getFunctionByIdentifier(replacement.nameIdentifier())
+            .id());
   }
 
   private int countActiveOwnerRelForMetadataObject(
@@ -698,16 +1253,30 @@ public class TestFunctionMetaService extends TestJDBCBackend {
   }
 
   private FunctionEntity copyFunctionWithComment(FunctionEntity function, String comment) {
+    return copyFunction(function, function.name(), function.namespace(), comment);
+  }
+
+  private FunctionEntity copyFunction(
+      FunctionEntity function, String name, Namespace namespace, String comment) {
     return FunctionEntity.builder()
         .withId(function.id())
-        .withName(function.name())
-        .withNamespace(function.namespace())
+        .withName(name)
+        .withNamespace(namespace)
         .withComment(comment)
         .withFunctionType(function.functionType())
         .withDeterministic(function.deterministic())
         .withDefinitions(function.definitions())
         .withAuditInfo(function.auditInfo())
         .build();
+  }
+
+  private void await(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(30, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
   }
 
   private void assertVersionActive(Map<Integer, Long> versionDeletedMap, int version) {
