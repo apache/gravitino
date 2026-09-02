@@ -120,10 +120,7 @@ public class BulkOperations {
                 accessControlDispatcher.addUsers(
                     metalake,
                     Arrays.stream(request.getUsers())
-                        .map(
-                            user ->
-                                new UserAdd(
-                                    user.getName(), user.getExternalId(), user.getEnabled()))
+                        .map(user -> new UserAdd(user.getName()))
                         .collect(Collectors.toList()));
             UserDTO[] users =
                 results.stream()
@@ -229,7 +226,7 @@ public class BulkOperations {
                 accessControlDispatcher.addGroups(
                     metalake,
                     Arrays.stream(request.getGroups())
-                        .map(group -> new GroupAdd(group.getName(), group.getExternalId()))
+                        .map(group -> new GroupAdd(group.getName()))
                         .collect(Collectors.toList()));
             GroupDTO[] groups =
                 results.stream()

@@ -182,9 +182,7 @@ public class TestBulkOperations extends BaseOperationsTest {
 
     BulkUserAddRequest request =
         new BulkUserAddRequest(
-            new UserAddRequest[] {
-              new UserAddRequest("user1", "ext-user1", false), new UserAddRequest("user2")
-            });
+            new UserAddRequest[] {new UserAddRequest("user1"), new UserAddRequest("user2")});
     Response response =
         target("/bulk/metalakes/metalake1/users/add")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -207,8 +205,6 @@ public class TestBulkOperations extends BaseOperationsTest {
     ArgumentCaptor<List<UserAdd>> usersCaptor = ArgumentCaptor.forClass(List.class);
     Mockito.verify(manager).addUsers(eq("metalake1"), usersCaptor.capture());
     Assertions.assertEquals("user1", usersCaptor.getValue().get(0).name());
-    Assertions.assertEquals("ext-user1", usersCaptor.getValue().get(0).externalId());
-    Assertions.assertEquals(false, usersCaptor.getValue().get(0).enabled());
   }
 
   @Test
@@ -258,9 +254,7 @@ public class TestBulkOperations extends BaseOperationsTest {
 
     BulkGroupAddRequest request =
         new BulkGroupAddRequest(
-            new GroupAddRequest[] {
-              new GroupAddRequest("group1", "ext-group1"), new GroupAddRequest("group2")
-            });
+            new GroupAddRequest[] {new GroupAddRequest("group1"), new GroupAddRequest("group2")});
     Response response =
         target("/bulk/metalakes/metalake1/groups/add")
             .request(MediaType.APPLICATION_JSON_TYPE)
@@ -283,7 +277,6 @@ public class TestBulkOperations extends BaseOperationsTest {
     ArgumentCaptor<List<GroupAdd>> groupsCaptor = ArgumentCaptor.forClass(List.class);
     Mockito.verify(manager).addGroups(eq("metalake1"), groupsCaptor.capture());
     Assertions.assertEquals("group1", groupsCaptor.getValue().get(0).name());
-    Assertions.assertEquals("ext-group1", groupsCaptor.getValue().get(0).externalId());
   }
 
   @Test
