@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
@@ -31,6 +32,7 @@ import io.jsonwebtoken.security.Keys;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,6 +44,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Configs;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -62,6 +65,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Container;
 
 /**
@@ -73,10 +78,14 @@ import org.testcontainers.containers.Container;
 @EnabledIfEnvironmentVariable(named = "GRAVITINO_CI_LOCALSTACK_DOCKER_IMAGE", matches = ".+")
 public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
+  private static final Logger LOG = LoggerFactory.getLogger(TrinoTlsOAuthCredentialVendingIT.class);
+
   private static final String AUDIENCE = "gravitino-trino-it";
   private static final String CLIENT_CREDENTIAL = "test-client:test-secret";
   private static final String STORE_PASSWORD = "changeit";
-  private static final String TRINO_IMAGE = "trinodb/trino:478";
+  // The enclosing @EnabledIfEnvironmentVariable guarantees this is non-blank whenever the test
+  // actually runs, so it always reflects the CI-prepared Trino image.
+  private static final String TRINO_IMAGE = TrinoContainer.DEFAULT_IMAGE;
   private static final String CONTAINER_TRUSTSTORE = "/etc/trino/tls/truststore.p12";
 
   private final KeyPair keyPair = Keys.keyPairFor(SignatureAlgorithm.RS256);
@@ -100,7 +109,7 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     createBucket();
     containerSuite.startPostgreSQLContainer(TestDatabaseName.PG_ICEBERG_AUTHZ_IT);
 
-    oauthServer = new OAuthServer(keyPair, AUDIENCE, "admin");
+    oauthServer = new OAuthServer(keyPair, AUDIENCE, "admin", CLIENT_CREDENTIAL);
     oauthServer.start();
     configureGravitino();
     copyIcebergAwsBundle();
@@ -109,7 +118,8 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     super.startIntegrationTest();
 
     createCatalog();
-    trinoConfigDirectory = createTrinoConfig();
+    trinoConfigDirectory = Files.createTempDirectory("trino-tls-oauth-");
+    populateTrinoConfig(trinoConfigDirectory);
     startTrino();
   }
 
@@ -130,8 +140,16 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
         oauthServer.gravitinoTokenRequests() > 0,
         "The Trino connector did not request a Gravitino OAuth2 token");
     assertTrue(
-        oauthServer.icebergTokenRequests() > 0,
+        oauthServer.trinoIcebergTokenRequests() > 0,
         "The Trino Iceberg connector did not request an Iceberg REST OAuth2 token");
+    assertTrue(
+        oauthServer.auxIcebergTokenRequests() > 0,
+        "The embedded Iceberg REST service did not request its own OAuth2 token for dynamic"
+            + " catalog provisioning");
+    assertEquals(
+        0,
+        oauthServer.invalidRequests(),
+        "The mock OAuth2 server rejected an unexpected or malformed token request");
 
     Container.ExecResult objects =
         localStack.executeInContainer("awslocal", "s3", "ls", "s3://" + bucketName, "--recursive");
@@ -145,22 +163,48 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
   @AfterAll
   @Override
   public void stopIntegrationTest() throws IOException, InterruptedException {
+    cleanupQuietly(
+        "Trino container",
+        () -> {
+          if (trinoContainer != null) {
+            trinoContainer.close();
+          }
+        });
+    cleanupQuietly(
+        "Gravitino metalake",
+        () -> {
+          if (client != null) {
+            client.dropMetalake(metalakeName, true);
+          }
+        });
+    cleanupQuietly(
+        "OAuth2 mock server",
+        () -> {
+          if (oauthServer != null) {
+            oauthServer.close();
+          }
+        });
+    cleanupQuietly(
+        "Trino config directory",
+        () -> {
+          if (trinoConfigDirectory != null) {
+            FileUtils.deleteDirectory(trinoConfigDirectory.toFile());
+          }
+        });
+    super.stopIntegrationTest();
+  }
+
+  private void cleanupQuietly(String resource, ThrowingRunnable action) {
     try {
-      if (trinoContainer != null) {
-        trinoContainer.close();
-      }
-      if (client != null) {
-        client.dropMetalake(metalakeName, true);
-      }
-    } finally {
-      if (oauthServer != null) {
-        oauthServer.close();
-      }
-      if (trinoConfigDirectory != null) {
-        FileUtils.deleteDirectory(trinoConfigDirectory.toFile());
-      }
-      super.stopIntegrationTest();
+      action.run();
+    } catch (Exception e) {
+      LOG.warn("Failed to clean up {} during test teardown", resource, e);
     }
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Exception;
   }
 
   private void configureGravitino() {
@@ -192,9 +236,13 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     customConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_OAUTH2_SERVER_URI,
         oauthServer.serverUri("127.0.0.1"));
+    // Distinct from OAuthServer.ICEBERG_TOKEN_PATH: this path authenticates the embedded Iceberg
+    // REST service's own client to Gravitino for dynamic catalog provisioning, whereas
+    // ICEBERG_TOKEN_PATH is what Trino's Iceberg REST catalog authenticates against. Keeping them
+    // separate lets the test tell the two OAuth2 flows apart instead of one masking the other.
     customConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_OAUTH2_TOKEN_PATH,
-        OAuthServer.ICEBERG_TOKEN_PATH);
+        OAuthServer.AUX_ICEBERG_TOKEN_PATH);
     customConfigs.put(
         GRAVITINO_ICEBERG_REST_PREFIX + IcebergConstants.GRAVITINO_OAUTH2_CREDENTIAL,
         CLIENT_CREDENTIAL);
@@ -242,11 +290,12 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
         catalogName, Catalog.Type.RELATIONAL, "lakehouse-iceberg", "", properties);
   }
 
-  private Path createTrinoConfig() throws Exception {
-    Path directory = Files.createTempDirectory("trino-tls-oauth-");
+  private void populateTrinoConfig(Path directory) throws Exception {
+    String rootDir = System.getenv("GRAVITINO_ROOT_DIR");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(rootDir), "GRAVITINO_ROOT_DIR environment variable is not set");
     FileUtils.copyDirectory(
-        Path.of(System.getenv("GRAVITINO_ROOT_DIR"), "dev", "docker", "trino", "conf").toFile(),
-        directory.toFile());
+        Path.of(rootDir, "dev", "docker", "trino", "conf").toFile(), directory.toFile());
     Path tlsDirectory = Files.createDirectories(directory.resolve("tls"));
     createTlsStores(tlsDirectory);
 
@@ -314,11 +363,12 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     Files.writeString(catalogs.resolve("gravitino.properties"), connector, StandardCharsets.UTF_8);
     Files.writeString(
         catalogs.resolve("gravitino.properties.template"), connector, StandardCharsets.UTF_8);
-    return directory;
   }
 
   private void startTrino() {
     String root = System.getenv("GRAVITINO_ROOT_DIR");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(root), "GRAVITINO_ROOT_DIR environment variable is not set");
     String connectorDirectory = System.getenv("TRINO_CONNECTOR_DIR");
     if (connectorDirectory == null || connectorDirectory.isBlank()) {
       connectorDirectory =
@@ -348,6 +398,8 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
 
   private void copyIcebergAwsBundle() {
     String gravitinoHome = System.getenv("GRAVITINO_HOME");
+    Preconditions.checkArgument(
+        StringUtils.isNotBlank(gravitinoHome), "GRAVITINO_HOME environment variable is not set");
     copyBundleJarsToDirectory(
         "iceberg-aws-bundle", Path.of(gravitinoHome, "iceberg-rest-server", "libs").toString());
     copyBundleJarsToDirectory(
@@ -407,7 +459,6 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
         certificate.toString());
   }
 
-  @SuppressWarnings("ThreadJoinLoop")
   private void run(Path executable, String... arguments) throws Exception {
     String[] command = new String[arguments.length + 1];
     command[0] = executable.toString();
@@ -439,26 +490,50 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
     return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
   }
 
+  /**
+   * A minimal OAuth2 client-credentials token endpoint. It serves three distinct flows, each on its
+   * own path with its own counter so the test can tell them apart:
+   *
+   * <ul>
+   *   <li>{@link #GRAVITINO_TOKEN_PATH}: Trino's Gravitino client authenticating to Gravitino.
+   *   <li>{@link #AUX_ICEBERG_TOKEN_PATH}: the embedded Iceberg REST service authenticating itself
+   *       to Gravitino for dynamic catalog provisioning.
+   *   <li>{@link #ICEBERG_TOKEN_PATH}: Trino's Iceberg REST catalog authenticating to the Iceberg
+   *       REST service.
+   * </ul>
+   */
   private static final class OAuthServer implements AutoCloseable {
+    private static final Logger LOG = LoggerFactory.getLogger(OAuthServer.class);
     private static final String GRAVITINO_TOKEN_PATH = "/oauth2/gravitino/token";
+    private static final String AUX_ICEBERG_TOKEN_PATH = "/oauth2/iceberg-rest-server/token";
     private static final String ICEBERG_TOKEN_PATH = "/oauth2/iceberg/token";
 
     private final HttpServer server;
     private final KeyPair keyPair;
     private final String audience;
     private final String subject;
+    private final String expectedClientId;
+    private final String expectedClientSecret;
     private final AtomicInteger gravitinoTokenRequests = new AtomicInteger();
-    private final AtomicInteger icebergTokenRequests = new AtomicInteger();
+    private final AtomicInteger auxIcebergTokenRequests = new AtomicInteger();
+    private final AtomicInteger trinoIcebergTokenRequests = new AtomicInteger();
+    private final AtomicInteger invalidRequests = new AtomicInteger();
 
-    private OAuthServer(KeyPair keyPair, String audience, String subject) throws IOException {
+    private OAuthServer(KeyPair keyPair, String audience, String subject, String clientCredential)
+        throws IOException {
       this.keyPair = keyPair;
       this.audience = audience;
       this.subject = subject;
+      String[] credentialParts = clientCredential.split(":", 2);
+      this.expectedClientId = credentialParts[0];
+      this.expectedClientSecret = credentialParts[1];
       this.server = HttpServer.create(new InetSocketAddress("0.0.0.0", 0), 0);
       this.server.createContext(
           GRAVITINO_TOKEN_PATH, exchange -> handle(exchange, gravitinoTokenRequests));
       this.server.createContext(
-          ICEBERG_TOKEN_PATH, exchange -> handle(exchange, icebergTokenRequests));
+          AUX_ICEBERG_TOKEN_PATH, exchange -> handle(exchange, auxIcebergTokenRequests));
+      this.server.createContext(
+          ICEBERG_TOKEN_PATH, exchange -> handle(exchange, trinoIcebergTokenRequests));
     }
 
     private void start() {
@@ -473,13 +548,45 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
       return gravitinoTokenRequests.get();
     }
 
-    private int icebergTokenRequests() {
-      return icebergTokenRequests.get();
+    private int auxIcebergTokenRequests() {
+      return auxIcebergTokenRequests.get();
+    }
+
+    private int trinoIcebergTokenRequests() {
+      return trinoIcebergTokenRequests.get();
+    }
+
+    private int invalidRequests() {
+      return invalidRequests.get();
+    }
+
+    private void handle(HttpExchange exchange, AtomicInteger requestCounter) throws IOException {
+      try {
+        String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+        if (!"POST".equalsIgnoreCase(exchange.getRequestMethod())) {
+          rejectRequest(exchange, 405, "Only POST is supported");
+          return;
+        }
+        Map<String, String> form = parseFormBody(body);
+        if (!"client_credentials".equals(form.get("grant_type"))) {
+          rejectRequest(exchange, 400, "Unsupported grant_type: " + form.get("grant_type"));
+          return;
+        }
+        if (!expectedClientId.equals(form.get("client_id"))
+            || !expectedClientSecret.equals(form.get("client_secret"))) {
+          rejectRequest(exchange, 401, "Invalid client credential");
+          return;
+        }
+        requestCounter.incrementAndGet();
+        sendToken(exchange);
+      } catch (Exception e) {
+        LOG.error("Mock OAuth2 server failed to handle request to {}", exchange.getRequestURI(), e);
+        rejectRequest(exchange, 500, "Mock OAuth2 server error: " + e.getMessage());
+      }
     }
 
     @SuppressWarnings("JavaUtilDate")
-    private void handle(HttpExchange exchange, AtomicInteger requestCounter) throws IOException {
-      requestCounter.incrementAndGet();
+    private void sendToken(HttpExchange exchange) throws IOException {
       String token =
           Jwts.builder()
               .setSubject(subject)
@@ -495,6 +602,33 @@ public class TrinoTlsOAuthCredentialVendingIT extends BaseIT {
       try (OutputStream output = exchange.getResponseBody()) {
         output.write(response);
       }
+    }
+
+    private void rejectRequest(HttpExchange exchange, int status, String message)
+        throws IOException {
+      invalidRequests.incrementAndGet();
+      LOG.warn("Rejecting OAuth2 request to {}: {}", exchange.getRequestURI(), message);
+      byte[] response = message.getBytes(StandardCharsets.UTF_8);
+      exchange.getResponseHeaders().add("Content-Type", "text/plain");
+      exchange.sendResponseHeaders(status, response.length);
+      try (OutputStream output = exchange.getResponseBody()) {
+        output.write(response);
+      }
+    }
+
+    private static Map<String, String> parseFormBody(String body) {
+      Map<String, String> form = new HashMap<>();
+      for (String pair : body.split("&")) {
+        if (pair.isEmpty()) {
+          continue;
+        }
+        String[] keyValue = pair.split("=", 2);
+        String key = URLDecoder.decode(keyValue[0], StandardCharsets.UTF_8);
+        String value =
+            keyValue.length > 1 ? URLDecoder.decode(keyValue[1], StandardCharsets.UTF_8) : "";
+        form.put(key, value);
+      }
+      return form;
     }
 
     @Override
