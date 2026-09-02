@@ -52,6 +52,21 @@ public interface AccessControlDispatcher {
       throws UserAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+<<<<<<< HEAD
+=======
+   * Adds users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The Users to add.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Users encounters storage issues.
+   */
+  List<BulkItemResult<User>> addUsers(String metalake, List<UserAdd> users)
+      throws NoSuchMetalakeException;
+
+  /**
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
    * Removes a User.
    *
    * @param metalake The Metalake of the User.
@@ -64,6 +79,23 @@ public interface AccessControlDispatcher {
   boolean removeUser(String metalake, String user) throws NoSuchMetalakeException;
 
   /**
+<<<<<<< HEAD
+=======
+   * Removes Users in bulk.
+   *
+   * @param metalake The Metalake of the Users.
+   * @param users The names of the Users.
+   * @param metalakeOwner The Metalake owner.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Users encounters storage issues.
+   */
+  List<BulkItemResult<String>> removeUsers(
+      String metalake, List<String> users, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException;
+
+  /**
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
    * Gets a User.
    *
    * @param metalake The Metalake of the User.
@@ -107,6 +139,21 @@ public interface AccessControlDispatcher {
       throws GroupAlreadyExistsException, NoSuchMetalakeException;
 
   /**
+<<<<<<< HEAD
+=======
+   * Adds groups in bulk.
+   *
+   * @param metalake The Metalake of the Groups.
+   * @param groups The Groups to add.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If adding the Groups encounters storage issues.
+   */
+  List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException;
+
+  /**
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
    * Removes a Group.
    *
    * @param metalake The Metalake of the Group.
@@ -119,6 +166,23 @@ public interface AccessControlDispatcher {
   boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException;
 
   /**
+<<<<<<< HEAD
+=======
+   * Removes Groups in bulk.
+   *
+   * @param metalake The Metalake of the Groups.
+   * @param groups The names of the Groups.
+   * @param metalakeOwner The Metalake owner.
+   * @return The item-level bulk results.
+   * @throws NoSuchMetalakeException If the Metalake with the given name does not exist.
+   * @throws RuntimeException If removing the Groups encounters storage issues.
+   */
+  List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException;
+
+  /**
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
    * Gets a Group.
    *
    * @param metalake The Metalake of the Group.

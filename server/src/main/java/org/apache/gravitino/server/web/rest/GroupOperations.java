@@ -118,10 +118,15 @@ public class GroupOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
+<<<<<<< HEAD
             return Utils.ok(
                 new GroupResponse(
                     DTOConverters.toDTO(
                         accessControlManager.addGroup(metalake, request.getName()))));
+=======
+            Group addedGroup = accessControlManager.addGroup(metalake, request.getName());
+            return Utils.ok(new GroupResponse(DTOConverters.toDTO(addedGroup)));
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleGroupException(

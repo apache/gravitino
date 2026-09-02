@@ -159,10 +159,15 @@ public class UserOperations {
           () -> {
             request.validate();
             MetalakeManager.checkMetalakeInUse(metalake);
+<<<<<<< HEAD
             return Utils.ok(
                 new UserResponse(
                     DTOConverters.toDTO(
                         accessControlManager.addUser(metalake, request.getName()))));
+=======
+            User addedUser = accessControlManager.addUser(metalake, request.getName());
+            return Utils.ok(new UserResponse(DTOConverters.toDTO(addedUser)));
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleUserException(

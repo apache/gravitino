@@ -163,6 +163,10 @@ components:
         name:
           type: string
           description: The name of the user
+<<<<<<< HEAD
+=======
+          default: true
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
         roles:
           type: array
           items:
@@ -179,6 +183,10 @@ components:
         name:
           type: string
           description: The name of the user
+<<<<<<< HEAD
+=======
+          default: true
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 
   responses:
     UserResponse:
@@ -211,7 +219,11 @@ components:
   examples:
     UserAddRequest:
       value: {
+<<<<<<< HEAD
         "name": "user1",
+=======
+        "name": "user"
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
       }
 
     NameListResponse:

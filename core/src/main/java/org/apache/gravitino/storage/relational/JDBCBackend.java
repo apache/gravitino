@@ -41,6 +41,10 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.UnsupportedEntityTypeException;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.cache.BaseEntityCache;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;

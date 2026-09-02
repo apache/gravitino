@@ -26,7 +26,14 @@ import com.google.common.collect.ImmutableList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.gravitino.NameIdentifier;
+<<<<<<< HEAD
 import org.apache.gravitino.authorization.User;
+=======
+import org.apache.gravitino.authorization.PagedResult;
+import org.apache.gravitino.authorization.User;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.UserAdd;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.exceptions.NoSuchUserException;
@@ -472,13 +479,91 @@ public class TestUserEvent {
     Assertions.assertEquals(revokedRoles, revokeUserRolesFailureEvent.roles());
   }
 
+<<<<<<< HEAD
+=======
+  @Test
+  void testBulkAddUsersDispatchesPerUserEvents() {
+    dummyEventListener.clear();
+
+    dispatcher.addUsers(METALAKE, Arrays.asList(new UserAdd(userName), new UserAdd(otherUserName)));
+
+    Assertions.assertEquals(2, dummyEventListener.getPreEvents().size());
+    PreEvent firstPreEvent = dummyEventListener.getPreEvents().get(0);
+    Assertions.assertEquals(AddUserPreEvent.class, firstPreEvent.getClass());
+    Assertions.assertEquals(identifier, firstPreEvent.identifier());
+    Assertions.assertEquals(userName, ((AddUserPreEvent) firstPreEvent).userName());
+    PreEvent secondPreEvent = dummyEventListener.getPreEvents().get(1);
+    Assertions.assertEquals(AddUserPreEvent.class, secondPreEvent.getClass());
+    Assertions.assertEquals(otherIdentifier, secondPreEvent.identifier());
+    Assertions.assertEquals(otherUserName, ((AddUserPreEvent) secondPreEvent).userName());
+
+    Assertions.assertEquals(2, dummyEventListener.getPostEvents().size());
+    Event firstEvent = dummyEventListener.getPostEvents().get(0);
+    Assertions.assertEquals(AddUserEvent.class, firstEvent.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, firstEvent.operationStatus());
+    validateUserInfo(((AddUserEvent) firstEvent).addedUserInfo(), user);
+    Event secondEvent = dummyEventListener.getPostEvents().get(1);
+    Assertions.assertEquals(AddUserFailureEvent.class, secondEvent.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, secondEvent.operationStatus());
+    Assertions.assertEquals(otherIdentifier, secondEvent.identifier());
+    Assertions.assertEquals(otherUserName, ((AddUserFailureEvent) secondEvent).userName());
+  }
+
+  @Test
+  void testBulkRemoveUsersDispatchesPerUserEvents() {
+    dummyEventListener.clear();
+
+    dispatcher.removeUsers(METALAKE, Arrays.asList(userName, inExistUserName), Optional.empty());
+
+    Assertions.assertEquals(2, dummyEventListener.getPreEvents().size());
+    PreEvent firstPreEvent = dummyEventListener.getPreEvents().get(0);
+    Assertions.assertEquals(RemoveUserPreEvent.class, firstPreEvent.getClass());
+    Assertions.assertEquals(identifier, firstPreEvent.identifier());
+    Assertions.assertEquals(userName, ((RemoveUserPreEvent) firstPreEvent).userName());
+    PreEvent secondPreEvent = dummyEventListener.getPreEvents().get(1);
+    Assertions.assertEquals(RemoveUserPreEvent.class, secondPreEvent.getClass());
+    Assertions.assertEquals(inExistIdentifier, secondPreEvent.identifier());
+    Assertions.assertEquals(inExistUserName, ((RemoveUserPreEvent) secondPreEvent).userName());
+
+    Assertions.assertEquals(2, dummyEventListener.getPostEvents().size());
+    Event firstEvent = dummyEventListener.getPostEvents().get(0);
+    Assertions.assertEquals(RemoveUserEvent.class, firstEvent.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, firstEvent.operationStatus());
+    Assertions.assertEquals(userName, ((RemoveUserEvent) firstEvent).removedUserName());
+    Assertions.assertTrue(((RemoveUserEvent) firstEvent).isExists());
+    Event secondEvent = dummyEventListener.getPostEvents().get(1);
+    Assertions.assertEquals(RemoveUserFailureEvent.class, secondEvent.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, secondEvent.operationStatus());
+    Assertions.assertEquals(inExistIdentifier, secondEvent.identifier());
+    Assertions.assertEquals(inExistUserName, ((RemoveUserFailureEvent) secondEvent).userName());
+  }
+
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   private AccessControlEventDispatcher mockUserDispatcher() {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
     when(dispatcher.addUser(METALAKE, userName)).thenReturn(user);
     when(dispatcher.addUser(METALAKE, otherUserName)).thenReturn(otherUser);
+<<<<<<< HEAD
 
     when(dispatcher.removeUser(METALAKE, userName)).thenReturn(true);
     when(dispatcher.removeUser(METALAKE, inExistUserName)).thenReturn(false);
+=======
+    when(dispatcher.addUsers(eq(METALAKE), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, userName, user),
+                BulkItemResult.failure(
+                    1, otherUserName, new GravitinoRuntimeException("Failed to add user"))));
+
+    when(dispatcher.removeUser(METALAKE, userName)).thenReturn(true);
+    when(dispatcher.removeUser(METALAKE, inExistUserName)).thenReturn(false);
+    when(dispatcher.removeUsers(eq(METALAKE), any(), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, userName),
+                BulkItemResult.failure(
+                    1, inExistUserName, new NoSuchUserException("user not found"))));
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 
     when(dispatcher.listUsers(METALAKE)).thenReturn(new User[] {user, otherUser});
     when(dispatcher.listUserNames(METALAKE)).thenReturn(new String[] {userName, otherUserName});

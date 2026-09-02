@@ -16,37 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.authorization;
+package org.apache.gravitino.bulk;
 
-import java.util.List;
-import org.apache.gravitino.Auditable;
-import org.apache.gravitino.annotation.Evolving;
+/** Represents one user to add in a bulk operation. */
+public final class UserAdd {
 
-/** The interface of a Group. The Group is the entity which contains users. */
-@Evolving
-public interface Group extends Auditable {
+  private final String name;
 
   /**
-   * The name of the group.
+   * Creates a user add item.
    *
-   * @return The name of the group.
+   * @param name The user name.
    */
-  String name();
+  public UserAdd(String name) {
+    this.name = name;
+  }
 
   /**
-<<<<<<< HEAD
-=======
-   * The unique id assigned by Gravitino.
+   * Returns the user name.
    *
-   * @return The unique id of the group.
+   * @return The user name.
    */
-  Long id();
-
-  /**
->>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
-   * The roles of the group.
-   *
-   * @return The roles of the group.
-   */
-  List<String> roles();
+  public String name() {
+    return name;
+  }
 }

@@ -211,7 +211,11 @@ components:
   examples:
     GroupAddRequest:
       value: {
+<<<<<<< HEAD
         "name": "group1",
+=======
+        "name": "group"
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
       }
 
     NameListResponse:

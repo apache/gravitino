@@ -214,6 +214,20 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testAddGroupWithNullRequestBodyDoesNotExposeNpe() {
+    Response resp =
+        target("/metalakes/metalake1/groups")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public void testGetGroup() throws IOException {
     Group group = buildGroup("group1");
 

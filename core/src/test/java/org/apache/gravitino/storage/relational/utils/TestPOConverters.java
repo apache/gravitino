@@ -793,6 +793,66 @@ public class TestPOConverters {
     assertEquals(1, updatePO2.getLastVersion());
     assertEquals(1, updatePO2.getFilesetVersionPOs().get(0).getVersion());
     assertEquals("test1", updatePO2.getFilesetName());
+<<<<<<< HEAD
+=======
+
+    // A snapshot stored above the version the metadata row records must not be rebuilt: the next
+    // version starts above every snapshot the fileset still owns.
+    FilesetPO updatePO3 = POConverters.updateFilesetPOWithVersion(initPO, updatedFileset, 7L);
+    assertEquals(8, updatePO3.getCurrentVersion());
+    assertEquals(8, updatePO3.getLastVersion());
+    assertEquals(8, updatePO3.getFilesetVersionPOs().get(0).getVersion());
+  }
+
+  @Test
+  public void testUpdateGroupPOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    GroupEntity group =
+        GroupEntity.builder().withId(2L).withName("group").withAuditInfo(auditInfo).build();
+    GroupPO initialGroupPO =
+        POConverters.initializeGroupPOWithVersion(group, GroupPO.builder().withMetalakeId(1L));
+    GroupPO groupPO =
+        GroupPO.builder()
+            .withGroupId(initialGroupPO.getGroupId())
+            .withGroupName(initialGroupPO.getGroupName())
+            .withMetalakeId(initialGroupPO.getMetalakeId())
+            .withAuditInfo(initialGroupPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialGroupPO.getDeletedAt())
+            .build();
+
+    GroupPO updatedGroupPO = POConverters.updateGroupPOWithVersion(groupPO, group);
+
+    assertEquals(8, updatedGroupPO.getCurrentVersion());
+    assertEquals(8, updatedGroupPO.getLastVersion());
+  }
+
+  @Test
+  public void testUpdateUserPOVersionUsesCurrentVersion() {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(FIX_INSTANT).build();
+    UserEntity user =
+        UserEntity.builder().withId(1L).withName("user").withAuditInfo(auditInfo).build();
+    UserPO initialUserPO =
+        POConverters.initializeUserPOWithVersion(user, UserPO.builder().withMetalakeId(1L));
+    UserPO userPO =
+        UserPO.builder()
+            .withUserId(initialUserPO.getUserId())
+            .withUserName(initialUserPO.getUserName())
+            .withMetalakeId(initialUserPO.getMetalakeId())
+            .withAuditInfo(initialUserPO.getAuditInfo())
+            .withCurrentVersion(7L)
+            .withLastVersion(3L)
+            .withDeletedAt(initialUserPO.getDeletedAt())
+            .build();
+
+    UserPO updatedUserPO = POConverters.updateUserPOWithVersion(userPO, user);
+
+    assertEquals(8, updatedUserPO.getCurrentVersion());
+    assertEquals(8, updatedUserPO.getLastVersion());
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   }
 
   @Test

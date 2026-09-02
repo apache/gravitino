@@ -25,10 +25,21 @@ import java.util.Set;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.authorization.Owner;
+import org.apache.gravitino.authorization.PagedResult;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 import org.apache.gravitino.authorization.Privilege;
 import org.apache.gravitino.authorization.Role;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.User;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
+import org.apache.gravitino.bulk.UserAdd;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 import org.apache.gravitino.exceptions.GroupAlreadyExistsException;
 import org.apache.gravitino.exceptions.IllegalRoleException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
@@ -44,6 +55,15 @@ import org.apache.gravitino.listener.api.event.AddGroupPreEvent;
 import org.apache.gravitino.listener.api.event.AddUserEvent;
 import org.apache.gravitino.listener.api.event.AddUserFailureEvent;
 import org.apache.gravitino.listener.api.event.AddUserPreEvent;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.listener.api.event.CountGroupsEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsFailureEvent;
+import org.apache.gravitino.listener.api.event.CountGroupsPreEvent;
+import org.apache.gravitino.listener.api.event.CountUsersEvent;
+import org.apache.gravitino.listener.api.event.CountUsersFailureEvent;
+import org.apache.gravitino.listener.api.event.CountUsersPreEvent;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 import org.apache.gravitino.listener.api.event.CreateRoleEvent;
 import org.apache.gravitino.listener.api.event.CreateRoleFailureEvent;
 import org.apache.gravitino.listener.api.event.CreateRolePreEvent;
@@ -147,6 +167,29 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<User>> addUsers(String metalake, List<UserAdd> users)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    users.forEach(
+        user -> eventBus.dispatchEvent(new AddUserPreEvent(initiator, metalake, user.name())));
+
+    try {
+      List<BulkItemResult<User>> results = dispatcher.addUsers(metalake, users);
+      results.forEach(result -> dispatchAddUserResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      users.forEach(
+          user ->
+              eventBus.dispatchEvent(new AddUserFailureEvent(initiator, metalake, e, user.name())));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -164,6 +207,29 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<String>> removeUsers(
+      String metalake, List<String> users, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    users.forEach(
+        user -> eventBus.dispatchEvent(new RemoveUserPreEvent(initiator, metalake, user)));
+
+    try {
+      List<BulkItemResult<String>> results = dispatcher.removeUsers(metalake, users, metalakeOwner);
+      results.forEach(result -> dispatchRemoveUserResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      users.forEach(
+          user -> eventBus.dispatchEvent(new RemoveUserFailureEvent(initiator, metalake, e, user)));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
@@ -236,6 +302,30 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    groups.forEach(
+        group -> eventBus.dispatchEvent(new AddGroupPreEvent(initiator, metalake, group.name())));
+
+    try {
+      List<BulkItemResult<Group>> results = dispatcher.addGroups(metalake, groups);
+      results.forEach(result -> dispatchAddGroupResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      groups.forEach(
+          group ->
+              eventBus.dispatchEvent(
+                  new AddGroupFailureEvent(initiator, metalake, e, group.name())));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();
 
@@ -253,6 +343,31 @@ public class AccessControlEventDispatcher implements AccessControlDispatcher {
 
   /** {@inheritDoc} */
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    String initiator = PrincipalUtils.getCurrentUserName();
+    groups.forEach(
+        group -> eventBus.dispatchEvent(new RemoveGroupPreEvent(initiator, metalake, group)));
+
+    try {
+      List<BulkItemResult<String>> results =
+          dispatcher.removeGroups(metalake, groups, metalakeOwner);
+      results.forEach(result -> dispatchRemoveGroupResultEvent(initiator, metalake, result));
+      return results;
+    } catch (Exception e) {
+      groups.forEach(
+          group ->
+              eventBus.dispatchEvent(new RemoveGroupFailureEvent(initiator, metalake, e, group)));
+      throw e;
+    }
+  }
+
+  /** {@inheritDoc} */
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     String initiator = PrincipalUtils.getCurrentUserName();

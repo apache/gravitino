@@ -320,4 +320,112 @@ public class UserMetaService {
 
     return userDeletedCount[0] + userRoleRelDeletedCount[0];
   }
+<<<<<<< HEAD
+=======
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "countUsersByMetalake")
+  public long countUsersByMetalake(String metalakeName) {
+    Long count =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class, mapper -> mapper.countUserMetasByMetalakeName(metalakeName));
+    return count == null ? 0L : count;
+  }
+
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "listUsersByMetalakePaginated")
+  public PagedResult<UserEntity> listUsersByMetalakePaginated(
+      String metalakeName, int offset, int limit) {
+    Preconditions.checkArgument(offset >= 0, "offset must be >= 0");
+    Preconditions.checkArgument(limit >= 0, "limit must be >= 0");
+
+    long totalCount = countUsersByMetalake(metalakeName);
+    if (limit == 0 || offset >= totalCount) {
+      return new PagedResult<>(totalCount, Collections.emptyList());
+    }
+
+    List<ExtendedUserPO> userPOs =
+        SessionUtils.getWithoutCommit(
+            UserMetaMapper.class,
+            mapper ->
+                mapper.listExtendedUserPOsByMetalakeNamePaginated(metalakeName, offset, limit));
+    List<UserEntity> users =
+        userPOs.stream()
+            .map(
+                po ->
+                    POConverters.fromExtendedUserPO(
+                        po, AuthorizationUtils.ofUserNamespace(metalakeName)))
+            .collect(Collectors.toList());
+    return new PagedResult<>(totalCount, users);
+  }
+
+  /**
+   * Holds the parent metalake row for the rest of the transaction, so the user cannot be created
+   * under a metalake that is going away.
+   *
+   * <p>The lock is shared, not exclusive: many users can be created under the same metalake at the
+   * same time. Dropping a metalake takes an exclusive lock on this row, so a drop and a create
+   * cannot overlap. Whoever gets the row first wins, and the loser either sees the metalake gone or
+   * inserts under a metalake that is still there.
+   *
+   * <p>The name is compared again because the ID alone cannot tell a rename apart: the caller
+   * looked the metalake up by name, so a renamed row means the name in the request no longer
+   * exists.
+   *
+   * <p>The metalake's version is deliberately not compared, matching {@code CatalogMetaService}.
+   * Holding the row is what makes the create safe. An unrelated metalake edit that commits in
+   * between bumps the version without making this create wrong, so comparing it would reject the
+   * create for no reason.
+   */
+  private void lockMetalakeForUserCreate(MetalakePO observedMetalakePO) {
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  private RuntimeException userWriteFailure(
+      NameIdentifier identifier, UserPO observedUserPO, UserLookup lookup) {
+    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
+    // The locking read additionally waits for a writer that is still in flight, so a rename or
+    // delete that has not committed yet is classified as not-found instead of as a stale-version
+    // conflict. The lock is taken on the error path of a transaction that is about to roll back.
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.USER,
+        () -> getUserPOByIdForUpdate(observedUserPO.getUserId()),
+        null,
+        current ->
+            Objects.equals(current.getMetalakeId(), observedUserPO.getMetalakeId())
+                && (lookup != UserLookup.NAME
+                    || Objects.equals(current.getUserName(), observedUserPO.getUserName()))
+                && (lookup != UserLookup.EXTERNAL_ID));
+  }
+
+  private UserPO getUserPOByIdForUpdate(long userId) {
+    return SessionUtils.getWithoutCommit(
+        UserMetaMapper.class, mapper -> mapper.selectUserMetaByIdForUpdate(userId));
+  }
+
+  /**
+   * How the caller addressed the user, which decides what counts as "the same user" when a failed
+   * compare-and-set is classified. A caller that used the name is looking for that name, so a
+   * rename means the user it asked for is gone; the same holds for the external ID. A caller that
+   * used the ID addressed the row itself, so a rename leaves it addressing the same user and only
+   * the metalake has to still match.
+   */
+  private enum UserLookup {
+    NAME,
+    EXTERNAL_ID,
+    ID
+  }
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 }

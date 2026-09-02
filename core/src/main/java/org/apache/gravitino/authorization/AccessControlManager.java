@@ -68,6 +68,30 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<User>> addUsers(String metalake, List<UserAdd> users)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<User>> results = Lists.newArrayListWithCapacity(users.size());
+          for (int index = 0; index < users.size(); index++) {
+            UserAdd user = users.get(index);
+            try {
+              User addedUser = userGroupManager.addUser(metalake, user.name());
+              results.add(BulkItemResult.success(index, user.name(), addedUser));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, user.name(), e));
+            }
+          }
+          return results;
+        });
+  }
+
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public boolean removeUser(String metalake, String user) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
@@ -76,6 +100,38 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<String>> removeUsers(
+      String metalake, List<String> users, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofUserNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<String>> results = Lists.newArrayListWithCapacity(users.size());
+          for (int index = 0; index < users.size(); index++) {
+            String user = users.get(index);
+            try {
+              ensureNotMetalakeOwner(metalakeOwner, metalake, user);
+              boolean removed = userGroupManager.removeUser(metalake, user);
+              if (!removed) {
+                results.add(
+                    BulkItemResult.failure(
+                        index, user, new NoSuchUserException("User does not exist: %s", user)));
+                continue;
+              }
+              results.add(BulkItemResult.success(index, user));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, user, e));
+            }
+          }
+          return results;
+        });
+  }
+
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public User getUser(String metalake, String user)
       throws NoSuchUserException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
@@ -109,6 +165,30 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<Group>> addGroups(String metalake, List<GroupAdd> groups)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<Group>> results = Lists.newArrayListWithCapacity(groups.size());
+          for (int index = 0; index < groups.size(); index++) {
+            GroupAdd group = groups.get(index);
+            try {
+              Group addedGroup = userGroupManager.addGroup(metalake, group.name());
+              results.add(BulkItemResult.success(index, group.name(), addedGroup));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, group.name(), e));
+            }
+          }
+          return results;
+        });
+  }
+
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public boolean removeGroup(String metalake, String group) throws NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(
         NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
@@ -117,6 +197,38 @@ public class AccessControlManager implements AccessControlDispatcher {
   }
 
   @Override
+<<<<<<< HEAD
+=======
+  public List<BulkItemResult<String>> removeGroups(
+      String metalake, List<String> groups, Optional<Owner> metalakeOwner)
+      throws NoSuchMetalakeException {
+    return TreeLockUtils.doWithTreeLock(
+        NameIdentifier.of(AuthorizationUtils.ofGroupNamespace(metalake).levels()),
+        LockType.WRITE,
+        () -> {
+          List<BulkItemResult<String>> results = Lists.newArrayListWithCapacity(groups.size());
+          for (int index = 0; index < groups.size(); index++) {
+            String group = groups.get(index);
+            try {
+              ensureNotMetalakeOwnerGroup(metalakeOwner, metalake, group);
+              boolean removed = userGroupManager.removeGroup(metalake, group);
+              if (!removed) {
+                results.add(
+                    BulkItemResult.failure(
+                        index, group, new NoSuchGroupException("Group does not exist: %s", group)));
+                continue;
+              }
+              results.add(BulkItemResult.success(index, group));
+            } catch (Exception e) {
+              results.add(BulkItemResult.failure(index, group, e));
+            }
+          }
+          return results;
+        });
+  }
+
+  @Override
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public Group getGroup(String metalake, String group)
       throws NoSuchGroupException, NoSuchMetalakeException {
     return TreeLockUtils.doWithTreeLock(

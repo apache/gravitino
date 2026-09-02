@@ -1063,6 +1063,292 @@ class TestGroupMetaService extends TestJDBCBackend {
         GroupMetaMapper.class, mapper -> mapper.getGroupUpdatedAt(metalakeName, groupName));
   }
 
+<<<<<<< HEAD
+=======
+  @TestTemplate
+  void testConcurrentUpdateDoesNotChangeRolesOnConflict() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role1",
+            AUDIT_INFO,
+            catalogName);
+    RoleEntity role2 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "role2",
+            AUDIT_INFO,
+            catalogName);
+    RoleMetaService.getInstance().insertRole(role1, false);
+    RoleMetaService.getInstance().insertRole(role2, false);
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "concurrent-group",
+            AUDIT_INFO,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    GroupMetaService.getInstance().insertGroup(group, false);
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () ->
+            GroupMetaService.getInstance()
+                .updateGroup(
+                    group.nameIdentifier(),
+                    (GroupEntity oldGroup) -> {
+                      advanceGroupVersion(group.id());
+                      List<String> roleNames = Lists.newArrayList(oldGroup.roleNames());
+                      List<Long> roleIds = Lists.newArrayList(oldGroup.roleIds());
+                      roleNames.add(role2.name());
+                      roleIds.add(role2.id());
+                      return GroupEntity.builder()
+                          .withId(oldGroup.id())
+                          .withName(oldGroup.name())
+                          .withNamespace(oldGroup.namespace())
+                          .withRoleNames(roleNames)
+                          .withRoleIds(roleIds)
+                          .withAuditInfo(oldGroup.auditInfo())
+                          .build();
+                    }));
+
+    GroupEntity storedGroup =
+        GroupMetaService.getInstance().getGroupByIdentifier(group.nameIdentifier());
+    assertEquals(Sets.newHashSet(role1.id()), Sets.newHashSet(storedGroup.roleIds()));
+  }
+
+  @TestTemplate
+  void testCreateLocksMetalakeWithoutChangingVersion() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    GroupMetaService service = GroupMetaService.getInstance();
+    MetalakePO beforeCreate = getMetalakePO();
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "fenced-group",
+            AUDIT_INFO);
+
+    service.insertGroup(group, false);
+
+    MetalakePO afterCreate = getMetalakePO();
+    assertEquals(beforeCreate.getCurrentVersion(), afterCreate.getCurrentVersion());
+    assertEquals(beforeCreate.getLastVersion(), afterCreate.getLastVersion());
+
+    GroupEntity duplicate =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            group.name(),
+            AUDIT_INFO);
+    Assertions.assertThrows(
+        EntityAlreadyExistsException.class, () -> service.insertGroup(duplicate, false));
+
+    MetalakePO afterFailedCreate = getMetalakePO();
+    assertEquals(afterCreate.getCurrentVersion(), afterFailedCreate.getCurrentVersion());
+    assertEquals(afterCreate.getLastVersion(), afterFailedCreate.getLastVersion());
+  }
+
+  @TestTemplate
+  void testOverwriteInsertAdvancesVersion() throws IOException {
+    GroupMetaService service = groupMetaService();
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "overwrite-group",
+            AUDIT_INFO);
+    service.insertGroup(group, false);
+    GroupPO initialPO = getGroupPO(group.name());
+
+    service.insertGroup(group, true);
+
+    GroupPO overwrittenPO = getGroupPO(group.name());
+    assertEquals(initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion());
+    assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
+    int staleDelete =
+        SessionUtils.doWithCommitAndFetchResult(
+            GroupMetaMapper.class,
+            mapper ->
+                mapper.softDeleteGroupMetaByGroupId(group.id(), initialPO.getCurrentVersion()));
+    assertEquals(0, staleDelete);
+  }
+
+  @TestTemplate
+  void testStaleDeleteReportsConflict() throws IOException {
+    GroupMetaService service = groupMetaService();
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "stale-delete-group",
+            AUDIT_INFO);
+    service.insertGroup(group, false);
+    GroupPO staleGroupPO = getGroupPO(group.name());
+    advanceGroupVersion(group.id());
+
+    Assertions.assertThrows(
+        OptimisticLockException.class,
+        () -> service.deleteGroupWithVersion(group.nameIdentifier(), staleGroupPO));
+    assertEquals(group.id(), service.getGroupByIdentifier(group.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  void testGroupPagination() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    GroupMetaService svc = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    RoleEntity role1 =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            "page_group_role",
+            auditInfo,
+            catalogName);
+    roleMetaService.insertRole(role1, false);
+
+    GroupEntity g1 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g1",
+            auditInfo);
+    GroupEntity g2 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g2",
+            auditInfo,
+            Lists.newArrayList(role1.name()),
+            Lists.newArrayList(role1.id()));
+    GroupEntity g3 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g3",
+            auditInfo);
+    GroupEntity g4 =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "page_g4",
+            auditInfo);
+    svc.insertGroup(g1, false);
+    svc.insertGroup(g2, false);
+    svc.insertGroup(g3, false);
+    svc.insertGroup(g4, false);
+
+    List<GroupEntity> ordered =
+        Lists.newArrayList(g1, g2, g3, g4).stream()
+            .sorted(Comparator.comparing(GroupEntity::id))
+            .collect(Collectors.toList());
+
+    Assertions.assertEquals(4, svc.countGroupsByMetalake(metalakeName));
+
+    // offset=1, limit=2 exercises JDBC OFFSET and stable ORDER BY group_id ASC.
+    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(4, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+    Assertions.assertEquals(ordered.get(1).name(), page.items().get(0).name());
+    Assertions.assertEquals(ordered.get(2).name(), page.items().get(1).name());
+    Assertions.assertEquals(ordered.get(1).id(), page.items().get(0).id());
+    Assertions.assertEquals(ordered.get(2).id(), page.items().get(1).id());
+
+    GroupEntity withRole =
+        ordered.stream().filter(g -> "page_g2".equals(g.name())).findFirst().orElseThrow();
+    int roleGroupOffset = ordered.indexOf(withRole);
+    PagedResult<GroupEntity> rolePage =
+        svc.listGroupsByMetalakePaginated(metalakeName, roleGroupOffset, 1);
+    Assertions.assertEquals(1, rolePage.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet("page_group_role"), Sets.newHashSet(rolePage.items().get(0).roleNames()));
+
+    PagedResult<GroupEntity> pageAgain = svc.listGroupsByMetalakePaginated(metalakeName, 1, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
+    Assertions.assertTrue(svc.listGroupsByMetalakePaginated(metalakeName, 0, 0).items().isEmpty());
+    Assertions.assertTrue(
+        svc.listGroupsByMetalakePaginated(metalakeName, 10, 10).items().isEmpty());
+  }
+
+  @TestTemplate
+  void testGroupPaginationWithSpecialRoleNames() throws IOException {
+    AuditInfo auditInfo =
+        AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
+    createAndInsertMakeLake(metalakeName);
+    createAndInsertCatalog(metalakeName, catalogName);
+
+    GroupMetaService svc = GroupMetaService.getInstance();
+    RoleMetaService roleMetaService = RoleMetaService.getInstance();
+    String quotedRole = "role\"quoted";
+    String backslashRole = "back\\slash";
+    RoleEntity roleQuoted =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            quotedRole,
+            auditInfo,
+            catalogName);
+    RoleEntity roleBackslash =
+        createRoleEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofRoleNamespace(metalakeName),
+            backslashRole,
+            auditInfo,
+            catalogName);
+    roleMetaService.insertRole(roleQuoted, false);
+    roleMetaService.insertRole(roleBackslash, false);
+
+    GroupEntity group =
+        createGroupEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            AuthorizationUtils.ofGroupNamespace(metalakeName),
+            "special_role_group",
+            auditInfo,
+            Lists.newArrayList(quotedRole, backslashRole),
+            Lists.newArrayList(roleQuoted.id(), roleBackslash.id()));
+    svc.insertGroup(group, false);
+
+    PagedResult<GroupEntity> page = svc.listGroupsByMetalakePaginated(metalakeName, 0, 10);
+    Assertions.assertEquals(1, page.totalCount());
+    Assertions.assertEquals(1, page.items().size());
+    Assertions.assertEquals(
+        Sets.newHashSet(quotedRole, backslashRole),
+        Sets.newHashSet(page.items().get(0).roleNames()));
+  }
+
+  private GroupMetaService groupMetaService() throws IOException {
+    createAndInsertMakeLake(metalakeName);
+    return GroupMetaService.getInstance();
+  }
+
+  private MetalakePO getMetalakePO() {
+    return SessionUtils.getWithoutCommit(
+        MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalakeName));
+  }
+
+  private GroupPO getGroupPO(String groupName) {
+    MetalakePO metalakePO = getMetalakePO();
+    return SessionUtils.getWithoutCommit(
+        GroupMetaMapper.class,
+        mapper -> mapper.selectGroupMetaByMetalakeIdAndName(metalakePO.getMetalakeId(), groupName));
+  }
+
+  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
+    Assertions.assertThrows(type, executable);
+  }
+
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   private GroupEntity createGroupEntity(
       Long id, Namespace namespace, String name, AuditInfo auditInfo) {
     return GroupEntity.builder()

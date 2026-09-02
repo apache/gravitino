@@ -29,6 +29,12 @@ import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.authorization.AccessControlDispatcher;
 import org.apache.gravitino.authorization.Group;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.authorization.PagedResult;
+import org.apache.gravitino.bulk.BulkItemResult;
+import org.apache.gravitino.bulk.GroupAdd;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchGroupException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
@@ -48,6 +54,10 @@ public class TestGroupEvent {
 
   private static final String METALAKE = "demo_metalake";
   private static final String INEXIST_METALAKE = "inexist_metalake";
+<<<<<<< HEAD
+=======
+  private static final long GROUP_ID = 1L;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   private AccessControlEventDispatcher dispatcher;
   private AccessControlEventDispatcher failureDispatcher;
   private DummyEventListener dummyEventListener;
@@ -534,6 +544,73 @@ public class TestGroupEvent {
     Assertions.assertEquals(revokedRoles, revokeGroupRolesFailureEvent.roles());
   }
 
+<<<<<<< HEAD
+=======
+  @Test
+  void testBulkAddGroupsDispatchesPerGroupEvents() {
+    dummyEventListener.clear();
+
+    dispatcher.addGroups(
+        METALAKE, Arrays.asList(new GroupAdd(groupName), new GroupAdd(otherGroupName)));
+
+    Assertions.assertEquals(2, dummyEventListener.getPreEvents().size());
+    PreEvent firstPreEvent = dummyEventListener.getPreEvents().get(0);
+    Assertions.assertEquals(AddGroupPreEvent.class, firstPreEvent.getClass());
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, groupName), firstPreEvent.identifier());
+    Assertions.assertEquals(groupName, ((AddGroupPreEvent) firstPreEvent).groupName());
+    PreEvent secondPreEvent = dummyEventListener.getPreEvents().get(1);
+    Assertions.assertEquals(AddGroupPreEvent.class, secondPreEvent.getClass());
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, otherGroupName), secondPreEvent.identifier());
+    Assertions.assertEquals(otherGroupName, ((AddGroupPreEvent) secondPreEvent).groupName());
+
+    Assertions.assertEquals(2, dummyEventListener.getPostEvents().size());
+    Event firstEvent = dummyEventListener.getPostEvents().get(0);
+    Assertions.assertEquals(AddGroupEvent.class, firstEvent.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, firstEvent.operationStatus());
+    validateGroup(((AddGroupEvent) firstEvent).addedGroupInfo(), group);
+    Event secondEvent = dummyEventListener.getPostEvents().get(1);
+    Assertions.assertEquals(AddGroupFailureEvent.class, secondEvent.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, secondEvent.operationStatus());
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, otherGroupName), secondEvent.identifier());
+    Assertions.assertEquals(otherGroupName, ((AddGroupFailureEvent) secondEvent).groupName());
+  }
+
+  @Test
+  void testBulkRemoveGroupsDispatchesPerGroupEvents() {
+    dummyEventListener.clear();
+
+    dispatcher.removeGroups(METALAKE, Arrays.asList(groupName, inExistGroupName), Optional.empty());
+
+    Assertions.assertEquals(2, dummyEventListener.getPreEvents().size());
+    PreEvent firstPreEvent = dummyEventListener.getPreEvents().get(0);
+    Assertions.assertEquals(RemoveGroupPreEvent.class, firstPreEvent.getClass());
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, groupName), firstPreEvent.identifier());
+    Assertions.assertEquals(groupName, ((RemoveGroupPreEvent) firstPreEvent).groupName());
+    PreEvent secondPreEvent = dummyEventListener.getPreEvents().get(1);
+    Assertions.assertEquals(RemoveGroupPreEvent.class, secondPreEvent.getClass());
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, inExistGroupName), secondPreEvent.identifier());
+    Assertions.assertEquals(inExistGroupName, ((RemoveGroupPreEvent) secondPreEvent).groupName());
+
+    Assertions.assertEquals(2, dummyEventListener.getPostEvents().size());
+    Event firstEvent = dummyEventListener.getPostEvents().get(0);
+    Assertions.assertEquals(RemoveGroupEvent.class, firstEvent.getClass());
+    Assertions.assertEquals(OperationStatus.SUCCESS, firstEvent.operationStatus());
+    Assertions.assertEquals(groupName, ((RemoveGroupEvent) firstEvent).removedGroupName());
+    Assertions.assertTrue(((RemoveGroupEvent) firstEvent).isExists());
+    Event secondEvent = dummyEventListener.getPostEvents().get(1);
+    Assertions.assertEquals(RemoveGroupFailureEvent.class, secondEvent.getClass());
+    Assertions.assertEquals(OperationStatus.FAILURE, secondEvent.operationStatus());
+    Assertions.assertEquals(
+        NameIdentifierUtil.ofGroup(METALAKE, inExistGroupName), secondEvent.identifier());
+    Assertions.assertEquals(inExistGroupName, ((RemoveGroupFailureEvent) secondEvent).groupName());
+  }
+
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   private Group getMockGroup(String name, List<String> roles) {
     Group mockGroup = mock(Group.class);
     when(mockGroup.name()).thenReturn(name);
@@ -546,9 +623,27 @@ public class TestGroupEvent {
     AccessControlEventDispatcher dispatcher = mock(AccessControlEventDispatcher.class);
     when(dispatcher.addGroup(METALAKE, groupName)).thenReturn(group);
     when(dispatcher.addGroup(METALAKE, otherGroupName)).thenReturn(otherGroup);
+<<<<<<< HEAD
 
     when(dispatcher.removeGroup(METALAKE, groupName)).thenReturn(true);
     when(dispatcher.removeGroup(METALAKE, inExistGroupName)).thenReturn(false);
+=======
+    when(dispatcher.addGroups(eq(METALAKE), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, groupName, group),
+                BulkItemResult.failure(
+                    1, otherGroupName, new GravitinoRuntimeException("Failed to add group"))));
+
+    when(dispatcher.removeGroup(METALAKE, groupName)).thenReturn(true);
+    when(dispatcher.removeGroup(METALAKE, inExistGroupName)).thenReturn(false);
+    when(dispatcher.removeGroups(eq(METALAKE), any(), any()))
+        .thenReturn(
+            Arrays.asList(
+                BulkItemResult.success(0, groupName),
+                BulkItemResult.failure(
+                    1, inExistGroupName, new NoSuchGroupException("group not found"))));
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
 
     when(dispatcher.listGroups(METALAKE)).thenReturn(new Group[] {group, otherGroup});
     when(dispatcher.listGroupNames(METALAKE)).thenReturn(new String[] {groupName, otherGroupName});

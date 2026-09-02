@@ -50,7 +50,10 @@ public class GroupAddRequest implements RESTRequest {
    * @param name The name of the group.
    */
   public GroupAddRequest(String name) {
+<<<<<<< HEAD
     super();
+=======
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
     this.name = name;
   }
 

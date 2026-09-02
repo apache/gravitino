@@ -66,6 +66,10 @@ import org.mockito.Mockito;
 public class TestMemoryEntityStore {
 
   public static class InMemoryEntityStore implements EntityStore {
+<<<<<<< HEAD
+=======
+
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
     private final Map<NameIdentifier, Entity> entityMap;
     private final Lock lock;
 

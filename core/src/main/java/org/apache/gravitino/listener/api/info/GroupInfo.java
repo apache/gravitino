@@ -49,7 +49,11 @@ public class GroupInfo {
   }
 
   /**
+<<<<<<< HEAD
    * Returns the roles of the roles.
+=======
+   * Returns the roles of the group.
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
    *
    * @return The roles of the group.
    */

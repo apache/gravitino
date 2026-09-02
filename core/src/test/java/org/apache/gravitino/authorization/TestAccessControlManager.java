@@ -243,6 +243,105 @@ public class TestAccessControlManager {
   }
 
   @Test
+<<<<<<< HEAD
+=======
+  public void testBulkAddUsers() {
+    List<BulkItemResult<User>> results =
+        accessControlManager.addUsers(
+            METALAKE,
+            Lists.newArrayList(
+                new UserAdd("bulk_user_1"),
+                new UserAdd("bulk_user_2"),
+                new UserAdd("bulk_user_1")));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_user_1", results.get(0).value().get().name());
+    Assertions.assertTrue(results.get(1).succeeded());
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof UserAlreadyExistsException);
+  }
+
+  @Test
+  public void testBulkRemoveUsers() {
+    accessControlManager.addUser(METALAKE, "bulk_remove_user");
+
+    List<BulkItemResult<String>> results =
+        accessControlManager.removeUsers(
+            METALAKE,
+            Lists.newArrayList("bulk_remove_user", "missing_bulk_user", "metalake_owner"),
+            Optional.of(
+                new Owner() {
+                  @Override
+                  public String name() {
+                    return "metalake_owner";
+                  }
+
+                  @Override
+                  public Type type() {
+                    return Type.USER;
+                  }
+                }));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_remove_user", results.get(0).name());
+    Assertions.assertFalse(results.get(1).succeeded());
+    Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchUserException);
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
+  }
+
+  @Test
+  public void testBulkAddGroups() {
+    List<BulkItemResult<Group>> results =
+        accessControlManager.addGroups(
+            METALAKE,
+            Lists.newArrayList(
+                new GroupAdd("bulk_group_1"),
+                new GroupAdd("bulk_group_2"),
+                new GroupAdd("bulk_group_1")));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_group_1", results.get(0).value().get().name());
+    Assertions.assertTrue(results.get(1).succeeded());
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof GroupAlreadyExistsException);
+  }
+
+  @Test
+  public void testBulkRemoveGroups() {
+    accessControlManager.addGroup(METALAKE, "bulk_remove_group");
+
+    List<BulkItemResult<String>> results =
+        accessControlManager.removeGroups(
+            METALAKE,
+            Lists.newArrayList("bulk_remove_group", "missing_bulk_group", "metalake_owner_group"),
+            Optional.of(
+                new Owner() {
+                  @Override
+                  public String name() {
+                    return "metalake_owner_group";
+                  }
+
+                  @Override
+                  public Type type() {
+                    return Type.GROUP;
+                  }
+                }));
+
+    Assertions.assertEquals(3, results.size());
+    Assertions.assertTrue(results.get(0).succeeded());
+    Assertions.assertEquals("bulk_remove_group", results.get(0).name());
+    Assertions.assertFalse(results.get(1).succeeded());
+    Assertions.assertTrue(results.get(1).error().get() instanceof NoSuchGroupException);
+    Assertions.assertFalse(results.get(2).succeeded());
+    Assertions.assertTrue(results.get(2).error().get() instanceof IllegalArgumentException);
+  }
+
+  @Test
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public void testListUsers() {
     accessControlManager.addUser("metalake_list", "testList1");
     accessControlManager.addUser("metalake_list", "testList2");
@@ -454,12 +553,111 @@ public class TestAccessControlManager {
     accessControlManager.deleteRole("metalake_list", "testList2");
   }
 
+<<<<<<< HEAD
+=======
+  @Test
+  public void testUserPagination() {
+    long beforeCount = accessControlManager.countUsers(METALAKE);
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.addUser(METALAKE, "page_user_" + i);
+    }
+
+    Assertions.assertEquals(beforeCount + 5, accessControlManager.countUsers(METALAKE));
+
+    PagedResult<User> page = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 5, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    // Repeated call with the same offset/limit must be stable.
+    PagedResult<User> pageAgain = accessControlManager.listUsers(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
+    PagedResult<User> lastPage =
+        accessControlManager.listUsers(METALAKE, (int) beforeCount + 4, 10);
+    Assertions.assertEquals(beforeCount + 5, lastPage.totalCount());
+    Assertions.assertEquals(1, lastPage.items().size());
+
+    for (int i = 0; i < 5; i++) {
+      accessControlManager.removeUser(METALAKE, "page_user_" + i);
+    }
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.countUsers("no_such_metalake"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.listUsers("no_such_metalake", 0, 10));
+  }
+
+  @Test
+  public void testGroupPagination() {
+    long beforeCount = accessControlManager.countGroups(METALAKE);
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.addGroup(METALAKE, "page_group_" + i);
+    }
+    Assertions.assertEquals(beforeCount + 3, accessControlManager.countGroups(METALAKE));
+
+    PagedResult<Group> page = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(beforeCount + 3, page.totalCount());
+    Assertions.assertEquals(2, page.items().size());
+
+    PagedResult<Group> pageAgain = accessControlManager.listGroups(METALAKE, (int) beforeCount, 2);
+    Assertions.assertEquals(page.items().get(0).name(), pageAgain.items().get(0).name());
+    Assertions.assertEquals(page.items().get(1).name(), pageAgain.items().get(1).name());
+
+    for (int i = 0; i < 3; i++) {
+      accessControlManager.removeGroup(METALAKE, "page_group_" + i);
+    }
+
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class, () -> accessControlManager.countGroups("no_such_metalake"));
+    Assertions.assertThrows(
+        NoSuchMetalakeException.class,
+        () -> accessControlManager.listGroups("no_such_metalake", 0, 10));
+  }
+
+  private void createCatalogRole(String role) {
+    accessControlManager.createRole(
+        METALAKE,
+        role,
+        ImmutableMap.of("k1", "v1"),
+        Lists.newArrayList(
+            SecurableObjects.ofCatalog(
+                "catalog", Lists.newArrayList(Privileges.UseCatalog.allow()))));
+  }
+
+  private void assertSortedRoles(User user, String... expectedRoles) {
+    List<String> roles = Lists.newArrayList(user.roles());
+    Collections.sort(roles);
+    Assertions.assertEquals(Lists.newArrayList(expectedRoles), roles);
+  }
+
+  private void assertThrowsExt(Class<? extends Exception> type, Executable executable) {
+    Assertions.assertThrows(type, executable);
+  }
+
+  private void assertInvalidExt(Executable executable) {
+    Assertions.assertThrows(IllegalArgumentException.class, executable);
+  }
+
+  private void assertMissingExt(Class<? extends Exception> type, Executable executable) {
+    Exception ex = Assertions.assertThrows(type, executable);
+    Assertions.assertTrue(ex.getMessage().contains("external id"));
+  }
+
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   private void testProperties(Map<String, String> expectedProps, Map<String, String> testProps) {
     expectedProps.forEach(
         (k, v) -> {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
+<<<<<<< HEAD
     Assertions.assertFalse(testProps.containsKey(StringIdentifier.ID_KEY));
+=======
+    Assertions.assertTrue(
+        !testProps.containsKey(StringIdentifier.ID_KEY)
+            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(testProps.get(StringIdentifier.ID_KEY)));
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   }
 }

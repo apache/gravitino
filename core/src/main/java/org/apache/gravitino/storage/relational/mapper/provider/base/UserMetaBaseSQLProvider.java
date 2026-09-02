@@ -44,21 +44,45 @@ public class UserMetaBaseSQLProvider {
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
     return "SELECT user_id as userId, user_name as userName,"
         + " metalake_id as metalakeId,"
+<<<<<<< HEAD
         + " audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
+=======
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
         + " FROM "
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
         + " AND deleted_at = 0";
   }
 
+<<<<<<< HEAD
   public String insertUserMeta(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
         + " (user_id, user_name,"
         + " metalake_id, audit_info,"
         + " current_version, last_version, deleted_at)"
+=======
+  /** Returns SQL that selects and locks an active user by ID. */
+  public String selectUserMetaByIdForUpdate(@Param("userId") Long userId) {
+    return "SELECT user_id as userId, user_name as userName,"
+        + " metalake_id as metalakeId,"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " WHERE user_id = #{userId} AND deleted_at = 0 FOR UPDATE";
+  }
+
+  public String insertUserMeta(@Param("userMeta") UserPO userPO) {
+    return "INSERT INTO "
+        + USER_TABLE_NAME
+        + " (user_id, user_name, metalake_id,"
+        + " audit_info, current_version, last_version, deleted_at)"
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
@@ -73,9 +97,14 @@ public class UserMetaBaseSQLProvider {
   public String insertUserMetaOnDuplicateKeyUpdate(@Param("userMeta") UserPO userPO) {
     return "INSERT INTO "
         + USER_TABLE_NAME
+<<<<<<< HEAD
         + " (user_id, user_name,"
         + " metalake_id, audit_info,"
         + " current_version, last_version, deleted_at)"
+=======
+        + " (user_id, user_name, metalake_id,"
+        + " audit_info, current_version, last_version, deleted_at)"
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
@@ -89,8 +118,15 @@ public class UserMetaBaseSQLProvider {
         + " user_name = #{userMeta.userName},"
         + " metalake_id = #{userMeta.metalakeId},"
         + " audit_info = #{userMeta.auditInfo},"
+<<<<<<< HEAD
         + " current_version = #{userMeta.currentVersion},"
         + " last_version = #{userMeta.lastVersion},"
+=======
+        // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
+        // cannot pass a later compare-and-set (an ABA conflict).
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
         + " deleted_at = #{userMeta.deletedAt}";
   }
 
@@ -184,6 +220,57 @@ public class UserMetaBaseSQLProvider {
         + " GROUP BY ut.user_id";
   }
 
+<<<<<<< HEAD
+=======
+  public String countUserMetasByMetalakeName(@Param("metalakeName") String metalakeName) {
+    return "SELECT COUNT(*) FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0";
+  }
+
+  public String listExtendedUserPOsByMetalakeNamePaginated(
+      @Param("metalakeName") String metalakeName,
+      @Param("offset") int offset,
+      @Param("limit") int limit) {
+    return "SELECT ut.user_id as userId, ut.user_name as userName,"
+        + " ut.metalake_id as metalakeId,"
+        + " ut.audit_info as auditInfo,"
+        + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
+        + " ut.deleted_at as deletedAt,"
+        + " JSON_ARRAYAGG(rot.role_name) as roleNames,"
+        + " JSON_ARRAYAGG(rot.role_id) as roleIds"
+        + " FROM ("
+        + " SELECT ut.user_id FROM "
+        + USER_TABLE_NAME
+        + " ut JOIN "
+        + MetalakeMetaMapper.TABLE_NAME
+        + " mt ON ut.metalake_id = mt.metalake_id"
+        + " WHERE mt.metalake_name = #{metalakeName}"
+        + " AND ut.deleted_at = 0 AND mt.deleted_at = 0"
+        + " ORDER BY ut.user_id ASC LIMIT #{limit} OFFSET #{offset}"
+        + " ) paginated"
+        + " JOIN "
+        + USER_TABLE_NAME
+        + " ut ON ut.user_id = paginated.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + USER_ROLE_RELATION_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rt ON rt.user_id = ut.user_id"
+        + " LEFT OUTER JOIN ("
+        + " SELECT * FROM "
+        + ROLE_TABLE_NAME
+        + " WHERE deleted_at = 0)"
+        + " AS rot ON rot.role_id = rt.role_id"
+        + " GROUP BY ut.user_id"
+        + " ORDER BY ut.user_id ASC";
+  }
+
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
   public String deleteUserMetasByLegacyTimeline(
       @Param("legacyTimeline") Long legacyTimeline, @Param("limit") int limit) {
     return "DELETE FROM "

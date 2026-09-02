@@ -49,7 +49,12 @@ public class UserDTO implements User {
    * @param roles The roles of the User DTO.
    * @param audit The audit information of the User DTO.
    */
+<<<<<<< HEAD
   protected UserDTO(String name, List<String> roles, AuditDTO audit) {
+=======
+  protected UserDTO(Long id, String name, List<String> roles, AuditDTO audit) {
+    this.id = id;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
     this.name = name;
     this.audit = audit;
     this.roles = roles;
@@ -151,7 +156,11 @@ public class UserDTO implements User {
     public UserDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
+<<<<<<< HEAD
       return new UserDTO(name, roles, audit);
+=======
+      return new UserDTO(id, name, roles, audit);
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
     }
   }
 }

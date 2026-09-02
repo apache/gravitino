@@ -49,7 +49,12 @@ public class GroupDTO implements Group {
    * @param roles The roles of the Group DTO.
    * @param audit The audit information of the Group DTO.
    */
+<<<<<<< HEAD
   protected GroupDTO(String name, List<String> roles, AuditDTO audit) {
+=======
+  protected GroupDTO(Long id, String name, List<String> roles, AuditDTO audit) {
+    this.id = id;
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
     this.name = name;
     this.audit = audit;
     this.roles = roles;
@@ -151,7 +156,11 @@ public class GroupDTO implements Group {
     public GroupDTO build() {
       Preconditions.checkArgument(StringUtils.isNotBlank(name), "name cannot be null or empty");
       Preconditions.checkArgument(audit != null, "audit cannot be null");
+<<<<<<< HEAD
       return new GroupDTO(name, roles, audit);
+=======
+      return new GroupDTO(id, name, roles, audit);
+>>>>>>> 0dcc2ec16 ([#12841] refactor(core): Remove external_id and enabled from user and group metadata (#12842))
     }
   }
 }
