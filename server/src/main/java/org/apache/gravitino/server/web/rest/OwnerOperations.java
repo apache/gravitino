@@ -88,7 +88,9 @@ public class OwnerOperations {
       return Utils.doAs(
           httpRequest,
           () -> {
-            MetalakeManager.checkMetalakeInUse(metalake);
+            if (object.type() != MetadataObject.Type.METALAKE) {
+              MetalakeManager.checkMetalakeInUse(metalake);
+            }
             MetadataObjectUtil.checkMetadataObject(metalake, object);
             Optional<Owner> owner = ownerDispatcher.getOwner(metalake, object);
             if (owner.isPresent()) {
