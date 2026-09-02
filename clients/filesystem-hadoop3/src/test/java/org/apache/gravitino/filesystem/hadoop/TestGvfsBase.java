@@ -1755,4 +1755,125 @@ public class TestGvfsBase extends GravitinoMockServerBase {
   private MockGVFSHook getHook(FileSystem gvfs) {
     return (MockGVFSHook) ((GravitinoVirtualFileSystem) gvfs).getHook();
   }
+
+  @Test
+  public void testOneCatalogLoadPerOperation() throws IOException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    String filesetName = "testOneCatalogLoadPerOperation";
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    String catalogPath = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
+
+    // Catalog loads only reach the server while the metadata cache is disabled. That is the
+    // default, but pin it so the expected count does not depend on a default defined elsewhere.
+    Configuration cacheOffConf = new Configuration(conf);
+    cacheOffConf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE, false);
+
+    try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(cacheOffConf);
+        FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+      FileSystemTestUtils.mkdirs(localPath, localFileSystem);
+      mockFilesetDTO(
+          metalakeName,
+          catalogName,
+          schemaName,
+          filesetName,
+          Fileset.Type.MANAGED,
+          ImmutableMap.of("location1", localPath.toString()),
+          ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location1"));
+      Map<String, String> queryParams = new HashMap<>();
+      queryParams.put("sub_path", "/test.txt");
+      buildMockResource(
+          Method.GET,
+          locationPath,
+          queryParams,
+          null,
+          new FileLocationResponse(localPath + "/test.txt"),
+          SC_OK);
+      buildMockResourceForCredential(filesetName, localPath + "/test.txt");
+
+      // Warm the filesystem cache first: the first operation also constructs a FileSystem, and
+      // the steady-state count is what a query engine pays per file.
+      Path filePath = new Path(managedFilesetPath + "/test.txt");
+      FileSystemTestUtils.create(filePath, gravitinoFileSystem);
+
+      HttpRequest catalogRequest = HttpRequest.request(catalogPath);
+      int before = mockServer().retrieveRecordedRequests(catalogRequest).length;
+      FileSystemTestUtils.create(filePath, gravitinoFileSystem);
+      int after = mockServer().retrieveRecordedRequests(catalogRequest).length;
+
+      assertEquals(
+          1, after - before, "one filesystem operation must load the catalog exactly once");
+
+      localFileSystem.delete(new Path(localPath + "/test.txt"), true);
+    }
+  }
+
+  @Test
+  public void testOneCatalogLoadPerRename() throws IOException {
+    Assumptions.assumeTrue(getClass() == TestGvfsBase.class);
+    String filesetName = "testOneCatalogLoadPerRename";
+    Path managedFilesetPath =
+        FileSystemTestUtils.createFilesetPath(catalogName, schemaName, filesetName, true);
+    Path localPath = FileSystemTestUtils.createLocalDirPrefix(catalogName, schemaName, filesetName);
+    String catalogPath = "/api/metalakes/" + metalakeName + "/catalogs/" + catalogName;
+    String locationPath =
+        String.format(
+            "/api/metalakes/%s/catalogs/%s/schemas/%s/filesets/%s/location",
+            metalakeName, catalogName, schemaName, RESTUtils.encodeString(filesetName));
+
+    // Catalog loads only reach the server while the metadata cache is disabled. That is the
+    // default, but pin it so the expected count does not depend on a default defined elsewhere.
+    Configuration cacheOffConf = new Configuration(conf);
+    cacheOffConf.setBoolean(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_FILESET_METADATA_CACHE_ENABLE, false);
+
+    try (FileSystem gravitinoFileSystem = managedFilesetPath.getFileSystem(cacheOffConf);
+        FileSystem localFileSystem = localPath.getFileSystem(conf)) {
+      FileSystemTestUtils.mkdirs(localPath, localFileSystem);
+      mockFilesetDTO(
+          metalakeName,
+          catalogName,
+          schemaName,
+          filesetName,
+          Fileset.Type.MANAGED,
+          ImmutableMap.of("location1", localPath.toString()),
+          ImmutableMap.of(PROPERTY_DEFAULT_LOCATION_NAME, "location1"));
+      buildMockResource(
+          Method.GET,
+          locationPath,
+          ImmutableMap.of("sub_path", "/src.txt"),
+          null,
+          new FileLocationResponse(localPath + "/src.txt"),
+          SC_OK);
+      buildMockResource(
+          Method.GET,
+          locationPath,
+          ImmutableMap.of("sub_path", "/dst.txt"),
+          null,
+          new FileLocationResponse(localPath + "/dst.txt"),
+          SC_OK);
+      buildMockResourceForCredential(filesetName, localPath + "/src.txt");
+
+      // Warm the filesystem cache first, as in testOneCatalogLoadPerOperation.
+      Path srcPath = new Path(managedFilesetPath + "/src.txt");
+      Path dstPath = new Path(managedFilesetPath + "/dst.txt");
+      FileSystemTestUtils.create(srcPath, gravitinoFileSystem);
+
+      HttpRequest catalogRequest = HttpRequest.request(catalogPath);
+      int before = mockServer().retrieveRecordedRequests(catalogRequest).length;
+      assertTrue(gravitinoFileSystem.rename(srcPath, dstPath));
+      int after = mockServer().retrieveRecordedRequests(catalogRequest).length;
+
+      // A rename resolves two paths, but both sit in one fileset, so one catalog serves both.
+      assertEquals(1, after - before, "a rename must load the catalog exactly once");
+
+      localFileSystem.delete(new Path(localPath + "/dst.txt"), true);
+    }
+  }
 }
