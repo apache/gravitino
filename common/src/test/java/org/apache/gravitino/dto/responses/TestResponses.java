@@ -21,6 +21,7 @@ package org.apache.gravitino.dto.responses;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -516,16 +517,18 @@ public class TestResponses {
 
   @Test
   void testAuthMeResponse() throws JsonProcessingException {
-    AuthMeResponse response = new AuthMeResponse("test-user");
+    AuthMeResponse response = new AuthMeResponse("test-user", true);
     response.validate();
     assertEquals(0, response.getCode());
     assertEquals("test-user", response.getPrincipal());
+    assertTrue(response.isServiceAdmin());
 
     String serJson = JsonUtils.objectMapper().writeValueAsString(response);
     AuthMeResponse deserResponse =
         JsonUtils.objectMapper().readValue(serJson, AuthMeResponse.class);
     assertEquals(response.getCode(), deserResponse.getCode());
     assertEquals(response.getPrincipal(), deserResponse.getPrincipal());
+    assertEquals(response.isServiceAdmin(), deserResponse.isServiceAdmin());
   }
 
   @Test
@@ -533,6 +536,7 @@ public class TestResponses {
     AuthMeResponse response = new AuthMeResponse();
     assertDoesNotThrow(response::validate);
     assertNull(response.getPrincipal());
+    assertFalse(response.isServiceAdmin());
   }
 
   @Test
