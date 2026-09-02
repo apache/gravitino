@@ -39,6 +39,7 @@ import org.apache.gravitino.lance.common.ops.gravitino.CommonUtil;
 import org.apache.gravitino.lance.common.ops.gravitino.ObjectIdentifier;
 import org.apache.gravitino.lance.service.LanceExceptionMapper;
 import org.apache.gravitino.lance.service.authorization.annotations.LanceRootNamespace;
+import org.apache.gravitino.lance.service.rest.LanceTableOperations;
 import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
 import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionEvaluator;
 import org.apache.gravitino.server.web.filter.BaseMetadataAuthorizationMethodInterceptor;
@@ -53,7 +54,9 @@ import org.lance.namespace.model.CreateNamespaceRequest;
 public class LanceMetadataAuthorizationMethodInterceptor
     extends BaseMetadataAuthorizationMethodInterceptor implements MethodInterceptor {
 
+  private static final int CATALOG_NAMESPACE_LEVELS = 1;
   private static final int SCHEMA_NAMESPACE_LEVELS = 2;
+  private static final int TABLE_IDENTIFIER_LEVELS = 3;
 
   private final String metalakeName;
 
@@ -97,21 +100,50 @@ public class LanceMetadataAuthorizationMethodInterceptor
         queryArgument(parameters, args, "delimiter")
             .orElse(NamespaceWrapper.NAMESPACE_DELIMITER_DEFAULT);
     ObjectIdentifier identifier = ObjectIdentifier.of(targetId, Pattern.quote(delimiter));
-    if (identifier.levels() == 0 || identifier.levels() > SCHEMA_NAMESPACE_LEVELS) {
+    if (identifier.levels() == 0 || identifier.levels() > maxIdentifierLevels(method)) {
       throw unsupportedIdentifier(targetId);
     }
 
+    // A Lance identifier carries its depth rather than its kind, so the addressed entity type
+    // follows from the level count: one level is a catalog, two a schema, three a table. An
+    // identifier of the wrong depth for an operation matches no branch of that operation's
+    // expression and is therefore denied rather than silently authorized against another type.
     Map<Entity.EntityType, NameIdentifier> identifiers = baseIdentifiers();
     String catalogName = identifier.levelAtListPos(0);
     identifiers.put(
         Entity.EntityType.CATALOG, NameIdentifierUtil.ofCatalog(metalakeName, catalogName));
+    if (identifier.levels() == CATALOG_NAMESPACE_LEVELS) {
+      return new AuthorizationTarget(identifiers, Entity.EntityType.CATALOG);
+    }
+
+    String schemaName = identifier.levelAtListPos(1);
+    identifiers.put(
+        Entity.EntityType.SCHEMA,
+        NameIdentifierUtil.ofSchema(metalakeName, catalogName, schemaName));
     if (identifier.levels() == SCHEMA_NAMESPACE_LEVELS) {
-      identifiers.put(
-          Entity.EntityType.SCHEMA,
-          NameIdentifierUtil.ofSchema(metalakeName, catalogName, identifier.levelAtListPos(1)));
       return new AuthorizationTarget(identifiers, Entity.EntityType.SCHEMA);
     }
-    return new AuthorizationTarget(identifiers, Entity.EntityType.CATALOG);
+
+    identifiers.put(
+        Entity.EntityType.TABLE,
+        NameIdentifierUtil.ofTable(
+            metalakeName, catalogName, schemaName, identifier.levelAtListPos(2)));
+    return new AuthorizationTarget(identifiers, Entity.EntityType.TABLE);
+  }
+
+  /**
+   * Returns the deepest identifier the given operation can address. Only the table resource accepts
+   * a table identifier; every namespace operation stops at a schema, so a deeper identifier is
+   * rejected as unsupported before any expression sees it. Anything else falls back to the
+   * shallower bound, so a resource added later cannot widen its own reach by omission.
+   *
+   * @param method invoked protocol method
+   * @return the maximum number of levels the operation's identifier may carry
+   */
+  private static int maxIdentifierLevels(Method method) {
+    return LanceTableOperations.class.isAssignableFrom(method.getDeclaringClass())
+        ? TABLE_IDENTIFIER_LEVELS
+        : SCHEMA_NAMESPACE_LEVELS;
   }
 
   /**
