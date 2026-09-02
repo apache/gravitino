@@ -95,6 +95,17 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     return false;
   }
 
+  /**
+   * Extra Spark session configs applied on top of the base set in {@link #initSparkEnv()}. Tests
+   * that intentionally exercise a non-REST Iceberg catalog backend without a discoverable Iceberg
+   * REST endpoint (e.g. {@code useDynamicIcebergRestConfigProvider() == false}) must disable
+   * Iceberg REST routing here, since routing is otherwise required and fails catalog initialization
+   * when no endpoint is discoverable.
+   */
+  protected Map<String, String> getExtraSparkConfigs() {
+    return Collections.emptyMap();
+  }
+
   /** Returns the Gravitino {@link Catalog} for the catalog under test. */
   protected Catalog getGravitinoCatalog() {
     return client.loadMetalake(metalakeName).loadCatalog(getCatalogName());
@@ -303,6 +314,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
             .set("hive.exec.dynamic.partition.mode", "nonstrict")
             .set("spark.sql.warehouse.dir", warehouse)
             .set("spark.sql.session.timeZone", TIME_ZONE_UTC);
+    getExtraSparkConfigs().forEach(sparkConf::set);
     sparkSession =
         SparkSession.builder()
             .master("local[1]")
