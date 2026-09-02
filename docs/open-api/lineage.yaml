@@ -21,7 +21,15 @@ paths:
   /lineage:
     post:
       summary: Post runEvent
-      description: Updates a run state for a job.
+      description: |
+        Updates a run state for a job. When authorization is enabled, `job.namespace`
+        identifies the Gravitino metalake (organization), and every input and output
+        dataset namespace must match it. Dataset names must be Gravitino metadata full
+        names. The optional `datasetType` facet defaults to `TABLE`; supported values are
+        `TABLE`, `VIEW`, `FILE`, `FILESET`, `MODEL`, `MODEL_VERSION`, and `TOPIC`.
+        Inputs and outputs both require metadata visibility. Unsupported or external
+        dataset identifiers are rejected when authorization is enabled. When authorization
+        is disabled, generic OpenLineage namespaces remain supported.
       operationId: postRunEvent
       tags:
         - lineage
@@ -29,13 +37,18 @@ paths:
         content:
           application/json:
             schema:
-              anyOf:
-                - $ref: '#/components/schemas/RunEvent'
-                - $ref: '#/components/schemas/DatasetEvent'
-                - $ref: '#/components/schemas/JobEvent'
+              $ref: '#/components/schemas/RunEvent'
       responses:
-        "200":
-          description: OK
+        "201":
+          description: Created
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
+        "403":
+          description: Forbidden - The caller cannot access at least one input or output dataset.
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "429":
           description: Too Many Requests
         "5xx":
