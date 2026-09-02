@@ -41,14 +41,8 @@ export default function UserSetting() {
   const [openCreateMeta, setOpenCreateMeta] = useState(false)
   const [showLogoutButton, setShowLogoutButton] = useState(false)
   const auth = useAppSelector(state => state.auth)
-<<<<<<< HEAD
-  const { serviceAdmins, authUser, anthEnable } = auth
-  const admins = Array.isArray(serviceAdmins) ? serviceAdmins : (serviceAdmins || '').split(',')
-  const isServiceAdmin = admins.includes(authUser?.name)
-=======
   const { isServiceAdmin, authUser, anthEnable } = auth
   const showCreateMetalake = canCreateMetalake(anthEnable, isServiceAdmin)
->>>>>>> ea76f1408 ([#12777] fix: Avoid exposing service admins publicly (#12778))
   const [session, setSession] = useState({})
   const router = useRouter()
   const pathname = usePathname()
