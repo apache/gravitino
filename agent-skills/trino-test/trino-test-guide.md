@@ -43,7 +43,8 @@ trino-connector/integration-test/
 │           ├── tpch/                             # TPC-H test set
 │           └── tpcds/                            # TPC-DS test set
 └── trino-test-tools/                            # Test scripts
-    └── trino_integration_test.sh                # Main test script
+    ├── trino_integration_test.sh                # Main test script
+    └── run_test_with_versions.sh                # Multi-version test script
 ```
 
 ### 1.1 Running Tests with Scripts (Recommended)

@@ -79,6 +79,12 @@ jobs:
             --auto=all --auto_patch --trino_version=440 \
             --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-440-445/build/libs
 
+      - name: Test Trino 435
+        run: |
+          trino-connector/integration-test/trino-test-tools/trino_integration_test.sh \
+            --auto=all --auto_patch --trino_version=435 \
+            --trino_connector_dir=${{ env.CONNECTOR_DIR }}/trino-connector-435-439/build/libs
+
       - name: Upload test reports
         uses: actions/upload-artifact@v7
         if: failure()
