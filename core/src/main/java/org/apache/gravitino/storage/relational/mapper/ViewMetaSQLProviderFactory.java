@@ -76,6 +76,22 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().selectViewMetaBySchemaIdAndName(schemaId, name);
   }
 
+  /** Delegates a root-only locking lookup by view natural key. */
+  public static String selectViewMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("viewName") String name) {
+    return getProvider().selectViewMetaBySchemaIdAndNameForUpdate(schemaId, name);
+  }
+
+  /**
+   * Returns SQL that selects and exclusively locks an active view metadata row.
+   *
+   * @param viewId the view ID
+   * @return the locking select SQL
+   */
+  public static String selectViewMetaByIdForUpdate(@Param("viewId") Long viewId) {
+    return getProvider().selectViewMetaByIdForUpdate(viewId);
+  }
+
   public static String selectViewByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
@@ -98,8 +114,16 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().updateViewMeta(newViewPO, oldViewPO);
   }
 
-  public static String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
-    return getProvider().softDeleteViewMetasByViewId(viewId);
+  /**
+   * Returns SQL that soft-deletes a view with a version check.
+   *
+   * @param viewId the view ID
+   * @param currentVersion the version observed by the caller
+   * @return the version-checked delete SQL
+   */
+  public static String softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteViewMetasByViewId(viewId, currentVersion);
   }
 
   public static String softDeleteViewMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {

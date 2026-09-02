@@ -107,6 +107,28 @@ public interface ViewMetaMapper {
   ViewPO selectViewMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("viewName") String name);
 
+  /**
+   * Selects and exclusively locks an active view by its natural key without joining a version row.
+   *
+   * @param schemaId the schema ID
+   * @param name the view name
+   * @return the locked view root, or {@code null} when it does not exist
+   */
+  @SelectProvider(
+      type = ViewMetaSQLProviderFactory.class,
+      method = "selectViewMetaBySchemaIdAndNameForUpdate")
+  ViewPO selectViewMetaBySchemaIdAndNameForUpdate(
+      @Param("schemaId") Long schemaId, @Param("viewName") String name);
+
+  /**
+   * Selects and exclusively locks an active view metadata row.
+   *
+   * @param viewId the view ID
+   * @return the active view metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewMetaByIdForUpdate")
+  ViewPO selectViewMetaByIdForUpdate(@Param("viewId") Long viewId);
+
   @ResultMap("viewPOResultMap")
   @SelectProvider(type = ViewMetaSQLProviderFactory.class, method = "selectViewByFullQualifiedName")
   ViewPO selectViewByFullQualifiedName(
@@ -127,8 +149,16 @@ public interface ViewMetaMapper {
   Integer updateViewMeta(
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO);
 
+  /**
+   * Soft-deletes a view only if its version has not changed since the caller read it.
+   *
+   * @param viewId the view ID
+   * @param currentVersion the version observed by the caller
+   * @return the number of deleted rows; zero means the view changed or disappeared
+   */
   @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "softDeleteViewMetasByViewId")
-  Integer softDeleteViewMetasByViewId(@Param("viewId") Long viewId);
+  Integer softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion);
 
   @UpdateProvider(
       type = ViewMetaSQLProviderFactory.class,
