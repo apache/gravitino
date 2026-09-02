@@ -99,12 +99,18 @@ public class TestGravitinoIcebergCatalogRestRouting {
   }
 
   @Test
-  void testNoEndpointFallsBackToLegacyWhenNotExplicitlyEnabled() {
-    Optional<String> result =
-        GravitinoIcebergCatalog.resolveIcebergRestUri(
-            hivePropertiesWithCredentialProviders(), key -> null, Optional::empty);
+  void testNoEndpointFailsWhenRoutingNotExplicitlySet() {
+    IllegalStateException exception =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                GravitinoIcebergCatalog.resolveIcebergRestUri(
+                    hivePropertiesWithCredentialProviders(), key -> null, Optional::empty));
 
-    Assertions.assertFalse(result.isPresent());
+    Assertions.assertTrue(
+        exception
+            .getMessage()
+            .contains(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED));
   }
 
   @Test
@@ -144,16 +150,21 @@ public class TestGravitinoIcebergCatalogRestRouting {
   }
 
   @Test
-  void testDiscoveryFailureFallsBackToLegacyWhenNotExplicitlyEnabled() {
-    Optional<String> result =
-        GravitinoIcebergCatalog.resolveIcebergRestUri(
-            hivePropertiesWithCredentialProviders(),
-            key -> null,
-            () -> {
-              throw new RuntimeException("connection refused");
-            });
+  void testDiscoveryFailureFailsWhenRoutingNotExplicitlySet() {
+    RuntimeException discoveryFailure = new RuntimeException("connection refused");
 
-    Assertions.assertFalse(result.isPresent());
+    IllegalStateException exception =
+        Assertions.assertThrows(
+            IllegalStateException.class,
+            () ->
+                GravitinoIcebergCatalog.resolveIcebergRestUri(
+                    hivePropertiesWithCredentialProviders(),
+                    key -> null,
+                    () -> {
+                      throw discoveryFailure;
+                    }));
+
+    Assertions.assertSame(discoveryFailure, exception.getCause());
   }
 
   @Test

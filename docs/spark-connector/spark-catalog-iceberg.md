@@ -164,10 +164,9 @@ REST routing is enabled by default. The endpoint is discovered once per Spark ap
 of the Gravitino Spark plugin, not per `SparkSession` — and is not re-checked afterward.
 
 - If no discoverable endpoint is found (for example, the `iceberg-rest` auxiliary service is disabled or
-  not configured with `catalog-config-provider=dynamic-config-provider`) and routing was left at its
-  default, the connector falls back to the native Hive/JDBC backend and logs a warning. Set
-  `spark.sql.gravitino.iceberg.rest-routing-enabled=true` explicitly to require Iceberg REST routing and
-  fail catalog initialization instead.
+  not configured with `catalog-config-provider=dynamic-config-provider`), catalog initialization fails
+  with an actionable error. Set `spark.sql.gravitino.iceberg.rest-routing-enabled=false` to retain the
+  native Hive/JDBC backend instead.
 - A catalog whose warehouse uses a scheme with a native Iceberg FileIO (`s3://`, `gs://`, `abfs://`, etc.)
   must have [credential vending](../security/credential-vending.md) configured (`credential-providers`)
   before it can be routed: routing replaces any static storage credentials for that FileIO with vended

@@ -59,8 +59,6 @@ import org.apache.spark.sql.connector.catalog.functions.UnboundFunction;
 import org.apache.spark.sql.connector.iceberg.catalog.Procedure;
 import org.apache.spark.sql.connector.iceberg.catalog.ProcedureCatalog;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * The GravitinoIcebergCatalog class extends the BaseCatalog to integrate with the Apache Iceberg
@@ -71,8 +69,6 @@ import org.slf4j.LoggerFactory;
  */
 public class GravitinoIcebergCatalog extends BaseCatalog
     implements FunctionCatalog, ProcedureCatalog, HasIcebergCatalog {
-
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoIcebergCatalog.class);
 
   @Override
   protected TableCatalog createAndInitSparkCatalog(
@@ -171,7 +167,6 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       return Optional.of(manualUri);
     }
 
-    boolean routingExplicitlyEnabled = "true".equalsIgnoreCase(routingEnabled);
     Optional<String> discoveredUri;
     try {
       discoveredUri = endpointDiscovery.get();
@@ -179,15 +174,6 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       // endpointDiscovery can throw for reasons other than connectivity (e.g. a bug in client
       // bootstrapping), so the exception's own type is included rather than assuming it is
       // always a reachability/config problem.
-      if (!routingExplicitlyEnabled) {
-        LOG.warn(
-            "Failed to discover the Iceberg REST endpoint ({}); falling back to legacy Hive/JDBC "
-                + "backend translation. Set {}=true to require Iceberg REST routing.",
-            e.getClass().getSimpleName(),
-            GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED,
-            e);
-        return Optional.empty();
-      }
       throw new IllegalStateException(
           "Failed to discover the Iceberg REST endpoint ("
               + e.getClass().getSimpleName()
@@ -199,13 +185,6 @@ public class GravitinoIcebergCatalog extends BaseCatalog
           e);
     }
     if (!discoveredUri.isPresent()) {
-      if (!routingExplicitlyEnabled) {
-        LOG.warn(
-            "No Iceberg REST endpoint is available; falling back to legacy Hive/JDBC backend "
-                + "translation. Set {}=true to require Iceberg REST routing.",
-            GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED);
-        return Optional.empty();
-      }
       throw new IllegalStateException(
           "No Iceberg REST endpoint is available. Configure "
               + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI

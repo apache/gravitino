@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -137,13 +138,18 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
    */
   void reapplyReservedRestProperties(
       String gravitinoCatalogName, String restUri, Map<String, String> all) {
-    warnOnReservedRestPropertyOverrides(gravitinoCatalogName, all);
-    all.put(
-        IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
-        IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST);
-    all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_URI, restUri);
-    all.put(IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE, gravitinoCatalogName);
-    all.put(IcebergPropertiesConstants.ICEBERG_REST_CATALOG_PREFIX, gravitinoCatalogName);
+    Map<String, String> derived =
+        ImmutableMap.of(
+            IcebergPropertiesConstants.ICEBERG_CATALOG_TYPE,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_BACKEND_REST,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_URI,
+            restUri,
+            IcebergPropertiesConstants.ICEBERG_CATALOG_WAREHOUSE,
+            gravitinoCatalogName,
+            IcebergPropertiesConstants.ICEBERG_REST_CATALOG_PREFIX,
+            gravitinoCatalogName);
+    warnOnReservedRestPropertyOverrides(gravitinoCatalogName, all, derived);
+    all.putAll(derived);
   }
 
   private Map<String, String> extractSparkBypassProperties(Map<String, String> properties) {
@@ -160,9 +166,12 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
   }
 
   private void warnOnReservedRestPropertyOverrides(
-      String gravitinoCatalogName, Map<String, String> config) {
+      String gravitinoCatalogName, Map<String, String> config, Map<String, String> derived) {
     for (String reserved : RESERVED_REST_PROPERTIES) {
-      if (config.containsKey(reserved)) {
+      String current = config.get(reserved);
+      // A reserved key already set to its own derived value (from a prior call on the same
+      // catalog) is not an override; only a value that actually differs is worth warning about.
+      if (current != null && !current.equals(derived.get(reserved))) {
         LOG.warn(
             "Property '{}' set on catalog '{}' is ignored; the connector always derives it when "
                 + "routing through the Iceberg REST server.",
@@ -188,7 +197,7 @@ public class IcebergPropertiesConverter implements PropertiesConverter {
     String fileIoImpl = deriveFileIoImpl(warehouse);
     if (fileIoImpl != null) {
       storageProperties.putIfAbsent(IcebergPropertiesConstants.ICEBERG_IO_IMPL, fileIoImpl);
-    } else {
+    } else if (!storageProperties.containsKey(IcebergPropertiesConstants.ICEBERG_IO_IMPL)) {
       warnOnSchemeWithoutNativeFileIo(gravitinoProperties, warehouse);
     }
 
