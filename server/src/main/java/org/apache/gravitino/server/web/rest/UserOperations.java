@@ -153,8 +153,6 @@ public class UserOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       UserAddRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       LOG.warn("Received add user request with null request body");
       return ExceptionHandlers.handleUserException(
@@ -165,7 +163,6 @@ public class UserOperations {
     }
 
     String userName = request.getName();
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     try {
       return Utils.doAs(
           httpRequest,
@@ -178,8 +175,7 @@ public class UserOperations {
                         accessControlManager.addUser(metalake, request.getName()))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleUserException(
-          OperationType.ADD, request.getName(), metalake, e);
+      return ExceptionHandlers.handleUserException(OperationType.ADD, userName, metalake, e);
     }
   }
 

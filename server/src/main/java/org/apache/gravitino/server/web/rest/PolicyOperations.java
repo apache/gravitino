@@ -141,8 +141,6 @@ public class PolicyOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       PolicyCreateRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       LOG.warn("Received create policy request with null request body");
       return ExceptionHandlers.handlePolicyException(
@@ -153,7 +151,6 @@ public class PolicyOperations {
     }
 
     String policyName = request.getName();
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     LOG.info("Received create policy request under metalake: {}", metalake);
 
     try {
@@ -175,8 +172,7 @@ public class PolicyOperations {
             return Utils.ok(new PolicyResponse(toDTO(policy, Optional.empty())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handlePolicyException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handlePolicyException(OperationType.CREATE, policyName, metalake, e);
     }
   }
 

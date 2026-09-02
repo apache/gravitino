@@ -150,8 +150,6 @@ public class JobOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       JobTemplateRegisterRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       LOG.warn("Received register job template request with null request body");
       return ExceptionHandlers.handleJobTemplateException(
@@ -163,11 +161,8 @@ public class JobOperations {
 
     String jobTemplateName =
         request.getJobTemplate() == null ? "" : request.getJobTemplate().name();
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     LOG.info(
-        "Received request to register job template {} in metalake: {}",
-        request.getJobTemplate().name(),
-        metalake);
+        "Received request to register job template {} in metalake: {}", jobTemplateName, metalake);
 
     try {
       return Utils.doAs(
@@ -187,7 +182,7 @@ public class JobOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleJobTemplateException(
-          OperationType.REGISTER, request.getJobTemplate().name(), metalake, e);
+          OperationType.REGISTER, jobTemplateName, metalake, e);
     }
   }
 

@@ -112,8 +112,6 @@ public class GroupOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       GroupAddRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       LOG.warn("Received add group request with null request body");
       return ExceptionHandlers.handleGroupException(
@@ -124,7 +122,6 @@ public class GroupOperations {
     }
 
     String groupName = request.getName();
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     try {
       return Utils.doAs(
           httpRequest,
@@ -137,8 +134,7 @@ public class GroupOperations {
                         accessControlManager.addGroup(metalake, request.getName()))));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleGroupException(
-          OperationType.ADD, request.getName(), metalake, e);
+      return ExceptionHandlers.handleGroupException(OperationType.ADD, groupName, metalake, e);
     }
   }
 

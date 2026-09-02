@@ -144,8 +144,6 @@ public class FilesetOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FilesetCreateRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       LOG.warn("Received create fileset request with null request body");
       return ExceptionHandlers.handleFilesetException(
@@ -156,7 +154,6 @@ public class FilesetOperations {
     }
 
     String filesetName = request.getName();
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     LOG.info(
         "Received create fileset request: {}.{}.{}.{}",
         metalake,
@@ -193,8 +190,7 @@ public class FilesetOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleFilesetException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleFilesetException(OperationType.CREATE, filesetName, schema, e);
     }
   }
 

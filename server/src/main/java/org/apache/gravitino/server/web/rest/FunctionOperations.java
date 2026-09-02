@@ -160,8 +160,6 @@ public class FunctionOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       FunctionRegisterRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       LOG.warn("Received register function request with null request body");
       return ExceptionHandlers.handleFunctionException(
@@ -172,7 +170,6 @@ public class FunctionOperations {
     }
 
     String functionName = request.getName();
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     LOG.info(
         "Received register function request: {}.{}.{}.{}",
         metalake,
@@ -207,7 +204,7 @@ public class FunctionOperations {
           });
     } catch (Exception e) {
       return ExceptionHandlers.handleFunctionException(
-          OperationType.REGISTER, request.getName(), schema, e);
+          OperationType.REGISTER, functionName, schema, e);
     }
   }
 

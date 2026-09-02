@@ -140,8 +140,6 @@ public class RoleOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       RoleCreateRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       LOG.warn("Received create role request with null request body");
       return ExceptionHandlers.handleRoleException(
@@ -152,7 +150,6 @@ public class RoleOperations {
     }
 
     String roleName = request.getName();
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     try {
 
       return Utils.doAs(
@@ -210,8 +207,7 @@ public class RoleOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleRoleException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handleRoleException(OperationType.CREATE, roleName, metalake, e);
     }
   }
 

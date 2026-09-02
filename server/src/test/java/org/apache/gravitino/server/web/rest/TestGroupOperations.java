@@ -225,52 +225,6 @@ public class TestGroupOperations extends BaseOperationsTest {
   }
 
   @Test
-<<<<<<< HEAD
-=======
-  public void testAddGroupWithNullRequestBodyDoesNotExposeNpe() {
-    Response resp =
-        target("/metalakes/metalake1/groups")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
-
-    assertNullRequestBodyRejected(resp);
-  }
-
-  @Test
-  public void testAddGroupWithExternalId() throws IOException {
-    GroupAddRequest req = new GroupAddRequest("group1", "ext-group-1");
-    Group group =
-        GroupEntity.builder()
-            .withId(1L)
-            .withName("group1")
-            .withExternalId("ext-group-1")
-            .withRoleNames(Collections.emptyList())
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
-
-    when(manager.addGroup(any(), any(), any())).thenReturn(group);
-
-    BaseMetalake metalake = mock(BaseMetalake.class);
-    PropertiesMetadata propertiesMetadata = mock(PropertiesMetadata.class);
-    when(propertiesMetadata.getOrDefault(any(), any())).thenReturn(true);
-    when(metalake.propertiesMetadata()).thenReturn(propertiesMetadata);
-    when(entityStore.get(any(), any(), any())).thenReturn(metalake);
-
-    Response resp =
-        target("/metalakes/metalake1/groups")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(Entity.entity(req, MediaType.APPLICATION_JSON_TYPE));
-
-    Assertions.assertEquals(Status.OK.getStatusCode(), resp.getStatus());
-    GroupResponse groupResponse = resp.readEntity(GroupResponse.class);
-    Assertions.assertEquals("ext-group-1", groupResponse.getGroup().externalId());
-  }
-
-  @Test
->>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
   public void testGetGroup() throws IOException {
     Group group = buildGroup("group1");
 
