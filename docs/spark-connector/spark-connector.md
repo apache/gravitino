@@ -11,7 +11,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 
 ## Capabilities
 
-1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md), [Jdbc catalog](spark-catalog-jdbc.md), [Apache Doris batch read](spark-catalog-doris.md), and [AWS Glue catalog](spark-catalog-glue.md).
+1. Supports [Hive catalog](spark-catalog-hive.md), [Iceberg catalog](spark-catalog-iceberg.md), [Paimon catalog](spark-catalog-paimon.md), [Jdbc catalog](spark-catalog-jdbc.md), [Apache Doris batch read/write](spark-catalog-doris.md), and [AWS Glue catalog](spark-catalog-glue.md).
 2. Supports federation query.
 3. Supports most DDL and DML SQLs.
 
@@ -76,10 +76,11 @@ Two limits are worth stating plainly:
 * This governs metadata resolution only. Data is read by the executors using the credentials that
   the underlying catalog was built with, not the end user's token.
 
-The specialized Doris adapter is currently implemented for Spark 3.5.3 and newer patches in the
-Spark 3.5 line with Scala 2.12 only.
-Other Spark versions will be adapted in the same contribution after PR #12414 is merged; the
-Spark 3.5 stage is not a separate PR or a final declaration for those versions.
+The specialized Doris adapter requires Spark 3.5.3 or newer in the Spark 3.5 line with Scala 2.12.
+Spark 3.5.3 and 3.5.9 are the individually certified compatibility points; other Spark 3.5 patches
+are accepted but not individually certified. Batch reads are available when the adapter is enabled.
+Governed batch append and non-atomic full-table truncate overwrite require separate catalog-level
+opt-in settings.
 
 ```shell
 ./bin/spark-sql -v \

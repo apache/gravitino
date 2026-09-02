@@ -256,6 +256,11 @@ public abstract class SparkEnvIT extends SparkUtilIT {
    */
   protected void configureSparkConf(SparkConf sparkConf) {}
 
+  /** Returns the Spark master used by this integration-test environment. */
+  protected String getSparkMaster() {
+    return System.getenv().getOrDefault("GRAVITINO_TEST_SPARK_MASTER", "local[1]");
+  }
+
   private void initIcebergRestServiceEnv() {
     super.ignoreIcebergAuxRestService = false;
     Map<String, String> icebergRestServiceConfigs = new HashMap<>();
@@ -323,7 +328,7 @@ public abstract class SparkEnvIT extends SparkUtilIT {
     configureSparkConf(sparkConf);
     sparkSession =
         SparkSession.builder()
-            .master("local[1]")
+            .master(getSparkMaster())
             .appName("Spark connector integration test")
             .config(sparkConf)
             .enableHiveSupport()

@@ -19,8 +19,10 @@
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.types.StructType;
@@ -31,20 +33,20 @@ final class DorisReadSchema35 {
   private final StructType schema;
   private final List<String> projections;
   private final boolean requiresSqlExecution;
-  private final Set<String> normalizedColumns;
+  private final Map<String, String> normalizedTypeNames;
 
   DorisReadSchema35(
       StructType schema,
       List<String> projections,
       boolean requiresSqlExecution,
-      Set<String> normalizedColumns) {
+      Map<String, String> normalizedTypeNames) {
     if (schema.length() != projections.size()) {
       throw new IllegalArgumentException("Doris schema and projection counts differ");
     }
     this.schema = schema;
     this.projections = ImmutableList.copyOf(projections);
     this.requiresSqlExecution = requiresSqlExecution;
-    this.normalizedColumns = ImmutableSet.copyOf(normalizedColumns);
+    this.normalizedTypeNames = ImmutableMap.copyOf(normalizedTypeNames);
   }
 
   StructType schema() {
@@ -60,12 +62,19 @@ final class DorisReadSchema35 {
   }
 
   Set<String> normalizedColumns() {
-    return normalizedColumns;
+    return ImmutableSet.copyOf(normalizedTypeNames.keySet());
+  }
+
+  String normalizedTypeName(String column) {
+    return normalizedTypeNames.get(column);
   }
 
   String tableOrQuery(Identifier identifier) {
     if (identifier.namespace().length != 1) {
       throw new IllegalArgumentException("Doris table identifiers require one schema");
+    }
+    if (projections.isEmpty()) {
+      throw new IllegalArgumentException("Doris JDBC reads require at least one projected column");
     }
     return String.format(
         "(SELECT %s FROM %s.%s) gravitino_doris_source",

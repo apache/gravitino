@@ -22,9 +22,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import org.apache.spark.sql.types.DataType;
-import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 
 /** Immutable physical Doris schema snapshot for one authorized table read. */
@@ -66,11 +63,6 @@ final class DorisPhysicalSchema35 {
     this.catalystTypesResolved =
         Collections.unmodifiableList(new ArrayList<>(catalystTypesResolved));
     this.nullabilityKnown = Collections.unmodifiableList(new ArrayList<>(nullabilityKnown));
-  }
-
-  /** Creates a Spark field whose nullable bit conservatively represents unknown Doris metadata. */
-  static StructField createUnknownNullableField(String name, DataType dataType) {
-    return DataTypes.createStructField(name, dataType, true);
   }
 
   StructType schema() {

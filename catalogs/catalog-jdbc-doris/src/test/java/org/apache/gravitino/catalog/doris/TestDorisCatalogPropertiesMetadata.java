@@ -20,6 +20,8 @@ package org.apache.gravitino.catalog.doris;
 
 import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.DORIS_FE_NODES;
 import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.DORIS_QUERY_PORT;
+import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.DORIS_WRITE_MODE;
+import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.DORIS_WRITE_OVERWRITE_MODE;
 import static org.apache.gravitino.catalog.jdbc.config.JdbcConfig.JDBC_URL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -40,6 +42,8 @@ public class TestDorisCatalogPropertiesMetadata {
     assertTrue(metadata.propertyEntries().containsKey(JDBC_URL.getKey()));
     assertTrue(metadata.propertyEntries().containsKey(DORIS_FE_NODES));
     assertTrue(metadata.propertyEntries().containsKey(DORIS_QUERY_PORT));
+    assertTrue(metadata.propertyEntries().containsKey(DORIS_WRITE_MODE));
+    assertTrue(metadata.propertyEntries().containsKey(DORIS_WRITE_OVERWRITE_MODE));
     PropertyEntry<?> queryPort = metadata.propertyEntries().get(DORIS_QUERY_PORT);
     assertEquals(Integer.class, queryPort.getJavaType());
     assertTrue(queryPort.isImmutable());
@@ -56,13 +60,21 @@ public class TestDorisCatalogPropertiesMetadata {
                 DORIS_FE_NODES,
                 " fe-1:8030,fe-2:8030 ",
                 DORIS_QUERY_PORT,
-                "9030"));
+                "9030",
+                DORIS_WRITE_MODE,
+                DorisCatalogPropertiesMetadata.WRITE_BATCH,
+                DORIS_WRITE_OVERWRITE_MODE,
+                DorisCatalogPropertiesMetadata.WRITE_OVERWRITE_TRUNCATE));
 
     Map<String, String> transformed = metadata.transformProperties(properties);
 
     assertEquals("jdbc:mysql://fe:9030", transformed.get(JDBC_URL.getKey()));
     assertEquals("fe-1:8030,fe-2:8030", transformed.get(DORIS_FE_NODES));
     assertEquals("9030", transformed.get(DORIS_QUERY_PORT));
+    assertEquals(DorisCatalogPropertiesMetadata.WRITE_BATCH, transformed.get(DORIS_WRITE_MODE));
+    assertEquals(
+        DorisCatalogPropertiesMetadata.WRITE_OVERWRITE_TRUNCATE,
+        transformed.get(DORIS_WRITE_OVERWRITE_MODE));
   }
 
   @Test
@@ -78,5 +90,20 @@ public class TestDorisCatalogPropertiesMetadata {
     assertThrows(
         IllegalArgumentException.class,
         () -> metadata.transformProperties(Map.of(DORIS_QUERY_PORT, "65536")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> metadata.transformProperties(Map.of(DORIS_WRITE_MODE, "streaming")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> metadata.transformProperties(Map.of(DORIS_WRITE_OVERWRITE_MODE, "dynamic")));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            metadata.transformProperties(
+                Map.of(
+                    DORIS_WRITE_MODE,
+                    DorisCatalogPropertiesMetadata.WRITE_DISABLED,
+                    DORIS_WRITE_OVERWRITE_MODE,
+                    DorisCatalogPropertiesMetadata.WRITE_OVERWRITE_TRUNCATE)));
   }
 }

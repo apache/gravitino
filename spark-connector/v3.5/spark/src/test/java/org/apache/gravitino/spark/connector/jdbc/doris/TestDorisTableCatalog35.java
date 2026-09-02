@@ -20,6 +20,7 @@ package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.junit.jupiter.api.Test;
@@ -39,6 +40,7 @@ public class TestDorisTableCatalog35 {
 
     assertFalse(result.getMessage().contains("secret-token"));
     assertFalse(result.getMessage().contains("jdbc:mysql"));
+    assertTrue(result.getMessage().contains("RuntimeException"));
     assertNull(result.getCause());
   }
 }

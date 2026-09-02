@@ -18,12 +18,16 @@
  */
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
+import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
 
@@ -106,6 +110,93 @@ public class TestDorisPropertiesConverter35 {
         () ->
             converter.toSparkCatalogProperties(
                 ImmutableMap.of(DorisConnectorConstants35.GRAVITINO_QUERY_PORT, "65536")));
+  }
+
+  @Test
+  void testPerWriteOptionsCannotOverrideGovernedPolicy() {
+    assertDoesNotThrow(
+        () ->
+            DorisPropertiesConverter35.validateWriteOptions(
+                new CaseInsensitiveStringMap(ImmutableMap.of("application.tag", "safe"))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            DorisPropertiesConverter35.validateWriteOptions(
+                new CaseInsensitiveStringMap(
+                    ImmutableMap.of(DorisConnectorConstants35.DORIS_SINK_ENABLE_2PC, "false"))));
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            DorisPropertiesConverter35.validateWriteOptions(
+                new CaseInsensitiveStringMap(
+                    ImmutableMap.of("spark.bypass.doris.sink.mode", "jdbc"))));
+  }
+
+  @Test
+  void testPerReadOptionsCannotOverrideGovernedPolicy() {
+    assertDoesNotThrow(
+        () ->
+            DorisPropertiesConverter35.validateReadOptions(
+                new CaseInsensitiveStringMap(ImmutableMap.of())));
+    for (String option : ImmutableList.of("url", "user", "password", "dbtable", "query")) {
+      String secret = "secret-value-for-" + option;
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  DorisPropertiesConverter35.validateReadOptions(
+                      new CaseInsensitiveStringMap(ImmutableMap.of(option, secret))));
+      assertFalse(failure.getMessage().contains(secret));
+    }
+  }
+
+  @Test
+  void testEveryProtectedWriteOptionIsRejectedWithoutLeakingValues() {
+    DorisPropertiesConverter35 converter = DorisPropertiesConverter35.getInstance();
+    for (String option :
+        ImmutableList.of(
+            DorisConnectorConstants35.DORIS_SINK_MODE,
+            DorisConnectorConstants35.DORIS_SINK_AUTO_REDIRECT,
+            DorisConnectorConstants35.DORIS_SINK_ENABLE_2PC,
+            DorisConnectorConstants35.DORIS_SINK_STRICT_MODE,
+            DorisConnectorConstants35.DORIS_MAX_FILTER_RATIO,
+            DorisConnectorConstants35.DORIS_WRITE_SCHEMALESS,
+            DorisConnectorConstants35.DORIS_FE_NODES,
+            DorisConnectorConstants35.DORIS_QUERY_PORT,
+            DorisConnectorConstants35.DORIS_USER,
+            DorisConnectorConstants35.DORIS_PASSWORD,
+            "url",
+            "driver",
+            "user",
+            "password",
+            "dbtable")) {
+      String secret = "secret-value-for-" + option;
+      IllegalArgumentException catalogFailure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  converter.toSparkCatalogProperties(
+                      new CaseInsensitiveStringMap(ImmutableMap.of(option, secret)),
+                      ImmutableMap.of()));
+      assertFalse(catalogFailure.getMessage().contains(secret));
+
+      IllegalArgumentException bypassFailure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  converter.toSparkCatalogProperties(
+                      new CaseInsensitiveStringMap(ImmutableMap.of()),
+                      ImmutableMap.of(PropertiesConverter.SPARK_PROPERTY_PREFIX + option, secret)));
+      assertFalse(bypassFailure.getMessage().contains(secret));
+
+      IllegalArgumentException writeFailure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  DorisPropertiesConverter35.validateWriteOptions(
+                      new CaseInsensitiveStringMap(ImmutableMap.of(option, secret))));
+      assertFalse(writeFailure.getMessage().contains(secret));
+    }
   }
 
   @Test

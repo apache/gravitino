@@ -21,10 +21,11 @@ package org.apache.gravitino.spark.connector.jdbc.doris;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.ImmutableMap;
 import java.util.Arrays;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
 import org.junit.jupiter.api.Test;
 
 /** Tests Spark-visible Doris schema projections and identifier quoting. */
@@ -35,12 +36,12 @@ public class TestDorisReadSchema35 {
     DorisReadSchema35 schema =
         new DorisReadSchema35(
             DataTypes.createStructType(
-                new org.apache.spark.sql.types.StructField[] {
+                new StructField[] {
                   DataTypes.createStructField("column", DataTypes.StringType, true)
                 }),
             Arrays.asList("`column`"),
             false,
-            ImmutableSet.of());
+            ImmutableMap.of());
 
     assertEquals(
         "(SELECT `column` FROM `db``name`.`table name`) gravitino_doris_source",
@@ -53,9 +54,23 @@ public class TestDorisReadSchema35 {
         IllegalArgumentException.class,
         () ->
             new DorisReadSchema35(
-                DataTypes.createStructType(new org.apache.spark.sql.types.StructField[0]),
+                DataTypes.createStructType(new StructField[0]),
                 Arrays.asList("`unexpected`"),
                 false,
-                ImmutableSet.of()));
+                ImmutableMap.of()));
+  }
+
+  @Test
+  void testEmptyProjectionCannotBuildJdbcQuery() {
+    DorisReadSchema35 schema =
+        new DorisReadSchema35(
+            DataTypes.createStructType(new StructField[0]),
+            Arrays.asList(),
+            false,
+            ImmutableMap.of());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> schema.tableOrQuery(Identifier.of(new String[] {"db"}, "table")));
   }
 }

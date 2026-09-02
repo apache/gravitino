@@ -64,6 +64,8 @@ final class DorisHybridScanBuilder35
 
   private boolean normalizationRequiresSql;
   private boolean sqlOperatorSelected;
+  // Spark pushes LIMIT before OFFSET. Spark JDBC subtracts the offset from its pushed limit; this
+  // mirror prevents a non-positive JDBC limit and keeps the outer Spark OFFSET for an empty result.
   private Integer sqlPushedUpperBound;
   private Predicate[] commonPushedPredicates = new Predicate[0];
 
@@ -113,18 +115,24 @@ final class DorisHybridScanBuilder35
 
   @Override
   public Predicate[] pushPredicates(Predicate[] predicates) {
-    Predicate[] sqlResidual = sqlFilters.pushPredicates(predicates);
-    if (nativeFilters == null) {
-      commonPushedPredicates = subtract(predicates, sqlResidual);
-      return sqlResidual;
+    List<Predicate> delegated = new ArrayList<>();
+    for (Predicate predicate : predicates) {
+      if (!referencesNormalizedColumn(predicate)) {
+        delegated.add(predicate);
+      }
     }
+    Predicate[] delegatedPredicates = delegated.toArray(new Predicate[0]);
+    Predicate[] sqlResidual = sqlFilters.pushPredicates(delegatedPredicates);
+    Predicate[] nativeResidual =
+        nativeFilters == null
+            ? new Predicate[0]
+            : nativeFilters.pushPredicates(delegatedPredicates);
 
-    Predicate[] nativeResidual = nativeFilters.pushPredicates(predicates);
     List<Predicate> residual = new ArrayList<>();
     for (Predicate predicate : predicates) {
-      if (contains(nativeResidual, predicate)
-          || contains(sqlResidual, predicate)
-          || referencesNormalizedColumn(predicate)) {
+      if (referencesNormalizedColumn(predicate)
+          || contains(nativeResidual, predicate)
+          || contains(sqlResidual, predicate)) {
         residual.add(predicate);
       }
     }
@@ -187,6 +195,8 @@ final class DorisHybridScanBuilder35
   @Override
   public boolean pushOffset(int offset) {
     if (sqlPushedUpperBound != null && offset >= sqlPushedUpperBound) {
+      // If OFFSET consumes the complete pushed upper bound, retain the Spark-side OFFSET instead of
+      // asking JDBCScanBuilder to produce a non-positive LIMIT.
       return false;
     }
     boolean accepted = sqlOffset.pushOffset(offset);

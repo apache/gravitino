@@ -201,7 +201,9 @@ if (scalaVersion != "2.12") {
     }
     named("test") {
       java.exclude("**/jdbc/doris/**")
+      java.exclude("**/integration/test/jdbc/SparkJdbcDorisAuthorizationIT35.java")
       java.exclude("**/integration/test/jdbc/SparkJdbcDorisCatalogIT35.java")
+      java.exclude("**/integration/test/jdbc/SparkJdbcDorisLoadPrivilegeIT35.java")
     }
   }
 }

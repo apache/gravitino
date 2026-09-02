@@ -18,11 +18,16 @@
  */
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.ImmutableSet;
 import java.util.Collections;
+import org.apache.spark.sql.connector.expressions.Expression;
+import org.apache.spark.sql.connector.expressions.Expressions;
 import org.apache.spark.sql.connector.expressions.SortOrder;
 import org.apache.spark.sql.connector.expressions.aggregate.Aggregation;
 import org.apache.spark.sql.connector.expressions.filter.Predicate;
@@ -35,6 +40,7 @@ import org.apache.spark.sql.connector.read.SupportsPushDownRequiredColumns;
 import org.apache.spark.sql.connector.read.SupportsPushDownTopN;
 import org.apache.spark.sql.connector.read.SupportsPushDownV2Filters;
 import org.apache.spark.sql.types.DataTypes;
+import org.apache.spark.sql.types.StructField;
 import org.apache.spark.sql.types.StructType;
 import org.junit.jupiter.api.Test;
 
@@ -62,11 +68,52 @@ public class TestDorisHybridScanBuilder35 {
 
     builder.pruneColumns(
         DataTypes.createStructType(
-            new org.apache.spark.sql.types.StructField[] {
+            new StructField[] {
               DataTypes.createStructField("payload", DataTypes.StringType, true)
             }));
 
     assertSame(jdbcBuilder.scan, builder.build());
+  }
+
+  @Test
+  void testNormalizedPredicatesRemainOnlyInSparkResiduals() {
+    RecordingBuilder nativeBuilder = new RecordingBuilder();
+    RecordingBuilder jdbcBuilder = new RecordingBuilder();
+    DorisHybridScanBuilder35 builder =
+        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, false, ImmutableSet.of("payload"));
+    Predicate normalized =
+        new Predicate(
+            "=", new Expression[] {Expressions.column("payload"), Expressions.literal("value")});
+    Predicate direct =
+        new Predicate("=", new Expression[] {Expressions.column("id"), Expressions.literal(1)});
+
+    Predicate[] residual = builder.pushPredicates(new Predicate[] {normalized, direct});
+
+    assertArrayEquals(new Predicate[] {normalized}, residual);
+    assertArrayEquals(new Predicate[] {direct}, builder.pushedPredicates());
+    assertArrayEquals(new Predicate[] {direct}, nativeBuilder.receivedPredicates);
+    assertArrayEquals(new Predicate[] {direct}, jdbcBuilder.receivedPredicates);
+  }
+
+  @Test
+  void testLimitAndOffsetFollowSparkJdbcPushdownOrder() {
+    RecordingBuilder nativeBuilder = new RecordingBuilder();
+    RecordingBuilder jdbcBuilder = new RecordingBuilder();
+    DorisHybridScanBuilder35 builder =
+        new DorisHybridScanBuilder35(nativeBuilder, jdbcBuilder, false, Collections.emptySet());
+
+    assertTrue(builder.pushLimit(10));
+    assertTrue(builder.pushOffset(3));
+    assertEquals(10, jdbcBuilder.receivedLimit);
+    assertEquals(3, jdbcBuilder.receivedOffset);
+
+    RecordingBuilder emptyJdbcBuilder = new RecordingBuilder();
+    DorisHybridScanBuilder35 emptyBuilder =
+        new DorisHybridScanBuilder35(
+            new RecordingBuilder(), emptyJdbcBuilder, false, Collections.emptySet());
+    assertTrue(emptyBuilder.pushLimit(10));
+    assertFalse(emptyBuilder.pushOffset(10));
+    assertEquals(-1, emptyJdbcBuilder.receivedOffset);
   }
 
   private static final class RecordingBuilder
@@ -79,6 +126,9 @@ public class TestDorisHybridScanBuilder35 {
           SupportsPushDownOffset {
 
     private final Scan scan = () -> new StructType();
+    private Predicate[] receivedPredicates = new Predicate[0];
+    private int receivedLimit = -1;
+    private int receivedOffset = -1;
 
     @Override
     public Scan build() {
@@ -90,6 +140,7 @@ public class TestDorisHybridScanBuilder35 {
 
     @Override
     public Predicate[] pushPredicates(Predicate[] predicates) {
+      receivedPredicates = predicates;
       return new Predicate[0];
     }
 
@@ -100,6 +151,7 @@ public class TestDorisHybridScanBuilder35 {
 
     @Override
     public boolean pushLimit(int limit) {
+      receivedLimit = limit;
       return true;
     }
 
@@ -125,6 +177,7 @@ public class TestDorisHybridScanBuilder35 {
 
     @Override
     public boolean pushOffset(int offset) {
+      receivedOffset = offset;
       return true;
     }
   }

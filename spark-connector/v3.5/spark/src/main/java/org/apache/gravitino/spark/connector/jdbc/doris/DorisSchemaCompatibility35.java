@@ -19,10 +19,10 @@
 package org.apache.gravitino.spark.connector.jdbc.doris;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
+import java.util.Map;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.types.Type;
@@ -30,7 +30,6 @@ import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.spark.sql.connector.catalog.Identifier;
 import org.apache.spark.sql.types.DataTypes;
-import org.apache.spark.sql.types.DecimalType;
 import org.apache.spark.sql.types.MetadataBuilder;
 import org.apache.spark.sql.types.StructField;
 
@@ -54,7 +53,7 @@ final class DorisSchemaCompatibility35 {
 
     List<StructField> visibleFields = new ArrayList<>(logicalColumns.length);
     List<String> projections = new ArrayList<>(logicalColumns.length);
-    Set<String> normalizedColumns = new LinkedHashSet<>();
+    Map<String, String> normalizedTypeNames = new LinkedHashMap<>();
     boolean requiresSql = false;
     for (int index = 0; index < logicalColumns.length; index++) {
       Column logicalColumn = logicalColumns[index];
@@ -75,8 +74,14 @@ final class DorisSchemaCompatibility35 {
         metadata.putString("comment", logicalColumn.comment());
       }
 
-      if (requiresNormalization(logicalColumn.dataType(), physicalField, typeName)) {
-        validateNormalizedType(identifier, logicalColumn.dataType(), typeName);
+      if (requiresNormalization(logicalColumn.dataType(), typeName)) {
+        validateNormalizedType(
+            identifier,
+            logicalColumn.dataType(),
+            physicalField,
+            physicalSchema.catalystTypeResolved(index),
+            typeName,
+            typeConverter);
         visibleFields.add(
             DataTypes.createStructField(
                 physicalField.name(),
@@ -84,9 +89,10 @@ final class DorisSchemaCompatibility35 {
                 visibleNullable(logicalColumn, physicalSchema, index),
                 metadata.build()));
         projections.add(normalizationProjection(physicalField.name(), typeName));
-        normalizedColumns.add(physicalField.name());
+        normalizedTypeNames.put(physicalField.name(), typeName);
         requiresSql = true;
       } else {
+        validateDirectTypeSignature(identifier, logicalColumn.dataType(), typeName);
         if (!typeConverter.toSparkType(logicalColumn.dataType()).equals(physicalField.dataType())) {
           throw incompatible(
               identifier,
@@ -107,7 +113,7 @@ final class DorisSchemaCompatibility35 {
       }
     }
     return new DorisReadSchema35(
-        DataTypes.createStructType(visibleFields), projections, requiresSql, normalizedColumns);
+        DataTypes.createStructType(visibleFields), projections, requiresSql, normalizedTypeNames);
   }
 
   private static void validateIdentity(
@@ -141,8 +147,7 @@ final class DorisSchemaCompatibility35 {
         : logicalColumn.nullable();
   }
 
-  private static boolean requiresNormalization(
-      Type logicalType, StructField physicalField, String rawTypeName) {
+  private static boolean requiresNormalization(Type logicalType, String rawTypeName) {
     String typeName = baseType(rawTypeName);
     if (logicalType instanceof Types.ExternalType) {
       return true;
@@ -153,21 +158,30 @@ final class DorisSchemaCompatibility35 {
     if (isAlwaysNormalizedType(typeName)) {
       return true;
     }
-    if (isDecimalType(typeName) && physicalField.dataType() instanceof DecimalType) {
-      return ((DecimalType) physicalField.dataType()).precision() > MAX_CATALYST_DECIMAL_PRECISION;
-    }
     return false;
   }
 
   private static void validateNormalizedType(
-      Identifier identifier, Type logicalType, String rawTypeName) {
+      Identifier identifier,
+      Type logicalType,
+      StructField physicalField,
+      boolean catalystTypeResolved,
+      String rawTypeName,
+      SparkTypeConverter typeConverter) {
     String typeName = baseType(rawTypeName);
     if (logicalType instanceof Types.ExternalType) {
-      return;
+      String logicalTypeName =
+          canonicalTypeName(((Types.ExternalType) logicalType).catalogString());
+      if (logicalTypeName.equals(canonicalTypeName(rawTypeName))) {
+        return;
+      }
     }
     if (logicalType instanceof Types.TimestampType) {
-      if (!((Types.TimestampType) logicalType).hasTimeZone()
-          && (typeName.equals("datetime") || typeName.equals("datetimev2"))) {
+      Types.TimestampType timestampType = (Types.TimestampType) logicalType;
+      int logicalPrecision = timestampType.hasPrecisionSet() ? timestampType.precision() : 0;
+      if (!timestampType.hasTimeZone()
+          && (typeName.equals("datetime") || typeName.equals("datetimev2"))
+          && logicalPrecision == datetimePrecision(rawTypeName)) {
         return;
       }
     }
@@ -175,32 +189,27 @@ final class DorisSchemaCompatibility35 {
         && (typeName.equals("binary") || typeName.equals("varbinary"))) {
       return;
     }
-    if (logicalType instanceof Types.ListType && typeName.equals("array")) {
-      return;
-    }
-    if (logicalType instanceof Types.MapType && typeName.equals("map")) {
-      return;
-    }
-    if (logicalType instanceof Types.StructType && typeName.equals("struct")) {
-      return;
+    if ((logicalType instanceof Types.ListType
+            || logicalType instanceof Types.MapType
+            || logicalType instanceof Types.StructType)
+        && catalystTypeResolved
+        && typeConverter.toSparkType(logicalType).equals(physicalField.dataType())) {
+      if ((logicalType instanceof Types.ListType && typeName.equals("array"))
+          || (logicalType instanceof Types.MapType && typeName.equals("map"))
+          || (logicalType instanceof Types.StructType && typeName.equals("struct"))) {
+        return;
+      }
     }
     if (logicalType instanceof Type.IntegralType
         && !((Type.IntegralType) logicalType).signed()
-        && isKnownUnsignedType(typeName)) {
+        && expectedUnsignedType(logicalType).equals(typeName)) {
       return;
     }
-    if (typeName.equals("largeint")
-        || typeName.equals("bitmap")
-        || typeName.equals("hll")
-        || typeName.equals("json")
-        || typeName.equals("jsonb")
-        || typeName.equals("variant")
-        || typeName.equals("ipv4")
-        || typeName.equals("ipv6")
-        || typeName.equals("decimal256")) {
-      return;
-    }
-    if (logicalType instanceof Types.DecimalType && isDecimalType(typeName)) {
+    if (logicalType instanceof Types.IntegerType
+        && ((Types.IntegerType) logicalType).signed()
+        && typeName.equals("largeint")) {
+      // Doris 3.x exposes LARGEINT as INTEGER through MySQL-protocol JDBC metadata. The exact
+      // physical COLUMN_TYPE remains authoritative for selecting lossless String normalization.
       return;
     }
     throw incompatible(
@@ -215,6 +224,28 @@ final class DorisSchemaCompatibility35 {
   private static boolean isSupportedNormalizedType(String rawTypeName) {
     String typeName = baseType(rawTypeName);
     return isAlwaysNormalizedType(typeName) || isSafeDecimalFallback(rawTypeName);
+  }
+
+  private static void validateDirectTypeSignature(
+      Identifier identifier, Type logicalType, String rawTypeName) {
+    String typeName = baseType(rawTypeName);
+    if (logicalType instanceof Types.VarCharType) {
+      if (!typeName.equals("varchar")
+          || ((Types.VarCharType) logicalType).length() != singleTypeParameter(rawTypeName)) {
+        throw incompatible(identifier, "VARCHAR length differs");
+      }
+      return;
+    }
+    if (logicalType instanceof Types.FixedCharType) {
+      if (!typeName.equals("char")
+          || ((Types.FixedCharType) logicalType).length() != singleTypeParameter(rawTypeName)) {
+        throw incompatible(identifier, "CHAR length differs");
+      }
+      return;
+    }
+    if (typeName.equals("varchar") || typeName.equals("char")) {
+      throw incompatible(identifier, "logical character type differs");
+    }
   }
 
   private static boolean isAlwaysNormalizedType(String typeName) {
@@ -276,6 +307,23 @@ final class DorisSchemaCompatibility35 {
     }
   }
 
+  private static int singleTypeParameter(String rawTypeName) {
+    if (rawTypeName == null) {
+      return -1;
+    }
+    String normalized = rawTypeName.trim();
+    int openingParenthesis = normalized.indexOf('(');
+    if (openingParenthesis < 0 || !normalized.endsWith(")")) {
+      return -1;
+    }
+    try {
+      return Integer.parseInt(
+          normalized.substring(openingParenthesis + 1, normalized.length() - 1).trim());
+    } catch (NumberFormatException e) {
+      return -1;
+    }
+  }
+
   private static String normalizationProjection(String columnName, String rawTypeName) {
     String quoted = DorisReadSchema35.quoteIdentifier(columnName);
     String typeName = baseType(rawTypeName);
@@ -301,6 +349,46 @@ final class DorisSchemaCompatibility35 {
     String normalized = value.trim().toLowerCase(Locale.ROOT);
     int parenthesis = normalized.indexOf('(');
     return parenthesis < 0 ? normalized : normalized.substring(0, parenthesis).trim();
+  }
+
+  private static String canonicalTypeName(String value) {
+    return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", "");
+  }
+
+  private static int datetimePrecision(String rawTypeName) {
+    if (rawTypeName == null) {
+      return -1;
+    }
+    String normalized = rawTypeName.trim();
+    int openingParenthesis = normalized.indexOf('(');
+    if (openingParenthesis < 0) {
+      return 0;
+    }
+    if (!normalized.endsWith(")")) {
+      return -1;
+    }
+    try {
+      return Integer.parseInt(
+          normalized.substring(openingParenthesis + 1, normalized.length() - 1).trim());
+    } catch (NumberFormatException e) {
+      return -1;
+    }
+  }
+
+  private static String expectedUnsignedType(Type logicalType) {
+    if (logicalType instanceof Types.ByteType) {
+      return "tinyint unsigned";
+    }
+    if (logicalType instanceof Types.ShortType) {
+      return "smallint unsigned";
+    }
+    if (logicalType instanceof Types.IntegerType) {
+      return "int unsigned";
+    }
+    if (logicalType instanceof Types.LongType) {
+      return "bigint unsigned";
+    }
+    return "";
   }
 
   private static IllegalArgumentException incompatible(Identifier identifier, String reason) {
