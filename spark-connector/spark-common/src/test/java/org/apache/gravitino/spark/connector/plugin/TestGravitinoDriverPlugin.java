@@ -20,6 +20,7 @@
 package org.apache.gravitino.spark.connector.plugin;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -37,10 +38,13 @@ import org.apache.gravitino.spark.connector.plugin.GravitinoDriverPlugin.Dynamic
 import org.apache.gravitino.spark.connector.version.CatalogNameAdaptor;
 import org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions;
 import org.apache.spark.SparkConf;
+import org.apache.spark.package$;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import scala.util.Properties$;
 
 public class TestGravitinoDriverPlugin {
 
@@ -161,7 +165,8 @@ public class TestGravitinoDriverPlugin {
 
     plugin.setDorisSupportEnabled(true);
     String dorisCatalogClassName = CatalogNameAdaptor.getCatalogName("jdbc-doris");
-    if (dorisCatalogClassName != null) {
+    if (dorisCatalogClassName != null
+        && GravitinoDriverPlugin.isDorisSparkVersionSupported(package$.MODULE$.SPARK_VERSION())) {
       SparkConf dorisSparkConf = new SparkConf(false);
       plugin.registerGravitinoCatalogs(dorisSparkConf, ImmutableMap.of("doris", catalog));
       assertTrue(dorisSparkConf.contains("spark.sql.catalog.doris"));
@@ -176,7 +181,20 @@ public class TestGravitinoDriverPlugin {
   }
 
   @Test
+  void testDorisSparkPatchVersionGate() {
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.0"));
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.2"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.3"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.9"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.10"));
+    assertTrue(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.5.3-SNAPSHOT"));
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("3.6.0"));
+    assertFalse(GravitinoDriverPlugin.isDorisSparkVersionSupported("invalid"));
+  }
+
+  @Test
   void testDorisDependencyPreflight() {
+    Assumptions.assumeTrue(Properties$.MODULE$.versionNumberString().startsWith("2.12"));
     Assertions.assertDoesNotThrow(
         () -> GravitinoDriverPlugin.validateDorisDependency(getClass().getClassLoader()));
 

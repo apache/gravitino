@@ -8,8 +8,8 @@ license: "This software is licensed under the Apache License version 2."
 ## Introduction
 
 The Apache Gravitino Spark connector offers the capability to read JDBC tables, with the metadata managed by the Gravitino server.
-For the specialized Apache Doris batch-read path on Spark 3.5, see
-[Spark Connector: Apache Doris Batch Read](spark-catalog-doris.md).
+For the specialized Apache Doris batch read/write path on Spark 3.5, see
+[Spark Connector: Apache Doris Batch Read and Write](spark-catalog-doris.md).
 
 ## Preparation
 
@@ -19,8 +19,9 @@ For the specialized Apache Doris batch-read path on Spark 3.5, see
 
 Supports MySQL and PostgreSQL. OceanBase, which is MySQL-compatible, can use the MySQL driver as a workaround.
 The existing generic JDBC path remains available for `jdbc-doris`; it does not provide the
-Doris-specific schema and query-semantics contract. The opt-in Doris batch-read adapter is
-documented separately and is currently limited to Spark 3.5.3+ in the Spark 3.5 line / Scala 2.12.
+Doris-specific schema and query-semantics contract. The opt-in Doris batch read/write adapter is
+documented separately and requires Spark 3.5.3+ in the Spark 3.5 line / Scala 2.12; Spark 3.5.3 and
+3.5.9 are the individually certified points.
 
 ### DML and DDL Operations
 
@@ -82,4 +83,5 @@ Gravitino spark connector will transform below property names which are defined 
 Gravitino catalog property names with the prefix `spark.bypass.` are passed to Spark JDBC connector.
 
 The generic JDBC write operations described above do not apply to the specialized Doris adapter.
-When `spark.sql.gravitino.enableDorisSupport=true`, the Doris adapter exposes batch reads only.
+When `spark.sql.gravitino.enableDorisSupport=true`, the Doris adapter exposes batch reads and only
+the separately enabled governed batch append/full-table truncate capabilities documented above.

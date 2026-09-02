@@ -79,11 +79,13 @@ final class DorisJdbcReadOptions35 {
   }
 
   private static void requirePositive(String property, String value) {
+    int parsed;
     try {
-      if (Integer.parseInt(value) < 1) {
-        throw new NumberFormatException();
-      }
+      parsed = Integer.parseInt(value);
     } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(property + " must be a positive integer");
+    }
+    if (parsed < 1) {
       throw new IllegalArgumentException(property + " must be a positive integer");
     }
   }

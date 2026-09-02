@@ -39,6 +39,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -61,6 +63,7 @@ import org.apache.spark.SparkConf;
 import org.apache.spark.SparkContext;
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.PluginContext;
+import org.apache.spark.package$;
 import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.internal.StaticSQLConf;
 import org.slf4j.Logger;
@@ -74,6 +77,8 @@ import scala.Option;
 public class GravitinoDriverPlugin implements DriverPlugin {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoDriverPlugin.class);
+  private static final Pattern SPARK_VERSION_PATTERN =
+      Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:\\D.*)?$");
   private static final String DORIS_SPARK_CATALOG_CLASS =
       "org.apache.doris.spark.catalog.DorisTableCatalog";
 
@@ -176,7 +181,8 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               }
               if ("jdbc-doris".equals(provider.toLowerCase(Locale.ROOT))
                   && enableDorisSupport
-                  && StringUtils.isBlank(CatalogNameAdaptor.getCatalogName(provider))) {
+                  && (StringUtils.isBlank(CatalogNameAdaptor.getCatalogName(provider))
+                      || !isDorisSparkVersionSupported(package$.MODULE$.SPARK_VERSION()))) {
                 throw new IllegalArgumentException(
                     "Apache Doris Spark support requires Spark 3.5.3 or newer in the Spark 3.5 "
                         + "line with Scala 2.12");
@@ -206,6 +212,21 @@ public class GravitinoDriverPlugin implements DriverPlugin {
     } catch (ClassNotFoundException | LinkageError e) {
       throw new IllegalArgumentException(
           "Apache Doris Spark Connector 26.0.0 must be available on the driver and executors", e);
+    }
+  }
+
+  @VisibleForTesting
+  static boolean isDorisSparkVersionSupported(String version) {
+    Matcher matcher = SPARK_VERSION_PATTERN.matcher(version);
+    if (!matcher.matches()) {
+      return false;
+    }
+    try {
+      return Integer.parseInt(matcher.group(1)) == 3
+          && Integer.parseInt(matcher.group(2)) == 5
+          && Integer.parseInt(matcher.group(3)) >= 3;
+    } catch (NumberFormatException e) {
+      return false;
     }
   }
 

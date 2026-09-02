@@ -23,10 +23,22 @@ final class DorisConnectorConstants35 {
 
   static final String GRAVITINO_FE_NODES = "doris-fenodes";
   static final String GRAVITINO_QUERY_PORT = "doris-query-port";
+  static final String GRAVITINO_WRITE_MODE = "doris-write-mode";
+  static final String GRAVITINO_WRITE_OVERWRITE_MODE = "doris-write-overwrite-mode";
   static final String DORIS_FE_NODES = "doris.fenodes";
   static final String DORIS_QUERY_PORT = "doris.query.port";
   static final String DORIS_USER = "doris.user";
   static final String DORIS_PASSWORD = "doris.password";
+  static final String WRITE_DISABLED = "disabled";
+  static final String WRITE_BATCH = "batch";
+  static final String WRITE_OVERWRITE_REJECT = "reject";
+  static final String WRITE_OVERWRITE_TRUNCATE = "truncate";
+  static final String DORIS_SINK_MODE = "doris.sink.mode";
+  static final String DORIS_SINK_AUTO_REDIRECT = "doris.sink.auto-redirect";
+  static final String DORIS_SINK_ENABLE_2PC = "doris.sink.enable-2pc";
+  static final String DORIS_SINK_STRICT_MODE = "doris.sink.properties.strict_mode";
+  static final String DORIS_MAX_FILTER_RATIO = "doris.max.filter.ratio";
+  static final String DORIS_WRITE_SCHEMALESS = "doris.write.schemaless";
   static final String JDBC_URL = "jdbc-url";
   static final String JDBC_DRIVER = "jdbc-driver";
   static final String JDBC_PARTITION_COLUMN = "doris-jdbc-partition-column";

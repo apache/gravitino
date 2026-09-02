@@ -47,17 +47,32 @@ Besides the [common catalog properties](./gravitino-server-config.md#catalog-pro
 | `jdbc-driver`           | The driver of the JDBC connection. For example, `com.mysql.jdbc.Driver`.                          | (none)        | Yes      |
 | `jdbc-user`             | The JDBC user name.                                                                               | (none)        | Yes      |
 | `jdbc-password`         | The JDBC password.                                                                                | (none)        | Yes      |
-| `doris-fenodes`         | Comma-separated Doris FE endpoints in `host:port` format, used by the specialized Spark reader. | (none)        | No       |
-| `doris-query-port`      | Doris MySQL-protocol query port, used by the specialized Spark reader.                            | (none)        | No       |
+| `doris-fenodes`         | Comma-separated Doris FE endpoints in `host:port` format, used by the specialized Spark adapter. | (none)        | No       |
+| `doris-query-port`      | Doris MySQL-protocol query port, used by the specialized Spark adapter.                           | (none)        | No       |
+| `doris-write-mode`      | Governed Spark write mode: `disabled` or `batch`.                                                  | `disabled`    | No       |
+| `doris-write-overwrite-mode` | Governed Spark overwrite mode: `reject` or non-atomic `truncate`.                           | `reject`      | No       |
 | `jdbc.pool.min-size`    | The minimum number of connections in the pool. `2` by default.                                    | `2`           | No       |
 | `jdbc.pool.max-size`    | The maximum number of connections in the pool. `10` by default.                                   | `10`          | No       |
 | `jdbc.pool.max-wait-ms` | The maximum Duration that the pool will wait for a connection to be returned. `30000` by default. | `30000`       | No       |
 
 :::note
 `doris-fenodes` and `doris-query-port` are optional for server-side metadata and DDL operations.
-They are required when the opt-in Spark Doris batch-read adapter is enabled. Endpoints must use
+They are required when the opt-in Spark Doris batch read/write adapter is enabled. Endpoints must use
 the comma-separated `host:port` form; URI schemes, paths, query strings, and IPv6 literals are
 rejected.
+
+Governed Spark writes are disabled by default. Set `doris-write-mode=batch` to enable batch append.
+Full-table truncate-then-load overwrite additionally requires
+`doris-write-overwrite-mode=truncate`. Truncate overwrite is non-atomic: if the subsequent Stream
+Load fails, the table may remain empty or partially populated.
+
+The credential vended to Spark must have Doris `SELECT_PRIV` for reads and physical schema
+inspection, and `LOAD_PRIV` for governed Stream Load writes. The opt-in full-table truncate
+overwrite additionally requires `DROP_PRIV` because the official Doris Spark Connector executes
+SQL `TRUNCATE TABLE`; it does not require `ALTER_PRIV`. Gravitino `SELECT_TABLE` and `MODIFY_TABLE`
+authorization does not replace these Doris-native privileges. Some Doris 3.x deployments may
+permit truncate through broader legacy `LOAD_PRIV` semantics; grant `DROP_PRIV` for the portable
+cross-version contract.
 :::
 
 Before using the Doris Catalog, you must download the corresponding JDBC driver to the `catalogs/jdbc-doris/libs` directory.

@@ -50,6 +50,14 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
           "doris.user",
           "doris.password",
           "doris.table.identifier",
+          DorisConnectorConstants35.GRAVITINO_WRITE_MODE,
+          DorisConnectorConstants35.GRAVITINO_WRITE_OVERWRITE_MODE,
+          DorisConnectorConstants35.DORIS_SINK_MODE,
+          DorisConnectorConstants35.DORIS_SINK_AUTO_REDIRECT,
+          DorisConnectorConstants35.DORIS_SINK_ENABLE_2PC,
+          DorisConnectorConstants35.DORIS_SINK_STRICT_MODE,
+          DorisConnectorConstants35.DORIS_MAX_FILTER_RATIO,
+          DorisConnectorConstants35.DORIS_WRITE_SCHEMALESS,
           "url",
           "driver",
           "user",
@@ -127,6 +135,33 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
     return new HashMap<>(properties);
   }
 
+  static void validateReadOptions(CaseInsensitiveStringMap options) {
+    if (options == null || options.asCaseSensitiveMap().isEmpty()) {
+      return;
+    }
+    throw new IllegalArgumentException(
+        "Doris per-read options cannot override governed catalog policy");
+  }
+
+  static void validateWriteOptions(CaseInsensitiveStringMap options) {
+    if (options == null) {
+      return;
+    }
+    options
+        .asCaseSensitiveMap()
+        .keySet()
+        .forEach(
+            key -> {
+              String canonicalKey = key.toLowerCase(Locale.ROOT);
+              if (canonicalKey.startsWith("doris.")
+                  || canonicalKey.startsWith("spark.bypass.")
+                  || PROTECTED_OPTIONS.contains(canonicalKey)) {
+                throw new IllegalArgumentException(
+                    "Doris per-write options cannot override governed catalog policy");
+              }
+            });
+  }
+
   private static String validateOptionKey(String key) {
     String canonicalKey = key.toLowerCase(Locale.ROOT);
     if (PROTECTED_OPTIONS.contains(canonicalKey)) {
@@ -134,7 +169,7 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
           "Doris Spark options cannot override protected properties");
     }
     if (!ALLOWED_OPTIONS.contains(canonicalKey)) {
-      throw new IllegalArgumentException("Unsupported Doris Spark read option: " + key);
+      throw new IllegalArgumentException("Unsupported Doris Spark option: " + key);
     }
     return canonicalKey;
   }
