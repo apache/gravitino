@@ -21,6 +21,7 @@ package org.apache.gravitino.policy;
 
 import java.util.Arrays;
 import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.annotation.Evolving;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyExistsException;
@@ -125,6 +126,30 @@ public interface PolicyDispatcher {
    * @return The array of metadata objects associated with the specified policy.
    */
   MetadataObject[] listMetadataObjectsForPolicy(String metalake, String policyName);
+
+  /**
+   * List tag names directly associated with the specified policy.
+   *
+   * @param metalake The name of the metalake.
+   * @param policyName The name of the policy.
+   * @return The directly associated tag names.
+   */
+  default String[] listTagsForPolicy(String metalake, String policyName) {
+    return Arrays.stream(listTagAssociationsForPolicy(metalake, policyName))
+        .map(association -> association.targetEntity().name())
+        .toArray(String[]::new);
+  }
+
+  /**
+   * List tag associations, including selectors, for the specified policy.
+   *
+   * @param metalake The name of the metalake.
+   * @param policyName The name of the policy.
+   * @return The policy-to-tag associations.
+   */
+  default RelationalEntity<?>[] listTagAssociationsForPolicy(String metalake, String policyName) {
+    throw new UnsupportedOperationException("Listing tag associations is not supported");
+  }
 
   /**
    * List all the policy names associated with a metadata object under a metalake.
