@@ -75,6 +75,7 @@ val skipTrinoConnector: Boolean =
 if (!skipTrinoConnector) {
   include(
     "trino-connector:trino-connector",
+    "trino-connector:trino-connector-435-439",
     "trino-connector:trino-connector-440-445",
     "trino-connector:trino-connector-446-451",
     "trino-connector:trino-connector-452-468",

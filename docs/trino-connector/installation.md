@@ -19,6 +19,7 @@ Choose the package by your Trino server version first.
 
 | Trino server version | Connector package segment |
 |----------------------|---------------------------|
+| 435-439              | `trino-connector-435-439` |
 | 440-445              | `trino-connector-440-445` |
 | 446-451              | `trino-connector-446-451` |
 | 452-468              | `trino-connector-452-468` |

@@ -79,7 +79,7 @@ services:
       start_period: 30s
 
   trino-remote:
-    image: trinodb/trino:440
+    image: trinodb/trino:435
     networks:
       - trino-net
     container_name: trino-ci-trino-remote
@@ -110,7 +110,7 @@ services:
         condition: service_healthy
 
   trino-local:
-    image: trinodb/trino:440
+    image: trinodb/trino:435
     networks:
       - trino-net
     container_name: trino-ci-trino-local
