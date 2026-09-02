@@ -51,7 +51,7 @@ import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFac
 public class GravitinoConnectorFactory implements ConnectorFactory {
 
   private static final Logger LOG = Logger.get(GravitinoConnectorFactory.class);
-  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
+  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 440;
   private static final int MAX_SUPPORT_TRINO_SPI_VERSION = Integer.MAX_VALUE;
   private static final Pattern TRINO_SPI_VERSION_PATTERN = Pattern.compile("^(\\d+)");
   private static final Set<String> SECURITY_SENSITIVE_PROPERTY_SUFFIXES =
@@ -125,11 +125,15 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           CatalogRegister catalogRegister = new CatalogRegister();
 
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
-          catalogConnectorManager =
+          CatalogConnectorManager newCatalogConnectorManager =
               new CatalogConnectorManager(
                   catalogRegister, catalogConnectorFactory, this::getTrinoCatalogName);
-          catalogConnectorManager.config(config, client);
+          newCatalogConnectorManager.config(config, client);
 
+          // Publish the manager only after it has been configured successfully. Otherwise a
+          // failed client initialization leaves a shared manager with a null Gravitino client,
+          // causing later connector creation attempts to fail with a misleading NPE.
+          catalogConnectorManager = newCatalogConnectorManager;
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
         }
 
@@ -243,6 +247,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   @VisibleForTesting
   static boolean isSecuritySensitivePropertyName(String propertyName) {
+    if (propertyName.startsWith(GravitinoConfig.GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX)) {
+      return false;
+    }
     String normalizedPropertyName = propertyName.toLowerCase(Locale.ROOT).replaceAll("[._-]", "");
     return SECURITY_SENSITIVE_PROPERTY_SUFFIXES.stream().anyMatch(normalizedPropertyName::endsWith);
   }

@@ -160,6 +160,17 @@ public class TestBulkOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testBulkAddUsersWithNullRequest() {
+    Response resp =
+        target("/bulk/metalakes/metalake1/users/add")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testBulkAddUsersBestEffort() {
     User user1 = buildUser("user1");
     when(manager.addUsers(any(), any()))
@@ -222,6 +233,17 @@ public class TestBulkOperations extends BaseOperationsTest {
     Assertions.assertEquals(1, bulkResponse.getErrors().length);
     Assertions.assertEquals("ghost", bulkResponse.getErrors()[0].getName());
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, bulkResponse.getErrors()[0].getCode());
+  }
+
+  @Test
+  public void testBulkAddGroupsWithNullRequest() {
+    Response resp =
+        target("/bulk/metalakes/metalake1/groups/add")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

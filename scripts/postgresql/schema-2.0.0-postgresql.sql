@@ -441,6 +441,7 @@ CREATE TABLE IF NOT EXISTS idp_user_meta (
     user_id BIGINT NOT NULL,
     user_name VARCHAR(128) NOT NULL,
     password_hash VARCHAR(1024) NOT NULL,
+    enabled BOOLEAN NOT NULL DEFAULT TRUE,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
     deleted_at BIGINT NOT NULL DEFAULT 0,
@@ -452,6 +453,7 @@ COMMENT ON TABLE idp_user_meta IS 'local IdP user metadata';
 COMMENT ON COLUMN idp_user_meta.user_id IS 'idp user id';
 COMMENT ON COLUMN idp_user_meta.user_name IS 'idp username';
 COMMENT ON COLUMN idp_user_meta.password_hash IS 'idp user password hash';
+COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
 COMMENT ON COLUMN idp_user_meta.current_version IS 'idp user current version';
 COMMENT ON COLUMN idp_user_meta.last_version IS 'idp user last version';
 COMMENT ON COLUMN idp_user_meta.deleted_at IS 'idp user deleted at';
@@ -598,11 +600,15 @@ CREATE TABLE IF NOT EXISTS model_meta (
     model_comment VARCHAR(65535) DEFAULT NULL,
     model_properties TEXT DEFAULT NULL,
     model_latest_version INT NOT NULL DEFAULT 0,
+    current_version INT NOT NULL DEFAULT 1,
+    last_version INT NOT NULL DEFAULT 1,
     audit_info TEXT NOT NULL,
     deleted_at BIGINT NOT NULL DEFAULT 0,
     PRIMARY KEY (model_id),
     UNIQUE (schema_id, model_name, deleted_at)
 );
+COMMENT ON COLUMN model_meta.current_version IS 'model current version';
+COMMENT ON COLUMN model_meta.last_version IS 'model last allocated version';
 
 CREATE INDEX IF NOT EXISTS model_meta_idx_metalake_id ON model_meta (metalake_id);
 CREATE INDEX IF NOT EXISTS model_meta_idx_catalog_id ON model_meta (catalog_id);
@@ -839,6 +845,7 @@ CREATE TABLE IF NOT EXISTS job_run_meta (
     job_run_status VARCHAR(64) NOT NULL,
     job_started_at BIGINT NOT NULL DEFAULT 0,
     job_finished_at BIGINT NOT NULL DEFAULT 0,
+    runtime_job_template TEXT DEFAULT NULL,
     audit_info TEXT NOT NULL,
     current_version INT NOT NULL DEFAULT 1,
     last_version INT NOT NULL DEFAULT 1,
@@ -857,6 +864,7 @@ COMMENT ON COLUMN job_run_meta.job_execution_id IS 'job execution id';
 COMMENT ON COLUMN job_run_meta.job_run_status IS 'job run status';
 COMMENT ON COLUMN job_run_meta.job_started_at IS 'job run started at';
 COMMENT ON COLUMN job_run_meta.job_finished_at IS 'job run finished at';
+COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 COMMENT ON COLUMN job_run_meta.audit_info IS 'job run audit info';
 COMMENT ON COLUMN job_run_meta.current_version IS 'job run current version';
 COMMENT ON COLUMN job_run_meta.last_version IS 'job run last version';

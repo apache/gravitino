@@ -129,8 +129,17 @@ public class TableOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TableCreateRequest request) {
-    LOG.info(
-        "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+    if (request == null) {
+      LOG.warn("Received create table request with null request body");
+      return ExceptionHandlers.handleTableException(
+          OperationType.CREATE,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String tableName = request.getName();
+    LOG.info("Received create table request: {}.{}.{}.{}", metalake, catalog, schema, tableName);
     try {
       return Utils.doAs(
           httpRequest,
@@ -155,8 +164,7 @@ public class TableOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleTableException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleTableException(OperationType.CREATE, tableName, schema, e);
     }
   }
 
@@ -214,6 +222,14 @@ public class TableOperations {
       @PathParam("table") @AuthorizationMetadata(type = Entity.EntityType.TABLE) String table,
       TableUpdatesRequest request) {
     LOG.info("Received alter table request: {}.{}.{}.{}", metalake, catalog, schema, table);
+    if (request == null) {
+      return ExceptionHandlers.handleTableException(
+          OperationType.ALTER,
+          table,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

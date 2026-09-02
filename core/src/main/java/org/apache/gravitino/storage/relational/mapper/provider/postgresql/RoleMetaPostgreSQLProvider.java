@@ -20,24 +20,29 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.RoleMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.ibatis.annotations.Param;
 
 public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   @Override
-  public String softDeleteRoleMetaByRoleId(@Param("roleId") Long roleId) {
+  public String softDeleteRoleMetaByRoleId(
+      @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE role_id = #{roleId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE role_id = #{roleId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteRoleMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -62,8 +67,13 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
         + " metalake_id = #{roleMeta.metalakeId},"
         + " properties = #{roleMeta.properties},"
         + " audit_info = #{roleMeta.auditInfo},"
-        + " current_version = #{roleMeta.currentVersion},"
-        + " last_version = #{roleMeta.lastVersion},"
+        // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
+        + " current_version = "
+        + ROLE_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + ROLE_TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{roleMeta.deletedAt}";
   }
 
@@ -81,7 +91,8 @@ public class RoleMetaPostgreSQLProvider extends RoleMetaBaseSQLProvider {
   public String touchRoleUpdatedAt(@Param("roleId") long roleId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 }

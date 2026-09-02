@@ -151,6 +151,16 @@ public class TagOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       TagCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create tag request with null request body");
+      return ExceptionHandlers.handleTagException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String tagName = request.getName();
     LOG.info("Received create tag request under metalake: {}", metalake);
 
     try {
@@ -170,8 +180,7 @@ public class TagOperations {
             return Utils.ok(new TagResponse(DTOConverters.toDTO(tag, Optional.empty())));
           });
     } catch (Exception e) {
-      return ExceptionHandlers.handleTagException(
-          OperationType.CREATE, request.getName(), metalake, e);
+      return ExceptionHandlers.handleTagException(OperationType.CREATE, tagName, metalake, e);
     }
   }
 
@@ -214,6 +223,13 @@ public class TagOperations {
       @PathParam("tag") @AuthorizationMetadata(type = Entity.EntityType.TAG) String name,
       TagUpdatesRequest request) {
     LOG.info("Received alter tag request for tag: {} under metalake: {}", name, metalake);
+    if (request == null) {
+      return ExceptionHandlers.handleTagException(
+          OperationType.ALTER,
+          name,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(

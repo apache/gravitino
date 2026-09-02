@@ -172,12 +172,17 @@ public class ModelOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       ModelRegisterRequest request) {
-    LOG.info(
-        "Received register model request: {}.{}.{}.{}",
-        metalake,
-        catalog,
-        schema,
-        request.getName());
+    if (request == null) {
+      LOG.warn("Received register model request with null request body");
+      return ExceptionHandlers.handleModelException(
+          OperationType.REGISTER,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String modelName = request.getName();
+    LOG.info("Received register model request: {}.{}.{}.{}", metalake, catalog, schema, modelName);
 
     try {
       return Utils.doAs(
@@ -194,8 +199,7 @@ public class ModelOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleModelException(
-          OperationType.REGISTER, request.getName(), schema, e);
+      return ExceptionHandlers.handleModelException(OperationType.REGISTER, modelName, schema, e);
     }
   }
 
@@ -419,6 +423,13 @@ public class ModelOperations {
       ModelVersionLinkRequest request) {
     LOG.info("Received link model version request: {}.{}.{}.{}", metalake, catalog, schema, model);
     NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.LINK,
+          model,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       return Utils.doAs(
@@ -573,6 +584,13 @@ public class ModelOperations {
         schema,
         model,
         version);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          versionString(model, version),
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -627,6 +645,13 @@ public class ModelOperations {
         schema,
         model,
         alias);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          aliasString(model, alias),
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
     try {
       NameIdentifier modelId = NameIdentifierUtil.ofModel(metalake, catalog, schema, model);
@@ -673,6 +698,14 @@ public class ModelOperations {
       @PathParam("model") @AuthorizationMetadata(type = Entity.EntityType.MODEL) String model,
       ModelUpdatesRequest request) {
     LOG.info("Received alter model request: {}.{}.{}.{}", metalake, catalog, schema, model);
+    if (request == null) {
+      return ExceptionHandlers.handleModelException(
+          OperationType.ALTER,
+          model,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

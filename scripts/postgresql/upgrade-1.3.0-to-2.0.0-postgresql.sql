@@ -32,11 +32,19 @@ CREATE UNIQUE INDEX IF NOT EXISTS uk_mid_geid_del ON group_meta (metalake_id, ex
 ALTER TABLE table_column_version_info
     ALTER COLUMN column_comment TYPE VARCHAR(4096);
 
+ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS current_version INT NOT NULL DEFAULT 1;
+ALTER TABLE model_meta ADD COLUMN IF NOT EXISTS last_version INT NOT NULL DEFAULT 1;
+COMMENT ON COLUMN model_meta.current_version IS 'model current version';
+COMMENT ON COLUMN model_meta.last_version IS 'model last allocated version';
+
 ALTER TABLE tag_meta ADD COLUMN IF NOT EXISTS allowed_values TEXT DEFAULT NULL;
 COMMENT ON COLUMN tag_meta.allowed_values IS 'tag allowed values as a JSON string array, NULL allows any value, [] allows no value';
 
 ALTER TABLE tag_relation_meta ADD COLUMN IF NOT EXISTS tag_value VARCHAR(256) NOT NULL DEFAULT '';
 COMMENT ON COLUMN tag_relation_meta.tag_value IS 'tag assignment value, empty string means no value';
+
+ALTER TABLE idp_user_meta ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT TRUE;
+COMMENT ON COLUMN idp_user_meta.enabled IS 'whether the user is enabled, 0 is disabled, 1 is enabled';
 
 ALTER TABLE idp_group_meta ADD COLUMN IF NOT EXISTS group_comment VARCHAR(1024) DEFAULT '';
 COMMENT ON COLUMN idp_group_meta.group_comment IS 'idp group comment';
@@ -72,6 +80,9 @@ COMMENT ON COLUMN policy_tag_relation_meta.audit_info IS 'policy tag relation au
 COMMENT ON COLUMN policy_tag_relation_meta.current_version IS 'policy tag relation current version';
 COMMENT ON COLUMN policy_tag_relation_meta.last_version IS 'policy tag relation last version';
 COMMENT ON COLUMN policy_tag_relation_meta.deleted_at IS 'policy tag relation deleted at';
+
+ALTER TABLE job_run_meta ADD COLUMN IF NOT EXISTS runtime_job_template TEXT DEFAULT NULL;
+COMMENT ON COLUMN job_run_meta.runtime_job_template IS 'job run runtime job template';
 
 CREATE TABLE IF NOT EXISTS semantic_model_meta (
     semantic_model_id BIGINT NOT NULL,
