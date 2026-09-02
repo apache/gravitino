@@ -66,7 +66,7 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
         + " ON CONFLICT(group_id) DO UPDATE SET"
         + " group_name = #{groupMeta.groupName},"
         + " metalake_id = #{groupMeta.metalakeId},"
-        + " external_id ="
+        + ""
         + " audit_info = #{groupMeta.auditInfo},"
         // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
         + " current_version = "

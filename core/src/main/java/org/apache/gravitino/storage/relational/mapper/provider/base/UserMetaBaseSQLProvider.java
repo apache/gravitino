@@ -44,7 +44,6 @@ public class UserMetaBaseSQLProvider {
       @Param("metalakeId") Long metalakeId, @Param("userName") String name) {
     return "SELECT user_id as userId, user_name as userName,"
         + " metalake_id as metalakeId,"
-        + ""
         + " audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -56,7 +55,7 @@ public class UserMetaBaseSQLProvider {
   /** Returns SQL that selects and locks an active user by ID. */
   public String selectUserMetaByIdForUpdate(@Param("userId") Long userId) {
     return "SELECT user_id as userId, user_name as userName,"
-        + " metalake_id as metalakeId"
+        + " metalake_id as metalakeId,"
         + " audit_info as auditInfo, current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -73,8 +72,6 @@ public class UserMetaBaseSQLProvider {
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
         + " #{userMeta.metalakeId},"
-        + ""
-        + ""
         + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
@@ -91,8 +88,6 @@ public class UserMetaBaseSQLProvider {
         + " #{userMeta.userId},"
         + " #{userMeta.userName},"
         + " #{userMeta.metalakeId},"
-        + ""
-        + ""
         + " #{userMeta.auditInfo},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
@@ -102,8 +97,6 @@ public class UserMetaBaseSQLProvider {
         + " user_name = #{userMeta.userName},"
         + " metalake_id = #{userMeta.metalakeId},"
         + " audit_info = #{userMeta.auditInfo},"
-        + " external_id ="
-        + " enabled ="
         // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
         // cannot pass a later compare-and-set (an ABA conflict).
         + " last_version = current_version + 1,"
@@ -136,8 +129,6 @@ public class UserMetaBaseSQLProvider {
         + " SET user_name = #{newUserMeta.userName},"
         + " metalake_id = #{newUserMeta.metalakeId},"
         + " audit_info = #{newUserMeta.auditInfo},"
-        + ""
-        + ""
         + " current_version = #{newUserMeta.currentVersion},"
         + " last_version = #{newUserMeta.lastVersion},"
         + " deleted_at = #{newUserMeta.deletedAt}"
@@ -149,7 +140,6 @@ public class UserMetaBaseSQLProvider {
   public String listUsersByRoleId(@Param("roleId") Long roleId) {
     return "SELECT us.user_id as userId, us.user_name as userName,"
         + " us.metalake_id as metalakeId,"
-        + ""
         + " us.audit_info as auditInfo, us.current_version as currentVersion,"
         + " us.last_version as lastVersion, us.deleted_at as deletedAt"
         + " FROM "
@@ -164,7 +154,6 @@ public class UserMetaBaseSQLProvider {
   public String listUserPOsByMetalake(@Param("metalakeName") String metalakeName) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + ""
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt"
@@ -180,7 +169,6 @@ public class UserMetaBaseSQLProvider {
   public String listExtendedUserPOsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + ""
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"
@@ -220,7 +208,6 @@ public class UserMetaBaseSQLProvider {
       @Param("limit") int limit) {
     return "SELECT ut.user_id as userId, ut.user_name as userName,"
         + " ut.metalake_id as metalakeId,"
-        + ""
         + " ut.audit_info as auditInfo,"
         + " ut.current_version as currentVersion, ut.last_version as lastVersion,"
         + " ut.deleted_at as deletedAt,"

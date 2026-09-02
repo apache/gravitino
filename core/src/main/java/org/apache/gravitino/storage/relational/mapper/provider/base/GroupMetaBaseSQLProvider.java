@@ -141,7 +141,7 @@ public class GroupMetaBaseSQLProvider {
   /** Returns SQL that selects and locks an active group by ID. */
   public String selectGroupMetaByIdForUpdate(@Param("groupId") Long groupId) {
     return "SELECT group_id as groupId, group_name as groupName,"
-        + " metalake_id as metalakeId audit_info as auditInfo,"
+        + " metalake_id as metalakeId, audit_info as auditInfo,"
         + " current_version as currentVersion, last_version as lastVersion,"
         + " deleted_at as deletedAt"
         + " FROM "
@@ -221,7 +221,7 @@ public class GroupMetaBaseSQLProvider {
         + " group_name = #{groupMeta.groupName},"
         + " metalake_id = #{groupMeta.metalakeId},"
         + " audit_info = #{groupMeta.auditInfo},"
-        + " external_id ="
+        + ""
         // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
         // cannot pass a later compare-and-set (an ABA conflict).
         + " last_version = current_version + 1,"
