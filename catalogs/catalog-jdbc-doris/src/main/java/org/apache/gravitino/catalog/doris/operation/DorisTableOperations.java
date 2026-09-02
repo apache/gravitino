@@ -24,6 +24,7 @@ import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.RE
 import static org.apache.gravitino.catalog.doris.DorisTablePropertiesMetadata.REPLICATION_FACTOR;
 import static org.apache.gravitino.catalog.doris.utils.DorisUtils.generatePartitionSqlFragment;
 import static org.apache.gravitino.catalog.jdbc.utils.JdbcConnectorUtils.escapeSqlLiteral;
+import static org.apache.gravitino.rel.Column.DEFAULT_VALUE_NOT_SET;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -51,6 +52,7 @@ import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.StringIdentifier;
+import org.apache.gravitino.catalog.doris.converter.DorisColumnDefaultValueConverter;
 import org.apache.gravitino.catalog.doris.utils.DorisUtils;
 import org.apache.gravitino.catalog.jdbc.JdbcColumn;
 import org.apache.gravitino.catalog.jdbc.JdbcTable;
@@ -69,6 +71,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.indexes.Indexes;
 import org.apache.gravitino.rel.partitions.ListPartition;
 import org.apache.gravitino.rel.partitions.RangePartition;
+import org.apache.gravitino.rel.types.Types;
 
 /** Table operations for Apache Doris. */
 public class DorisTableOperations extends JdbcTableOperations {
@@ -119,7 +122,7 @@ public class DorisTableOperations extends JdbcTableOperations {
                       .append(BACK_QUOTE)
                       .append(column.name())
                       .append(BACK_QUOTE);
-                  appendColumnDefinition(column, columnsSql);
+                  appendColumnDefinitionForDoris(column, columnsSql);
                   return columnsSql.toString();
                 })
             .collect(Collectors.joining(",\n")));
@@ -257,6 +260,14 @@ public class DorisTableOperations extends JdbcTableOperations {
     if (!hasAutoIncrement) {
       return;
     }
+    String version = getDorisVersion("AUTO_INCREMENT compatibility check");
+    if (!isVersionAtLeast(version, 2, 1, 0)) {
+      throw new UnsupportedOperationException(
+          "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
+    }
+  }
+
+  private String getDorisVersion(String purpose) {
     Preconditions.checkState(dataSource != null, "dataSource is required for version validation");
     String version = null;
     // SELECT VERSION() returns the MySQL protocol version (e.g. "5.7.99"), not the Doris version.
@@ -283,21 +294,20 @@ public class DorisTableOperations extends JdbcTableOperations {
       }
     } catch (SQLException e) {
       throw new UnsupportedOperationException(
-          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
-              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
+          "Unable to determine Doris version for "
+              + purpose
+              + ". Ensure the connection user has permission to execute SHOW FRONTENDS "
               + "and the Doris FE is reachable.",
           e);
     }
     if (version == null) {
       throw new UnsupportedOperationException(
-          "Unable to determine Doris version for AUTO_INCREMENT compatibility check. "
-              + "Ensure the connection user has permission to execute SHOW FRONTENDS "
+          "Unable to determine Doris version for "
+              + purpose
+              + ". Ensure the connection user has permission to execute SHOW FRONTENDS "
               + "and the Doris FE is reachable.");
     }
-    if (!isVersionAtLeast(version, 2, 1, 0)) {
-      throw new UnsupportedOperationException(
-          "AUTO_INCREMENT requires Doris 2.1.0 or later. Current server version: " + version);
-    }
+    return version;
   }
 
   @VisibleForTesting
@@ -739,6 +749,7 @@ public class DorisTableOperations extends JdbcTableOperations {
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
     List<String> alterSql = new ArrayList<>();
+    Optional<String> modifyDorisVersion = Optional.empty();
     for (int i = 0; i < changes.length; i++) {
       TableChange change = changes[i];
       if (change instanceof TableChange.UpdateComment) {
@@ -758,7 +769,16 @@ public class DorisTableOperations extends JdbcTableOperations {
       } else if (change instanceof TableChange.UpdateColumnType) {
         lazyLoadTable = getOrCreateTable(databaseName, tableName, lazyLoadTable);
         TableChange.UpdateColumnType updateColumnType = (TableChange.UpdateColumnType) change;
-        alterSql.add(updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable));
+        if (updateColumnType.fieldName().length == 1 && modifyDorisVersion.isEmpty()) {
+          JdbcColumn currentColumn =
+              getJdbcColumnFromTable(lazyLoadTable, updateColumnType.fieldName()[0]);
+          if (requiresVersionAwareModifyEscaping(currentColumn)) {
+            modifyDorisVersion =
+                Optional.of(getDorisVersion("MODIFY COLUMN default literal compatibility check"));
+          }
+        }
+        alterSql.add(
+            updateColumnTypeFieldDefinition(updateColumnType, lazyLoadTable, modifyDorisVersion));
       } else if (change instanceof TableChange.UpdateColumnComment) {
         TableChange.UpdateColumnComment updateColumnComment =
             (TableChange.UpdateColumnComment) change;
@@ -958,7 +978,9 @@ public class DorisTableOperations extends JdbcTableOperations {
   }
 
   private String updateColumnTypeFieldDefinition(
-      TableChange.UpdateColumnType updateColumnType, JdbcTable jdbcTable) {
+      TableChange.UpdateColumnType updateColumnType,
+      JdbcTable jdbcTable,
+      Optional<String> dorisVersion) {
     if (updateColumnType.fieldName().length > 1) {
       throw new UnsupportedOperationException("Doris does not support nested column names.");
     }
@@ -974,33 +996,84 @@ public class DorisTableOperations extends JdbcTableOperations {
             .withNullable(column.nullable())
             .withAutoIncrement(column.autoIncrement())
             .build();
-    return appendColumnDefinition(newColumn, sqlBuilder).toString();
+    return appendColumnDefinitionForModify(newColumn, sqlBuilder, dorisVersion).toString();
   }
 
-  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
-    // Add data type
+  private StringBuilder appendColumnDefinitionForModify(
+      JdbcColumn column, StringBuilder sqlBuilder, Optional<String> dorisVersion) {
+    return appendColumnDefinition(column, sqlBuilder, true, dorisVersion, true);
+  }
+
+  private StringBuilder appendColumnDefinitionForDoris(
+      JdbcColumn column, StringBuilder sqlBuilder) {
+    return appendColumnDefinition(column, sqlBuilder, true, Optional.empty(), false);
+  }
+
+  private StringBuilder appendColumnDefinition(
+      JdbcColumn column,
+      StringBuilder sqlBuilder,
+      boolean includeDefaultValue,
+      Optional<String> dorisVersion,
+      boolean useModifyDefaultSerializer) {
     sqlBuilder.append(SPACE).append(typeConverter.fromGravitino(column.dataType())).append(SPACE);
 
-    // Add NOT NULL if the column is marked as such
     if (column.nullable()) {
       sqlBuilder.append("NULL ");
     } else {
       sqlBuilder.append("NOT NULL ");
     }
 
-    // Add DEFAULT value if specified
-    appendDefaultValue(column, sqlBuilder);
+    if (includeDefaultValue && !DEFAULT_VALUE_NOT_SET.equals(column.defaultValue())) {
+      Preconditions.checkState(
+          columnDefaultValueConverter instanceof DorisColumnDefaultValueConverter,
+          "DorisColumnDefaultValueConverter is required for Doris column default serialization");
+      DorisColumnDefaultValueConverter converter =
+          (DorisColumnDefaultValueConverter) columnDefaultValueConverter;
+      boolean isDoris3x =
+          dorisVersion
+              .map(
+                  version ->
+                      isVersionAtLeast(version, 3, 0, 0) && !isVersionAtLeast(version, 4, 0, 0))
+              .orElse(false);
+      sqlBuilder
+          .append("DEFAULT ")
+          .append(
+              useModifyDefaultSerializer
+                  ? converter.fromGravitinoForColumnDefinition(
+                      column.defaultValue(), isDoris3x, isDoris3x)
+                  : converter.fromGravitinoForCreateTableDefinition(column.defaultValue()))
+          .append(SPACE);
+    } else if (!includeDefaultValue) {
+      appendDefaultValue(column, sqlBuilder);
+    }
 
-    // Add column auto_increment if specified
     if (column.autoIncrement()) {
       sqlBuilder.append(DORIS_AUTO_INCREMENT).append(" ");
     }
 
-    // Add column comment if specified
     if (StringUtils.isNotEmpty(column.comment())) {
       sqlBuilder.append("COMMENT '").append(escapeSqlLiteral(column.comment(), '\'')).append("' ");
     }
     return sqlBuilder;
+  }
+
+  private static boolean requiresVersionAwareModifyEscaping(Column column) {
+    if (!(column.defaultValue() instanceof Literal)) {
+      return false;
+    }
+
+    Literal<?> literal = (Literal<?>) column.defaultValue();
+    if (!(literal.dataType() instanceof Types.StringType
+        || literal.dataType() instanceof Types.VarCharType
+        || literal.dataType() instanceof Types.FixedCharType)) {
+      return false;
+    }
+    String value = literal.value() == null ? null : String.valueOf(literal.value());
+    return value != null && (value.contains("\\") || value.contains("\""));
+  }
+
+  private StringBuilder appendColumnDefinition(JdbcColumn column, StringBuilder sqlBuilder) {
+    return appendColumnDefinition(column, sqlBuilder, false, Optional.empty(), false);
   }
 
   static String addIndexDefinition(TableChange.AddIndex addIndex) {

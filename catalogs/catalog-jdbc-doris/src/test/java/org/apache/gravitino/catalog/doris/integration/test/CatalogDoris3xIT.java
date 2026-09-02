@@ -32,6 +32,7 @@ import com.google.common.collect.Maps;
 import java.io.IOException;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.Arrays;
@@ -270,6 +271,258 @@ public class CatalogDoris3xIT extends BaseIT {
               assertEquals(Types.LongType.get(), updatedColumn.dataType());
               assertEquals(Literals.longLiteral(7L), updatedColumn.defaultValue());
             });
+  }
+
+  @Test
+  void testAlterColumnTypePreservesQuotedAndBackslashDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_special_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String logicalDefault = "owner's \"value\"\\\\path";
+    String sqlDefault = "owner's \\\"value\\\"" + "\\\\\\\\" + "path";
+    String createSql =
+        String.format(
+            "CREATE TABLE %s ("
+                + "col_pk BIGINT NOT NULL, "
+                + "col_data VARCHAR(32) NOT NULL DEFAULT \"%s\") "
+                + "DUPLICATE KEY(col_pk) "
+                + "DISTRIBUTED BY HASH(col_pk) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName, sqlDefault);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    Column originalColumn = findColumn(tc.loadTable(tid), colName2);
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(32)), originalColumn.defaultValue());
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO %s (col_pk) VALUES (0)", tableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 0", tableName))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+      }
+    }
+
+    tc.alterTable(
+        tid, TableChange.updateColumnType(new String[] {colName2}, Types.VarCharType.of(64)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), colName2);
+              assertEquals(Types.VarCharType.of(64), updatedColumn.dataType());
+              assertEquals(
+                  Literals.of(logicalDefault, Types.VarCharType.of(64)),
+                  updatedColumn.defaultValue());
+            });
+
+    Table alteredTable = tc.loadTable(tid);
+    NameIdentifier recreatedTid =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_recreated_special_default"));
+    tc.createTable(
+        recreatedTid,
+        alteredTable.columns(),
+        alteredTable.comment(),
+        alteredTable.properties(),
+        alteredTable.partitioning(),
+        alteredTable.distribution(),
+        alteredTable.sortOrder(),
+        alteredTable.index());
+    Column recreatedColumn = findColumn(tc.loadTable(recreatedTid), colName2);
+    assertEquals(Types.VarCharType.of(64), recreatedColumn.dataType());
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(64)), recreatedColumn.defaultValue());
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO %s (col_pk) VALUES (1)", tableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 1", tableName))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+      }
+    }
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format("INSERT INTO %s (col_pk) VALUES (2)", recreatedTid.name()));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 2", recreatedTid.name()))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+      }
+    }
+  }
+
+  @Test
+  void testAlterColumnTypePreservesBackslashOnlyDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_backslash_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String logicalDefault = "owner's\\value";
+    String sqlDefault = quotedDefaultExpression(logicalDefault, 1, 2);
+    String createSql =
+        String.format(
+            "CREATE TABLE %s ("
+                + "col_pk BIGINT NOT NULL, "
+                + "col_data VARCHAR(32) NOT NULL DEFAULT %s) "
+                + "DUPLICATE KEY(col_pk) "
+                + "DISTRIBUTED BY HASH(col_pk) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName, sqlDefault);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    Column originalColumn = findColumn(tc.loadTable(tid), colName2);
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(32)), originalColumn.defaultValue());
+
+    tc.alterTable(
+        tid, TableChange.updateColumnType(new String[] {colName2}, Types.VarCharType.of(64)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), colName2);
+              assertEquals(Types.VarCharType.of(64), updatedColumn.dataType());
+              assertEquals(
+                  Literals.of(logicalDefault, Types.VarCharType.of(64)),
+                  updatedColumn.defaultValue());
+            });
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO %s (col_pk) VALUES (1)", tableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 1", tableName))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+      }
+    }
+  }
+
+  @Test
+  void testAlterColumnTypePreservesAdjacentBackslashQuoteDefaultValue() throws SQLException {
+    TableCatalog tc = catalog.asTableCatalog();
+    String tableName = GravitinoITUtils.genRandomName("t_alter_type_adjacent_default");
+    NameIdentifier tid = NameIdentifier.of(schemaName, tableName);
+    String logicalDefault = "prefix" + "\\" + "\"" + "suffix";
+    String sqlDefault = quotedDefaultExpression(logicalDefault, 1, 2);
+    String createSql =
+        String.format(
+            "CREATE TABLE %s ("
+                + "col_pk BIGINT NOT NULL, "
+                + "col_data VARCHAR(32) NOT NULL DEFAULT %s) "
+                + "DUPLICATE KEY(col_pk) "
+                + "DISTRIBUTED BY HASH(col_pk) BUCKETS 1 "
+                + "PROPERTIES (\"replication_num\" = \"1\")",
+            tableName, sqlDefault);
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(createSql);
+    }
+
+    Column originalColumn = findColumn(tc.loadTable(tid), colName2);
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(32)), originalColumn.defaultValue());
+
+    tc.alterTable(
+        tid, TableChange.updateColumnType(new String[] {colName2}, Types.VarCharType.of(64)));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(
+            () -> {
+              Column updatedColumn = findColumn(tc.loadTable(tid), colName2);
+              assertEquals(Types.VarCharType.of(64), updatedColumn.dataType());
+              assertEquals(
+                  Literals.of(logicalDefault, Types.VarCharType.of(64)),
+                  updatedColumn.defaultValue());
+            });
+
+    Table alteredTable = tc.loadTable(tid);
+    NameIdentifier recreatedTid =
+        NameIdentifier.of(
+            schemaName, GravitinoITUtils.genRandomName("t_recreated_adjacent_default"));
+    tc.createTable(
+        recreatedTid,
+        alteredTable.columns(),
+        alteredTable.comment(),
+        alteredTable.properties(),
+        alteredTable.partitioning(),
+        alteredTable.distribution(),
+        alteredTable.sortOrder(),
+        alteredTable.index());
+    Column recreatedColumn = findColumn(tc.loadTable(recreatedTid), colName2);
+    assertEquals(Types.VarCharType.of(64), recreatedColumn.dataType());
+    assertEquals(
+        Literals.of(logicalDefault, Types.VarCharType.of(64)), recreatedColumn.defaultValue());
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(String.format("INSERT INTO %s (col_pk) VALUES (1)", tableName));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 1", tableName))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+      }
+    }
+
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl + schemaName, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.executeUpdate(
+          String.format("INSERT INTO %s (col_pk) VALUES (2)", recreatedTid.name()));
+      try (ResultSet resultSet =
+          statement.executeQuery(
+              String.format("SELECT col_data FROM %s WHERE col_pk = 2", recreatedTid.name()))) {
+        assertTrue(resultSet.next());
+        assertEquals(logicalDefault, resultSet.getString(1));
+      }
+    }
+  }
+
+  private static String quotedDefaultExpression(
+      String value, int quoteBackslashCount, int valueBackslashCount) {
+    String escaped = value.replace("\\", "\\".repeat(valueBackslashCount));
+    escaped = escaped.replace("\"", "\\".repeat(quoteBackslashCount) + "\"");
+    return "\"" + escaped + "\"";
   }
 
   @Test
