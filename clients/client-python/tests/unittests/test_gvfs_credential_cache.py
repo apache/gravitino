@@ -60,9 +60,7 @@ class TestGVFSCredentialCache(unittest.TestCase):
 
         ops = MagicMock()
         ops._options = options or {}
-        ops._enable_credential_vending = (options or {}).get(
-            GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING, False
-        )
+        ops._enable_credential_vending = True
         ops._credential_cache = {}
         ops._credential_cache_lock = rwlock.RWLockFair()
 
@@ -78,11 +76,9 @@ class TestGVFSCredentialCache(unittest.TestCase):
         )
         return ops
 
-    def test_credential_vending_disabled_returns_none(self):
-        """When credential vending is disabled, should return None without touching cache."""
-        ops = self._create_operations(
-            {GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING: False}
-        )
+    def test_credential_vending_always_fetches_from_server(self):
+        """Cloud filesets always fetch credentials from the Gravitino server."""
+        ops = self._create_operations({})
         fileset = _create_mock_fileset([])
 
         result = ops._get_credentials_with_cache(
@@ -91,8 +87,8 @@ class TestGVFSCredentialCache(unittest.TestCase):
             "default",
         )
 
-        self.assertIsNone(result)
-        fileset.support_credentials().get_credentials.assert_not_called()
+        self.assertEqual([], result)
+        fileset.support_credentials().get_credentials.assert_called_once()
 
     def test_first_call_fetches_from_server(self):
         """First call should fetch credentials from server and cache them."""

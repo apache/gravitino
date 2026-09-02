@@ -443,7 +443,7 @@ For a catalog, `{type}` is `catalog` and `{full_name}` is the catalog name:
 GET /api/metalakes/{metalake}/objects/catalog/{catalog}/credentials
 ```
 
-The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed.
+The Gravitino Spark and Flink connectors call this for you and inject the returned credentials, so no client configuration is needed. The [Gravitino Virtual File System](./how-to-use-gvfs.md) does the same for cloud-backed filesets: GVFS always calls this endpoint and must not be configured with static cloud access keys.
 
 ### Read or Write Scope
 

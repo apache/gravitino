@@ -35,18 +35,21 @@ properties do not need to be set.
 ## Google Cloud Storage Properties
 
 These properties are needed in addition to the shared
-[catalog properties](./fileset-catalog.md#catalog-properties). The same values are also needed by
-the GVFS clients, so they are listed together here — note that the Python client spells them with
-underscores while the catalog and the Java client use hyphens.
+[catalog properties](./fileset-catalog.md#catalog-properties). Configure credentials on the
+catalog; GVFS clients fetch them through [credential vending](./security/credential-vending.md)
+and must not set cloud credentials in local configuration. Non-secret settings are inherited
+from catalog, schema, and fileset metadata — override them in GVFS configuration only when
+needed. The Python client spells property names with underscores while the catalog and the
+Java client use hyphens.
 
-| Catalog and Java client    | Python client              | Description                                                                                                                                                                                                                                                                              | Required |
-|----------------------------|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| `gcs-service-account-file` | `gcs_service_account_file` | Path of the GCS service account JSON file.                                                                                                                                                                                                                                               | Yes      |
-| `credential-providers`     | (n/a)                      | The credential provider types, separated by comma. Possible values are `gcs-token`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#gcs) for the extra properties each provider takes. | No       |
+| Catalog and Java client    | Python client              | Description                                                                                                                                                                                                                                                                              | Required      |
+|----------------------------|----------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `gcs-service-account-file` | `gcs_service_account_file` | Path of the GCS service account JSON file.                                                                                                                                                                                                                                               | Yes (catalog) |
+| `credential-providers`     | (n/a)                      | The credential provider types, separated by comma. Possible values are `gcs-token`. When set explicitly, chooses how the server vends credentials. If omitted, Gravitino auto-detects a provider from the static credentials on the catalog. See [credential vending](./security/credential-vending.md#gcs) for the extra properties each provider takes. | No            |
 
 :::note
-The service account file must be readable by the Gravitino server process for the catalog, and by
-each client process for GVFS.
+The service account file must be readable by the Gravitino server process for the catalog. GVFS
+clients do not need the file locally; they receive credentials through credential vending.
 :::
 
 Schema and fileset properties are documented on the shared page: see
@@ -290,8 +293,9 @@ The thin `gravitino-gcp` jar is not needed. Its functionality is already include
 
 ### GVFS Java client
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), set the Google Cloud Storage
-properties from the table above.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), configure the Gravitino
+connection. Cloud credentials are fetched from the server; do not set the service account file in the
+Hadoop `Configuration`.
 
 ```java
 Configuration conf = new Configuration();
@@ -299,7 +303,6 @@ conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.had
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
-conf.set("gcs-service-account-file", "/path/to/service-account.json");
 
 Path filesetPath = new Path("gvfs://fileset/gcs_catalog/gcs_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
@@ -334,7 +337,6 @@ spark = (SparkSession.builder
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
-    .config("spark.hadoop.gcs-service-account-file", "/path/to/service-account.json")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
     .getOrCreate())
@@ -382,10 +384,6 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
   <name>fs.gravitino.client.metalake</name>
   <value>metalake</value>
 </property>
-<property>
-  <name>gcs-service-account-file</name>
-  <value>/path/to/service-account.json</value>
-</property>
 ```
 
 2. Add these jars to the Hadoop classpath:
@@ -406,8 +404,9 @@ ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/gcs_catalog
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Google Cloud Storage
-properties in `options`, spelled with underscores.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass Gravitino
+connection settings in `options`. Do not pass the service account file; GVFS fetches credentials from
+the server.
 
 ```python
 from gravitino import gvfs
@@ -416,7 +415,6 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "gcs_service_account_file": "/path/to/service-account.json",
 }
 
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
@@ -437,7 +435,7 @@ storage_options = {
     "server_uri": "http://localhost:8090",
     "metalake_name": "metalake",
     "options": {
-        "gcs_service_account_file": "/path/to/service-account.json",
+        "auth_type": "simple",
     }
 }
 
@@ -460,11 +458,11 @@ For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md)
 
 ## Credential Vending
 
-With credential vending the catalog holds the Google Cloud Storage credentials and the Gravitino server hands
-out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the general mechanism and
-[GCS credentials](./security/credential-vending.md#gcs) for the properties
-each provider takes.
+GVFS always uses credential vending for cloud filesets: the catalog holds the Google Cloud Storage
+credentials and the Gravitino server hands out a credential per request, so clients never configure
+cloud keys locally. See [Credential Vending](./security/credential-vending.md) for the general
+mechanism and [GCS credentials](./security/credential-vending.md#gcs) for the properties each
+provider takes.
 
 The supported provider is `gcs-token`, which vends a short-lived token.
 
@@ -506,18 +504,16 @@ curl -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 }' http://localhost:8090/api/metalakes/metalake/catalogs/gcs_catalog_with_vending/schemas/gcs_schema/filesets
 ```
 
-### Access without local credentials
+### GVFS client configuration
 
-Enable vending on the client and drop the credential properties.
+Configure only the Gravitino connection on the client. Cloud credentials come from the server.
 
 ```java
 Configuration conf = new Configuration();
-conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
-// No need to set gcs-service-account-file
 
 Path filesetPath = new Path(
     "gvfs://fileset/gcs_catalog_with_vending/gcs_schema/example_fileset/new_dir");
@@ -528,20 +524,16 @@ fs.mkdirs(filesetPath);
 ```python
 spark = (SparkSession.builder
     .appName("gcs_fileset")
-    .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
-    # No need to set gcs-service-account-file
     .getOrCreate())
 ```
 
 ```python
 options = {
     "auth_type": "simple",
-    "enable_credential_vending": True,
-    # No need to set gcs-service-account-file
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
                                      metalake_name="metalake",

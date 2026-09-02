@@ -29,6 +29,7 @@ import static org.apache.gravitino.file.Fileset.PROPERTY_SCHEMA_PLACEHOLDER;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.cloud.storage.AzurePropertiesMetadata;
+import org.apache.gravitino.cloud.storage.COSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.GCSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.OSSPropertiesMetadata;
 import org.apache.gravitino.cloud.storage.S3PropertiesMetadata;
@@ -83,7 +84,8 @@ public class FilesetPropertiesMetadata extends BasePropertiesMetadata {
         .putAll(S3PropertiesMetadata.PROPERTY_ENTRIES)
         .putAll(OSSPropertiesMetadata.PROPERTY_ENTRIES)
         .putAll(AzurePropertiesMetadata.PROPERTY_ENTRIES)
-        .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES);
+        .putAll(GCSPropertiesMetadata.PROPERTY_ENTRIES)
+        .putAll(COSPropertiesMetadata.PROPERTY_ENTRIES);
     return builder.build();
   }
 }

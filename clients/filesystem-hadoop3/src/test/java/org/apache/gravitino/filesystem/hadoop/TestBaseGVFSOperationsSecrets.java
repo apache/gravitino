@@ -19,6 +19,7 @@
 package org.apache.gravitino.filesystem.hadoop;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -32,6 +33,7 @@ import org.apache.gravitino.client.GravitinoClient;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
+import org.apache.gravitino.storage.OSSProperties;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
@@ -130,6 +132,54 @@ public class TestBaseGVFSOperationsSecrets {
         ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
 
     assertEquals("from-fileset-secret", all.get("shared"));
+  }
+
+  @Test
+  public void testOmitsStaticCredentialKeys() throws Exception {
+    Configuration conf = new Configuration();
+    conf.set(GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_CLIENT_METALAKE_KEY, "ml");
+    conf.set(
+        GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_SERVER_URI_KEY,
+        "http://localhost:8090");
+
+    Catalog catalog = mock(Catalog.class);
+    Schema schema = mock(Schema.class);
+    Fileset fileset = mock(Fileset.class);
+    SupportsSchemas schemas = mock(SupportsSchemas.class);
+    FilesetCatalog filesetCatalog = mock(FilesetCatalog.class);
+    SupportsSecrets catalogSecrets = mock(SupportsSecrets.class);
+    SupportsSecrets schemaSecrets = mock(SupportsSecrets.class);
+    SupportsSecrets filesetSecrets = mock(SupportsSecrets.class);
+
+    when(catalog.properties())
+        .thenReturn(
+            Map.of(
+                OSSProperties.GRAVITINO_OSS_ENDPOINT,
+                "https://oss.example.com",
+                OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET,
+                "******"));
+    when(catalog.supportsSecrets()).thenReturn(catalogSecrets);
+    when(catalogSecrets.getSecrets()).thenReturn(Map.of());
+    when(catalog.asSchemas()).thenReturn(schemas);
+    when(schemas.loadSchema("schema")).thenReturn(schema);
+    when(schema.properties()).thenReturn(Map.of());
+    when(schema.supportsSecrets()).thenReturn(schemaSecrets);
+    when(schemaSecrets.getSecrets()).thenReturn(Map.of());
+    when(catalog.asFilesetCatalog()).thenReturn(filesetCatalog);
+    when(filesetCatalog.loadFileset(NameIdentifier.of("schema", "fs"))).thenReturn(fileset);
+    when(fileset.properties()).thenReturn(Map.of());
+    when(fileset.supportsSecrets()).thenReturn(filesetSecrets);
+    when(filesetSecrets.getSecrets()).thenReturn(Map.of());
+
+    GravitinoClient client = mock(GravitinoClient.class);
+    when(client.loadCatalog("catalog")).thenReturn(catalog);
+
+    TestOps ops = new TestOps(conf, client);
+    Map<String, String> all =
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+
+    assertEquals("https://oss.example.com", all.get(OSSProperties.GRAVITINO_OSS_ENDPOINT));
+    assertFalse(all.containsKey(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
   }
 
   @Test

@@ -110,8 +110,6 @@ public class GravitinoVirtualFileSystemABSCredentialIT extends GravitinoVirtualF
     conf.set(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, ABS_ACCOUNT_NAME);
     conf.set(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, ABS_ACCOUNT_KEY);
     conf.set("fs.abfss.impl", "org.apache.hadoop.fs.azurebfs.SecureAzureBlobFileSystem");
-
-    conf.set("fs.gravitino.enableCredentialVending", "true");
   }
 
   @AfterAll

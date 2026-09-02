@@ -82,6 +82,7 @@ import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.file.FilesetCatalog;
 import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.CloudStorageCredentialPropertyKeys;
 import org.apache.gravitino.storage.OSSProperties;
 import org.apache.gravitino.storage.S3Properties;
 import org.apache.gravitino.utils.FilesetUtil;
@@ -152,8 +153,6 @@ public abstract class BaseGVFSOperations implements Closeable {
   @Nullable private final String currentLocationName;
 
   private final long defaultBlockSize;
-
-  private final boolean enableCredentialVending;
 
   private final boolean autoCreateLocation;
   /** A key class for caching FileSystem instances based on scheme, authority, and configuration. */
@@ -250,11 +249,6 @@ public abstract class BaseGVFSOperations implements Closeable {
         configuration.getLong(
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE,
             GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_BLOCK_SIZE_DEFAULT);
-
-    this.enableCredentialVending =
-        configuration.getBoolean(
-            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING,
-            GravitinoVirtualFileSystemConfiguration.FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT);
 
     this.autoCreateLocation =
         configuration.getBoolean(
@@ -497,12 +491,12 @@ public abstract class BaseGVFSOperations implements Closeable {
   }
 
   /**
-   * Whether to enable credential vending.
+   * Cloud-backed filesets always use credential vending via {@code getCredentials()}.
    *
-   * @return true if credential vending is enabled, false otherwise.
+   * @return always {@code true}
    */
   protected boolean enableCredentialVending() {
-    return enableCredentialVending;
+    return true;
   }
 
   /**
@@ -732,13 +726,11 @@ public abstract class BaseGVFSOperations implements Closeable {
           FilesetUtil.getUserDefinedFileSystemConfigs(
               targetLocation.toUri(), allProperties, FS_GRAVITINO_PATH_CONFIG_PREFIX));
 
-      if (enableCredentialVending()) {
-        allProperties.putAll(
-            getCredentialProperties(
-                getFileSystemProviderByScheme(targetLocation.toUri().getScheme()),
-                filesetIdent,
-                locationName));
-      }
+      allProperties.putAll(
+          getCredentialProperties(
+              getFileSystemProviderByScheme(targetLocation.toUri().getScheme()),
+              filesetIdent,
+              locationName));
 
       FileSystem actualFileSystem = getActualFileSystemByPath(targetLocation, allProperties);
       createFilesetLocationIfNeed(filesetIdent, actualFileSystem, targetLocation);
@@ -979,12 +971,24 @@ public abstract class BaseGVFSOperations implements Closeable {
     return all;
   }
 
-  private static void putPropsAndSecrets(
+  private void putPropsAndSecrets(
       Map<String, String> target, Map<String, String> props, SupportsSecrets secrets) {
     if (props != null) {
-      target.putAll(props);
+      target.putAll(filterPropertiesForClient(props));
     }
-    target.putAll(secrets.getSecrets());
+    if (secrets != null) {
+      target.putAll(secrets.getSecrets());
+    }
+  }
+
+  /**
+   * Filters REST metadata properties before passing them to the underlying HCFS client.
+   *
+   * <p>Static cloud credential keys and masked placeholder values are omitted so GVFS relies on
+   * {@link #getCredentialProperties} instead.
+   */
+  private Map<String, String> filterPropertiesForClient(Map<String, String> props) {
+    return CloudStorageCredentialPropertyKeys.omitStaticCredentialProperties(props);
   }
 
   private Map<String, String> getNecessaryProperties(Map<String, String> properties) {
@@ -1007,18 +1011,22 @@ public abstract class BaseGVFSOperations implements Closeable {
       Fileset fileset = getFileset(filesetIdentifier);
       GravitinoVirtualFileSystemUtils.setCallerContextForGetCredentials(locationName);
       Credential[] credentials = fileset.supportsCredentials().getCredentials();
-      if (credentials.length > 0) {
-        mapBuilder.put(
-            GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
-            DefaultGravitinoFileSystemCredentialsProvider.class.getCanonicalName());
-        mapBuilder.put(
-            GravitinoFileSystemCredentialsProvider.GVFS_NAME_IDENTIFIER,
-            filesetIdentifier.toString());
-
-        SupportsCredentialVending supportsCredentialVending =
-            (SupportsCredentialVending) fileSystemProvider;
-        mapBuilder.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
+      if (credentials.length == 0) {
+        throw new GravitinoRuntimeException(
+            "No credentials returned for fileset %s. Configure credential-providers on the catalog "
+                + "and ensure cloud credentials are available for server-side vending.",
+            filesetIdentifier);
       }
+      mapBuilder.put(
+          GravitinoFileSystemCredentialsProvider.GVFS_CREDENTIAL_PROVIDER,
+          DefaultGravitinoFileSystemCredentialsProvider.class.getCanonicalName());
+      mapBuilder.put(
+          GravitinoFileSystemCredentialsProvider.GVFS_NAME_IDENTIFIER,
+          filesetIdentifier.toString());
+
+      SupportsCredentialVending supportsCredentialVending =
+          (SupportsCredentialVending) fileSystemProvider;
+      mapBuilder.putAll(supportsCredentialVending.getFileSystemCredentialConf(credentials));
     } catch (Exception e) {
       throw new RuntimeException(e);
     } finally {

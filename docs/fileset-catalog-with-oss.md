@@ -35,16 +35,19 @@ properties do not need to be set.
 ## Alibaba Cloud OSS Properties
 
 These properties are needed in addition to the shared
-[catalog properties](./fileset-catalog.md#catalog-properties). The same values are also needed by
-the GVFS clients, so they are listed together here — note that the Python client spells them with
-underscores while the catalog and the Java client use hyphens.
+[catalog properties](./fileset-catalog.md#catalog-properties). Configure credentials on the
+catalog; GVFS clients fetch them through [credential vending](./security/credential-vending.md)
+and must not set cloud credentials in local configuration. Non-secret settings are inherited
+from catalog, schema, and fileset metadata — override them in GVFS configuration only when
+needed. The Python client spells property names with underscores while the catalog and the
+Java client use hyphens.
 
-| Catalog and Java client | Python client           | Description                                                                                                                                                                                                                                                                                                | Required |
-|-------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
-| `oss-endpoint`          | `oss_endpoint`          | Endpoint of the Aliyun OSS service.                                                                                                                                                                                                                                                                        | Yes      |
-| `oss-access-key-id`     | `oss_access_key_id`     | Access key of the Aliyun OSS service.                                                                                                                                                                                                                                                                      | Yes      |
-| `oss-secret-access-key` | `oss_secret_access_key` | Secret key of the Aliyun OSS service.                                                                                                                                                                                                                                                                      | Yes      |
-| `credential-providers`  | (n/a)                   | The credential provider types, separated by comma. Possible values are `oss-token`, `oss-secret-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#oss) for the extra properties each provider takes. | No       |
+| Catalog and Java client | Python client           | Description                                                                                                                                                                                                                                                                                                         | Required    |
+|-------------------------|-------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------|
+| `oss-endpoint`          | `oss_endpoint`          | Endpoint of the Aliyun OSS service.                                                                                                                                                                                                                                                                                 | Yes         |
+| `oss-access-key-id`     | `oss_access_key_id`     | Access key of the Aliyun OSS service.                                                                                                                                                                                                                                                                               | Yes (catalog) |
+| `oss-secret-access-key` | `oss_secret_access_key` | Secret key of the Aliyun OSS service.                                                                                                                                                                                                                                                                               | Yes (catalog) |
+| `credential-providers`  | (n/a)                   | The credential provider types, separated by comma. Possible values are `oss-token`, `oss-secret-key`. When set explicitly, chooses how the server vends credentials. If omitted, Gravitino auto-detects a provider from the static credentials on the catalog. See [credential vending](./security/credential-vending.md#oss) for the extra properties each provider takes. | No          |
 
 Schema and fileset properties are documented on the shared page: see
 [schema properties](./fileset-catalog.md#schema-properties) and
@@ -293,8 +296,10 @@ The thin `gravitino-aliyun` jar is not needed. Its functionality is already incl
 
 ### GVFS Java client
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), set the Alibaba Cloud OSS
-properties from the table above.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), configure the Gravitino
+connection. Cloud credentials are fetched from the server; do not set access keys in the Hadoop
+`Configuration`. Override non-secret properties such as `oss-endpoint` only when they are not
+already set on the catalog.
 
 ```java
 Configuration conf = new Configuration();
@@ -302,9 +307,6 @@ conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.had
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
-conf.set("oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com");
-conf.set("oss-access-key-id", "access_key");
-conf.set("oss-secret-access-key", "secret_key");
 
 Path filesetPath = new Path("gvfs://fileset/oss_catalog/oss_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
@@ -341,9 +343,6 @@ spark = (SparkSession.builder
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
-    .config("spark.hadoop.oss-endpoint", "http://oss-cn-hangzhou.aliyuncs.com")
-    .config("spark.hadoop.oss-access-key-id", "access_key")
-    .config("spark.hadoop.oss-secret-access-key", "secret_key")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
     .getOrCreate())
@@ -391,18 +390,6 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
   <name>fs.gravitino.client.metalake</name>
   <value>metalake</value>
 </property>
-<property>
-  <name>oss-endpoint</name>
-  <value>http://oss-cn-hangzhou.aliyuncs.com</value>
-</property>
-<property>
-  <name>oss-access-key-id</name>
-  <value>access_key</value>
-</property>
-<property>
-  <name>oss-secret-access-key</name>
-  <value>secret_key</value>
-</property>
 ```
 
 2. Add these jars to the Hadoop classpath:
@@ -423,8 +410,9 @@ ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/oss_catalog
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Alibaba Cloud OSS
-properties in `options`, spelled with underscores.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass Gravitino
+connection settings in `options`. Do not pass cloud access keys; GVFS fetches credentials from the
+server.
 
 ```python
 from gravitino import gvfs
@@ -433,9 +421,6 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
-    "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
-    "oss_access_key_id": "access_key",
-    "oss_secret_access_key": "secret_key",
 }
 
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
@@ -456,9 +441,7 @@ storage_options = {
     "server_uri": "http://localhost:8090",
     "metalake_name": "metalake",
     "options": {
-        "oss_endpoint": "http://oss-cn-hangzhou.aliyuncs.com",
-        "oss_access_key_id": "access_key",
-        "oss_secret_access_key": "secret_key",
+        "auth_type": "simple",
     }
 }
 
@@ -481,11 +464,11 @@ For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md)
 
 ## Credential Vending
 
-With credential vending the catalog holds the Alibaba Cloud OSS credentials and the Gravitino server hands
-out a credential per request, so clients never hold cloud keys of their own. See
-[Credential Vending](./security/credential-vending.md) for the general mechanism and
-[OSS credentials](./security/credential-vending.md#oss) for the properties
-each provider takes.
+GVFS always uses credential vending for cloud filesets: the catalog holds the Alibaba Cloud OSS
+credentials and the Gravitino server hands out a credential per request, so clients never configure
+cloud keys locally. See [Credential Vending](./security/credential-vending.md) for the general
+mechanism and [OSS credentials](./security/credential-vending.md#oss) for the properties each
+provider takes.
 
 The supported providers are `oss-token`, which vends a short-lived STS token, and
 `oss-secret-key`, which vends the static access key configured on the catalog. The example below uses
@@ -540,18 +523,16 @@ The `oss-token` provider needs two more catalog properties.
 | `oss-region`   | Region of the bucket, for example `oss-cn-hangzhou` |
 | `oss-role-arn` | ARN of the role that grants access to the data      |
 
-### Access without local credentials
+### GVFS client configuration
 
-Enable vending on the client and drop the credential properties.
+Configure only the Gravitino connection on the client. Cloud credentials come from the server.
 
 ```java
 Configuration conf = new Configuration();
-conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
-// No need to set oss-access-key-id or oss-secret-access-key
 
 Path filesetPath = new Path(
     "gvfs://fileset/oss_catalog_with_vending/oss_schema/example_fileset/new_dir");
@@ -562,20 +543,16 @@ fs.mkdirs(filesetPath);
 ```python
 spark = (SparkSession.builder
     .appName("oss_fileset")
-    .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
-    # No need to set oss-access-key-id or oss-secret-access-key
     .getOrCreate())
 ```
 
 ```python
 options = {
     "auth_type": "simple",
-    "enable_credential_vending": True,
-    # No need to set oss-access-key-id or oss-secret-access-key
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
                                      metalake_name="metalake",

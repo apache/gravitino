@@ -107,7 +107,6 @@ public class GravitinoVirtualFileSystemS3CredentialIT extends GravitinoVirtualFi
     conf.set("fs.gvfs.impl.disable.cache", "true");
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
-    conf.set("fs.gravitino.enableCredentialVending", "true");
 
     // Pass this configuration to the real file system
     conf.set(S3Properties.GRAVITINO_S3_ENDPOINT, S3_ENDPOINT);
