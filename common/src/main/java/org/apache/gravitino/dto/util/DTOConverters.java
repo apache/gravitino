@@ -496,8 +496,6 @@ public class DTOConverters {
     return UserDTO.builder()
         .withId(user.id())
         .withName(user.name())
-        .withExternalId(user.externalId())
-        .withEnabled(user.enabled())
         .withRoles(user.roles())
         .withAudit(toDTO(user.auditInfo()))
         .build();
@@ -517,7 +515,6 @@ public class DTOConverters {
     return GroupDTO.builder()
         .withId(group.id())
         .withName(group.name())
-        .withExternalId(group.externalId())
         .withRoles(group.roles())
         .withAudit(toDTO(group.auditInfo()))
         .build();

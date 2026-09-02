@@ -163,12 +163,6 @@ components:
         name:
           type: string
           description: The name of the user
-        externalId:
-          type: string
-          description: The external identifier of the user
-        enabled:
-          type: boolean
-          description: Whether the user is enabled
           default: true
         roles:
           type: array
@@ -186,12 +180,6 @@ components:
         name:
           type: string
           description: The name of the user
-        externalId:
-          type: string
-          description: The external identifier of the user
-        enabled:
-          type: boolean
-          description: Whether the user is enabled
           default: true
 
   responses:
@@ -225,9 +213,7 @@ components:
   examples:
     UserAddRequest:
       value: {
-        "name": "user",
-        "externalId": "ext-user",
-        "enabled": true
+        "name": "user"
       }
 
     NameListResponse:

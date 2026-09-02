@@ -25,7 +25,6 @@ public class GroupPO {
   private Long groupId;
   private String groupName;
   private Long metalakeId;
-  private String externalId;
   private String auditInfo;
   private Long currentVersion;
   private Long lastVersion;
@@ -41,10 +40,6 @@ public class GroupPO {
 
   public Long getMetalakeId() {
     return metalakeId;
-  }
-
-  public String getExternalId() {
-    return externalId;
   }
 
   public String getAuditInfo() {
@@ -75,7 +70,6 @@ public class GroupPO {
     return Objects.equal(getGroupId(), tablePO.getGroupId())
         && Objects.equal(getGroupName(), tablePO.getGroupName())
         && Objects.equal(getMetalakeId(), tablePO.getMetalakeId())
-        && Objects.equal(getExternalId(), tablePO.getExternalId())
         && Objects.equal(getAuditInfo(), tablePO.getAuditInfo())
         && Objects.equal(getCurrentVersion(), tablePO.getCurrentVersion())
         && Objects.equal(getLastVersion(), tablePO.getLastVersion())
@@ -88,7 +82,6 @@ public class GroupPO {
         getGroupId(),
         getGroupName(),
         getMetalakeId(),
-        getExternalId(),
         getAuditInfo(),
         getCurrentVersion(),
         getLastVersion(),
@@ -114,11 +107,6 @@ public class GroupPO {
 
     public Builder withMetalakeId(Long metalakeId) {
       groupPO.metalakeId = metalakeId;
-      return this;
-    }
-
-    public Builder withExternalId(String externalId) {
-      groupPO.externalId = externalId;
       return this;
     }
 
