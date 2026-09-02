@@ -18,6 +18,7 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.base;
 
+import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.ViewVersionInfoPO;
@@ -61,12 +62,18 @@ public class ViewVersionInfoBaseSQLProvider {
         + " WHERE view_id = #{viewId} AND deleted_at = 0";
   }
 
-  public String softDeleteViewVersionsBySchemaId(@Param("schemaId") Long schemaId) {
-    return "UPDATE "
+  public String softDeleteViewVersionsBySchemaIds(@Param("schemaIds") List<Long> schemaIds) {
+    return "<script>"
+        + "UPDATE "
         + ViewVersionInfoMapper.TABLE_NAME
         + " SET deleted_at = "
         + DatabaseTimeSQL.MYSQL
-        + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
+        + " WHERE schema_id IN ("
+        + "<foreach collection='schemaIds' item='schemaId' separator=','>"
+        + "#{schemaId}"
+        + "</foreach>"
+        + ") AND deleted_at = 0"
+        + "</script>";
   }
 
   public String softDeleteViewVersionsByCatalogId(@Param("catalogId") Long catalogId) {

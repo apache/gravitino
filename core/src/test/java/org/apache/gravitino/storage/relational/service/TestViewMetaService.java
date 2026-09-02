@@ -653,6 +653,32 @@ public class TestViewMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testCascadingSchemaDeleteCleansViewVersions() throws IOException {
+    String cascadeSchemaName = GravitinoITUtils.genRandomName("tst_view_schema_cascade");
+    createAndInsertSchema(metalakeName, catalogName, cascadeSchemaName);
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, cascadeSchemaName);
+    ViewEntity view =
+        createViewEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            namespace,
+            GravitinoITUtils.genRandomName("view_cascade"),
+            AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+    ViewMetaService.getInstance()
+        .updateView(view.nameIdentifier(), e -> copyViewWithComment((ViewEntity) e, "v2"));
+    assertEquals(2, listViewVersions(view.id()).size());
+
+    assertTrue(
+        SchemaMetaService.getInstance()
+            .deleteSchema(NameIdentifier.of(metalakeName, catalogName, cascadeSchemaName), true));
+
+    // The view root and its version rows must go together. Leaving the versions active would leak
+    // them: the legacy-timeline collector only reclaims rows that are already soft deleted.
+    listViewVersions(view.id())
+        .forEach((version, deletedAt) -> assertTrue(deletedAt > 0L, "version " + version));
+  }
+
+  @TestTemplate
   public void testOverwriteDoesNotAdoptViewFromAnotherSchema() throws IOException {
     String otherSchemaName = GravitinoITUtils.genRandomName("tst_view_schema_other");
     createAndInsertSchema(metalakeName, catalogName, otherSchemaName);
