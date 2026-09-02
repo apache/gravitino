@@ -347,24 +347,4 @@ public interface EntityStore extends Closeable {
   default SupportsRelationOperations relationOperations() {
     throw new UnsupportedOperationException("relation operations are not supported");
   }
-
-  /**
-   * Get the extra external id operations that are supported by the entity store.
-   *
-   * @return the external id operations that are supported by the entity store
-   * @throws UnsupportedOperationException if the extra operations are not supported
-   */
-  default SupportsExternalIdOperations externalIdOperations() {
-    throw new UnsupportedOperationException("external id operations are not supported");
-  }
-
-  /**
-   * Get the extra id operations that are supported by the entity store.
-   *
-   * @return the id operations that are supported by the entity store
-   * @throws UnsupportedOperationException if the extra operations are not supported
-   */
-  default SupportsIdOperations idOperations() {
-    throw new UnsupportedOperationException("id operations are not supported");
-  }
 }

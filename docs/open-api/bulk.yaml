@@ -339,8 +339,8 @@ components:
     BulkUserAddRequest:
       value: {
         "users": [
-          {"name": "alice", "externalId": "ext-alice", "enabled": true},
-          {"name": "bob", "enabled": true}
+          {"name": "alice"},
+          {"name": "bob"}
         ]
       }
 
@@ -352,7 +352,7 @@ components:
     BulkGroupAddRequest:
       value: {
         "groups": [
-          {"name": "engineers", "externalId": "ext-engineers"},
+          {"name": "engineers"},
           {"name": "analysts"}
         ]
       }
@@ -368,8 +368,6 @@ components:
         "users": [
           {
             "name": "alice",
-            "externalId": "ext-alice",
-            "enabled": true,
             "roles": [],
             "audit": {
               "creator": "gravitino",
@@ -411,7 +409,6 @@ components:
         "groups": [
           {
             "name": "engineers",
-            "externalId": "ext-engineers",
             "roles": [],
             "audit": {
               "creator": "gravitino",
