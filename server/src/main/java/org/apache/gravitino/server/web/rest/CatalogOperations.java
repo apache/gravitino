@@ -141,6 +141,19 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
+<<<<<<< HEAD
+=======
+    if (request == null) {
+      LOG.warn("Received create catalog request with null request body");
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String catalogName = request.getName();
+>>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     LOG.info("Received create catalog request for metalake: {}", metalake);
     try {
       return Utils.doAs(

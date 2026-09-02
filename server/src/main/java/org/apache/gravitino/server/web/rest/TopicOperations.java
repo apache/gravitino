@@ -124,6 +124,19 @@ public class TopicOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TopicCreateRequest request) {
+<<<<<<< HEAD
+=======
+    if (request == null) {
+      LOG.warn("Received create topic request with null request body");
+      return ExceptionHandlers.handleTopicException(
+          OperationType.CREATE,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String topicName = request.getName();
+>>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     LOG.info("Received create topic request: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(

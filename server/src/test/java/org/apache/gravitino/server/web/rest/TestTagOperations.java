@@ -272,6 +272,17 @@ public class TestTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTagWithNullRequest() {
+    Response resp =
+        target(tagPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateTag() {
     TagEntity tag1 =
         TagEntity.builder()

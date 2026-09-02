@@ -172,12 +172,26 @@ public class ModelOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       ModelRegisterRequest request) {
+<<<<<<< HEAD
     LOG.info(
         "Received register model request: {}.{}.{}.{}",
         metalake,
         catalog,
         schema,
         request.getName());
+=======
+    if (request == null) {
+      LOG.warn("Received register model request with null request body");
+      return ExceptionHandlers.handleModelException(
+          OperationType.REGISTER,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String modelName = request.getName();
+    LOG.info("Received register model request: {}.{}.{}.{}", metalake, catalog, schema, modelName);
+>>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
 
     try {
       return Utils.doAs(

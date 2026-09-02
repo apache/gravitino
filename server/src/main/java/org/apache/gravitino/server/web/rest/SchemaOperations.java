@@ -141,7 +141,21 @@ public class SchemaOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.CREATE_SCHEMA)
           SchemaCreateRequest request) {
+<<<<<<< HEAD
     LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, request.getName());
+=======
+    if (request == null) {
+      LOG.warn("Received create schema request with null request body");
+      return ExceptionHandlers.handleSchemaException(
+          OperationType.CREATE,
+          "",
+          catalog,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String schemaName = request.getName();
+    LOG.info("Received create schema request: {}.{}.{}", metalake, catalog, schemaName);
+>>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     try {
       return Utils.doAs(
           httpRequest,

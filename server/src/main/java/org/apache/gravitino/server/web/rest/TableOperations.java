@@ -129,8 +129,22 @@ public class TableOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TableCreateRequest request) {
+<<<<<<< HEAD
     LOG.info(
         "Received create table request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+=======
+    if (request == null) {
+      LOG.warn("Received create table request with null request body");
+      return ExceptionHandlers.handleTableException(
+          OperationType.CREATE,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String tableName = request.getName();
+    LOG.info("Received create table request: {}.{}.{}.{}", metalake, catalog, schema, tableName);
+>>>>>>> 29a566bc6 ([#12788] fix(server): reject null request body before validate() in create/register/add operations (#12791))
     try {
       return Utils.doAs(
           httpRequest,
