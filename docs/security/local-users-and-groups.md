@@ -81,14 +81,14 @@ All management endpoints are under `http://{host}:{port}/api/idp` and require Ba
 
 ### User Operations
 
-| Operation       | Method | Path                     | Body                                        |
-|-----------------|--------|--------------------------|---------------------------------------------|
-| Get a user      | GET    | `/api/idp/users/{user}`  | None                                        |
-| Add a user      | POST   | `/api/idp/users`         | `{"user":"alice","password":"{password}"}`  |
-| Reset a password| PUT    | `/api/idp/users/{user}`  | `{"password":"{new_password}"}`             |
-| Remove a user   | DELETE | `/api/idp/users/{user}`  | None                                        |
+| Operation                | Method | Path                                | Body                                       |
+|--------------------------|--------|-------------------------------------|--------------------------------------------|
+| Get a user               | GET    | `/api/idp/users/{user}`             | None                                       |
+| Add a user               | POST   | `/api/idp/users`                    | `{"user":"alice","password":"{password}"}` |
+| Update a user            | PUT    | `/api/idp/users/{user}`             | `{"password":"{new_password}"}` and/or `{"enabled":false}` |
+| Remove a user            | DELETE | `/api/idp/users/{user}`             | None                                       |
 
-The add-user body uses the field name `user` rather than `name`.
+The add-user body uses the field name `user` rather than `name`. `enabled` is optional on create and defaults to `true`. A disabled user cannot authenticate. `PUT /api/idp/users/{user}` accepts `password` and/or `enabled`; at least one is required. Users listed in `gravitino.authorization.serviceAdmins` cannot be disabled.
 
 ```shell
 curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
@@ -107,7 +107,11 @@ curl -s -X POST -H "Accept: application/vnd.gravitino.v1+json" \
 | Remove a group           | DELETE | `/api/idp/groups/{group}?force={true false}`| None                                                       |
 | Change group membership  | PUT    | `/api/idp/groups/{group}/users`             | `{"usersToAdd":["alice"],"usersToRemove":["carol"]}`       |
 
+<<<<<<< HEAD
 The add-group body uses the field name `group` rather than `name`. Removing a group that still has members fails unless `force=true`. A membership change requires at least one of `usersToAdd` or `usersToRemove`, and accepts both in a single request.
+=======
+The add-group body uses the field name `group` rather than `name`. `comment` is optional on create (max 1024 characters, utf8mb4) and stored as the group description. Removing a group that still has members fails unless `force=true`. A membership change requires at least one of `usersToAdd` or `usersToRemove`, and accepts both in a single request.
+>>>>>>> 3893386df ([#12773] feat(idp-basic): add enabled flag for local IdP users (#12774))
 
 ```shell
 curl -s -X PUT -H "Accept: application/vnd.gravitino.v1+json" \

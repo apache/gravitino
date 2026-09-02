@@ -56,6 +56,7 @@ public class IdpUserGroupManager implements Closeable {
 
   private static volatile IdpUserGroupManager instance;
 
+  private final Config config;
   private final IdpRelationalStorage relationalStorage;
   private final IdpGarbageCollector garbageCollector;
   private final IdGenerator idGenerator;
@@ -80,6 +81,7 @@ public class IdpUserGroupManager implements Closeable {
   }
 
   private IdpUserGroupManager(Config config, IdGenerator idGenerator) {
+    this.config = config;
     this.relationalStorage = new IdpRelationalStorage(config);
     this.idGenerator = idGenerator;
     this.passwordHasher = PasswordHasherFactory.create();
@@ -113,7 +115,7 @@ public class IdpUserGroupManager implements Closeable {
     IdpCredentialValidator.validatePassword(initialAdminPassword);
     String passwordHash = passwordHasher.hash(initialAdminPassword);
     for (String serviceAdmin : missingServiceAdmins) {
-      USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash));
+      USER_SERVICE.insertIdpUser(newUserPO(serviceAdmin, passwordHash, true));
     }
   }
 
@@ -125,9 +127,24 @@ public class IdpUserGroupManager implements Closeable {
    * @return The created built-in IdP user.
    */
   public IdpUser addUser(String username, String password) throws IOException {
+    return addUser(username, password, true);
+  }
+
+  /**
+   * Adds a built-in IdP user.
+   *
+   * @param username The username.
+   * @param password The plaintext password.
+   * @param enabled Whether the user is enabled.
+   * @return The created built-in IdP user.
+   * @throws IllegalArgumentException if {@code enabled} is {@code false} and the username is a
+   *     configured service admin
+   */
+  public IdpUser addUser(String username, String password, boolean enabled) throws IOException {
+    checkCanDisableUser(username, enabled);
     String passwordHash = passwordHasher.hash(password);
-    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash));
-    return new IdpUser(username, Collections.emptyList());
+    USER_SERVICE.insertIdpUser(newUserPO(username, passwordHash, enabled));
+    return new IdpUser(username, Collections.emptyList(), enabled);
   }
 
   /**
@@ -153,7 +170,9 @@ public class IdpUserGroupManager implements Closeable {
   public IdpUser authenticate(String username, String password) {
     try {
       IdpUser user = USER_SERVICE.getIdpUser(username);
-      if (user.passwordHash() == null || !passwordHasher.verify(password, user.passwordHash())) {
+      if (!user.enabled()
+          || user.passwordHash() == null
+          || !passwordHasher.verify(password, user.passwordHash())) {
         throw new UnauthorizedException(
             "Invalid username or password", AuthConstants.AUTHORIZATION_BASIC_HEADER.trim());
       }
@@ -174,6 +193,21 @@ public class IdpUserGroupManager implements Closeable {
    */
   public boolean changePassword(String username, String password) {
     return USER_SERVICE.updateIdpUserPassword(username, passwordHasher.hash(password));
+  }
+
+  /**
+   * Enables or disables a built-in IdP user.
+   *
+   * @param username The username.
+   * @param enabled Whether the user should be enabled.
+   * @return {@code true} if the enabled flag was updated
+   * @throws NotFoundException if the user does not exist
+   * @throws IllegalArgumentException if {@code enabled} is {@code false} and the username is a
+   *     configured service admin
+   */
+  public boolean updateEnabled(String username, boolean enabled) {
+    checkCanDisableUser(username, enabled);
+    return USER_SERVICE.updateIdpUserEnabled(username, enabled);
   }
 
   /**
@@ -234,11 +268,29 @@ public class IdpUserGroupManager implements Closeable {
     relationalStorage.close();
   }
 
-  private IdpUserPO newUserPO(String username, String passwordHash) {
+  private void checkCanDisableUser(String username, boolean enabled) {
+    if (enabled) {
+      return;
+    }
+    Preconditions.checkArgument(
+        !isServiceAdmin(username), "Cannot disable service admin %s", username);
+  }
+
+  private boolean isServiceAdmin(String username) {
+    String rawServiceAdmins = config.getRawString(Configs.SERVICE_ADMINS.getKey());
+    if (StringUtils.isBlank(rawServiceAdmins)) {
+      return false;
+    }
+    List<String> serviceAdmins = config.get(Configs.SERVICE_ADMINS);
+    return serviceAdmins != null && serviceAdmins.contains(username);
+  }
+
+  private IdpUserPO newUserPO(String username, String passwordHash, boolean enabled) {
     return IdpUserPO.builder()
         .withUserId(idGenerator.nextId())
         .withUsername(username)
         .withPasswordHash(passwordHash)
+        .withEnabled(enabled)
         .withCurrentVersion(POConverters.INIT_VERSION)
         .withLastVersion(POConverters.INIT_VERSION)
         .withDeletedAt(POConverters.DEFAULT_DELETED_AT)

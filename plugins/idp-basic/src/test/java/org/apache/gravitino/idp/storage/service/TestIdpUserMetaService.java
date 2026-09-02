@@ -19,6 +19,7 @@
 package org.apache.gravitino.idp.storage.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -103,6 +104,24 @@ class TestIdpUserMetaService extends AbstractIdpMetaServiceTest {
     assertEquals(1L, userMetaService.getIdpUserByUsername("user1").getCurrentVersion());
 
     runServiceCall(() -> assertTrue(userMetaService.updateIdpUserPassword("user1", "hash-2")));
+  }
+
+  @ParameterizedTest
+  @MethodSource("storageProvider")
+  void testUpdateIdpUserEnabled(String type) throws IOException {
+    init(type);
+    insertUsers(1);
+    IdpUserMetaService userMetaService = IdpUserMetaService.getInstance();
+
+    assertTrue(userMetaService.getIdpUserByUsername("user1").getEnabled());
+    closeSession();
+    assertThrows(
+        NotFoundException.class, () -> userMetaService.updateIdpUserEnabled("missing", false));
+    refreshSession();
+
+    runServiceCall(() -> assertTrue(userMetaService.updateIdpUserEnabled("user1", false)));
+    assertEquals(false, userMetaService.getIdpUserByUsername("user1").getEnabled());
+    assertFalse(userMetaService.getIdpUser("user1").enabled());
   }
 
   @ParameterizedTest

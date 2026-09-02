@@ -42,8 +42,8 @@ import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
-import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -98,7 +98,7 @@ class TestIdpOperations extends JerseyTest {
   @Test
   void testAddUser() throws Exception {
     AddUserRequest req = new AddUserRequest("user1", VALID_PASSWORD);
-    doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD);
+    doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD, true);
 
     assertError(
         Response.Status.BAD_REQUEST,
@@ -110,7 +110,7 @@ class TestIdpOperations extends JerseyTest {
 
     doThrow(new AlreadyExistsException("mock error"))
         .when(MANAGER)
-        .addUser("user1", VALID_PASSWORD);
+        .addUser("user1", VALID_PASSWORD, true);
     assertStatus(Response.Status.CONFLICT, post("/idp/users", req));
   }
 
@@ -127,7 +127,7 @@ class TestIdpOperations extends JerseyTest {
 
   @Test
   void testChangePasswordAndRemoveUser() {
-    ChangePasswordRequest req = new ChangePasswordRequest(VALID_PASSWORD);
+    UpdateUserRequest req = new UpdateUserRequest(VALID_PASSWORD);
     when(MANAGER.changePassword("user1", VALID_PASSWORD)).thenReturn(true);
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
     when(MANAGER.removeUser("user1")).thenReturn(true);
@@ -135,6 +135,29 @@ class TestIdpOperations extends JerseyTest {
     Assertions.assertEquals(
         "user1", put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().name());
     Assertions.assertTrue(delete("/idp/users/user1").readEntity(RemoveResponse.class).removed());
+  }
+
+  @Test
+  void testUpdateEnabled() {
+    UpdateUserRequest req = new UpdateUserRequest(null, false);
+    when(MANAGER.updateEnabled("user1", false)).thenReturn(true);
+    when(MANAGER.getUser("user1")).thenReturn(new IdpUser("user1", Collections.emptyList(), false));
+
+    Assertions.assertFalse(
+        put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().enabled());
+  }
+
+  @Test
+  void testCannotDisableServiceAdmin() {
+    UpdateUserRequest req = new UpdateUserRequest(null, false);
+    doThrow(new IllegalArgumentException("Cannot disable service admin admin"))
+        .when(MANAGER)
+        .updateEnabled("admin", false);
+
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin", req),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
   }
 
   @Test
