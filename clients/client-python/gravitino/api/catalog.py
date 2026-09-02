@@ -170,6 +170,20 @@ class Catalog(Auditable):
         """
         raise UnsupportedOperationException("Catalog does not support view operations")
 
+    def as_semantic_model_catalog(self) -> "SemanticModelCatalog":  # noqa: F821
+        """
+        Raises:
+            UnsupportedOperationException if the catalog does not support Semantic
+            Model operations.
+
+        Returns:
+            the {@link SemanticModelCatalog} if the catalog supports Semantic Model
+            operations.
+        """
+        raise UnsupportedOperationException(
+            "Catalog does not support semantic model operations"
+        )
+
     def as_fileset_catalog(self) -> "FilesetCatalog":  # noqa: F821
         """
         Raises:
