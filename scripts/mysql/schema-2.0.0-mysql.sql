@@ -250,6 +250,7 @@ CREATE TABLE IF NOT EXISTS `idp_user_meta` (
     `user_id` BIGINT(20) UNSIGNED NOT NULL COMMENT 'idp user id',
     `user_name` VARCHAR(128) NOT NULL COMMENT 'idp username',
     `password_hash` VARCHAR(1024) NOT NULL COMMENT 'idp user password hash',
+    `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled',
     `current_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user current version',
     `last_version` INT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'idp user last version',
     `deleted_at` BIGINT(20) UNSIGNED NOT NULL DEFAULT 0 COMMENT 'idp user deleted at',

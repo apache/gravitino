@@ -30,6 +30,7 @@ import org.apache.ibatis.annotations.Param;
 public class IdpUserMetaBaseSQLProvider {
   public String selectIdpUser(@Param("username") String username) {
     return "SELECT user_id as userId, user_name as username, password_hash as passwordHash,"
+        + " enabled as enabled,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -39,6 +40,7 @@ public class IdpUserMetaBaseSQLProvider {
 
   public String selectIdpUserWithGroups(@Param("username") String username) {
     return "SELECT u.user_name as name, u.password_hash as passwordHash,"
+        + " u.enabled as enabled,"
         + " COALESCE(JSON_ARRAYAGG(g.group_name), JSON_ARRAY()) as groupNames"
         + " FROM "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
@@ -49,12 +51,13 @@ public class IdpUserMetaBaseSQLProvider {
         + IdpGroupMetaMapper.IDP_GROUP_TABLE_NAME
         + " g ON g.group_id = r.group_id AND g.deleted_at = 0"
         + " WHERE u.user_name = #{username} AND u.deleted_at = 0"
-        + " GROUP BY u.user_id, u.user_name, u.password_hash";
+        + " GROUP BY u.user_id, u.user_name, u.password_hash, u.enabled";
   }
 
   public String selectIdpUsersByUsernames(@Param("usernames") List<String> usernames) {
     return "<script>"
         + "SELECT user_id as userId, user_name as username, password_hash as passwordHash,"
+        + " enabled as enabled,"
         + " current_version as currentVersion,"
         + " last_version as lastVersion, deleted_at as deletedAt"
         + " FROM "
@@ -70,11 +73,12 @@ public class IdpUserMetaBaseSQLProvider {
   public String insertIdpUser(@Param("userMeta") IdpUserPO userPO) {
     return "INSERT INTO "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
-        + " (user_id, user_name, password_hash, current_version, last_version, deleted_at)"
+        + " (user_id, user_name, password_hash, enabled, current_version, last_version, deleted_at)"
         + " VALUES ("
         + " #{userMeta.userId},"
         + " #{userMeta.username},"
         + " #{userMeta.passwordHash},"
+        + " #{userMeta.enabled},"
         + " #{userMeta.currentVersion},"
         + " #{userMeta.lastVersion},"
         + " #{userMeta.deletedAt}"
@@ -86,6 +90,15 @@ public class IdpUserMetaBaseSQLProvider {
     return "UPDATE "
         + IdpUserMetaMapper.IDP_USER_TABLE_NAME
         + " SET password_hash = #{passwordHash}"
+        + " WHERE user_name = #{username}"
+        + " AND deleted_at = 0";
+  }
+
+  public String updateIdpUserEnabled(
+      @Param("username") String username, @Param("enabled") boolean enabled) {
+    return "UPDATE "
+        + IdpUserMetaMapper.IDP_USER_TABLE_NAME
+        + " SET enabled = #{enabled}"
         + " WHERE user_name = #{username}"
         + " AND deleted_at = 0";
   }

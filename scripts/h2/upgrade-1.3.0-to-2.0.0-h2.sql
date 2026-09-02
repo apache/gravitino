@@ -37,6 +37,8 @@ ALTER TABLE `tag_relation_meta` DROP INDEX `uk_ti_mi_del`;
 
 ALTER TABLE `tag_relation_meta` ADD COLUMN `tag_value` VARCHAR(256) NOT NULL DEFAULT '' COMMENT 'tag assignment value, empty string means no value' AFTER `metadata_object_type`;
 
+ALTER TABLE `idp_user_meta` ADD COLUMN `enabled` TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'whether the user is enabled, 0 is disabled, 1 is enabled' AFTER `password_hash`;
+
 ALTER TABLE `idp_group_meta` ADD COLUMN `group_comment` VARCHAR(1024) DEFAULT '' COMMENT 'idp group comment' AFTER `group_name`;
 
 CREATE UNIQUE INDEX IF NOT EXISTS `uk_ti_mi_mo_tv_del` ON `tag_relation_meta` (`tag_id`, `metadata_object_id`, `metadata_object_type`, `tag_value`, `deleted_at`);

@@ -38,6 +38,7 @@ public class TestIdpUserPO {
     Assertions.assertEquals(1L, userPO.getUserId());
     Assertions.assertEquals("alice", userPO.getUsername());
     Assertions.assertEquals("hash", userPO.getPasswordHash());
+    Assertions.assertTrue(userPO.getEnabled());
     Assertions.assertEquals(1L, userPO.getCurrentVersion());
     Assertions.assertEquals(1L, userPO.getLastVersion());
     Assertions.assertEquals(0L, userPO.getDeletedAt());
