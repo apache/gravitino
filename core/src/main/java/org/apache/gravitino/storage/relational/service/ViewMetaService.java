@@ -27,7 +27,7 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -44,6 +44,7 @@ import org.apache.gravitino.storage.relational.mapper.TagMetadataObjectRelMapper
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.po.ViewPO;
+import org.apache.gravitino.storage.relational.po.ViewVersionInfoPO;
 import org.apache.gravitino.storage.relational.utils.ExceptionUtils;
 import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -104,6 +105,7 @@ public class ViewMetaService {
     ViewPO.ViewPOBuilder builder = ViewPO.builder();
     try {
       ViewPO po = initializeViewPO(viewEntity, builder);
+      AtomicReference<ViewPO> persistedPO = new AtomicReference<>(po);
 
       SessionUtils.doMultipleWithCommit(
           // Hold the parent schema row until this transaction ends, so the view cannot be
@@ -117,13 +119,28 @@ public class ViewMetaService {
                       po.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
-                  ViewMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),
+                  ViewMetaMapper.class,
+                  mapper -> {
+                    ops.insertPO(mapper, po, overwrite);
+                    if (overwrite) {
+                      ViewPO storedPO =
+                          mapper.selectViewMetaBySchemaIdAndName(
+                              po.getSchemaId(), po.getViewName());
+                      Preconditions.checkState(
+                          storedPO != null,
+                          "The overwritten view %s in schema %s does not exist",
+                          po.getViewName(),
+                          po.getSchemaId());
+                      persistedPO.set(viewPOWithPersistedIdentityAndVersions(po, storedPO));
+                    }
+                  }),
           () ->
               SessionUtils.doWithoutCommit(
                   ViewVersionInfoMapper.class,
                   mapper -> {
                     if (overwrite) {
-                      mapper.insertViewVersionInfoOnDuplicateKeyUpdate(po.getViewVersionInfoPO());
+                      mapper.insertViewVersionInfoOnDuplicateKeyUpdate(
+                          persistedPO.get().getViewVersionInfoPO());
                     } else {
                       mapper.insertViewVersionInfo(po.getViewVersionInfoPO());
                     }
@@ -149,27 +166,42 @@ public class ViewMetaService {
         newEntity.id(),
         oldViewEntity.id());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
+    boolean isSchemaChanged = !newEntity.namespace().equals(oldViewEntity.namespace());
+    Long newSchemaId =
+        isSchemaChanged
+            ? EntityIdService.getEntityId(
+                NameIdentifier.of(newEntity.namespace().levels()), Entity.EntityType.SCHEMA)
+            : oldViewPO.getSchemaId();
+
     try {
-      ViewPO newViewPO = updateViewPO(oldViewPO, newEntity);
+      ViewPO newViewPO = updateViewPO(oldViewPO, newEntity, newSchemaId);
       SessionUtils.doMultipleWithCommit(
+          () -> {
+            if (isSchemaChanged) {
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      newEntity.nameIdentifier(),
+                      newSchemaId,
+                      oldViewPO.getCatalogId(),
+                      oldViewPO.getMetalakeId());
+            }
+          },
+          () -> {
+            // current_version is the sole OCC token. The root CAS is the transaction's decision
+            // point and must run before the unguarded version-row insert below.
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO));
+            if (updated == 0) {
+              throw viewWriteFailure(ident, oldViewPO);
+            }
+          },
           () ->
               SessionUtils.doWithoutCommit(
                   ViewVersionInfoMapper.class,
-                  mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())),
-          () -> {
-            updateResult.set(
-                SessionUtils.getWithoutCommit(
-                    ViewMetaMapper.class, mapper -> ops.updatePO(mapper, newViewPO, oldViewPO)));
-            if (updateResult.get() == 0) {
-              throw new RuntimeException("Failed to update the entity: " + ident);
-            }
-          });
+                  mapper -> mapper.insertViewVersionInfo(newViewPO.getViewVersionInfoPO())));
       return newEntity;
     } catch (RuntimeException re) {
-      if (updateResult.get() == 0) {
-        throw new IOException("Failed to update the entity: " + ident);
-      }
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.VIEW, newEntity.nameIdentifier().toString());
       throw re;
@@ -181,7 +213,30 @@ public class ViewMetaService {
       baseMetricName = "deleteViewByIdentifier")
   public boolean deleteView(NameIdentifier ident) {
     ViewPO viewPO = getViewPOByIdentifier(ident);
-    return deleteView(viewPO.getViewId());
+
+    deleteViewWithVersion(ident, viewPO);
+    return true;
+  }
+
+  /**
+   * Deletes the observed view and its dependent rows in one transaction.
+   *
+   * <p>Package-private access lets concurrency tests submit a deliberately stale snapshot while
+   * exercising the same root-first ordering as the public delete path.
+   */
+  void deleteViewWithVersion(NameIdentifier identifier, ViewPO observedViewPO) {
+    SessionUtils.doMultipleWithCommit(
+        // Check the root version before touching relationships. A stale drop stops here.
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        ViewMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteViewMetasByViewId(
+                                observedViewPO.getViewId(), observedViewPO.getCurrentVersion())),
+                () -> viewWriteFailure(identifier, observedViewPO)),
+        () -> deleteViewDependents(observedViewPO.getViewId()));
   }
 
   @Monitored(
@@ -205,51 +260,19 @@ public class ViewMetaService {
     return ops;
   }
 
-  private boolean deleteView(Long viewId) {
-    AtomicInteger deleteResult = new AtomicInteger(0);
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            deleteResult.set(
-                SessionUtils.getWithoutCommit(
-                    ViewMetaMapper.class, mapper -> mapper.softDeleteViewMetasByViewId(viewId))),
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                ViewVersionInfoMapper.class,
-                mapper -> mapper.softDeleteViewVersionsByViewId(viewId));
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        viewId, MetadataObject.Type.VIEW.name()));
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        viewId, MetadataObject.Type.VIEW.name()));
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        viewId, MetadataObject.Type.VIEW.name()));
-          }
-        });
-    return deleteResult.get() > 0;
-  }
-
-  private ViewPO updateViewPO(ViewPO oldViewPO, ViewEntity newEntity) {
+  private ViewPO updateViewPO(ViewPO oldViewPO, ViewEntity newEntity, Long newSchemaId) {
     Long newVersion = oldViewPO.getLastVersion() + 1;
     ViewPO.ViewPOBuilder builder =
         ViewPO.builder()
             .withMetalakeId(oldViewPO.getMetalakeId())
             .withCatalogId(oldViewPO.getCatalogId())
-            .withSchemaId(oldViewPO.getSchemaId())
+            .withSchemaId(newSchemaId)
             .withCurrentVersion(newVersion)
             .withLastVersion(newVersion);
     return buildViewPO(newEntity, builder, newVersion.intValue());
   }
 
-  private ViewPO getViewPOByIdentifier(NameIdentifier identifier) {
+  ViewPO getViewPOByIdentifier(NameIdentifier identifier) {
     NameIdentifierUtil.checkView(identifier);
     ViewPO viewPO =
         SessionUtils.getWithoutCommit(
@@ -269,5 +292,72 @@ public class ViewMetaService {
     return SessionUtils.getWithoutCommit(
         ViewMetaMapper.class,
         mapper -> POStorageReadRouting.listPOs(mapper, namespace, ops, Entity.EntityType.VIEW));
+  }
+
+  private ViewPO viewPOWithPersistedIdentityAndVersions(ViewPO incomingPO, ViewPO persistedPO) {
+    ViewVersionInfoPO incomingVersionPO = incomingPO.getViewVersionInfoPO();
+    ViewVersionInfoPO persistedVersionPO =
+        ViewVersionInfoPO.builder()
+            .withMetalakeId(incomingVersionPO.metalakeId())
+            .withCatalogId(incomingVersionPO.catalogId())
+            .withSchemaId(incomingVersionPO.schemaId())
+            .withViewId(persistedPO.getViewId())
+            .withVersion(persistedPO.getCurrentVersion().intValue())
+            .withViewComment(incomingVersionPO.viewComment())
+            .withColumns(incomingVersionPO.columns())
+            .withProperties(incomingVersionPO.properties())
+            .withDefaultCatalog(incomingVersionPO.defaultCatalog())
+            .withDefaultSchema(incomingVersionPO.defaultSchema())
+            .withRepresentations(incomingVersionPO.representations())
+            .withAuditInfo(incomingVersionPO.auditInfo())
+            .withDeletedAt(incomingVersionPO.deletedAt())
+            .build();
+    return ViewPO.builder()
+        .withViewId(persistedPO.getViewId())
+        .withViewName(incomingPO.getViewName())
+        .withMetalakeId(incomingPO.getMetalakeId())
+        .withCatalogId(incomingPO.getCatalogId())
+        .withSchemaId(incomingPO.getSchemaId())
+        .withAuditInfo(incomingPO.getAuditInfo())
+        .withCurrentVersion(persistedPO.getCurrentVersion())
+        .withLastVersion(persistedPO.getLastVersion())
+        .withDeletedAt(incomingPO.getDeletedAt())
+        .withViewVersionInfoPO(persistedVersionPO)
+        .build();
+  }
+
+  private void deleteViewDependents(Long viewId) {
+    SessionUtils.doWithoutCommit(
+        ViewVersionInfoMapper.class, mapper -> mapper.softDeleteViewVersionsByViewId(viewId));
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                viewId, MetadataObject.Type.VIEW.name()));
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(viewId, MetadataObject.Type.VIEW.name()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                viewId, MetadataObject.Type.VIEW.name()));
+  }
+
+  private RuntimeException viewWriteFailure(NameIdentifier identifier, ViewPO observedViewPO) {
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.VIEW,
+        () ->
+            SessionUtils.getWithoutCommit(
+                ViewMetaMapper.class,
+                mapper -> mapper.selectViewMetaByIdForUpdate(observedViewPO.getViewId())),
+        null,
+        current ->
+            Objects.equals(current.getViewName(), observedViewPO.getViewName())
+                && Objects.equals(current.getSchemaId(), observedViewPO.getSchemaId())
+                && Objects.equals(current.getCatalogId(), observedViewPO.getCatalogId())
+                && Objects.equals(current.getMetalakeId(), observedViewPO.getMetalakeId()));
   }
 }

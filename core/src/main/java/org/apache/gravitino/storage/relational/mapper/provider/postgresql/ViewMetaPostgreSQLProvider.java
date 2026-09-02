@@ -51,8 +51,12 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + " metalake_id = #{viewMeta.metalakeId},"
         + " catalog_id = #{viewMeta.catalogId},"
         + " schema_id = #{viewMeta.schemaId},"
-        + " current_version = #{viewMeta.currentVersion},"
-        + " last_version = #{viewMeta.lastVersion},"
+        + " current_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + TABLE_NAME
+        + ".current_version + 1,"
         + " audit_info = #{viewMeta.auditInfo},"
         + " deleted_at = #{viewMeta.deletedAt}";
   }
@@ -86,19 +90,22 @@ public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
         + " vi.audit_info as version_audit_info, vi.deleted_at as version_deleted_at"
         + " FROM "
         + TABLE_NAME
-        + " vm INNER JOIN "
+        + " vm LEFT JOIN "
         + VERSION_TABLE_NAME
         + " vi ON vm.view_id = vi.view_id AND vm.current_version = vi.version"
+        + " AND vi.deleted_at = 0"
         + " WHERE vm.schema_id = #{schemaId} AND vm.view_name = #{viewName}"
-        + " AND vm.deleted_at = 0 AND vi.deleted_at = 0";
+        + " AND vm.deleted_at = 0";
   }
 
   @Override
-  public String softDeleteViewMetasByViewId(@Param("viewId") Long viewId) {
+  public String softDeleteViewMetasByViewId(
+      @Param("viewId") Long viewId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE view_id = #{viewId} AND deleted_at = 0";
+        + " WHERE view_id = #{viewId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override

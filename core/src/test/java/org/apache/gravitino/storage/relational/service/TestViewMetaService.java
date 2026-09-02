@@ -37,6 +37,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
+import org.apache.gravitino.exceptions.OptimisticLockException;
 import org.apache.gravitino.integration.test.util.GravitinoITUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TagEntity;
@@ -47,10 +48,14 @@ import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
+import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
+import org.apache.gravitino.storage.relational.utils.SessionUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
 import org.apache.ibatis.session.SqlSession;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 
@@ -162,7 +167,7 @@ public class TestViewMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
-  public void testUpdateViewRollbackWhenMetaUpdateAffectsZeroRows() throws IOException {
+  public void testUpdateViewReportsNoSuchAfterConcurrentDelete() throws IOException {
     String viewName = GravitinoITUtils.genRandomName("test_view");
     Namespace ns = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
     ViewEntity view =
@@ -185,7 +190,7 @@ public class TestViewMetaService extends TestJDBCBackend {
             .build();
 
     assertThrows(
-        IOException.class,
+        NoSuchEntityException.class,
         () ->
             ViewMetaService.getInstance()
                 .updateView(
@@ -199,6 +204,208 @@ public class TestViewMetaService extends TestJDBCBackend {
     assertEquals(1, versions.size());
     assertTrue(versions.containsKey(1));
     assertTrue(versions.get(1) > 0L);
+  }
+
+  @TestTemplate
+  public void testAlterReportsOptimisticLockConflictAndKeepsWinnerVersion() throws IOException {
+    String viewName = GravitinoITUtils.genRandomName("view_alter_conflict");
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+
+    assertThrows(
+        OptimisticLockException.class,
+        () ->
+            ViewMetaService.getInstance()
+                .updateView(
+                    view.nameIdentifier(),
+                    entity -> {
+                      try {
+                        ViewMetaService.getInstance()
+                            .updateView(
+                                view.nameIdentifier(),
+                                competing ->
+                                    copyViewWithComment(
+                                        (ViewEntity) competing, "competing update"));
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                      return copyViewWithComment((ViewEntity) entity, "requested update");
+                    }));
+
+    ViewEntity current = ViewMetaService.getInstance().getViewByIdentifier(view.nameIdentifier());
+    assertEquals("competing update", current.comment());
+    Map<Integer, Long> versions = listViewVersions(view.id());
+    assertEquals(2, versions.size());
+    assertTrue(versions.containsKey(2));
+  }
+
+  @TestTemplate
+  public void testAlterRollsBackRootCasWhenVersionInsertFails() throws IOException {
+    String viewName = GravitinoITUtils.genRandomName("view_version_insert_failure");
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+    ViewEntity conflictingVersion = copyViewWithComment(view, "conflicting version");
+    ViewPO conflictingPO =
+        ViewPO.buildViewPO(
+            conflictingVersion, ViewPO.builder().withCurrentVersion(2L).withLastVersion(2L), 2);
+    SessionUtils.doWithCommit(
+        ViewVersionInfoMapper.class,
+        mapper -> mapper.insertViewVersionInfo(conflictingPO.getViewVersionInfoPO()));
+
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () ->
+            ViewMetaService.getInstance()
+                .updateView(
+                    view.nameIdentifier(),
+                    entity -> copyViewWithComment((ViewEntity) entity, "must roll back")));
+
+    ViewPO currentPO = ViewMetaService.getInstance().getViewPOByIdentifier(view.nameIdentifier());
+    assertEquals(1L, currentPO.getCurrentVersion());
+    assertEquals(1L, currentPO.getLastVersion());
+    assertEquals(
+        view.comment(),
+        ViewMetaService.getInstance().getViewByIdentifier(view.nameIdentifier()).comment());
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenRenamedConcurrently() throws IOException {
+    String viewName = GravitinoITUtils.genRandomName("view_alter_renamed");
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+    NameIdentifier renamedIdentifier = NameIdentifier.of(namespace, viewName + "_winner");
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ViewMetaService.getInstance()
+                .updateView(
+                    view.nameIdentifier(),
+                    entity -> {
+                      try {
+                        ViewMetaService.getInstance()
+                            .updateView(
+                                view.nameIdentifier(),
+                                competing ->
+                                    copyView(
+                                        (ViewEntity) competing,
+                                        renamedIdentifier.name(),
+                                        namespace,
+                                        "renamed winner"));
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                      return copyViewWithComment((ViewEntity) entity, "stale update");
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> ViewMetaService.getInstance().getViewByIdentifier(view.nameIdentifier()));
+    assertEquals(
+        "renamed winner",
+        ViewMetaService.getInstance().getViewByIdentifier(renamedIdentifier).comment());
+  }
+
+  @TestTemplate
+  public void testAlterReportsNoSuchWhenMovedConcurrently() throws IOException {
+    String targetSchemaName = GravitinoITUtils.genRandomName("view_target_schema");
+    createAndInsertSchema(metalakeName, catalogName, targetSchemaName);
+    String viewName = GravitinoITUtils.genRandomName("view_alter_moved");
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    Namespace movedNamespace = NamespaceUtil.ofView(metalakeName, catalogName, targetSchemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+    NameIdentifier movedIdentifier = NameIdentifier.of(movedNamespace, viewName);
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () ->
+            ViewMetaService.getInstance()
+                .updateView(
+                    view.nameIdentifier(),
+                    entity -> {
+                      try {
+                        ViewMetaService.getInstance()
+                            .updateView(
+                                view.nameIdentifier(),
+                                competing ->
+                                    copyView(
+                                        (ViewEntity) competing,
+                                        viewName,
+                                        movedNamespace,
+                                        "moved winner"));
+                      } catch (IOException e) {
+                        throw new RuntimeException(e);
+                      }
+                      return copyViewWithComment((ViewEntity) entity, "stale update");
+                    }));
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> ViewMetaService.getInstance().getViewByIdentifier(view.nameIdentifier()));
+    assertEquals(
+        "moved winner",
+        ViewMetaService.getInstance().getViewByIdentifier(movedIdentifier).comment());
+  }
+
+  @TestTemplate
+  public void testDeleteRejectsStaleVersion() throws IOException {
+    String viewName = GravitinoITUtils.genRandomName("view_stale_delete");
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("view_occ_tag")
+            .withNamespace(NamespaceUtil.ofTag(metalakeName))
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    TagMetaService.getInstance().insertTag(tag, false);
+    TagMetaService.getInstance()
+        .associateTagsWithMetadataObject(
+            view.nameIdentifier(),
+            view.type(),
+            new NameIdentifier[] {tag.nameIdentifier()},
+            new NameIdentifier[0]);
+    ViewPO stalePO = ViewMetaService.getInstance().getViewPOByIdentifier(view.nameIdentifier());
+
+    ViewMetaService.getInstance()
+        .updateView(
+            view.nameIdentifier(),
+            entity -> copyViewWithComment((ViewEntity) entity, "winning update"));
+
+    assertThrows(
+        OptimisticLockException.class,
+        () -> ViewMetaService.getInstance().deleteViewWithVersion(view.nameIdentifier(), stalePO));
+    assertEquals(
+        "winning update",
+        ViewMetaService.getInstance().getViewByIdentifier(view.nameIdentifier()).comment());
+    assertEquals(1, countActiveTagRelForMetadataObject(view.id(), "VIEW"));
+  }
+
+  @TestTemplate
+  public void testDeleteReportsNoSuchWhenDeletedConcurrently() throws IOException {
+    String viewName = GravitinoITUtils.genRandomName("view_delete_deleted");
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity view =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(view, false);
+    ViewPO stalePO = ViewMetaService.getInstance().getViewPOByIdentifier(view.nameIdentifier());
+
+    ViewMetaService.getInstance().deleteView(view.nameIdentifier());
+
+    assertThrows(
+        NoSuchEntityException.class,
+        () -> ViewMetaService.getInstance().deleteViewWithVersion(view.nameIdentifier(), stalePO));
   }
 
   @TestTemplate
@@ -273,6 +480,40 @@ public class TestViewMetaService extends TestJDBCBackend {
     NameIdentifier viewIdent = NameIdentifier.of(metalakeName, catalogName, schemaName, viewName);
     ViewEntity loaded = ViewMetaService.getInstance().getViewByIdentifier(viewIdent);
     assertEquals("overwritten comment", loaded.comment());
+    ViewPO overwrittenPO = ViewMetaService.getInstance().getViewPOByIdentifier(viewIdent);
+    assertEquals(2L, overwrittenPO.getCurrentVersion());
+    assertEquals(2L, overwrittenPO.getLastVersion());
+    assertEquals(2, listViewVersions(view.id()).size());
+  }
+
+  @TestTemplate
+  public void testNaturalKeyOverwriteUsesPersistedViewId() throws IOException {
+    // PostgreSQL's upsert targets view_id and rejects a different ID on the natural key before
+    // readback. This regression covers MySQL/H2 ON DUPLICATE KEY, which can choose either key.
+    Assumptions.assumeFalse("postgresql".equalsIgnoreCase(backendType));
+    String viewName = GravitinoITUtils.genRandomName("view_natural_key_overwrite");
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity original =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(original, false);
+    ViewEntity replacement =
+        copyView(
+            createViewEntity(RandomIdGenerator.INSTANCE.nextId(), namespace, viewName, AUDIT_INFO),
+            viewName,
+            namespace,
+            "replacement");
+
+    ViewMetaService.getInstance().insertView(replacement, true);
+
+    ViewEntity stored =
+        ViewMetaService.getInstance().getViewByIdentifier(original.nameIdentifier());
+    ViewPO storedPO =
+        ViewMetaService.getInstance().getViewPOByIdentifier(original.nameIdentifier());
+    assertEquals(original.id(), stored.id());
+    assertEquals("replacement", stored.comment());
+    assertEquals(2L, storedPO.getCurrentVersion());
+    assertEquals(2, listViewVersions(original.id()).size());
+    assertTrue(listViewVersions(replacement.id()).isEmpty());
   }
 
   @TestTemplate
@@ -331,6 +572,25 @@ public class TestViewMetaService extends TestJDBCBackend {
         .withDefaultSchema(null)
         .withProperties(ImmutableMap.of("k1", "v1"))
         .withAuditInfo(auditInfo)
+        .build();
+  }
+
+  private ViewEntity copyViewWithComment(ViewEntity view, String comment) {
+    return copyView(view, view.name(), view.namespace(), comment);
+  }
+
+  private ViewEntity copyView(ViewEntity view, String name, Namespace namespace, String comment) {
+    return ViewEntity.builder()
+        .withId(view.id())
+        .withName(name)
+        .withNamespace(namespace)
+        .withComment(comment)
+        .withColumns(view.columns())
+        .withRepresentations(view.representations())
+        .withDefaultCatalog(view.defaultCatalog())
+        .withDefaultSchema(view.defaultSchema())
+        .withProperties(view.properties())
+        .withAuditInfo(view.auditInfo())
         .build();
   }
 

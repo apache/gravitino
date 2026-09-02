@@ -142,16 +142,35 @@ public interface FunctionMetaMapper {
   FunctionPO selectFunctionMetaBySchemaIdAndName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
 
+  /**
+   * Selects and exclusively locks an active function metadata row.
+   *
+   * @param functionId the function ID
+   * @return the active function metadata, or {@code null} when it no longer exists
+   */
+  @SelectProvider(
+      type = FunctionMetaSQLProviderFactory.class,
+      method = "selectFunctionMetaByIdForUpdate")
+  FunctionPO selectFunctionMetaByIdForUpdate(@Param("functionId") Long functionId);
+
   @SelectProvider(
       type = FunctionMetaSQLProviderFactory.class,
       method = "selectFunctionIdBySchemaIdAndFunctionName")
   Long selectFunctionIdBySchemaIdAndFunctionName(
       @Param("schemaId") Long schemaId, @Param("functionName") String functionName);
 
+  /**
+   * Soft-deletes a function only if its version has not changed since the caller read it.
+   *
+   * @param functionId the function ID
+   * @param currentVersion the version observed by the caller
+   * @return the number of deleted rows; zero means the function changed or disappeared
+   */
   @UpdateProvider(
       type = FunctionMetaSQLProviderFactory.class,
       method = "softDeleteFunctionMetaByFunctionId")
-  Integer softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId);
+  Integer softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId, @Param("currentVersion") Integer currentVersion);
 
   @UpdateProvider(
       type = FunctionMetaSQLProviderFactory.class,

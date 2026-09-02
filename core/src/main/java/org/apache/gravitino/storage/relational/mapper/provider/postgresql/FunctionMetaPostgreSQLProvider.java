@@ -58,8 +58,12 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
         + " schema_id = #{functionMeta.schemaId},"
         + " function_type = #{functionMeta.functionType},"
         + " \"deterministic\" = #{functionMeta.deterministic},"
-        + " function_current_version = #{functionMeta.functionCurrentVersion},"
-        + " function_latest_version = #{functionMeta.functionLatestVersion},"
+        + " function_current_version = "
+        + FunctionMetaMapper.TABLE_NAME
+        + ".function_current_version + 1,"
+        + " function_latest_version = "
+        + FunctionMetaMapper.TABLE_NAME
+        + ".function_current_version + 1,"
         + " audit_info = #{functionMeta.auditInfo},"
         + " deleted_at = #{functionMeta.deletedAt}";
   }
@@ -93,19 +97,22 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
         + " vi.audit_info as version_audit_info, vi.deleted_at as version_deleted_at"
         + " FROM "
         + FunctionMetaMapper.TABLE_NAME
-        + " fm INNER JOIN "
+        + " fm LEFT JOIN "
         + FunctionMetaMapper.VERSION_TABLE_NAME
         + " vi ON fm.function_id = vi.function_id AND fm.function_current_version = vi.version"
+        + " AND vi.deleted_at = 0"
         + " WHERE fm.schema_id = #{schemaId} AND fm.function_name = #{functionName}"
-        + " AND fm.deleted_at = 0 AND vi.deleted_at = 0";
+        + " AND fm.deleted_at = 0";
   }
 
   @Override
-  public String softDeleteFunctionMetaByFunctionId(@Param("functionId") Long functionId) {
+  public String softDeleteFunctionMetaByFunctionId(
+      @Param("functionId") Long functionId, @Param("currentVersion") Integer currentVersion) {
     return "UPDATE "
         + FunctionMetaMapper.TABLE_NAME
         + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE function_id = #{functionId} AND deleted_at = 0";
+        + " WHERE function_id = #{functionId}"
+        + " AND function_current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
@@ -165,14 +172,7 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
         + " audit_info = #{newFunctionMeta.auditInfo},"
         + " deleted_at = #{newFunctionMeta.deletedAt}"
         + " WHERE function_id = #{oldFunctionMeta.functionId}"
-        + " AND function_name = #{oldFunctionMeta.functionName}"
-        + " AND metalake_id = #{oldFunctionMeta.metalakeId}"
-        + " AND catalog_id = #{oldFunctionMeta.catalogId}"
-        + " AND schema_id = #{oldFunctionMeta.schemaId}"
-        + " AND function_type = #{oldFunctionMeta.functionType}"
         + " AND function_current_version = #{oldFunctionMeta.functionCurrentVersion}"
-        + " AND function_latest_version = #{oldFunctionMeta.functionLatestVersion}"
-        + " AND audit_info = #{oldFunctionMeta.auditInfo}"
         + " AND deleted_at = 0";
   }
 }
