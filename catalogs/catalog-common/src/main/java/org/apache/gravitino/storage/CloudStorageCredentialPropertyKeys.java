@@ -28,8 +28,9 @@ import javax.annotation.Nullable;
 /**
  * Gravitino property keys for cloud static credentials.
  *
- * <p>GVFS clients must not consume these keys from REST {@code properties()} responses. When
- * credential vending is enabled, credentials are fetched via {@code getCredentials()} instead.
+ * <p>GVFS must not consume these keys from REST catalog/schema/fileset {@code properties()}
+ * responses (which may be masked). Clients may still supply credentials via local Hadoop {@code
+ * Configuration} or {@code getCredentials()} when credential vending is enabled.
  */
 public final class CloudStorageCredentialPropertyKeys {
 
@@ -61,7 +62,7 @@ public final class CloudStorageCredentialPropertyKeys {
 
   /**
    * Returns a copy of {@code properties} with static credential keys and masked placeholders
-   * removed. Used by GVFS when credential vending is enabled.
+   * removed. Used when merging REST metadata into GVFS client configuration.
    *
    * @param properties source properties from REST metadata responses
    * @return filtered properties safe to pass to the underlying HCFS client

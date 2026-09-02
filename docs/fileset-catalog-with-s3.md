@@ -35,19 +35,16 @@ properties do not need to be set.
 ## Amazon S3 Properties
 
 These properties are needed in addition to the shared
-[catalog properties](./fileset-catalog.md#catalog-properties). Configure credentials on the
-catalog; GVFS clients fetch them through [credential vending](./security/credential-vending.md)
-and must not set cloud credentials in local configuration. Non-secret settings are inherited
-from catalog, schema, and fileset metadata — override them in GVFS configuration only when
-needed. The Python client spells property names with underscores while the catalog and the
-Java client use hyphens.
+[catalog properties](./fileset-catalog.md#catalog-properties). The same values are also needed by
+the GVFS clients, so they are listed together here — note that the Python client spells them with
+underscores while the catalog and the Java client use hyphens.
 
 | Catalog and Java client | Python client          | Description                                                                                                                                                                                                                                                                                                         | Required                                         |
 |-------------------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
 | `s3-endpoint`           | `s3_endpoint`          | Endpoint of the S3 service. S3-compatible storage such as MinIO always needs it.                                                                                                                                                                                                                                    | Yes, except for the Python client against AWS S3 |
-| `s3-access-key-id`      | `s3_access_key_id`     | Access key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes (catalog)                                    |
-| `s3-secret-access-key`  | `s3_secret_access_key` | Secret key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes (catalog)                                    |
-| `credential-providers`  | (n/a)                  | The credential provider types, separated by comma. Possible values are `s3-token`, `s3-secret-key`, `aws-irsa`. When set explicitly, chooses how the server vends credentials. If omitted, Gravitino auto-detects a provider from the static credentials on the catalog. See [credential vending](./security/credential-vending.md#s3) for the extra properties each provider takes. | No                                               |
+| `s3-access-key-id`      | `s3_access_key_id`     | Access key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
+| `s3-secret-access-key`  | `s3_secret_access_key` | Secret key of the S3 service.                                                                                                                                                                                                                                                                                       | Yes                                              |
+| `credential-providers`  | (n/a)                  | The credential provider types, separated by comma. Possible values are `s3-token`, `s3-secret-key`, `aws-irsa`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#s3) for the extra properties each provider takes. | No                                               |
 
 :::note
 - The location must start with `s3a://`, not `s3://`. The `hadoop-aws` library does not support the
@@ -309,10 +306,8 @@ The thin `gravitino-aws` jar is not needed. Its functionality is already include
 
 ### GVFS Java client
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), configure the Gravitino
-connection. Cloud credentials are fetched from the server; do not set access keys in the Hadoop
-`Configuration`. Override non-secret properties such as `s3-endpoint` only when they are not
-already set on the catalog.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), set the Amazon S3
+properties from the table above.
 
 ```java
 Configuration conf = new Configuration();
@@ -320,6 +315,9 @@ conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.had
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
+conf.set("s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com");
+conf.set("s3-access-key-id", "access_key");
+conf.set("s3-secret-access-key", "secret_key");
 
 Path filesetPath = new Path("gvfs://fileset/s3_catalog/s3_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
@@ -355,6 +353,9 @@ spark = (SparkSession.builder
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    .config("spark.hadoop.s3-endpoint", "http://s3.ap-northeast-1.amazonaws.com")
+    .config("spark.hadoop.s3-access-key-id", "access_key")
+    .config("spark.hadoop.s3-secret-access-key", "secret_key")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
     .getOrCreate())
@@ -402,6 +403,18 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
   <name>fs.gravitino.client.metalake</name>
   <value>metalake</value>
 </property>
+<property>
+  <name>s3-endpoint</name>
+  <value>http://s3.ap-northeast-1.amazonaws.com</value>
+</property>
+<property>
+  <name>s3-access-key-id</name>
+  <value>access_key</value>
+</property>
+<property>
+  <name>s3-secret-access-key</name>
+  <value>secret_key</value>
+</property>
 ```
 
 2. Add these jars to the Hadoop classpath:
@@ -422,9 +435,8 @@ ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/s3_catalog/
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass Gravitino
-connection settings in `options`. Do not pass cloud access keys; GVFS fetches credentials from the
-server.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Amazon S3
+properties in `options`, spelled with underscores.
 
 ```python
 from gravitino import gvfs
@@ -433,6 +445,9 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
+    "s3_endpoint": "http://s3.ap-northeast-1.amazonaws.com",
+    "s3_access_key_id": "access_key",
+    "s3_secret_access_key": "secret_key",
 }
 
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
@@ -453,7 +468,9 @@ storage_options = {
     "server_uri": "http://localhost:8090",
     "metalake_name": "metalake",
     "options": {
-        "auth_type": "simple",
+        "s3_endpoint": "http://s3.ap-northeast-1.amazonaws.com",
+        "s3_access_key_id": "access_key",
+        "s3_secret_access_key": "secret_key",
     }
 }
 
@@ -476,11 +493,11 @@ For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md)
 
 ## Credential Vending
 
-GVFS always uses credential vending for cloud filesets: the catalog holds the Amazon S3
-credentials and the Gravitino server hands out a credential per request, so clients never configure
-cloud keys locally. See [Credential Vending](./security/credential-vending.md) for the general
-mechanism and [S3 credentials](./security/credential-vending.md#s3) for the properties each
-provider takes.
+With credential vending the catalog holds the Amazon S3 credentials and the Gravitino server hands
+out a credential per request, so clients never hold cloud keys of their own. See
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[S3 credentials](./security/credential-vending.md#s3) for the properties
+each provider takes.
 
 The supported providers are `s3-token`, which vends a short-lived STS token;
 `s3-secret-key`, which vends the static access key configured on the catalog; and `aws-irsa`, which
@@ -536,16 +553,18 @@ The `s3-token` provider needs two more catalog properties.
 | `s3-region`   | Region of the bucket, for example `ap-northeast-1` |
 | `s3-role-arn` | ARN of the role that grants access to the data     |
 
-### GVFS client configuration
+### Access without local credentials
 
-Configure only the Gravitino connection on the client. Cloud credentials come from the server.
+Enable vending on the client and drop the credential properties.
 
 ```java
 Configuration conf = new Configuration();
+conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
+// No need to set s3-access-key-id or s3-secret-access-key
 
 Path filesetPath = new Path(
     "gvfs://fileset/s3_catalog_with_vending/s3_schema/example_fileset/new_dir");
@@ -556,16 +575,20 @@ fs.mkdirs(filesetPath);
 ```python
 spark = (SparkSession.builder
     .appName("s3_fileset")
+    .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    # No need to set s3-access-key-id or s3-secret-access-key
     .getOrCreate())
 ```
 
 ```python
 options = {
     "auth_type": "simple",
+    "enable_credential_vending": True,
+    # No need to set s3-access-key-id or s3-secret-access-key
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
                                      metalake_name="metalake",

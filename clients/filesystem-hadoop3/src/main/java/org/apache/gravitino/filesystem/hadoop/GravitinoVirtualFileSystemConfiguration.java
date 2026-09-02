@@ -180,16 +180,15 @@ public class GravitinoVirtualFileSystemConfiguration {
   public static final String FS_GRAVITINO_CLIENT_REQUEST_HEADER_PREFIX =
       "fs.gravitino.client.request.header.";
 
-  /**
-   * @deprecated Cloud filesets always use credential vending via {@code getCredentials()}. This
-   *     configuration key is ignored and will be removed in a future release.
-   */
-  @Deprecated
+  /** The configuration key for whether to enable credential vending. The default is false. */
   public static final String FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING =
       "fs.gravitino.enableCredentialVending";
 
   /** The configuration key prefix for the Gravitino client config. */
   public static final String FS_GRAVITINO_CLIENT_CONFIG_PREFIX = "fs.gravitino.client.";
+
+  /** The default value for whether to enable credential vending. */
+  public static final boolean FS_GRAVITINO_ENABLE_CREDENTIAL_VENDING_DEFAULT = false;
 
   /** The configuration key list which not a Gravitino client config */
   public static final List<String> NOT_GRAVITINO_CLIENT_CONFIG_LIST =

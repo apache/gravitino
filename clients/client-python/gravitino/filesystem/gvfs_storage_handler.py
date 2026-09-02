@@ -55,14 +55,6 @@ SLASH = "/"
 logger = logging.getLogger(__name__)
 
 
-def _require_vended_credentials(credentials: Optional[List[Credential]], provider: str) -> None:
-    if not credentials:
-        raise GravitinoRuntimeException(
-            f"No {provider} credentials returned from Gravitino. Configure "
-            "credential-providers on the fileset catalog."
-        )
-
-
 class StorageType(Enum):
     HDFS = "hdfs"
     LOCAL = "file"
@@ -313,37 +305,58 @@ class S3StorageHandler(StorageHandler):
             GVFSConfig.GVFS_FILESYSTEM_S3_ENDPOINT
         ) or catalog_props.get("s3-endpoint")
 
-        _require_vended_credentials(credentials, "S3")
-        credential = self._get_most_suitable_credential(credentials)
-        if credential is None:
-            raise GravitinoRuntimeException(
-                "No suitable S3 credential returned from Gravitino."
-            )
+        if credentials:
+            credential = self._get_most_suitable_credential(credentials)
+            if credential is not None:
+                expire_time = self._get_expire_time_by_ratio(
+                    credential.expire_time_in_ms(),
+                    catalog_props,
+                )
+                if isinstance(credential, S3TokenCredential):
+                    fs = self.get_filesystem(
+                        key=credential.access_key_id(),
+                        secret=credential.secret_access_key(),
+                        token=credential.session_token(),
+                        endpoint_url=s3_endpoint,
+                        **kwargs,
+                    )
+                    return expire_time, fs
+                if isinstance(credential, S3SecretKeyCredential):
+                    fs = self.get_filesystem(
+                        key=credential.access_key_id(),
+                        secret=credential.secret_access_key(),
+                        endpoint_url=s3_endpoint,
+                        **kwargs,
+                    )
+                    return expire_time, fs
 
-        expire_time = self._get_expire_time_by_ratio(
-            credential.expire_time_in_ms(),
-            catalog_props,
+        # this is the old way to get the s3 file system
+        # get 'aws_access_key_id' from s3_options, if the key is not found, throw an exception
+        aws_access_key_id = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_S3_ACCESS_KEY, None
         )
-        if isinstance(credential, S3TokenCredential):
-            fs = self.get_filesystem(
-                key=credential.access_key_id(),
-                secret=credential.secret_access_key(),
-                token=credential.session_token(),
-                endpoint_url=s3_endpoint,
-                **kwargs,
+        if aws_access_key_id is None:
+            raise GravitinoRuntimeException(
+                "AWS access key id is not found in the options."
             )
-            return expire_time, fs
-        if isinstance(credential, S3SecretKeyCredential):
-            fs = self.get_filesystem(
-                key=credential.access_key_id(),
-                secret=credential.secret_access_key(),
-                endpoint_url=s3_endpoint,
-                **kwargs,
-            )
-            return expire_time, fs
 
-        raise GravitinoRuntimeException(
-            f"Unsupported S3 credential type: {credential.credential_type()}"
+        # get 'aws_secret_access_key' from s3_options, if the key is not found, throw an exception
+        aws_secret_access_key = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_S3_SECRET_KEY
+        )
+        if aws_secret_access_key is None:
+            raise GravitinoRuntimeException(
+                "AWS secret access key is not found in the options."
+            )
+
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            self.get_filesystem(
+                key=aws_access_key_id,
+                secret=aws_secret_access_key,
+                endpoint_url=s3_endpoint,
+                **kwargs,
+            ),
         )
 
     def get_filesystem(
@@ -447,8 +460,21 @@ class GCSStorageHandler(StorageHandler):
                         ),
                     )
 
-        _require_vended_credentials(credentials, "GCS")
-        raise GravitinoRuntimeException("No suitable GCS credential returned from Gravitino.")
+        # get 'service-account-key' from gcs_options, if the key is not found, throw an exception
+        service_account_key_path = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_GCS_SERVICE_KEY_FILE
+        )
+        if service_account_key_path is None:
+            raise GravitinoRuntimeException(
+                "Service account key is not found in the options."
+            )
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            self.get_filesystem(
+                token=service_account_key_path,
+                **kwargs,
+            ),
+        )
 
     def _get_actual_prefix(
         self,
@@ -497,39 +523,57 @@ class OSSStorageHandler(StorageHandler):
             GVFSConfig.GVFS_FILESYSTEM_OSS_ENDPOINT
         ) or catalog_props.get("oss-endpoint")
 
-        _require_vended_credentials(credentials, "OSS")
-        credential = self._get_most_suitable_credential(credentials)
-        if credential is None:
+        if credentials:
+            credential = self._get_most_suitable_credential(credentials)
+            if credential is not None:
+                expire_time = self._get_expire_time_by_ratio(
+                    credential.expire_time_in_ms(),
+                    catalog_props,
+                )
+                if isinstance(credential, OSSTokenCredential):
+                    fs = self.get_filesystem(
+                        key=credential.access_key_id(),
+                        secret=credential.secret_access_key(),
+                        token=credential.security_token(),
+                        endpoint=oss_endpoint,
+                        **kwargs,
+                    )
+                    return expire_time, fs
+                if isinstance(credential, OSSSecretKeyCredential):
+                    return (
+                        expire_time,
+                        self.get_filesystem(
+                            key=credential.access_key_id(),
+                            secret=credential.secret_access_key(),
+                            endpoint=oss_endpoint,
+                            **kwargs,
+                        ),
+                    )
+
+        # get 'oss_access_key_id' from oss options, if the key is not found, throw an exception
+        oss_access_key_id = catalog_props.get(GVFSConfig.GVFS_FILESYSTEM_OSS_ACCESS_KEY)
+        if oss_access_key_id is None:
             raise GravitinoRuntimeException(
-                "No suitable OSS credential returned from Gravitino."
+                "OSS access key id is not found in the options."
             )
 
-        expire_time = self._get_expire_time_by_ratio(
-            credential.expire_time_in_ms(),
-            catalog_props,
+        # get 'oss_secret_access_key' from oss options, if the key is not found, throw an exception
+        oss_secret_access_key = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_OSS_SECRET_KEY
         )
-        if isinstance(credential, OSSTokenCredential):
-            fs = self.get_filesystem(
-                key=credential.access_key_id(),
-                secret=credential.secret_access_key(),
-                token=credential.security_token(),
+        if oss_secret_access_key is None:
+            raise GravitinoRuntimeException(
+                "OSS secret access key is not found in the options."
+            )
+
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            importlib.import_module("ossfs").OSSFileSystem(
+                key=oss_access_key_id,
+                secret=oss_secret_access_key,
                 endpoint=oss_endpoint,
                 **kwargs,
-            )
-            return expire_time, fs
-        if isinstance(credential, OSSSecretKeyCredential):
-            return (
-                expire_time,
-                self.get_filesystem(
-                    key=credential.access_key_id(),
-                    secret=credential.secret_access_key(),
-                    endpoint=oss_endpoint,
-                    **kwargs,
-                ),
-            )
-
-        raise GravitinoRuntimeException(
-            f"Unsupported OSS credential type: {credential.credential_type()}"
+            ),
         )
 
     def _get_last_modified(self, entry: Dict):
@@ -578,35 +622,54 @@ class ABSStorageHandler(StorageHandler):
         actual_path: Optional[str] = None,
         **kwargs,
     ) -> Tuple[int, AbstractFileSystem]:
-        _require_vended_credentials(credentials, "ADLS")
-        credential = self._get_most_suitable_credential(credentials)
-        if credential is None:
-            raise GravitinoRuntimeException(
-                "No suitable ADLS credential returned from Gravitino."
-            )
+        if credentials:
+            credential = self._get_most_suitable_credential(credentials)
+            if credential is not None:
+                expire_time = self._get_expire_time_by_ratio(
+                    credential.expire_time_in_ms(),
+                    catalog_props,
+                )
+                if isinstance(credential, ADLSTokenCredential):
+                    fs = self.get_filesystem(
+                        account_name=credential.account_name(),
+                        sas_token=credential.sas_token(),
+                        **kwargs,
+                    )
+                    return expire_time, fs
 
-        expire_time = self._get_expire_time_by_ratio(
-            credential.expire_time_in_ms(),
-            catalog_props,
+                if isinstance(credential, AzureAccountKeyCredential):
+                    fs = self.get_filesystem(
+                        account_name=credential.account_name(),
+                        account_key=credential.account_key(),
+                        **kwargs,
+                    )
+                    return expire_time, fs
+
+        # get 'abs_account_name' from abs options, if the key is not found, throw an exception
+        abs_account_name = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_NAME
         )
-        if isinstance(credential, ADLSTokenCredential):
-            fs = self.get_filesystem(
-                account_name=credential.account_name(),
-                sas_token=credential.sas_token(),
-                **kwargs,
+        if abs_account_name is None:
+            raise GravitinoRuntimeException(
+                "ABS account name is not found in the options."
             )
-            return expire_time, fs
 
-        if isinstance(credential, AzureAccountKeyCredential):
-            fs = self.get_filesystem(
-                account_name=credential.account_name(),
-                account_key=credential.account_key(),
-                **kwargs,
+        # get 'abs_account_key' from abs options, if the key is not found, throw an exception
+        abs_account_key = catalog_props.get(
+            GVFSConfig.GVFS_FILESYSTEM_AZURE_ACCOUNT_KEY
+        )
+        if abs_account_key is None:
+            raise GravitinoRuntimeException(
+                "ABS account key is not found in the options."
             )
-            return expire_time, fs
 
-        raise GravitinoRuntimeException(
-            f"Unsupported ADLS credential type: {credential.credential_type()}"
+        return (
+            TIME_WITHOUT_EXPIRATION,
+            self.get_filesystem(
+                account_name=abs_account_name,
+                account_key=abs_account_key,
+                **kwargs,
+            ),
         )
 
     def strip_storage_protocol(self, path: str):

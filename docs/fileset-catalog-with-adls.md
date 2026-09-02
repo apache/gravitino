@@ -35,18 +35,15 @@ properties do not need to be set.
 ## Azure Data Lake Storage Properties
 
 These properties are needed in addition to the shared
-[catalog properties](./fileset-catalog.md#catalog-properties). Configure credentials on the
-catalog; GVFS clients fetch them through [credential vending](./security/credential-vending.md)
-and must not set cloud credentials in local configuration. Non-secret settings are inherited
-from catalog, schema, and fileset metadata — override them in GVFS configuration only when
-needed. The Python client spells property names with underscores while the catalog and the
-Java client use hyphens.
+[catalog properties](./fileset-catalog.md#catalog-properties). The same values are also needed by
+the GVFS clients, so they are listed together here — note that the Python client spells them with
+underscores while the catalog and the Java client use hyphens.
 
-| Catalog and Java client      | Python client                | Description                                                                                                                                                                                                                                                                                                     | Required      |
-|------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
-| `azure-storage-account-name` | `azure_storage_account_name` | Account name of the Azure Blob Storage.                                                                                                                                                                                                                                                                         | Yes (catalog) |
-| `azure-storage-account-key`  | `azure_storage_account_key`  | Account key of the Azure Blob Storage.                                                                                                                                                                                                                                                                          | Yes (catalog) |
-| `credential-providers`       | (n/a)                        | The credential provider types, separated by comma. Possible values are `adls-token`, `azure-account-key`. When set explicitly, chooses how the server vends credentials. If omitted, Gravitino auto-detects a provider from the static credentials on the catalog. See [credential vending](./security/credential-vending.md#adls) for the extra properties each provider takes. | No            |
+| Catalog and Java client      | Python client                | Description                                                                                                                                                                                                                                                                                                     | Required |
+|------------------------------|------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| `azure-storage-account-name` | `azure_storage_account_name` | Account name of the Azure Blob Storage.                                                                                                                                                                                                                                                                         | Yes      |
+| `azure-storage-account-key`  | `azure_storage_account_key`  | Account key of the Azure Blob Storage.                                                                                                                                                                                                                                                                          | Yes      |
+| `credential-providers`       | (n/a)                        | The credential provider types, separated by comma. Possible values are `adls-token`, `azure-account-key`. Setting it enables credential vending, so clients no longer need the credentials above. See [credential vending](./security/credential-vending.md#adls) for the extra properties each provider takes. | No       |
 
 :::note
 Azure Data Lake Storage is also known as Azure Blob Storage (ABS). The location uses the `abfss://`
@@ -297,9 +294,8 @@ The thin `gravitino-azure` jar is not needed. Its functionality is already inclu
 
 ### GVFS Java client
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), configure the Gravitino
-connection. Cloud credentials are fetched from the server; do not set account keys in the Hadoop
-`Configuration`.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration), set the Azure Data Lake Storage
+properties from the table above.
 
 ```java
 Configuration conf = new Configuration();
@@ -307,6 +303,8 @@ conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.had
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
+conf.set("azure-storage-account-name", "account_name");
+conf.set("azure-storage-account-key", "account_key");
 
 Path filesetPath = new Path("gvfs://fileset/adls_catalog/adls_schema/example_fileset/new_dir");
 FileSystem fs = filesetPath.getFileSystem(conf);
@@ -343,6 +341,8 @@ spark = (SparkSession.builder
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    .config("spark.hadoop.azure-storage-account-name", "account_name")
+    .config("spark.hadoop.azure-storage-account-key", "account_key")
     .config("spark.driver.memory", "2g")
     .config("spark.driver.port", "2048")
     .getOrCreate())
@@ -390,6 +390,14 @@ implementations passed with `--jars`. If that happens, add the jars to the Spark
   <name>fs.gravitino.client.metalake</name>
   <value>metalake</value>
 </property>
+<property>
+  <name>azure-storage-account-name</name>
+  <value>account_name</value>
+</property>
+<property>
+  <name>azure-storage-account-key</name>
+  <value>account_key</value>
+</property>
 ```
 
 2. Add these jars to the Hadoop classpath:
@@ -410,9 +418,8 @@ ${HADOOP_HOME}/bin/hadoop fs -put /path/to/local/file gvfs://fileset/adls_catalo
 pip install apache-gravitino==${GRAVITINO_VERSION}
 ```
 
-On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass Gravitino
-connection settings in `options`. Do not pass cloud access keys; GVFS fetches credentials from the
-server.
+On top of the [base GVFS configuration](./how-to-use-gvfs.md#configuration-1), pass the Azure Data Lake Storage
+properties in `options`, spelled with underscores.
 
 ```python
 from gravitino import gvfs
@@ -421,6 +428,8 @@ options = {
     "cache_size": 20,
     "cache_expired_time": 3600,
     "auth_type": "simple",
+    "azure_storage_account_name": "account_name",
+    "azure_storage_account_key": "account_key",
 }
 
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
@@ -441,7 +450,8 @@ storage_options = {
     "server_uri": "http://localhost:8090",
     "metalake_name": "metalake",
     "options": {
-        "auth_type": "simple",
+        "azure_storage_account_name": "account_name",
+        "azure_storage_account_key": "account_key",
     }
 }
 
@@ -464,11 +474,11 @@ For further use cases, see [Gravitino Virtual File System](./how-to-use-gvfs.md)
 
 ## Credential Vending
 
-GVFS always uses credential vending for cloud filesets: the catalog holds the Azure Data Lake Storage
-credentials and the Gravitino server hands out a credential per request, so clients never configure
-cloud keys locally. See [Credential Vending](./security/credential-vending.md) for the general
-mechanism and [ADLS credentials](./security/credential-vending.md#adls) for the properties each
-provider takes.
+With credential vending the catalog holds the Azure Data Lake Storage credentials and the Gravitino server hands
+out a credential per request, so clients never hold cloud keys of their own. See
+[Credential Vending](./security/credential-vending.md) for the general mechanism and
+[ADLS credentials](./security/credential-vending.md#adls) for the properties
+each provider takes.
 
 The supported providers are `adls-token`, which vends a short-lived token, and
 `azure-account-key`, which vends the static account key configured on the catalog. The example below
@@ -524,16 +534,18 @@ The `adls-token` provider needs three more catalog properties.
 | `azure-client-id`     | Azure client id         |
 | `azure-client-secret` | Azure client secret key |
 
-### GVFS client configuration
+### Access without local credentials
 
-Configure only the Gravitino connection on the client. Cloud credentials come from the server.
+Enable vending on the client and drop the credential properties.
 
 ```java
 Configuration conf = new Configuration();
+conf.setBoolean("fs.gravitino.enableCredentialVending", true);
 conf.set("fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs");
 conf.set("fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem");
 conf.set("fs.gravitino.server.uri", "http://localhost:8090");
 conf.set("fs.gravitino.client.metalake", "metalake");
+// No need to set azure-storage-account-name or azure-storage-account-key
 
 Path filesetPath = new Path(
     "gvfs://fileset/adls_catalog_with_vending/adls_schema/example_fileset/new_dir");
@@ -544,16 +556,20 @@ fs.mkdirs(filesetPath);
 ```python
 spark = (SparkSession.builder
     .appName("adls_fileset")
+    .config("spark.hadoop.fs.gravitino.enableCredentialVending", "true")
     .config("spark.hadoop.fs.AbstractFileSystem.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.Gvfs")
     .config("spark.hadoop.fs.gvfs.impl", "org.apache.gravitino.filesystem.hadoop.GravitinoVirtualFileSystem")
     .config("spark.hadoop.fs.gravitino.server.uri", "http://localhost:8090")
     .config("spark.hadoop.fs.gravitino.client.metalake", "metalake")
+    # No need to set azure-storage-account-name or azure-storage-account-key
     .getOrCreate())
 ```
 
 ```python
 options = {
     "auth_type": "simple",
+    "enable_credential_vending": True,
+    # No need to set azure-storage-account-name or azure-storage-account-key
 }
 fs = gvfs.GravitinoVirtualFileSystem(server_uri="http://localhost:8090",
                                      metalake_name="metalake",

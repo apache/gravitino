@@ -91,6 +91,7 @@ public class GravitinoVirtualFileSystemGCSCredentialIT extends GravitinoVirtualF
     conf.set("fs.gvfs.impl.disable.cache", "true");
     conf.set("fs.gravitino.server.uri", serverUri);
     conf.set("fs.gravitino.client.metalake", metalakeName);
+    conf.set("fs.gravitino.enableCredentialVending", "true");
   }
 
   @AfterAll

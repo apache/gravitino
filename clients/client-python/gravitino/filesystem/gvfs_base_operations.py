@@ -49,9 +49,6 @@ from gravitino.filesystem.gvfs_utils import (
     extract_identifier,
     create_client,
 )
-from gravitino.filesystem.cloud_storage_credential_keys import (
-    omit_static_credential_properties,
-)
 from gravitino.name_identifier import NameIdentifier
 
 logger = logging.getLogger(__name__)
@@ -148,7 +145,7 @@ class BaseGVFSOperations(ABC):
     SLASH = "/"
 
     ENV_CURRENT_LOCATION_NAME_ENV_VAR_DEFAULT = "CURRENT_LOCATION_NAME"
-    ENABLE_CREDENTIAL_VENDING_DEFAULT = True
+    ENABLE_CREDENTIAL_VENDING_DEFAULT = False
     ENABLE_FILESET_METADATA_CACHE_DEFAULT = False
     AUTO_CREATE_LOCATION_DEFAULT = True
 
@@ -239,7 +236,14 @@ class BaseGVFSOperations(ABC):
             self._schema_cache = LRUCache(maxsize=1000)
             self._schema_cache_lock = rwlock.RWLockFair()
 
-        self._enable_credential_vending = True
+        self._enable_credential_vending = (
+            False
+            if options is None
+            else options.get(
+                GVFSConfig.GVFS_FILESYSTEM_ENABLE_CREDENTIAL_VENDING,
+                self.ENABLE_CREDENTIAL_VENDING_DEFAULT,
+            )
+        )
         self._current_location_name = self._init_current_location_name()
         self._kwargs = kwargs
 
@@ -517,7 +521,6 @@ class BaseGVFSOperations(ABC):
         fileset_props.update(schema.get_secrets())
         fileset_props.update(fileset.properties() or {})
         fileset_props.update(fileset.get_secrets())
-        fileset_props = omit_static_credential_properties(fileset_props)
         if self._options:
             fileset_props.update(self._options)
         # Get user-defined configurations for the actual location
@@ -681,8 +684,11 @@ class BaseGVFSOperations(ABC):
         :param fileset_ident: The fileset identifier
         :param fileset: The fileset object
         :param target_location_name: The resolved location name
-        :return: List of credentials from the Gravitino server
+        :return: List of credentials, or None if credential vending is disabled
         """
+        if not self._enable_credential_vending:
+            return None
+
         cache_key = (fileset_ident, target_location_name)
 
         # Fast path: read lock, check cache

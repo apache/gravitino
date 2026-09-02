@@ -140,6 +140,7 @@ abstract class AbstractFileSystemCredentialAuthorizationIT extends BaseIT {
     gvfsConf.set("fs.gvfs.impl.disable.cache", "true");
     gvfsConf.set("fs.gravitino.server.uri", serverUri);
     gvfsConf.set("fs.gravitino.client.metalake", metalakeName);
+    gvfsConf.set("fs.gravitino.enableCredentialVending", "true");
   }
 
   @AfterAll
