@@ -24,13 +24,29 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
+import org.apache.gravitino.connector.CatalogInfo;
+import org.apache.gravitino.connector.CatalogOperations;
+import org.apache.gravitino.connector.HasPropertyMetadata;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogBackendProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
+import org.apache.gravitino.utils.ThrowableFunction;
+import org.apache.iceberg.Schema;
+import org.apache.iceberg.catalog.Namespace;
+import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.inmemory.InMemoryCatalog;
+import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
+import org.apache.iceberg.rest.requests.CreateTableRequest;
+import org.apache.iceberg.rest.requests.ImmutableCreateViewRequest;
+import org.apache.iceberg.types.Types;
+import org.apache.iceberg.view.ImmutableSQLViewRepresentation;
+import org.apache.iceberg.view.ImmutableViewVersion;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
@@ -42,11 +58,12 @@ import org.mockito.Mockito;
 public class TestIcebergCatalogWrapperManagerForREST {
 
   private static final String DEFAULT_CATALOG = "memory";
+  private static CatalogManager mockCatalogManager;
 
   @BeforeAll
   public static void setup() throws IllegalAccessException {
     // Mock CatalogManager for GravitinoEnv to avoid initialization errors
-    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
+    mockCatalogManager = Mockito.mock(CatalogManager.class);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
   }
 
@@ -145,11 +162,93 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Assertions.assertEquals(CatalogWrapperForREST.class, wrapper.getClass());
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"test", IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG})
+  public void testAuxModeMemoryWrapperSharesCreateStateWithManagedBackend(String restCatalogName)
+      throws Exception {
+    String managedCatalogName = "test";
+    InMemoryCatalog managedBackend = new InMemoryCatalog();
+    managedBackend.initialize(managedCatalogName, ImmutableMap.of());
+    CatalogManager.CatalogWrapper managedWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
+    TestCatalogOperations managedOperations = new TestCatalogOperations(managedBackend);
+    Mockito.when(
+            mockCatalogManager.loadCatalogAndWrap(
+                NameIdentifier.of("metalake", managedCatalogName)))
+        .thenReturn(managedWrapper);
+    Mockito.when(managedWrapper.doWithCatalogOps(Mockito.any()))
+        .thenAnswer(
+            invocation -> {
+              ThrowableFunction<CatalogOperations, ?> function = invocation.getArgument(0);
+              return function.apply(managedOperations);
+            });
+
+    IcebergConfig icebergConfig =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    Mockito.when(configProvider.getDefaultCatalogName()).thenReturn(managedCatalogName);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(ImmutableMap.of(), configProvider, true, "metalake");
+
+    CatalogWrapperForREST wrapper = manager.createCatalogWrapper(restCatalogName, icebergConfig);
+    Namespace namespace = Namespace.of("created_through_rest");
+    wrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
+    Schema schema = new Schema(Types.NestedField.required(1, "id", Types.LongType.get()));
+    wrapper.createTable(
+        namespace,
+        CreateTableRequest.builder().withName("table").withSchema(schema).build(),
+        false);
+    wrapper.createView(
+        namespace,
+        ImmutableCreateViewRequest.builder()
+            .name("view")
+            .schema(schema)
+            .viewVersion(
+                ImmutableViewVersion.builder()
+                    .versionId(1)
+                    .timestampMillis(System.currentTimeMillis())
+                    .schemaId(schema.schemaId())
+                    .defaultNamespace(namespace)
+                    .addRepresentations(
+                        ImmutableSQLViewRepresentation.builder()
+                            .sql("SELECT id FROM table")
+                            .dialect("spark")
+                            .build())
+                    .build())
+            .build());
+
+    Assertions.assertSame(managedBackend, wrapper.getCatalog());
+    Assertions.assertTrue(managedBackend.namespaceExists(namespace));
+    Assertions.assertTrue(managedBackend.tableExists(TableIdentifier.of(namespace, "table")));
+    Assertions.assertTrue(managedBackend.viewExists(TableIdentifier.of(namespace, "view")));
+  }
+
   private static IcebergCatalogWrapperManager newManager() {
     Map<String, String> config = Maps.newHashMap();
     IcebergConfigProvider configProvider = IcebergConfigProviderFactory.create(config);
     configProvider.initialize(config);
     return new IcebergCatalogWrapperManager(
         config, configProvider, false, configProvider.getMetalakeName());
+  }
+
+  private static class TestCatalogOperations
+      implements CatalogOperations, IcebergCatalogBackendProvider {
+    private final InMemoryCatalog catalog;
+
+    private TestCatalogOperations(InMemoryCatalog catalog) {
+      this.catalog = catalog;
+    }
+
+    @Override
+    public void initialize(
+        Map<String, String> config, CatalogInfo info, HasPropertyMetadata propertiesMetadata) {}
+
+    @Override
+    public InMemoryCatalog icebergCatalogBackend() {
+      return catalog;
+    }
+
+    @Override
+    public void close() {}
   }
 }

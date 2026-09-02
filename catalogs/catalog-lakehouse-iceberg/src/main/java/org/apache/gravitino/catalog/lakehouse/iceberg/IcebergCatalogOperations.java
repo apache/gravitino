@@ -53,6 +53,7 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogBackendProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
@@ -74,6 +75,7 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
+import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
@@ -92,7 +94,11 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalogOperations
-    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog {
+    implements CatalogOperations,
+        SupportsSchemas,
+        TableCatalog,
+        ViewCatalog,
+        IcebergCatalogBackendProvider {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
@@ -152,6 +158,11 @@ public class IcebergCatalogOperations
     } catch (RESTException e) {
       throw handleRestException(e);
     }
+  }
+
+  @Override
+  public Catalog icebergCatalogBackend() {
+    return icebergCatalogWrapper.getCatalog();
   }
 
   // Maps an Iceberg REST-client exception into Gravitino's taxonomy

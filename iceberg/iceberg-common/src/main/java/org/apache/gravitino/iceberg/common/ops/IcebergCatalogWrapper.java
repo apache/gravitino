@@ -78,11 +78,28 @@ public class IcebergCatalogWrapper implements AutoCloseable {
   private volatile SupportsNamespaces asNamespaceCatalog;
   private final IcebergCatalogBackend catalogBackend;
   private final IcebergConfig icebergConfig;
+  private final boolean closeCatalogOnClose;
   private volatile TableMetadataCache metadataCache;
   private final Configuration configuration;
 
   public IcebergCatalogWrapper(IcebergConfig icebergConfig) {
+    this(icebergConfig, true);
+  }
+
+  /**
+   * Creates a wrapper around an Iceberg catalog whose lifecycle is managed by another component.
+   *
+   * @param icebergConfig the Iceberg catalog configuration
+   * @param catalog the externally managed Iceberg catalog
+   */
+  protected IcebergCatalogWrapper(IcebergConfig icebergConfig, Catalog catalog) {
+    this(icebergConfig, false);
+    this.catalog = Preconditions.checkNotNull(catalog, "catalog must not be null");
+  }
+
+  private IcebergCatalogWrapper(IcebergConfig icebergConfig, boolean closeCatalogOnClose) {
     this.icebergConfig = icebergConfig;
+    this.closeCatalogOnClose = closeCatalogOnClose;
     this.catalogBackend =
         IcebergCatalogBackend.valueOf(
             icebergConfig.get(IcebergConfig.CATALOG_BACKEND).toUpperCase(Locale.ROOT));
@@ -389,7 +406,7 @@ public class IcebergCatalogWrapper implements AutoCloseable {
     } else {
       LOG.info("Closing IcebergCatalogWrapper before catalog is initialized");
     }
-    if (loadedCatalog instanceof AutoCloseable) {
+    if (closeCatalogOnClose && loadedCatalog instanceof AutoCloseable) {
       // JdbcCatalog and ClosableHiveCatalog implement AutoCloseable and will handle their own
       // cleanup
       ((AutoCloseable) loadedCatalog).close();

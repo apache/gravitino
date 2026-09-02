@@ -22,6 +22,7 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.github.benmanes.caffeine.cache.Scheduler;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import java.util.Locale;
 import java.util.Map;
@@ -29,16 +30,22 @@ import java.util.Optional;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import org.apache.gravitino.GravitinoEnv;
+import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergCatalogBackend;
+import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
+import org.apache.gravitino.iceberg.common.ops.IcebergCatalogBackendProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
 import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
+import org.apache.gravitino.utils.NameIdentifierUtil;
+import org.apache.iceberg.catalog.Catalog;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,12 +57,18 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   private final IcebergConfigProvider configProvider;
 
+  private final boolean auxMode;
+
+  private final String metalakeName;
+
   public IcebergCatalogWrapperManager(
       Map<String, String> properties,
       IcebergConfigProvider configProvider,
       boolean auxMode,
       String metalakeName) {
     this.configProvider = configProvider;
+    this.auxMode = auxMode;
+    this.metalakeName = metalakeName;
     this.catalogWrapperCache =
         Caffeine.newBuilder()
             .expireAfterAccess(
@@ -146,7 +159,7 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     CatalogWrapperForREST rest =
         backend == IcebergCatalogBackend.REST
             ? new FederatedCatalogWrapper(catalogName, icebergConfig)
-            : new CatalogWrapperForREST(catalogName, icebergConfig);
+            : createBaseCatalogWrapper(catalogName, icebergConfig, backend);
     AuthenticationConfig authenticationConfig =
         new AuthenticationConfig(icebergConfig.getAllConfig());
     if (authenticationConfig.isKerberosAuth() && rest.getCatalog() instanceof SupportsKerberos) {
@@ -155,6 +168,44 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
     }
 
     return rest;
+  }
+
+  private CatalogWrapperForREST createBaseCatalogWrapper(
+      String catalogName, IcebergConfig icebergConfig, IcebergCatalogBackend backend) {
+    if (!auxMode || backend != IcebergCatalogBackend.MEMORY) {
+      return new CatalogWrapperForREST(catalogName, icebergConfig);
+    }
+
+    // An in-memory backend is scoped to one catalog instance. Recreating it for the auxiliary
+    // Iceberg REST service makes REST writes invisible to the Gravitino catalog used by metadata
+    // import. Borrow the backend already owned by CatalogManager so both paths share state.
+    return new CatalogWrapperForREST(
+        catalogName, icebergConfig, loadManagedIcebergCatalog(catalogName));
+  }
+
+  private Catalog loadManagedIcebergCatalog(String catalogName) {
+    String managedCatalogName =
+        IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG.equals(catalogName)
+            ? configProvider.getDefaultCatalogName()
+            : catalogName;
+    NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, managedCatalogName);
+    CatalogManager.CatalogWrapper catalogWrapper =
+        GravitinoEnv.getInstance().catalogManager().loadCatalogAndWrap(catalogIdent);
+    try {
+      return catalogWrapper.doWithCatalogOps(
+          operations -> {
+            Preconditions.checkState(
+                operations instanceof IcebergCatalogBackendProvider,
+                "Catalog %s does not expose an Iceberg backend",
+                catalogIdent);
+            return ((IcebergCatalogBackendProvider) operations).icebergCatalogBackend();
+          });
+    } catch (RuntimeException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(
+          String.format("Failed to access the Iceberg backend for catalog %s", catalogIdent), e);
+    }
   }
 
   private void closeIcebergCatalogWrapper(IcebergCatalogWrapper catalogWrapper) {

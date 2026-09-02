@@ -31,10 +31,12 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
 import org.apache.iceberg.TableMetadata;
+import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
 
@@ -55,6 +57,17 @@ public class TestIcebergCatalogWrapper {
         () -> {
           wrapper.close();
         });
+  }
+
+  @Test
+  public void testCloseShouldNotCloseExternallyManagedCatalog() throws Exception {
+    Catalog catalog =
+        Mockito.mock(Catalog.class, Mockito.withSettings().extraInterfaces(AutoCloseable.class));
+    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(new IcebergConfig(Map.of()), catalog);
+
+    wrapper.close();
+
+    Mockito.verify((AutoCloseable) catalog, Mockito.never()).close();
   }
 
   @Test
