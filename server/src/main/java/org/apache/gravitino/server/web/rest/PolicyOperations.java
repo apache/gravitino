@@ -141,7 +141,16 @@ public class PolicyOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       PolicyCreateRequest request) {
-    String policyName = request == null ? "" : request.getName();
+    if (request == null) {
+      LOG.warn("Received create policy request with null request body");
+      return ExceptionHandlers.handlePolicyException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String policyName = request.getName();
     LOG.info("Received create policy request under metalake: {}", metalake);
 
     try {

@@ -113,7 +113,16 @@ public class GroupOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       GroupAddRequest request) {
-    String groupName = request == null ? "" : request.getName();
+    if (request == null) {
+      LOG.warn("Received add group request with null request body");
+      return ExceptionHandlers.handleGroupException(
+          OperationType.ADD,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String groupName = request.getName();
     try {
       return Utils.doAs(
           httpRequest,

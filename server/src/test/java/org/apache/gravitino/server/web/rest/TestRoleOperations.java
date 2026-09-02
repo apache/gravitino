@@ -149,6 +149,17 @@ public class TestRoleOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateRoleWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/roles")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateRole() throws IllegalAccessException, NoSuchFieldException, IOException {
     SecurableObject securableObject =
         SecurableObjects.ofCatalog("catalog", Lists.newArrayList(Privileges.UseCatalog.allow()));

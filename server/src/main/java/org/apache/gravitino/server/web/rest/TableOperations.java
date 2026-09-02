@@ -129,7 +129,16 @@ public class TableOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       TableCreateRequest request) {
-    String tableName = request == null ? "" : request.getName();
+    if (request == null) {
+      LOG.warn("Received create table request with null request body");
+      return ExceptionHandlers.handleTableException(
+          OperationType.CREATE,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String tableName = request.getName();
     LOG.info("Received create table request: {}.{}.{}.{}", metalake, catalog, schema, tableName);
     try {
       return Utils.doAs(

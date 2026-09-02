@@ -143,7 +143,16 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
-    String catalogName = request == null ? "" : request.getName();
+    if (request == null) {
+      LOG.warn("Received create catalog request with null request body");
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String catalogName = request.getName();
     LOG.info("Received create catalog request for metalake: {}", metalake);
     try {
       return Utils.doAs(

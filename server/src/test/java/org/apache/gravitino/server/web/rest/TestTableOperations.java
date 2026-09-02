@@ -226,6 +226,17 @@ public class TestTableOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTableWithNullRequest() {
+    Response resp =
+        target(tablePath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateTable() {
     Column[] columns =
         new Column[] {

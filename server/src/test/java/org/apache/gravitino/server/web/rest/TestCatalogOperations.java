@@ -222,6 +222,17 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateCatalog() {
     CatalogCreateRequest req =
         new CatalogCreateRequest(

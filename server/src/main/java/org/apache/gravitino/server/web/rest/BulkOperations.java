@@ -101,6 +101,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkUserAddRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleUserException(
+          OperationType.ADD,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,
@@ -202,6 +210,14 @@ public class BulkOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       BulkGroupAddRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleGroupException(
+          OperationType.ADD,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

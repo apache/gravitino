@@ -219,6 +219,17 @@ public class TestSchemaOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateSchemaWithNullRequest() {
+    Response resp =
+        target("/metalakes/" + metalake + "/catalogs/" + catalog + "/schemas")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateSchema() {
     SchemaCreateRequest req =
         new SchemaCreateRequest("schema1", "comment", ImmutableMap.of("key", "value"));
