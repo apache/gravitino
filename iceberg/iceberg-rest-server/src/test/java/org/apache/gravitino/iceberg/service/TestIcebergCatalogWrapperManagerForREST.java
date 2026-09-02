@@ -34,6 +34,7 @@ import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogBackendProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.iceberg.service.provider.DynamicIcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProvider;
 import org.apache.gravitino.iceberg.service.provider.IcebergConfigProviderFactory;
 import org.apache.gravitino.utils.ThrowableFunction;
@@ -162,6 +163,19 @@ public class TestIcebergCatalogWrapperManagerForREST {
     Assertions.assertEquals(CatalogWrapperForREST.class, wrapper.getClass());
   }
 
+  @Test
+  public void testAuxModeStaticMemoryWrapperUsesIndependentBackend() {
+    IcebergConfig icebergConfig =
+        new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
+    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    IcebergCatalogWrapperManager manager =
+        new IcebergCatalogWrapperManager(ImmutableMap.of(), configProvider, true, "metalake");
+
+    CatalogWrapperForREST wrapper = manager.createCatalogWrapper("static", icebergConfig);
+
+    Assertions.assertNotNull(wrapper.getCatalog());
+  }
+
   @ParameterizedTest
   @ValueSource(strings = {"test", IcebergConstants.ICEBERG_REST_DEFAULT_CATALOG})
   public void testAuxModeMemoryWrapperSharesCreateStateWithManagedBackend(String restCatalogName)
@@ -185,7 +199,7 @@ public class TestIcebergCatalogWrapperManagerForREST {
 
     IcebergConfig icebergConfig =
         new IcebergConfig(ImmutableMap.of(IcebergConstants.CATALOG_BACKEND, "memory"));
-    IcebergConfigProvider configProvider = Mockito.mock(IcebergConfigProvider.class);
+    IcebergConfigProvider configProvider = Mockito.mock(DynamicIcebergConfigProvider.class);
     Mockito.when(configProvider.getDefaultCatalogName()).thenReturn(managedCatalogName);
     IcebergCatalogWrapperManager manager =
         new IcebergCatalogWrapperManager(ImmutableMap.of(), configProvider, true, "metalake");

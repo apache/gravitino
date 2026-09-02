@@ -172,7 +172,9 @@ public class IcebergCatalogWrapperManager implements AutoCloseable {
 
   private CatalogWrapperForREST createBaseCatalogWrapper(
       String catalogName, IcebergConfig icebergConfig, IcebergCatalogBackend backend) {
-    if (!auxMode || backend != IcebergCatalogBackend.MEMORY) {
+    if (!auxMode
+        || backend != IcebergCatalogBackend.MEMORY
+        || !(configProvider instanceof DynamicIcebergConfigProvider)) {
       return new CatalogWrapperForREST(catalogName, icebergConfig);
     }
 
