@@ -236,15 +236,9 @@ public class TestMetadataAuthzHelper {
     return authorizer;
   }
 
-  /**
-   * Builds an authorizer with table privileges granted at the schema scope. Optional use grants
-   * satisfy the catalog and schema gates in the table-like list expression, while deny discovery
-   * reports a deny only when the short-circuit asks about one of {@code deniedPrivileges}.
-   */
+  /** Builds an authorizer with selected table privileges granted at the schema scope. */
   private GravitinoAuthorizer mockTableListRouteAuthorizer(
-      Set<Privilege.Name> grantedPrivileges,
-      Set<Privilege.Name> deniedPrivileges,
-      boolean grantUsePrivileges) {
+      Set<Privilege.Name> grantedPrivileges, Set<Privilege.Name> deniedPrivileges) {
     GravitinoAuthorizer authorizer = mock(GravitinoAuthorizer.class);
     lenient()
         .when(authorizer.authorize(any(), eq("testMetalake"), any(), any(), any()))
@@ -252,12 +246,8 @@ public class TestMetadataAuthzHelper {
             invocation -> {
               MetadataObject object = invocation.getArgument(2);
               Privilege.Name privilege = invocation.getArgument(3);
-              if (object.type() == MetadataObject.Type.CATALOG) {
-                return grantUsePrivileges && privilege == Privilege.Name.USE_CATALOG;
-              }
               if (object.type() == MetadataObject.Type.SCHEMA) {
-                return grantedPrivileges.contains(privilege)
-                    || grantUsePrivileges && privilege == Privilege.Name.USE_SCHEMA;
+                return grantedPrivileges.contains(privilege);
               }
               return false;
             });
@@ -620,15 +610,14 @@ public class TestMetadataAuthzHelper {
   @ParameterizedTest
   @EnumSource(
       value = Privilege.Name.class,
-      names = {"PROBE_TABLE_LIKE", "SELECT_TABLE", "MODIFY_TABLE", "CREATE_TABLE", "CREATE_VIEW"})
-  public void testListTableLikeShortCircuitSupportsEveryParentPrivilege(Privilege.Name privilege) {
-    GravitinoAuthorizer authorizer =
-        mockTableListRouteAuthorizer(Set.of(privilege), Set.of(), true);
+      names = {"SELECT_TABLE", "MODIFY_TABLE"})
+  public void testListShortCircuitSupportsEveryParentPrivilege(Privilege.Name privilege) {
+    GravitinoAuthorizer authorizer = mockTableListRouteAuthorizer(Set.of(privilege), Set.of());
     withAuthorizer(
         authorizer,
         () -> {
           NameIdentifier[] tables = threeTables();
-          NameIdentifier[] filtered = filterTableLike(tables);
+          NameIdentifier[] filtered = filterTables(tables);
 
           Assertions.assertSame(tables, filtered);
           verify(authorizer, times(1))
@@ -637,17 +626,16 @@ public class TestMetadataAuthzHelper {
   }
 
   @Test
-  public void testListTableLikeShortCircuitIgnoresDenyOnIndependentPath() {
+  public void testListShortCircuitIgnoresDenyOnIndependentPath() {
     GravitinoAuthorizer authorizer =
         mockTableListRouteAuthorizer(
             Set.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
-            Set.of(Privilege.Name.MODIFY_TABLE),
-            true);
+            Set.of(Privilege.Name.MODIFY_TABLE));
     withAuthorizer(
         authorizer,
         () -> {
           NameIdentifier[] tables = threeTables();
-          NameIdentifier[] filtered = filterTableLike(tables);
+          NameIdentifier[] filtered = filterTables(tables);
 
           Assertions.assertSame(
               tables,
@@ -663,17 +651,16 @@ public class TestMetadataAuthzHelper {
   }
 
   @Test
-  public void testListTableLikeShortCircuitTriesNextPathAfterDeny() {
+  public void testListShortCircuitTriesNextPathAfterDeny() {
     GravitinoAuthorizer authorizer =
         mockTableListRouteAuthorizer(
             Set.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE),
-            Set.of(Privilege.Name.SELECT_TABLE),
-            true);
+            Set.of(Privilege.Name.SELECT_TABLE));
     withAuthorizer(
         authorizer,
         () -> {
           NameIdentifier[] tables = threeTables();
-          NameIdentifier[] filtered = filterTableLike(tables);
+          NameIdentifier[] filtered = filterTables(tables);
 
           Assertions.assertSame(
               tables,
@@ -685,23 +672,6 @@ public class TestMetadataAuthzHelper {
           verify(authorizer, times(1))
               .hasDenyPolicy(
                   any(), eq("testMetalake"), eq(Set.of(Privilege.Name.MODIFY_TABLE)), any());
-        });
-  }
-
-  @Test
-  public void testListTableLikeShortCircuitRequiresUsePrivileges() {
-    GravitinoAuthorizer authorizer =
-        mockTableListRouteAuthorizer(Set.of(Privilege.Name.SELECT_TABLE), Set.of(), false);
-    withAuthorizer(
-        authorizer,
-        () -> {
-          NameIdentifier[] filtered = filterTableLike(threeTables());
-
-          verify(authorizer, times(0)).hasDenyPolicy(any(), eq("testMetalake"), anySet(), any());
-          Assertions.assertEquals(
-              0,
-              filtered.length,
-              "The short-circuit must not bypass the table-like expression's use privileges");
         });
   }
 
@@ -727,10 +697,10 @@ public class TestMetadataAuthzHelper {
         });
   }
 
-  private static NameIdentifier[] filterTableLike(NameIdentifier[] tables) {
+  private static NameIdentifier[] filterTables(NameIdentifier[] tables) {
     return MetadataAuthzHelper.filterByExpression(
         "testMetalake",
-        AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
+        AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
         Entity.EntityType.TABLE,
         tables);
   }

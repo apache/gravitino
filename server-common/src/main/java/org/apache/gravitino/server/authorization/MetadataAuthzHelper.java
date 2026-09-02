@@ -108,15 +108,7 @@ public class MetadataAuthzHelper {
                   List.of(
                       parentOwnerPath(TABLE_PARENT_SCOPES),
                       parentPrivilegePath(Privilege.Name.SELECT_TABLE, TABLE_PARENT_SCOPES),
-                      parentPrivilegePath(Privilege.Name.MODIFY_TABLE, TABLE_PARENT_SCOPES)),
-                  AuthorizationExpressionConstants.LIST_TABLE_LIKE_AUTHORIZATION_EXPRESSION,
-                  List.of(
-                      parentOwnerPath(TABLE_PARENT_SCOPES),
-                      tableLikeParentPrivilegePath(Privilege.Name.PROBE_TABLE_LIKE),
-                      tableLikeParentPrivilegePath(Privilege.Name.SELECT_TABLE),
-                      tableLikeParentPrivilegePath(Privilege.Name.MODIFY_TABLE),
-                      tableLikeParentPrivilegePath(Privilege.Name.CREATE_TABLE),
-                      tableLikeParentPrivilegePath(Privilege.Name.CREATE_VIEW))),
+                      parentPrivilegePath(Privilege.Name.MODIFY_TABLE, TABLE_PARENT_SCOPES))),
               Entity.EntityType.SCHEMA,
               Map.of(
                   AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
@@ -151,13 +143,6 @@ public class MetadataAuthzHelper {
       Privilege.Name privilege, String parentScopes) {
     return new ParentScopeAccessPath(
         String.format("ANY(%s, %s)", privilege.name(), parentScopes), Set.of(privilege));
-  }
-
-  private static ParentScopeAccessPath tableLikeParentPrivilegePath(Privilege.Name privilege) {
-    ParentScopeAccessPath privilegePath = parentPrivilegePath(privilege, TABLE_PARENT_SCOPES);
-    return new ParentScopeAccessPath(
-        "ANY_USE_CATALOG && ANY_USE_SCHEMA && (" + privilegePath.expression + ")",
-        privilegePath.denyPrivileges);
   }
 
   public static Metalake[] filterMetalakes(Metalake[] metalakes, String expression) {
@@ -252,27 +237,11 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
-<<<<<<< HEAD
-    ListShortCircuit spec = LIST_SHORT_CIRCUITS.get(entityType);
-    if (spec == null || !spec.filterExpression.equals(expression)) {
-=======
-    Principal principal = PrincipalUtils.getCurrentPrincipal();
     Map<String, List<ParentScopeAccessPath>> entityShortCircuits =
         LIST_SHORT_CIRCUITS.get(entityType);
     List<ParentScopeAccessPath> accessPaths =
         entityShortCircuits == null ? null : entityShortCircuits.get(expression);
     if (accessPaths == null) {
-      LOG.debug(
-          "Parent-scope short-circuit unavailable for principal {}, entity type {} under metalake "
-              + "{}: {}.",
-          principal.getName(),
-          entityType,
-          metalake,
-          entityShortCircuits == null
-              ? "no short-circuit spec is registered for this entity type"
-              : "the requested filter expression does not match a registered short-circuit "
-                  + "expression");
->>>>>>> b3593b869 ([#12837] fix(authz): Evaluate list denies by access path (#12838))
       return false;
     }
 
@@ -291,19 +260,6 @@ public class MetadataAuthzHelper {
     Map<Entity.EntityType, NameIdentifier> metadataNames =
         NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifiers[0]);
 
-<<<<<<< HEAD
-    boolean parentGrantsAccess =
-        new AuthorizationExpressionEvaluator(spec.parentScopeExpression, authorizer)
-            .evaluate(metadataNames, requestContext, principal, Optional.empty());
-    if (!parentGrantsAccess) {
-      return false;
-    }
-
-    // Parent scope grants access to every object; the only thing that can still hide one is a
-    // deny on these privileges (at the parent scope or on an individual object), so the
-    // short-circuit is only safe when no such deny may exist.
-    return !authorizer.hasDenyPolicy(principal, metalake, spec.denyPrivileges, requestContext);
-=======
     for (ParentScopeAccessPath accessPath : accessPaths) {
       requestContext.setOriginalAuthorizationExpression(accessPath.expression);
       boolean parentGrantsAccess =
@@ -320,25 +276,8 @@ public class MetadataAuthzHelper {
       if (!hasDeny) {
         return true;
       }
-
-      LOG.debug(
-          "Parent-scope access path {} disabled for entity type {} under metalake {}: principal "
-              + "{} holds a deny policy on {}.",
-          accessPath.expression,
-          entityType,
-          metalake,
-          principal.getName(),
-          accessPath.denyPrivileges);
     }
-
-    LOG.debug(
-        "Parent-scope short-circuit skipped for entity type {} under metalake {}: principal {} "
-            + "has no deny-free parent access path, so per-object authorization is required.",
-        entityType,
-        metalake,
-        principal.getName());
     return false;
->>>>>>> b3593b869 ([#12837] fix(authz): Evaluate list denies by access path (#12838))
   }
 
   /**
