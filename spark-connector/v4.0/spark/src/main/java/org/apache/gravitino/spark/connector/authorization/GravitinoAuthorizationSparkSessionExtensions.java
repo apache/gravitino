@@ -34,8 +34,10 @@ import scala.collection.immutable.Seq;
 /**
  * Registers Gravitino authorization checks with a Spark session.
  *
- * <p>This is the Spark 4 flavor. It matches the Spark 3.5 one under {@code src/main/spark35} except
- * that Spark 4 added the abstract {@code parseRoutineParam} method to {@code ParserInterface}.
+ * <p>This is the Spark 4 copy. Each version module carries one at this name, because Spark 4 added
+ * the abstract {@code parseRoutineParam} method to {@code ParserInterface} and a parser can only
+ * implement one version's interface. Everything else here matches the Spark 3.5 copy in {@code
+ * v3.5/spark}.
  */
 public class GravitinoAuthorizationSparkSessionExtensions
     implements Function1<SparkSessionExtensions, Void> {

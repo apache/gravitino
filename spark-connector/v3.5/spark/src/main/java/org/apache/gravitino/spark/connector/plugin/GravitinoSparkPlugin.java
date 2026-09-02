@@ -30,6 +30,8 @@ import org.apache.gravitino.spark.connector.jdbc.postgresql.GravitinoPostgreSqlC
 import org.apache.spark.api.plugin.DriverPlugin;
 import org.apache.spark.api.plugin.ExecutorPlugin;
 import org.apache.spark.api.plugin.SparkPlugin;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * The entrypoint for Apache Gravitino Spark connector on Spark 3.5.
@@ -41,11 +43,13 @@ import org.apache.spark.api.plugin.SparkPlugin;
  */
 public class GravitinoSparkPlugin implements SparkPlugin {
 
+  private static final Logger LOG = LoggerFactory.getLogger(GravitinoSparkPlugin.class);
+
   /**
-   * The Paimon catalog is the one binding that cannot be a class reference: Paimon publishes no
-   * {@code paimon-spark-3.5_2.13} artifact, so the Scala 2.13 build compiles the Paimon package out
-   * and the class is absent from that jar. Resolved by presence below, and checked against the real
-   * class by a test in that package, which the same build exclusion drops on 2.13.
+   * The Paimon catalog is the one binding that cannot be a class reference: the build takes its
+   * Paimon dependency only under Scala 2.12 and excludes the Paimon package otherwise, so the class
+   * is absent from the 2.13 jar. Resolved by presence below, and checked against the real class by
+   * a test in that package, which the same build exclusion drops on 2.13.
    */
   @VisibleForTesting
   public static final String PAIMON_CATALOG =
@@ -78,14 +82,18 @@ public class GravitinoSparkPlugin implements SparkPlugin {
 
   private static boolean isPresent(String className) {
     try {
-      // initialize=false still loads and links the class, so its Paimon supertypes are resolved
-      // here. A Spark 3.5 deployment that does not add the Paimon runtime, which is the documented
-      // default, reaches this with the catalog class present but its supertypes missing, surfacing
-      // as NoClassDefFoundError rather than ClassNotFoundException. Both mean the same thing to the
-      // caller: this build cannot offer a Paimon catalog.
       Class.forName(className, false, GravitinoSparkPlugin.class.getClassLoader());
       return true;
-    } catch (ClassNotFoundException | LinkageError e) {
+    } catch (ClassNotFoundException e) {
+      // The Scala 2.13 build compiles the Paimon package out, so its jar does not carry the class.
+      LOG.debug("No Paimon catalog in this build: {} is absent.", className, e);
+      return false;
+    } catch (LinkageError e) {
+      // initialize=false still links the class, which resolves its Paimon supertypes. The class is
+      // in this jar but the Paimon runtime is not on the classpath, which is the documented default
+      // for a deployment that does not use Paimon. It is also what an incompatible Paimon version
+      // looks like, so record why rather than only that.
+      LOG.debug("No Paimon catalog available: {} does not link.", className, e);
       return false;
     }
   }

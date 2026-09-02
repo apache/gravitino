@@ -37,6 +37,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -154,11 +155,18 @@ public class GravitinoDriverPlugin implements DriverPlugin {
               String catalogName = entry.getKey();
               Catalog gravitinoCatalog = entry.getValue();
               String provider = gravitinoCatalog.provider();
-              // Resolve the kind once, so the two opt-in gates below stay in step with the
-              // provider-to-kind mapping instead of repeating provider literals. An unknown
-              // provider falls through to registerCatalog, which warns and skips.
-              SparkCatalogKind kind =
-                  StringUtils.isBlank(provider) ? null : SparkCatalogKind.fromProvider(provider);
+              if (StringUtils.isBlank(provider)) {
+                LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
+                return;
+              }
+              // The provider is read once, here, and every decision below is made from the kind, so
+              // no two places can disagree about what this catalog is.
+              SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
+              if (kind == null) {
+                LOG.warn(
+                    "Skip registering {} because {} is not supported yet.", catalogName, provider);
+                return;
+              }
               if (SparkCatalogKind.LAKEHOUSE_ICEBERG.equals(kind) && !enableIcebergSupport) {
                 return;
               }
@@ -166,23 +174,28 @@ public class GravitinoDriverPlugin implements DriverPlugin {
                 return;
               }
               try {
-                registerCatalog(sparkConf, catalogName, provider);
+                registerCatalog(sparkConf, catalogName, kind);
               } catch (Exception e) {
                 LOG.warn("Register catalog {} failed.", catalogName, e);
               }
             });
   }
 
+  /**
+   * Registers the Spark catalog class bound to {@code kind} under {@code catalogName}, or skips the
+   * catalog when this build bound none.
+   *
+   * @param sparkConf the conf to register into
+   * @param catalogName the Gravitino catalog name, which becomes the Spark catalog name
+   * @param kind the kind of catalog to register
+   * @throws NullPointerException if the kind is null. A provider that maps to no kind is the
+   *     caller's to report, since only the caller still has the provider name.
+   */
   @VisibleForTesting
-  void registerCatalog(SparkConf sparkConf, String catalogName, @Nullable String provider) {
-    if (StringUtils.isBlank(provider)) {
-      LOG.warn("Skip registering {} because catalog provider is empty.", catalogName);
-      return;
-    }
-
-    String catalogClassName = catalogClassName(provider);
+  void registerCatalog(SparkConf sparkConf, String catalogName, SparkCatalogKind kind) {
+    String catalogClassName = catalogClassName(kind);
     if (catalogClassName == null) {
-      LOG.warn("Skip registering {} because {} is not supported yet.", catalogName, provider);
+      LOG.warn("Skip registering {} because this build has no {} catalog.", catalogName, kind);
       return;
     }
 
@@ -195,15 +208,15 @@ public class GravitinoDriverPlugin implements DriverPlugin {
   }
 
   /**
-   * Resolves the Spark catalog class a Gravitino catalog provider needs, from the bindings this
-   * build supplied. Returns null when the build has no catalog for the provider. The provider must
-   * not be blank; callers check that first, since this dereferences it.
+   * Resolves the Spark catalog class bound to a kind, from the bindings this build supplied.
+   * Returns null when the build bound no catalog for it, which is how a kind this build cannot
+   * serve, such as Paimon on Spark 4, is skipped.
    */
   @Nullable
   @VisibleForTesting
-  String catalogClassName(String provider) {
-    SparkCatalogKind kind = SparkCatalogKind.fromProvider(provider);
-    return kind == null ? null : bindings.catalogClassNames().get(kind);
+  String catalogClassName(SparkCatalogKind kind) {
+    Objects.requireNonNull(kind, "Catalog kind must not be null");
+    return bindings.catalogClassNames().get(kind);
   }
 
   /**

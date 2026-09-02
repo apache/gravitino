@@ -52,7 +52,12 @@ public class TestGravitinoDriverPlugin {
   private static final String COMMA = ",";
   private static final String AUTHZ_EXTENSION = "org.example.AuthorizationExtensions";
   private static final String USER_EXTENSION = "org.example.UserExtensions";
+  private static final String HIVE_CATALOG = "org.example.HiveCatalog";
+  private static final String ICEBERG_CATALOG = "org.example.IcebergCatalog";
   private static final String PAIMON_CATALOG = "org.example.PaimonCatalog";
+  private static final String GLUE_CATALOG = "org.example.GlueCatalog";
+  private static final String JDBC_CATALOG = "org.example.JdbcCatalog";
+  private static final String POSTGRESQL_CATALOG = "org.example.PostgreSqlCatalog";
 
   @Test
   void testIcebergExtensionName() {
@@ -135,34 +140,34 @@ public class TestGravitinoDriverPlugin {
   void testEveryProviderResolvesToTheClassBoundForItsKind() {
     GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withPaimon());
 
-    assertEquals("org.example.HiveCatalog", plugin.catalogClassName("hive"));
-    assertEquals("org.example.IcebergCatalog", plugin.catalogClassName("lakehouse-iceberg"));
-    assertEquals(PAIMON_CATALOG, plugin.catalogClassName("lakehouse-paimon"));
-    assertEquals("org.example.GlueCatalog", plugin.catalogClassName("glue"));
-    assertEquals("org.example.PostgreSqlCatalog", plugin.catalogClassName("jdbc-postgresql"));
+    assertEquals(HIVE_CATALOG, classFor(plugin, "hive"));
+    assertEquals(ICEBERG_CATALOG, classFor(plugin, "lakehouse-iceberg"));
+    assertEquals(PAIMON_CATALOG, classFor(plugin, "lakehouse-paimon"));
+    assertEquals(GLUE_CATALOG, classFor(plugin, "glue"));
+    assertEquals(POSTGRESQL_CATALOG, classFor(plugin, "jdbc-postgresql"));
     // Every other JDBC backend shares one catalog.
-    assertEquals("org.example.JdbcCatalog", plugin.catalogClassName("jdbc-mysql"));
-    assertEquals("org.example.JdbcCatalog", plugin.catalogClassName("jdbc-doris"));
+    assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-mysql"));
+    assertEquals(JDBC_CATALOG, classFor(plugin, "jdbc-doris"));
   }
 
   @Test
-  void testAProviderThisBuildHasNoCatalogForResolvesToNothing() {
+  void testAKindThisBuildBoundNoCatalogForResolvesToNothing() {
     GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
 
-    // Gravitino providers this connector implements no catalog for.
-    Assertions.assertNull(plugin.catalogClassName("kafka"));
-    Assertions.assertNull(plugin.catalogClassName("lakehouse-hudi"));
-    // Paimon, on a build that bound no Paimon catalog.
-    Assertions.assertNull(plugin.catalogClassName("lakehouse-paimon"));
+    // Paimon is the one kind a build may legitimately omit, so it is the only kind that can reach
+    // catalogClassName with nothing behind it. Providers that map to no kind at all are
+    // TestSparkCatalogKind's subject.
+    Assertions.assertNull(plugin.catalogClassName(SparkCatalogKind.LAKEHOUSE_PAIMON));
   }
 
   @Test
   void testRegisteringACatalogWritesTheBoundClassUnderItsName() {
     SparkConf sparkConf = new SparkConf(false);
 
-    new GravitinoDriverPlugin(withoutPaimon()).registerCatalog(sparkConf, "my_hive", "hive");
+    new GravitinoDriverPlugin(withoutPaimon())
+        .registerCatalog(sparkConf, "my_hive", SparkCatalogKind.HIVE);
 
-    assertEquals("org.example.HiveCatalog", sparkConf.get("spark.sql.catalog.my_hive"));
+    assertEquals(HIVE_CATALOG, sparkConf.get("spark.sql.catalog.my_hive"));
   }
 
   @Test
@@ -170,16 +175,30 @@ public class TestGravitinoDriverPlugin {
     SparkConf sparkConf = new SparkConf(false);
     GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
 
-    plugin.registerCatalog(sparkConf, "my_paimon", "lakehouse-paimon");
-    plugin.registerCatalog(sparkConf, "my_kafka", "kafka");
-    // A blank provider is skipped by its own branch, ahead of the kind lookup. null is the shape
-    // that pins that branch: without it, the kind lookup dereferences the provider and NPEs, so
-    // removing the branch fails here. The empty string covers the other blank shape, and asserting
-    // that nothing at all was written also catches a future edit that writes some unrelated key.
-    plugin.registerCatalog(sparkConf, "no_provider", "");
-    plugin.registerCatalog(sparkConf, "null_provider", null);
+    plugin.registerCatalog(sparkConf, "my_paimon", SparkCatalogKind.LAKEHOUSE_PAIMON);
 
+    // Asserting that nothing at all was written also catches a future edit that writes some
+    // unrelated key.
     assertEquals(0, sparkConf.getAll().length, Arrays.toString(sparkConf.getAll()));
+  }
+
+  /**
+   * registerCatalog takes a resolved kind and rejects a missing one rather than treating it as "no
+   * catalog": a provider that maps to no kind has to be reported by the caller, which still has the
+   * provider name in hand.
+   */
+  @Test
+  void testRegisterCatalogRejectsAMissingKind() {
+    SparkConf sparkConf = new SparkConf(false);
+    GravitinoDriverPlugin plugin = new GravitinoDriverPlugin(withoutPaimon());
+
+    Assertions.assertThrows(
+        NullPointerException.class, () -> plugin.registerCatalog(sparkConf, "my_kafka", null));
+  }
+
+  /** Composes the two steps production takes: provider to kind, then kind to the bound class. */
+  private static String classFor(GravitinoDriverPlugin plugin, String provider) {
+    return plugin.catalogClassName(SparkCatalogKind.fromProvider(provider));
   }
 
   /**
@@ -202,25 +221,40 @@ public class TestGravitinoDriverPlugin {
 
         plugin.registerGravitinoCatalogs(
             sparkConf,
-            ImmutableMap.of(
-                "my_iceberg",
-                catalogWithProvider("lakehouse-iceberg"),
-                "my_paimon",
-                catalogWithProvider("lakehouse-paimon"),
-                "my_hive",
-                catalogWithProvider("hive"),
-                // A catalog whose provider the server left unset must be skipped, not NPE out of
-                // the loop and fail SparkContext creation.
-                "no_provider",
-                catalogWithProvider(null)));
+            ImmutableMap.<String, Catalog>builder()
+                .put("my_iceberg", catalogWithProvider("lakehouse-iceberg"))
+                .put("my_paimon", catalogWithProvider("lakehouse-paimon"))
+                .put("my_hive", catalogWithProvider("hive"))
+                .put("my_mysql", catalogWithProvider("jdbc-mysql"))
+                .put("my_postgresql", catalogWithProvider("jdbc-postgresql"))
+                // Three shapes that must all be skipped. null and "" stop at the blank-provider
+                // guard, null being the one that pins it since fromProvider rejects null; kafka is
+                // the other shape, a non-blank provider this connector maps to no kind.
+                .put("no_provider", catalogWithProvider(null))
+                .put("blank_provider", catalogWithProvider(""))
+                .put("my_kafka", catalogWithProvider("kafka"))
+                .build());
         plugin.registerSqlExtensions(sparkConf);
 
         String flags = "iceberg=" + iceberg + " paimon=" + paimon;
-        assertEquals(iceberg, sparkConf.contains("spark.sql.catalog.my_iceberg"), flags);
-        assertEquals(paimon, sparkConf.contains("spark.sql.catalog.my_paimon"), flags);
-        // A catalog behind no flag is registered either way.
-        assertTrue(sparkConf.contains("spark.sql.catalog.my_hive"), flags);
+        // Assert the class, not just the key: the kind reaching registerCatalog has to be the one
+        // this catalog's own provider maps to, and only the value shows that.
+        assertEquals(
+            iceberg ? ICEBERG_CATALOG : null,
+            sparkConf.get("spark.sql.catalog.my_iceberg", null),
+            flags);
+        assertEquals(
+            paimon ? PAIMON_CATALOG : null,
+            sparkConf.get("spark.sql.catalog.my_paimon", null),
+            flags);
+        // Catalogs behind no flag are registered either way.
+        assertEquals(HIVE_CATALOG, sparkConf.get("spark.sql.catalog.my_hive", null), flags);
+        assertEquals(JDBC_CATALOG, sparkConf.get("spark.sql.catalog.my_mysql", null), flags);
+        assertEquals(
+            POSTGRESQL_CATALOG, sparkConf.get("spark.sql.catalog.my_postgresql", null), flags);
         assertFalse(sparkConf.contains("spark.sql.catalog.no_provider"), flags);
+        assertFalse(sparkConf.contains("spark.sql.catalog.blank_provider"), flags);
+        assertFalse(sparkConf.contains("spark.sql.catalog.my_kafka"), flags);
 
         String extensions = sparkConf.get(StaticSQLConf.SPARK_SESSION_EXTENSIONS().key());
         assertEquals(
@@ -268,11 +302,11 @@ public class TestGravitinoDriverPlugin {
   private static SparkBindings.Builder requiredCatalogs() {
     return SparkBindings.builder()
         .authorizationExtension(AUTHZ_EXTENSION)
-        .catalog(SparkCatalogKind.HIVE, "org.example.HiveCatalog")
-        .catalog(SparkCatalogKind.LAKEHOUSE_ICEBERG, "org.example.IcebergCatalog")
-        .catalog(SparkCatalogKind.GLUE, "org.example.GlueCatalog")
-        .catalog(SparkCatalogKind.JDBC, "org.example.JdbcCatalog")
-        .catalog(SparkCatalogKind.JDBC_POSTGRESQL, "org.example.PostgreSqlCatalog");
+        .catalog(SparkCatalogKind.HIVE, HIVE_CATALOG)
+        .catalog(SparkCatalogKind.LAKEHOUSE_ICEBERG, ICEBERG_CATALOG)
+        .catalog(SparkCatalogKind.GLUE, GLUE_CATALOG)
+        .catalog(SparkCatalogKind.JDBC, JDBC_CATALOG)
+        .catalog(SparkCatalogKind.JDBC_POSTGRESQL, POSTGRESQL_CATALOG);
   }
 
   @Test

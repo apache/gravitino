@@ -55,4 +55,14 @@ public class TestSparkCatalogKind {
     Assertions.assertNull(SparkCatalogKind.fromProvider("kafka"));
     Assertions.assertNull(SparkCatalogKind.fromProvider(""));
   }
+
+  /**
+   * A null provider is rejected rather than mapped to no kind. GravitinoDriverPlugin relies on that
+   * to keep its own blank-provider branch load-bearing: were this to return null instead, dropping
+   * that branch would go unnoticed, since a catalog with no kind is skipped anyway.
+   */
+  @Test
+  void testANullProviderIsRejected() {
+    Assertions.assertThrows(NullPointerException.class, () -> SparkCatalogKind.fromProvider(null));
+  }
 }

@@ -18,22 +18,15 @@
  */
 package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
-import org.apache.gravitino.spark.connector.iceberg.GravitinoIcebergCatalogSpark40;
 import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIf;
 
-public class SparkIcebergCatalogHiveBackendIT40 extends SparkIcebergCatalogHiveBackendIT {
-
-  @Test
-  void testCatalogClassName() {
-    String catalogClass =
-        getSparkSession()
-            .sessionState()
-            .conf()
-            .getConfString("spark.sql.catalog." + getCatalogName());
-    Assertions.assertEquals(GravitinoIcebergCatalogSpark40.class.getName(), catalogClass);
-  }
+/**
+ * Runs the shared Iceberg suite against the Iceberg REST backend on Spark 4.0. The base is disabled
+ * in embedded mode; repeating the condition here matches what the 3.5 subclass does.
+ */
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
+public class SparkIcebergCatalogRestBackendIT40 extends SparkIcebergCatalogRestBackendIT {
 
   @Override
   protected SparkMetadataColumnInfo[] getIcebergMetadataColumns() {

@@ -21,6 +21,7 @@ package org.apache.gravitino.spark.connector.catalog;
 import com.google.common.collect.ImmutableMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 
 /**
@@ -64,9 +65,13 @@ public enum SparkCatalogKind {
    *
    * @param provider a Gravitino catalog provider, such as {@code hive} or {@code jdbc-mysql}
    * @return the matching kind, or null when this connector has no catalog for the provider
+   * @throws NullPointerException if the provider is null. Callers hold a provider the server set,
+   *     and a catalog with none is a server-side problem worth its own message rather than a null
+   *     that quietly maps to no kind.
    */
   @Nullable
   public static SparkCatalogKind fromProvider(String provider) {
+    Objects.requireNonNull(provider, "Catalog provider must not be null");
     String normalized = provider.toLowerCase(Locale.ROOT);
     // All JDBC backends share one Spark catalog, apart from PostgreSQL, whose type and property
     // conversions differ.
