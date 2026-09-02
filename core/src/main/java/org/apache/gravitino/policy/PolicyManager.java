@@ -26,6 +26,7 @@ import com.google.common.collect.Sets;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import org.apache.gravitino.Entity;
@@ -33,6 +34,7 @@ import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchMetadataObjectException;
@@ -261,39 +263,42 @@ public class PolicyManager implements PolicyDispatcher {
   }
 
   @Override
+  public RelationalEntity<?>[] listTagAssociationsForPolicy(String metalake, String policyName) {
+    NameIdentifier policyIdentifier = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    checkMetalake(NameIdentifier.of(metalake), entityStore);
+    return TreeLockUtils.doWithTreeLock(
+        policyIdentifier,
+        LockType.READ,
+        () -> {
+          getPolicyWithoutLock(metalake, policyName);
+          try {
+            return entityStore
+                .relationOperations()
+                .batchListEntitiesByRelation(
+                    SupportsRelationOperations.Type.POLICY_TAG_REL,
+                    Collections.singletonList(policyIdentifier),
+                    Entity.EntityType.POLICY)
+                .toArray(new RelationalEntity<?>[0]);
+          } catch (IOException e) {
+            LOG.error(
+                "Failed to list tag associations for policy {} under metalake {}",
+                policyName,
+                metalake,
+                e);
+            throw new RuntimeException(e);
+          }
+        });
+  }
+
+  @Override
   public PolicyEntity[] listPolicyInfosForMetadataObject(
       String metalake, MetadataObject metadataObject) {
     NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
     Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
-    return TreeLockUtils.doWithTreeLock(
-        entityIdent,
-        LockType.READ,
-        () -> {
-          try {
-            return entityStore
-                .relationOperations()
-                .listEntitiesByRelation(
-                    SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
-                    entityIdent,
-                    entityType,
-                    true /* allFields */)
-                .stream()
-                .map(entity -> (PolicyEntity) entity)
-                .toArray(PolicyEntity[]::new);
-          } catch (NoSuchEntityException e) {
-            throw new NoSuchMetadataObjectException(
-                e,
-                "Failed to list policies for metadata object %s due to not found",
-                metadataObject);
-          } catch (IOException e) {
-            LOG.error("Failed to list policies for metadata object {}", metadataObject, e);
-            throw new RuntimeException(e);
-          }
-        });
+    return listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject);
   }
 
   @Override
@@ -373,13 +378,23 @@ public class PolicyManager implements PolicyDispatcher {
   @Override
   public PolicyEntity getPolicyForMetadataObject(
       String metalake, MetadataObject metadataObject, String policyName) {
-    NameIdentifier entityIdent = MetadataObjectUtil.toEntityIdent(metalake, metadataObject);
-    Entity.EntityType entityType = MetadataObjectUtil.toEntityType(metadataObject);
-    NameIdentifier policyIdent = NameIdentifierUtil.ofPolicy(metalake, policyName);
+    try {
+      return Arrays.stream(listPolicyInfosForMetadataObject(metalake, metadataObject))
+          .filter(policy -> policy.name().equals(policyName))
+          .findFirst()
+          .orElseThrow(
+              () ->
+                  new NoSuchPolicyException(
+                      "Policy %s does not exist for metadata object %s",
+                      policyName, metadataObject));
+    } catch (NoSuchMetadataObjectException e) {
+      throw new NoSuchMetadataObjectException(
+          e, "Failed to get policy for metadata object %s due to not found", metadataObject);
+    }
+  }
 
-    MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
-    checkMetalake(NameIdentifier.of(metalake), entityStore);
-
+  private PolicyEntity[] listDirectPoliciesForMetadataObject(
+      NameIdentifier entityIdent, Entity.EntityType entityType, MetadataObject metadataObject) {
     return TreeLockUtils.doWithTreeLock(
         entityIdent,
         LockType.READ,
@@ -387,28 +402,38 @@ public class PolicyManager implements PolicyDispatcher {
           try {
             return entityStore
                 .relationOperations()
-                .getEntityByRelation(
+                .listEntitiesByRelation(
                     SupportsRelationOperations.Type.POLICY_METADATA_OBJECT_REL,
                     entityIdent,
                     entityType,
-                    policyIdent);
+                    true /* allFields */)
+                .stream()
+                .map(entity -> (PolicyEntity) entity)
+                .toArray(PolicyEntity[]::new);
           } catch (NoSuchEntityException e) {
-            // The store reports a missing policy and a missing metadata object with the same
-            // exception type, so the message is the only thing that tells them apart.
-            if (isMissingEntity(e, Entity.EntityType.POLICY, policyName)) {
-              throw new NoSuchPolicyException(
-                  e, "Policy %s does not exist for metadata object %s", policyName, metadataObject);
-            } else {
-              throw new NoSuchMetadataObjectException(
-                  e,
-                  "Failed to get policy for metadata object %s due to not found",
-                  metadataObject);
-            }
+            throw new NoSuchMetadataObjectException(
+                e,
+                "Failed to list policies for metadata object %s due to not found",
+                metadataObject);
           } catch (IOException e) {
-            LOG.error("Failed to get policy for metadata object {}", metadataObject, e);
+            LOG.error("Failed to list policies for metadata object {}", metadataObject, e);
             throw new RuntimeException(e);
           }
         });
+  }
+
+  private PolicyEntity getPolicyWithoutLock(String metalake, String policyName) {
+    try {
+      return entityStore.get(
+          NameIdentifierUtil.ofPolicy(metalake, policyName),
+          Entity.EntityType.POLICY,
+          PolicyEntity.class);
+    } catch (NoSuchEntityException e) {
+      throw new NoSuchPolicyException(
+          e, "Policy with name %s under metalake %s does not exist", policyName, metalake);
+    } catch (IOException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private void changePolicyEnabledState(
@@ -478,6 +503,7 @@ public class PolicyManager implements PolicyDispatcher {
     }
   }
 
+  @SuppressWarnings("deprecation")
   private PolicyEntity updatePolicyEntity(PolicyEntity policyEntity, PolicyChange... changes) {
     String newName = policyEntity.name();
     String newComment = policyEntity.comment();
@@ -520,19 +546,5 @@ public class PolicyManager implements PolicyDispatcher {
     builder.withContent(newContent);
 
     return builder.build();
-  }
-
-  /**
-   * Tells a "the related entity does not exist" failure apart from a "the metadata object does not
-   * exist" one. The store signals both with {@link NoSuchEntityException}, so the message built by
-   * the relational services is the only discriminator; it is rebuilt here from the same constant
-   * and the same lowercasing behavior they use.
-   */
-  private static boolean isMissingEntity(
-      NoSuchEntityException e, Entity.EntityType type, String name) {
-    String expected =
-        String.format(
-            NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE, type.name().toLowerCase(), name);
-    return expected.equals(e.getMessage());
   }
 }
