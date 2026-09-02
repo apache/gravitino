@@ -55,7 +55,6 @@ import org.apache.gravitino.server.web.HttpAuditFilter;
 import org.apache.gravitino.server.web.HttpServerMetricsSource;
 import org.apache.gravitino.server.web.JettyServer;
 import org.apache.gravitino.server.web.JettyServerConfig;
-import org.apache.gravitino.server.web.JsonErrorHandler;
 import org.apache.gravitino.server.web.ObjectMapperProvider;
 import org.apache.gravitino.server.web.RequestContextFilter;
 import org.apache.gravitino.server.web.SecretProvidersConfigServlet;
@@ -65,10 +64,11 @@ import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
+import org.apache.gravitino.server.web.mapper.NotFoundExceptionMapper;
+import org.apache.gravitino.server.web.mapper.ParamExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
-import org.eclipse.jetty.server.handler.ErrorHandler;
 import org.glassfish.hk2.api.InterceptionService;
 import org.glassfish.hk2.utilities.binding.AbstractBinder;
 import org.glassfish.jersey.CommonProperties;
@@ -82,9 +82,7 @@ public class GravitinoServer extends ResourceConfig {
 
   private static final Logger LOG = LoggerFactory.getLogger(GravitinoServer.class);
 
-  private static final String API_PATH_PREFIX = "/api/";
-
-  private static final String API_ANY_PATH = API_PATH_PREFIX + "*";
+  private static final String API_ANY_PATH = "/api/*";
 
   public static final String CONF_FILE = "gravitino.conf";
 
@@ -104,13 +102,7 @@ public class GravitinoServer extends ResourceConfig {
 
   public GravitinoServer(ServerConfig config, GravitinoEnv gravitinoEnv) {
     this.serverConfig = config;
-    this.server =
-        new JettyServer() {
-          @Override
-          protected ErrorHandler createErrorHandler() {
-            return new JsonErrorHandler(API_PATH_PREFIX);
-          }
-        };
+    this.server = new JettyServer();
     this.gravitinoEnv = gravitinoEnv;
     this.lineageService = new LineageService();
   }
@@ -180,6 +172,8 @@ public class GravitinoServer extends ResourceConfig {
     register(JsonProcessingExceptionMapper.class);
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
+    register(ParamExceptionMapper.class);
+    register(NotFoundExceptionMapper.class);
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
     property(CommonProperties.JSON_JACKSON_DISABLED_MODULES, "DefaultScalaModule");
 

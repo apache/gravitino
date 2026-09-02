@@ -48,7 +48,7 @@ public class JsonErrorHandlerIT extends BaseIT {
         sendGet("/api/metalakes/m/catalogs/c/schemas/s/models/mo/versions/abc");
 
     Assertions.assertEquals(404, response.statusCode());
-    assertJsonNotFoundBody(response);
+    assertJsonNotFoundBody(response, "PathParamException");
   }
 
   @Test
@@ -57,17 +57,17 @@ public class JsonErrorHandlerIT extends BaseIT {
         sendGet("/api/metalakes/m/catalogs/c/schemas/s/models/mo/versions/abc/uri");
 
     Assertions.assertEquals(404, response.statusCode());
-    assertJsonNotFoundBody(response);
+    assertJsonNotFoundBody(response, "PathParamException");
   }
 
   @Test
   public void testUnknownApiRouteStillReturnsJsonErrorBody() throws Exception {
-    // A route that Jersey cannot match at all takes the same Jetty-level error path as a
-    // typed-path-param conversion failure, so it must be covered by the same fix.
+    // A route that Jersey cannot match at all is a different failure (no @PathParam conversion
+    // is even attempted), but it must be covered by the same fix.
     HttpResponse<String> response = sendGet("/api/v99/nonexistent/route");
 
     Assertions.assertEquals(404, response.statusCode());
-    assertJsonNotFoundBody(response);
+    assertJsonNotFoundBody(response, "NotFoundException");
   }
 
   private HttpResponse<String> sendGet(String path) throws Exception {
@@ -79,7 +79,8 @@ public class JsonErrorHandlerIT extends BaseIT {
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
-  private void assertJsonNotFoundBody(HttpResponse<String> response) throws Exception {
+  private void assertJsonNotFoundBody(HttpResponse<String> response, String expectedType)
+      throws Exception {
     String contentType = response.headers().firstValue("Content-Type").orElse("");
     Assertions.assertTrue(
         contentType.contains("application/json"),
@@ -90,7 +91,7 @@ public class JsonErrorHandlerIT extends BaseIT {
     ErrorResponse errorResponse =
         ObjectMapperProvider.objectMapper().readValue(response.body(), ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
-    Assertions.assertEquals("NotFoundException", errorResponse.getType());
+    Assertions.assertEquals(expectedType, errorResponse.getType());
     Assertions.assertFalse(errorResponse.getMessage().isEmpty());
   }
 }

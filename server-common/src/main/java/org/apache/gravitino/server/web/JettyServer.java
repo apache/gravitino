@@ -104,7 +104,7 @@ public class JettyServer {
     server.setStopTimeout(serverConfig.getStopTimeout());
 
     // Set error handler for Jetty Server
-    ErrorHandler errorHandler = createErrorHandler();
+    ErrorHandler errorHandler = new ErrorHandler();
     errorHandler.setShowStacks(true);
     errorHandler.setServer(server);
     server.addBean(errorHandler);
@@ -522,16 +522,5 @@ public class JettyServer {
    */
   protected Filter createAuthenticationFilter() {
     return new AuthenticationFilter();
-  }
-
-  /**
-   * Creates the error handler for this server. Subclasses can override this to provide a custom
-   * error handler, e.g. one that writes structured JSON error bodies for a subset of paths instead
-   * of Jetty's default HTML error page.
-   *
-   * @return the error handler to install on this server
-   */
-  protected ErrorHandler createErrorHandler() {
-    return new ErrorHandler();
   }
 }
