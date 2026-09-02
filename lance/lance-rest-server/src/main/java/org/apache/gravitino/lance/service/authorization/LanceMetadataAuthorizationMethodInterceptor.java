@@ -143,9 +143,11 @@ public class LanceMetadataAuthorizationMethodInterceptor
    * @return the maximum number of levels the operation's identifier may carry
    */
   private static int maxIdentifierLevels(Method method) {
-    return LanceTableOperations.class.isAssignableFrom(method.getDeclaringClass())
-        ? TABLE_IDENTIFIER_LEVELS
-        : SCHEMA_NAMESPACE_LEVELS;
+    return isTableOperation(method) ? TABLE_IDENTIFIER_LEVELS : SCHEMA_NAMESPACE_LEVELS;
+  }
+
+  private static boolean isTableOperation(Method method) {
+    return LanceTableOperations.class.isAssignableFrom(method.getDeclaringClass());
   }
 
   /**
@@ -161,7 +163,12 @@ public class LanceMetadataAuthorizationMethodInterceptor
   @Override
   protected Optional<AuthorizationHandler> createAuthorizationHandler(
       Method method, Parameter[] parameters, Object[] args) {
-    return createMode(parameters, args).map(OverwriteAuthzHandler::new);
+    String overwriteExpression =
+        isTableOperation(method)
+            ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
+            : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
+    return createMode(parameters, args)
+        .map(mode -> new OverwriteAuthzHandler(mode, overwriteExpression));
   }
 
   @Override
@@ -196,8 +203,8 @@ public class LanceMetadataAuthorizationMethodInterceptor
    * Authorizes a create request whose mode overwrites an object that already exists.
    *
    * <p>An overwrite replaces an existing namespace or table, so it is a modification rather than a
-   * creation and is authorized against the ownership expression for the addressed entity instead of
-   * the create expression on the method. Without this, CREATE_CATALOG, CREATE_SCHEMA, or
+   * creation and is authorized against the modification expression for the invoked resource instead
+   * of the create expression on the method. Without this, CREATE_CATALOG, CREATE_SCHEMA, or
    * CREATE_TABLE would escalate into permission to replace an object the caller does not own.
    *
    * <p>The mode alone decides this, without probing whether the object exists: an existence probe
@@ -209,14 +216,16 @@ public class LanceMetadataAuthorizationMethodInterceptor
     private static final String OVERWRITE_MODE = "OVERWRITE";
 
     private final boolean overwrite;
+    private final String authorizationExpression;
 
-    private OverwriteAuthzHandler(String mode) {
+    private OverwriteAuthzHandler(String mode, String authorizationExpression) {
       // Read the mode through the same normalization the create operation applies, so a token the
       // operation will act on as an overwrite cannot be authorized as a plain create. Comparing the
       // raw string here would leave a gap: " overwrite " reaches the operation as OVERWRITE but
       // would not match, and a caller holding only a create privilege could replace an object owned
       // by somebody else.
       this.overwrite = OVERWRITE_MODE.equals(CommonUtil.normalizeToken(mode));
+      this.authorizationExpression = authorizationExpression;
     }
 
     @Override
@@ -226,12 +235,8 @@ public class LanceMetadataAuthorizationMethodInterceptor
       }
 
       Entity.EntityType entityType = deepestEntityType(nameIdentifierMap);
-      String expression =
-          entityType == Entity.EntityType.TABLE
-              ? LanceAuthorizationExpressions.MODIFY_TABLE_AUTHORIZATION_EXPRESSION
-              : LanceAuthorizationExpressions.MODIFY_NAMESPACE_AUTHORIZATION_EXPRESSION;
       boolean authorized =
-          new AuthorizationExpressionEvaluator(expression)
+          new AuthorizationExpressionEvaluator(authorizationExpression)
               .evaluate(
                   nameIdentifierMap,
                   new HashMap<>(),

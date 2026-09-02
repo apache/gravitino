@@ -351,6 +351,26 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  void testTableOverwriteRejectsIdentifiersOfTheWrongDepth() throws Throwable {
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.values());
+
+    // Overwrite authorization must retain the table operation's target type. Deriving the
+    // expression from the identifier depth would authorize these as catalog or schema overwrites.
+    assertErrorResponse(
+        interceptor.invoke(createTableInvocation(CATALOG, "overwrite")), Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(createTableInvocation(CATALOG + "$" + SCHEMA, "overwrite")),
+        Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(registerTableInvocation(CATALOG, "overwrite")),
+        Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(registerTableInvocation(CATALOG + "$" + SCHEMA, "overwrite")),
+        Response.Status.FORBIDDEN);
+  }
+
+  @Test
   void testModifyTablePrivilegeAndOwnershipAuthorizeOverwrite() throws Throwable {
     allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
     assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "overwrite")));
