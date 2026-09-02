@@ -101,6 +101,33 @@ public class TestStaticIcebergConfigProvider {
     Assertions.assertTrue(hiveOps.getCatalog() instanceof HiveCatalog);
     Assertions.assertTrue(jdbcOps.getCatalog() instanceof JdbcCatalog);
     Assertions.assertTrue(defaultOps.getCatalog() instanceof InMemoryCatalog);
+    Assertions.assertArrayEquals(
+        new String[] {defaultCatalogName, hiveCatalogName, jdbcCatalogName},
+        provider.listCatalogs());
+  }
+
+  @Test
+  public void testLegacyProviderListsDefaultCatalog() {
+    IcebergConfigProvider provider =
+        new IcebergConfigProvider() {
+          @Override
+          public void initialize(Map<String, String> properties) {}
+
+          @Override
+          public Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName) {
+            return Optional.empty();
+          }
+
+          @Override
+          public String getDefaultCatalogName() {
+            return "legacy_default";
+          }
+
+          @Override
+          public void close() {}
+        };
+
+    Assertions.assertArrayEquals(new String[] {"legacy_default"}, provider.listCatalogs());
   }
 
   @ParameterizedTest

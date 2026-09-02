@@ -47,6 +47,18 @@ public interface IcebergConfigProvider extends Closeable {
   Optional<IcebergConfig> getIcebergCatalogConfig(String catalogName);
 
   /**
+   * List Iceberg catalogs served by this provider.
+   *
+   * <p>The default implementation advertises only the provider's default catalog to preserve
+   * compatibility with custom providers that predate catalog discovery.
+   *
+   * @return the names accepted by the Iceberg REST server's {@code warehouse} parameter
+   */
+  default String[] listCatalogs() {
+    return new String[] {getDefaultCatalogName()};
+  }
+
+  /**
    * Get metalake name.
    *
    * @return the name of metalake.

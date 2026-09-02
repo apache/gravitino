@@ -68,6 +68,11 @@ public class StaticIcebergConfigProvider implements IcebergConfigProvider {
   }
 
   @Override
+  public String[] listCatalogs() {
+    return catalogConfigs.keySet().stream().sorted().toArray(String[]::new);
+  }
+
+  @Override
   public void close() {}
 
   private Optional<String> getCatalogName(String catalogConfigKey) {

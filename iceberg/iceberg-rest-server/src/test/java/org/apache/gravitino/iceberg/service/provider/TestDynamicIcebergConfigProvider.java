@@ -35,6 +35,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.connector.BaseCatalog;
@@ -116,6 +117,11 @@ public class TestDynamicIcebergConfigProvider {
               throw new NoSuchCatalogException("Catalog not found: %s", catalogName);
             }
             return catalog;
+          }
+
+          @Override
+          public Catalog[] listCatalogsInfo() {
+            return catalogMap.values().toArray(Catalog[]::new);
           }
         };
     provider.setCatalogFetcher(mockFetcher);
@@ -209,6 +215,29 @@ public class TestDynamicIcebergConfigProvider {
         IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(invalidCatalogName));
     Assertions.assertThrowsExactly(
         IllegalArgumentException.class, () -> provider.getIcebergCatalogConfig(""));
+  }
+
+  @Test
+  public void testListCatalogs() {
+    Catalog alphaCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(alphaCatalog.name()).thenReturn("alpha");
+    Mockito.when(alphaCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Catalog zetaCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(zetaCatalog.name()).thenReturn("zeta");
+    Mockito.when(zetaCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Catalog nonIcebergCatalog = Mockito.mock(Catalog.class);
+    Mockito.when(nonIcebergCatalog.name()).thenReturn("hive");
+    Mockito.when(nonIcebergCatalog.provider()).thenReturn("hive");
+
+    Map<String, String> properties = new HashMap<>();
+    properties.put(IcebergConstants.GRAVITINO_METALAKE, "test_metalake");
+    properties.put(IcebergConstants.ICEBERG_REST_DEFAULT_DYNAMIC_CATALOG_NAME, "alpha");
+    DynamicIcebergConfigProvider provider = new DynamicIcebergConfigProvider();
+    provider.initialize(properties);
+    setMockCatalogFetcher(
+        provider, Map.of("zeta", zetaCatalog, "hive", nonIcebergCatalog, "alpha", alphaCatalog));
+
+    Assertions.assertArrayEquals(new String[] {"alpha", "zeta"}, provider.listCatalogs());
   }
 
   @Test
@@ -306,6 +335,8 @@ public class TestDynamicIcebergConfigProvider {
 
     NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalakeName, catalogName);
     Mockito.when(mockInternalCatalogDispatcher.loadCatalog(catalogIdent)).thenReturn(mockCatalog);
+    Mockito.when(mockInternalCatalogDispatcher.listCatalogsInfo(Namespace.of(metalakeName)))
+        .thenReturn(new Catalog[] {mockCatalog});
     Map<String, String> catalogProperties =
         new HashMap<String, String>() {
           {
@@ -314,6 +345,7 @@ public class TestDynamicIcebergConfigProvider {
           }
         };
     Mockito.when(mockCatalog.provider()).thenReturn("lakehouse-iceberg");
+    Mockito.when(mockCatalog.name()).thenReturn(catalogName);
     Mockito.when(mockCatalog.properties()).thenReturn(catalogProperties);
 
     // Set the mock CatalogDispatchers to GravitinoEnv
@@ -336,7 +368,9 @@ public class TestDynamicIcebergConfigProvider {
     Optional<IcebergConfig> icebergConfig = provider.getIcebergCatalogConfig(catalogName);
 
     Assertions.assertTrue(icebergConfig.isPresent());
+    Assertions.assertArrayEquals(new String[] {catalogName}, provider.listCatalogs());
     Mockito.verify(mockInternalCatalogDispatcher).loadCatalog(catalogIdent);
+    Mockito.verify(mockInternalCatalogDispatcher).listCatalogsInfo(Namespace.of(metalakeName));
     Mockito.verify(mockCatalogDispatcher, Mockito.never()).loadCatalog(catalogIdent);
   }
 

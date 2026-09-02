@@ -74,6 +74,7 @@ public class TestIcebergAuthenticationFilter {
       strings = {
         "/iceberg/v1/namespaces",
         "/iceberg/v1/config",
+        "/iceberg/gravitino/v1/management/catalogs",
         "/iceberg/healthcheck",
         "/api/metalakes"
       })

@@ -31,6 +31,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
+import org.apache.gravitino.Namespace;
 import org.apache.gravitino.auth.AuthProperties;
 import org.apache.gravitino.catalog.CatalogDispatcher;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
@@ -56,6 +57,8 @@ import org.apache.gravitino.utils.NameIdentifierUtil;
  * <p>The catalogName is iceberg_catalog
  */
 public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
+
+  private static final String ICEBERG_CATALOG_PROVIDER = "lakehouse-iceberg";
 
   private String gravitinoMetalake;
   private Optional<String> defaultDynamicCatalogName;
@@ -108,6 +111,16 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets,
     // then JdbcCredential overlays so credentials win.
     return Optional.of(getIcebergConfigFromCatalogProperties(resolveProps(catalog)));
+  }
+
+  @Override
+  public String[] listCatalogs() {
+    return Arrays.stream(getCatalogFetcher().listCatalogsInfo())
+        .filter(catalog -> ICEBERG_CATALOG_PROVIDER.equals(catalog.provider()))
+        .map(Catalog::name)
+        .distinct()
+        .sorted()
+        .toArray(String[]::new);
   }
 
   private static Map<String, String> resolveProps(Catalog catalog) {
@@ -275,6 +288,8 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
   interface CatalogFetcher extends Closeable {
     Catalog loadCatalog(String catalogName) throws NoSuchCatalogException;
 
+    Catalog[] listCatalogsInfo();
+
     @Override
     default void close() {}
   }
@@ -306,6 +321,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
       NameIdentifier catalogIdent = NameIdentifierUtil.ofCatalog(metalake, catalogName);
       return catalogDispatcher.loadCatalog(catalogIdent);
     }
+
+    @Override
+    public Catalog[] listCatalogsInfo() {
+      return catalogDispatcher.listCatalogsInfo(Namespace.of(metalake));
+    }
   }
 
   /**
@@ -327,6 +347,11 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
       return getGravitinoClient().loadCatalog(catalogName);
+    }
+
+    @Override
+    public Catalog[] listCatalogsInfo() {
+      return getGravitinoClient().listCatalogsInfo();
     }
 
     @Override
