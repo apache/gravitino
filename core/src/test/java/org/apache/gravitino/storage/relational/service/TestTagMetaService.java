@@ -35,6 +35,12 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
 import org.apache.gravitino.MetadataObject;
@@ -66,7 +72,9 @@ import org.apache.gravitino.policy.PolicyContents;
 import org.apache.gravitino.rel.types.Types;
 import org.apache.gravitino.storage.RandomIdGenerator;
 import org.apache.gravitino.storage.relational.TestJDBCBackend;
+import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TagMetaMapper;
+import org.apache.gravitino.storage.relational.po.MetalakePO;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.gravitino.storage.relational.session.SqlSessionFactoryHelper;
 import org.apache.gravitino.storage.relational.utils.POConverters;
@@ -353,10 +361,20 @@ public class TestTagMetaService extends TestJDBCBackend {
     TagPO initialPO =
         SessionUtils.getWithoutCommit(
             TagMetaMapper.class, mapper -> mapper.selectTagByTagId(tag.id()));
-    tagMetaService.insertTag(tag, true);
+    TagEntity replacement =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(tag.name())
+            .withNamespace(tag.namespace())
+            .withComment("overwritten")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(replacement, true);
     TagPO overwrittenPO =
         SessionUtils.getWithoutCommit(
             TagMetaMapper.class, mapper -> mapper.selectTagByTagId(tag.id()));
+    Assertions.assertEquals(tag.id(), overwrittenPO.getTagId().longValue());
+    Assertions.assertEquals("overwritten", overwrittenPO.getComment());
     Assertions.assertEquals(
         initialPO.getCurrentVersion() + 1, overwrittenPO.getCurrentVersion().longValue());
     Assertions.assertEquals(overwrittenPO.getCurrentVersion(), overwrittenPO.getLastVersion());
@@ -384,6 +402,242 @@ public class TestTagMetaService extends TestJDBCBackend {
             TagMetaMapper.class,
             mapper ->
                 mapper.softDeleteTagMetaByIdAndVersion(tag.id(), nextPO.getCurrentVersion())));
+  }
+
+  @TestTemplate
+  public void testTagOverwriteByNameDoesNotRevertConcurrentRename() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity original =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_overwrite_rename_race")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("initial")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(original, false);
+    TagPO observedPO = getTagPO(original.nameIdentifier());
+    TagEntity renamed = copyTag(original, "tag_overwrite_rename_winner", "rename winner");
+    TagPO renamedPO = POConverters.updateTagPOWithVersion(observedPO, renamed);
+    TagEntity replacement =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName(original.name())
+            .withNamespace(original.namespace())
+            .withComment("replacement")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    CountDownLatch renameWritten = new CountDownLatch(1);
+    CountDownLatch allowRenameCommit = new CountDownLatch(1);
+    CountDownLatch overwriteStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> renameResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        Assertions.assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                TagMetaMapper.class,
+                                mapper -> mapper.updateTagMeta(renamedPO, observedPO))),
+                    () -> {
+                      renameWritten.countDown();
+                      await(allowRenameCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      assertTrue(renameWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> overwriteResult =
+          executor.submit(
+              () -> {
+                overwriteStarted.countDown();
+                try {
+                  tagMetaService.insertTag(replacement, true);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(overwriteStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> overwriteResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowRenameCommit.countDown();
+      Assertions.assertNull(renameResult.get(30, TimeUnit.SECONDS));
+      Assertions.assertNull(overwriteResult.get(30, TimeUnit.SECONDS));
+    } finally {
+      allowRenameCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    Assertions.assertEquals(
+        original.id(), tagMetaService.getTagByIdentifier(renamed.nameIdentifier()).id());
+    Assertions.assertEquals(
+        replacement.id(), tagMetaService.getTagByIdentifier(replacement.nameIdentifier()).id());
+  }
+
+  @TestTemplate
+  public void testTagCreateWaitsForConcurrentParentDelete() throws Exception {
+    BaseMetalake metalake = createAndInsertMakeLake(METALAKE_NAME);
+    MetalakePO observedMetalakePO =
+        SessionUtils.getWithoutCommit(
+            MetalakeMetaMapper.class, mapper -> mapper.selectMetalakeMetaByName(metalake.name()));
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_parent_delete_race")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("initial")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+
+    CountDownLatch deleteWritten = new CountDownLatch(1);
+    CountDownLatch allowDeleteCommit = new CountDownLatch(1);
+    CountDownLatch createStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> deleteResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        Assertions.assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                MetalakeMetaMapper.class,
+                                mapper ->
+                                    mapper.softDeleteMetalakeMetaByMetalakeId(
+                                        observedMetalakePO.getMetalakeId(),
+                                        observedMetalakePO.getCurrentVersion()))),
+                    () -> {
+                      deleteWritten.countDown();
+                      await(allowDeleteCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      assertTrue(deleteWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> createResult =
+          executor.submit(
+              () -> {
+                createStarted.countDown();
+                try {
+                  TagMetaService.getInstance().insertTag(tag, false);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(createStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> createResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowDeleteCommit.countDown();
+      Assertions.assertNull(deleteResult.get(30, TimeUnit.SECONDS));
+      Throwable createFailure = createResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue(
+          createFailure instanceof NoSuchEntityException, String.valueOf(createFailure));
+    } finally {
+      allowDeleteCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    assertFalse(backend.exists(tag.nameIdentifier(), Entity.EntityType.TAG));
+    Assertions.assertNull(
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class, mapper -> mapper.selectTagByTagId(tag.id())));
+  }
+
+  @TestTemplate
+  public void testTagAssignmentWaitsForConcurrentRenameAndRollsBack() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, "catalog_tag_rename_race");
+    TagMetaService tagMetaService = TagMetaService.getInstance();
+    TagEntity tag =
+        TagEntity.builder()
+            .withId(RandomIdGenerator.INSTANCE.nextId())
+            .withName("tag_assignment_rename_race")
+            .withNamespace(NamespaceUtil.ofTag(METALAKE_NAME))
+            .withComment("initial")
+            .withAuditInfo(AUDIT_INFO)
+            .build();
+    tagMetaService.insertTag(tag, false);
+    TagPO observedPO = getTagPO(tag.nameIdentifier());
+    TagEntity renamed = copyTag(tag, "tag_assignment_rename_winner", "renamed");
+    TagPO renamedPO = POConverters.updateTagPOWithVersion(observedPO, renamed);
+
+    CountDownLatch renameWritten = new CountDownLatch(1);
+    CountDownLatch allowRenameCommit = new CountDownLatch(1);
+    CountDownLatch assignmentStarted = new CountDownLatch(1);
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+    Future<Throwable> renameResult =
+        executor.submit(
+            () -> {
+              try {
+                SessionUtils.doMultipleWithCommit(
+                    () ->
+                        Assertions.assertEquals(
+                            Integer.valueOf(1),
+                            SessionUtils.getWithoutCommit(
+                                TagMetaMapper.class,
+                                mapper -> mapper.updateTagMeta(renamedPO, observedPO))),
+                    () -> {
+                      renameWritten.countDown();
+                      await(allowRenameCommit);
+                    });
+                return null;
+              } catch (Throwable throwable) {
+                return throwable;
+              }
+            });
+
+    try {
+      assertTrue(renameWritten.await(30, TimeUnit.SECONDS));
+      Future<Throwable> assignmentResult =
+          executor.submit(
+              () -> {
+                assignmentStarted.countDown();
+                try {
+                  tagMetaService.associateTagsWithMetadataObject(
+                      catalog.nameIdentifier(),
+                      catalog.type(),
+                      new NameIdentifier[] {tag.nameIdentifier()},
+                      new NameIdentifier[0]);
+                  return null;
+                } catch (Throwable throwable) {
+                  return throwable;
+                }
+              });
+      assertTrue(assignmentStarted.await(30, TimeUnit.SECONDS));
+      Assertions.assertThrows(
+          TimeoutException.class, () -> assignmentResult.get(500, TimeUnit.MILLISECONDS));
+
+      allowRenameCommit.countDown();
+      Assertions.assertNull(renameResult.get(30, TimeUnit.SECONDS));
+      Throwable assignmentFailure = assignmentResult.get(30, TimeUnit.SECONDS);
+      Assertions.assertTrue(
+          assignmentFailure instanceof NoSuchEntityException, String.valueOf(assignmentFailure));
+    } finally {
+      allowRenameCommit.countDown();
+      executor.shutdownNow();
+    }
+
+    assertEquals(0, countActiveTagRel(tag.id()));
+    Assertions.assertEquals(
+        tag.id(), tagMetaService.getTagByIdentifier(renamed.nameIdentifier()).id());
   }
 
   @TestTemplate
@@ -604,11 +858,9 @@ public class TestTagMetaService extends TestJDBCBackend {
             TagMetaMapper.class, mapper -> mapper.selectTagByTagId(tag.id()));
     Assertions.assertTrue(tagMetaService.deleteTag(tag.nameIdentifier()));
 
-    // The row the caller observed is gone rather than merely moved on, so the failed
-    // compare-and-set is a missing tag and not a version conflict.
-    Assertions.assertThrows(
-        NoSuchEntityException.class,
-        () -> tagMetaService.deleteTag(tag.nameIdentifier(), observedPO));
+    // The row the caller observed is gone rather than merely moved on, so the idempotent delete
+    // contract reports false instead of turning a concurrent delete into an exception.
+    Assertions.assertFalse(tagMetaService.deleteTag(tag.nameIdentifier(), observedPO));
     Assertions.assertFalse(tagMetaService.deleteTag(tag.nameIdentifier()));
   }
 
@@ -1576,10 +1828,14 @@ public class TestTagMetaService extends TestJDBCBackend {
   }
 
   private TagEntity copyTagWithComment(TagEntity tag, String comment) {
+    return copyTag(tag, tag.name(), comment);
+  }
+
+  private TagEntity copyTag(TagEntity tag, String name, String comment) {
     TagEntity.Builder builder =
         TagEntity.builder()
             .withId(tag.id())
-            .withName(tag.name())
+            .withName(name)
             .withNamespace(tag.namespace())
             .withComment(comment)
             .withProperties(tag.properties())
@@ -1588,6 +1844,23 @@ public class TestTagMetaService extends TestJDBCBackend {
       builder.withAllowedValues(tag.valueConstraint().allowedValues());
     }
     return builder.build();
+  }
+
+  private TagPO getTagPO(NameIdentifier identifier) {
+    return SessionUtils.getWithoutCommit(
+        TagMetaMapper.class,
+        mapper ->
+            mapper.selectTagMetaByMetalakeAndName(
+                identifier.namespace().level(0), identifier.name()));
+  }
+
+  private void await(CountDownLatch latch) {
+    try {
+      assertTrue(latch.await(30, TimeUnit.SECONDS));
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    }
   }
 
   private boolean containsValuelessTagAssignment(

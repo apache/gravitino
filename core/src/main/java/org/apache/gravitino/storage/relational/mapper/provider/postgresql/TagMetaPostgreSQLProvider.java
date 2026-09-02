@@ -46,41 +46,6 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   }
 
   @Override
-  public String insertTagMetaOnDuplicateKeyUpdate(TagPO tagPO) {
-    return "INSERT INTO "
-        + TAG_TABLE_NAME
-        + " (tag_id, tag_name,"
-        + " metalake_id, tag_comment, properties, allowed_values, audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ("
-        + " #{tagMeta.tagId},"
-        + " #{tagMeta.tagName},"
-        + " #{tagMeta.metalakeId},"
-        + " #{tagMeta.comment},"
-        + " #{tagMeta.properties},"
-        + " #{tagMeta.allowedValues},"
-        + " #{tagMeta.auditInfo},"
-        + " #{tagMeta.currentVersion},"
-        + " #{tagMeta.lastVersion},"
-        + " #{tagMeta.deletedAt}"
-        + " )"
-        + " ON CONFLICT(tag_id) DO UPDATE SET"
-        + " tag_name = #{tagMeta.tagName},"
-        + " metalake_id = #{tagMeta.metalakeId},"
-        + " tag_comment = #{tagMeta.comment},"
-        + " properties = #{tagMeta.properties},"
-        + " allowed_values = #{tagMeta.allowedValues},"
-        + " audit_info = #{tagMeta.auditInfo},"
-        + " current_version = "
-        + TAG_TABLE_NAME
-        + ".current_version + 1,"
-        + " last_version = "
-        + TAG_TABLE_NAME
-        + ".current_version + 1,"
-        + " deleted_at = #{tagMeta.deletedAt}";
-  }
-
-  @Override
   public String updateTagMeta(
       @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
     return "UPDATE "

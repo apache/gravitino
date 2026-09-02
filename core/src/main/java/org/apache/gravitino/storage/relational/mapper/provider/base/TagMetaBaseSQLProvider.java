@@ -123,38 +123,6 @@ public class TagMetaBaseSQLProvider {
         + " )";
   }
 
-  public String insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO) {
-    return "INSERT INTO "
-        + TAG_TABLE_NAME
-        + " (tag_id, tag_name,"
-        + " metalake_id, tag_comment, properties, allowed_values, audit_info,"
-        + " current_version, last_version, deleted_at)"
-        + " VALUES ("
-        + " #{tagMeta.tagId},"
-        + " #{tagMeta.tagName},"
-        + " #{tagMeta.metalakeId},"
-        + " #{tagMeta.comment},"
-        + " #{tagMeta.properties},"
-        + " #{tagMeta.allowedValues},"
-        + " #{tagMeta.auditInfo},"
-        + " #{tagMeta.currentVersion},"
-        + " #{tagMeta.lastVersion},"
-        + " #{tagMeta.deletedAt}"
-        + " )"
-        + " ON DUPLICATE KEY UPDATE"
-        + " tag_name = #{tagMeta.tagName},"
-        + " metalake_id = #{tagMeta.metalakeId},"
-        + " tag_comment = #{tagMeta.comment},"
-        + " properties = #{tagMeta.properties},"
-        + " allowed_values = #{tagMeta.allowedValues},"
-        + " audit_info = #{tagMeta.auditInfo},"
-        // Preserve the stored OCC sequence when an overwrite replaces the payload. Assign
-        // last_version first because MySQL evaluates assignments from left to right.
-        + " last_version = current_version + 1,"
-        + " current_version = current_version + 1,"
-        + " deleted_at = #{tagMeta.deletedAt}";
-  }
-
   public String updateTagMeta(
       @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
     return "UPDATE "
@@ -212,6 +180,12 @@ public class TagMetaBaseSQLProvider {
         + " FROM "
         + TAG_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND tag_name = #{name} and deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and exclusively locks an active tag by its natural key. */
+  public String selectTagMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("name") String name) {
+    return selectTagMetaByMetalakeIdAndName(metalakeId, name) + " FOR UPDATE";
   }
 
   public String selectTagByTagId(@Param("tagId") Long tagId) {

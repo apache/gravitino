@@ -122,16 +122,7 @@ public class TagMetaService {
 
       SessionUtils.doMultipleWithCommit(
           () -> lockMetalakeForTagCreate(metalakePO),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TagMetaMapper.class,
-                  mapper -> {
-                    if (overwritten) {
-                      mapper.insertTagMetaOnDuplicateKeyUpdate(tagPO);
-                    } else {
-                      mapper.insertTagMeta(tagPO);
-                    }
-                  }));
+          () -> insertTagWithoutCommit(tagEntity, tagPO, overwritten));
     } catch (RuntimeException e) {
       ExceptionUtils.checkSQLException(e, Entity.EntityType.TAG, tagEntity.toString());
       throw e;
@@ -559,7 +550,9 @@ public class TagMetaService {
   /**
    * Deletes the tag the caller observed. The delete is a compare-and-set on the observed version,
    * so a tag that changed since it was read is rejected instead of being removed, and the dependent
-   * rows are cleaned up in the same transaction as the tag row itself.
+   * rows are cleaned up in the same transaction as the tag row itself. If another transaction
+   * deletes or renames the observed tag first, this method returns {@code false}, preserving the
+   * idempotent delete contract.
    *
    * <p>The observed row is a parameter so that a test can hand in a stale one; production callers
    * use {@link #deleteTag(NameIdentifier)}, which reads it first.
@@ -574,33 +567,37 @@ public class TagMetaService {
     // so their row counts carry no information -- a tag with no assignments, no policies, no owner
     // and no securable object legitimately clears zero rows -- and only the delete above is
     // checked.
-    SessionUtils.doMultipleWithCommit(
-        () -> deleteTagWithVersion(identifier, tagPO),
-        () ->
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tagId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId)),
-        () ->
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        tagId, MetadataObject.Type.TAG.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        tagId, MetadataObject.Type.TAG.name())),
-        () ->
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        tagId, MetadataObject.Type.TAG.name())));
+    try {
+      SessionUtils.doMultipleWithCommit(
+          () -> deleteTagWithVersion(identifier, tagPO),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TagMetadataObjectRelMapper.class,
+                  mapper -> mapper.softDeleteTagMetadataObjectRelsByTagId(tagId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyTagRelMapper.class, mapper -> mapper.softDeleteByTagId(tagId)),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  PolicyMetadataObjectRelMapper.class,
+                  mapper ->
+                      mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                          tagId, MetadataObject.Type.TAG.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  OwnerMetaMapper.class,
+                  mapper ->
+                      mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                          tagId, MetadataObject.Type.TAG.name())),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  SecurableObjectMapper.class,
+                  mapper ->
+                      mapper.softDeleteObjectRelsByMetadataObject(
+                          tagId, MetadataObject.Type.TAG.name())));
+    } catch (NoSuchEntityException e) {
+      return false;
+    }
 
     return true;
   }
@@ -728,6 +725,68 @@ public class TagMetaService {
                     mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
         null,
         current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
+  }
+
+  /**
+   * Writes a new tag or replaces the active tag selected by name or stable ID.
+   *
+   * <p>The overwrite path uses locking reads instead of a database-specific upsert. This keeps the
+   * stored tag ID and OCC sequence stable across all databases. A name-targeted overwrite that
+   * races with a rename creates a new row under the now-free name instead of reverting the renamed
+   * row.
+   */
+  private void insertTagWithoutCommit(
+      TagEntity tagEntity, TagPO initializedTagPO, boolean overwritten) {
+    if (!overwritten) {
+      insertNewTagWithoutCommit(initializedTagPO);
+      return;
+    }
+
+    TagPO existingTagPO = findAndLockTagForOverwrite(initializedTagPO);
+    if (existingTagPO == null) {
+      insertNewTagWithoutCommit(initializedTagPO);
+      return;
+    }
+
+    TagPO replacementTagPO = POConverters.updateTagPOWithVersion(existingTagPO, tagEntity);
+    NameIdentifier observedIdentifier =
+        NameIdentifier.of(tagEntity.namespace(), existingTagPO.getTagName());
+    updateTagRootWithVersion(observedIdentifier, existingTagPO, replacementTagPO);
+  }
+
+  private void insertNewTagWithoutCommit(TagPO tagPO) {
+    SessionUtils.doWithoutCommit(TagMetaMapper.class, mapper -> mapper.insertTagMeta(tagPO));
+  }
+
+  private TagPO findAndLockTagForOverwrite(TagPO initializedTagPO) {
+    TagPO sameNameTagPO =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper ->
+                mapper.selectTagMetaByMetalakeIdAndNameForUpdate(
+                    initializedTagPO.getMetalakeId(), initializedTagPO.getTagName()));
+    if (sameNameTagPO != null) {
+      return sameNameTagPO;
+    }
+
+    TagPO sameIdTagPO =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class,
+            mapper -> mapper.selectTagByTagIdForUpdate(initializedTagPO.getTagId()));
+    if (sameIdTagPO == null
+        || !Objects.equals(sameIdTagPO.getMetalakeId(), initializedTagPO.getMetalakeId())) {
+      return null;
+    }
+    return sameIdTagPO;
+  }
+
+  private void updateTagRootWithVersion(NameIdentifier identifier, TagPO oldTagPO, TagPO newTagPO) {
+    Integer updated =
+        SessionUtils.getWithoutCommit(
+            TagMetaMapper.class, mapper -> mapper.updateTagMeta(newTagPO, oldTagPO));
+    if (updated == null || updated == 0) {
+      throw tagWriteFailure(identifier, oldTagPO);
+    }
   }
 
   private void deleteTagWithVersion(NameIdentifier identifier, TagPO observedTagPO) {

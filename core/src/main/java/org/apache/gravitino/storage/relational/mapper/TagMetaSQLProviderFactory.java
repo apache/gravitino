@@ -74,10 +74,6 @@ public class TagMetaSQLProviderFactory {
     return getProvider().insertTagMeta(tagPO);
   }
 
-  public static String insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO) {
-    return getProvider().insertTagMetaOnDuplicateKeyUpdate(tagPO);
-  }
-
   public static String updateTagMeta(
       @Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO) {
     return getProvider().updateTagMeta(newTagPO, oldTagPO);
@@ -101,6 +97,12 @@ public class TagMetaSQLProviderFactory {
   public static String selectTagMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("name") String name) {
     return getProvider().selectTagMetaByMetalakeIdAndName(metalakeId, name);
+  }
+
+  /** Delegates an exclusive-lock tag query by natural key. */
+  public static String selectTagMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("name") String name) {
+    return getProvider().selectTagMetaByMetalakeIdAndNameForUpdate(metalakeId, name);
   }
 
   public static String selectTagByTagId(@Param("tagId") Long tagId) {

@@ -53,13 +53,21 @@ public interface TagMetaMapper {
   TagPO selectTagMetaByMetalakeIdAndName(
       @Param("metalakeId") Long metalakeId, @Param("name") String tagName);
 
+  /**
+   * Selects and exclusively locks an active tag by its natural key.
+   *
+   * @param metalakeId The metalake ID.
+   * @param tagName The tag name.
+   * @return The locked tag, or null if the natural key is not active.
+   */
+  @SelectProvider(
+      type = TagMetaSQLProviderFactory.class,
+      method = "selectTagMetaByMetalakeIdAndNameForUpdate")
+  TagPO selectTagMetaByMetalakeIdAndNameForUpdate(
+      @Param("metalakeId") Long metalakeId, @Param("name") String tagName);
+
   @InsertProvider(type = TagMetaSQLProviderFactory.class, method = "insertTagMeta")
   void insertTagMeta(@Param("tagMeta") TagPO tagPO);
-
-  @InsertProvider(
-      type = TagMetaSQLProviderFactory.class,
-      method = "insertTagMetaOnDuplicateKeyUpdate")
-  void insertTagMetaOnDuplicateKeyUpdate(@Param("tagMeta") TagPO tagPO);
 
   @UpdateProvider(type = TagMetaSQLProviderFactory.class, method = "updateTagMeta")
   Integer updateTagMeta(@Param("newTagMeta") TagPO newTagPO, @Param("oldTagMeta") TagPO oldTagPO);
