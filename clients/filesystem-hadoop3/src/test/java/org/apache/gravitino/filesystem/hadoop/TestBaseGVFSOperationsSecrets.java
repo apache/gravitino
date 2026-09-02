@@ -81,7 +81,7 @@ public class TestBaseGVFSOperationsSecrets {
 
     TestOps ops = new TestOps(conf, client);
     Map<String, String> all =
-        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"), fileset, catalog);
 
     assertEquals("1", all.get("c-vis"));
     assertEquals("cs", all.get("c-secret"));
@@ -127,7 +127,7 @@ public class TestBaseGVFSOperationsSecrets {
 
     TestOps ops = new TestOps(conf, client);
     Map<String, String> all =
-        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"), fileset, catalog);
 
     assertEquals("from-fileset-secret", all.get("shared"));
   }
@@ -168,7 +168,7 @@ public class TestBaseGVFSOperationsSecrets {
 
     TestOps ops = new TestOps(conf, client);
     Map<String, String> all =
-        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"));
+        ops.getAllProperties(NameIdentifier.of("ml", "catalog", "schema", "fs"), fileset, catalog);
 
     assertEquals("cs", all.get("c-secret"));
     assertEquals("ss", all.get("s-secret"));
