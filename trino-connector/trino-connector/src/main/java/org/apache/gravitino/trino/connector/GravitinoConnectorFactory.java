@@ -25,6 +25,7 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.Connector;
 import io.trino.spi.connector.ConnectorContext;
@@ -45,14 +46,12 @@ import org.apache.gravitino.trino.connector.catalog.DefaultCatalogConnectorFacto
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /** Gravitino connector factory. */
 public class GravitinoConnectorFactory implements ConnectorFactory {
 
-  private static final Logger LOG = LoggerFactory.getLogger(GravitinoConnectorFactory.class);
-  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 435;
+  private static final Logger LOG = Logger.get(GravitinoConnectorFactory.class);
+  private static final int MIN_SUPPORT_TRINO_SPI_VERSION = 440;
   private static final int MAX_SUPPORT_TRINO_SPI_VERSION = Integer.MAX_VALUE;
   private static final Pattern TRINO_SPI_VERSION_PATTERN = Pattern.compile("^(\\d+)");
   private static final Set<String> SECURITY_SENSITIVE_PROPERTY_SUFFIXES =
@@ -64,6 +63,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   private GravitinoSystemTableFactory gravitinoSystemTableFactory;
 
   private CatalogConnectorManager catalogConnectorManager;
+  private boolean catalogConnectorManagerStartTriggered = false;
 
   private GravitinoAdminClient client;
   private int trinoVersion;
@@ -88,6 +88,16 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
   }
 
   /**
+   * Returns whether starting the catalog connector manager has been triggered.
+   *
+   * @return true if starting the catalog connector manager has been triggered
+   */
+  @VisibleForTesting
+  public boolean isCatalogConnectorManagerStartTriggered() {
+    return catalogConnectorManagerStartTriggered;
+  }
+
+  /**
    * This function call by Trino creates a connector. It creates GravitinoSystemConnector at first.
    * Another time's it get GravitinoConnector by CatalogConnectorManager
    *
@@ -104,27 +114,51 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     GravitinoConfig config = new GravitinoConfig(requiredConfig);
 
     synchronized (this) {
+      // Keep the version check out of the try below so that it keeps reporting its own error code
+      // instead of being wrapped as a generic initialization failure.
       if (catalogConnectorManager == null) {
         checkTrinoSpiVersion(trinoConnectorContext, config);
-        try {
+      }
+
+      try {
+        if (catalogConnectorManager == null) {
           CatalogRegister catalogRegister = new CatalogRegister();
 
           CatalogConnectorFactory catalogConnectorFactory = createCatalogConnectorFactory(config);
-          catalogConnectorManager =
+          CatalogConnectorManager newCatalogConnectorManager =
               new CatalogConnectorManager(
                   catalogRegister, catalogConnectorFactory, this::getTrinoCatalogName);
-          catalogConnectorManager.config(config, client);
+          newCatalogConnectorManager.config(config, client);
 
-          if (isCoordinator(trinoConnectorContext)) {
-            catalogConnectorManager.start();
-          }
-
+          // Publish the manager only after it has been configured successfully. Otherwise a
+          // failed client initialization leaves a shared manager with a null Gravitino client,
+          // causing later connector creation attempts to fail with a misleading NPE.
+          catalogConnectorManager = newCatalogConnectorManager;
           gravitinoSystemTableFactory = new GravitinoSystemTableFactory(catalogConnectorManager);
-        } catch (Exception e) {
-          String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
-          LOG.error(message);
-          throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
         }
+
+        // The `trino.jdbc.*` settings that CatalogRegister needs to connect back to the
+        // coordinator are deliberately not propagated to the dynamic catalogs, so they are only
+        // present in the configuration of the static connector. Trino does not guarantee that the
+        // static catalog is loaded before the catalogs Gravitino created, therefore the manager is
+        // started from the static connector only, re-applying its configuration in case a dynamic
+        // connector was created first.
+        if (!catalogConnectorManagerStartTriggered
+            && !config.isDynamicConnector()
+            && isCoordinator(trinoConnectorContext)) {
+          // Triggered before start() on purpose: everything that makes it fail is a
+          // configuration error, and retrying on the next create() would only open another
+          // connection.
+          catalogConnectorManagerStartTriggered = true;
+          // Only the configuration is re-applied here: rebuilding the Gravitino client would leak
+          // the one a dynamic connector may have already built.
+          catalogConnectorManager.updateConfig(config);
+          catalogConnectorManager.start();
+        }
+      } catch (Exception e) {
+        String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
+        LOG.error(e, message);
+        throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);
       }
     }
 
@@ -182,10 +216,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
     // check catalog name with metalake are supported in this trino version
     if (!config.singleMetalakeMode() && !supportCatalogNameWithMetalake()) {
       LOG.warn(
-          "The trino-connector-{}-{} does not fully support catalog name with metalake. "
+          "The trino-connector-%s-%s does not fully support catalog name with metalake. "
               + "The DROP CATALOG operation may not work correctly in multi-metalake mode.",
-          getMinSupportTrinoSpiVersion(),
-          getMaxSupportTrinoSpiVersion());
+          getMinSupportTrinoSpiVersion(), getMaxSupportTrinoSpiVersion());
     }
 
     // skip version validation
@@ -194,7 +227,7 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
       if (trinoVersion < getMinSupportTrinoSpiVersion()
           || trinoVersion > getMaxSupportTrinoSpiVersion()) {
         LOG.warn(
-            "Trino version {} has not been tested with Gravitino and may have compatibility issues",
+            "Trino version %s has not been tested with Gravitino and may have compatibility issues",
             trinoVersion);
       }
       return;
@@ -214,6 +247,9 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
 
   @VisibleForTesting
   static boolean isSecuritySensitivePropertyName(String propertyName) {
+    if (propertyName.startsWith(GravitinoConfig.GRAVITINO_DYNAMIC_CATALOG_ENV_PREFIX)) {
+      return false;
+    }
     String normalizedPropertyName = propertyName.toLowerCase(Locale.ROOT).replaceAll("[._-]", "");
     return SECURITY_SENSITIVE_PROPERTY_SUFFIXES.stream().anyMatch(normalizedPropertyName::endsWith);
   }

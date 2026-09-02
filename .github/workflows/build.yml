@@ -150,11 +150,6 @@ jobs:
     strategy:
       matrix:
         java-version: [ 17 ]
-    # This job compiles and unit-tests every module. It has been finishing in 75-84 minutes against
-    # a 90-minute cap, and :core:test alone has varied from 27 to 45 minutes across runs on
-    # identical code, so the margin was already thinner than the runner's own variance. Adding a
-    # second Spark line spends some of what is left. 120 minutes matches the backend and cron
-    # integration test jobs.
     timeout-minutes: 120
     needs: changes
     if: needs.changes.outputs.source_changes == 'true'
@@ -195,6 +190,7 @@ jobs:
 
           gradle_args=(
             build
+            --max-workers=2
             -PskipWeb=true
             -PskipITs
             -PskipDockerTests=false

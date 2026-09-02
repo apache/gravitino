@@ -139,6 +139,31 @@ public class IdpUserMetaService {
         });
   }
 
+  /**
+   * Updates whether an active user is enabled. Succeeds when the user exists and the update is
+   * committed, even if the stored flag is already equal to {@code enabled}.
+   *
+   * @param username username of the user
+   * @param enabled whether the user should be enabled
+   * @return {@code true} if the enabled flag was updated
+   * @throws NotFoundException if the user does not exist or is soft-deleted
+   */
+  @Monitored(
+      metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
+      baseMetricName = "updateIdpUserEnabled")
+  public boolean updateIdpUserEnabled(String username, boolean enabled) {
+    return SessionUtils.doWithCommitAndFetchResult(
+        IdpUserMetaMapper.class,
+        mapper -> {
+          IdpUserPO userPO = mapper.selectIdpUser(username);
+          if (userPO == null) {
+            throw new NotFoundException("IdP user not found: %s", username);
+          }
+          mapper.updateIdpUserEnabled(username, enabled);
+          return true;
+        });
+  }
+
   @Monitored(
       metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME,
       baseMetricName = "deleteIdpUserMetasByLegacyTimeline")

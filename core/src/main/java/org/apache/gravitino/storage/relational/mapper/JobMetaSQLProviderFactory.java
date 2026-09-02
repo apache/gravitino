@@ -76,6 +76,11 @@ public class JobMetaSQLProviderFactory {
     return getProvider().selectJobPOByMetalakeAndRunId(metalakeName, jobRunId);
   }
 
+  public static String updateJobMeta(
+      @Param("newJobMeta") JobPO newJobPO, @Param("oldJobMeta") JobPO oldJobPO) {
+    return getProvider().updateJobMeta(newJobPO, oldJobPO);
+  }
+
   public static String softDeleteJobMetaByMetalakeAndTemplate(
       @Param("metalakeName") String metalakeName,
       @Param("jobTemplateName") String jobTemplateName) {

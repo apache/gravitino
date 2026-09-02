@@ -200,8 +200,12 @@ Updating the package list ensures you have the latest information on the newest 
 **On Ubuntu (WSL):**
 
 ```shell
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
-sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
 sudo apt install docker-ce
 sudo service docker start
@@ -209,7 +213,7 @@ sudo docker run hello-world
 sudo usermod -aG docker $USER
 ```
 
-These commands install Docker. Running `hello-world` verifies the installation. Adding your user to the Docker group allows you to run Docker commands without `sudo`.
+These commands install Docker using the signed `apt` keyring instead of the deprecated `apt-key` command. Running `hello-world` verifies the installation. Adding your user to the Docker group allows you to run Docker commands without `sudo`.
 
 ### Install Python 3.11
 

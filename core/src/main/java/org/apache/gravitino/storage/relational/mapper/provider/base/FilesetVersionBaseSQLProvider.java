@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.base;
 import static org.apache.gravitino.storage.relational.mapper.FilesetVersionMapper.VERSION_TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.FilesetVersionPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -74,16 +75,16 @@ public class FilesetVersionBaseSQLProvider {
   public String softDeleteFilesetVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
   public String softDeleteFilesetVersionsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -91,8 +92,8 @@ public class FilesetVersionBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE schema_id IN ("
         + "<foreach collection='schemaIds' item='schemaId' separator=','>"
         + "#{schemaId}"
@@ -104,8 +105,8 @@ public class FilesetVersionBaseSQLProvider {
   public String softDeleteFilesetVersionsByFilesetId(@Param("filesetId") Long filesetId) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
   }
 
@@ -114,6 +115,19 @@ public class FilesetVersionBaseSQLProvider {
     return "DELETE FROM "
         + VERSION_TABLE_NAME
         + " WHERE deleted_at > 0 AND deleted_at < #{legacyTimeline} LIMIT #{limit}";
+  }
+
+  /**
+   * Returns SQL that finds the highest active snapshot version owned by a fileset.
+   *
+   * @param filesetId the fileset ID
+   * @return the maximum-version query
+   */
+  public String selectMaxFilesetVersion(@Param("filesetId") Long filesetId) {
+    return "SELECT MAX(version)"
+        + " FROM "
+        + VERSION_TABLE_NAME
+        + " WHERE fileset_id = #{filesetId} AND deleted_at = 0";
   }
 
   public String selectFilesetVersionsByRetentionCount(
@@ -132,8 +146,8 @@ public class FilesetVersionBaseSQLProvider {
       @Param("limit") int limit) {
     return "UPDATE "
         + VERSION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE fileset_id = #{filesetId} AND version <= #{versionRetentionLine} AND deleted_at = 0 LIMIT #{limit}";
   }
 }

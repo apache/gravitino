@@ -21,6 +21,7 @@ package org.apache.gravitino.job;
 
 import static org.apache.gravitino.metalake.MetalakeManager.checkMetalake;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.File;
@@ -49,11 +50,14 @@ import org.apache.gravitino.EntityStore;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.connector.job.JobExecutor;
+import org.apache.gravitino.dto.job.JobTemplateDTO;
+import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.exceptions.InUseException;
 import org.apache.gravitino.exceptions.JobTemplateAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
 import org.apache.gravitino.exceptions.NoSuchJobException;
 import org.apache.gravitino.exceptions.NoSuchJobTemplateException;
+import org.apache.gravitino.json.JsonUtils;
 import org.apache.gravitino.lock.LockType;
 import org.apache.gravitino.lock.TreeLockUtils;
 import org.apache.gravitino.meta.AuditInfo;
@@ -443,6 +447,19 @@ public class JobManager implements JobOperationDispatcher {
     // also downloading any necessary files from the URIs specified in the job template.
     JobTemplate jobTemplate = createRuntimeJobTemplate(jobTemplateEntity, jobConf, jobStagingDir);
 
+    // Serialize the resolved (placeholder-replaced) job template so callers can later see exactly
+    // what was submitted for execution, not just the original template. This is done before
+    // submission so that a serialization failure never leaves a job running on the executor
+    // without a corresponding JobEntity.
+    JobTemplateDTO runtimeJobTemplateDTO =
+        DTOConverters.toDTO(jobTemplate, DTOConverters.toDTO(jobTemplateEntity.auditInfo()));
+    String runtimeJobTemplateJson;
+    try {
+      runtimeJobTemplateJson = JsonUtils.anyFieldMapper().writeValueAsString(runtimeJobTemplateDTO);
+    } catch (JsonProcessingException e) {
+      throw new RuntimeException("Failed to serialize the runtime job template", e);
+    }
+
     // Submit the job template to the job executor
     String jobExecutionId;
     try {
@@ -468,6 +485,7 @@ public class JobManager implements JobOperationDispatcher {
             // A newly submitted job is queued, not started or finished yet.
             .withStartedAt(0L)
             .withFinishedAt(0L)
+            .withRuntimeJobTemplate(runtimeJobTemplateJson)
             .build();
 
     try {
@@ -509,40 +527,59 @@ public class JobManager implements JobOperationDispatcher {
         LockType.WRITE,
         () -> {
           try {
-            // Re-fetch under the lock rather than reusing the snapshot taken before the
-            // (potentially slow) external cancel call above - a concurrent status poll could
-            // have persisted a real startedAt/finishedAt in that gap, and carrying forward the
-            // stale snapshot would clobber it back to the sentinel.
-            JobEntity latestJobEntity = getJob(metalake, jobId);
-            JobEntity newJobEntity =
-                JobEntity.builder()
-                    .withId(latestJobEntity.id())
-                    .withJobExecutionId(latestJobEntity.jobExecutionId())
-                    .withJobTemplateName(latestJobEntity.jobTemplateName())
-                    .withStatus(JobHandle.Status.CANCELLING)
-                    .withNamespace(latestJobEntity.namespace())
-                    .withAuditInfo(
-                        AuditInfo.builder()
-                            .withCreator(latestJobEntity.auditInfo().creator())
-                            .withCreateTime(latestJobEntity.auditInfo().createTime())
-                            .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                            .withLastModifiedTime(Instant.now())
-                            .build())
-                    // CANCELLING is not a terminal state; carry forward whatever
-                    // startedAt/finishedAt the job already had.
-                    .withStartedAt(latestJobEntity.startedAt())
-                    .withFinishedAt(latestJobEntity.finishedAt())
-                    .build();
-
-            // Update the job entity in the entity store
-            entityStore.put(newJobEntity, true /* overwrite */);
-            return newJobEntity;
+            // entityStore.update() re-fetches the latest entity itself right before applying the
+            // updater, rather than reusing the snapshot taken before the (potentially slow)
+            // external cancel call above - a concurrent status poll could have persisted a real
+            // startedAt/finishedAt in that gap, and carrying forward the stale snapshot would
+            // clobber it back to the sentinel.
+            return entityStore.update(
+                NameIdentifierUtil.ofJob(metalake, jobId),
+                JobEntity.class,
+                Entity.EntityType.JOB,
+                this::toCancellingJobEntity);
+          } catch (NoSuchEntityException e) {
+            throw new NoSuchJobException(
+                "Job with ID %s under metalake %s does not exist, this could be due to the job "
+                    + "not existing or being deleted concurrently.",
+                jobId, metalake);
           } catch (IOException e) {
             throw new RuntimeException(
                 String.format("Failed to update job entity for job %s to CANCELING status", jobId),
                 e);
           }
         });
+  }
+
+  private JobEntity toCancellingJobEntity(JobEntity latestJobEntity) {
+    // The external cancel call happens before this locked update, so a concurrent status poll
+    // can persist a terminal status (or another cancelJob() call can already have moved the job
+    // to CANCELLING) in the gap between the pre-cancel snapshot and this re-fetch. Never regress
+    // the latest entity out of a terminal state, or overwrite an already-CANCELLING one.
+    if (isFinishedStatus(latestJobEntity.status())
+        || latestJobEntity.status() == JobHandle.Status.CANCELLING) {
+      return latestJobEntity;
+    }
+
+    return JobEntity.builder()
+        .withId(latestJobEntity.id())
+        .withJobExecutionId(latestJobEntity.jobExecutionId())
+        .withJobTemplateName(latestJobEntity.jobTemplateName())
+        .withStatus(JobHandle.Status.CANCELLING)
+        .withNamespace(latestJobEntity.namespace())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(latestJobEntity.auditInfo().creator())
+                .withCreateTime(latestJobEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        // CANCELLING is not a terminal state; carry forward whatever startedAt/finishedAt the
+        // job already had.
+        .withStartedAt(latestJobEntity.startedAt())
+        .withFinishedAt(latestJobEntity.finishedAt())
+        // The runtime job template is fixed at job creation and never changes.
+        .withRuntimeJobTemplate(latestJobEntity.runtimeJobTemplate())
+        .build();
   }
 
   @Override
@@ -601,74 +638,126 @@ public class JobManager implements JobOperationDispatcher {
             }
 
             if (newStatus != job.status()) {
-              boolean isStarted = newStatus == JobHandle.Status.STARTED;
-              boolean isFinished =
-                  newStatus == JobHandle.Status.SUCCEEDED
-                      || newStatus == JobHandle.Status.FAILED
-                      || newStatus == JobHandle.Status.CANCELLED;
-
-              // Only a directly-observed STARTED transition is trustworthy evidence of when a
-              // job started. SUCCEEDED/FAILED do not prove the job ever reached STARTED: FAILED
-              // in particular can be reached directly from QUEUED (e.g. NoSuchJobException from
-              // the executor, or LocalJobExecutor failing before it records STARTED), and even
-              // for SUCCEEDED, backfilling startedAt from the queued time would understate queue
-              // latency and overstate execution duration in any derived metric. So startedAt is
-              // left unset unless a STARTED transition was actually observed.
-              //
-              // Only stamp startedAt on the first STARTED observation (job.startedAt() <= 0).
-              // A CANCELLING job already carries forward a real startedAt from cancelJob, and
-              // since cancellation is asynchronous, a poll can still observe STARTED while
-              // cancellation is in flight - overwriting the recorded start time with this later
-              // poll timestamp would lose the accurate value.
-              long startedAt =
-                  isStarted && job.startedAt() <= 0
-                      ? Instant.now().toEpochMilli()
-                      : job.startedAt();
-
-              JobEntity newJobEntity =
-                  JobEntity.builder()
-                      .withId(job.id())
-                      .withJobExecutionId(job.jobExecutionId())
-                      .withJobTemplateName(job.jobTemplateName())
-                      .withStatus(newStatus)
-                      .withNamespace(job.namespace())
-                      .withAuditInfo(
-                          AuditInfo.builder()
-                              .withCreator(job.auditInfo().creator())
-                              .withCreateTime(job.auditInfo().createTime())
-                              .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
-                              .withLastModifiedTime(Instant.now())
-                              .build())
-                      .withStartedAt(startedAt)
-                      .withFinishedAt(isFinished ? Instant.now().toEpochMilli() : job.finishedAt())
-                      .build();
-
-              // Update the job entity with new status.
+              // Update the job entity with new status. entityStore.update() re-fetches the
+              // latest entity itself right before applying the updater, so the transition below
+              // is derived from latestJobEntity - the state as of right before the write - rather
+              // than the possibly-stale `job` snapshot taken by listJobs() above. A concurrent
+              // writer (e.g. cancelJob(), or another poll run) may have already moved the job to
+              // a terminal state, into CANCELLING, or recorded a real startedAt/finishedAt in the
+              // gap between that snapshot and this point; the updater must not regress any of
+              // that using the stale snapshot's view of the world.
               JobHandle.Status finalNewStatus = newStatus;
-              TreeLockUtils.doWithTreeLock(
-                  NameIdentifierUtil.ofJob(metalake, job.name()),
-                  LockType.WRITE,
-                  () -> {
-                    try {
-                      entityStore.put(newJobEntity, true /* overwrite */);
-                      return null;
-                    } catch (IOException e) {
-                      throw new RuntimeException(
-                          String.format(
-                              "Failed to update job entity %s to status %s",
-                              newJobEntity, finalNewStatus),
-                          e);
-                    }
-                  });
+              JobEntity updated;
+              try {
+                updated =
+                    TreeLockUtils.doWithTreeLock(
+                        NameIdentifierUtil.ofJob(metalake, job.name()),
+                        LockType.WRITE,
+                        () -> {
+                          try {
+                            return entityStore.update(
+                                NameIdentifierUtil.ofJob(metalake, job.name()),
+                                JobEntity.class,
+                                Entity.EntityType.JOB,
+                                latestJobEntity ->
+                                    toUpdatedStatusJobEntity(latestJobEntity, finalNewStatus));
+                          } catch (IOException e) {
+                            throw new RuntimeException(
+                                String.format(
+                                    "Failed to update job entity %s to status %s",
+                                    job.name(), finalNewStatus),
+                                e);
+                          }
+                        });
+              } catch (NoSuchEntityException e) {
+                // The job could have been deleted concurrently (e.g. by legacy-timeline cleanup)
+                // in the gap between the listJobs() snapshot above and this update. Skip it rather
+                // than letting the exception escape this scheduled task, which would silently
+                // cancel all future status-pull runs (ScheduledExecutorService semantics).
+                LOG.warn(
+                    "Job {} under metalake {} no longer exists, skipping status update to {}. "
+                        + "This could be due to the job being deleted concurrently.",
+                    job.name(),
+                    metalake,
+                    finalNewStatus);
+                return;
+              }
 
               LOG.info(
                   "Updated the job {} with execution id {} status to {}",
                   job.name(),
                   job.jobExecutionId(),
-                  newStatus);
+                  updated.status());
             }
           });
     }
+  }
+
+  private JobEntity toUpdatedStatusJobEntity(
+      JobEntity latestJobEntity, JobHandle.Status observedStatus) {
+    JobHandle.Status currentStatus = latestJobEntity.status();
+    boolean observedIsFinished = isFinishedStatus(observedStatus);
+
+    // Never regress a job out of a terminal state, and never move a CANCELLING job back to a
+    // non-terminal state - both would only be possible here because the executor status was
+    // observed against a stale snapshot of the job.
+    if (isFinishedStatus(currentStatus)
+        || (currentStatus == JobHandle.Status.CANCELLING && !observedIsFinished)) {
+      return latestJobEntity;
+    }
+
+    // Only a directly-observed STARTED transition is trustworthy evidence of when a job started.
+    // SUCCEEDED/FAILED do not prove the job ever reached STARTED: FAILED in particular can be
+    // reached directly from QUEUED (e.g. NoSuchJobException from the executor, or
+    // LocalJobExecutor failing before it records STARTED), and even for SUCCEEDED, backfilling
+    // startedAt from the queued time would understate queue latency and overstate execution
+    // duration in any derived metric. So startedAt is left unset unless a STARTED transition was
+    // actually observed.
+    //
+    // Only stamp startedAt on the first STARTED observation (latestJobEntity.startedAt() <= 0).
+    // A CANCELLING job already carries forward a real startedAt from cancelJob, and since
+    // cancellation is asynchronous, a poll can still observe STARTED while cancellation is in
+    // flight - overwriting the recorded start time with this later poll timestamp would lose the
+    // accurate value.
+    boolean isStarted = observedStatus == JobHandle.Status.STARTED;
+    long startedAt =
+        isStarted && latestJobEntity.startedAt() <= 0
+            ? Instant.now().toEpochMilli()
+            : latestJobEntity.startedAt();
+
+    // Preserve an already-recorded finishedAt (e.g. stamped by a concurrent writer) instead of
+    // overwriting it with a later poll's timestamp.
+    long finishedAt =
+        observedIsFinished
+            ? (latestJobEntity.finishedAt() > 0
+                ? latestJobEntity.finishedAt()
+                : Instant.now().toEpochMilli())
+            : latestJobEntity.finishedAt();
+
+    return JobEntity.builder()
+        .withId(latestJobEntity.id())
+        .withJobExecutionId(latestJobEntity.jobExecutionId())
+        .withJobTemplateName(latestJobEntity.jobTemplateName())
+        .withStatus(observedStatus)
+        .withNamespace(latestJobEntity.namespace())
+        .withAuditInfo(
+            AuditInfo.builder()
+                .withCreator(latestJobEntity.auditInfo().creator())
+                .withCreateTime(latestJobEntity.auditInfo().createTime())
+                .withLastModifier(PrincipalUtils.getCurrentPrincipal().getName())
+                .withLastModifiedTime(Instant.now())
+                .build())
+        .withStartedAt(startedAt)
+        .withFinishedAt(finishedAt)
+        // The runtime job template is fixed at job creation and never changes.
+        .withRuntimeJobTemplate(latestJobEntity.runtimeJobTemplate())
+        .build();
+  }
+
+  private static boolean isFinishedStatus(JobHandle.Status status) {
+    return status == JobHandle.Status.SUCCEEDED
+        || status == JobHandle.Status.FAILED
+        || status == JobHandle.Status.CANCELLED;
   }
 
   @VisibleForTesting

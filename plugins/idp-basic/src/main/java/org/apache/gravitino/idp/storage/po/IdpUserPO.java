@@ -36,6 +36,7 @@ public class IdpUserPO {
   private Long userId;
   private String username;
   private String passwordHash;
+  @Builder.Default private Boolean enabled = true;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;

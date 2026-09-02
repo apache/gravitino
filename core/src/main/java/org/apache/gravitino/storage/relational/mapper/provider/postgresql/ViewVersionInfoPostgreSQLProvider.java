@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewVersionInfoBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.ViewVersionInfoPO;
 import org.apache.ibatis.annotations.Param;
@@ -55,7 +56,8 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
   public String softDeleteViewVersionsByViewId(@Param("viewId") Long viewId) {
     return "UPDATE "
         + ViewVersionInfoMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE view_id = #{viewId} AND deleted_at = 0";
   }
 
@@ -63,7 +65,8 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
   public String softDeleteViewVersionsBySchemaId(@Param("schemaId") Long schemaId) {
     return "UPDATE "
         + ViewVersionInfoMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE schema_id = #{schemaId} AND deleted_at = 0";
   }
 
@@ -71,7 +74,8 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
   public String softDeleteViewVersionsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + ViewVersionInfoMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId} AND deleted_at = 0";
   }
 
@@ -79,7 +83,8 @@ public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLPro
   public String softDeleteViewVersionsByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ViewVersionInfoMapper.TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

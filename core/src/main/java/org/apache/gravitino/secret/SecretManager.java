@@ -127,7 +127,8 @@ public class SecretManager implements Closeable {
    * is the mutable map that will be stored (may already contain merged catalog conf).
    *
    * @param properties properties used for key uniqueness checks (may be null)
-   * @param targetProperties mutable properties that receive URN values
+   * @param targetProperties mutable properties that receive URN values (may be null only when both
+   *     secret maps are null or empty)
    * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
    * @param entityId stable numeric entity id
    * @param secretBindings property key → write-through binding (may be null)
@@ -137,12 +138,17 @@ public class SecretManager implements Closeable {
    */
   public List<SecretMaterial> assembleSecretMaterials(
       @Nullable Map<String, String> properties,
-      Map<String, String> targetProperties,
+      @Nullable Map<String, String> targetProperties,
       String entityType,
       long entityId,
       @Nullable Map<String, SecretBinding> secretBindings,
       @Nullable Map<String, SecretReference> secretReferences) {
     checkSecretKeys(properties, secretBindings, secretReferences);
+    if (!SecretPropertyUtils.hasSecretMaps(secretBindings, secretReferences)) {
+      return List.of();
+    }
+    Preconditions.checkArgument(
+        targetProperties != null, "targetProperties must not be null when secrets are present");
     Map<String, SecretBinding> bindings = secretBindings == null ? Map.of() : secretBindings;
     Map<String, SecretReference> references =
         secretReferences == null ? Map.of() : secretReferences;
@@ -343,6 +349,140 @@ public class SecretManager implements Closeable {
       }
     }
     deleteSecrets(writeThrough);
+  }
+
+  /**
+   * Writes a write-through secret for alter setSecretBinding; updates properties with the URN.
+   * Appends written materials to {@code written} for caller rollback.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param property property key
+   * @param binding write-through secret binding
+   * @param written list that receives newly written materials for rollback
+   * @return the URN string stored in properties
+   */
+  public String alterSetSecretBinding(
+      Map<String, String> properties,
+      String entityType,
+      long entityId,
+      String property,
+      SecretBinding binding,
+      List<SecretMaterial> written) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    Preconditions.checkArgument(binding != null, "binding must not be null");
+    SecretPropertyUtils.validateAlterSecretBindingPlaintext(binding.plaintext());
+    Map<String, SecretBinding> bindings = ImmutableMap.of(property, binding);
+    List<SecretUrn> urns = buildSecretBindingUrns(entityType, entityId, bindings);
+    String newUrn = urns.get(0).toString();
+    String current = properties.get(property);
+    if (current != null
+        && !current.equals(newUrn)
+        && SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
+      deleteSecretsFromProperties(Map.of(property, current));
+    }
+    List<SecretMaterial> materials = List.of(new SecretMaterial(urns.get(0), binding.plaintext()));
+    writeSecrets(materials);
+    written.addAll(materials);
+    SecretPropertyUtils.putSecretUrns(properties, urns);
+    return properties.get(property);
+  }
+
+  /**
+   * Puts external-ref URN into properties; deletes prior write-through if owned by this entity.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param property property key
+   * @param reference external secret reference
+   * @return the URN string stored in properties
+   */
+  public String alterSetSecretReference(
+      Map<String, String> properties,
+      String entityType,
+      long entityId,
+      String property,
+      SecretReference reference) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    Preconditions.checkArgument(reference != null, "reference must not be null");
+    String current = properties.get(property);
+    if (SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
+      deleteSecretsFromProperties(Map.of(property, current));
+    }
+    Map<String, SecretReference> refs = ImmutableMap.of(property, reference);
+    List<SecretUrn> urns = buildSecretReferenceUrns(refs);
+    SecretPropertyUtils.putSecretUrns(properties, urns);
+    return properties.get(property);
+  }
+
+  /**
+   * Handles alter setProperty. If current value is a secret URN, rewrite via provider/writeSecrets.
+   * Otherwise puts plaintext into properties.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param property property key
+   * @param value new property value (plaintext when rewriting a secret, or plain value)
+   * @return value to use in SetProperty change (URN or plaintext)
+   */
+  public String alterSetProperty(
+      Map<String, String> properties,
+      String entityType,
+      long entityId,
+      String property,
+      String value) {
+    SecretPropertyUtils.validateAlterSetPropertyValue(property, value);
+    String current = properties.get(property);
+    if (SecretPropertyUtils.isSecretProperty(property, current)) {
+      SecretUrn currentUrn = SecretUrn.parse(current);
+      SecretBinding binding = new SecretBinding(currentUrn.providerName(), value);
+      if (SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
+        Map<String, SecretBinding> bindings = ImmutableMap.of(property, binding);
+        List<SecretUrn> urns = buildSecretBindingUrns(entityType, entityId, bindings);
+        List<SecretMaterial> materials = List.of(new SecretMaterial(urns.get(0), value));
+        writeSecrets(materials);
+        SecretPropertyUtils.putSecretUrns(properties, urns);
+        return properties.get(property);
+      }
+      List<String> segments = currentUrn.identifierSegments();
+      Preconditions.checkArgument(
+          !segments.isEmpty(), "Secret URN must contain identifier segments: %s", currentUrn);
+      Map<String, String> attributes = new HashMap<>();
+      if (segments.size() == 3) {
+        attributes.put(ATTR_ENTITY_TYPE, segments.get(0));
+        attributes.put(ATTR_ENTITY_ID, segments.get(1));
+        attributes.put(ATTR_PROPERTY_KEY, segments.get(2));
+      } else {
+        attributes.put(ATTR_PROPERTY_KEY, property);
+      }
+      SecretUrn writtenUrn =
+          getRegistry().getProvider(currentUrn.providerName()).writeSecret(value, attributes);
+      properties.put(property, writtenUrn.toString());
+      return writtenUrn.toString();
+    }
+    properties.put(property, value);
+    return value;
+  }
+
+  /**
+   * Deletes write-through secret if owned by this entity; removes key from properties.
+   *
+   * @param properties mutable properties map updated as changes are applied
+   * @param entityType {@code catalog}, {@code schema}, or {@code fileset}
+   * @param entityId stable numeric entity id
+   * @param property property key to remove
+   */
+  public void alterRemoveProperty(
+      Map<String, String> properties, String entityType, long entityId, String property) {
+    Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
+    String current = properties.get(property);
+    if (SecretPropertyUtils.isWriteThroughForEntity(property, current, entityType, entityId)) {
+      deleteSecretsFromProperties(Map.of(property, current));
+    }
+    properties.remove(property);
   }
 
   /**

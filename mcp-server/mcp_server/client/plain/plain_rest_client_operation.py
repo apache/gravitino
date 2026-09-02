@@ -15,6 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
+from typing import Optional
+
 import httpx
 
 from mcp_server.client import (
@@ -68,7 +70,14 @@ from mcp_server.client.topic_operation import TopicOperation
 
 # pylint: disable=too-many-instance-attributes
 class PlainRESTClientOperation(GravitinoOperation):
-    def __init__(self, metalake_name: str, uri: str, authorization: str = ""):
+    def __init__(
+        self,
+        metalake_name: str,
+        uri: str,
+        authorization: str = "",
+        *,
+        auth: Optional[httpx.Auth] = None,
+    ):
         """Create a REST client for one identity.
 
         Args:
@@ -78,11 +87,15 @@ class PlainRESTClientOperation(GravitinoOperation):
                 on every request (for example ``"Bearer <token>"`` for OAuth2 or
                 ``"Basic <base64(user:secret)>"`` for simple or Basic auth).
                 Empty string means anonymous (no header sent).
+            auth: Optional httpx auth hook used instead of a frozen header
+                (OAuth client-credentials refresh).
         """
         headers = {}
         if authorization:
             headers["Authorization"] = authorization
-        _rest_client = httpx.AsyncClient(base_url=uri, headers=headers)
+        _rest_client = httpx.AsyncClient(
+            base_url=uri, headers=headers, auth=auth
+        )
         # Kept so the shared connection pool can be closed (see close()).
         self._rest_client = _rest_client
         self._catalog_operation = PlainRESTClientCatalogOperation(

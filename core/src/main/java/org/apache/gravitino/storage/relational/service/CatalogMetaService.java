@@ -435,15 +435,14 @@ public class CatalogMetaService {
    * loses the race to another writer must not delete a catalog it never saw.
    */
   private void deleteCatalogWithVersion(NameIdentifier identifier, CatalogPO observedCatalogPO) {
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper ->
-                mapper.softDeleteCatalogMetasByCatalogId(
-                    observedCatalogPO.getCatalogId(), observedCatalogPO.getCurrentVersion()));
-    if (deleted == 0) {
-      throw catalogWriteFailure(identifier, observedCatalogPO);
-    }
+    OccWriteSupport.deleteWithVersion(
+        () ->
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class,
+                mapper ->
+                    mapper.softDeleteCatalogMetasByCatalogId(
+                        observedCatalogPO.getCatalogId(), observedCatalogPO.getCurrentVersion())),
+        () -> catalogWriteFailure(identifier, observedCatalogPO));
   }
 
   /**
@@ -460,18 +459,16 @@ public class CatalogMetaService {
    * exists.
    */
   private void lockMetalakeForCatalogCreate(MetalakePO observedMetalakePO) {
-    MetalakePO currentMetalakePO =
-        SessionUtils.getWithoutCommit(
-            MetalakeMetaMapper.class,
-            mapper -> mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId()));
-    if (currentMetalakePO == null
-        || !Objects.equals(
-            currentMetalakePO.getMetalakeName(), observedMetalakePO.getMetalakeName())) {
-      throw new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.METALAKE.name().toLowerCase(),
-          observedMetalakePO.getMetalakeName());
-    }
+    OccWriteSupport.lockParentForChildWrite(
+        observedMetalakePO.getMetalakeName(),
+        Entity.EntityType.METALAKE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                MetalakeMetaMapper.class,
+                mapper ->
+                    mapper.selectMetalakeMetaByIdForShare(observedMetalakePO.getMetalakeId())),
+        null,
+        current -> Objects.equals(current.getMetalakeName(), observedMetalakePO.getMetalakeName()));
   }
 
   /**
@@ -481,23 +478,17 @@ public class CatalogMetaService {
    */
   private RuntimeException catalogWriteFailure(
       NameIdentifier identifier, CatalogPO observedCatalogPO) {
-    // Sessions run at READ_COMMITTED, so a plain read would already see the latest committed row.
-    // The locking read additionally waits for a writer that is still in flight, so a rename or
-    // delete that has not committed yet is classified as not-found instead of as a stale-version
-    // conflict. The lock is taken on the error path of a transaction that is about to roll back.
-    CatalogPO currentCatalogPO =
-        SessionUtils.getWithoutCommit(
-            CatalogMetaMapper.class,
-            mapper -> mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId()));
-    if (currentCatalogPO == null
-        || !Objects.equals(currentCatalogPO.getCatalogName(), observedCatalogPO.getCatalogName())
-        || !Objects.equals(currentCatalogPO.getMetalakeId(), observedCatalogPO.getMetalakeId())) {
-      return new NoSuchEntityException(
-          NoSuchEntityException.NO_SUCH_ENTITY_MESSAGE,
-          Entity.EntityType.CATALOG.name().toLowerCase(),
-          identifier.name());
-    }
-    return ExceptionUtils.concurrentModification(Entity.EntityType.CATALOG, identifier);
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.CATALOG,
+        () ->
+            SessionUtils.getWithoutCommit(
+                CatalogMetaMapper.class,
+                mapper -> mapper.selectCatalogMetaByIdForUpdate(observedCatalogPO.getCatalogId())),
+        null,
+        current ->
+            Objects.equals(current.getCatalogName(), observedCatalogPO.getCatalogName())
+                && Objects.equals(current.getMetalakeId(), observedCatalogPO.getMetalakeId()));
   }
 
   /**
@@ -505,20 +496,25 @@ public class CatalogMetaService {
    * must already hold the catalog row, so no schema can appear or disappear in between.
    */
   private void deleteSchemasWithVersions(NameIdentifier catalogIdentifier, Long catalogId) {
-    List<SchemaPO> schemaPOs =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
-    if (schemaPOs.isEmpty()) {
-      return;
-    }
-    int deleted =
-        SessionUtils.getWithoutCommit(
-            SchemaMetaMapper.class, mapper -> mapper.softDeleteSchemaMetasWithVersion(schemaPOs));
-    // A smaller count means one of these schemas was altered by someone who did not take the
-    // catalog row lock. Never commit half a cascade: roll the whole transaction back instead.
-    if (deleted != schemaPOs.size()) {
-      throw ExceptionUtils.concurrentChildModification(
-          Entity.EntityType.SCHEMA, Entity.EntityType.CATALOG, catalogIdentifier);
-    }
+    List<SchemaPO> schemaPOs = listSchemaPOsForCascade(catalogId);
+    OccWriteSupport.deleteChildrenWithVersions(
+        catalogIdentifier,
+        Entity.EntityType.SCHEMA,
+        Entity.EntityType.CATALOG,
+        schemaPOs,
+        children ->
+            SessionUtils.getWithoutCommit(
+                SchemaMetaMapper.class,
+                mapper -> mapper.softDeleteSchemaMetasWithVersion(children)));
+  }
+
+  /**
+   * Reads the schemas that the cascade is about to delete. The caller already holds the catalog
+   * row, so this snapshot cannot grow or shrink behind it. Kept separate so a test can pause the
+   * cascade exactly here, between taking the lock and reading the children.
+   */
+  List<SchemaPO> listSchemaPOsForCascade(Long catalogId) {
+    return SessionUtils.getWithoutCommit(
+        SchemaMetaMapper.class, mapper -> mapper.listSchemaPOsByCatalogId(catalogId));
   }
 }

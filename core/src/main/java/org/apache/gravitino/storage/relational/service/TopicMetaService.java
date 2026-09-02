@@ -24,7 +24,6 @@ import com.google.common.base.Preconditions;
 import java.io.IOException;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Entity;
@@ -70,17 +69,28 @@ public class TopicMetaService {
 
       TopicPO.Builder builder = TopicPO.builder();
       fillTopicPOBuilderParentEntityId(builder, topicEntity.namespace());
+      TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
 
-      SessionUtils.doWithCommit(
-          TopicMetaMapper.class,
-          mapper -> {
-            TopicPO po = POConverters.initializeTopicPOWithVersion(topicEntity, builder);
-            if (overwrite) {
-              mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
-            } else {
-              mapper.insertTopicMeta(po);
-            }
-          });
+      SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the topic cannot be
+          // written below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      topicEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
+          () ->
+              SessionUtils.doWithoutCommit(
+                  TopicMetaMapper.class,
+                  mapper -> {
+                    if (overwrite) {
+                      mapper.insertTopicMetaOnDuplicateKeyUpdate(po);
+                    } else {
+                      mapper.insertTopicMeta(po);
+                    }
+                  }));
       // TODO: insert topic dataLayout version after supporting it
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
@@ -111,28 +121,28 @@ public class TopicMetaService {
         newEntity.id(),
         oldTopicEntity.id());
 
-    AtomicInteger updateResult = new AtomicInteger(0);
     try {
+      TopicPO newTopicPO = POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity);
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      TopicMetaMapper.class,
-                      mapper ->
-                          mapper.updateTopicMeta(
-                              POConverters.updateTopicPOWithVersion(oldTopicPO, newEntity),
-                              oldTopicPO))));
+          () -> {
+            // current_version is the decision point for the whole write. Even if another writer
+            // changes the payload and later restores it, that writer still advances the version,
+            // so this stale update changes zero rows.
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    TopicMetaMapper.class,
+                    mapper -> mapper.updateTopicMeta(newTopicPO, oldTopicPO));
+            if (updated == 0) {
+              throw topicWriteFailure(ident, oldTopicPO);
+            }
+          });
     } catch (RuntimeException re) {
       ExceptionUtils.checkSQLException(
           re, Entity.EntityType.TOPIC, newEntity.nameIdentifier().toString());
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newEntity;
-    } else {
-      throw new IOException("Failed to update the entity: " + ident);
-    }
+    return newEntity;
   }
 
   private TopicPO getTopicPOBySchemaIdAndName(Long schemaId, String topicName) {
@@ -269,44 +279,8 @@ public class TopicMetaService {
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTopic")
   public boolean deleteTopic(NameIdentifier identifier) {
     TopicPO topicPO = getTopicPOByIdentifier(identifier);
-    Long topicId = topicPO.getTopicId();
-
-    AtomicInteger deleteResult = new AtomicInteger(0);
-    SessionUtils.doMultipleWithCommit(
-        () ->
-            deleteResult.set(
-                SessionUtils.getWithoutCommit(
-                    TopicMetaMapper.class,
-                    mapper -> mapper.softDeleteTopicMetasByTopicId(topicId))),
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
-                mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        topicId, MetadataObject.Type.TOPIC.name()));
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name()));
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name()));
-            SessionUtils.doWithoutCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(topicId));
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
-                        topicId, MetadataObject.Type.TOPIC.name()));
-          }
-        });
-
-    return deleteResult.get() > 0;
+    deleteTopicWithVersion(identifier, topicPO);
+    return true;
   }
 
   @Monitored(
@@ -358,5 +332,75 @@ public class TopicMetaService {
                   topicNames);
           return POConverters.fromTopicPOs(topicPOs, firstIdent.namespace());
         });
+  }
+
+  /**
+   * Deletes the observed topic and its dependent rows in one transaction.
+   *
+   * <p>Package access lets concurrency tests submit a stale snapshot while exercising the same
+   * root-first ordering as the public delete path.
+   *
+   * @param identifier the topic identity observed by the caller
+   * @param observedTopicPO the topic row and OCC version observed by the caller
+   */
+  void deleteTopicWithVersion(NameIdentifier identifier, TopicPO observedTopicPO) {
+    SessionUtils.doMultipleWithCommit(
+        // Check the root version before touching relationships. If this snapshot is stale,
+        // throwing here stops the transaction before any dependent row can be deleted.
+        () ->
+            OccWriteSupport.deleteWithVersion(
+                () ->
+                    SessionUtils.getWithoutCommit(
+                        TopicMetaMapper.class,
+                        mapper ->
+                            mapper.softDeleteTopicMetasByTopicId(
+                                observedTopicPO.getTopicId(), observedTopicPO.getCurrentVersion())),
+                () -> topicWriteFailure(identifier, observedTopicPO)),
+        () -> deleteTopicDependents(observedTopicPO.getTopicId()));
+  }
+
+  private void deleteTopicDependents(Long topicId) {
+    // The topic row has passed its version check. Every cleanup below uses the same transaction,
+    // so a later failure also restores the root row and all earlier relationship changes.
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                topicId, MetadataObject.Type.TOPIC.name()));
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(topicId, MetadataObject.Type.TOPIC.name()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                topicId, MetadataObject.Type.TOPIC.name()));
+    SessionUtils.doWithoutCommit(
+        StatisticMetaMapper.class, mapper -> mapper.softDeleteStatisticsByEntityId(topicId));
+    SessionUtils.doWithoutCommit(
+        PolicyMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeletePolicyMetadataObjectRelsByMetadataObject(
+                topicId, MetadataObject.Type.TOPIC.name()));
+  }
+
+  private RuntimeException topicWriteFailure(NameIdentifier identifier, TopicPO observedTopicPO) {
+    // A zero-row CAS means either the same topic has a newer version, or the topic disappeared
+    // from the name the caller used. The stable-ID lock waits for an in-flight writer to finish so
+    // the result is classified from committed identity data.
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.TOPIC,
+        () ->
+            SessionUtils.getWithoutCommit(
+                TopicMetaMapper.class,
+                mapper -> mapper.selectTopicMetaByIdForUpdate(observedTopicPO.getTopicId())),
+        null,
+        current ->
+            Objects.equals(current.getTopicName(), observedTopicPO.getTopicName())
+                && Objects.equals(current.getSchemaId(), observedTopicPO.getSchemaId())
+                && Objects.equals(current.getCatalogId(), observedTopicPO.getCatalogId())
+                && Objects.equals(current.getMetalakeId(), observedTopicPO.getMetalakeId()));
   }
 }

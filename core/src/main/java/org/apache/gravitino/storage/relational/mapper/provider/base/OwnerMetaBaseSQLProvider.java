@@ -31,14 +31,14 @@ import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.UserMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
 import org.apache.ibatis.annotations.Param;
 
 public class OwnerMetaBaseSQLProvider {
   protected String currentTimestampMillisExpression() {
-    return "(UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000";
+    return DatabaseTimeSQL.MYSQL;
   }
 
   public String selectUserOwnerMetaByMetadataObjectIdAndType(

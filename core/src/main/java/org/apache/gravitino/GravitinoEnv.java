@@ -47,6 +47,9 @@ import org.apache.gravitino.catalog.PartitionOperationDispatcher;
 import org.apache.gravitino.catalog.SchemaDispatcher;
 import org.apache.gravitino.catalog.SchemaNormalizeDispatcher;
 import org.apache.gravitino.catalog.SchemaOperationDispatcher;
+import org.apache.gravitino.catalog.SemanticModelDispatcher;
+import org.apache.gravitino.catalog.SemanticModelNormalizeDispatcher;
+import org.apache.gravitino.catalog.SemanticModelOperationDispatcher;
 import org.apache.gravitino.catalog.TableDispatcher;
 import org.apache.gravitino.catalog.TableNormalizeDispatcher;
 import org.apache.gravitino.catalog.TableOperationDispatcher;
@@ -100,6 +103,7 @@ import org.apache.gravitino.metrics.source.JVMMetricsSource;
 import org.apache.gravitino.policy.PolicyDispatcher;
 import org.apache.gravitino.policy.PolicyManager;
 import org.apache.gravitino.secret.SecretManager;
+import org.apache.gravitino.secret.SecretPropertyOperationDispatcher;
 import org.apache.gravitino.secret.SecretProviderRegistry;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.stats.StatisticManager;
@@ -151,12 +155,16 @@ public class GravitinoEnv {
 
   private FunctionDispatcher functionDispatcher;
 
+  private SemanticModelDispatcher semanticModelDispatcher;
+
   private ViewDispatcher viewDispatcher;
   private ViewDispatcher internalViewDispatcher;
 
   private MetalakeDispatcher metalakeDispatcher;
 
   private CredentialOperationDispatcher credentialOperationDispatcher;
+
+  private SecretPropertyOperationDispatcher secretPropertyOperationDispatcher;
 
   private KmsClientRegistry kmsClientRegistry;
 
@@ -242,6 +250,15 @@ public class GravitinoEnv {
    */
   public Config config() {
     return config;
+  }
+
+  /**
+   * Get the auxiliary service manager associated with the Gravitino environment.
+   *
+   * @return The auxiliary service manager instance.
+   */
+  public AuxiliaryServiceManager auxServiceManager() {
+    return auxServiceManager;
   }
 
   /**
@@ -339,6 +356,15 @@ public class GravitinoEnv {
   }
 
   /**
+   * Get the Semantic Model dispatcher associated with the Gravitino environment.
+   *
+   * @return The Semantic Model dispatcher.
+   */
+  public SemanticModelDispatcher semanticModelDispatcher() {
+    return semanticModelDispatcher;
+  }
+
+  /**
    * Get the ViewDispatcher associated with the Gravitino environment.
    *
    * @return The ViewDispatcher instance.
@@ -425,6 +451,15 @@ public class GravitinoEnv {
    */
   public CredentialOperationDispatcher credentialOperationDispatcher() {
     return credentialOperationDispatcher;
+  }
+
+  /**
+   * Get the {@link SecretPropertyOperationDispatcher} associated with the Gravitino environment.
+   *
+   * @return The {@link SecretPropertyOperationDispatcher} instance.
+   */
+  public SecretPropertyOperationDispatcher secretPropertyOperationDispatcher() {
+    return secretPropertyOperationDispatcher;
   }
 
   /**
@@ -729,22 +764,24 @@ public class GravitinoEnv {
     // Tree lock
     this.lockManager = new LockManager(config);
 
+    // Create and initialize Catalog related modules first so MetalakeManager can force-drop
+    // child catalogs through CatalogManager.dropCatalog (same path as FilesetCatalogOperations).
+    // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
+    // CatalogManager
+    // CatalogManager registers its own change-log listener with the entity store (when the store
+    // supports it), so no poller wiring is needed here.
+    this.catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
+
     // Create and initialize metalake related modules, the operation chain is:
     // MetalakeHookDispatcher -> MetalakeEventDispatcher -> MetalakeNormalizeDispatcher ->
     // MetalakeManager
-    this.metalakeManager = new MetalakeManager(entityStore, idGenerator);
+    this.metalakeManager = new MetalakeManager(entityStore, idGenerator, catalogManager);
     MetalakeNormalizeDispatcher metalakeNormalizeDispatcher =
         new MetalakeNormalizeDispatcher(metalakeManager);
     MetalakeEventDispatcher metalakeEventDispatcher =
         new MetalakeEventDispatcher(eventBus, metalakeNormalizeDispatcher);
     this.metalakeDispatcher = new MetalakeHookDispatcher(metalakeEventDispatcher);
 
-    // Create and initialize Catalog related modules, the operation chain is:
-    // CatalogHookDispatcher -> CatalogEventDispatcher -> CatalogNormalizeDispatcher ->
-    // CatalogManager
-    // CatalogManager registers its own change-log listener with the entity store (when the store
-    // supports it), so no poller wiring is needed here.
-    this.catalogManager = new CatalogManager(config, entityStore, idGenerator, secretManager);
     this.internalCatalogDispatcher = catalogManager;
     CatalogNormalizeDispatcher catalogNormalizeDispatcher =
         new CatalogNormalizeDispatcher(catalogManager);
@@ -756,8 +793,23 @@ public class GravitinoEnv {
     this.credentialOperationDispatcher =
         new CredentialOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
 
+    this.secretPropertyOperationDispatcher =
+        new SecretPropertyOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager);
+
+    // Fileset dispatcher is created before schema dispatcher so schema can take it directly.
+    FilesetOperationDispatcher filesetOperationDispatcher =
+        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
+        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
+    this.internalFilesetDispatcher = filesetNormalizeDispatcher;
+    FilesetEventDispatcher filesetEventDispatcher =
+        new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
+    this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
+
     SchemaOperationDispatcher schemaOperationDispatcher =
-        new SchemaOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
+        new SchemaOperationDispatcher(
+            catalogManager, entityStore, idGenerator, secretManager, filesetNormalizeDispatcher);
     this.internalSchemaDispatcher = schemaOperationDispatcher;
     SchemaNormalizeDispatcher schemaNormalizeDispatcher =
         new SchemaNormalizeDispatcher(schemaOperationDispatcher, catalogManager);
@@ -792,15 +844,6 @@ public class GravitinoEnv {
     PartitionNormalizeDispatcher partitionNormalizeDispatcher =
         new PartitionNormalizeDispatcher(partitionOperationDispatcher, catalogManager);
     this.partitionDispatcher = new PartitionEventDispatcher(eventBus, partitionNormalizeDispatcher);
-
-    FilesetOperationDispatcher filesetOperationDispatcher =
-        new FilesetOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
-    FilesetNormalizeDispatcher filesetNormalizeDispatcher =
-        new FilesetNormalizeDispatcher(filesetOperationDispatcher, catalogManager);
-    this.internalFilesetDispatcher = filesetNormalizeDispatcher;
-    FilesetEventDispatcher filesetEventDispatcher =
-        new FilesetEventDispatcher(eventBus, filesetNormalizeDispatcher);
-    this.filesetDispatcher = new FilesetHookDispatcher(filesetEventDispatcher);
 
     TopicOperationDispatcher topicOperationDispatcher =
         new TopicOperationDispatcher(catalogManager, entityStore, idGenerator, secretManager);
@@ -852,6 +895,16 @@ public class GravitinoEnv {
     ViewEventDispatcher viewEventDispatcher =
         new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
     this.viewDispatcher = viewEventDispatcher;
+
+    // Semantic Model operation chain: SemanticModelNormalizeDispatcher ->
+    // SemanticModelOperationDispatcher -> ManagedSemanticModelOperations.
+    // TODO(#12595): Add Semantic Model event dispatching before server integration.
+    // TODO(#12594): Add Semantic Model ownership and privilege hooks.
+    SemanticModelOperationDispatcher semanticModelOperationDispatcher =
+        new SemanticModelOperationDispatcher(
+            catalogManager, schemaOperationDispatcher, entityStore, idGenerator, secretManager);
+    this.semanticModelDispatcher =
+        new SemanticModelNormalizeDispatcher(semanticModelOperationDispatcher, catalogManager);
 
     this.statisticDispatcher =
         new StatisticEventDispatcher(

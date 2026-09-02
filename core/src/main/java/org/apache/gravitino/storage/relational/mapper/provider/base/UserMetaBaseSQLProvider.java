@@ -27,6 +27,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -51,6 +52,17 @@ public class UserMetaBaseSQLProvider {
         + USER_TABLE_NAME
         + " WHERE metalake_id = #{metalakeId} AND user_name = #{userName}"
         + " AND deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and locks an active user by ID. */
+  public String selectUserMetaByIdForUpdate(@Param("userId") Long userId) {
+    return "SELECT user_id as userId, user_name as userName,"
+        + " metalake_id as metalakeId, external_id as externalId, enabled as enabled,"
+        + " audit_info as auditInfo, current_version as currentVersion,"
+        + " last_version as lastVersion, deleted_at as deletedAt"
+        + " FROM "
+        + USER_TABLE_NAME
+        + " WHERE user_id = #{userId} AND deleted_at = 0 FOR UPDATE";
   }
 
   public String selectUserMetaByMetalakeNameAndExternalId(
@@ -99,11 +111,8 @@ public class UserMetaBaseSQLProvider {
         + " current_version = #{newUserMeta.currentVersion},"
         + " last_version = #{newUserMeta.lastVersion},"
         + " deleted_at = #{newUserMeta.deletedAt}"
-        + " WHERE external_id = #{oldUserMeta.externalId}"
-        + " AND metalake_id = #{oldUserMeta.metalakeId}"
-        + " AND audit_info = #{oldUserMeta.auditInfo}"
+        + " WHERE user_id = #{oldUserMeta.userId}"
         + " AND current_version = #{oldUserMeta.currentVersion}"
-        + " AND last_version = #{oldUserMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -147,24 +156,28 @@ public class UserMetaBaseSQLProvider {
         + " audit_info = #{userMeta.auditInfo},"
         + " external_id = #{userMeta.externalId},"
         + " enabled = #{userMeta.enabled},"
-        + " current_version = #{userMeta.currentVersion},"
-        + " last_version = #{userMeta.lastVersion},"
+        // Advance rather than reset the OCC token so a writer holding a pre-overwrite snapshot
+        // cannot pass a later compare-and-set (an ABA conflict).
+        + " last_version = current_version + 1,"
+        + " current_version = current_version + 1,"
         + " deleted_at = #{userMeta.deletedAt}";
   }
 
-  public String softDeleteUserMetaByUserId(@Param("userId") Long userId) {
+  public String softDeleteUserMetaByUserId(
+      @Param("userId") Long userId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
+        + " WHERE user_id = #{userId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   public String softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -181,11 +194,7 @@ public class UserMetaBaseSQLProvider {
         + " last_version = #{newUserMeta.lastVersion},"
         + " deleted_at = #{newUserMeta.deletedAt}"
         + " WHERE user_id = #{oldUserMeta.userId}"
-        + " AND user_name = #{oldUserMeta.userName}"
-        + " AND metalake_id = #{oldUserMeta.metalakeId}"
-        + " AND audit_info = #{oldUserMeta.auditInfo}"
         + " AND current_version = #{oldUserMeta.currentVersion}"
-        + " AND last_version = #{oldUserMeta.lastVersion}"
         + " AND deleted_at = 0";
   }
 
@@ -306,8 +315,8 @@ public class UserMetaBaseSQLProvider {
   public String touchUserUpdatedAt(@Param("userId") long userId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 

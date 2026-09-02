@@ -23,6 +23,7 @@ import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.T
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -147,6 +148,11 @@ public class CatalogMetaBaseSQLProvider {
     return selectCatalogMetaById(catalogId) + " FOR UPDATE";
   }
 
+  /** Returns SQL that selects and share-locks an active catalog by ID. */
+  public String selectCatalogMetaByIdForShare(@Param("catalogId") Long catalogId) {
+    return selectCatalogMetaById(catalogId) + " LOCK IN SHARE MODE";
+  }
+
   public String insertCatalogMeta(@Param("catalogMeta") CatalogPO catalogPO) {
     return "INSERT INTO "
         + TABLE_NAME
@@ -236,8 +242,8 @@ public class CatalogMetaBaseSQLProvider {
       @Param("catalogId") Long catalogId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
@@ -248,8 +254,8 @@ public class CatalogMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE deleted_at = 0 AND "
         + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"

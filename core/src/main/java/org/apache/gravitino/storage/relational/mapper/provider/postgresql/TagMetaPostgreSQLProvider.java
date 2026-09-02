@@ -21,6 +21,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.TagMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.Param;
@@ -30,7 +31,8 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   public String softDeleteTagMetaByMetalakeAndTagName(String metalakeName, String tagName) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " tm SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " tm SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE tm.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -42,7 +44,8 @@ public class TagMetaPostgreSQLProvider extends TagMetaBaseSQLProvider {
   public String softDeleteTagMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 

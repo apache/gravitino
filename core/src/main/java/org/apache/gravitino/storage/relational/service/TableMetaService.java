@@ -25,7 +25,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import org.apache.gravitino.Entity;
@@ -54,15 +53,6 @@ import org.apache.gravitino.utils.NamespaceUtil;
 
 /** The service class for table metadata. It provides the basic database operations for table. */
 public class TableMetaService {
-
-  /**
-   * Message prefix of the {@link java.io.IOException} thrown by {@link #updateTable} when the
-   * optimistic-lock CAS matches zero rows (the stored version advanced under a concurrent update).
-   * Exposed so callers that retry the lost race (e.g. the Lance repair-on-load path) can recognize
-   * the conflict without re-declaring the literal.
-   */
-  public static final String UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX =
-      "Failed to update the entity: ";
 
   private static final TableMetaService INSTANCE = new TableMetaService();
   private BasePOStorageOps<TablePO, TableMetaMapper> ops;
@@ -123,22 +113,56 @@ public class TableMetaService {
       TablePO.Builder builder = TablePO.builder();
       fillTablePOBuilderParentEntityId(builder, tableEntity.namespace());
 
-      AtomicReference<TablePO> tablePORef = new AtomicReference<>();
       TablePO po = POConverters.initializeTablePOWithVersion(tableEntity, builder);
+      AtomicReference<TablePO> persistedPO = new AtomicReference<>(po);
+      // The schema lock, table row, version row, and columns share one transaction. If any later
+      // step fails, the earlier inserts are rolled back as well.
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the table cannot be
+          // written below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      tableEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   TableMetaMapper.class,
                   mapper -> {
-                    tablePORef.set(po);
                     ops.insertPO(mapper, po, overwrite);
+                    if (overwrite) {
+                      // MySQL may resolve the upsert through the active (schema_id, table_name,
+                      // deleted_at) key rather than table_id. In that case it preserves the
+                      // winner's ID. The upsert already holds that row until commit, so read the
+                      // database-derived identity and version back through the same natural key.
+                      TablePO storedPO =
+                          mapper.selectTableMetaBySchemaIdAndName(
+                              po.getSchemaId(), po.getTableName());
+                      Preconditions.checkState(
+                          storedPO != null,
+                          "The overwritten table %s in schema %s does not exist",
+                          po.getTableName(),
+                          po.getSchemaId());
+                      persistedPO.set(tablePOWithPersistedIdentityAndVersions(po, storedPO));
+                    }
                   }),
           () ->
               SessionUtils.doWithoutCommit(
                   TableVersionMapper.class,
                   mapper -> {
                     if (overwrite) {
-                      mapper.insertTableVersionOnDuplicateKeyUpdate(po);
+                      TablePO storedPO = persistedPO.get();
+                      // Retire the version row this overwrite replaces. There is one only when the
+                      // upsert updated an existing table: the database then moved the version from
+                      // N to N + 1, so the row to retire is N. When the upsert inserted a brand new
+                      // table the version is still the initial one and no earlier row exists.
+                      if (storedPO.getCurrentVersion() > POConverters.INIT_VERSION) {
+                        mapper.softDeleteTableVersionByTableIdAndVersion(
+                            storedPO.getTableId(), storedPO.getCurrentVersion() - 1);
+                      }
+                      mapper.insertTableVersionOnDuplicateKeyUpdate(storedPO);
                     } else {
                       mapper.insertTableVersion(po);
                     }
@@ -147,13 +171,13 @@ public class TableMetaService {
             // We need to delete the columns first if we want to overwrite the table.
             if (overwrite) {
               TableColumnMetaService.getInstance()
-                  .deleteColumnsByTableId(tablePORef.get().getTableId());
+                  .deleteColumnsByTableId(persistedPO.get().getTableId());
             }
           },
           () -> {
             if (tableEntity.columns() != null && !tableEntity.columns().isEmpty()) {
               TableColumnMetaService.getInstance()
-                  .insertColumnPOs(tablePORef.get(), tableEntity.columns());
+                  .insertColumnPOs(persistedPO.get(), tableEntity.columns());
             }
           });
 
@@ -191,27 +215,57 @@ public class TableMetaService {
     TablePO newTablePO =
         POConverters.updateTablePOWithVersionAndSchemaId(oldTablePO, newTableEntity, newSchemaId);
 
-    final AtomicInteger updateResult = new AtomicInteger(0);
     try {
       SessionUtils.doMultipleWithCommit(
-          () ->
-              updateResult.set(
-                  SessionUtils.getWithoutCommit(
-                      TableMetaMapper.class,
-                      mapper -> ops.updatePO(mapper, newTablePO, oldTablePO))),
-          () ->
-              SessionUtils.doWithoutCommit(
-                  TableVersionMapper.class,
-                  mapper -> {
-                    mapper.softDeleteTableVersionByTableIdAndVersion(
-                        oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
-                    mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
-                  }),
           () -> {
-            if (updateResult.get() > 0) {
-              TableColumnMetaService.getInstance()
-                  .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
+            // Only an update that moves the table to another schema needs a lock here. The new
+            // parent must stay alive until the move commits; locking the old parent would not
+            // protect the table's new location.
+            if (isSchemaChanged) {
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      newTableEntity.nameIdentifier(),
+                      newSchemaId,
+                      oldTablePO.getCatalogId(),
+                      oldTablePO.getMetalakeId());
             }
+          },
+          () -> {
+            // This update is the decision point for the whole transaction. current_version is the
+            // table's OCC token: if another writer changed the table after we read it, that writer
+            // has already increased the token and this UPDATE changes zero rows. Throwing here
+            // rolls back the transaction before it can touch the version history or columns.
+            int updated =
+                SessionUtils.getWithoutCommit(
+                    TableMetaMapper.class, mapper -> ops.updatePO(mapper, newTablePO, oldTablePO));
+            if (updated == 0) {
+              throw tableWriteFailure(identifier, oldTablePO);
+            }
+          },
+          () -> {
+            // The table details live in table_version_info, keyed by (table_id, version), while
+            // table_meta only points at the current version. The two rows have to move together,
+            // and the upsert below has no version guard of its own: it overwrites whatever sits
+            // under that key.
+            //
+            // Say two writers both read version 5 and both want to write 6. Their version rows
+            // carry the same key, (table_id, 6), so whichever runs this statement second would
+            // silently replace the other's details. Ordering this step after the table_meta CAS is
+            // what prevents that: the loser matches no row up there, throws, and the transaction
+            // rolls back before reaching this statement. Only the winner ever writes version 6.
+            SessionUtils.doWithoutCommit(
+                TableVersionMapper.class,
+                mapper -> {
+                  mapper.softDeleteTableVersionByTableIdAndVersion(
+                      oldTablePO.getTableId(), oldTablePO.getCurrentVersion());
+                  mapper.insertTableVersionOnDuplicateKeyUpdate(newTablePO);
+                });
+          },
+          () -> {
+            // Column changes use the same new table version. Keeping this in the same transaction
+            // means a column failure also rolls back table_meta and table_version_info.
+            TableColumnMetaService.getInstance()
+                .updateColumnPOsFromTableDiff(oldTableEntity, newTableEntity, newTablePO);
           });
 
     } catch (RuntimeException re) {
@@ -220,61 +274,38 @@ public class TableMetaService {
       throw re;
     }
 
-    if (updateResult.get() > 0) {
-      return newTableEntity;
-    } else {
-      throw new IOException(UPDATE_ENTITY_CONFLICT_MESSAGE_PREFIX + identifier);
-    }
+    return newTableEntity;
   }
 
   @Monitored(metricsSource = GRAVITINO_RELATIONAL_STORE_METRIC_NAME, baseMetricName = "deleteTable")
   public boolean deleteTable(NameIdentifier identifier) {
     TablePO tablePO = getTablePOByIdentifier(identifier);
 
-    AtomicInteger deleteResult = new AtomicInteger(0);
+    // Delete the table row first and only if it still has the version we read. A stale drop stops
+    // there, before it can remove columns, tags, policies, or any other related data.
     SessionUtils.doMultipleWithCommit(
+        () -> deleteTableWithVersion(identifier, tablePO), () -> deleteTableDependents(tablePO));
+
+    return true;
+  }
+
+  /**
+   * Deletes the table root row only when it still has the version observed by the caller.
+   *
+   * <p>This method deliberately does not start or commit a transaction. Its caller must include it
+   * in the same transaction as dependent-row cleanup, so a later cleanup failure restores the root
+   * row too. Package-private access also lets concurrency tests submit a deliberately stale
+   * snapshot without copying the production CAS logic.
+   */
+  void deleteTableWithVersion(NameIdentifier identifier, TablePO observedTablePO) {
+    OccWriteSupport.deleteWithVersion(
         () ->
-            deleteResult.set(
-                SessionUtils.getWithoutCommit(
-                    TableMetaMapper.class,
-                    mapper -> mapper.softDeleteTableMetasByTableId(tablePO.getTableId()))),
-        () -> {
-          if (deleteResult.get() > 0) {
-            SessionUtils.doWithoutCommit(
-                OwnerMetaMapper.class,
+            SessionUtils.getWithoutCommit(
+                TableMetaMapper.class,
                 mapper ->
-                    mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
-                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
-            TableColumnMetaService.getInstance().deleteColumnsByTableId(tablePO.getTableId());
-            SessionUtils.doWithoutCommit(
-                SecurableObjectMapper.class,
-                mapper ->
-                    mapper.softDeleteObjectRelsByMetadataObject(
-                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper ->
-                    mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
-                        tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
-            SessionUtils.doWithoutCommit(
-                TagMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tablePO.getTableId()));
-
-            SessionUtils.doWithoutCommit(
-                StatisticMetaMapper.class,
-                mapper -> mapper.softDeleteStatisticsByEntityId(tablePO.getTableId()));
-            SessionUtils.doWithoutCommit(
-                PolicyMetadataObjectRelMapper.class,
-                mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tablePO.getTableId()));
-            SessionUtils.doWithoutCommit(
-                TableVersionMapper.class,
-                mapper ->
-                    mapper.softDeleteTableVersionByTableIdAndVersion(
-                        tablePO.getTableId(), tablePO.getCurrentVersion()));
-          }
-        });
-
-    return deleteResult.get() > 0;
+                    mapper.softDeleteTableMetasByTableId(
+                        observedTablePO.getTableId(), observedTablePO.getCurrentVersion())),
+        () -> tableWriteFailure(identifier, observedTablePO));
   }
 
   @Monitored(
@@ -352,5 +383,66 @@ public class TableMetaService {
     builder.withMetalakeId(namespacedEntityId.namespaceIds()[0]);
     builder.withCatalogId(namespacedEntityId.namespaceIds()[1]);
     builder.withSchemaId(namespacedEntityId.entityId());
+  }
+
+  private TablePO tablePOWithPersistedIdentityAndVersions(TablePO incomingPO, TablePO persistedPO) {
+    // The upsert derives the version inside the database and may preserve an existing table ID, so
+    // its dependent rows must carry the identity and versions the database ended up with.
+    return TablePO.builder(incomingPO)
+        .withTableId(persistedPO.getTableId())
+        .withCurrentVersion(persistedPO.getCurrentVersion())
+        .withLastVersion(persistedPO.getLastVersion())
+        .build();
+  }
+
+  private void deleteTableDependents(TablePO tablePO) {
+    // The table row has already passed its version check. All cleanup below uses the same database
+    // transaction, so either the table and every related row are deleted together, or none are.
+    SessionUtils.doWithoutCommit(
+        OwnerMetaMapper.class,
+        mapper ->
+            mapper.softDeleteOwnerRelByMetadataObjectIdAndType(
+                tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
+    TableColumnMetaService.getInstance().deleteColumnsByTableId(tablePO.getTableId());
+    SessionUtils.doWithoutCommit(
+        SecurableObjectMapper.class,
+        mapper ->
+            mapper.softDeleteObjectRelsByMetadataObject(
+                tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper ->
+            mapper.softDeleteTagMetadataObjectRelsByMetadataObject(
+                tablePO.getTableId(), MetadataObject.Type.TABLE.name()));
+    SessionUtils.doWithoutCommit(
+        TagMetadataObjectRelMapper.class,
+        mapper -> mapper.softDeleteTagMetadataObjectRelsByTableId(tablePO.getTableId()));
+    SessionUtils.doWithoutCommit(
+        StatisticMetaMapper.class,
+        mapper -> mapper.softDeleteStatisticsByEntityId(tablePO.getTableId()));
+    SessionUtils.doWithoutCommit(
+        PolicyMetadataObjectRelMapper.class,
+        mapper -> mapper.softDeletePolicyMetadataObjectRelsByTableId(tablePO.getTableId()));
+    SessionUtils.doWithoutCommit(
+        TableVersionMapper.class,
+        mapper ->
+            mapper.softDeleteTableVersionByTableIdAndVersion(
+                tablePO.getTableId(), tablePO.getCurrentVersion()));
+  }
+
+  private RuntimeException tableWriteFailure(NameIdentifier identifier, TablePO observedTablePO) {
+    return OccWriteSupport.writeFailure(
+        identifier,
+        Entity.EntityType.TABLE,
+        () ->
+            SessionUtils.getWithoutCommit(
+                TableMetaMapper.class,
+                mapper -> mapper.selectTableMetaByIdForUpdate(observedTablePO.getTableId())),
+        null,
+        current ->
+            Objects.equals(current.getTableName(), observedTablePO.getTableName())
+                && Objects.equals(current.getSchemaId(), observedTablePO.getSchemaId())
+                && Objects.equals(current.getCatalogId(), observedTablePO.getCatalogId())
+                && Objects.equals(current.getMetalakeId(), observedTablePO.getMetalakeId()));
   }
 }

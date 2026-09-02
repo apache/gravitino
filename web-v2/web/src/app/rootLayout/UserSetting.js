@@ -24,13 +24,13 @@ import { LogoutOutlined, PlusOutlined, UserOutlined } from '@ant-design/icons'
 import { Avatar, Dropdown, Tooltip } from 'antd'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils/tailwind'
-import { normalizeServiceAdmins } from '@/lib/utils/serviceAdmins'
 import { useAppSelector, useAppDispatch } from '@/lib/hooks/useStore'
 import Loading from '@/components/Loading'
 import { fetchMetalakes, resetMetalakeStore } from '@/lib/store/metalakes'
 import { resetRolesStore } from '@/lib/store/roles'
 import { logoutAction } from '@/lib/store/auth'
 import { oauthProviderFactory } from '@/lib/auth/providers/factory'
+import { canCreateMetalake } from '@/lib/utils/metalakePermissions'
 
 const CreateMetalakeDialog = dynamic(() => import('@/app/metalakes/CreateMetalakeDialog'), {
   loading: () => <Loading />,
@@ -41,9 +41,8 @@ export default function UserSetting() {
   const [openCreateMeta, setOpenCreateMeta] = useState(false)
   const [showLogoutButton, setShowLogoutButton] = useState(false)
   const auth = useAppSelector(state => state.auth)
-  const { serviceAdmins, authUser, anthEnable } = auth
-  const admins = normalizeServiceAdmins(serviceAdmins)
-  const isServiceAdmin = admins.includes(authUser?.name)
+  const { isServiceAdmin, authUser, anthEnable } = auth
+  const showCreateMetalake = canCreateMetalake(anthEnable, isServiceAdmin)
   const [session, setSession] = useState({})
   const router = useRouter()
   const pathname = usePathname()
@@ -88,7 +87,7 @@ export default function UserSetting() {
         label: (
           <div className='flex w-[208px] justify-between'>
             <span>Metalakes</span>
-            {isServiceAdmin && (
+            {showCreateMetalake && (
               <Tooltip title='Create Metalake'>
                 <PlusOutlined className='cursor-pointer text-black' onClick={handleCreateMetalake} />
               </Tooltip>
@@ -151,7 +150,7 @@ export default function UserSetting() {
           ]
         : [])
     ],
-    [authUser, serviceAdmins, store.metalakes, currentMetalake, anthEnable, searchParams]
+    [authUser, showCreateMetalake, store.metalakes, currentMetalake, anthEnable, searchParams]
   )
 
   return (

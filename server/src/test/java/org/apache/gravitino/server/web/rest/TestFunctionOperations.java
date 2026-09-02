@@ -408,6 +408,18 @@ public class TestFunctionOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAlterFunctionWithNullRequest() {
+    Response resp =
+        target(functionPath())
+            .path("func1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testAlterFunction() {
     NameIdentifier funcId = NameIdentifierUtil.ofFunction(metalake, catalog, schema, "func1");
     Function mockFunction = mockFunction("func1", "new comment", FunctionType.SCALAR);

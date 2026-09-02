@@ -29,6 +29,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import javax.annotation.Nullable;
 import org.apache.commons.lang3.tuple.Pair;
@@ -178,7 +179,14 @@ public class RelationalEntityStore
   public <E extends Entity & HasIdentifier> void put(E e, boolean overwritten)
       throws IOException, EntityAlreadyExistsException {
     backend.insert(e, overwritten);
-    cache.put(e);
+    if (overwritten) {
+      // An overwrite is resolved by the database, which may keep the identity and version of the
+      // row it already had. Caching the copy handed in here would publish values the stored row
+      // does not carry, so the next read is served from the backend instead.
+      cache.invalidate(e.nameIdentifier(), e.type());
+    } else {
+      cache.put(e);
+    }
   }
 
   @Override
@@ -315,6 +323,20 @@ public class RelationalEntityStore
       return deleted;
     } catch (NoSuchEntityException e) {
       return false;
+    } finally {
+      cache.invalidate(ident, entityType);
+    }
+  }
+
+  @Override
+  public <E extends Entity & HasIdentifier> Optional<E> deleteAndGet(
+      NameIdentifier ident,
+      Entity.EntityType entityType,
+      Class<E> clazz,
+      Consumer<E> postDeleteAction)
+      throws IOException {
+    try {
+      return backend.deleteAndGet(ident, entityType, clazz, postDeleteAction);
     } finally {
       cache.invalidate(ident, entityType);
     }
@@ -565,6 +587,8 @@ public class RelationalEntityStore
         return Entity.EntityType.POLICY;
       case TAG_METADATA_OBJECT_REL:
         return Entity.EntityType.TAG;
+      case POLICY_TAG_REL:
+        return Entity.EntityType.POLICY;
       default:
         throw new IllegalArgumentException(
             String.format("Doesn't support the relation type %s", relType));

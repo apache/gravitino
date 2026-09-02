@@ -106,6 +106,15 @@ public class ViewMetaService {
       ViewPO po = initializeViewPO(viewEntity, builder);
 
       SessionUtils.doMultipleWithCommit(
+          // Hold the parent schema row until this transaction ends, so the view cannot be
+          // written below a schema that is being dropped.
+          () ->
+              SchemaMetaService.getInstance()
+                  .lockSchemaForEntityWrite(
+                      viewEntity.nameIdentifier(),
+                      po.getSchemaId(),
+                      po.getCatalogId(),
+                      po.getMetalakeId()),
           () ->
               SessionUtils.doWithoutCommit(
                   ViewMetaMapper.class, mapper -> ops.insertPO(mapper, po, overwrite)),

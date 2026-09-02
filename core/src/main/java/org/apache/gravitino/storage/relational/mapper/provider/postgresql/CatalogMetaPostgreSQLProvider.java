@@ -21,16 +21,23 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import static org.apache.gravitino.storage.relational.mapper.CatalogMetaMapper.TABLE_NAME;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.CatalogMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.CatalogPO;
 import org.apache.ibatis.annotations.Param;
 
 public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
   @Override
+  public String selectCatalogMetaByIdForShare(Long catalogId) {
+    return selectCatalogMetaById(catalogId) + " FOR SHARE";
+  }
+
+  @Override
   public String softDeleteCatalogMetasByCatalogId(Long catalogId, Long currentVersion) {
     return "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE catalog_id = #{catalogId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
@@ -41,7 +48,8 @@ public class CatalogMetaPostgreSQLProvider extends CatalogMetaBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE deleted_at = 0 AND "
         + "<foreach collection='catalogMetas' item='item' separator=' OR ' open='(' close=')'>"
         + "(catalog_id = #{item.catalogId} AND current_version = #{item.currentVersion})"

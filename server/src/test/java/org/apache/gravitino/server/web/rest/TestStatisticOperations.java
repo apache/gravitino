@@ -784,6 +784,47 @@ public class TestStatisticOperations extends JerseyTest {
   }
 
   @Test
+  public void testUpdatePartitionStatisticsWithNullStatisticValue() {
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+
+    // Sent as raw JSON because PartitionStatisticsUpdateDTO.of rejects this body. Jackson's
+    // MapDeserializer puts the JSON null straight into the map without consulting the
+    // StatisticValue deserializer, so only validate() can reject it.
+    String body =
+        "{\"updates\":[{\"partitionName\":\"partition1\",\"statistics\":{\""
+            + Statistic.CUSTOM_PREFIX
+            + "test1\":null}}]}";
+
+    Response resp =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics/partitions")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(body, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), resp.getStatus());
+    Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp.getMediaType());
+
+    ErrorResponse errorResp = resp.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResp.getCode());
+    // Pin the reason: a body that lost the entry entirely would fail on "statistics must not be
+    // null or empty" instead, which would let this test pass for the wrong reason.
+    Assertions.assertTrue(
+        errorResp.getMessage().contains(Statistic.CUSTOM_PREFIX + "test1")
+            && errorResp.getMessage().contains("must not be null"),
+        () -> "Unexpected rejection reason: " + errorResp.getMessage());
+  }
+
+  @Test
   public void testDropPartitionStatistics() {
     List<PartitionStatisticsDropDTO> partitionStatistics = Lists.newArrayList();
     partitionStatistics.add(
