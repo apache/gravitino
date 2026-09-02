@@ -27,9 +27,7 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.EntityAlreadyExistsException;
@@ -71,7 +69,6 @@ public class PolicyManager implements PolicyDispatcher {
 
   private final IdGenerator idGenerator;
   private final EntityStore entityStore;
-  private final ObjectPolicyResolver objectPolicyResolver;
 
   public PolicyManager(IdGenerator idGenerator, EntityStore entityStore) {
     if (!(entityStore instanceof SupportsRelationOperations)) {
@@ -84,7 +81,6 @@ public class PolicyManager implements PolicyDispatcher {
 
     this.idGenerator = idGenerator;
     this.entityStore = entityStore;
-    this.objectPolicyResolver = new ObjectPolicyResolver(entityStore);
   }
 
   @Override
@@ -302,12 +298,7 @@ public class PolicyManager implements PolicyDispatcher {
     MetadataObjectUtil.checkMetadataObject(metalake, metadataObject);
     checkMetalake(NameIdentifier.of(metalake), entityStore);
 
-    Map<Long, PolicyEntity> policiesById = new LinkedHashMap<>();
-    Arrays.stream(listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject))
-        .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
-    Arrays.stream(objectPolicyResolver.resolve(metalake, metadataObject))
-        .forEach(policy -> policiesById.putIfAbsent(policy.id(), policy));
-    return policiesById.values().toArray(new PolicyEntity[0]);
+    return listDirectPoliciesForMetadataObject(entityIdent, entityType, metadataObject);
   }
 
   @Override
