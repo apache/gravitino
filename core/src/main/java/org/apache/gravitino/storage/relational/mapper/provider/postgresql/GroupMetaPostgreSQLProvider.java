@@ -24,6 +24,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.ROLE
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.GroupMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.ibatis.annotations.Param;
@@ -33,7 +34,8 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String softDeleteGroupMetaByGroupId(Long groupId, Long currentVersion) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE group_id = #{groupId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
@@ -42,7 +44,8 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String softDeleteGroupMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -196,7 +199,8 @@ public class GroupMetaPostgreSQLProvider extends GroupMetaBaseSQLProvider {
   public String touchGroupUpdatedAt(@Param("groupId") long groupId) {
     return "UPDATE "
         + GROUP_TABLE_NAME
-        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE group_id = #{groupId} AND deleted_at = 0";
   }
 }

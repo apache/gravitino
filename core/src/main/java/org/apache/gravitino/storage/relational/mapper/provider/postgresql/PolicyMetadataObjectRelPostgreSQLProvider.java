@@ -30,13 +30,13 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableColumnMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetadataObjectRelBaseSQLProvider;
 import org.apache.ibatis.annotations.Param;
 
 public class PolicyMetadataObjectRelPostgreSQLProvider
     extends PolicyMetadataObjectRelBaseSQLProvider {
-  private static final String DELETED_AT_NOW_EXPRESSION =
-      " CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+  private static final String DELETED_AT_NOW_EXPRESSION = " " + DatabaseTimeSQL.POSTGRESQL;
 
   @Override
   public String softDeletePolicyMetadataObjectRelsByMetalakeAndPolicyName(

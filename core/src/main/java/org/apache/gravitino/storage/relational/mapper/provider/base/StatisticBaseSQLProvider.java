@@ -27,6 +27,7 @@ import org.apache.gravitino.storage.relational.mapper.ModelMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.StatisticPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -196,7 +197,6 @@ public class StatisticBaseSQLProvider {
   }
 
   protected String softDeleteSQL() {
-    return " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000 ";
+    return " SET deleted_at = " + DatabaseTimeSQL.MYSQL + " ";
   }
 }

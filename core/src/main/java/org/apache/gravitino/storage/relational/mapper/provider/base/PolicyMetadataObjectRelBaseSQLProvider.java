@@ -29,6 +29,7 @@ import org.apache.gravitino.storage.relational.mapper.PolicyMetadataObjectRelMap
 import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.PolicyMetadataObjectRelPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -120,8 +121,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE policy_id IN "
         + "<foreach item='policyId' collection='policyIds' open='(' separator=',' close=')'>"
         + "#{policyId}"
@@ -140,8 +141,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " pm ON pe.policy_id = pm.policy_id JOIN "
         + MetalakeMetaMapper.TABLE_NAME
         + " mm ON pm.metalake_id = mm.metalake_id"
-        + " SET pe.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET pe.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE mm.metalake_name = #{metalakeName} AND pm.policy_name = #{policyName}"
         + " AND pe.deleted_at = 0 AND pm.deleted_at = 0 AND mm.deleted_at = 0";
   }
@@ -153,8 +154,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
         + " pe JOIN "
         + PolicyMetaMapper.POLICY_META_TABLE_NAME
         + " pm ON pe.policy_id = pm.policy_id"
-        + " SET pe.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET pe.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE pm.metalake_id = #{metalakeId}"
         + " AND pe.deleted_at = 0 AND pm.deleted_at = 0";
   }
@@ -164,8 +165,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
       @Param("metadataObjectType") String metadataObjectType) {
     return " UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metadata_object_id = #{metadataObjectId} AND deleted_at = 0"
         + " AND metadata_object_type = #{metadataObjectType}";
   }
@@ -173,7 +174,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
   public String softDeletePolicyMetadataObjectRelsByCatalogId(@Param("catalogId") Long catalogId) {
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE deleted_at = 0 AND ("
         + "   (metadata_object_type = 'CATALOG' AND metadata_object_id = #{catalogId})"
         + "   OR (metadata_object_type = 'SCHEMA' AND metadata_object_id IN (SELECT schema_id FROM "
@@ -199,7 +201,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
     return "<script>"
         + "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0) + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE deleted_at = 0 AND ("
         + "   (metadata_object_type = 'SCHEMA' AND metadata_object_id IN "
         + "<foreach collection='schemaIds' item='schemaId' open='(' close=')' separator=','>"
@@ -241,8 +244,8 @@ public class PolicyMetadataObjectRelBaseSQLProvider {
   public String softDeletePolicyMetadataObjectRelsByTableId(@Param("tableId") Long tableId) {
     return "UPDATE "
         + PolicyMetadataObjectRelMapper.POLICY_METADATA_OBJECT_RELATION_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metadata_object_id = #{tableId}"
         + " AND metadata_object_type = 'TABLE'"
         + " AND deleted_at = 0";

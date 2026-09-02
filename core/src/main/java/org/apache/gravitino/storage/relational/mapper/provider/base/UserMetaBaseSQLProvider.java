@@ -27,6 +27,7 @@ import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.U
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -166,8 +167,8 @@ public class UserMetaBaseSQLProvider {
       @Param("userId") Long userId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE user_id = #{userId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
@@ -175,8 +176,8 @@ public class UserMetaBaseSQLProvider {
   public String softDeleteUserMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -314,8 +315,8 @@ public class UserMetaBaseSQLProvider {
   public String touchUserUpdatedAt(@Param("userId") long userId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 

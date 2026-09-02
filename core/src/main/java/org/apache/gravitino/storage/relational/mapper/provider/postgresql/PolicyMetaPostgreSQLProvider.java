@@ -20,6 +20,7 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
 import static org.apache.gravitino.storage.relational.mapper.PolicyMetaMapper.POLICY_META_TABLE_NAME;
 
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.PolicyMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.PolicyPO;
 
@@ -29,7 +30,8 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   public String softDeletePolicyByMetalakeAndPolicyName(String metalakeName, String policyName) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = (SELECT metalake_id FROM "
         + " metalake_meta mm WHERE mm.metalake_name = #{metalakeName} AND mm.deleted_at = 0)"
         + " AND policy_name = #{policyName} AND deleted_at = 0";
@@ -39,7 +41,8 @@ public class PolicyMetaPostgreSQLProvider extends PolicyMetaBaseSQLProvider {
   public String softDeletePolicyMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + POLICY_META_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
