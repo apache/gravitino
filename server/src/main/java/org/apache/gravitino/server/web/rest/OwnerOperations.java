@@ -119,6 +119,14 @@ public class OwnerOperations {
       @PathParam("metadataObjectType") String metadataObjectType,
       @PathParam("fullName") String fullName,
       OwnerSetRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleOwnerException(
+          OperationType.SET,
+          String.format("metadata object %s", fullName),
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       MetadataObject object =
           MetadataObjects.parse(

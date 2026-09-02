@@ -289,6 +289,14 @@ public class MetadataObjectTagOperations {
 
   private Response associateTagsForObjectInternal(
       String metalake, String type, String fullName, TagsAssociateRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleTagException(
+          OperationType.ASSOCIATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,
@@ -314,6 +322,16 @@ public class MetadataObjectTagOperations {
 
   private Response associateTagValuesForObjectInternal(
       String metalake, String type, String fullName, TagValuesAssociateRequest request) {
+    if (request == null) {
+      return withMediaType(
+          ExceptionHandlers.handleTagException(
+              OperationType.ASSOCIATE,
+              "",
+              fullName,
+              new IllegalArgumentException("Request body cannot be null")),
+          TAG_VALUES_MEDIA_TYPE);
+    }
+
     LOG.info(
         "Received associate tag values request for object type: {}, full name: {} under metalake: {}",
         type,
