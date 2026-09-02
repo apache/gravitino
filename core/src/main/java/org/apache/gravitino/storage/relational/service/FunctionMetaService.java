@@ -318,7 +318,10 @@ public class FunctionMetaService {
       Long newSchemaId,
       Long newCatalogId,
       Long newMetalakeId) {
-    Integer newVersion = oldFunctionPO.functionLatestVersion() + 1;
+    // Both version columns always advance together, but deriving the next version from
+    // the higher of the two keeps it above every version row that exists, even if a
+    // future path ever leaves the current version behind the latest one.
+    Integer newVersion = nextVersion(oldFunctionPO);
     FunctionPO.FunctionPOBuilder builder =
         FunctionPO.builder()
             .withMetalakeId(newMetalakeId)
@@ -379,13 +382,32 @@ public class FunctionMetaService {
       return sameNameFunctionPO;
     }
 
-    return SessionUtils.getWithoutCommit(
-        FunctionMetaMapper.class,
-        mapper -> mapper.selectFunctionMetaByIdForUpdate(initializedFunctionPO.functionId()));
+    FunctionPO sameIdFunctionPO =
+        SessionUtils.getWithoutCommit(
+            FunctionMetaMapper.class,
+            mapper -> mapper.selectFunctionMetaByIdForUpdate(initializedFunctionPO.functionId()));
+    // Only a function that already lives under the target schema can be replaced by ID. A stored
+    // function with the same ID under another schema belongs to a different parent: adopting it
+    // here would move it without ever fencing its own schema.
+    if (sameIdFunctionPO == null
+        || !Objects.equals(sameIdFunctionPO.schemaId(), initializedFunctionPO.schemaId())) {
+      return null;
+    }
+    return sameIdFunctionPO;
+  }
+
+  /**
+   * Returns the version to write next, one above every version this function has ever had.
+   *
+   * @param functionPO the function row observed by the caller
+   * @return the next monotonic version
+   */
+  private static int nextVersion(FunctionPO functionPO) {
+    return Math.max(functionPO.functionCurrentVersion(), functionPO.functionLatestVersion()) + 1;
   }
 
   private FunctionPO functionPOForOverwrite(FunctionPO incomingPO, FunctionPO persistedPO) {
-    int nextVersion = persistedPO.functionLatestVersion() + 1;
+    int nextVersion = nextVersion(persistedPO);
     FunctionVersionPO incomingVersionPO = incomingPO.functionVersionPO();
     FunctionVersionPO persistedVersionPO =
         FunctionVersionPO.builder()

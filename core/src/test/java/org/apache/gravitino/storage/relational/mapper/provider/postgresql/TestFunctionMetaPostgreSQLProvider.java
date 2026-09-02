@@ -18,29 +18,10 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import org.apache.gravitino.storage.relational.mapper.FunctionMetaMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestFunctionMetaPostgreSQLProvider {
-
-  @Test
-  void testOverwriteAdvancesStoredVersion() {
-    String sql = new FunctionMetaPostgreSQLProvider().insertFunctionMetaOnDuplicateKeyUpdate(null);
-    String conflictClause = sql.substring(sql.indexOf(" ON CONFLICT"));
-
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "function_current_version = "
-                + FunctionMetaMapper.TABLE_NAME
-                + ".function_current_version + 1"));
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "function_latest_version = "
-                + FunctionMetaMapper.TABLE_NAME
-                + ".function_current_version + 1"));
-    Assertions.assertFalse(conflictClause.matches(".*[^.\\w]function_current_version\\s*\\+.*"));
-  }
 
   @Test
   void testDirectDeleteUsesVersionCas() {

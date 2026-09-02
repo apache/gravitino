@@ -41,35 +41,6 @@ public class FunctionMetaPostgreSQLProvider extends FunctionMetaBaseSQLProvider 
   }
 
   @Override
-  public String insertFunctionMetaOnDuplicateKeyUpdate(
-      @Param("functionMeta") FunctionPO functionPO) {
-    return "INSERT INTO "
-        + FunctionMetaMapper.TABLE_NAME
-        + " (function_id, function_name, metalake_id, catalog_id, schema_id,"
-        + " function_type, \"deterministic\", function_current_version, function_latest_version, audit_info, deleted_at)"
-        + " VALUES (#{functionMeta.functionId}, #{functionMeta.functionName}, #{functionMeta.metalakeId},"
-        + " #{functionMeta.catalogId}, #{functionMeta.schemaId}, #{functionMeta.functionType},"
-        + " #{functionMeta.deterministic},"
-        + " #{functionMeta.functionCurrentVersion}, #{functionMeta.functionLatestVersion}, #{functionMeta.auditInfo},"
-        + " #{functionMeta.deletedAt})"
-        + " ON CONFLICT (function_id) DO UPDATE SET"
-        + " function_name = #{functionMeta.functionName},"
-        + " metalake_id = #{functionMeta.metalakeId},"
-        + " catalog_id = #{functionMeta.catalogId},"
-        + " schema_id = #{functionMeta.schemaId},"
-        + " function_type = #{functionMeta.functionType},"
-        + " \"deterministic\" = #{functionMeta.deterministic},"
-        + " function_current_version = "
-        + FunctionMetaMapper.TABLE_NAME
-        + ".function_current_version + 1,"
-        + " function_latest_version = "
-        + FunctionMetaMapper.TABLE_NAME
-        + ".function_current_version + 1,"
-        + " audit_info = #{functionMeta.auditInfo},"
-        + " deleted_at = #{functionMeta.deletedAt}";
-  }
-
-  @Override
   public String listFunctionPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return "SELECT fm.function_id, fm.function_name, fm.metalake_id, fm.catalog_id, fm.schema_id,"
         + " fm.function_type, fm.\"deterministic\", fm.function_current_version, fm.function_latest_version,"

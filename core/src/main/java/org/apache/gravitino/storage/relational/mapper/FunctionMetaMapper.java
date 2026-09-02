@@ -57,11 +57,6 @@ public interface FunctionMetaMapper {
   @InsertProvider(type = FunctionMetaSQLProviderFactory.class, method = "insertFunctionMeta")
   void insertFunctionMeta(@Param("functionMeta") FunctionPO functionPO);
 
-  @InsertProvider(
-      type = FunctionMetaSQLProviderFactory.class,
-      method = "insertFunctionMetaOnDuplicateKeyUpdate")
-  void insertFunctionMetaOnDuplicateKeyUpdate(@Param("functionMeta") FunctionPO functionPO);
-
   @Results({
     @Result(property = "functionId", column = "function_id", id = true),
     @Result(property = "functionName", column = "function_name"),

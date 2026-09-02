@@ -1033,6 +1033,37 @@ public class TestFunctionMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteDoesNotAdoptFunctionFromAnotherSchema() throws IOException {
+    String otherSchemaName = GravitinoITUtils.genRandomName("tst_fn_schema_other");
+    createAndInsertSchema(metalakeName, catalogName, otherSchemaName);
+
+    String functionName = GravitinoITUtils.genRandomName("function_cross_schema_overwrite");
+    Namespace otherNamespace = NamespaceUtil.ofFunction(metalakeName, catalogName, otherSchemaName);
+    FunctionEntity foreign =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(), otherNamespace, functionName, AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(foreign, false);
+
+    // The overwrite targets a schema that holds no function with this name, but it carries the ID
+    // of a function stored under another schema. Adopting that row would move it out of its own
+    // schema without ever fencing that schema, so the write is rejected instead.
+    Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);
+    FunctionEntity replacement = copyFunction(foreign, functionName, namespace, "replacement");
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> FunctionMetaService.getInstance().insertFunction(replacement, true));
+
+    FunctionEntity stored =
+        FunctionMetaService.getInstance().getFunctionByIdentifier(foreign.nameIdentifier());
+    FunctionPO storedPO =
+        FunctionMetaService.getInstance().getFunctionPOByIdentifier(foreign.nameIdentifier());
+    assertEquals(otherNamespace, stored.namespace());
+    assertEquals(foreign.comment(), stored.comment());
+    assertEquals(1, storedPO.functionCurrentVersion());
+    assertEquals(1, listFunctionVersions(foreign.id()).size());
+  }
+
+  @TestTemplate
   public void testNaturalKeyOverwriteUsesPersistedFunctionId() throws IOException {
     String functionName = GravitinoITUtils.genRandomName("function_natural_key_overwrite");
     Namespace namespace = NamespaceUtil.ofFunction(metalakeName, catalogName, schemaName);

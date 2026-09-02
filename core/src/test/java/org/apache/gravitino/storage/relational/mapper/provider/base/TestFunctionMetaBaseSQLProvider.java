@@ -26,21 +26,6 @@ class TestFunctionMetaBaseSQLProvider {
   private static final FunctionMetaBaseSQLProvider PROVIDER = new FunctionMetaBaseSQLProvider();
 
   @Test
-  void testOverwriteAdvancesStoredVersion() {
-    String sql = PROVIDER.insertFunctionMetaOnDuplicateKeyUpdate(null);
-    String updateClause = sql.substring(sql.indexOf(" ON DUPLICATE KEY UPDATE"));
-
-    Assertions.assertTrue(
-        updateClause.contains("function_latest_version = function_current_version + 1"));
-    Assertions.assertTrue(
-        updateClause.contains("function_current_version = function_current_version + 1"));
-    Assertions.assertFalse(
-        updateClause.contains("function_current_version = #{functionMeta.functionCurrentVersion}"));
-    Assertions.assertFalse(
-        updateClause.contains("function_latest_version = #{functionMeta.functionLatestVersion}"));
-  }
-
-  @Test
   void testUpdateUsesOnlyIdVersionAndActiveStateForCas() {
     String sql = PROVIDER.updateFunctionMeta(null, null);
     String whereClause = sql.substring(sql.indexOf(" WHERE"));

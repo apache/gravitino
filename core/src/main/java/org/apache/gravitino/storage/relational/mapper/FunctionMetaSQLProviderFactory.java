@@ -56,11 +56,6 @@ public class FunctionMetaSQLProviderFactory {
     return getProvider().insertFunctionMeta(functionPO);
   }
 
-  public static String insertFunctionMetaOnDuplicateKeyUpdate(
-      @Param("functionMeta") FunctionPO functionPO) {
-    return getProvider().insertFunctionMetaOnDuplicateKeyUpdate(functionPO);
-  }
-
   public static String listFunctionPOsBySchemaId(@Param("schemaId") Long schemaId) {
     return getProvider().listFunctionPOsBySchemaId(schemaId);
   }

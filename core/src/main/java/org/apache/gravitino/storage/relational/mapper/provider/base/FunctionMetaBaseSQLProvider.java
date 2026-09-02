@@ -101,34 +101,6 @@ public class FunctionMetaBaseSQLProvider {
         + " #{functionMeta.deletedAt})";
   }
 
-  public String insertFunctionMetaOnDuplicateKeyUpdate(
-      @Param("functionMeta") FunctionPO functionPO) {
-    return "INSERT INTO "
-        + TABLE_NAME
-        + " (function_id, function_name, metalake_id, catalog_id, schema_id,"
-        + " function_type, `deterministic`,"
-        + " function_current_version, function_latest_version, audit_info, deleted_at)"
-        + " VALUES (#{functionMeta.functionId}, #{functionMeta.functionName},"
-        + " #{functionMeta.metalakeId}, #{functionMeta.catalogId}, #{functionMeta.schemaId},"
-        + " #{functionMeta.functionType}, #{functionMeta.deterministic},"
-        + " #{functionMeta.functionCurrentVersion},"
-        + " #{functionMeta.functionLatestVersion}, #{functionMeta.auditInfo},"
-        + " #{functionMeta.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " function_name = #{functionMeta.functionName},"
-        + " metalake_id = #{functionMeta.metalakeId},"
-        + " catalog_id = #{functionMeta.catalogId},"
-        + " schema_id = #{functionMeta.schemaId},"
-        + " function_type = #{functionMeta.functionType},"
-        + " `deterministic` = #{functionMeta.deterministic},"
-        // Keep both version columns monotonic on overwrite. Assign latest first so MySQL computes
-        // both values from the stored current version rather than the newly assigned value.
-        + " function_latest_version = function_current_version + 1,"
-        + " function_current_version = function_current_version + 1,"
-        + " audit_info = #{functionMeta.auditInfo},"
-        + " deleted_at = #{functionMeta.deletedAt}";
-  }
-
   public String selectFunctionMetaByFullQualifiedName(
       @Param("metalakeName") String metalakeName,
       @Param("catalogName") String catalogName,
