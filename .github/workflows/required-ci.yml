@@ -49,6 +49,9 @@ concurrency:
   group: required-ci-${{ github.event.pull_request.number || github.ref }}
   # Cancel the superseded PR run. Children already cancel in-progress; the
   # parent must too or a second push waits out a full stale parent run.
+  # Child groups use a hardcoded suite id, not github.workflow: that context
+  # is the caller name under workflow_call, so every suite would share
+  # Required CI-<pr> and cancel-in-progress would keep only one.
   cancel-in-progress: true
 
 jobs:
@@ -160,6 +163,8 @@ jobs:
         run: python3 dev/ci/test_coverage_comment.py
       - name: Check build-relevant path model
         run: python3 dev/ci/test_build_relevant.py
+      - name: Check concurrency-group model
+        run: python3 dev/ci/test_concurrency_group.py
 
   # Aggregate every reusable suite into one check. `if: always()` runs even
   # when a needed job was cancelled or skipped. Inner path filters still make

@@ -28,7 +28,8 @@ sources and asserts the contract this PR relies on:
 - conflict-marker-check stays standalone and is not part of the aggregate
 - every other pull_request workflow is aggregated or explicitly allowlisted
 - required-mode concurrency keys are unique per suite
-- standalone (push) keys use github.workflow, not a shared 'standalone' literal
+- suite concurrency groups hardcode a suite id; they do not use github.workflow
+  or event_name == workflow_call (those are the caller under workflow_call)
 - the parent cancels superseded PR runs
 - web-ui and charts path-filter inside the called workflow
 - the contract script runs from Required CI
@@ -39,7 +40,15 @@ sources and asserts the contract this PR relies on:
 """
 
 import re
+import sys
 from pathlib import Path
+
+
+CI_DIR = Path(__file__).resolve().parent
+if str(CI_DIR) not in sys.path:
+    sys.path.insert(0, str(CI_DIR))
+
+import concurrency_group
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -204,6 +213,10 @@ def verify_parent():
         raise AssertionError(
             "required-ci.yml: must run the build-relevant path model tests in CI"
         )
+    if "python3 dev/ci/test_concurrency_group.py" not in source:
+        raise AssertionError(
+            "required-ci.yml: must run the concurrency-group model tests in CI"
+        )
     if "- contract" not in required_ci:
         raise AssertionError("required-ci.yml: Required CI does not need contract")
 
@@ -285,10 +298,7 @@ def verify_suites():
                 raise AssertionError("build.yml: build is the source path")
 
         expected_key = REQUIRED_CONCURRENCY_KEYS[job_id]
-        group = re.search(r"(?m)^  group: (.+)$", source)
-        if not group:
-            raise AssertionError(f"{workflow_name}: missing concurrency group")
-        group_expr = group.group(1)
+        group_expr = concurrency_group.extract_group(source)
         if expected_key not in group_expr:
             raise AssertionError(
                 f"{workflow_name}: missing unique required concurrency key "
@@ -298,13 +308,14 @@ def verify_suites():
             raise AssertionError(
                 f"{workflow_name}: shared standalone concurrency key still present"
             )
-        if "github.workflow" not in group_expr:
+        if "github.workflow" in group_expr:
             raise AssertionError(
-                f"{workflow_name}: standalone concurrency must use github.workflow"
+                f"{workflow_name}: github.workflow is the caller name under "
+                "workflow_call; hardcode the suite id"
             )
-        if "github.event_name == 'workflow_call' && inputs.required_ci" not in source:
+        if "github.event_name == 'workflow_call'" in source:
             raise AssertionError(
-                f"{workflow_name}: push must not evaluate inputs.required_ci"
+                f"{workflow_name}: event_name is never workflow_call in a callee"
             )
         required_keys.append(expected_key)
         if not re.search(r"(?m)^  cancel-in-progress: true$", source):
