@@ -25,6 +25,7 @@ import static org.apache.gravitino.storage.relational.mapper.RoleMetaMapper.USER
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.SecurableObjectMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.RolePO;
 import org.apache.ibatis.annotations.Param;
 
@@ -184,8 +185,8 @@ public class RoleMetaBaseSQLProvider {
       @Param("roleId") Long roleId, @Param("currentVersion") Long currentVersion) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE role_id = #{roleId}"
         + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
@@ -193,8 +194,8 @@ public class RoleMetaBaseSQLProvider {
   public String softDeleteRoleMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -208,8 +209,8 @@ public class RoleMetaBaseSQLProvider {
   public String touchRoleUpdatedAt(@Param("roleId") long roleId) {
     return "UPDATE "
         + ROLE_TABLE_NAME
-        + " SET updated_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE role_id = #{roleId} AND deleted_at = 0";
   }
 
