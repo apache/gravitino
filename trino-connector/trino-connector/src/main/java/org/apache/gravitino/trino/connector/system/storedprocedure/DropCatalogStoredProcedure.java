@@ -21,6 +21,7 @@ package org.apache.gravitino.trino.connector.system.storedprocedure;
 import static io.trino.spi.type.BooleanType.BOOLEAN;
 import static io.trino.spi.type.VarcharType.VARCHAR;
 
+import io.airlift.log.Logger;
 import io.trino.spi.TrinoException;
 import io.trino.spi.procedure.Procedure;
 import java.lang.invoke.MethodHandle;
@@ -33,8 +34,6 @@ import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Stored procedure implementation for dropping an existing catalog in Gravitino.
@@ -42,7 +41,7 @@ import org.slf4j.LoggerFactory;
  * <p>This procedure allows dropping a catalog with optional ignoreNotExist flag.
  */
 public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
-  private static final Logger LOG = LoggerFactory.getLogger(DropCatalogStoredProcedure.class);
+  private static final Logger LOG = Logger.get(DropCatalogStoredProcedure.class);
 
   private final CatalogConnectorManager catalogConnectorManager;
   private final String metalake;
@@ -103,9 +102,8 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
               "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
         }
         LOG.info(
-            "Drop catalog {} in metalake {} from server (no local connector) successfully.",
-            catalogName,
-            metalake);
+            "Drop catalog %s in metalake %s from server (no local connector) successfully.",
+            catalogName, metalake);
         return;
       }
 
@@ -122,7 +120,7 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
             "Drop catalog failed due to the reloading process fails");
       }
 
-      LOG.info("Drop catalog {} in metalake {} successfully.", catalogName, metalake);
+      LOG.info("Drop catalog %s in metalake %s successfully.", catalogName, metalake);
 
     } catch (NoSuchMetalakeException e) {
       throw new TrinoException(

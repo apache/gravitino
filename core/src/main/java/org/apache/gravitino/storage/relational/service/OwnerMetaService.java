@@ -35,9 +35,11 @@ import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.RelationalEntity;
 import org.apache.gravitino.SupportsRelationOperations;
 import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.meta.GroupEntity;
 import org.apache.gravitino.meta.UserEntity;
 import org.apache.gravitino.metrics.Monitored;
 import org.apache.gravitino.storage.relational.mapper.OwnerMetaMapper;
+import org.apache.gravitino.storage.relational.po.GroupOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
@@ -139,8 +141,28 @@ public class OwnerMetaService {
           });
     }
 
-    // TODO: Add batch support for group owners when GroupOwnerRelPO and batch method are available
-    // For now, we only handle user owners in batch mode
+    // Get group owners
+    List<GroupOwnerRelPO> groupPOList =
+        SessionUtils.getWithoutCommit(
+            OwnerMetaMapper.class,
+            mapper ->
+                mapper.batchSelectGroupOwnerMetaByMetadataObjectIdAndType(entityIds, type.name()));
+    if (CollectionUtils.isNotEmpty(groupPOList)) {
+      groupPOList.forEach(
+          groupPO -> {
+            GroupEntity groupEntity =
+                POConverters.fromGroupPO(
+                    groupPO,
+                    Collections.emptyList(),
+                    AuthorizationUtils.ofGroupNamespace(metalake));
+            result.add(
+                new RelationalEntity<>(
+                    SupportsRelationOperations.Type.OWNER_REL,
+                    nameIdentifierMap.get(groupPO.getMetadataObjectId()),
+                    type,
+                    groupEntity));
+          });
+    }
 
     return result;
   }

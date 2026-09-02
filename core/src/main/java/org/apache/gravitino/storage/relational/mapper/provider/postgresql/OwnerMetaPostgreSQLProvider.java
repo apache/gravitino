@@ -29,6 +29,7 @@ import org.apache.gravitino.storage.relational.mapper.SchemaMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TableMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.TopicMetaMapper;
 import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.OwnerMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.ibatis.annotations.Param;
@@ -36,7 +37,7 @@ import org.apache.ibatis.annotations.Param;
 public class OwnerMetaPostgreSQLProvider extends OwnerMetaBaseSQLProvider {
   @Override
   protected String currentTimestampMillisExpression() {
-    return "CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)";
+    return DatabaseTimeSQL.POSTGRESQL;
   }
 
   @Override

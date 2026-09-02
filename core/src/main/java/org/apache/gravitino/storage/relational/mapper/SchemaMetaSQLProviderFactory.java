@@ -49,7 +49,15 @@ public class SchemaMetaSQLProviderFactory {
 
   static class SchemaMetaMySQLProvider extends SchemaMetaBaseSQLProvider {}
 
-  static class SchemaMetaH2Provider extends SchemaMetaBaseSQLProvider {}
+  static class SchemaMetaH2Provider extends SchemaMetaBaseSQLProvider {
+    @Override
+    public String selectSchemaMetaByIdForShare(Long schemaId) {
+      // H2 has no shared row-lock syntax, so H2 backends fall back to an exclusive lock. Writes of
+      // tables, views, filesets and the like under one schema therefore serialize on H2, and a slow
+      // write can make a concurrent one hit H2's lock timeout instead of a clean conflict.
+      return selectSchemaMetaByIdForUpdate(schemaId);
+    }
+  }
 
   public static String listSchemaPOsByFullQualifiedName(
       @Param("metalakeName") String metalakeName, @Param("catalogName") String catalogName) {
@@ -98,6 +106,16 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().selectSchemaMetaById(schemaId);
   }
 
+  /** Returns SQL that selects and locks an active schema by ID. */
+  public static String selectSchemaMetaByIdForUpdate(@Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdForUpdate(schemaId);
+  }
+
+  /** Returns SQL that selects and share-locks an active schema by ID. */
+  public static String selectSchemaMetaByIdForShare(@Param("schemaId") Long schemaId) {
+    return getProvider().selectSchemaMetaByIdForShare(schemaId);
+  }
+
   public static String insertSchemaMeta(@Param("schemaMeta") SchemaPO schemaPO) {
     return getProvider().insertSchemaMeta(schemaPO);
   }
@@ -125,8 +143,9 @@ public class SchemaMetaSQLProviderFactory {
     return getProvider().softDeleteSchemaMetasBySchemaIds(schemaIds);
   }
 
-  public static String softDeleteSchemaMetasByCatalogId(@Param("catalogId") Long catalogId) {
-    return getProvider().softDeleteSchemaMetasByCatalogId(catalogId);
+  public static String softDeleteSchemaMetaBySchemaIdAndVersion(
+      @Param("schemaId") Long schemaId, @Param("currentVersion") Long currentVersion) {
+    return getProvider().softDeleteSchemaMetaBySchemaIdAndVersion(schemaId, currentVersion);
   }
 
   /** Returns SQL that soft-deletes schemas using identifier-and-version pairs. */

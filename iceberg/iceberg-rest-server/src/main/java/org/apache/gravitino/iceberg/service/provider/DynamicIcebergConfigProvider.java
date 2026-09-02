@@ -43,6 +43,7 @@ import org.apache.gravitino.credential.SupportsCredentials;
 import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.secret.SupportsSecrets;
 import org.apache.gravitino.server.web.JettyServerConfig;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
@@ -104,36 +105,44 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
         "lakehouse-iceberg".equals(catalog.provider()),
         String.format("%s.%s is not iceberg catalog", gravitinoMetalake, catalogName));
 
-    // Sensitive credentials (e.g. jdbc-password) are marked hidden in PropertiesMetadata and
-    // filtered out of catalog.properties(). We need two different strategies to recover them:
-    //
-    // Auxiliary mode: the catalog is a BaseCatalog running in the same JVM as the Gravitino
-    // server. Call propertiesWithCredentialProviders() which returns the raw entity properties
-    // including all hidden fields.
-    //
-    // Standalone mode: the catalog is a client-side object obtained via the Gravitino REST API.
-    // Call getCredentials() to retrieve vended credentials, then inject any JdbcCredential
-    // fields into the properties map so the JDBC backend can connect.
-    Map<String, String> catalogProperties;
+    // Auxiliary: BaseCatalog + SecretManager plaintext. Standalone: properties + getSecrets,
+    // then JdbcCredential overlays so credentials win.
+    return Optional.of(getIcebergConfigFromCatalogProperties(resolveProps(catalog)));
+  }
+
+  private static Map<String, String> resolveProps(Catalog catalog) {
     if (catalog instanceof BaseCatalog) {
-      catalogProperties = ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders();
-    } else {
-      catalogProperties = new HashMap<>(catalog.properties());
-      if (catalog instanceof SupportsCredentials) {
-        Arrays.stream(((SupportsCredentials) catalog).getCredentials())
-            .filter(c -> c instanceof JdbcCredential)
-            .map(c -> (JdbcCredential) c)
-            .findFirst()
-            .ifPresent(
-                jdbc -> {
-                  catalogProperties.putIfAbsent(
-                      IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
-                  catalogProperties.putIfAbsent(
-                      IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
-                });
-      }
+      return new HashMap<>(
+          GravitinoEnv.getInstance()
+              .secretManager()
+              .toPlaintextProperties(
+                  ((BaseCatalog<?>) catalog).propertiesWithCredentialProviders()));
     }
-    return Optional.of(getIcebergConfigFromCatalogProperties(catalogProperties));
+    Map<String, String> props =
+        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+    try {
+      SupportsSecrets supportsSecrets = catalog.supportsSecrets();
+      if (supportsSecrets != null) {
+        Map<String, String> secrets = supportsSecrets.getSecrets();
+        if (secrets != null) {
+          props.putAll(secrets);
+        }
+      }
+    } catch (UnsupportedOperationException ignored) {
+      // Catalog does not support secret property operations.
+    }
+    if (catalog instanceof SupportsCredentials) {
+      Arrays.stream(((SupportsCredentials) catalog).getCredentials())
+          .filter(c -> c instanceof JdbcCredential)
+          .map(c -> (JdbcCredential) c)
+          .findFirst()
+          .ifPresent(
+              jdbc -> {
+                props.put(IcebergConstants.GRAVITINO_JDBC_USER, jdbc.jdbcUser());
+                props.put(IcebergConstants.GRAVITINO_JDBC_PASSWORD, jdbc.jdbcPassword());
+              });
+    }
+    return props;
   }
 
   /**
@@ -317,7 +326,7 @@ public class DynamicIcebergConfigProvider implements IcebergConfigProvider {
 
     @Override
     public Catalog loadCatalog(String catalogName) throws NoSuchCatalogException {
-      return getGravitinoClient().loadMetalake(metalake).loadCatalog(catalogName);
+      return getGravitinoClient().loadCatalog(catalogName);
     }
 
     @Override

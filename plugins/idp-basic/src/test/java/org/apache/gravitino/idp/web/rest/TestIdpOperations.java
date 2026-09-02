@@ -18,6 +18,8 @@
  */
 package org.apache.gravitino.idp.web.rest;
 
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
@@ -40,10 +42,11 @@ import org.apache.gravitino.dto.responses.RemoveResponse;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
 import org.apache.gravitino.idp.IdpUserGroupManager;
+import org.apache.gravitino.idp.dto.IdpGroupDTO;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
-import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.model.IdpGroup;
@@ -98,7 +101,7 @@ class TestIdpOperations extends JerseyTest {
   @Test
   void testAddUser() throws Exception {
     AddUserRequest req = new AddUserRequest("user1", VALID_PASSWORD);
-    doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD);
+    doReturn(buildUser("user1")).when(MANAGER).addUser("user1", VALID_PASSWORD, true);
 
     assertError(
         Response.Status.BAD_REQUEST,
@@ -110,7 +113,7 @@ class TestIdpOperations extends JerseyTest {
 
     doThrow(new AlreadyExistsException("mock error"))
         .when(MANAGER)
-        .addUser("user1", VALID_PASSWORD);
+        .addUser("user1", VALID_PASSWORD, true);
     assertStatus(Response.Status.CONFLICT, post("/idp/users", req));
   }
 
@@ -127,7 +130,7 @@ class TestIdpOperations extends JerseyTest {
 
   @Test
   void testChangePasswordAndRemoveUser() {
-    ChangePasswordRequest req = new ChangePasswordRequest(VALID_PASSWORD);
+    UpdateUserRequest req = new UpdateUserRequest(VALID_PASSWORD);
     when(MANAGER.changePassword("user1", VALID_PASSWORD)).thenReturn(true);
     when(MANAGER.getUser("user1")).thenReturn(buildUser("user1"));
     when(MANAGER.removeUser("user1")).thenReturn(true);
@@ -138,16 +141,56 @@ class TestIdpOperations extends JerseyTest {
   }
 
   @Test
+  void testUpdateEnabled() {
+    UpdateUserRequest req = new UpdateUserRequest(null, false);
+    when(MANAGER.updateEnabled("user1", false)).thenReturn(true);
+    when(MANAGER.getUser("user1")).thenReturn(new IdpUser("user1", Collections.emptyList(), false));
+
+    Assertions.assertFalse(
+        put("/idp/users/user1", req).readEntity(IdpUserResponse.class).getUser().enabled());
+  }
+
+  @Test
+  void testCannotDisableServiceAdmin() {
+    UpdateUserRequest req = new UpdateUserRequest(null, false);
+    doThrow(new IllegalArgumentException("Cannot disable service admin admin"))
+        .when(MANAGER)
+        .updateEnabled("admin", false);
+
+    assertError(
+        Response.Status.BAD_REQUEST,
+        put("/idp/users/admin", req),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+  }
+
+  @Test
   void testAddAndGetGroup() throws Exception {
     AddGroupRequest req = new AddGroupRequest("group1");
-    doReturn(buildGroup("group1")).when(MANAGER).addGroup("group1");
+    doReturn(buildGroup("group1")).when(MANAGER).addGroup(eq("group1"), nullable(String.class));
     when(MANAGER.getGroup("group1")).thenReturn(buildGroup("group1"));
 
-    assertStatus(Response.Status.OK, post("/idp/groups", req));
+    IdpGroupDTO created = post("/idp/groups", req).readEntity(IdpGroupResponse.class).getGroup();
+    Assertions.assertEquals("group1", created.name());
+    Assertions.assertEquals("", created.comment());
     Assertions.assertEquals(
-        "group1", get("/idp/groups/group1").readEntity(IdpGroupResponse.class).getGroup().name());
+        "", get("/idp/groups/group1").readEntity(IdpGroupResponse.class).getGroup().comment());
 
-    doThrow(new AlreadyExistsException("mock error")).when(MANAGER).addGroup("group1");
+    AddGroupRequest withComment = new AddGroupRequest("group2", "platform engineering");
+    doReturn(buildGroup("group2", "platform engineering"))
+        .when(MANAGER)
+        .addGroup(eq("group2"), eq("platform engineering"));
+    Assertions.assertEquals(
+        "platform engineering",
+        post("/idp/groups", withComment).readEntity(IdpGroupResponse.class).getGroup().comment());
+
+    assertError(
+        Response.Status.BAD_REQUEST,
+        post("/idp/groups", new AddGroupRequest("group3", "a".repeat(1025))),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+
+    doThrow(new AlreadyExistsException("mock error"))
+        .when(MANAGER)
+        .addGroup(eq("group1"), nullable(String.class));
     assertStatus(Response.Status.CONFLICT, post("/idp/groups", req));
   }
 
@@ -220,10 +263,18 @@ class TestIdpOperations extends JerseyTest {
   }
 
   private IdpGroup buildGroup(String group) {
-    return buildGroup(group, Collections.emptyList());
+    return buildGroup(group, Collections.emptyList(), "");
+  }
+
+  private IdpGroup buildGroup(String group, String comment) {
+    return buildGroup(group, Collections.emptyList(), comment);
   }
 
   private IdpGroup buildGroup(String group, List<String> users) {
-    return new IdpGroup(group, users);
+    return buildGroup(group, users, "");
+  }
+
+  private IdpGroup buildGroup(String group, List<String> users, String comment) {
+    return new IdpGroup(group, users, comment);
   }
 }

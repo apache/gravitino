@@ -42,8 +42,8 @@ import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.idp.dto.requests.AddGroupRequest;
 import org.apache.gravitino.idp.dto.requests.AddUserRequest;
-import org.apache.gravitino.idp.dto.requests.ChangePasswordRequest;
 import org.apache.gravitino.idp.dto.requests.GroupMembershipChangeRequest;
+import org.apache.gravitino.idp.dto.requests.UpdateUserRequest;
 import org.apache.gravitino.idp.dto.responses.IdpGroupResponse;
 import org.apache.gravitino.idp.dto.responses.IdpUserResponse;
 import org.apache.gravitino.idp.web.rest.feature.IdpRESTFeature;
@@ -165,17 +165,27 @@ public class IdpRESTApiIT extends BaseIT {
     changePassword(USER1, UPDATED_PASSWORD);
     Assertions.assertEquals(USER1, getUser(USER1).getUser().name());
 
+    put("/idp/users/" + USER1, new UpdateUserRequest(null, false));
+    Assertions.assertFalse(getUser(USER1).getUser().enabled());
+    put("/idp/users/" + USER1, new UpdateUserRequest(null, true));
+    Assertions.assertTrue(getUser(USER1).getUser().enabled());
+    assertError(
+        400,
+        put("/idp/users/" + ADMIN, new UpdateUserRequest(null, false)),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    Assertions.assertTrue(getUser(ADMIN).getUser().enabled());
+
     assertError(
         404,
         get("/idp/users/" + MISSING_USER, ADMIN, ADMIN_PASSWORD),
         ErrorConstants.NOT_FOUND_CODE);
     assertError(
         404,
-        put("/idp/users/" + MISSING_USER, new ChangePasswordRequest(UPDATED_PASSWORD)),
+        put("/idp/users/" + MISSING_USER, new UpdateUserRequest(UPDATED_PASSWORD)),
         ErrorConstants.NOT_FOUND_CODE);
     assertError(
         400,
-        put("/idp/users/" + USER1, new ChangePasswordRequest(" ")),
+        put("/idp/users/" + USER1, new UpdateUserRequest(" ")),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
 
     Assertions.assertTrue(deleteUser(USER1));
@@ -191,13 +201,23 @@ public class IdpRESTApiIT extends BaseIT {
 
     IdpGroupResponse group = postGroup(GROUP1);
     Assertions.assertEquals(GROUP1, group.getGroup().name());
+    Assertions.assertEquals("", group.getGroup().comment());
     Assertions.assertTrue(group.getGroup().users().isEmpty());
+
+    IdpGroupResponse commented = postGroup("commented-group", "on-call rotation");
+    Assertions.assertEquals("on-call rotation", commented.getGroup().comment());
+    Assertions.assertEquals("on-call rotation", getGroup("commented-group").getGroup().comment());
+    Assertions.assertTrue(deleteGroup("commented-group", false));
 
     assertError(
         409, post("/idp/groups", new AddGroupRequest(GROUP1)), ErrorConstants.ALREADY_EXISTS_CODE);
     assertError(
         400,
         post("/idp/groups", new AddGroupRequest("a".repeat(129))),
+        ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
+    assertError(
+        400,
+        post("/idp/groups", new AddGroupRequest("too-long-comment", "a".repeat(1025))),
         ErrorConstants.ILLEGAL_ARGUMENTS_CODE);
     assertError(
         404,
@@ -283,8 +303,7 @@ public class IdpRESTApiIT extends BaseIT {
   }
 
   private static void changePassword(String username, String password) throws Exception {
-    HttpResponse<String> response =
-        put("/idp/users/" + username, new ChangePasswordRequest(password));
+    HttpResponse<String> response = put("/idp/users/" + username, new UpdateUserRequest(password));
     Assertions.assertEquals(200, response.statusCode(), response.body());
   }
 
@@ -304,7 +323,20 @@ public class IdpRESTApiIT extends BaseIT {
   }
 
   private static IdpGroupResponse postGroup(String groupName) throws Exception {
-    HttpResponse<String> response = post("/idp/groups", new AddGroupRequest(groupName));
+    return postGroup(groupName, null);
+  }
+
+  private static IdpGroupResponse postGroup(String groupName, String comment) throws Exception {
+    HttpResponse<String> response = post("/idp/groups", new AddGroupRequest(groupName, comment));
+    Assertions.assertEquals(200, response.statusCode(), response.body());
+    IdpGroupResponse groupResponse =
+        JsonUtils.objectMapper().readValue(response.body(), IdpGroupResponse.class);
+    groupResponse.validate();
+    return groupResponse;
+  }
+
+  private static IdpGroupResponse getGroup(String groupName) throws Exception {
+    HttpResponse<String> response = get("/idp/groups/" + groupName, ADMIN, ADMIN_PASSWORD);
     Assertions.assertEquals(200, response.statusCode(), response.body());
     IdpGroupResponse groupResponse =
         JsonUtils.objectMapper().readValue(response.body(), IdpGroupResponse.class);

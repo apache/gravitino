@@ -15,7 +15,9 @@
 # specific language governing permissions and limitations
 # under the License.
 import unittest
+from datetime import datetime, timezone
 from http.client import HTTPResponse
+from typing import Optional
 from unittest.mock import Mock, patch
 
 from gravitino import GravitinoClient
@@ -24,8 +26,10 @@ from gravitino.api.job.job_template import JobType
 from gravitino.api.job.job_template_change import JobTemplateChange, ShellTemplateUpdate
 from gravitino.api.job.shell_job_template import ShellJobTemplate
 from gravitino.api.job.spark_job_template import SparkJobTemplate
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.audit_dto import AuditDTO
 from gravitino.dto.job.job_dto import JobDTO
+from gravitino.dto.job.job_template_dto import JobTemplateDTO
 from gravitino.dto.job.shell_job_template_dto import ShellJobTemplateDTO
 from gravitino.dto.job.spark_job_template_dto import SparkJobTemplateDTO
 from gravitino.dto.responses.base_response import BaseResponse
@@ -205,7 +209,11 @@ class TestSupportsJobs(unittest.TestCase):
         )
 
         job_template_name = "test_shell_job"
-        job_dto = self._new_job_dto(job_template_name)
+        job_dto = self._new_job_dto(
+            job_template_name,
+            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(timezone.utc),
+        )
         resp = JobResponse(_job=job_dto, _code=0)
         mock_resp = self._mock_http_response(resp.to_json())
 
@@ -221,6 +229,39 @@ class TestSupportsJobs(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             gravitino_client.get_job(None)
+
+    def test_get_job_with_runtime_job_template(self, *mock_methods):
+        gravitino_client = GravitinoClient(
+            uri="http://localhost:8090",
+            metalake_name=self._metalake_name,
+        )
+
+        job_template_name = "test_shell_job"
+        runtime_job_template = self._new_shell_job_template_dto(
+            self._new_shell_job_template()
+        )
+        job_dto = self._new_job_dto(
+            job_template_name,
+            finished_at=datetime.now(timezone.utc),
+            started_at=datetime.now(timezone.utc),
+            runtime_job_template=runtime_job_template,
+        )
+        resp = JobResponse(_job=job_dto, _code=0)
+        mock_resp = self._mock_http_response(resp.to_json())
+
+        with patch(
+            "gravitino.utils.http_client.HTTPClient.get", return_value=mock_resp
+        ):
+            job_handle = gravitino_client.get_job(job_dto.job_id())
+            self._compare_job_handle(job_handle, job_dto)
+
+            # The handle must expose the resolved runtime template as an api-level JobTemplate
+            # (not the wire DTO), converted via DTOConverters.from_job_template_dto.
+            self.assertIsNotNone(job_handle.runtime_job_template())
+            self.assertEqual(
+                DTOConverters.from_job_template_dto(runtime_job_template),
+                job_handle.runtime_job_template(),
+            )
 
     def test_cancel_job(self, *mock_methods):
         gravitino_client = GravitinoClient(
@@ -310,15 +351,36 @@ class TestSupportsJobs(unittest.TestCase):
         mock_resp = Response(mock_http_resp)
         return mock_resp
 
-    def _new_job_dto(self, job_template_name: str) -> JobDTO:
+    def _new_job_dto(
+        self,
+        job_template_name: str,
+        finished_at: Optional[datetime] = None,
+        started_at: Optional[datetime] = None,
+        runtime_job_template: Optional[JobTemplateDTO] = None,
+    ) -> JobDTO:
         return JobDTO(
             _job_id="job-123",
             _job_template_name=job_template_name,
             _status=JobHandle.Status.QUEUED,
             _audit=AuditDTO(_creator="test", _create_time="2023-10-01T00:00:00Z"),
+            _queued_at=datetime(2023, 10, 1, tzinfo=timezone.utc),
+            _started_at=started_at,
+            _finished_at=finished_at,
+            _runtime_job_template=runtime_job_template,
         )
 
     def _compare_job_handle(self, job_handle: JobHandle, job_dto: JobDTO):
         self.assertEqual(job_handle.job_id(), job_dto.job_id())
         self.assertEqual(job_handle.job_template_name(), job_dto.job_template_name())
         self.assertEqual(job_handle.job_status(), job_dto.status())
+        self.assertEqual(job_handle.queued_at(), job_dto.queued_at())
+        self.assertEqual(job_handle.started_at(), job_dto.started_at())
+        self.assertEqual(job_handle.finished_at(), job_dto.finished_at())
+        expected_runtime_job_template = (
+            None
+            if job_dto.runtime_job_template() is None
+            else DTOConverters.from_job_template_dto(job_dto.runtime_job_template())
+        )
+        self.assertEqual(
+            job_handle.runtime_job_template(), expected_runtime_job_template
+        )

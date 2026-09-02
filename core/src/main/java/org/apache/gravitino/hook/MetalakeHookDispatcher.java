@@ -103,6 +103,8 @@ public class MetalakeHookDispatcher implements MetalakeDispatcher {
   @Override
   public boolean dropMetalake(NameIdentifier ident, boolean force)
       throws NonEmptyEntityException, MetalakeInUseException {
+    // Child catalog/schema/fileset write-through secrets are cleaned when MetalakeManager
+    // force-drops catalogs via CatalogManager.dropCatalog → FilesetCatalogOperations.dropSchema.
     return dispatcher.dropMetalake(ident, force);
   }
 

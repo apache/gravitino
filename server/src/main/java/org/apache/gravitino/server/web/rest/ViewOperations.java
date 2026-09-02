@@ -99,15 +99,23 @@ public class ViewOperations {
       @PathParam("catalog") String catalog,
       @PathParam("schema") String schema,
       ViewCreateRequest request) {
-    LOG.info(
-        "Received create view request: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+    if (request == null) {
+      LOG.warn("Received create view request with null request body");
+      return ExceptionHandlers.handleViewException(
+          OperationType.CREATE,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String viewName = request.getName();
+    LOG.info("Received create view request: {}.{}.{}.{}", metalake, catalog, schema, viewName);
     try {
       return Utils.doAs(
           httpRequest,
           () -> {
             request.validate();
-            NameIdentifier ident =
-                NameIdentifierUtil.ofView(metalake, catalog, schema, request.getName());
+            NameIdentifier ident = NameIdentifierUtil.ofView(metalake, catalog, schema, viewName);
 
             View view =
                 dispatcher.createView(
@@ -119,13 +127,12 @@ public class ViewOperations {
                     request.getDefaultSchema(),
                     request.getProperties());
             Response response = Utils.ok(new ViewResponse(DTOConverters.toDTO(view)));
-            LOG.info("View created: {}.{}.{}.{}", metalake, catalog, schema, request.getName());
+            LOG.info("View created: {}.{}.{}.{}", metalake, catalog, schema, viewName);
             return response;
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleViewException(
-          OperationType.CREATE, request.getName(), schema, e);
+      return ExceptionHandlers.handleViewException(OperationType.CREATE, viewName, schema, e);
     }
   }
 
@@ -167,6 +174,14 @@ public class ViewOperations {
       @PathParam("view") String view,
       ViewUpdatesRequest request) {
     LOG.info("Received alter view request: {}.{}.{}.{}", metalake, catalog, schema, view);
+    if (request == null) {
+      return ExceptionHandlers.handleViewException(
+          OperationType.ALTER,
+          view,
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

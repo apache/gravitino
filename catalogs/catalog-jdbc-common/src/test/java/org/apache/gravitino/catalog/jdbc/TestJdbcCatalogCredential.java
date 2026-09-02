@@ -31,6 +31,7 @@ import org.apache.gravitino.catalog.jdbc.converter.JdbcColumnDefaultValueConvert
 import org.apache.gravitino.catalog.jdbc.converter.JdbcTypeConverter;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcDatabaseOperations;
 import org.apache.gravitino.catalog.jdbc.operation.JdbcTableOperations;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.meta.AuditInfo;
@@ -203,7 +204,7 @@ public class TestJdbcCatalogCredential {
   }
 
   @Test
-  void testJdbcCatalogPropertiesHidesCredentials() {
+  void testJdbcCatalogPropertiesMasksCredentials() {
     AuditInfo auditInfo =
         AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build();
 
@@ -229,8 +230,10 @@ public class TestJdbcCatalogCredential {
 
     // GravitinoEnv is not initialized in unit tests, so backfill is disabled by default.
     Map<String, String> publicProps = jdbcCatalog.properties();
-    Assertions.assertFalse(publicProps.containsKey(JdbcConfig.USERNAME.getKey()));
-    Assertions.assertFalse(publicProps.containsKey(JdbcConfig.PASSWORD.getKey()));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, publicProps.get(JdbcConfig.USERNAME.getKey()));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, publicProps.get(JdbcConfig.PASSWORD.getKey()));
 
     // propertiesWithCredentialProviders must still see the raw credentials
     Map<String, String> credProps = jdbcCatalog.propertiesWithCredentialProviders();

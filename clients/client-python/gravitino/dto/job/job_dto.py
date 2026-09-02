@@ -16,14 +16,34 @@
 # under the License.
 
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import Dict, Optional
+
 from dataclasses_json import config, DataClassJsonMixin
 
 from gravitino.api.job.job_handle import JobHandle
-from gravitino.dto.audit_dto import AuditDTO
+from gravitino.dto.audit_dto import (
+    AuditDTO,
+    _deserialize_datetime,
+    _serialize_datetime,
+)
+from gravitino.dto.job.job_template_dto import JobTemplateDTO
+
+
+def _serialize_runtime_job_template(
+    value: Optional[JobTemplateDTO],
+) -> Optional[Dict]:
+    return None if value is None else value.to_dict()
+
+
+def _deserialize_runtime_job_template(
+    value: Optional[Dict],
+) -> Optional[JobTemplateDTO]:
+    return None if value is None else JobTemplateDTO.from_dict_by_type(value)
 
 
 @dataclass
-class JobDTO(DataClassJsonMixin):
+class JobDTO(DataClassJsonMixin):  # pylint: disable=too-many-instance-attributes
     """Data transfer object representing a Job."""
 
     _job_id: str = field(metadata=config(field_name="jobId"))
@@ -36,6 +56,43 @@ class JobDTO(DataClassJsonMixin):
         )
     )
     _audit: AuditDTO = field(metadata=config(field_name="audit"))
+    _queued_at: Optional[datetime] = field(
+        default=None,
+        metadata=config(
+            field_name="queuedAt",
+            encoder=_serialize_datetime,
+            decoder=_deserialize_datetime,
+        ),
+    )
+    _started_at: Optional[datetime] = field(
+        default=None,
+        metadata=config(
+            field_name="startedAt",
+            encoder=_serialize_datetime,
+            decoder=_deserialize_datetime,
+        ),
+    )
+    _finished_at: Optional[datetime] = field(
+        default=None,
+        metadata=config(
+            field_name="finishedAt",
+            encoder=_serialize_datetime,
+            decoder=_deserialize_datetime,
+        ),
+    )
+    _runtime_job_template: Optional[JobTemplateDTO] = field(
+        default=None,
+        metadata=config(
+            field_name="runtimeJobTemplate",
+            encoder=_serialize_runtime_job_template,
+            decoder=_deserialize_runtime_job_template,
+        ),
+    )
+
+    def __post_init__(self) -> None:
+        self._queued_at = _deserialize_datetime(self._queued_at)
+        self._started_at = _deserialize_datetime(self._started_at)
+        self._finished_at = _deserialize_datetime(self._finished_at)
 
     def job_id(self) -> str:
         """Returns the job ID."""
@@ -52,6 +109,28 @@ class JobDTO(DataClassJsonMixin):
     def audit(self) -> AuditDTO:
         """Returns the audit information of the job."""
         return self._audit
+
+    def queued_at(self) -> Optional[datetime]:
+        """Returns the time the job was queued for execution."""
+        return self._queued_at
+
+    def started_at(self) -> Optional[datetime]:
+        """Returns the time the job started execution, or ``None`` if the job has not started
+        execution yet.
+        """
+        return self._started_at
+
+    def finished_at(self) -> Optional[datetime]:
+        """Returns the time the job finished execution, or ``None`` if the job has not finished
+        execution yet.
+        """
+        return self._finished_at
+
+    def runtime_job_template(self) -> Optional[JobTemplateDTO]:
+        """Returns the resolved job template that was actually submitted for execution, or
+        ``None`` for jobs run before this field was introduced.
+        """
+        return self._runtime_job_template
 
     def validate(self) -> None:
         """Validates the JobDTO, ensuring required fields are present and non-empty."""

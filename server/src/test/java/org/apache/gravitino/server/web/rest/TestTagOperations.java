@@ -273,6 +273,17 @@ public class TestTagOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateTagWithNullRequest() {
+    Response resp =
+        target(tagPath(metalake))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateTag() {
     TagEntity tag1 =
         TagEntity.builder()
@@ -399,6 +410,18 @@ public class TestTagOperations extends BaseOperationsTest {
     ErrorResponse errorResp1 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp1.getType());
+  }
+
+  @Test
+  public void testAlterTagWithNullRequest() {
+    Response resp =
+        target(tagPath(metalake))
+            .path("tag1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

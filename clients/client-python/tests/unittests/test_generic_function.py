@@ -70,7 +70,13 @@ class TestGenericFunction(unittest.TestCase):
         generic_function = self._generic_function()
 
         self.assertTrue(issubclass(GenericFunction, SupportsTags))
-        expected_methods = ["list_tags", "list_tags_info", "get_tag", "associate_tags"]
+        expected_methods = [
+            "list_tags",
+            "list_tags_info",
+            "get_tag",
+            "assign_tags",
+            "associate_tags",
+        ]
         self.assertTrue(
             all(
                 callable(getattr(generic_function, method, None))

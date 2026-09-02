@@ -22,6 +22,7 @@ import static org.apache.gravitino.storage.relational.mapper.TagMetaMapper.TAG_T
 
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.po.TagPO;
 import org.apache.ibatis.annotations.Param;
 
@@ -180,8 +181,8 @@ public class TagMetaBaseSQLProvider {
       @Param("metalakeName") String metalakeName, @Param("tagName") String tagName) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " tm SET tm.deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " tm SET tm.deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE tm.metalake_id IN ("
         + " SELECT mm.metalake_id FROM "
         + MetalakeMetaMapper.TABLE_NAME
@@ -192,8 +193,8 @@ public class TagMetaBaseSQLProvider {
   public String softDeleteTagMetasByMetalakeId(@Param("metalakeId") Long metalakeId) {
     return "UPDATE "
         + TAG_TABLE_NAME
-        + " SET deleted_at = (UNIX_TIMESTAMP() * 1000.0)"
-        + " + EXTRACT(MICROSECOND FROM CURRENT_TIMESTAMP(3)) / 1000"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.MYSQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -231,6 +232,11 @@ public class TagMetaBaseSQLProvider {
         + " FROM "
         + TAG_TABLE_NAME
         + " WHERE tag_id = #{tagId} and deleted_at = 0";
+  }
+
+  /** Returns SQL that selects and locks an active tag by ID. */
+  public String selectTagByTagIdForUpdate(@Param("tagId") Long tagId) {
+    return selectTagByTagId(tagId) + " FOR UPDATE";
   }
 
   public String listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds) {

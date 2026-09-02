@@ -15,6 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 from gravitino.api.job.job_handle import JobHandle
+from gravitino.client.dto_converters import DTOConverters
 from gravitino.dto.job.job_dto import JobDTO
 
 
@@ -32,3 +33,18 @@ class GenericJobHandle(JobHandle):
 
     def job_status(self):
         return self._job_dto.status()
+
+    def queued_at(self):
+        return self._job_dto.queued_at()
+
+    def started_at(self):
+        return self._job_dto.started_at()
+
+    def finished_at(self):
+        return self._job_dto.finished_at()
+
+    def runtime_job_template(self):
+        runtime_job_template_dto = self._job_dto.runtime_job_template()
+        if runtime_job_template_dto is None:
+            return None
+        return DTOConverters.from_job_template_dto(runtime_job_template_dto)

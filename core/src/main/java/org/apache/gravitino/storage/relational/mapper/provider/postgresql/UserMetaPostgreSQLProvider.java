@@ -23,24 +23,28 @@ import static org.apache.gravitino.storage.relational.mapper.UserMetaMapper.USER
 import static org.apache.gravitino.storage.relational.mapper.UserRoleRelMapper.USER_TABLE_NAME;
 
 import org.apache.gravitino.storage.relational.mapper.MetalakeMetaMapper;
+import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.UserMetaBaseSQLProvider;
 import org.apache.gravitino.storage.relational.po.UserPO;
 import org.apache.ibatis.annotations.Param;
 
 public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   @Override
-  public String softDeleteUserMetaByUserId(Long userId) {
+  public String softDeleteUserMetaByUserId(Long userId, Long currentVersion) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
-        + " WHERE user_id = #{userId} AND deleted_at = 0";
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
+        + " WHERE user_id = #{userId}"
+        + " AND current_version = #{currentVersion} AND deleted_at = 0";
   }
 
   @Override
   public String softDeleteUserMetasByMetalakeId(Long metalakeId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET deleted_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET deleted_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE metalake_id = #{metalakeId} AND deleted_at = 0";
   }
 
@@ -68,8 +72,13 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
         + " external_id = #{userMeta.externalId},"
         + " enabled = #{userMeta.enabled},"
         + " audit_info = #{userMeta.auditInfo},"
-        + " current_version = #{userMeta.currentVersion},"
-        + " last_version = #{userMeta.lastVersion},"
+        // PostgreSQL requires the stored-row column to be qualified in ON CONFLICT assignments.
+        + " current_version = "
+        + USER_TABLE_NAME
+        + ".current_version + 1,"
+        + " last_version = "
+        + USER_TABLE_NAME
+        + ".current_version + 1,"
         + " deleted_at = #{userMeta.deletedAt}";
   }
 
@@ -155,7 +164,8 @@ public class UserMetaPostgreSQLProvider extends UserMetaBaseSQLProvider {
   public String touchUserUpdatedAt(@Param("userId") long userId) {
     return "UPDATE "
         + USER_TABLE_NAME
-        + " SET updated_at = CAST(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000 AS BIGINT)"
+        + " SET updated_at = "
+        + DatabaseTimeSQL.POSTGRESQL
         + " WHERE user_id = #{userId} AND deleted_at = 0";
   }
 }

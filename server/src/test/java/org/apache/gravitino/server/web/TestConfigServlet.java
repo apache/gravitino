@@ -64,25 +64,13 @@ public class TestConfigServlet {
   }
 
   @Test
-  public void testConfigServletWithAuthEnabledButNoServiceAdmins() throws Exception {
-    // When authorization is enabled but serviceAdmins is not configured, the key should be
-    // absent from the response (no crash) rather than null or empty.
-    ServerConfig serverConfig = new ServerConfig();
-    serverConfig.set(Configs.ENABLE_AUTHORIZATION, true);
-    Map<String, Object> configs = fetchConfigs(serverConfig);
-    Assertions.assertEquals(true, configs.get(Configs.ENABLE_AUTHORIZATION.getKey()));
-    Assertions.assertFalse(configs.containsKey(Configs.SERVICE_ADMINS.getKey()));
-  }
-
-  @Test
-  public void testConfigServletWithAuthEnabledAndServiceAdmins() throws Exception {
+  public void testConfigServletDoesNotImplicitlyExposeServiceAdmins() throws Exception {
     ServerConfig serverConfig = new ServerConfig();
     serverConfig.set(Configs.ENABLE_AUTHORIZATION, true);
     serverConfig.set(Configs.SERVICE_ADMINS, Lists.newArrayList("admin1", "admin2"));
     Map<String, Object> configs = fetchConfigs(serverConfig);
     Assertions.assertEquals(true, configs.get(Configs.ENABLE_AUTHORIZATION.getKey()));
-    Assertions.assertEquals(
-        Lists.newArrayList("admin1", "admin2"), configs.get(Configs.SERVICE_ADMINS.getKey()));
+    Assertions.assertFalse(configs.containsKey(Configs.SERVICE_ADMINS.getKey()));
   }
 
   @Test

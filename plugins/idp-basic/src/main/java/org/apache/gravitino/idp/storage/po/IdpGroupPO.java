@@ -35,6 +35,7 @@ import lombok.ToString;
 public class IdpGroupPO {
   private Long groupId;
   private String groupName;
+  private String groupComment;
   private Long currentVersion;
   private Long lastVersion;
   private Long deletedAt;

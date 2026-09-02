@@ -19,6 +19,7 @@
 package org.apache.gravitino.storage.relational.mapper;
 
 import java.util.List;
+import org.apache.gravitino.storage.relational.po.GroupOwnerRelPO;
 import org.apache.gravitino.storage.relational.po.GroupPO;
 import org.apache.gravitino.storage.relational.po.OwnerRelForDeletion;
 import org.apache.gravitino.storage.relational.po.OwnerRelPO;
@@ -62,6 +63,20 @@ public interface OwnerMetaMapper {
       method = "selectGroupOwnerMetaByMetadataObjectIdAndType")
   GroupPO selectGroupOwnerMetaByMetadataObjectIdAndType(
       @Param("metadataObjectId") Long metadataObjectId,
+      @Param("metadataObjectType") String metadataObjectType);
+
+  /**
+   * Selects group owners for the specified metadata objects.
+   *
+   * @param metadataObjectIds IDs of the metadata objects
+   * @param metadataObjectType type of the metadata objects
+   * @return group owners with their owned metadata object IDs
+   */
+  @SelectProvider(
+      type = OwnerMetaSQLProviderFactory.class,
+      method = "batchSelectGroupOwnerMetaByMetadataObjectIdAndType")
+  List<GroupOwnerRelPO> batchSelectGroupOwnerMetaByMetadataObjectIdAndType(
+      @Param("metadataObjectIds") List<Long> metadataObjectIds,
       @Param("metadataObjectType") String metadataObjectType);
 
   @InsertProvider(type = OwnerMetaSQLProviderFactory.class, method = "insertOwnerRel")

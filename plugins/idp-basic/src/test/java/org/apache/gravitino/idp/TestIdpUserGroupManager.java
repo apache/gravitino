@@ -41,6 +41,7 @@ import org.apache.gravitino.Config;
 import org.apache.gravitino.auth.AuthenticatorType;
 import org.apache.gravitino.exceptions.AlreadyExistsException;
 import org.apache.gravitino.exceptions.NotFoundException;
+import org.apache.gravitino.exceptions.UnauthorizedException;
 import org.apache.gravitino.idp.basic.IdpCredentialValidator;
 import org.apache.gravitino.idp.model.IdpGroup;
 import org.apache.gravitino.idp.model.IdpUser;
@@ -96,7 +97,12 @@ public class TestIdpUserGroupManager {
   public void testAddUser() throws IOException {
     IdpUser user = manager.addUser("testAdd", VALID_PASSWORD);
     Assertions.assertEquals("testAdd", user.name());
+    Assertions.assertTrue(user.enabled());
     Assertions.assertTrue(user.groupNames().isEmpty());
+
+    IdpUser disabled = manager.addUser("testAddDisabled", VALID_PASSWORD, false);
+    Assertions.assertFalse(disabled.enabled());
+    Assertions.assertFalse(manager.getUser("testAddDisabled").enabled());
 
     Assertions.assertThrows(
         AlreadyExistsException.class, () -> manager.addUser("testAdd", ANOTHER_VALID_PASSWORD));
@@ -134,10 +140,67 @@ public class TestIdpUserGroupManager {
   }
 
   @Test
+  public void testUpdateEnabled() throws IOException {
+    manager.addUser("testEnabled", VALID_PASSWORD);
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", false));
+    Assertions.assertFalse(manager.getUser("testEnabled").enabled());
+    Assertions.assertThrows(
+        UnauthorizedException.class, () -> manager.authenticate("testEnabled", VALID_PASSWORD));
+
+    Assertions.assertTrue(manager.updateEnabled("testEnabled", true));
+    Assertions.assertTrue(manager.getUser("testEnabled").enabled());
+    Assertions.assertEquals(
+        "testEnabled", manager.authenticate("testEnabled", VALID_PASSWORD).name());
+
+    Assertions.assertThrows(
+        NotFoundException.class, () -> manager.updateEnabled("not-exist", false));
+  }
+
+  @Test
+  public void testCannotDisableServiceAdmin() throws IOException {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminDisable");
+    manager.addUser("svcAdminDisable", VALID_PASSWORD);
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class, () -> manager.updateEnabled("svcAdminDisable", false));
+    Assertions.assertEquals("Cannot disable service admin svcAdminDisable", exception.getMessage());
+    Assertions.assertTrue(manager.getUser("svcAdminDisable").enabled());
+    Assertions.assertTrue(manager.updateEnabled("svcAdminDisable", true));
+  }
+
+  @Test
+  public void testCannotAddDisabledServiceAdmin() {
+    loadServiceAdminConfig(BASIC_AUTHENTICATOR, "svcAdminCreateDisabled");
+
+    IllegalArgumentException exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> manager.addUser("svcAdminCreateDisabled", VALID_PASSWORD, false));
+    Assertions.assertEquals(
+        "Cannot disable service admin svcAdminCreateDisabled", exception.getMessage());
+  }
+
+  @Test
   public void testAddGroup() throws IOException {
     IdpGroup group = manager.addGroup("testAddGroup");
     Assertions.assertEquals("testAddGroup", group.name());
+    Assertions.assertEquals("", group.comment());
     Assertions.assertTrue(group.usernames().isEmpty());
+
+    IdpGroup commented = manager.addGroup("testAddGroupComment", "on-call rotation");
+    Assertions.assertEquals("on-call rotation", commented.comment());
+    Assertions.assertEquals("on-call rotation", manager.getGroup("testAddGroupComment").comment());
+
+    Assertions.assertDoesNotThrow(
+        () -> manager.addGroup("testAddGroupMaxComment", "a".repeat(1024)));
+    Assertions.assertThrows(
+        IllegalArgumentException.class,
+        () -> manager.addGroup("testAddGroupTooLongComment", "a".repeat(1025)));
 
     Assertions.assertThrows(AlreadyExistsException.class, () -> manager.addGroup("testAddGroup"));
   }

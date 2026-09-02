@@ -106,6 +106,11 @@ public class TagMetaSQLProviderFactory {
     return getProvider().selectTagByTagId(tagId);
   }
 
+  /** Delegates an exclusive-lock tag query. */
+  public static String selectTagByTagIdForUpdate(@Param("tagId") Long tagId) {
+    return getProvider().selectTagByTagIdForUpdate(tagId);
+  }
+
   public static String listTagPOsByTagIds(@Param("tagIds") List<Long> tagIds) {
     return getProvider().listTagPOsByTagIds(tagIds);
   }

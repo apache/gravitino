@@ -277,6 +277,13 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
   }
 
   static JobEntity newJobEntity(String templateName, JobHandle.Status status, String metalake) {
+    // Any status other than QUEUED implies the job has at least started.
+    boolean isStarted = status != JobHandle.Status.QUEUED;
+    boolean isFinished =
+        status == JobHandle.Status.SUCCEEDED
+            || status == JobHandle.Status.FAILED
+            || status == JobHandle.Status.CANCELLED;
+
     return JobEntity.builder()
         .withId(RandomIdGenerator.INSTANCE.nextId())
         .withJobExecutionId(RandomIdGenerator.INSTANCE.nextId() + "")
@@ -284,6 +291,8 @@ public class TestJobTemplateMetaService extends TestJDBCBackend {
         .withJobTemplateName(templateName)
         .withStatus(status)
         .withAuditInfo(AUDIT_INFO)
+        .withStartedAt(isStarted ? System.currentTimeMillis() : 0L)
+        .withFinishedAt(isFinished ? System.currentTimeMillis() : 0L)
         .build();
   }
 }

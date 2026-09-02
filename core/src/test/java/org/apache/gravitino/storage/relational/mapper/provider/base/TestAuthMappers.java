@@ -188,13 +188,23 @@ public class TestAuthMappers {
   void testRoleMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertRole(13L, "role13", 1L);
-    roleMetaMapper.softDeleteRoleMetaByRoleId(13L);
+    roleMetaMapper.softDeleteRoleMetaByRoleId(13L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
     roleMetaMapper.touchRoleUpdatedAt(13L);
     long afterUpdatedAt = queryUpdatedAt("role_meta", "role_id", 13L);
 
     Assertions.assertEquals(beforeUpdatedAt, afterUpdatedAt);
+  }
+
+  @Test
+  void testRoleDeleteUsesCurrentVersion() {
+    insertMetalake(1L, "metalake1");
+    insertRole(14L, "role14", 1L);
+
+    Assertions.assertEquals(0, roleMetaMapper.softDeleteRoleMetaByRoleId(14L, 2L));
+    Assertions.assertNotNull(roleMetaMapper.selectRoleMetaByMetalakeIdAndName(1L, "role14"));
+    Assertions.assertEquals(1, roleMetaMapper.softDeleteRoleMetaByRoleId(14L, 1L));
   }
 
   @Test
@@ -219,7 +229,7 @@ public class TestAuthMappers {
   void testUserMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertUser(22L, "user22", 1L);
-    userMetaMapper.softDeleteUserMetaByUserId(22L);
+    userMetaMapper.softDeleteUserMetaByUserId(22L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("user_meta", "user_id", 22L);
     userMetaMapper.touchUserUpdatedAt(22L);
@@ -264,7 +274,7 @@ public class TestAuthMappers {
   void testGroupMetaTouchUpdatedAtSkipsSoftDeleted() {
     insertMetalake(1L, "metalake1");
     insertGroup(31L, "group31", 1L);
-    groupMetaMapper.softDeleteGroupMetaByGroupId(31L);
+    groupMetaMapper.softDeleteGroupMetaByGroupId(31L, 1L);
 
     long beforeUpdatedAt = queryUpdatedAt("group_meta", "group_id", 31L);
     groupMetaMapper.touchGroupUpdatedAt(31L);
@@ -285,6 +295,26 @@ public class TestAuthMappers {
     Assertions.assertNotNull(info);
     Assertions.assertEquals(32L, info.getGroupId());
     Assertions.assertEquals(expected, info.getUpdatedAt());
+  }
+
+  @Test
+  void testGroupDeleteUsesCurrentVersion() {
+    insertMetalake(1L, "metalake1");
+    insertGroup(33L, "group33", 1L);
+
+    Assertions.assertEquals(0, groupMetaMapper.softDeleteGroupMetaByGroupId(33L, 2L));
+    Assertions.assertNotNull(groupMetaMapper.selectGroupMetaByMetalakeIdAndName(1L, "group33"));
+    Assertions.assertEquals(1, groupMetaMapper.softDeleteGroupMetaByGroupId(33L, 1L));
+  }
+
+  @Test
+  void testUserDeleteUsesCurrentVersion() {
+    insertMetalake(1L, "metalake1");
+    insertUser(23L, "user23", 1L);
+
+    Assertions.assertEquals(0, userMetaMapper.softDeleteUserMetaByUserId(23L, 2L));
+    Assertions.assertNotNull(userMetaMapper.selectUserMetaByMetalakeIdAndName(1L, "user23"));
+    Assertions.assertEquals(1, userMetaMapper.softDeleteUserMetaByUserId(23L, 1L));
   }
 
   @Test

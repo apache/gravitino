@@ -74,20 +74,9 @@ public abstract class TestKmsClientContract {
   }
 
   @Test
-  void testRejectsMismatchedSource() {
+  void testRejectsMismatchedProvider() {
     KmsReference reference = usableKey();
-    KmsReference mismatched =
-        new KmsReference(reference.api(), reference.source() + "-other", reference.keyId());
-
-    Assertions.assertThrows(
-        IllegalArgumentException.class, () -> client().getKeyProperties(mismatched));
-  }
-
-  @Test
-  void testRejectsMismatchedApi() {
-    KmsReference reference = usableKey();
-    KmsReference mismatched =
-        new KmsReference(reference.api() + "-other", reference.source(), reference.keyId());
+    KmsReference mismatched = new KmsReference(reference.provider() + "-other", reference.keyId());
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> client().getKeyProperties(mismatched));

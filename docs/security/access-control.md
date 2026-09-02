@@ -165,29 +165,30 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 
 ### Data Object Privileges
 
-| Privilege            | Grantable On                        | What It Allows                                                     |
-|----------------------|-------------------------------------|--------------------------------------------------------------------|
-| `CREATE_CATALOG`     | Metalake                            | Create catalogs                                                    |
-| `USE_CATALOG`        | Metalake, Catalog                   | Use any catalog in scope, and reach the objects inside it          |
-| `CREATE_SCHEMA`      | Metalake, Catalog, Schema           | Create schemas or nested schemas in scope                          |
-| `USE_SCHEMA`         | Metalake, Catalog, Schema           | Use any schema in scope, and reach the objects inside it           |
-| `CREATE_TABLE`       | Metalake, Catalog, Schema           | Create tables in any schema in scope                               |
-| `SELECT_TABLE`       | Metalake, Catalog, Schema, Table    | Read any table in scope                                            |
-| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table    | Read and write to, and alter the schema of, any table in scope     |
-| `CREATE_VIEW`        | Metalake, Catalog, Schema           | Create views in any schema in scope                                |
-| `SELECT_VIEW`        | Metalake, Catalog, Schema, View     | Read any view in scope                                             |
-| `CREATE_TOPIC`       | Metalake, Catalog, Schema           | Create topics in any schema in scope                               |
-| `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic    | Consume from any topic in scope                                    |
-| `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic    | Consume from, produce to, and alter any topic in scope             |
-| `CREATE_FILESET`     | Metalake, Catalog, Schema           | Create filesets in any schema in scope                             |
-| `READ_FILESET`       | Metalake, Catalog, Schema, Fileset  | Read any fileset in scope                                          |
-| `WRITE_FILESET`      | Metalake, Catalog, Schema, Fileset  | Read, write, and alter any fileset in scope                        |
-| `REGISTER_MODEL`     | Metalake, Catalog, Schema           | Register models in any schema in scope                             |
-| `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model    | Link versions to any model in scope                                |
-| `USE_MODEL`          | Metalake, Catalog, Schema, Model    | Read the metadata of, and download versions of, any model in scope |
-| `REGISTER_FUNCTION`  | Metalake, Catalog, Schema           | Register functions in any schema in scope                          |
-| `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function | Read the metadata of, and execute, any function in scope           |
-| `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function | Alter or drop any function in scope                                |
+| Privilege            | Grantable On                           | What It Allows                                                     |
+|----------------------|----------------------------------------|--------------------------------------------------------------------|
+| `CREATE_CATALOG`     | Metalake                               | Create catalogs                                                    |
+| `USE_CATALOG`        | Metalake, Catalog                      | Use any catalog in scope, and reach the objects inside it          |
+| `CREATE_SCHEMA`      | Metalake, Catalog, Schema              | Create schemas or nested schemas in scope                          |
+| `USE_SCHEMA`         | Metalake, Catalog, Schema              | Use any schema in scope, and reach the objects inside it           |
+| `CREATE_TABLE`       | Metalake, Catalog, Schema              | Create tables in any schema in scope                               |
+| `PROBE_TABLE_LIKE`   | Metalake, Catalog, Schema, Table, View | Probe whether a table-like object exists without reading its data  |
+| `SELECT_TABLE`       | Metalake, Catalog, Schema, Table       | Read any table in scope                                            |
+| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table       | Read and write to, and alter the schema of, any table in scope     |
+| `CREATE_VIEW`        | Metalake, Catalog, Schema              | Create views in any schema in scope                                |
+| `SELECT_VIEW`        | Metalake, Catalog, Schema, View        | Read any view in scope                                             |
+| `CREATE_TOPIC`       | Metalake, Catalog, Schema              | Create topics in any schema in scope                               |
+| `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from any topic in scope                                    |
+| `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from, produce to, and alter any topic in scope             |
+| `CREATE_FILESET`     | Metalake, Catalog, Schema              | Create filesets in any schema in scope                             |
+| `READ_FILESET`       | Metalake, Catalog, Schema, Fileset     | Read any fileset in scope                                          |
+| `WRITE_FILESET`      | Metalake, Catalog, Schema, Fileset     | Read, write, and alter any fileset in scope                        |
+| `REGISTER_MODEL`     | Metalake, Catalog, Schema              | Register models in any schema in scope                             |
+| `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model       | Link versions to any model in scope                                |
+| `USE_MODEL`          | Metalake, Catalog, Schema, Model       | Read the metadata of, and download versions of, any model in scope |
+| `REGISTER_FUNCTION`  | Metalake, Catalog, Schema              | Register functions in any schema in scope                          |
+| `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function    | Read the metadata of, and execute, any function in scope           |
+| `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function    | Alter or drop any function in scope                                |
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata, and the same pairing
 holds for views, topics, and filesets.
@@ -269,6 +270,71 @@ object: the owner of the table or view, plus `CREATE_TABLE` or `CREATE_VIEW` on 
 | Policy       | `CREATE_POLICY`         | `APPLY_POLICY`                         | Owner           | Attach: `APPLY_POLICY` and access to the object |
 | Job template | `REGISTER_JOB_TEMPLATE` | `USE_JOB_TEMPLATE`                     | Owner           | Run a job: `RUN_JOB` and `USE_JOB_TEMPLATE` |
 | Job          |                         | Owner                                  | Owner           |                                           |
+
+Bulk access-control APIs use the same privileges as the matching single-entity operations. These
+bulk operations are authorized once before processing the request. Bulk requests report item-level
+failures in `errors`.
+
+| API                                                 | Required privilege                         |
+|-----------------------------------------------------|--------------------------------------------|
+| `POST /api/bulk/metalakes/{metalake}/users/add`     | `OWNER` of the metalake or `MANAGE_USERS`  |
+| `POST /api/bulk/metalakes/{metalake}/users/remove`  | `OWNER` of the metalake or `MANAGE_USERS`  |
+| `POST /api/bulk/metalakes/{metalake}/groups/add`    | `OWNER` of the metalake or `MANAGE_GROUPS` |
+| `POST /api/bulk/metalakes/{metalake}/groups/remove` | `OWNER` of the metalake or `MANAGE_GROUPS` |
+
+For example, add users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "users": [
+    {"name": "analyst"},
+    {"name": "developer", "externalId": "developer@example.com", "enabled": true}
+  ]
+}'
+```
+
+Remove users in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/users/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analyst", "developer"]
+}'
+```
+
+For example, add groups in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/groups/add" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "groups": [
+    {"name": "analysts"},
+    {"name": "developers", "externalId": "developers@example.com"}
+  ]
+}'
+```
+
+Remove groups in bulk:
+
+```shell
+curl -X POST "http://localhost:8090/api/bulk/metalakes/{metalake}/groups/remove" \
+  -H "Authorization: Bearer $MANAGER_TOKEN" \
+  -H "Accept: application/vnd.gravitino.v1+json" \
+  -H "Content-Type: application/json" \
+  -d '{
+  "names": ["analysts", "developers"]
+}'
+```
 
 Granting or revoking a privilege on an object takes `MANAGE_GRANTS` on that object or an ancestor.
 Granting or revoking a role, and overriding a role's privileges, takes `MANAGE_GRANTS` on the
