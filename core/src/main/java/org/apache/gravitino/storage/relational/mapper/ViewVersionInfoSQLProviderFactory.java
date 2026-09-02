@@ -56,11 +56,6 @@ public class ViewVersionInfoSQLProviderFactory {
     return getProvider().insertViewVersionInfo(viewVersionInfoPO);
   }
 
-  public static String insertViewVersionInfoOnDuplicateKeyUpdate(
-      @Param("viewVersionInfo") ViewVersionInfoPO viewVersionInfoPO) {
-    return getProvider().insertViewVersionInfoOnDuplicateKeyUpdate(viewVersionInfoPO);
-  }
-
   public static String selectViewVersionInfoByViewIdAndVersion(
       @Param("viewId") Long viewId, @Param("version") Integer version) {
     return getProvider().selectViewVersionInfoByViewIdAndVersion(viewId, version);

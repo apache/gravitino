@@ -18,25 +18,10 @@
  */
 package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 
-import org.apache.gravitino.storage.relational.mapper.ViewMetaMapper;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 class TestViewMetaPostgreSQLProvider {
-
-  @Test
-  void testOverwriteAdvancesStoredVersion() {
-    String sql = new ViewMetaPostgreSQLProvider().insertViewMetaOnDuplicateKeyUpdate(null);
-    String conflictClause = sql.substring(sql.indexOf(" ON CONFLICT"));
-
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "current_version = " + ViewMetaMapper.TABLE_NAME + ".current_version + 1"));
-    Assertions.assertTrue(
-        conflictClause.contains(
-            "last_version = " + ViewMetaMapper.TABLE_NAME + ".current_version + 1"));
-    Assertions.assertFalse(conflictClause.matches(".*[^.\\w]current_version\\s*\\+.*"));
-  }
 
   @Test
   void testDirectDeleteUsesVersionCas() {

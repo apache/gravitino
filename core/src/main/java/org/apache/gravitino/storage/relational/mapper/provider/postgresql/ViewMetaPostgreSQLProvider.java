@@ -24,43 +24,9 @@ import static org.apache.gravitino.storage.relational.mapper.ViewMetaMapper.VERS
 import java.util.List;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewMetaBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.ViewPO;
 import org.apache.ibatis.annotations.Param;
 
 public class ViewMetaPostgreSQLProvider extends ViewMetaBaseSQLProvider {
-
-  @Override
-  public String insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO) {
-    return "INSERT INTO "
-        + TABLE_NAME
-        + " (view_id, view_name, metalake_id,"
-        + " catalog_id, schema_id,"
-        + " current_version, last_version, audit_info, deleted_at)"
-        + " VALUES ("
-        + " #{viewMeta.viewId},"
-        + " #{viewMeta.viewName},"
-        + " #{viewMeta.metalakeId},"
-        + " #{viewMeta.catalogId},"
-        + " #{viewMeta.schemaId},"
-        + " #{viewMeta.currentVersion},"
-        + " #{viewMeta.lastVersion},"
-        + " #{viewMeta.auditInfo},"
-        + " #{viewMeta.deletedAt}"
-        + " )"
-        + " ON CONFLICT (view_id) DO UPDATE SET"
-        + " view_name = #{viewMeta.viewName},"
-        + " metalake_id = #{viewMeta.metalakeId},"
-        + " catalog_id = #{viewMeta.catalogId},"
-        + " schema_id = #{viewMeta.schemaId},"
-        + " current_version = "
-        + TABLE_NAME
-        + ".current_version + 1,"
-        + " last_version = "
-        + TABLE_NAME
-        + ".current_version + 1,"
-        + " audit_info = #{viewMeta.auditInfo},"
-        + " deleted_at = #{viewMeta.deletedAt}";
-  }
 
   @Override
   public String listViewPOsBySchemaId(@Param("schemaId") Long schemaId) {

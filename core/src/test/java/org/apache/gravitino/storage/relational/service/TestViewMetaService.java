@@ -653,6 +653,34 @@ public class TestViewMetaService extends TestJDBCBackend {
   }
 
   @TestTemplate
+  public void testOverwriteDoesNotAdoptViewFromAnotherSchema() throws IOException {
+    String otherSchemaName = GravitinoITUtils.genRandomName("tst_view_schema_other");
+    createAndInsertSchema(metalakeName, catalogName, otherSchemaName);
+
+    String viewName = GravitinoITUtils.genRandomName("view_cross_schema_overwrite");
+    Namespace otherNamespace = NamespaceUtil.ofView(metalakeName, catalogName, otherSchemaName);
+    ViewEntity foreign =
+        createViewEntity(RandomIdGenerator.INSTANCE.nextId(), otherNamespace, viewName, AUDIT_INFO);
+    ViewMetaService.getInstance().insertView(foreign, false);
+
+    // The overwrite targets a schema that holds no view with this name, but it carries the ID of a
+    // view stored under another schema. Adopting that row would move it out of its own schema
+    // without ever fencing that schema, so the write is rejected instead.
+    Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);
+    ViewEntity replacement = copyView(foreign, viewName, namespace, "replacement");
+    assertThrows(
+        EntityAlreadyExistsException.class,
+        () -> ViewMetaService.getInstance().insertView(replacement, true));
+
+    ViewEntity stored = ViewMetaService.getInstance().getViewByIdentifier(foreign.nameIdentifier());
+    ViewPO storedPO = ViewMetaService.getInstance().getViewPOByIdentifier(foreign.nameIdentifier());
+    assertEquals(otherNamespace, stored.namespace());
+    assertEquals(foreign.comment(), stored.comment());
+    assertEquals(1L, storedPO.getCurrentVersion());
+    assertEquals(1, listViewVersions(foreign.id()).size());
+  }
+
+  @TestTemplate
   public void testNaturalKeyOverwriteUsesPersistedViewId() throws IOException {
     String viewName = GravitinoITUtils.genRandomName("view_natural_key_overwrite");
     Namespace namespace = NamespaceUtil.ofView(metalakeName, catalogName, schemaName);

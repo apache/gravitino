@@ -234,16 +234,27 @@ public class ViewMetaService {
     return ops;
   }
 
+  /**
+   * Builds the next version of a view row.
+   *
+   * <p>The parent IDs are not seeded here: {@link ViewPO#buildViewPO} resolves them from the new
+   * entity's namespace, which is what carries a cross-schema move.
+   */
   private ViewPO updateViewPO(ViewPO oldViewPO, ViewEntity newEntity) {
-    Long newVersion = oldViewPO.getLastVersion() + 1;
+    long newVersion = nextVersion(oldViewPO);
     ViewPO.ViewPOBuilder builder =
-        ViewPO.builder()
-            .withMetalakeId(oldViewPO.getMetalakeId())
-            .withCatalogId(oldViewPO.getCatalogId())
-            .withSchemaId(oldViewPO.getSchemaId())
-            .withCurrentVersion(newVersion)
-            .withLastVersion(newVersion);
-    return buildViewPO(newEntity, builder, newVersion.intValue());
+        ViewPO.builder().withCurrentVersion(newVersion).withLastVersion(newVersion);
+    return buildViewPO(newEntity, builder, (int) newVersion);
+  }
+
+  /**
+   * Returns the version to write next, one above every version this view has ever had.
+   *
+   * @param viewPO the view row observed by the caller
+   * @return the next monotonic version
+   */
+  private static long nextVersion(ViewPO viewPO) {
+    return Math.max(viewPO.getCurrentVersion(), viewPO.getLastVersion()) + 1;
   }
 
   ViewPO getViewPOByIdentifier(NameIdentifier identifier) {
@@ -317,13 +328,22 @@ public class ViewMetaService {
       return sameNameViewPO;
     }
 
-    return SessionUtils.getWithoutCommit(
-        ViewMetaMapper.class,
-        mapper -> mapper.selectViewMetaByIdForUpdate(initializedViewPO.getViewId()));
+    ViewPO sameIdViewPO =
+        SessionUtils.getWithoutCommit(
+            ViewMetaMapper.class,
+            mapper -> mapper.selectViewMetaByIdForUpdate(initializedViewPO.getViewId()));
+    // Only a view that already lives under the target schema can be replaced by ID. A stored view
+    // with the same ID under another schema belongs to a different parent: adopting it here would
+    // move it without ever fencing its own schema.
+    if (sameIdViewPO == null
+        || !Objects.equals(sameIdViewPO.getSchemaId(), initializedViewPO.getSchemaId())) {
+      return null;
+    }
+    return sameIdViewPO;
   }
 
   private ViewPO viewPOForOverwrite(ViewPO incomingPO, ViewPO persistedPO) {
-    Long nextVersion = persistedPO.getLastVersion() + 1;
+    Long nextVersion = nextVersion(persistedPO);
     ViewVersionInfoPO incomingVersionPO = incomingPO.getViewVersionInfoPO();
     ViewVersionInfoPO persistedVersionPO =
         ViewVersionInfoPO.builder()

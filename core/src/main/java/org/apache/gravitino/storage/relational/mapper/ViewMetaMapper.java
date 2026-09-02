@@ -140,11 +140,6 @@ public interface ViewMetaMapper {
   @InsertProvider(type = ViewMetaSQLProviderFactory.class, method = "insertViewMeta")
   void insertViewMeta(@Param("viewMeta") ViewPO viewPO);
 
-  @InsertProvider(
-      type = ViewMetaSQLProviderFactory.class,
-      method = "insertViewMetaOnDuplicateKeyUpdate")
-  void insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO);
-
   @UpdateProvider(type = ViewMetaSQLProviderFactory.class, method = "updateViewMeta")
   Integer updateViewMeta(
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO);

@@ -21,36 +21,9 @@ package org.apache.gravitino.storage.relational.mapper.provider.postgresql;
 import org.apache.gravitino.storage.relational.mapper.ViewVersionInfoMapper;
 import org.apache.gravitino.storage.relational.mapper.provider.DatabaseTimeSQL;
 import org.apache.gravitino.storage.relational.mapper.provider.base.ViewVersionInfoBaseSQLProvider;
-import org.apache.gravitino.storage.relational.po.ViewVersionInfoPO;
 import org.apache.ibatis.annotations.Param;
 
 public class ViewVersionInfoPostgreSQLProvider extends ViewVersionInfoBaseSQLProvider {
-
-  @Override
-  public String insertViewVersionInfoOnDuplicateKeyUpdate(
-      @Param("viewVersionInfo") ViewVersionInfoPO viewVersionInfoPO) {
-    return "INSERT INTO "
-        + ViewVersionInfoMapper.TABLE_NAME
-        + " (metalake_id, catalog_id, schema_id, view_id, version,"
-        + " view_comment, columns, properties, default_catalog, default_schema, representations,"
-        + " audit_info, deleted_at)"
-        + " VALUES (#{viewVersionInfo.metalakeId}, #{viewVersionInfo.catalogId},"
-        + " #{viewVersionInfo.schemaId}, #{viewVersionInfo.viewId},"
-        + " #{viewVersionInfo.version}, #{viewVersionInfo.viewComment},"
-        + " #{viewVersionInfo.columns}, #{viewVersionInfo.properties},"
-        + " #{viewVersionInfo.defaultCatalog}, #{viewVersionInfo.defaultSchema},"
-        + " #{viewVersionInfo.representations},"
-        + " #{viewVersionInfo.auditInfo}, #{viewVersionInfo.deletedAt})"
-        + " ON CONFLICT (view_id, version, deleted_at) DO UPDATE SET"
-        + " view_comment = #{viewVersionInfo.viewComment},"
-        + " columns = #{viewVersionInfo.columns},"
-        + " properties = #{viewVersionInfo.properties},"
-        + " default_catalog = #{viewVersionInfo.defaultCatalog},"
-        + " default_schema = #{viewVersionInfo.defaultSchema},"
-        + " representations = #{viewVersionInfo.representations},"
-        + " audit_info = #{viewVersionInfo.auditInfo},"
-        + " deleted_at = #{viewVersionInfo.deletedAt}";
-  }
 
   @Override
   public String softDeleteViewVersionsByViewId(@Param("viewId") Long viewId) {

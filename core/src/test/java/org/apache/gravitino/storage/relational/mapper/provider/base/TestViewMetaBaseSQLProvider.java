@@ -26,17 +26,6 @@ class TestViewMetaBaseSQLProvider {
   private static final ViewMetaBaseSQLProvider PROVIDER = new ViewMetaBaseSQLProvider();
 
   @Test
-  void testOverwriteAdvancesStoredVersion() {
-    String sql = PROVIDER.insertViewMetaOnDuplicateKeyUpdate(null);
-    String updateClause = sql.substring(sql.indexOf(" ON DUPLICATE KEY UPDATE"));
-
-    Assertions.assertTrue(updateClause.contains("last_version = current_version + 1"));
-    Assertions.assertTrue(updateClause.contains("current_version = current_version + 1"));
-    Assertions.assertFalse(updateClause.contains("current_version = #{viewMeta.currentVersion}"));
-    Assertions.assertFalse(updateClause.contains("last_version = #{viewMeta.lastVersion}"));
-  }
-
-  @Test
   void testUpdateUsesVersionCas() {
     String sql = PROVIDER.updateViewMeta(null, null);
     String whereClause = sql.substring(sql.indexOf(" WHERE"));

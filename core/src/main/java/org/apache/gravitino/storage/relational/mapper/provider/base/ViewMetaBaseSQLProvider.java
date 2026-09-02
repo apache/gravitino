@@ -188,36 +188,6 @@ public class ViewMetaBaseSQLProvider {
         + " )";
   }
 
-  public String insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO) {
-    return "INSERT INTO "
-        + TABLE_NAME
-        + " (view_id, view_name, metalake_id,"
-        + " catalog_id, schema_id,"
-        + " current_version, last_version, audit_info, deleted_at)"
-        + " VALUES ("
-        + " #{viewMeta.viewId},"
-        + " #{viewMeta.viewName},"
-        + " #{viewMeta.metalakeId},"
-        + " #{viewMeta.catalogId},"
-        + " #{viewMeta.schemaId},"
-        + " #{viewMeta.currentVersion},"
-        + " #{viewMeta.lastVersion},"
-        + " #{viewMeta.auditInfo},"
-        + " #{viewMeta.deletedAt}"
-        + " )"
-        + " ON DUPLICATE KEY UPDATE"
-        + " view_name = #{viewMeta.viewName},"
-        + " metalake_id = #{viewMeta.metalakeId},"
-        + " catalog_id = #{viewMeta.catalogId},"
-        + " schema_id = #{viewMeta.schemaId},"
-        // Keep both version columns monotonic on overwrite. Assign last first so MySQL computes
-        // both values from the stored current version rather than the newly assigned value.
-        + " last_version = current_version + 1,"
-        + " current_version = current_version + 1,"
-        + " audit_info = #{viewMeta.auditInfo},"
-        + " deleted_at = #{viewMeta.deletedAt}";
-  }
-
   public String updateViewMeta(
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO) {
     return "UPDATE "

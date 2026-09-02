@@ -105,10 +105,6 @@ public class ViewMetaSQLProviderFactory {
     return getProvider().insertViewMeta(viewPO);
   }
 
-  public static String insertViewMetaOnDuplicateKeyUpdate(@Param("viewMeta") ViewPO viewPO) {
-    return getProvider().insertViewMetaOnDuplicateKeyUpdate(viewPO);
-  }
-
   public static String updateViewMeta(
       @Param("newViewMeta") ViewPO newViewPO, @Param("oldViewMeta") ViewPO oldViewPO) {
     return getProvider().updateViewMeta(newViewPO, oldViewPO);

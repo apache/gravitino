@@ -41,31 +41,6 @@ public class ViewVersionInfoBaseSQLProvider {
         + " #{viewVersionInfo.auditInfo}, #{viewVersionInfo.deletedAt})";
   }
 
-  public String insertViewVersionInfoOnDuplicateKeyUpdate(
-      @Param("viewVersionInfo") ViewVersionInfoPO viewVersionInfoPO) {
-    return "INSERT INTO "
-        + ViewVersionInfoMapper.TABLE_NAME
-        + " (metalake_id, catalog_id, schema_id, view_id, version,"
-        + " view_comment, columns, properties, default_catalog, default_schema, representations,"
-        + " audit_info, deleted_at)"
-        + " VALUES (#{viewVersionInfo.metalakeId}, #{viewVersionInfo.catalogId},"
-        + " #{viewVersionInfo.schemaId}, #{viewVersionInfo.viewId},"
-        + " #{viewVersionInfo.version}, #{viewVersionInfo.viewComment},"
-        + " #{viewVersionInfo.columns}, #{viewVersionInfo.properties},"
-        + " #{viewVersionInfo.defaultCatalog}, #{viewVersionInfo.defaultSchema},"
-        + " #{viewVersionInfo.representations},"
-        + " #{viewVersionInfo.auditInfo}, #{viewVersionInfo.deletedAt})"
-        + " ON DUPLICATE KEY UPDATE"
-        + " view_comment = #{viewVersionInfo.viewComment},"
-        + " columns = #{viewVersionInfo.columns},"
-        + " properties = #{viewVersionInfo.properties},"
-        + " default_catalog = #{viewVersionInfo.defaultCatalog},"
-        + " default_schema = #{viewVersionInfo.defaultSchema},"
-        + " representations = #{viewVersionInfo.representations},"
-        + " audit_info = #{viewVersionInfo.auditInfo},"
-        + " deleted_at = #{viewVersionInfo.deletedAt}";
-  }
-
   public String selectViewVersionInfoByViewIdAndVersion(
       @Param("viewId") Long viewId, @Param("version") Integer version) {
     return "SELECT id as id, metalake_id as metalakeId, catalog_id as catalogId,"

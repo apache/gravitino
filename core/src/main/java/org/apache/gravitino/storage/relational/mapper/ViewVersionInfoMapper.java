@@ -33,12 +33,6 @@ public interface ViewVersionInfoMapper {
   @InsertProvider(type = ViewVersionInfoSQLProviderFactory.class, method = "insertViewVersionInfo")
   void insertViewVersionInfo(@Param("viewVersionInfo") ViewVersionInfoPO viewVersionInfoPO);
 
-  @InsertProvider(
-      type = ViewVersionInfoSQLProviderFactory.class,
-      method = "insertViewVersionInfoOnDuplicateKeyUpdate")
-  void insertViewVersionInfoOnDuplicateKeyUpdate(
-      @Param("viewVersionInfo") ViewVersionInfoPO viewVersionInfoPO);
-
   @SelectProvider(
       type = ViewVersionInfoSQLProviderFactory.class,
       method = "selectViewVersionInfoByViewIdAndVersion")
