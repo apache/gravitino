@@ -39,6 +39,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -729,6 +730,7 @@ public class DorisTableOperations extends JdbcTableOperations {
      * */
 
     // Not all operations require the original table information, so lazy loading is used here
+    validateIndexChangeConflicts(changes);
     JdbcTable lazyLoadTable = null;
     TableChange.UpdateComment updateComment = null;
     List<TableChange.SetProperty> setProperties = new ArrayList<>();
@@ -802,13 +804,42 @@ public class DorisTableOperations extends JdbcTableOperations {
       alterSql.add("MODIFY COMMENT \"" + escapeSqlLiteral(newComment, '"') + "\"");
     }
 
-    if (CollectionUtils.isEmpty(alterSql)) {
+    List<String> nonEmptyAlterSql =
+        alterSql.stream().filter(StringUtils::isNotEmpty).collect(Collectors.toList());
+    if (CollectionUtils.isEmpty(nonEmptyAlterSql)) {
       return "";
     }
     // Return the generated SQL statement
-    String result = "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", alterSql) + ";";
+    String result =
+        "ALTER TABLE `" + tableName + "`\n" + String.join(",\n", nonEmptyAlterSql) + ";";
     LOG.info("Generated alter table:{}.{} sql: {}", databaseName, tableName, result);
     return result;
+  }
+
+  private static void validateIndexChangeConflicts(TableChange... changes) {
+    Set<String> deleteIndexNames = new HashSet<>();
+    Set<String> addIndexNames = new HashSet<>();
+
+    for (TableChange change : changes) {
+      if (change instanceof TableChange.DeleteIndex) {
+        String indexName = ((TableChange.DeleteIndex) change).getName();
+        Preconditions.checkArgument(
+            deleteIndexNames.add(indexName),
+            "Index '%s' cannot be deleted more than once in the same request",
+            indexName);
+        Preconditions.checkArgument(
+            !addIndexNames.contains(indexName),
+            "Index '%s' cannot be added and deleted in the same request",
+            indexName);
+      } else if (change instanceof TableChange.AddIndex) {
+        String indexName = ((TableChange.AddIndex) change).getName();
+        Preconditions.checkArgument(
+            !deleteIndexNames.contains(indexName),
+            "Index '%s' cannot be added and deleted in the same request",
+            indexName);
+        addIndexNames.add(indexName);
+      }
+    }
   }
 
   private String updateColumnNullabilityDefinition(
@@ -1016,11 +1047,14 @@ public class DorisTableOperations extends JdbcTableOperations {
 
   static String deleteIndexDefinition(
       JdbcTable lazyLoadTable, TableChange.DeleteIndex deleteIndex) {
-    if (!deleteIndex.isIfExists()) {
-      Preconditions.checkArgument(
-          Arrays.stream(lazyLoadTable.index())
-              .anyMatch(index -> index.name().equals(deleteIndex.getName())),
-          "Index does not exist");
+    boolean indexExists =
+        Arrays.stream(lazyLoadTable.index())
+            .anyMatch(index -> index.name().equals(deleteIndex.getName()));
+    if (!indexExists) {
+      if (deleteIndex.isIfExists()) {
+        return "";
+      }
+      Preconditions.checkArgument(false, "Index does not exist");
     }
     return "DROP INDEX `" + deleteIndex.getName() + "`";
   }

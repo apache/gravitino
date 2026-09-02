@@ -26,6 +26,7 @@ import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
@@ -41,6 +42,7 @@ import org.apache.gravitino.Catalog;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.jdbc.config.JdbcConfig;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.exceptions.NoSuchTableException;
 import org.apache.gravitino.integration.test.container.ContainerSuite;
 import org.apache.gravitino.integration.test.container.DorisContainer;
 import org.apache.gravitino.integration.test.container.DorisImageName;
@@ -218,6 +220,137 @@ public class CatalogDoris3xIT extends BaseIT {
         .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
         .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
         .untilAsserted(() -> assertEquals(0, tc.loadTable(tid).index().length));
+  }
+
+  @Test
+  void testDeleteMissingIndexIfExists() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_missing_idx"));
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+
+    tc.alterTable(tid, TableChange.deleteIndex("idx_missing", true));
+    assertEquals(0, tc.loadTable(tid).index().length);
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () -> tc.alterTable(tid, TableChange.deleteIndex("idx_missing", false)));
+    assertTrue(exception.getMessage().contains("Index does not exist"), exception.getMessage());
+  }
+
+  @Test
+  void testDeleteExistingInvertedIndexWithIfExistsFalse() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_existing_idx_strict"));
+
+    tc.createTable(
+        tid,
+        basicColumns(),
+        tableComment,
+        Collections.emptyMap(),
+        Transforms.EMPTY_TRANSFORM,
+        hashDist(),
+        null,
+        null);
+    tc.alterTable(
+        tid,
+        TableChange.addIndex(Index.IndexType.INVERTED, "idx_strict", new String[][] {{colName2}}));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(() -> assertEquals(1, tc.loadTable(tid).index().length));
+
+    tc.alterTable(tid, TableChange.deleteIndex("idx_strict", false));
+
+    Awaitility.await()
+        .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+        .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+        .untilAsserted(() -> assertEquals(0, tc.loadTable(tid).index().length));
+  }
+
+  @Test
+  void testNoOpDeleteComposesWithUnrelatedChanges() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier addColumnFirst =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_column_first"));
+    NameIdentifier addColumnLast =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_column_last"));
+    NameIdentifier addIndexFirst =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_index_first"));
+    NameIdentifier addIndexLast =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_noop_index_last"));
+
+    for (NameIdentifier tid :
+        new NameIdentifier[] {addColumnFirst, addColumnLast, addIndexFirst, addIndexLast}) {
+      tc.createTable(
+          tid,
+          basicColumns(),
+          tableComment,
+          Collections.emptyMap(),
+          Transforms.EMPTY_TRANSFORM,
+          hashDist(),
+          null,
+          null);
+    }
+
+    tc.alterTable(
+        addColumnFirst,
+        TableChange.deleteIndex("idx_missing", true),
+        TableChange.addColumn(new String[] {"col_extra"}, Types.VarCharType.of(100)));
+    tc.alterTable(
+        addColumnLast,
+        TableChange.addColumn(new String[] {"col_extra"}, Types.VarCharType.of(100)),
+        TableChange.deleteIndex("idx_missing", true));
+
+    for (NameIdentifier tid : new NameIdentifier[] {addColumnFirst, addColumnLast}) {
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(() -> assertEquals(3, tc.loadTable(tid).columns().length));
+    }
+
+    tc.alterTable(
+        addIndexFirst,
+        TableChange.deleteIndex("idx_missing", true),
+        TableChange.addIndex(
+            Index.IndexType.INVERTED, "idx_unrelated", new String[][] {{colName2}}));
+    tc.alterTable(
+        addIndexLast,
+        TableChange.addIndex(
+            Index.IndexType.INVERTED, "idx_unrelated", new String[][] {{colName2}}),
+        TableChange.deleteIndex("idx_missing", true));
+
+    for (NameIdentifier tid : new NameIdentifier[] {addIndexFirst, addIndexLast}) {
+      Awaitility.await()
+          .atMost(MAX_WAIT_IN_SECONDS, TimeUnit.SECONDS)
+          .pollInterval(WAIT_INTERVAL_IN_SECONDS, TimeUnit.SECONDS)
+          .untilAsserted(() -> assertEquals(1, tc.loadTable(tid).index().length));
+    }
+  }
+
+  @Test
+  void testDeleteIndexDoesNotSuppressMissingTable() {
+    TableCatalog tc = catalog.asTableCatalog();
+    NameIdentifier tid =
+        NameIdentifier.of(schemaName, GravitinoITUtils.genRandomName("t_missing_table"));
+
+    NoSuchTableException exception =
+        assertThrows(
+            NoSuchTableException.class,
+            () -> tc.alterTable(tid, TableChange.deleteIndex("idx_missing", true)));
+    assertTrue(exception.getMessage().contains(tid.name()), exception.getMessage());
   }
 
   @Test
