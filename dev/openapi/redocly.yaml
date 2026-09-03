@@ -1,0 +1,33 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+
+# Redocly configuration for the Gravitino OpenAPI spec.
+#
+# The ruleset is NOT pinned here — CI lints at several strictness levels
+# (`redocly lint --extends=minimal|recommended|recommended-strict`) to show
+# how findings grow with strictness, and `npm run lint:redocly` defaults to
+# recommended-strict. `redocly bundle gravitino -o build/openapi.json` resolves
+# the ~30 cross-referenced files into a single machine-readable artifact.
+#
+# Spec files live under docs/open-api; this tooling lives under dev/openapi
+# so paths below are repo-relative from this config's directory.
+
+apis:
+  gravitino:
+    root: ../../docs/open-api/openapi.yaml
+  idp:
+    root: ../../docs/open-api/idp/openapi.yaml
