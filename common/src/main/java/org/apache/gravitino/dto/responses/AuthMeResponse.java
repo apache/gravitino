@@ -23,7 +23,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 
-/** Response for the authenticated principal information. */
+/** Response for the authenticated principal and service-administrator status. */
 @Getter
 @EqualsAndHashCode(callSuper = true)
 @ToString
@@ -32,20 +32,35 @@ public class AuthMeResponse extends BaseResponse {
   @JsonProperty("principal")
   private final String principal;
 
+  @JsonProperty("serviceAdmin")
+  private final boolean serviceAdmin;
+
   /**
    * Constructor for AuthMeResponse.
    *
    * @param principal The server-resolved principal name of the authenticated user.
    */
   public AuthMeResponse(String principal) {
+    this(principal, false);
+  }
+
+  /**
+   * Constructor for AuthMeResponse.
+   *
+   * @param principal The server-resolved principal name of the authenticated user.
+   * @param serviceAdmin Whether the authenticated user is a service administrator.
+   */
+  public AuthMeResponse(String principal, boolean serviceAdmin) {
     super(0);
     this.principal = principal;
+    this.serviceAdmin = serviceAdmin;
   }
 
   /** Default constructor for AuthMeResponse. (Used for Jackson deserialization.) */
   public AuthMeResponse() {
     super();
     this.principal = null;
+    this.serviceAdmin = false;
   }
 
   @Override

@@ -141,6 +141,16 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
+    if (request == null) {
+      LOG.warn("Received create catalog request with null request body");
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.CREATE,
+          "",
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String catalogName = request.getName();
     LOG.info("Received create catalog request for metalake: {}", metalake);
     try {
       return Utils.doAs(
@@ -162,7 +172,7 @@ public class CatalogOperations {
 
     } catch (Exception e) {
       return ExceptionHandlers.handleCatalogException(
-          OperationType.CREATE, request.getName(), metalake, e);
+          OperationType.CREATE, catalogName, metalake, e);
     }
   }
 
@@ -293,6 +303,14 @@ public class CatalogOperations {
           String catalogName,
       CatalogUpdatesRequest request) {
     LOG.info("Received alter catalog request for catalog: {}.{}", metalakeName, catalogName);
+    if (request == null) {
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.ALTER,
+          catalogName,
+          metalakeName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     try {
       return Utils.doAs(
           httpRequest,

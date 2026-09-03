@@ -244,6 +244,17 @@ public class TestFilesetOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateFilesetWithNullRequest() {
+    Response resp =
+        target(filesetPath(metalake, catalog, schema))
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateFileset() {
     Fileset fileset =
         mockFileset(
@@ -395,6 +406,17 @@ public class TestFilesetOperations extends BaseOperationsTest {
     ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp4.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testAlterFilesetWithNullRequest() {
+    Response resp =
+        target(filesetPath(metalake, catalog, schema) + "fileset1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   @Test

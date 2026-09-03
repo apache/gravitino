@@ -83,6 +83,7 @@ dependencies {
 }
 
 tasks.register("setupDependencies") {
+  dependsOn(":trino-connector:trino-connector-435-439:copyLibs")
   dependsOn(":trino-connector:trino-connector-440-445:copyLibs")
   dependsOn(":trino-connector:trino-connector-446-451:copyLibs")
   dependsOn(":trino-connector:trino-connector-452-468:copyLibs")

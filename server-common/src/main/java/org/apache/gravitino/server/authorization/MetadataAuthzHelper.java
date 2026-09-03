@@ -89,44 +89,61 @@ public class MetadataAuthzHelper {
   private static final List<Entity.EntityType> REQUIRE_SCHEMA_EXISTS =
       Arrays.asList(Entity.EntityType.TABLE, Entity.EntityType.TOPIC);
 
+  private static final String TABLE_PARENT_SCOPES = "METALAKE, CATALOG, SCHEMA";
+  private static final String SCHEMA_PARENT_SCOPES = "METALAKE, CATALOG";
+  private static final String CATALOG_PARENT_SCOPES = "METALAKE";
+
   /**
    * Registry of list-authorization short-circuits keyed by the listed object's entity type. Each
-   * entry pairs the per-object filter expression it applies to with the parent-scope expression to
-   * evaluate once and the privileges whose object-level denies would defeat the short-circuit.
+   * entry pairs a per-object filter expression with the alternative parent-scope access paths that
+   * can make every listed object visible. Each path tracks only the deny privileges that can
+   * invalidate that path, so a deny on one path does not disable an independent path.
    */
-  private static final Map<Entity.EntityType, ListShortCircuit> LIST_SHORT_CIRCUITS =
-      Map.of(
-          Entity.EntityType.TABLE,
-          new ListShortCircuit(
-              AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
-              AuthorizationExpressionConstants.TABLE_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION,
-              Set.of(Privilege.Name.SELECT_TABLE, Privilege.Name.MODIFY_TABLE)),
-          Entity.EntityType.SCHEMA,
-          new ListShortCircuit(
-              AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
-              AuthorizationExpressionConstants.SCHEMA_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION,
-              Set.of(Privilege.Name.USE_SCHEMA)),
-          Entity.EntityType.CATALOG,
-          new ListShortCircuit(
-              AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
-              AuthorizationExpressionConstants.CATALOG_LIST_PARENT_SCOPE_AUTHORIZATION_EXPRESSION,
-              Set.of(Privilege.Name.USE_CATALOG)));
+  private static final Map<Entity.EntityType, Map<String, List<ParentScopeAccessPath>>>
+      LIST_SHORT_CIRCUITS =
+          Map.of(
+              Entity.EntityType.TABLE,
+              Map.of(
+                  AuthorizationExpressionConstants.FILTER_TABLE_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(TABLE_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.SELECT_TABLE, TABLE_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.MODIFY_TABLE, TABLE_PARENT_SCOPES))),
+              Entity.EntityType.SCHEMA,
+              Map.of(
+                  AuthorizationExpressionConstants.FILTER_SCHEMA_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(SCHEMA_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.USE_SCHEMA, SCHEMA_PARENT_SCOPES))),
+              Entity.EntityType.CATALOG,
+              Map.of(
+                  AuthorizationExpressionConstants.LOAD_CATALOG_AUTHORIZATION_EXPRESSION,
+                  List.of(
+                      parentOwnerPath(CATALOG_PARENT_SCOPES),
+                      parentPrivilegePath(Privilege.Name.USE_CATALOG, CATALOG_PARENT_SCOPES))));
 
-  /** Immutable description of a single list-authorization short-circuit. */
-  private static final class ListShortCircuit {
-    private final String filterExpression;
-    private final String parentScopeExpression;
+  /** A sufficient parent-scope access path and the deny privileges that can invalidate it. */
+  private static final class ParentScopeAccessPath {
+    private final String expression;
     private final Set<Privilege.Name> denyPrivileges;
 
-    private ListShortCircuit(
-        String filterExpression, String parentScopeExpression, Set<Privilege.Name> denyPrivileges) {
-      this.filterExpression = filterExpression;
-      this.parentScopeExpression = parentScopeExpression;
+    private ParentScopeAccessPath(String expression, Set<Privilege.Name> denyPrivileges) {
+      this.expression = expression;
       this.denyPrivileges = denyPrivileges;
     }
   }
 
   private MetadataAuthzHelper() {}
+
+  private static ParentScopeAccessPath parentOwnerPath(String parentScopes) {
+    return new ParentScopeAccessPath("ANY(OWNER, " + parentScopes + ")", Set.of());
+  }
+
+  private static ParentScopeAccessPath parentPrivilegePath(
+      Privilege.Name privilege, String parentScopes) {
+    return new ParentScopeAccessPath(
+        String.format("ANY(%s, %s)", privilege.name(), parentScopes), Set.of(privilege));
+  }
 
   public static Metalake[] filterMetalakes(Metalake[] metalakes, String expression) {
     AuthorizationRequestContext authorizationRequestContext = new AuthorizationRequestContext();
@@ -220,8 +237,11 @@ public class MetadataAuthzHelper {
       String expression,
       Entity.EntityType entityType,
       NameIdentifier[] nameIdentifiers) {
-    ListShortCircuit spec = LIST_SHORT_CIRCUITS.get(entityType);
-    if (spec == null || !spec.filterExpression.equals(expression)) {
+    Map<String, List<ParentScopeAccessPath>> entityShortCircuits =
+        LIST_SHORT_CIRCUITS.get(entityType);
+    List<ParentScopeAccessPath> accessPaths =
+        entityShortCircuits == null ? null : entityShortCircuits.get(expression);
+    if (accessPaths == null) {
       return false;
     }
 
@@ -237,21 +257,27 @@ public class MetadataAuthzHelper {
     GravitinoAuthorizer authorizer =
         GravitinoAuthorizerProvider.getInstance().getGravitinoAuthorizer();
     AuthorizationRequestContext requestContext = new AuthorizationRequestContext();
-    requestContext.setOriginalAuthorizationExpression(spec.parentScopeExpression);
     Map<Entity.EntityType, NameIdentifier> metadataNames =
         NameIdentifierUtil.splitNameIdentifier(metalake, entityType, nameIdentifiers[0]);
 
-    boolean parentGrantsAccess =
-        new AuthorizationExpressionEvaluator(spec.parentScopeExpression, authorizer)
-            .evaluate(metadataNames, requestContext, principal, Optional.empty());
-    if (!parentGrantsAccess) {
-      return false;
-    }
+    for (ParentScopeAccessPath accessPath : accessPaths) {
+      requestContext.setOriginalAuthorizationExpression(accessPath.expression);
+      boolean parentGrantsAccess =
+          new AuthorizationExpressionEvaluator(accessPath.expression, authorizer)
+              .evaluate(metadataNames, requestContext, principal, Optional.empty());
+      if (!parentGrantsAccess) {
+        continue;
+      }
 
-    // Parent scope grants access to every object; the only thing that can still hide one is a
-    // deny on these privileges (at the parent scope or on an individual object), so the
-    // short-circuit is only safe when no such deny may exist.
-    return !authorizer.hasDenyPolicy(principal, metalake, spec.denyPrivileges, requestContext);
+      boolean hasDeny =
+          !accessPath.denyPrivileges.isEmpty()
+              && authorizer.hasDenyPolicy(
+                  principal, metalake, accessPath.denyPrivileges, requestContext);
+      if (!hasDeny) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
