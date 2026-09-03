@@ -626,8 +626,6 @@ public class TestCatalogOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
-<<<<<<< HEAD
-=======
   @Test
   public void testSetCatalogWithNullRequest() {
     Response resp =
@@ -640,41 +638,6 @@ public class TestCatalogOperations extends BaseOperationsTest {
     assertNullRequestBodyRejected(resp);
   }
 
-  private static TestCatalog buildCatalogWithProperties(
-      String metalake, String catalogName, Map<String, String> properties) {
-    CatalogEntity entity =
-        CatalogEntity.builder()
-            .withId(1L)
-            .withName(catalogName)
-            .withComment("comment")
-            .withNamespace(Namespace.of(metalake))
-            .withProperties(properties)
-            .withType(Catalog.Type.RELATIONAL)
-            .withProvider("test")
-            .withAuditInfo(
-                AuditInfo.builder().withCreator("creator").withCreateTime(Instant.now()).build())
-            .build();
-
-    return new TestCatalog().withCatalogConf(Collections.emptyMap()).withCatalogEntity(entity);
-  }
-
-  private void assertExistingCatalogConnectionError(RuntimeException exception, int expectedCode) {
-    doThrow(exception).when(manager).testConnection(any(NameIdentifier.class));
-    Response response =
-        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
-            .request(MediaType.APPLICATION_JSON_TYPE)
-            .accept("application/vnd.gravitino.v1+json")
-            .post(null);
-
-    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
-    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
-    Assertions.assertEquals(expectedCode, errorResponse.getCode());
-    Assertions.assertEquals(exception.getClass().getSimpleName(), errorResponse.getType());
-    Assertions.assertEquals(exception.getMessage(), errorResponse.getMessage());
-    Assertions.assertNull(errorResponse.getStack());
-  }
-
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
   private static TestCatalog buildCatalog(String metalake, String catalogName) {
     CatalogEntity entity =
         CatalogEntity.builder()

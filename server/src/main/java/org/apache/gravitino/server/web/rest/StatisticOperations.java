@@ -151,8 +151,6 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsUpdateRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handleStatisticException(
           OperationType.UPDATE,
@@ -161,8 +159,6 @@ public class StatisticOperations {
           new IllegalArgumentException("Request body cannot be null"));
     }
 
-    String statisticNames = getStatisticNames(request);
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     try {
       LOG.info(
           "Received update statistics request for object full name: {} type: {} in the metalake {}",
@@ -220,8 +216,6 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       StatisticsDropRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handleStatisticException(
           OperationType.DROP,
@@ -230,9 +224,6 @@ public class StatisticOperations {
           new IllegalArgumentException("Request body cannot be null"));
     }
 
-    String statisticNames =
-        request.getNames() == null ? "" : StringUtils.join(request.getNames(), ",");
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     try {
       LOG.info(
           "Received drop statistics request for object full name: {} type: {} in the metalake {}",
@@ -372,8 +363,6 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsUpdateRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.UPDATE,
@@ -382,9 +371,7 @@ public class StatisticOperations {
           new IllegalArgumentException("Request body cannot be null"));
     }
 
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     LOG.info("Updating partition statistics for table: {} in the metalake {}", fullName, metalake);
-    String partitions = getPartitionNames(request);
     try {
       return Utils.doAs(
           httpRequest,
@@ -458,8 +445,6 @@ public class StatisticOperations {
       @PathParam("type") @AuthorizationObjectType String type,
       @PathParam("fullName") @AuthorizationFullName String fullName,
       PartitionStatisticsDropRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handlePartitionStatsException(
           OperationType.DROP,
@@ -467,9 +452,6 @@ public class StatisticOperations {
           fullName,
           new IllegalArgumentException("Request body cannot be null"));
     }
-
-    String partitions = getDropPartitionNames(request);
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
 
     try {
       return Utils.doAs(
@@ -541,7 +523,7 @@ public class StatisticOperations {
   }
 
   private static String getStatisticNames(StatisticsUpdateRequest request) {
-    if (request.getUpdates() == null) {
+    if (request == null || request.getUpdates() == null) {
       return "";
     }
 
@@ -549,7 +531,7 @@ public class StatisticOperations {
   }
 
   private static String getPartitionNames(PartitionStatisticsUpdateRequest request) {
-    if (request.getUpdates() == null) {
+    if (request == null || request.getUpdates() == null) {
       return "";
     }
 
@@ -561,7 +543,7 @@ public class StatisticOperations {
   }
 
   private static String getDropPartitionNames(PartitionStatisticsDropRequest request) {
-    if (request.getDrops() == null) {
+    if (request == null || request.getDrops() == null) {
       return "";
     }
 

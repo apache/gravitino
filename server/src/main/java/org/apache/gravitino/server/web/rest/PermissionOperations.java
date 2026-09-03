@@ -88,8 +88,6 @@ public class PermissionOperations {
           String metalake,
       @PathParam("user") String user,
       RoleGrantRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.GRANT,
@@ -98,8 +96,6 @@ public class PermissionOperations {
           new IllegalArgumentException("Request body cannot be null"));
     }
 
-    String roleNames = StringUtils.join(request.getRoleNames(), ",");
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     try {
       return Utils.doAs(
           httpRequest,
@@ -129,8 +125,6 @@ public class PermissionOperations {
           String metalake,
       @PathParam("group") String group,
       RoleGrantRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.GRANT,
@@ -139,8 +133,6 @@ public class PermissionOperations {
           new IllegalArgumentException("Request body cannot be null"));
     }
 
-    String roleNames = StringUtils.join(request.getRoleNames(), ",");
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     try {
       return Utils.doAs(
           httpRequest,
@@ -170,8 +162,6 @@ public class PermissionOperations {
           String metalake,
       @PathParam("user") String user,
       RoleRevokeRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handleUserPermissionOperationException(
           OperationType.REVOKE,
@@ -180,8 +170,6 @@ public class PermissionOperations {
           new IllegalArgumentException("Request body cannot be null"));
     }
 
-    String roleNames = StringUtils.join(request.getRoleNames(), ",");
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     try {
       return Utils.doAs(
           httpRequest,
@@ -211,8 +199,6 @@ public class PermissionOperations {
           String metalake,
       @PathParam("group") String group,
       RoleRevokeRequest request) {
-<<<<<<< HEAD
-=======
     if (request == null) {
       return ExceptionHandlers.handleGroupPermissionOperationException(
           OperationType.REVOKE,
@@ -221,8 +207,6 @@ public class PermissionOperations {
           new IllegalArgumentException("Request body cannot be null"));
     }
 
-    String roleNames = StringUtils.join(request.getRoleNames(), ",");
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     try {
       return Utils.doAs(
           httpRequest,

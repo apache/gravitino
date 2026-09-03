@@ -188,9 +188,6 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
-<<<<<<< HEAD
-    LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
-=======
     if (request == null) {
       // Unlike a failed connection test, which handleTestConnectionException() reports inside an
       // HTTP 200 response by design, a missing request body never reaches the connection test, so
@@ -198,9 +195,7 @@ public class CatalogOperations {
       return Utils.illegalArguments("Request body cannot be null");
     }
 
-    String catalogName = request.getName();
-    LOG.info("Received test connection request for catalog: {}.{}", metalake, catalogName);
->>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
+    LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
     try {
       return Utils.doAs(
           httpRequest,
