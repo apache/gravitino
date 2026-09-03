@@ -140,4 +140,63 @@ public class TestRequestContext {
         RequestContext.takeAuditExtras().get("audit.reason"),
         "Child thread must not consume the parent's stash");
   }
+
+  /**
+   * Unlike audit extras, the query-param snapshot is read by every {@code Event} constructed during
+   * the request, not consumed once. Pins that reading it does not clear it.
+   */
+  @Test
+  public void testGetRequestQueryParamsDoesNotClear() {
+    RequestContext.setRequestQueryParams(Collections.singletonMap("details", "true"));
+    Assertions.assertEquals("true", RequestContext.getRequestQueryParams().get("details"));
+    Assertions.assertEquals(
+        "true",
+        RequestContext.getRequestQueryParams().get("details"),
+        "a second read must still see the value");
+  }
+
+  @Test
+  public void testGetRequestQueryParamsReturnsEmptyWhenUnset() {
+    Assertions.assertTrue(RequestContext.getRequestQueryParams().isEmpty());
+  }
+
+  @Test
+  public void testEmptyOrNullRequestQueryParamsClearsStash() {
+    RequestContext.setRequestQueryParams(Collections.singletonMap("k", "v"));
+    RequestContext.setRequestQueryParams(Collections.emptyMap());
+    Assertions.assertTrue(RequestContext.getRequestQueryParams().isEmpty());
+
+    RequestContext.setRequestQueryParams(Collections.singletonMap("k", "v"));
+    RequestContext.setRequestQueryParams(null);
+    Assertions.assertTrue(RequestContext.getRequestQueryParams().isEmpty());
+  }
+
+  @Test
+  public void testClearRemovesRequestQueryParams() {
+    RequestContext.setRequestQueryParams(Collections.singletonMap("k", "v"));
+    RequestContext.clear();
+    Assertions.assertTrue(RequestContext.getRequestQueryParams().isEmpty());
+  }
+
+  /**
+   * Mirrors the existing {@code operationFailureFired} flag on the success path. Kept as an
+   * independent flag (not merged with the failure one) so that an operation which succeeds but
+   * whose HTTP response delivery later fails can still produce both a success and a failure audit
+   * entry.
+   */
+  @Test
+  public void testOperationSuccessFiredLifecycle() {
+    Assertions.assertFalse(RequestContext.isOperationSuccessFired());
+    RequestContext.markOperationSuccessFired();
+    Assertions.assertTrue(RequestContext.isOperationSuccessFired());
+    RequestContext.resetOperationSuccessFired();
+    Assertions.assertFalse(RequestContext.isOperationSuccessFired());
+  }
+
+  @Test
+  public void testClearRemovesOperationSuccessFired() {
+    RequestContext.markOperationSuccessFired();
+    RequestContext.clear();
+    Assertions.assertFalse(RequestContext.isOperationSuccessFired());
+  }
 }

@@ -37,6 +37,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.server.HttpRequestEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.utils.RequestContext;
 import org.slf4j.Logger;
@@ -44,8 +45,10 @@ import org.slf4j.LoggerFactory;
 
 /**
  * A servlet filter that emits an {@link HttpRequestFailureEvent} for every HTTP request that
- * completes with a 4xx or 5xx status code and for which no operation-layer failure event was
- * already dispatched on the same request thread.
+ * completes with a 4xx or 5xx status code, or an {@link HttpRequestEvent} for one that completes
+ * with a 2xx/3xx status code, and for which no matching operation-layer event was already
+ * dispatched on the same request thread. This guarantees every request produces at least one audit
+ * entry, even for endpoints that are not (yet) wired into the operation-layer event system.
  *
  * <p><strong>Filter chain position:</strong> this filter must be registered <em>after</em> {@link
  * RequestContextFilter} (so the remote address is already populated) but <em>before</em> both
@@ -61,17 +64,21 @@ import org.slf4j.LoggerFactory;
  * with {@link DispatcherType#ERROR} to render an error page. This filter detects that case and
  * passes the request straight through without emitting a second event, preventing double-logging.
  *
- * <p><strong>Double-logging prevention:</strong> when an operation-layer failure event (e.g. {@code
- * LoadTableFailureEvent}, {@code AuthorizationDenialFailureEvent}) has already been dispatched via
- * {@link EventBus}, {@link RequestContext#markOperationFailureFired()} is set on the request
- * thread. This filter checks that flag in the {@code finally} block and skips emitting its own
- * {@link HttpRequestFailureEvent} if the flag is set.
+ * <p><strong>Double-logging prevention:</strong> when an operation-layer event has already been
+ * dispatched via {@link EventBus} for this request — a failure (e.g. {@code LoadTableFailureEvent},
+ * {@code AuthorizationDenialFailureEvent}) via {@link RequestContext#markOperationFailureFired()},
+ * or a success via {@link RequestContext#markOperationSuccessFired()} — this filter skips emitting
+ * its own fallback event for the same outcome: no {@link HttpRequestFailureEvent} on a 4xx/5xx
+ * response if a failure was already recorded, and no {@link HttpRequestEvent} on a 2xx/3xx response
+ * if either a success or a failure was already recorded (a recorded failure means the fallback
+ * success event would be misleading even if the HTTP layer ultimately returned a non-error status).
  *
- * <p><strong>Success + 5xx edge case:</strong> if an operation dispatcher emits a {@code
- * SuccessEvent} (flag not set) but the HTTP layer subsequently fails with a 5xx (e.g. JSON
- * serialization error), this filter will emit an {@link HttpRequestFailureEvent} in addition to the
- * success event already in the audit log. Both entries are correct — the operation itself succeeded
- * but the response delivery failed — and are intentionally preserved.
+ * <p><strong>Success + 5xx edge case:</strong> if an operation dispatcher emits a success event but
+ * the HTTP layer subsequently fails with a 5xx (e.g. JSON serialization error), this filter still
+ * emits an {@link HttpRequestFailureEvent} in addition to the success event already in the audit
+ * log. Both entries are correct — the operation itself succeeded but the response delivery failed —
+ * and are intentionally preserved: the 5xx branch above checks only the failure flag, not the
+ * success one, so a recorded success never suppresses this filter's own failure fallback.
  *
  * <p><strong>Health check exclusion:</strong> requests matched by the configured {@link
  * HealthCheckPathMatcher} are silently passed through without audit logging to avoid polluting the
@@ -96,11 +103,11 @@ public class HttpAuditFilter implements Filter {
   /**
    * Constructs an {@code HttpAuditFilter} using the default {@link HealthCheckPathMatcher}.
    *
-   * @param eventBus the event bus used to dispatch {@link HttpRequestFailureEvent}s; may be {@code
-   *     null}, in which case the filter is a pass-through no-op (useful when no audit listener is
-   *     configured).
+   * @param eventBus the event bus used to dispatch {@link HttpRequestFailureEvent}s and {@link
+   *     HttpRequestEvent}s; may be {@code null}, in which case the filter is a pass-through no-op
+   *     (useful when no audit listener is configured).
    * @param eventSource identifies which server this filter instance is installed on; included in
-   *     every emitted {@link HttpRequestFailureEvent}.
+   *     every emitted event.
    */
   public HttpAuditFilter(@Nullable EventBus eventBus, EventSource eventSource) {
     this(eventBus, eventSource, new HealthCheckPathMatcher());
@@ -109,8 +116,8 @@ public class HttpAuditFilter implements Filter {
   /**
    * Constructs an {@code HttpAuditFilter} with a custom {@link HealthCheckPathMatcher}.
    *
-   * @param eventBus the event bus used to dispatch {@link HttpRequestFailureEvent}s; may be {@code
-   *     null}, in which case the filter is a pass-through no-op.
+   * @param eventBus the event bus used to dispatch {@link HttpRequestFailureEvent}s and {@link
+   *     HttpRequestEvent}s; may be {@code null}, in which case the filter is a pass-through no-op.
    * @param eventSource identifies which server this filter instance is installed on.
    * @param healthCheckMatcher determines which URI paths are health check probes; those paths are
    *     excluded from audit logging to avoid polluting the audit log with probe traffic.
@@ -146,11 +153,13 @@ public class HttpAuditFilter implements Filter {
     }
     // Defensive cleanup at request entry in case a pooled thread leaked stale state.
     RequestContext.resetOperationFailureFired();
+    RequestContext.resetOperationSuccessFired();
     if (healthCheckMatcher.isHealthCheckPath(httpRequest.getRequestURI())) {
       try {
         chain.doFilter(request, response);
       } finally {
         RequestContext.resetOperationFailureFired();
+        RequestContext.resetOperationSuccessFired();
       }
       return;
     }
@@ -168,9 +177,9 @@ public class HttpAuditFilter implements Filter {
       }
     } finally {
       try {
-        if (!RequestContext.isOperationFailureFired()) {
-          int status = wrappedResponse.getCapturedStatus();
-          if (status >= 400) {
+        int status = wrappedResponse.getCapturedStatus();
+        if (status >= 400) {
+          if (!RequestContext.isOperationFailureFired()) {
             String user = resolveUser(httpRequest);
             String remoteAddress = resolveClientAddress(httpRequest);
             HttpRequestFailureEvent event =
@@ -183,6 +192,19 @@ public class HttpAuditFilter implements Filter {
                     eventSource);
             eventBus.get().dispatchEvent(event);
           }
+        } else if (!RequestContext.isOperationFailureFired()
+            && !RequestContext.isOperationSuccessFired()) {
+          String user = resolveUser(httpRequest);
+          String remoteAddress = resolveClientAddress(httpRequest);
+          HttpRequestEvent event =
+              new HttpRequestEvent(
+                  user,
+                  remoteAddress,
+                  httpRequest.getMethod(),
+                  httpRequest.getRequestURI(),
+                  status,
+                  eventSource);
+          eventBus.get().dispatchEvent(event);
         }
       } catch (Exception e) {
         LOG.error(
@@ -191,8 +213,9 @@ public class HttpAuditFilter implements Filter {
             httpRequest.getRequestURI(),
             e);
       } finally {
-        // Always clear the flag to prevent ThreadLocal leaks across pooled threads.
+        // Always clear the flags to prevent ThreadLocal leaks across pooled threads.
         RequestContext.resetOperationFailureFired();
+        RequestContext.resetOperationSuccessFired();
       }
     }
 

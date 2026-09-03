@@ -113,8 +113,8 @@ class TestIcebergRequestContext {
 
   /**
    * Failure events are the case where the reason matters most. Pins that {@link
-   * IcebergFailureEvent#customInfo()} is headers ∪ extras and that extras stay off {@code
-   * httpHeaders()}.
+   * IcebergFailureEvent#customInfo()} is headers ∪ extras ∪ any automatically captured request
+   * query parameters, and that extras stay off {@code httpHeaders()}.
    */
   @Test
   void testFailureEventCustomInfoMergesHeadersAndExtras() {
@@ -137,7 +137,10 @@ class TestIcebergRequestContext {
     IcebergLoadTableFailureEvent event =
         new IcebergLoadTableFailureEvent(
             context, NameIdentifier.of("ml", "cat", "ns", "t"), new RuntimeException("boom"));
-    Assertions.assertSame(context.httpHeaders(), event.customInfo());
+    // Content equality, not identity: Event.customInfo() now merges in the request's
+    // automatically captured query parameters, so the result is always a freshly built map even
+    // when that automatic contribution is empty.
+    Assertions.assertEquals(context.httpHeaders(), event.customInfo());
   }
 
   private static HttpServletRequest requestWithoutHeader() {

@@ -22,12 +22,16 @@ package org.apache.gravitino.server.web;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.google.common.collect.ImmutableMap;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.servlet.FilterChain;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -35,7 +39,11 @@ import org.junit.jupiter.api.Test;
 
 public class TestRequestContextFilter {
 
+  // No EventBus: exercises the remote-address-only path shared by every request.
   private final RequestContextFilter filter = new RequestContextFilter();
+  // With an EventBus configured: exercises query-parameter capture, which is otherwise skipped.
+  private final RequestContextFilter filterWithEventBus =
+      new RequestContextFilter(new EventBus(Collections.emptyList()));
 
   @AfterEach
   public void cleanup() {
@@ -116,5 +124,111 @@ public class TestRequestContextFilter {
         ServletException.class, () -> filter.doFilter(req, resp, throwingChain));
     Assertions.assertNull(
         RequestContext.getRemoteAddress(), "ThreadLocal must be cleared even when chain throws");
+  }
+
+  /**
+   * Query parameters are captured raw here, not redacted — redaction happens once, uniformly, at
+   * audit-log format time (see AuditLogRedactor's class doc). So a sensitive-looking parameter like
+   * "token" must come through as its real value at this layer, not already masked.
+   */
+  @Test
+  public void testQueryParamsCapturedRaw() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    when(req.getParameterMap())
+        .thenReturn(
+            ImmutableMap.of(
+                "details", new String[] {"true"},
+                "token", new String[] {"secret-value"}));
+
+    AtomicReference<Map<String, String>> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
+
+    filterWithEventBus.doFilter(req, resp, chain);
+
+    Assertions.assertEquals("true", captured.get().get("details"));
+    Assertions.assertEquals("secret-value", captured.get().get("token"));
+  }
+
+  @Test
+  public void testMultiValuedQueryParamIsJoinedWithComma() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    when(req.getParameterMap())
+        .thenReturn(ImmutableMap.of("keyword", new String[] {"a", "b", "c"}));
+
+    AtomicReference<Map<String, String>> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
+
+    filterWithEventBus.doFilter(req, resp, chain);
+
+    Assertions.assertEquals("a,b,c", captured.get().get("keyword"));
+  }
+
+  /**
+   * A servlet container is not expected to hand back a null value array, but the type
+   * (Map<String,String[]>) allows it, and this is fed from request data — a null value must not
+   * crash the whole request.
+   */
+  @Test
+  public void testNullValueArrayDoesNotThrow() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    when(req.getParameterMap()).thenReturn(Collections.singletonMap("empty", null));
+
+    AtomicReference<Map<String, String>> captured = new AtomicReference<>();
+    FilterChain chain = (request, response) -> captured.set(RequestContext.getRequestQueryParams());
+
+    Assertions.assertDoesNotThrow(() -> filterWithEventBus.doFilter(req, resp, chain));
+    Assertions.assertEquals("", captured.get().get("empty"));
+  }
+
+  @Test
+  public void testQueryParamsClearedAfterChain() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    when(req.getParameterMap()).thenReturn(ImmutableMap.of("details", new String[] {"true"}));
+
+    filterWithEventBus.doFilter(req, resp, (request, response) -> {});
+
+    Assertions.assertTrue(
+        RequestContext.getRequestQueryParams().isEmpty(),
+        "query-param ThreadLocal must be cleared after chain completes");
+  }
+
+  /**
+   * Pins the efficiency fix: when no EventBus is configured, nothing will ever read the captured
+   * query parameters, so capture (and its redaction-list scanning) is skipped entirely — remote
+   * address is still captured, since HttpAuditFilter's own fallback events need it regardless of
+   * whether any listener is configured.
+   */
+  @Test
+  public void testQueryParamsNotCapturedWithoutEventBus() throws IOException, ServletException {
+    HttpServletRequest req = mock(HttpServletRequest.class);
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    when(req.getHeader("X-Forwarded-For")).thenReturn(null);
+    when(req.getRemoteAddr()).thenReturn("1.2.3.4");
+    when(req.getParameterMap()).thenReturn(ImmutableMap.of("details", new String[] {"true"}));
+
+    AtomicReference<Map<String, String>> capturedParams = new AtomicReference<>();
+    AtomicReference<String> capturedAddress = new AtomicReference<>();
+    FilterChain chain =
+        (request, response) -> {
+          capturedParams.set(RequestContext.getRequestQueryParams());
+          capturedAddress.set(RequestContext.getRemoteAddress());
+        };
+
+    filter.doFilter(req, resp, chain);
+
+    Assertions.assertTrue(capturedParams.get().isEmpty());
+    Assertions.assertEquals("1.2.3.4", capturedAddress.get());
   }
 }

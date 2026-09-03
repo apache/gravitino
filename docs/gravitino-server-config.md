@@ -402,9 +402,19 @@ pipeline can replace either.
 
 `SimpleFormatterV2` is the default formatter. `JsonAuditFormatter` is available where structured
 output is wanted: it emits one JSON object per line, serializes `customInfo`, and writes timestamps
-as ISO 8601 with millisecond precision and a zone offset. Both formatters replace the value of a
-sensitive `customInfo` key with `***`. The masked keys are `authorization`, `cookie`,
-`x-amz-security-token`, `s3.access-key-id`, and `jdbc-password`.
+as ISO 8601 with millisecond precision and a zone offset.
+
+`customInfo` always includes the request's query parameters, captured automatically for every
+event — not just the ones an operation dispatcher explicitly reports. For example, a listing
+endpoint's `?details=true` shows up in the audit entry for that request even though no dispatcher
+code added it. Both formatters redact a `customInfo` value, replacing it with `***`, when its key
+either exactly matches `authorization`, `cookie`, `x-amz-security-token`, `s3.access-key-id`, or
+`jdbc-password`, or contains (case-insensitively) `password`, `secret`, `token`, `credential`,
+`apikey`, `accesskey`, `privatekey`, `auth`, or `signature` — so a caller-named parameter like
+`?token=...` or `?myApiKey=...` is masked even though its exact name was never enumerated. A short,
+fixed list of keys the server itself always uses (e.g. `http.method`, `http.status`, `auth.method`)
+is exempt from that substring check, since otherwise `auth.method` would be masked for merely
+containing "auth".
 
 `FileAuditWriter` is the default writer, and it manages no files itself. Rotation, compression, and
 retention are delegated to Log4j2 through a logger named `gravitino.audit`, configured by the

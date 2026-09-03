@@ -38,6 +38,7 @@ import org.apache.gravitino.auth.AuthConstants;
 import org.apache.gravitino.listener.EventBus;
 import org.apache.gravitino.listener.api.event.BaseEvent;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.server.HttpRequestEvent;
 import org.apache.gravitino.listener.api.event.server.HttpRequestFailureEvent;
 import org.apache.gravitino.utils.RequestContext;
 import org.junit.jupiter.api.AfterEach;
@@ -50,6 +51,7 @@ public class TestHttpAuditFilter {
   @AfterEach
   public void cleanup() {
     RequestContext.resetOperationFailureFired();
+    RequestContext.resetOperationSuccessFired();
     RequestContext.clear();
   }
 
@@ -127,10 +129,13 @@ public class TestHttpAuditFilter {
     verify(eventBus, never()).dispatchEvent(any());
   }
 
-  // ─── Successful 200 — no event ───────────────────────────────────────────────
+  // ─── Successful 200 — fallback HttpRequestEvent ──────────────────────────────
 
   @Test
-  public void test200ResponseNoEvent() throws Exception {
+  public void test200ResponseWithNoOperationEventEmitsHttpRequestEvent() throws Exception {
+    // No operation-layer event was dispatched for this request (e.g. an endpoint that is not yet
+    // wired into the event system), so the filter must emit a fallback HttpRequestEvent rather than
+    // leaving the request completely unaudited.
     EventBus eventBus = mock(EventBus.class);
     HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
     HttpServletRequest req = mockRequest("GET", "/api/metalakes", null, "1.2.3.4");
@@ -139,7 +144,74 @@ public class TestHttpAuditFilter {
 
     filter.doFilter(req, resp, chain);
 
+    ArgumentCaptor<BaseEvent> captor = ArgumentCaptor.forClass(BaseEvent.class);
+    verify(eventBus).dispatchEvent(captor.capture());
+    Assertions.assertInstanceOf(HttpRequestEvent.class, captor.getValue());
+    HttpRequestEvent event = (HttpRequestEvent) captor.getValue();
+    Assertions.assertEquals(200, event.statusCode());
+    Assertions.assertEquals("GET", event.httpMethod());
+    Assertions.assertEquals("/api/metalakes", event.requestUri());
+    Assertions.assertEquals(EventSource.GRAVITINO_SERVER, event.eventSource());
+  }
+
+  @Test
+  public void testOperationSuccessFiredFlagPreventsHttpRequestEvent() throws Exception {
+    // An operation-layer success event (e.g. LoadTableEvent) was already dispatched for this
+    // request, so the filter must not emit a redundant fallback event.
+    EventBus eventBus = mock(EventBus.class);
+    HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
+    HttpServletRequest req = mockRequest("GET", "/api/metalakes/m1", null, "1.2.3.4");
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    FilterChain chain =
+        (request, response) -> {
+          RequestContext.markOperationSuccessFired();
+          ((HttpServletResponse) response).setStatus(200);
+        };
+
+    filter.doFilter(req, resp, chain);
+
     verify(eventBus, never()).dispatchEvent(any());
+  }
+
+  /**
+   * Pins a fix to the success-fallback guard: it now also checks the failure flag, not just the
+   * success flag, so a recorded operation-layer failure never gets a contradictory success-shaped
+   * fallback event just because the HTTP layer happened to resolve to a non-error status.
+   */
+  @Test
+  public void testOperationFailureFiredFlagAlsoPreventsHttpRequestEvent() throws Exception {
+    EventBus eventBus = mock(EventBus.class);
+    HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
+    HttpServletRequest req = mockRequest("POST", "/api/catalogs/test-connection", null, "1.2.3.4");
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    FilterChain chain =
+        (request, response) -> {
+          RequestContext.markOperationFailureFired();
+          ((HttpServletResponse) response).setStatus(200);
+        };
+
+    filter.doFilter(req, resp, chain);
+
+    verify(eventBus, never()).dispatchEvent(any());
+  }
+
+  @Test
+  public void testSuccessFlagClearedAfterNormalCompletion() throws Exception {
+    EventBus eventBus = mock(EventBus.class);
+    HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
+    HttpServletRequest req = mockRequest("GET", "/api/metalakes/m1", null, "1.2.3.4");
+    HttpServletResponse resp = mock(HttpServletResponse.class);
+    FilterChain chain =
+        (request, response) -> {
+          RequestContext.markOperationSuccessFired();
+          ((HttpServletResponse) response).setStatus(200);
+        };
+
+    filter.doFilter(req, resp, chain);
+
+    Assertions.assertFalse(
+        RequestContext.isOperationSuccessFired(),
+        "operationSuccessFired flag must be cleared after filter completes");
   }
 
   // ─── 4xx via sendError ───────────────────────────────────────────────────────
@@ -371,15 +443,20 @@ public class TestHttpAuditFilter {
 
   @Test
   public void testSuccessEventFollowedBy5xxStillEmitsHttpFailureEvent() throws Exception {
-    // An operation dispatcher emits a SuccessEvent (operationFailureFired stays false),
-    // but the HTTP response ends up as 500 (e.g. JSON serialization failure).
-    // HttpAuditFilter must still emit HttpRequestFailureEvent for the HTTP-layer failure.
+    // An operation dispatcher emits a SuccessEvent (operationSuccessFired set,
+    // operationFailureFired
+    // stays false), but the HTTP response ends up as 500 (e.g. JSON serialization failure).
+    // HttpAuditFilter must still emit HttpRequestFailureEvent for the HTTP-layer failure — the
+    // success flag must not suppress it, since the two flags are tracked independently.
     EventBus eventBus = mock(EventBus.class);
     HttpAuditFilter filter = new HttpAuditFilter(eventBus, EventSource.GRAVITINO_SERVER);
     HttpServletRequest req = mockRequest("GET", "/api/metalakes/m1", null, "1.2.3.4");
     HttpServletResponse resp = mock(HttpServletResponse.class);
-    // operationFailureFired is NOT set (success event path)
-    FilterChain chain = (request, response) -> ((HttpServletResponse) response).sendError(500);
+    FilterChain chain =
+        (request, response) -> {
+          RequestContext.markOperationSuccessFired();
+          ((HttpServletResponse) response).sendError(500);
+        };
 
     filter.doFilter(req, resp, chain);
 
