@@ -486,8 +486,12 @@ public class CatalogConnectorManager {
       String provider = null;
       try {
         Catalog catalog = metalake.loadCatalog(catalogName);
-        Map<String, String> properties = propsWithSecrets(catalog);
-        GravitinoCatalog gravitinoCatalog = new GravitinoCatalog(metalakeName, catalog, properties);
+        // Registration deliberately carries only the visible properties. The resolved secrets are
+        // added by each node in createCatalogConnectorContext(), so that they never reach the
+        // CREATE CATALOG statement, the catalog properties file Trino persists from it, or
+        // anything that quotes either of them back.
+        GravitinoCatalog gravitinoCatalog =
+            new GravitinoCatalog(metalakeName, catalog, visibleProps(catalog));
         provider = gravitinoCatalog.getProvider();
         if (alreadyRegistered) {
           // Reload catalogs that have been updated in Gravitino server.
@@ -831,12 +835,12 @@ public class CatalogConnectorManager {
             GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
             "Multiple metalakes are not supported");
       }
+      GravitinoMetalake metalake =
+          metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake);
+      catalog = withResolvedSecrets(catalog, metalake);
       CatalogConnectorContext.Builder builder =
           catalogConnectorFactory.createCatalogConnectorContextBuilder(catalog);
-      builder
-          .withMetalake(metalakes.computeIfAbsent(catalog.getMetalake(), this::retrieveMetalake))
-          .withContext(context)
-          .withConfig(config);
+      builder.withMetalake(metalake).withContext(context).withConfig(config);
 
       CatalogConnectorContext connectorContext = builder.build();
       String fullCatalogName = getTrinoCatalogName(catalog);
@@ -896,12 +900,34 @@ public class CatalogConnectorManager {
     return false;
   }
 
-  /** Visible catalog properties overlaid with {@code getSecrets()}. */
-  static Map<String, String> propsWithSecrets(Catalog catalog) {
-    Map<String, String> props =
-        new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
-    props.putAll(catalog.supportsSecrets().getSecrets());
-    return props;
+  /** The catalog properties as the Gravitino server reports them, secret URNs unresolved. */
+  static Map<String, String> visibleProps(Catalog catalog) {
+    return new HashMap<>(catalog.properties() == null ? Map.of() : catalog.properties());
+  }
+
+  /**
+   * Overlays the secrets the Gravitino server vends for this catalog onto its properties.
+   *
+   * <p>Resolved here, on the node that is about to build the connector, rather than once at
+   * registration time: the registered definition travels through a CREATE CATALOG statement that
+   * Trino persists as a catalog properties file, and a secret placed in it would be readable there
+   * for as long as the catalog exists.
+   */
+  private GravitinoCatalog withResolvedSecrets(
+      GravitinoCatalog catalog, GravitinoMetalake metalake) {
+    Map<String, String> secrets =
+        metalake.loadCatalog(catalog.getName()).supportsSecrets().getSecrets();
+    if (secrets.isEmpty()) {
+      return catalog;
+    }
+    Map<String, String> properties = new HashMap<>(catalog.getProperties());
+    properties.putAll(secrets);
+    return new GravitinoCatalog(
+        catalog.getMetalake(),
+        catalog.getProvider(),
+        catalog.getName(),
+        properties,
+        catalog.getLastModifiedTime());
   }
 
   public interface TrinoCatalogNameHandler {

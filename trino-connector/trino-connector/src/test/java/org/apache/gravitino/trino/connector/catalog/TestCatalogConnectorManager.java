@@ -26,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -52,6 +53,7 @@ import org.apache.gravitino.trino.connector.GravitinoConfig;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.metadata.GravitinoCatalog;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestCatalogConnectorManager {
@@ -993,33 +995,68 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
-  public void testPropsWithSecrets() {
-    Catalog catalog = mock(Catalog.class);
-    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
+  public void testRegistrationCarriesNoSecrets() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
     when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
-    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
-    when(supportsSecrets.getSecrets())
-        .thenReturn(Map.of("jdbc-password", "secret", "shared", "from-secret"));
+    when(catalog.supportsSecrets().getSecrets())
+        .thenReturn(Map.of("jdbc-password", "hunter2", "shared", "from-secret"));
+    fixture.withCatalogs(catalog);
 
-    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
 
-    assertEquals("v1", merged.get("visible"));
-    assertEquals("secret", merged.get("jdbc-password"));
-    assertEquals("from-secret", merged.get("shared"));
+    // The registered definition is what the CREATE CATALOG statement carries and what Trino
+    // persists as a catalog properties file, so no secret may be in it.
+    ArgumentCaptor<GravitinoCatalog> registered = ArgumentCaptor.forClass(GravitinoCatalog.class);
+    verify(fixture.catalogRegister).registerCatalog(eq("memory"), registered.capture());
+    Map<String, String> properties = registered.getValue().getProperties();
+    assertEquals("v1", properties.get("visible"));
+    assertEquals("from-props", properties.get("shared"));
+    assertFalse(properties.containsKey("jdbc-password"));
+    assertFalse(properties.toString().contains("hunter2"));
   }
 
   @Test
-  public void testPropsWithSecretsNullProps() {
+  public void testConnectorContextResolvesSecrets() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    when(catalog.properties()).thenReturn(Map.of("visible", "v1", "shared", "from-props"));
+    when(catalog.supportsSecrets().getSecrets())
+        .thenReturn(Map.of("jdbc-password", "hunter2", "shared", "from-secret"));
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    // What Trino hands back to the node when it loads the catalog that was registered without
+    // secrets.
+    manager.createCatalogConnectorContext(
+        "memory",
+        createConnectorConfig(
+            GravitinoCatalog.toJson(
+                new GravitinoCatalog(
+                    "test",
+                    "memory",
+                    "memory",
+                    Map.of("visible", "v1", "shared", "from-props"),
+                    0L))),
+        mockContext());
+
+    // The node resolves them against the server, and a secret wins over a visible property of
+    // the same name the way the merge at registration time used to.
+    ArgumentCaptor<GravitinoCatalog> built = ArgumentCaptor.forClass(GravitinoCatalog.class);
+    verify(fixture.catalogFactory).createCatalogConnectorContextBuilder(built.capture());
+    Map<String, String> properties = built.getValue().getProperties();
+    assertEquals("v1", properties.get("visible"));
+    assertEquals("hunter2", properties.get("jdbc-password"));
+    assertEquals("from-secret", properties.get("shared"));
+  }
+
+  @Test
+  public void testVisiblePropsHandlesNullProperties() {
     Catalog catalog = mock(Catalog.class);
-    SupportsSecrets supportsSecrets = mock(SupportsSecrets.class);
     when(catalog.properties()).thenReturn(null);
-    when(catalog.supportsSecrets()).thenReturn(supportsSecrets);
-    when(supportsSecrets.getSecrets()).thenReturn(Map.of("jdbc-password", "secret"));
 
-    Map<String, String> merged = CatalogConnectorManager.propsWithSecrets(catalog);
-
-    assertEquals("secret", merged.get("jdbc-password"));
-    assertEquals(1, merged.size());
+    assertTrue(CatalogConnectorManager.visibleProps(catalog).isEmpty());
   }
 
   private CatalogConnectorManager createManager(ImmutableMap<String, String> configMap)
@@ -1040,7 +1077,15 @@ public class TestCatalogConnectorManager {
             singleMetalakeMode
                 ? null
                 : (metalake, catalog) -> String.format("\"%s.%s\"", metalake, catalog));
-    manager.config(new GravitinoConfig(configMap), mock(GravitinoAdminClient.class));
+    // Building a connector resolves the catalog's secrets against the server, so the client has
+    // to answer for the metalake it is asked about.
+    GravitinoAdminClient client = mock(GravitinoAdminClient.class);
+    GravitinoMetalake metalake = mock(GravitinoMetalake.class);
+    Mockito.doReturn(metalake).when(client).loadMetalake(any());
+    Mockito.doReturn(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL))
+        .when(metalake)
+        .loadCatalog(any());
+    manager.config(new GravitinoConfig(configMap), client);
     return manager;
   }
 
