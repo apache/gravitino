@@ -16,30 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.catalog.doris.operation;
+package org.apache.gravitino.catalog.starrocks.operation;
 
 import java.util.Collections;
+import org.apache.gravitino.catalog.starrocks.operations.StarRocksDatabaseOperations;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
-class TestDorisDatabaseOperationsSqlGeneration {
-
-  @Test
-  public void testEscapeCommentInGeneratedSql() {
-    DorisDatabaseOperations operations = new DorisDatabaseOperations();
-    String comment = "owner's \"comment\" C:\\tmp; DROP DATABASE marker; --";
-
-    String sql =
-        operations.generateCreateDatabaseSql("test_database", comment, Collections.emptyMap());
-
-    Assertions.assertTrue(
-        sql.contains("\"comment\"=\"owner's \"\"comment\"\" C:\\\\tmp; DROP DATABASE marker; --\""),
-        sql);
-  }
+public class TestStarRocksDatabaseOperationsSqlGeneration {
 
   @Test
   public void testGenerateDropDatabaseSqlValidatesDatabaseName() {
-    DorisDatabaseOperations operations = new DorisDatabaseOperations();
+    StarRocksDatabaseOperations operations = new StarRocksDatabaseOperations();
 
     Assertions.assertEquals(
         "DROP DATABASE `test_db` FORCE", operations.generateDropDatabaseSql("test_db", true));
@@ -50,8 +38,12 @@ class TestDorisDatabaseOperationsSqlGeneration {
 
   @Test
   public void testGenerateCreateDatabaseSqlValidatesDatabaseName() {
-    DorisDatabaseOperations operations = new DorisDatabaseOperations();
+    StarRocksDatabaseOperations operations = new StarRocksDatabaseOperations();
 
+    Assertions.assertEquals(
+        "CREATE DATABASE `test_db`\n PROPERTIES (\n\"replication_num\"=\"1\"\n)",
+        operations.generateCreateDatabaseSql(
+            "test_db", null, Collections.singletonMap("replication_num", "1")));
     Assertions.assertThrows(
         IllegalArgumentException.class,
         () ->
