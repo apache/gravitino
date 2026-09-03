@@ -187,6 +187,14 @@ public class TestMetadataObjectUtil {
         List.of("CATALOG:catalog"),
         describe(MetadataObjectUtil.getParentMetadataObjects(schema, ":")));
 
+    // A semantic model under a flat schema inherits from [schema, catalog], so tags and policies
+    // assigned to its schema or catalog reach it.
+    MetadataObject semanticModel =
+        MetadataObjects.of("catalog.schema", "sales_model", MetadataObject.Type.SEMANTIC_MODEL);
+    Assertions.assertEquals(
+        List.of("SCHEMA:catalog.schema", "CATALOG:catalog"),
+        describe(MetadataObjectUtil.getParentMetadataObjects(semanticModel, ":")));
+
     // A catalog has no ancestors.
     MetadataObject catalog = MetadataObjects.of(null, "catalog", MetadataObject.Type.CATALOG);
     Assertions.assertTrue(MetadataObjectUtil.getParentMetadataObjects(catalog, ":").isEmpty());

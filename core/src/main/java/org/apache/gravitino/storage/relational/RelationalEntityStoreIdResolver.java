@@ -60,6 +60,9 @@ public class RelationalEntityStoreIdResolver implements EntityIdResolver {
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_CATALOG_IDS =
       ImmutableSet.of(Entity.EntityType.CATALOG);
 
+  // TODO(#12600): Add Entity.EntityType.SEMANTIC_MODEL here, and a matching branch in
+  // getEntityIdsRequiringSchemaIds, once SemanticModelMetaService can resolve a Semantic Model id
+  // from its schema id and name. Tag association for Semantic Models needs that resolution.
   private static final Set<Entity.EntityType> ENTITY_TYPES_REQUIRING_SCHEMA_IDS =
       ImmutableSet.of(
           Entity.EntityType.SCHEMA,

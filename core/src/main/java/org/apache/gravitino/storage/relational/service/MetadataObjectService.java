@@ -94,6 +94,9 @@ public class MetadataObjectService {
               .put(
                   MetadataObject.Type.JOB_TEMPLATE,
                   MetadataObjectService::getJobTemplateObjectsFullName)
+              // TODO(#12600): Add MetadataObject.Type.SEMANTIC_MODEL once the Semantic Model PO and
+              // mapper exist. Listing the objects a tag is attached to needs full-name resolution
+              // for Semantic Models.
               .build();
 
   static final Map<MetadataObject.Type, BasePOStorageOps<?, ?>> TYPE_TO_STORAGE_OPS_MAP =

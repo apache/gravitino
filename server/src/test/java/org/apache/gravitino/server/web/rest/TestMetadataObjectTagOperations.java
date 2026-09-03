@@ -1163,6 +1163,91 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), v2WithV1Shape.getStatus());
   }
 
+  @Test
+  public void testTagsForSemanticModel() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    MetadataObject schema = MetadataObjects.parse("object1.object2", MetadataObject.Type.SCHEMA);
+    MetadataObject semanticModel =
+        MetadataObjects.parse("object1.object2.sales", MetadataObject.Type.SEMANTIC_MODEL);
+
+    when(tagManager.listTagsInfoForMetadataObject(metalake, catalog))
+        .thenReturn(tagInfos("catalogTag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, schema))
+        .thenReturn(tagInfos("schemaTag"));
+    when(tagManager.listTagsInfoForMetadataObject(metalake, semanticModel))
+        .thenReturn(tagInfos("semanticModelTag"));
+
+    // A Semantic Model shows its own tags plus the tags inherited from its schema and catalog.
+    Response listResponse =
+        target(basePath(metalake))
+            .path(semanticModel.type().toString())
+            .path(semanticModel.fullName())
+            .path("tags")
+            .queryParam("details", true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), listResponse.getStatus());
+    TagListResponse tagListResponse = listResponse.readEntity(TagListResponse.class);
+    Assertions.assertEquals(0, tagListResponse.getCode());
+    Assertions.assertEquals(3, tagListResponse.getTags().length);
+
+    Map<String, Tag> resultTags =
+        Arrays.stream(tagListResponse.getTags())
+            .collect(Collectors.toMap(Tag::name, Function.identity()));
+    Assertions.assertFalse(resultTags.get("semanticModelTag").inherited().get());
+    Assertions.assertTrue(resultTags.get("schemaTag").inherited().get());
+    Assertions.assertTrue(resultTags.get("catalogTag").inherited().get());
+
+    // Getting a single tag on a Semantic Model.
+    TagEntity semanticModelTag =
+        TagEntity.builder()
+            .withName("semanticModelTag")
+            .withId(1L)
+            .withAuditInfo(testAuditInfo1)
+            .build();
+    when(tagManager.getTagForMetadataObject(metalake, semanticModel, "semanticModelTag"))
+        .thenReturn(semanticModelTag);
+
+    Response getResponse =
+        target(basePath(metalake))
+            .path(semanticModel.type().toString())
+            .path(semanticModel.fullName())
+            .path("tags")
+            .path("semanticModelTag")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), getResponse.getStatus());
+    Tag respTag = getResponse.readEntity(TagResponse.class).getTag();
+    Assertions.assertEquals("semanticModelTag", respTag.name());
+    Assertions.assertFalse(respTag.inherited().get());
+
+    // Associating and disassociating tags on a Semantic Model.
+    String[] tagsToAdd = new String[] {"semanticModelTag"};
+    String[] tagsToRemove = new String[] {"staleTag"};
+    when(tagManager.associateTagsForMetadataObject(
+            metalake, semanticModel, tagsToAdd, tagsToRemove))
+        .thenReturn(tagsToAdd);
+
+    TagsAssociateRequest request = new TagsAssociateRequest(tagsToAdd, tagsToRemove);
+    Response associateResponse =
+        target(basePath(metalake))
+            .path(semanticModel.type().toString())
+            .path(semanticModel.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), associateResponse.getStatus());
+    NameListResponse nameListResponse = associateResponse.readEntity(NameListResponse.class);
+    Assertions.assertEquals(0, nameListResponse.getCode());
+    Assertions.assertArrayEquals(tagsToAdd, nameListResponse.getNames());
+  }
+
   private String basePath(String metalake) {
     return "/metalakes/" + metalake + "/objects";
   }

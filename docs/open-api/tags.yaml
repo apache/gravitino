@@ -222,7 +222,7 @@ paths:
       tags:
         - tag
       summary: Associate tags with metadata object
-      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, VIEW, FILESET, TOPIC, COLUMN, MODEL, FUNCTION
+      description: Associate and disassociate tags with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, VIEW, SEMANTIC_MODEL, FILESET, TOPIC, COLUMN, MODEL, FUNCTION
       operationId: associateTags
       requestBody:
         content:
@@ -458,6 +458,7 @@ components:
             - "SCHEMA"
             - "TABLE"
             - "VIEW"
+            - "SEMANTIC_MODEL"
             - "FILESET"
             - "TOPIC"
             - "MODEL"

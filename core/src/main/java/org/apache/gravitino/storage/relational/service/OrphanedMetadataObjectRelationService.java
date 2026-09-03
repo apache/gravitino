@@ -45,6 +45,8 @@ public class OrphanedMetadataObjectRelationService {
   private static final OrphanedMetadataObjectRelationService INSTANCE =
       new OrphanedMetadataObjectRelationService();
 
+  private static final String SEMANTIC_MODEL_META_TABLE_NAME = "semantic_model_meta";
+
   private static final Map<MetadataObject.Type, EntityTable> ENTITY_TABLES =
       ImmutableMap.<MetadataObject.Type, EntityTable>builder()
           .put(
@@ -77,6 +79,11 @@ public class OrphanedMetadataObjectRelationService {
           .put(
               MetadataObject.Type.FUNCTION,
               new EntityTable(FunctionMetaMapper.TABLE_NAME, "function_id"))
+          // TODO(#12600): Reference SemanticModelMetaMapper.TABLE_NAME once the Semantic Model
+          // relational persistence layer introduces the mapper.
+          .put(
+              MetadataObject.Type.SEMANTIC_MODEL,
+              new EntityTable(SEMANTIC_MODEL_META_TABLE_NAME, "semantic_model_id"))
           .build();
 
   private OrphanedMetadataObjectRelationService() {}
