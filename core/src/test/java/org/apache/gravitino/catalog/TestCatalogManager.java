@@ -1556,10 +1556,9 @@ public class TestCatalogManager {
           Assertions.assertEquals(v, testProps.get(k));
         });
 
-    Assertions.assertEquals(
-        HiddenPropertyMaskUtils.MASKED_VALUE,
-        testProps.get(ID_KEY),
-        "`gravitino.identifier` should be returned as a masked placeholder");
+    Assertions.assertFalse(
+        testProps.containsKey(ID_KEY),
+        "`gravitino.identifier` is reserved+hidden and should be omitted from responses");
   }
 
   @Test

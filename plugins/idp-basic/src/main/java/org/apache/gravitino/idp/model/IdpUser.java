@@ -29,6 +29,7 @@ public class IdpUser {
 
   private final String name;
   private final String passwordHash;
+  private final boolean enabled;
   private final List<String> groupNames;
 
   /**
@@ -38,9 +39,18 @@ public class IdpUser {
    * @param groupNames The group names the user belongs to.
    */
   public IdpUser(String name, List<String> groupNames) {
-    this.name = name;
-    this.passwordHash = null;
-    this.groupNames = groupNames;
+    this(name, null, groupNames, true);
+  }
+
+  /**
+   * Creates a built-in IdP user without a password hash.
+   *
+   * @param name The username.
+   * @param groupNames The group names the user belongs to.
+   * @param enabled Whether the user is enabled.
+   */
+  public IdpUser(String name, List<String> groupNames, boolean enabled) {
+    this(name, null, groupNames, enabled);
   }
 
   /**
@@ -51,10 +61,25 @@ public class IdpUser {
    * @param groupNames The group names the user belongs to.
    */
   public IdpUser(String name, String passwordHash, List<String> groupNames) {
-    Preconditions.checkArgument(
-        StringUtils.isNotBlank(passwordHash), "passwordHash must not be blank");
+    this(name, passwordHash, groupNames, true);
+  }
+
+  /**
+   * Creates a built-in IdP user with a password hash loaded from storage.
+   *
+   * @param name The username.
+   * @param passwordHash The password hash, or null when the hash is not loaded.
+   * @param groupNames The group names the user belongs to.
+   * @param enabled Whether the user is enabled.
+   */
+  public IdpUser(String name, String passwordHash, List<String> groupNames, boolean enabled) {
+    if (passwordHash != null) {
+      Preconditions.checkArgument(
+          StringUtils.isNotBlank(passwordHash), "passwordHash must not be blank");
+    }
     this.name = name;
     this.passwordHash = passwordHash;
+    this.enabled = enabled;
     this.groupNames = groupNames;
   }
 
@@ -72,6 +97,15 @@ public class IdpUser {
     return passwordHash;
   }
 
+  /**
+   * Returns whether the user is enabled.
+   *
+   * @return True if the user is enabled, false otherwise.
+   */
+  public boolean enabled() {
+    return enabled;
+  }
+
   /** Returns the group names the user belongs to. */
   public List<String> groupNames() {
     return groupNames;
@@ -83,7 +117,7 @@ public class IdpUser {
    * @return the user DTO
    */
   public IdpUserDTO toDTO() {
-    return IdpUserDTO.builder().withName(name).withGroups(groupNames).build();
+    return IdpUserDTO.builder().withName(name).withEnabled(enabled).withGroups(groupNames).build();
   }
 
   @Override
@@ -95,18 +129,19 @@ public class IdpUser {
       return false;
     }
     IdpUser that = (IdpUser) other;
-    return Objects.equals(name, that.name)
+    return enabled == that.enabled
+        && Objects.equals(name, that.name)
         && Objects.equals(passwordHash, that.passwordHash)
         && Objects.equals(groupNames, that.groupNames);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, passwordHash, groupNames);
+    return Objects.hash(name, passwordHash, enabled, groupNames);
   }
 
   @Override
   public String toString() {
-    return "IdpUser{name='" + name + "', groupNames=" + groupNames + '}';
+    return "IdpUser{name='" + name + "', enabled=" + enabled + ", groupNames=" + groupNames + '}';
   }
 }

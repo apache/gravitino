@@ -64,6 +64,8 @@ import org.apache.gravitino.server.web.filter.GravitinoInterceptionService;
 import org.apache.gravitino.server.web.mapper.JsonMappingExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonParseExceptionMapper;
 import org.apache.gravitino.server.web.mapper.JsonProcessingExceptionMapper;
+import org.apache.gravitino.server.web.mapper.NotFoundExceptionMapper;
+import org.apache.gravitino.server.web.mapper.ParamExceptionMapper;
 import org.apache.gravitino.server.web.ui.WebUIFilter;
 import org.apache.gravitino.stats.StatisticDispatcher;
 import org.apache.gravitino.tag.TagDispatcher;
@@ -170,6 +172,8 @@ public class GravitinoServer extends ResourceConfig {
     register(JsonProcessingExceptionMapper.class);
     register(JsonParseExceptionMapper.class);
     register(JsonMappingExceptionMapper.class);
+    register(ParamExceptionMapper.class);
+    register(NotFoundExceptionMapper.class);
     register(ObjectMapperProvider.class).register(JacksonFeature.class);
     property(CommonProperties.JSON_JACKSON_DISABLED_MODULES, "DefaultScalaModule");
 

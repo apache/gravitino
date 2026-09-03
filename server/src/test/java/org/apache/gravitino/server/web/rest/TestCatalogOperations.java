@@ -30,6 +30,8 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableList;
@@ -222,6 +224,17 @@ public class TestCatalogOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testCreateCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testCreateCatalog() {
     CatalogCreateRequest req =
         new CatalogCreateRequest(
@@ -303,6 +316,20 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse2 = resp3.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
+  }
+
+  @Test
+  public void testTestConnectionWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    // A missing request body never reaches the connection test, so it is reported as a regular
+    // HTTP 400 rather than through the HTTP 200 envelope used for connection-test failures.
+    assertNullRequestBodyRejected(resp);
+    verify(manager, never()).testConnection(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -680,6 +707,18 @@ public class TestCatalogOperations extends BaseOperationsTest {
     ErrorResponse errorResponse1 = resp.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse1.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
+  }
+
+  @Test
+  public void testSetCatalogWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/catalogs/catalog1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
   }
 
   private static TestCatalog buildCatalogWithProperties(

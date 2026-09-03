@@ -52,14 +52,16 @@ public class TestIdpUserDTO {
     Assertions.assertEquals(userDTO1, deserialized1);
     Assertions.assertEquals("test_user", deserialized1.name());
     Assertions.assertTrue(deserialized1.groups().isEmpty());
-    Assertions.assertEquals("IdpUserDTO(name=test_user, groups=[])", deserialized1.toString());
+    Assertions.assertEquals(
+        "IdpUserDTO(name=test_user, enabled=true, groups=[])", deserialized1.toString());
 
     IdpUserDTO deserializedWithNullGroups =
         JsonUtils.objectMapper()
             .readValue("{\"name\":\"test_user\",\"groups\":null}", IdpUserDTO.class);
     Assertions.assertTrue(deserializedWithNullGroups.groups().isEmpty());
     Assertions.assertEquals(
-        "IdpUserDTO(name=test_user, groups=[])", deserializedWithNullGroups.toString());
+        "IdpUserDTO(name=test_user, enabled=true, groups=[])",
+        deserializedWithNullGroups.toString());
 
     Assertions.assertThrows(
         IllegalArgumentException.class, () -> IdpUserDTO.builder().withName(" ").build());

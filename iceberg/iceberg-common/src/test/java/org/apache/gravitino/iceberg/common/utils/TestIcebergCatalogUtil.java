@@ -338,4 +338,26 @@ public class TestIcebergCatalogUtil {
     return new UncheckedSQLException(
         new SQLSyntaxErrorException(causeMessage), "Cannot check and eventually update SQL schema");
   }
+
+  @Test
+  void testJdbcRetryableStatusCodes() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
+
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog);
+
+    // Verify that calling loadCatalogBackend again does not throw
+    Catalog catalog2 =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog2);
+  }
 }

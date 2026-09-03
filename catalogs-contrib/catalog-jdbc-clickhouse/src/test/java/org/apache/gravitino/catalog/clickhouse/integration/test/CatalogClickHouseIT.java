@@ -532,6 +532,51 @@ public class CatalogClickHouseIT extends BaseIT {
   }
 
   @Test
+  void testCreateAndLoadCompositePrimaryKey() {
+    String table = GravitinoITUtils.genRandomName("composite_primary_key");
+    NameIdentifier ident = NameIdentifier.of(schemaName, table);
+    Column[] columns =
+        new Column[] {
+          Column.of("id", Types.LongType.get(), "id", false, false, DEFAULT_VALUE_NOT_SET),
+          Column.of(
+              "ts",
+              Types.TimestampType.withoutTimeZone(),
+              "timestamp",
+              false,
+              false,
+              DEFAULT_VALUE_NOT_SET),
+          Column.of("value", Types.StringType.get(), "value")
+        };
+    SortOrder[] sortOrders =
+        new SortOrder[] {
+          SortOrders.of(NamedReference.field("id"), SortDirection.ASCENDING),
+          SortOrders.of(NamedReference.field("ts"), SortDirection.ASCENDING)
+        };
+    Index[] indexes =
+        new Index[] {
+          Indexes.primary(Indexes.DEFAULT_PRIMARY_KEY_NAME, new String[][] {{"id"}, {"ts"}})
+        };
+
+    catalog
+        .asTableCatalog()
+        .createTable(
+            ident,
+            columns,
+            "composite primary key roundtrip",
+            createProperties(),
+            Transforms.EMPTY_TRANSFORM,
+            Distributions.NONE,
+            sortOrders,
+            indexes);
+
+    Index[] loadedIndexes = catalog.asTableCatalog().loadTable(ident).index();
+    Assertions.assertEquals(1, loadedIndexes.length);
+    Assertions.assertEquals(Index.IndexType.PRIMARY_KEY, loadedIndexes[0].type());
+    Assertions.assertEquals(Indexes.DEFAULT_PRIMARY_KEY_NAME, loadedIndexes[0].name());
+    Assertions.assertArrayEquals(new String[][] {{"id"}, {"ts"}}, loadedIndexes[0].fieldNames());
+  }
+
+  @Test
   void testCreateAndLoadWithPartitionSortAndIndexes() {
     String table = GravitinoITUtils.genRandomName("meta_roundtrip");
     NameIdentifier ident = NameIdentifier.of(schemaName, table);
@@ -1460,7 +1505,7 @@ public class CatalogClickHouseIT extends BaseIT {
 
     Table table = catalog.asTableCatalog().loadTable(NameIdentifier.of(schemaName, alertTableName));
     Assertions.assertEquals(alertTableName, table.name());
-    Assertions.assertTrue(table.properties().containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertFalse(table.properties().containsKey(StringIdentifier.ID_KEY));
 
     Assertions.assertEquals(CLICKHOUSE_COL_NAME1, table.columns()[0].name());
     Assertions.assertEquals(Types.IntegerType.get(), table.columns()[0].dataType());
