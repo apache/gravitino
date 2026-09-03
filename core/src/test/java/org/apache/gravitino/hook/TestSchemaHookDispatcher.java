@@ -81,7 +81,7 @@ public class TestSchemaHookDispatcher {
     mockCatalogWrapper = mock(CatalogManager.CatalogWrapper.class);
     when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockCatalogWrapper);
     when(mockCatalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    savedOwnerDispatcher = GravitinoEnv.getInstance().ownerDispatcher();
+    savedOwnerDispatcher = GravitinoEnv.getInstance().internalOwnerDispatcher();
     // Tests in this class that rely on the singleton catalogManager always go through
     // GravitinoEnv.getInstance().catalogManager(), but we cannot call the public accessor here
     // because it Preconditions-checks for non-null and would fail when GravitinoEnv has not been
@@ -90,7 +90,8 @@ public class TestSchemaHookDispatcher {
         (CatalogManager) FieldUtils.readField(GravitinoEnv.getInstance(), "catalogManager", true);
     savedLockManager =
         (LockManager) FieldUtils.readField(GravitinoEnv.getInstance(), "lockManager", true);
-    FieldUtils.writeField(GravitinoEnv.getInstance(), "ownerDispatcher", mockOwnerDispatcher, true);
+    FieldUtils.writeField(
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", mockOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", mockCatalogManager, true);
     // createSchema now acquires a catalog-level tree lock, so wire up a real LockManager.
     FieldUtils.writeField(
@@ -101,7 +102,7 @@ public class TestSchemaHookDispatcher {
   @AfterEach
   public void tearDown() throws IllegalAccessException {
     FieldUtils.writeField(
-        GravitinoEnv.getInstance(), "ownerDispatcher", savedOwnerDispatcher, true);
+        GravitinoEnv.getInstance(), "internalOwnerDispatcher", savedOwnerDispatcher, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "catalogManager", savedCatalogManager, true);
     FieldUtils.writeField(GravitinoEnv.getInstance(), "lockManager", savedLockManager, true);
   }

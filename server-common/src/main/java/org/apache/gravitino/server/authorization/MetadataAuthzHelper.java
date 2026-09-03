@@ -551,7 +551,7 @@ public class MetadataAuthzHelper {
       Entity.EntityType entityType, NameIdentifier[] nameIdentifiers) {
     // If cache is not enabled or access control dispatcher is not set, skip preloading to cache
     if (!GravitinoEnv.getInstance().cacheEnabled()
-        || GravitinoEnv.getInstance().accessControlDispatcher() == null
+        || GravitinoEnv.getInstance().internalAccessControlDispatcher() == null
         || nameIdentifiers.length == 0) {
       return;
     }
@@ -570,7 +570,7 @@ public class MetadataAuthzHelper {
           "All identifiers must have the same schema");
 
       if (!GravitinoEnv.getInstance()
-          .schemaDispatcher()
+          .internalSchemaDispatcher()
           .schemaExists(NameIdentifier.parse(firstNamespace.toString()))) {
         return;
       }
