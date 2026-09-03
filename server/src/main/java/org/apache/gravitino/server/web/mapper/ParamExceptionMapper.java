@@ -30,9 +30,9 @@ import org.glassfish.jersey.server.ParamException;
  * parameter (e.g. a typed {@code @PathParam}) into its declared Java type, instead of letting the
  * servlet container fall back to Jetty's default HTML error page.
  *
- * <p>{@link ParamException} is thrown by Jersey itself, before any resource method or other
- * registered {@link ExceptionMapper} runs, so this is the only place such a conversion failure can
- * be intercepted.
+ * <p>{@link ParamException} is thrown by Jersey itself while binding request parameters, before any
+ * resource method runs, so this mapper is the only place such a conversion failure can be
+ * intercepted.
  */
 @Priority(1)
 public class ParamExceptionMapper implements ExceptionMapper<ParamException> {
