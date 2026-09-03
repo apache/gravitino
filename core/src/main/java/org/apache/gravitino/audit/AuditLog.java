@@ -105,6 +105,16 @@ import org.apache.gravitino.listener.api.event.PurgePartitionEvent;
 import org.apache.gravitino.listener.api.event.PurgePartitionFailureEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableEvent;
 import org.apache.gravitino.listener.api.event.PurgeTableFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.AlterSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.CreateSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.DropSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.ListSemanticModelFailureEvent;
+import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelEvent;
+import org.apache.gravitino.listener.api.event.semantic.LoadSemanticModelFailureEvent;
 import org.apache.gravitino.listener.api.event.server.AuthorizationDenialFailureEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewEvent;
 import org.apache.gravitino.listener.api.event.view.AlterViewFailureEvent;
@@ -498,6 +508,16 @@ public interface AuditLog {
 
     GET_POLICY_FOR_METADATA_OBJECT,
 
+    CREATE_SEMANTIC_MODEL,
+
+    ALTER_SEMANTIC_MODEL,
+
+    DROP_SEMANTIC_MODEL,
+
+    LOAD_SEMANTIC_MODEL,
+
+    LIST_SEMANTIC_MODEL,
+
     REGISTER_FUNCTION,
 
     GET_FUNCTION,
@@ -602,6 +622,21 @@ public interface AuditLog {
         return LOAD_VIEW;
       } else if (event instanceof ListViewEvent || event instanceof ListViewFailureEvent) {
         return LIST_VIEW;
+      } else if (event instanceof CreateSemanticModelEvent
+          || event instanceof CreateSemanticModelFailureEvent) {
+        return CREATE_SEMANTIC_MODEL;
+      } else if (event instanceof AlterSemanticModelEvent
+          || event instanceof AlterSemanticModelFailureEvent) {
+        return ALTER_SEMANTIC_MODEL;
+      } else if (event instanceof DropSemanticModelEvent
+          || event instanceof DropSemanticModelFailureEvent) {
+        return DROP_SEMANTIC_MODEL;
+      } else if (event instanceof LoadSemanticModelEvent
+          || event instanceof LoadSemanticModelFailureEvent) {
+        return LOAD_SEMANTIC_MODEL;
+      } else if (event instanceof ListSemanticModelEvent
+          || event instanceof ListSemanticModelFailureEvent) {
+        return LIST_SEMANTIC_MODEL;
       } else if (event instanceof CreateFilesetEvent
           || event instanceof CreateFilesetFailureEvent) {
         return CREATE_FILESET;
