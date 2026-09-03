@@ -249,7 +249,7 @@ paths:
       tags:
         - policy
       summary: Associate policies with metadata object
-      description: Associate and disassociate policies with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, COLUMN, VIEW, FUNCTION
+      description: Associate and disassociate policies with metadata object, please be aware that supported metadata objects are CATALOG, SCHEMA, TABLE, FILESET, TOPIC, MODEL, VIEW, FUNCTION
       operationId: associatePoliciesForObject
       requestBody:
         content:

@@ -24,13 +24,21 @@ import com.google.common.collect.Sets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Schema;
+import org.apache.gravitino.client.ErrorHandlers;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.client.HTTPClient;
+import org.apache.gravitino.client.RESTClient;
+import org.apache.gravitino.dto.requests.PoliciesAssociateRequest;
+import org.apache.gravitino.dto.responses.NameListResponse;
+import org.apache.gravitino.dto.responses.PolicyListResponse;
+import org.apache.gravitino.dto.responses.PolicyResponse;
 import org.apache.gravitino.dto.tag.MetadataObjectDTO;
 import org.apache.gravitino.exceptions.NoSuchPolicyException;
 import org.apache.gravitino.exceptions.PolicyAlreadyAssociatedException;
@@ -52,12 +60,14 @@ import org.apache.gravitino.policy.Policy;
 import org.apache.gravitino.policy.PolicyChange;
 import org.apache.gravitino.policy.PolicyContent;
 import org.apache.gravitino.policy.PolicyContents;
+import org.apache.gravitino.policy.SupportsPolicies;
 import org.apache.gravitino.rel.Column;
 import org.apache.gravitino.rel.Dialects;
 import org.apache.gravitino.rel.SQLRepresentation;
 import org.apache.gravitino.rel.Table;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.types.Types;
+import org.apache.gravitino.rest.RESTUtils;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -78,6 +88,9 @@ public class PolicyIT extends BaseIT {
   private static Table table;
   private static View view;
   private static Function function;
+  private static SupportsPolicies viewPolicyOperations;
+  private static SupportsPolicies functionPolicyOperations;
+  private static RESTClient policyRestClient;
 
   private static Catalog modelCatalog;
   private static Schema modelSchema;
@@ -86,6 +99,8 @@ public class PolicyIT extends BaseIT {
   @BeforeAll
   public void setUp() {
     containerSuite.startHiveContainer();
+    policyRestClient =
+        closer.register(HTTPClient.builder(Collections.emptyMap()).uri(serverUri).build());
     String hmsUri =
         String.format(
             "thrift://%s:%d",
@@ -152,6 +167,9 @@ public class PolicyIT extends BaseIT {
                 null,
                 null,
                 Collections.emptyMap());
+    viewPolicyOperations =
+        policyOperations(
+            relationalCatalog, schema, view.name(), MetadataObject.Type.VIEW, policyRestClient);
 
     // Create function
     String functionName = GravitinoITUtils.genRandomName("policy_it_function");
@@ -173,6 +191,13 @@ public class PolicyIT extends BaseIT {
                 FunctionType.SCALAR,
                 true,
                 new FunctionDefinition[] {definition});
+    functionPolicyOperations =
+        policyOperations(
+            relationalCatalog,
+            schema,
+            function.name(),
+            MetadataObject.Type.FUNCTION,
+            policyRestClient);
 
     // Create model catalog
     String modelCatalogName = GravitinoITUtils.genRandomName("policy_it_model_catalog");
@@ -228,11 +253,11 @@ public class PolicyIT extends BaseIT {
 
   @AfterEach
   public void cleanUp() {
-    String[] functionPolicies = function.supportsPolicies().listPolicies();
-    function.supportsPolicies().associatePolicies(null, functionPolicies);
+    String[] functionPolicies = functionPolicyOperations.listPolicies();
+    functionPolicyOperations.associatePolicies(null, functionPolicies);
 
-    String[] viewPolicies = view.supportsPolicies().listPolicies();
-    view.supportsPolicies().associatePolicies(null, viewPolicies);
+    String[] viewPolicies = viewPolicyOperations.listPolicies();
+    viewPolicyOperations.associatePolicies(null, viewPolicies);
 
     String[] tablePolicies = table.supportsPolicies().listPolicies();
     table.supportsPolicies().associatePolicies(null, tablePolicies);
@@ -857,30 +882,18 @@ public class PolicyIT extends BaseIT {
 
   @Test
   public void testAssociatePoliciesToView() {
-    PolicyContent content =
-        PolicyContents.custom(
-            ImmutableMap.of("rule1", "value1"), ImmutableSet.of(MetadataObject.Type.VIEW), null);
     Policy policy1 =
-        metalake.createPolicy(
+        createCustomPolicy(
             GravitinoITUtils.genRandomName("policy_it_view_policy1"),
-            "custom",
-            null,
-            true,
-            content);
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
     Policy policy2 =
-        metalake.createPolicy(
+        createCustomPolicy(
             GravitinoITUtils.genRandomName("policy_it_view_policy2"),
-            "custom",
-            null,
-            true,
-            content);
+            ImmutableSet.of(MetadataObject.Type.SCHEMA));
     Policy policy3 =
-        metalake.createPolicy(
+        createCustomPolicy(
             GravitinoITUtils.genRandomName("policy_it_view_policy3"),
-            "custom",
-            null,
-            true,
-            content);
+            ImmutableSet.of(MetadataObject.Type.VIEW));
 
     // Associate policies to catalog
     relationalCatalog.supportsPolicies().associatePolicies(new String[] {policy1.name()}, null);
@@ -889,14 +902,13 @@ public class PolicyIT extends BaseIT {
     schema.supportsPolicies().associatePolicies(new String[] {policy2.name()}, null);
 
     // Test associate policies to view
-    String[] policies =
-        view.supportsPolicies().associatePolicies(new String[] {policy3.name()}, null);
+    String[] policies = viewPolicyOperations.associatePolicies(new String[] {policy3.name()}, null);
 
     Assertions.assertEquals(1, policies.length);
     Assertions.assertEquals(policy3.name(), policies[0]);
 
     // Test list associated policies for view
-    String[] policies1 = view.supportsPolicies().listPolicies();
+    String[] policies1 = viewPolicyOperations.listPolicies();
     Assertions.assertEquals(3, policies1.length);
     Set<String> policyNames = Sets.newHashSet(policies1);
     Assertions.assertTrue(policyNames.contains(policy1.name()));
@@ -904,35 +916,34 @@ public class PolicyIT extends BaseIT {
     Assertions.assertTrue(policyNames.contains(policy3.name()));
 
     // Test list associated policies with details for view
-    Policy[] policies2 = view.supportsPolicies().listPolicyInfos();
+    Policy[] policies2 = viewPolicyOperations.listPolicyInfos();
     Assertions.assertEquals(3, policies2.length);
 
-    Set<Policy> nonInheritedPolicies =
+    Set<String> nonInheritedPolicies =
         Arrays.stream(policies2)
             .filter(policy -> !policy.inherited().get())
+            .map(Policy::name)
             .collect(Collectors.toSet());
-    Set<Policy> inheritedPolicies =
+    Set<String> inheritedPolicies =
         Arrays.stream(policies2)
             .filter(policy -> policy.inherited().get())
+            .map(Policy::name)
             .collect(Collectors.toSet());
 
-    Assertions.assertEquals(1, nonInheritedPolicies.size());
-    Assertions.assertEquals(2, inheritedPolicies.size());
-    Assertions.assertTrue(nonInheritedPolicies.contains(policy3));
-    Assertions.assertTrue(inheritedPolicies.contains(policy1));
-    Assertions.assertTrue(inheritedPolicies.contains(policy2));
+    Assertions.assertEquals(ImmutableSet.of(policy3.name()), nonInheritedPolicies);
+    Assertions.assertEquals(ImmutableSet.of(policy1.name(), policy2.name()), inheritedPolicies);
 
     // Test get associated policy for view
-    Policy resultPolicy1 = view.supportsPolicies().getPolicy(policy1.name());
-    Assertions.assertEquals(policy1, resultPolicy1);
+    Policy resultPolicy1 = viewPolicyOperations.getPolicy(policy1.name());
+    Assertions.assertEquals(policy1.name(), resultPolicy1.name());
     Assertions.assertTrue(resultPolicy1.inherited().get());
 
-    Policy resultPolicy2 = view.supportsPolicies().getPolicy(policy2.name());
-    Assertions.assertEquals(policy2, resultPolicy2);
+    Policy resultPolicy2 = viewPolicyOperations.getPolicy(policy2.name());
+    Assertions.assertEquals(policy2.name(), resultPolicy2.name());
     Assertions.assertTrue(resultPolicy2.inherited().get());
 
-    Policy resultPolicy3 = view.supportsPolicies().getPolicy(policy3.name());
-    Assertions.assertEquals(policy3, resultPolicy3);
+    Policy resultPolicy3 = viewPolicyOperations.getPolicy(policy3.name());
+    Assertions.assertEquals(policy3.name(), resultPolicy3.name());
     Assertions.assertFalse(resultPolicy3.inherited().get());
 
     // Test get objects associated with policy
@@ -951,36 +962,31 @@ public class PolicyIT extends BaseIT {
     Assertions.assertEquals(view.name(), policy3.associatedObjects().objects()[0].name());
     Assertions.assertEquals(
         MetadataObject.Type.VIEW, policy3.associatedObjects().objects()[0].type());
+
+    // Test disassociate policy from view
+    String[] policies3 =
+        viewPolicyOperations.associatePolicies(null, new String[] {policy3.name()});
+    Assertions.assertEquals(0, policies3.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policy1.name(), policy2.name()),
+        ImmutableSet.copyOf(viewPolicyOperations.listPolicies()));
+    Assertions.assertEquals(0, policy3.associatedObjects().count());
   }
 
   @Test
   public void testAssociatePoliciesToFunction() {
-    PolicyContent content =
-        PolicyContents.custom(
-            ImmutableMap.of("rule1", "value1"),
-            ImmutableSet.of(MetadataObject.Type.FUNCTION),
-            null);
     Policy policy1 =
-        metalake.createPolicy(
+        createCustomPolicy(
             GravitinoITUtils.genRandomName("policy_it_func_policy1"),
-            "custom",
-            null,
-            true,
-            content);
+            ImmutableSet.of(MetadataObject.Type.CATALOG));
     Policy policy2 =
-        metalake.createPolicy(
+        createCustomPolicy(
             GravitinoITUtils.genRandomName("policy_it_func_policy2"),
-            "custom",
-            null,
-            true,
-            content);
+            ImmutableSet.of(MetadataObject.Type.SCHEMA));
     Policy policy3 =
-        metalake.createPolicy(
+        createCustomPolicy(
             GravitinoITUtils.genRandomName("policy_it_func_policy3"),
-            "custom",
-            null,
-            true,
-            content);
+            ImmutableSet.of(MetadataObject.Type.FUNCTION));
 
     // Associate policies to catalog
     relationalCatalog.supportsPolicies().associatePolicies(new String[] {policy1.name()}, null);
@@ -990,13 +996,13 @@ public class PolicyIT extends BaseIT {
 
     // Test associate policies to function
     String[] policies =
-        function.supportsPolicies().associatePolicies(new String[] {policy3.name()}, null);
+        functionPolicyOperations.associatePolicies(new String[] {policy3.name()}, null);
 
     Assertions.assertEquals(1, policies.length);
     Assertions.assertEquals(policy3.name(), policies[0]);
 
     // Test list associated policies for function
-    String[] policies1 = function.supportsPolicies().listPolicies();
+    String[] policies1 = functionPolicyOperations.listPolicies();
     Assertions.assertEquals(3, policies1.length);
     Set<String> policyNames = Sets.newHashSet(policies1);
     Assertions.assertTrue(policyNames.contains(policy1.name()));
@@ -1004,35 +1010,34 @@ public class PolicyIT extends BaseIT {
     Assertions.assertTrue(policyNames.contains(policy3.name()));
 
     // Test list associated policies with details for function
-    Policy[] policies2 = function.supportsPolicies().listPolicyInfos();
+    Policy[] policies2 = functionPolicyOperations.listPolicyInfos();
     Assertions.assertEquals(3, policies2.length);
 
-    Set<Policy> nonInheritedPolicies =
+    Set<String> nonInheritedPolicies =
         Arrays.stream(policies2)
             .filter(policy -> !policy.inherited().get())
+            .map(Policy::name)
             .collect(Collectors.toSet());
-    Set<Policy> inheritedPolicies =
+    Set<String> inheritedPolicies =
         Arrays.stream(policies2)
             .filter(policy -> policy.inherited().get())
+            .map(Policy::name)
             .collect(Collectors.toSet());
 
-    Assertions.assertEquals(1, nonInheritedPolicies.size());
-    Assertions.assertEquals(2, inheritedPolicies.size());
-    Assertions.assertTrue(nonInheritedPolicies.contains(policy3));
-    Assertions.assertTrue(inheritedPolicies.contains(policy1));
-    Assertions.assertTrue(inheritedPolicies.contains(policy2));
+    Assertions.assertEquals(ImmutableSet.of(policy3.name()), nonInheritedPolicies);
+    Assertions.assertEquals(ImmutableSet.of(policy1.name(), policy2.name()), inheritedPolicies);
 
     // Test get associated policy for function
-    Policy resultPolicy1 = function.supportsPolicies().getPolicy(policy1.name());
-    Assertions.assertEquals(policy1, resultPolicy1);
+    Policy resultPolicy1 = functionPolicyOperations.getPolicy(policy1.name());
+    Assertions.assertEquals(policy1.name(), resultPolicy1.name());
     Assertions.assertTrue(resultPolicy1.inherited().get());
 
-    Policy resultPolicy2 = function.supportsPolicies().getPolicy(policy2.name());
-    Assertions.assertEquals(policy2, resultPolicy2);
+    Policy resultPolicy2 = functionPolicyOperations.getPolicy(policy2.name());
+    Assertions.assertEquals(policy2.name(), resultPolicy2.name());
     Assertions.assertTrue(resultPolicy2.inherited().get());
 
-    Policy resultPolicy3 = function.supportsPolicies().getPolicy(policy3.name());
-    Assertions.assertEquals(policy3, resultPolicy3);
+    Policy resultPolicy3 = functionPolicyOperations.getPolicy(policy3.name());
+    Assertions.assertEquals(policy3.name(), resultPolicy3.name());
     Assertions.assertFalse(resultPolicy3.inherited().get());
 
     // Test get objects associated with policy
@@ -1051,6 +1056,15 @@ public class PolicyIT extends BaseIT {
     Assertions.assertEquals(function.name(), policy3.associatedObjects().objects()[0].name());
     Assertions.assertEquals(
         MetadataObject.Type.FUNCTION, policy3.associatedObjects().objects()[0].type());
+
+    // Test disassociate policy from function
+    String[] policies3 =
+        functionPolicyOperations.associatePolicies(null, new String[] {policy3.name()});
+    Assertions.assertEquals(0, policies3.length);
+    Assertions.assertEquals(
+        ImmutableSet.of(policy1.name(), policy2.name()),
+        ImmutableSet.copyOf(functionPolicyOperations.listPolicies()));
+    Assertions.assertEquals(0, policy3.associatedObjects().count());
   }
 
   @Test
@@ -1086,7 +1100,14 @@ public class PolicyIT extends BaseIT {
                 Collections.emptyMap());
 
     // Associate the policy with the view
-    cascadeView.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+    SupportsPolicies cascadeViewPolicyOperations =
+        policyOperations(
+            relationalCatalog,
+            schema,
+            cascadeView.name(),
+            MetadataObject.Type.VIEW,
+            policyRestClient);
+    cascadeViewPolicyOperations.associatePolicies(new String[] {policy.name()}, null);
 
     // Verify the policy is associated with the view
     Policy fetchedPolicy = metalake.getPolicy(policy.name());
@@ -1132,7 +1153,14 @@ public class PolicyIT extends BaseIT {
                 new FunctionDefinition[] {definition});
 
     // Associate the policy with the function
-    cascadeFunc.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+    SupportsPolicies cascadeFunctionPolicyOperations =
+        policyOperations(
+            relationalCatalog,
+            schema,
+            cascadeFunc.name(),
+            MetadataObject.Type.FUNCTION,
+            policyRestClient);
+    cascadeFunctionPolicyOperations.associatePolicies(new String[] {policy.name()}, null);
 
     // Verify the policy is associated with the function
     Policy fetchedPolicy = metalake.getPolicy(policy.name());
@@ -1214,8 +1242,22 @@ public class PolicyIT extends BaseIT {
                 new FunctionDefinition[] {definition});
 
     // Associate the policy with the view and function
-    cascadeView.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
-    cascadeFunc.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+    SupportsPolicies cascadeViewPolicyOperations =
+        policyOperations(
+            relationalCatalog,
+            cascadeSchema,
+            cascadeView.name(),
+            MetadataObject.Type.VIEW,
+            policyRestClient);
+    SupportsPolicies cascadeFunctionPolicyOperations =
+        policyOperations(
+            relationalCatalog,
+            cascadeSchema,
+            cascadeFunc.name(),
+            MetadataObject.Type.FUNCTION,
+            policyRestClient);
+    cascadeViewPolicyOperations.associatePolicies(new String[] {policy.name()}, null);
+    cascadeFunctionPolicyOperations.associatePolicies(new String[] {policy.name()}, null);
 
     // Verify the policy is associated with both view and function
     Policy fetchedPolicy = metalake.getPolicy(policy.name());
@@ -1287,10 +1329,7 @@ public class PolicyIT extends BaseIT {
                   Column.of("col2", Types.StringType.get())
                 },
                 new SQLRepresentation[] {
-                  SQLRepresentation.builder()
-                      .withDialect(Dialects.HIVE)
-                      .withSql("SELECT 1")
-                      .build()
+                  SQLRepresentation.builder().withDialect(Dialects.HIVE).withSql("SELECT 1").build()
                 },
                 null,
                 null,
@@ -1315,8 +1354,22 @@ public class PolicyIT extends BaseIT {
                 new FunctionDefinition[] {definition});
 
     // Associate the policy with the view and function
-    cascadeView.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
-    cascadeFunc.supportsPolicies().associatePolicies(new String[] {policy.name()}, null);
+    SupportsPolicies cascadeViewPolicyOperations =
+        policyOperations(
+            cascadeCatalog,
+            cascadeSchema,
+            cascadeView.name(),
+            MetadataObject.Type.VIEW,
+            policyRestClient);
+    SupportsPolicies cascadeFunctionPolicyOperations =
+        policyOperations(
+            cascadeCatalog,
+            cascadeSchema,
+            cascadeFunc.name(),
+            MetadataObject.Type.FUNCTION,
+            policyRestClient);
+    cascadeViewPolicyOperations.associatePolicies(new String[] {policy.name()}, null);
+    cascadeFunctionPolicyOperations.associatePolicies(new String[] {policy.name()}, null);
 
     // Verify the policy is associated with both view and function
     Policy fetchedPolicy = metalake.getPolicy(policy.name());
@@ -1342,9 +1395,91 @@ public class PolicyIT extends BaseIT {
         "custom",
         "test comment",
         true,
-        PolicyContents.custom(
-            ImmutableMap.of("rule1", "value1"),
-            types,
-            null));
+        PolicyContents.custom(ImmutableMap.of("rule1", "value1"), types, null));
+  }
+
+  private static SupportsPolicies policyOperations(
+      Catalog catalog,
+      Schema schema,
+      String objectName,
+      MetadataObject.Type objectType,
+      RESTClient restClient) {
+    MetadataObject metadataObject =
+        MetadataObjectDTO.builder()
+            .withParent(String.join(".", catalog.name(), schema.name()))
+            .withName(objectName)
+            .withType(objectType)
+            .build();
+    return new RestPolicyOperations(metalakeName, metadataObject, restClient);
+  }
+
+  private static final class RestPolicyOperations implements SupportsPolicies {
+    private final RESTClient restClient;
+    private final String requestPath;
+
+    private RestPolicyOperations(
+        String metalakeName, MetadataObject metadataObject, RESTClient restClient) {
+      this.restClient = restClient;
+      this.requestPath =
+          String.format(
+              "api/metalakes/%s/objects/%s/%s/policies",
+              RESTUtils.encodeString(metalakeName),
+              metadataObject.type().name().toLowerCase(Locale.ROOT),
+              RESTUtils.encodeString(metadataObject.fullName()));
+    }
+
+    @Override
+    public String[] listPolicies() {
+      NameListResponse response =
+          restClient.get(
+              requestPath,
+              NameListResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.policyErrorHandler());
+      response.validate();
+      return response.getNames();
+    }
+
+    @Override
+    public Policy[] listPolicyInfos() {
+      PolicyListResponse response =
+          restClient.get(
+              requestPath,
+              ImmutableMap.of("details", "true"),
+              PolicyListResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.policyErrorHandler());
+      response.validate();
+      return response.getPolicies();
+    }
+
+    @Override
+    public Policy getPolicy(String name) throws NoSuchPolicyException {
+      PolicyResponse response =
+          restClient.get(
+              requestPath + "/" + RESTUtils.encodeString(name),
+              PolicyResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.policyErrorHandler());
+      response.validate();
+      return response.getPolicy();
+    }
+
+    @Override
+    public String[] associatePolicies(String[] policiesToAdd, String[] policiesToRemove) {
+      PoliciesAssociateRequest request =
+          new PoliciesAssociateRequest(policiesToAdd, policiesToRemove);
+      request.validate();
+
+      NameListResponse response =
+          restClient.post(
+              requestPath,
+              request,
+              NameListResponse.class,
+              Collections.emptyMap(),
+              ErrorHandlers.policyErrorHandler());
+      response.validate();
+      return response.getNames();
+    }
   }
 }
