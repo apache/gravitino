@@ -41,8 +41,10 @@ import {
   fetchModelVersions,
   fetchFunctions,
   fetchViews,
+  fetchSemanticModels,
   getFunctionDetails,
   getViewDetails,
+  getSemanticModelDetails,
   getMetalakeDetails,
   getCatalogDetails,
   getSchemaDetails,
@@ -81,7 +83,8 @@ const CatalogsListPage = () => {
       'topic',
       'model',
       'function',
-      'view'
+      'view',
+      'semanticModel'
     ]
 
     return keys.map(key => (routeParams[key] ? `{{${routeParams[key]}}}` : '')).join('')
@@ -99,6 +102,7 @@ const CatalogsListPage = () => {
       model: searchParams.get('model'),
       function: searchParams.get('function'),
       view: searchParams.get('view'),
+      semanticModel: searchParams.get('semanticModel'),
       version: searchParams.get('version')
     }
     async function fetchDependsData() {
@@ -114,6 +118,7 @@ const CatalogsListPage = () => {
           model,
           function: func,
           view,
+          semanticModel,
           version
         } = routeParams
 
@@ -182,6 +187,7 @@ const CatalogsListPage = () => {
             case 'relational':
               dispatch(fetchTables({ init: true, page: 'schemas', metalake, catalog, schema }))
               dispatch(fetchViews({ init: true, metalake, catalog, schema }))
+              dispatch(fetchSemanticModels({ init: true, metalake, catalog, schema }))
               break
             case 'fileset':
               dispatch(fetchFilesets({ init: true, page: 'schemas', metalake, catalog, schema }))
@@ -342,6 +348,23 @@ const CatalogsListPage = () => {
             await dispatch(setActivatedDetailsLoading(true))
             await dispatch(getViewDetails({ init: true, metalake, catalog, schema, view }))
             await dispatch(setActivatedDetailsLoading(false))
+          }
+          if (semanticModel) {
+            store.semanticModels.length === 0 &&
+              (await dispatch(fetchSemanticModels({ init: true, metalake, catalog, schema })))
+            await dispatch(resetActivatedDetails())
+            await dispatch(setActivatedDetailsLoading(true))
+            await dispatch(getSemanticModelDetails({ init: true, metalake, catalog, schema, semanticModel }))
+            await dispatch(setActivatedDetailsLoading(false))
+            dispatch(
+              getCurrentEntityTags({
+                init: true,
+                metalake,
+                metadataObjectType: 'semantic_model',
+                metadataObjectFullName: `${catalog}.${schema}.${semanticModel}`,
+                details: true
+              })
+            )
           }
         }
         if (paramsSize === 6 && version) {
