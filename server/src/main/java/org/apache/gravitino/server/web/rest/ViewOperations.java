@@ -31,6 +31,8 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.Response;
+import org.apache.gravitino.Entity;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.catalog.ViewDispatcher;
@@ -44,6 +46,10 @@ import org.apache.gravitino.dto.util.DTOConverters;
 import org.apache.gravitino.metrics.MetricNames;
 import org.apache.gravitino.rel.View;
 import org.apache.gravitino.rel.ViewChange;
+import org.apache.gravitino.server.authorization.MetadataAuthzHelper;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationExpression;
+import org.apache.gravitino.server.authorization.annotations.AuthorizationMetadata;
+import org.apache.gravitino.server.authorization.expression.AuthorizationExpressionConstants;
 import org.apache.gravitino.server.web.Utils;
 import org.apache.gravitino.utils.NameIdentifierUtil;
 import org.apache.gravitino.utils.NamespaceUtil;
@@ -68,10 +74,14 @@ public class ViewOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "list-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "list-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_SCHEMA_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response listViews(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema) {
     LOG.info("Received list views request for schema: {}.{}.{}", metalake, catalog, schema);
     try {
       return Utils.doAs(
@@ -79,6 +89,12 @@ public class ViewOperations {
           () -> {
             Namespace viewNS = NamespaceUtil.ofView(metalake, catalog, schema);
             NameIdentifier[] idents = dispatcher.listViews(viewNS);
+            idents =
+                MetadataAuthzHelper.filterByExpression(
+                    metalake,
+                    AuthorizationExpressionConstants.FILTER_VIEW_AUTHORIZATION_EXPRESSION,
+                    Entity.EntityType.VIEW,
+                    idents);
             Response response = Utils.ok(new EntityListResponse(idents));
             LOG.info(
                 "List {} views under schema: {}.{}.{}", idents.length, metalake, catalog, schema);
@@ -94,10 +110,14 @@ public class ViewOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "create-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.CREATE_VIEW_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.SCHEMA)
   public Response createView(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       ViewCreateRequest request) {
     if (request == null) {
       LOG.warn("Received create view request with null request body");
@@ -141,11 +161,15 @@ public class ViewOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "load-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "load-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.LOAD_VIEW_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.VIEW)
   public Response loadView(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("view") String view) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("view") @AuthorizationMetadata(type = Entity.EntityType.VIEW) String view) {
     LOG.info("Received load view request for view: {}.{}.{}.{}", metalake, catalog, schema, view);
     try {
       return Utils.doAs(
@@ -167,11 +191,15 @@ public class ViewOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "alter-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "alter-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.VIEW_OWNER_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.VIEW)
   public Response alterView(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("view") String view,
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("view") @AuthorizationMetadata(type = Entity.EntityType.VIEW) String view,
       ViewUpdatesRequest request) {
     LOG.info("Received alter view request: {}.{}.{}.{}", metalake, catalog, schema, view);
     if (request == null) {
@@ -208,11 +236,15 @@ public class ViewOperations {
   @Produces("application/vnd.gravitino.v1+json")
   @Timed(name = "drop-view." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "drop-view", absolute = true)
+  @AuthorizationExpression(
+      expression = AuthorizationExpressionConstants.VIEW_OWNER_AUTHORIZATION_EXPRESSION,
+      accessMetadataType = MetadataObject.Type.VIEW)
   public Response dropView(
-      @PathParam("metalake") String metalake,
-      @PathParam("catalog") String catalog,
-      @PathParam("schema") String schema,
-      @PathParam("view") String view) {
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
+      @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
+      @PathParam("view") @AuthorizationMetadata(type = Entity.EntityType.VIEW) String view) {
     LOG.info("Received drop view request: {}.{}.{}.{}", metalake, catalog, schema, view);
     try {
       return Utils.doAs(
