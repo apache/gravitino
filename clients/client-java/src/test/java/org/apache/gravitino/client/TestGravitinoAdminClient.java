@@ -327,6 +327,20 @@ public class TestGravitinoAdminClient extends TestBase {
         HttpStatus.SC_OK);
     Assertions.assertDoesNotThrow(() -> metaLake.testConnection("catalog"));
 
+    buildMockResource(
+        Method.POST,
+        "/api/metalakes/mock/catalogs/catalog/testConnection",
+        null,
+        new BaseResponse(),
+        HttpStatus.SC_OK);
+    Assertions.assertDoesNotThrow(() -> metaLake.testConnection("catalog", new CatalogChange[0]));
+
+    exception =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> metaLake.testConnection("catalog", (CatalogChange[]) null));
+    Assertions.assertTrue(exception.getMessage().contains("changes must not be null"));
+
     CatalogUpdatesRequest updatesRequest =
         new CatalogUpdatesRequest(
             Collections.singletonList(

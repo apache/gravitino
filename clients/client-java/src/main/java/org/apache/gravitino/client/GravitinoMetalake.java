@@ -506,6 +506,12 @@ public class GravitinoMetalake extends MetalakeDTO
    */
   @Override
   public void testConnection(String catalogName, CatalogChange... changes) throws Exception {
+    Preconditions.checkArgument(changes != null, "changes must not be null");
+    if (changes.length == 0) {
+      testConnection(catalogName);
+      return;
+    }
+
     List<CatalogUpdateRequest> requests =
         Arrays.stream(changes)
             .map(DTOConverters::toCatalogUpdateRequest)

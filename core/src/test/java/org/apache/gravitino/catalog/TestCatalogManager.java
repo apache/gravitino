@@ -1742,6 +1742,7 @@ public class TestCatalogManager {
       CatalogEntity stored = entityStore.get(ident, EntityType.CATALOG, CatalogEntity.class);
       String storedUrn = stored.getProperties().get(PROPERTY_KEY4);
       Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+      SecretUrn proposedUrn = writeThroughUrn("catalog", stored.id(), PROPERTY_KEY2);
 
       CatalogManager.CatalogWrapper temporaryWrapper =
           Mockito.mock(CatalogManager.CatalogWrapper.class);
@@ -1758,10 +1759,16 @@ public class TestCatalogManager {
       manager.testConnection(
           ident,
           CatalogChange.setSecretBinding(
-              PROPERTY_KEY4, new SecretBinding("memory", "temporary-secret")));
+              PROPERTY_KEY4, new SecretBinding("memory", "temporary-secret")),
+          CatalogChange.setSecretBinding(
+              PROPERTY_KEY2, new SecretBinding("memory", "temporary-new-secret")));
       Assertions.assertEquals(
           "temporary-secret", effectiveEntity.get().getProperties().get(PROPERTY_KEY4));
+      Assertions.assertEquals(
+          "temporary-new-secret", effectiveEntity.get().getProperties().get(PROPERTY_KEY2));
       Assertions.assertEquals("stored-secret", secrets.readSecret(SecretUrn.parse(storedUrn)));
+      Assertions.assertThrows(
+          IllegalArgumentException.class, () -> secrets.readSecret(proposedUrn));
 
       manager.testConnection(ident, CatalogChange.removeProperty(PROPERTY_KEY4));
       Assertions.assertFalse(effectiveEntity.get().getProperties().containsKey(PROPERTY_KEY4));

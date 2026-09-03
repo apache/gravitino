@@ -118,7 +118,7 @@ public final class SecretAlterChanges {
         Preconditions.checkArgument(StringUtils.isNotBlank(property), "property must not be blank");
         Preconditions.checkArgument(binding != null, "binding must not be null");
         SecretPropertyUtils.validateAlterSecretBindingPlaintext(binding.plaintext());
-        secretManager.buildSecretBindingUrns("catalog", entityId, Map.of(property, binding));
+        secretManager.validateSecretBindingUrns("catalog", entityId, Map.of(property, binding));
         out.add(CatalogChange.setProperty(property, binding.plaintext()));
       } else if (change instanceof CatalogChange.SetSecretReference) {
         CatalogChange.SetSecretReference c = (CatalogChange.SetSecretReference) change;
