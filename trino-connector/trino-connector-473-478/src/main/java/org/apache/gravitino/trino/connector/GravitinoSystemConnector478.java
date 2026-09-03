@@ -20,6 +20,7 @@ package org.apache.gravitino.trino.connector;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.trino.spi.HostAddress;
 import io.trino.spi.Page;
 import io.trino.spi.connector.ConnectorPageSource;
 import io.trino.spi.connector.ConnectorPageSourceProvider;
@@ -29,12 +30,14 @@ import io.trino.spi.connector.SchemaTableName;
 import io.trino.spi.connector.SourcePage;
 import org.apache.gravitino.trino.connector.system.GravitinoSystemConnector;
 import org.apache.gravitino.trino.connector.system.storedprocedure.GravitinoStoredProcedureFactory;
+import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTableFactory;
 
 public class GravitinoSystemConnector478 extends GravitinoSystemConnector {
 
   public GravitinoSystemConnector478(
-      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory) {
-    super(gravitinoStoredProcedureFactory);
+      GravitinoStoredProcedureFactory gravitinoStoredProcedureFactory,
+      GravitinoSystemTableFactory systemTableFactory) {
+    super(gravitinoStoredProcedureFactory, systemTableFactory);
   }
 
   @Override
@@ -44,10 +47,14 @@ public class GravitinoSystemConnector478 extends GravitinoSystemConnector {
 
   @Override
   protected ConnectorPageSourceProvider createPageSourceProvider() {
-    return new DatasourceProvider478();
+    return new DatasourceProvider478(getSystemTableFactory());
   }
 
   static class DatasourceProvider478 extends DatasourceProvider {
+
+    DatasourceProvider478(GravitinoSystemTableFactory systemTableFactory) {
+      super(systemTableFactory);
+    }
 
     @Override
     protected ConnectorPageSource createPageSource(Page page) {
@@ -58,7 +65,7 @@ public class GravitinoSystemConnector478 extends GravitinoSystemConnector {
   static class GravitinoSplitManager478 extends SplitManager {
 
     protected ConnectorSplit createSplit(SchemaTableName tableName) {
-      return new Split478(tableName);
+      return new Split478(tableName, Split.getCurrentCoordinatorAddress());
     }
   }
 
@@ -76,8 +83,10 @@ public class GravitinoSystemConnector478 extends GravitinoSystemConnector {
   public static class Split478 extends Split {
 
     @JsonCreator
-    public Split478(@JsonProperty("tableName") SchemaTableName tableName) {
-      super(tableName);
+    public Split478(
+        @JsonProperty("tableName") SchemaTableName tableName,
+        @JsonProperty("coordinatorAddress") HostAddress coordinatorAddress) {
+      super(tableName, coordinatorAddress);
     }
   }
 }
