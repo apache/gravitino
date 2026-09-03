@@ -697,13 +697,20 @@ Gravitino provides the build-in `org.apache.gravitino.iceberg.common.cache.Local
 
 Gravitino caches scan plan results to speed up repeated queries with identical parameters. The cache uses snapshot ID as part of the cache key, so queries against different snapshots will not use stale cached data.
 
-Plan scan responses follow the Iceberg 1.11 REST API: completed plans return structured `file-scan-tasks` only. Legacy `plan-tasks` JSON strings (used by some Iceberg 1.9.x–1.10.x clients) are not emitted.
+Plan scan responses follow the Iceberg 1.11 REST API: `file-scan-tasks` are returned as structured tasks rather than as the JSON strings used by some Iceberg 1.9.x–1.10.x clients.
 
-| Configuration item                                      | Description                                              | Default value | Required |
-|---------------------------------------------------------|----------------------------------------------------------|---------------|----------|
-| `gravitino.iceberg-rest.scan-plan-cache-impl`           | The implementation of the scan plan cache.               | (none)        | No       |
-| `gravitino.iceberg-rest.scan-plan-cache-capacity`       | The capacity of the scan plan cache.                     | 200           | No       |
-| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes` | The expiration time (in minutes) of the scan plan cache. | 60            | No       |
+Scan planning is synchronous: `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/plan` always returns status `COMPLETED`, never `SUBMITTED`, so a plan is never left running in the background.
+
+A plan is handed to the client in batches of at most `scan-plan-task-batch-size` file scan tasks. The first batch is returned inline in the plan response; each remaining batch is offered as a `plan-task` that the client exchanges for its tasks through `POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/tasks`, the second step of the Iceberg REST scan planning protocol. A plan that fits in one batch carries no `plan-tasks`, so most scans complete in a single round trip.
+
+A `plan-task` is an opaque string to clients, and describes its own unit of work to the server: the scan it was planned from, with the snapshot pinned at planning time, plus the range of tasks it covers. Nothing is stored server side between the two calls, so a `plan-task` stays redeemable after a server restart and on any Gravitino instance serving the same catalog. Redeeming one replans the pinned snapshot unless the plan is still in the scan plan cache, so enabling the cache is recommended when planning large tables. A `plan-task` that this server did not issue, was issued for another table, or refers to a plan that can no longer be reproduced (for example because its snapshot expired) returns `404` with a `NoSuchPlanTaskException` error.
+
+| Configuration item                                      | Description                                                                                                                                                                        | Default value | Required |
+|---------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|----------|
+| `gravitino.iceberg-rest.scan-plan-cache-impl`           | The implementation of the scan plan cache.                                                                                                                                         | (none)        | No       |
+| `gravitino.iceberg-rest.scan-plan-cache-capacity`       | The capacity of the scan plan cache.                                                                                                                                               | 200           | No       |
+| `gravitino.iceberg-rest.scan-plan-cache-expire-minutes` | The expiration time (in minutes) of the scan plan cache.                                                                                                                           | 60            | No       |
+| `gravitino.iceberg-rest.scan-plan-task-batch-size`      | Maximum number of file scan tasks returned inline by one scan planning response. Tasks beyond this limit are offered as `plan-tasks`. Set to 0 to always return every task inline. | 100           | No       |
 
 The scan plan cache uses snapshot ID as part of the cache key, ensuring automatic invalidation when table data changes. This can provide significant speedup for repeated queries like dashboard refreshes or BI tool queries.
 

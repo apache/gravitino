@@ -158,4 +158,26 @@ public class TestIcebergConfig extends IcebergTestBase {
         hasBrokenScanPlanEndpoint,
         "Config response must not advertise the namespace-less scan plan path from Iceberg 1.10.1");
   }
+
+  @Test
+  public void testConfigAdvertisesFetchScanTasksEndpoint() {
+    // Server-side scan planning is a two-step protocol: /plan then /tasks. Clients such as
+    // pyiceberg refuse to use server-side planning unless /tasks is advertised as supported,
+    // so both endpoints must appear in the config response.
+    Response resp = getConfigClientBuilder().get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+
+    ConfigResponse response = resp.readEntity(ConfigResponse.class);
+
+    boolean hasFetchScanTasksEndpoint =
+        response.endpoints().stream()
+            .anyMatch(
+                endpoint ->
+                    "POST".equals(endpoint.httpMethod())
+                        && endpoint.path().contains("namespaces/{namespace}/tables/{table}/tasks"));
+    Assertions.assertTrue(
+        hasFetchScanTasksEndpoint,
+        "Config response must advertise the fetch scan tasks path: "
+            + "POST /v1/{prefix}/namespaces/{namespace}/tables/{table}/tasks");
+  }
 }

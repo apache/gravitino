@@ -265,6 +265,7 @@ public class IcebergRESTUtils {
   static PlanTableScanResponse copyWithCredentials(
       PlanTableScanResponse response,
       List<org.apache.iceberg.rest.credentials.Credential> credentials) {
+    // withFileScanTasks re-derives the response's delete files from the copied tasks.
     return PlanTableScanResponse.builder()
         .withPlanStatus(response.planStatus())
         .withPlanId(response.planId())
