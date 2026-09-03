@@ -22,6 +22,7 @@ import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_
 import static org.apache.gravitino.trino.connector.GravitinoErrorCode.GRAVITINO_MISSING_CONFIG;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -492,10 +493,11 @@ public class TestCatalogRegister {
   }
 
   @Test
-  public void testRegisterCatalogRedactsSecretsFromSqlExceptionMessage() throws Exception {
-    // Regression test: some JDBC drivers echo the failing statement back in a SQLException
-    // message. registerCatalog must redact that message the same way it redacts its own success
-    // log, so a failed CREATE CATALOG never surfaces the embedded credential to the caller.
+  public void testRegisterCatalogPassesTheDriverFailureOnUnchanged() throws Exception {
+    // The driver's exception travels to the caller with its type, message and stack intact:
+    // redacting it here would have to rebuild every level of the cause chain as a different
+    // exception type. Whatever a message carries is masked where it is rendered instead, which
+    // for the load loop is CatalogConnectorManager.toErrorMessage().
     String secretValue = "hunter2";
     Statement statement = mock(Statement.class);
     when(statement.execute(eq("SHOW CATALOGS"))).thenReturn(true);
@@ -529,21 +531,17 @@ public class TestCatalogRegister {
         assertThrows(
             TrinoException.class, () -> catalogRegister.registerCatalog("hive_catalog", catalog));
 
-    // The original driver SQLException carrying the credential is two levels down the cause
-    // chain: registerCatalog's generic wrapper -> executeSql's generic wrapper -> the redacted
-    // SQLException. No exception in that chain may still carry the raw secret.
-    for (Throwable t = e; t != null; t = t.getCause()) {
-      assertFalse(String.valueOf(t.getMessage()).contains(secretValue));
-    }
-    assertTrue(e.getCause().getCause().getMessage().contains("***"));
+    // registerCatalog's generic wrapper -> executeSql's generic wrapper -> the driver exception.
+    Throwable driverFailure = e.getCause().getCause();
+    assertInstanceOf(SQLException.class, driverFailure);
+    assertTrue(driverFailure.getMessage().contains(secretValue));
   }
 
   @Test
-  public void testRegisterCatalogKeepsDeepCauseUnrelatedToSecretsThroughRedaction()
-      throws Exception {
-    // Regression test: redaction previously discarded the whole cause chain along with the
-    // top-level message, so a deep cause unrelated to credentials (e.g. a connector's own
-    // configuration validation error) never reached the caller either.
+  public void testRegisterCatalogKeepsTheDeepCause() throws Exception {
+    // The reason a registration failed usually sits at the bottom of the chain, e.g. a
+    // connector's own configuration validation error, and that is what the status tables end up
+    // reporting.
     Statement statement = mock(Statement.class);
     when(statement.execute(eq("SHOW CATALOGS"))).thenReturn(true);
     ResultSet resultSet = mock(ResultSet.class);
@@ -582,7 +580,7 @@ public class TestCatalogRegister {
         deepCauseSurvived = true;
       }
     }
-    assertTrue(deepCauseSurvived, "the deep, credential-free cause must survive redaction");
+    assertTrue(deepCauseSurvived, "the deep cause must reach the caller");
   }
 
   private static void setPrivateField(Object target, String fieldName, Object value)

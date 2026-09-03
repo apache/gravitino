@@ -357,40 +357,18 @@ public class CatalogRegister {
         config.toCatalogConfig());
   }
 
-  @VisibleForTesting
+  /**
+   * Masks the values of the secret bearing properties of a CREATE CATALOG statement, in both its
+   * SQL assignments and the catalog JSON it carries.
+   *
+   * <p>Applied where a message is rendered for a user or a log rather than to the exceptions
+   * themselves, so that the original failure keeps its type and its cause chain.
+   *
+   * @param createCatalogCommand the text to redact
+   * @return the text with every secret value replaced
+   */
   static String redactSecrets(String createCatalogCommand) {
     return redactJsonSecrets(redactSqlSecrets(createCatalogCommand));
-  }
-
-  // Some JDBC drivers echo the failing statement back in the exception message, which for a
-  // failed CREATE CATALOG would otherwise carry its embedded credentials into every caller and
-  // log line downstream. Every level of the cause chain is rebuilt with its message redacted,
-  // rather than discarded outright, so a deep cause unrelated to credentials (e.g. a connector's
-  // own configuration validation error) still reaches the caller.
-  private static SQLException redactedSqlException(SQLException e) {
-    Throwable redactedCause = e.getCause() == null ? null : redactThrowableChain(e.getCause());
-    SQLException redacted =
-        new SQLException(
-            e.getMessage() == null ? null : redactSecrets(e.getMessage()),
-            e.getSQLState(),
-            e.getErrorCode(),
-            redactedCause);
-    redacted.setStackTrace(e.getStackTrace());
-    return redacted;
-  }
-
-  private static Throwable redactThrowableChain(Throwable t) {
-    // Guards against a cause cycle the same way toErrorMessage() in CatalogConnectorManager does.
-    Throwable cause = t.getCause();
-    Throwable redactedCause = (cause == null || cause == t) ? null : redactThrowableChain(cause);
-    // Rebuilt as a plain RuntimeException rather than the original type: most exception classes
-    // don't expose a (String message, Throwable cause) constructor, and nothing downstream of
-    // this redaction inspects the exception's type, only its message chain.
-    RuntimeException redacted =
-        new RuntimeException(
-            t.getMessage() == null ? null : redactSecrets(t.getMessage()), redactedCause);
-    redacted.setStackTrace(t.getStackTrace());
-    return redacted;
   }
 
   private static String redactSqlSecrets(String createCatalogCommand) {
@@ -513,7 +491,10 @@ public class CatalogRegister {
           statement.execute(sql);
           return;
         } catch (SQLException e) {
-          throw redactedSqlException(e);
+          // Fail fast: the statement was rejected, so retrying it would only repeat the same
+          // rejection. The exception is passed on untouched, and the redaction happens where its
+          // message is rendered.
+          throw e;
         } catch (Exception e) {
           failedException = e;
           LOG.warn(e, "Failed to execute command: %s", redactSecrets(sql));

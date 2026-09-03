@@ -742,6 +742,28 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testRecordedErrorRedactsSecrets() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+    // What a driver that echoes the failing CREATE CATALOG back would report.
+    doThrow(
+            new TrinoException(
+                GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR,
+                "Query failed: CREATE CATALOG memory USING gravitino WITH ("
+                    + "\"trino.bypass.password\"='hunter2')"))
+        .when(fixture.catalogRegister)
+        .registerCatalog(any(), any());
+
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    // The exception keeps its own message; the text the status tables report does not.
+    CatalogRegistrationState state = singleState(manager);
+    assertFalse(state.getLastError().contains("hunter2"));
+    assertTrue(state.getLastError().contains("\"trino.bypass.password\"='***'"));
+  }
+
+  @Test
   public void testReloadFailureAfterUnregisterIsRecordedAsFailed() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);

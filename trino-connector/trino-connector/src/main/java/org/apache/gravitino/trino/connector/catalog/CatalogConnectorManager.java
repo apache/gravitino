@@ -338,6 +338,13 @@ public class CatalogConnectorManager {
   }
 
   private static String toErrorMessage(Throwable e) {
+    // Redact here rather than on the exceptions themselves: a failed CREATE CATALOG carries the
+    // credentials it embedded, and this is the single point where that chain is turned into the
+    // text the catalog_status and load_status tables report.
+    return CatalogRegister.redactSecrets(describeFailure(e));
+  }
+
+  private static String describeFailure(Throwable e) {
     // Report the root cause: the actual reason a registration failed, such as "Access Denied:
     // Cannot create catalog", is wrapped in several layers of TrinoException by the time it gets
     // here, and the outer messages say nothing a user can act on. The outermost message is kept
