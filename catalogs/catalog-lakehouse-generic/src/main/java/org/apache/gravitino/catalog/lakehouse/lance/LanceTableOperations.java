@@ -115,9 +115,9 @@ public class LanceTableOperations extends ManagedTableOperations {
    *
    * <p><b>Zero-column Lance dataset:</b> when the dataset has no columns, Gravitino records the
    * checked dataset version ({@code lance.version}) without modifying stored columns. Subsequent
-   * {@code loadTable} calls skip the dataset open because the stored version acts as a "confirmed
-   * empty" marker. The dataset is re-examined only after the stored version changes (for example
-   * via an explicit {@code alterTable}) or when the mode is switched to {@link #VERSION_CHECK}.
+   * {@code loadTable} calls re-examine the dataset because the stored version alone cannot
+   * distinguish a genuinely empty dataset from incomplete Gravitino column metadata. An unchanged
+   * empty dataset does not trigger another metadata update.
    */
   public enum SchemaRefreshMode {
     /**
@@ -129,8 +129,8 @@ public class LanceTableOperations extends ManagedTableOperations {
     /**
      * Opens the Lance dataset on every {@code loadTable}, compares the dataset version with the
      * stored {@code lance.version}, and refreshes columns when the version has changed. The version
-     * is the sole gating factor: if the version is unchanged the schema read is skipped even when
-     * stored columns are empty.
+     * gates refreshes when stored columns are present. Empty stored columns are always re-examined
+     * because the version alone does not prove that the empty metadata is complete.
      */
     VERSION_CHECK
   }
@@ -187,17 +187,6 @@ public class LanceTableOperations extends ManagedTableOperations {
     if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
       return table;
     }
-    // Empty-schema table that was already confirmed against a stored version: skip the dataset
-    // open. The stored lance.version acts as a "checked at this version" marker written on the
-    // first confirmation. VERSION_CHECK mode does not take this shortcut — it opens the dataset
-    // every time to compare the current version.
-    if (!declaredOnly
-        && emptySchema
-        && StringUtils.isNotBlank(table.properties().get(LanceConstants.LANCE_TABLE_VERSION))
-        && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
-      return table;
-    }
-
     String location = table.properties().get(Table.PROPERTY_LOCATION);
     if (StringUtils.isBlank(location)) {
       return table;
@@ -211,6 +200,7 @@ public class LanceTableOperations extends ManagedTableOperations {
       datasetVersion = dataset.version();
       if (refreshMode == SchemaRefreshMode.VERSION_CHECK
           && !declaredOnly
+          && !emptySchema
           && !isDatasetVersionChanged(table, datasetVersion)) {
         return table;
       }
@@ -225,10 +215,10 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
 
     if (columns.length == 0) {
-      // Dataset is genuinely empty: record the checked version so future DECLARED_AND_EMPTY loads
-      // can skip the dataset open (see the early-return above). Declared tables are excluded
-      // because their lance.declared flag is the authoritative "not yet written" signal.
-      if (!declaredOnly) {
+      // Record a newly checked empty version, but avoid a no-op metadata update when the same empty
+      // dataset is loaded again. Declared tables are excluded because their lance.declared flag is
+      // the authoritative "not yet written" signal.
+      if (!declaredOnly && isDatasetVersionChanged(table, datasetVersion)) {
         return recordCheckedEmptyVersion(ident, datasetVersion);
       }
       return table;
