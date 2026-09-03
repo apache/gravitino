@@ -260,6 +260,47 @@ public class MetadataObjectTagOperations {
       @PathParam("fullName") @AuthorizationFullName String fullName,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
           TagsAssociateRequest request) {
+<<<<<<< HEAD
+=======
+    return associateTagsForObjectInternal(metalake, type, fullName, request);
+  }
+
+  /**
+   * Associates tag values with a metadata object using the v2 request representation.
+   *
+   * @param metalake The metalake name.
+   * @param type The metadata object type.
+   * @param fullName The metadata object full name.
+   * @param request The tag values association request.
+   * @return The response containing associated tag names.
+   */
+  @POST
+  @Consumes(TAG_VALUES_MEDIA_TYPE)
+  @Produces(TAG_VALUES_MEDIA_TYPE)
+  @Timed(name = "associate-object-tags." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
+  @ResponseMetered(name = "associate-object-tags", absolute = true)
+  @AuthorizationExpression(expression = CAN_ACCESS_METADATA_AND_TAG)
+  public Response associateTagValuesForObject(
+      @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
+          String metalake,
+      @PathParam("type") @AuthorizationObjectType String type,
+      @PathParam("fullName") @AuthorizationFullName String fullName,
+      @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
+          TagValuesAssociateRequest request) {
+    return associateTagValuesForObjectInternal(metalake, type, fullName, request);
+  }
+
+  private Response associateTagsForObjectInternal(
+      String metalake, String type, String fullName, TagsAssociateRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleTagException(
+          OperationType.ASSOCIATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+>>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,
@@ -290,6 +331,65 @@ public class MetadataObjectTagOperations {
     }
   }
 
+<<<<<<< HEAD
+=======
+  private Response associateTagValuesForObjectInternal(
+      String metalake, String type, String fullName, TagValuesAssociateRequest request) {
+    if (request == null) {
+      return withMediaType(
+          ExceptionHandlers.handleTagException(
+              OperationType.ASSOCIATE,
+              "",
+              fullName,
+              new IllegalArgumentException("Request body cannot be null")),
+          TAG_VALUES_MEDIA_TYPE);
+    }
+
+    LOG.info(
+        "Received associate tag values request for object type: {}, full name: {} under metalake: {}",
+        type,
+        fullName,
+        metalake);
+    try {
+      return Utils.doAs(
+          httpRequest,
+          () -> {
+            request.validate();
+            MetadataObject object = parseMetadataObject(type, fullName);
+            String[] tagNames =
+                tagDispatcher.associateTagValuesForMetadataObject(
+                    metalake, object, request.tagValuesToAdd(), request.tagValuesToRemove());
+            tagNames = tagNames == null ? new String[0] : tagNames;
+            logAssociatedTags(type, fullName, metalake, tagNames);
+            return Response.ok(new NameListResponse(tagNames), TAG_VALUES_MEDIA_TYPE).build();
+          });
+    } catch (Exception e) {
+      return withMediaType(
+          ExceptionHandlers.handleTagException(OperationType.ASSOCIATE, "", fullName, e),
+          TAG_VALUES_MEDIA_TYPE);
+    }
+  }
+
+  private static MetadataObject parseMetadataObject(String type, String fullName) {
+    return MetadataObjects.parse(
+        fullName, MetadataObject.Type.valueOf(type.toUpperCase(Locale.ROOT)));
+  }
+
+  private static void logAssociatedTags(
+      String type, String fullName, String metalake, String[] tagNames) {
+    LOG.info(
+        "Associated tags: {} for object type: {}, full name: {} under metalake: {}",
+        Arrays.toString(tagNames),
+        type,
+        fullName,
+        metalake);
+  }
+
+  private static Response withMediaType(Response response, String mediaType) {
+    return Response.fromResponse(response).type(mediaType).build();
+  }
+
+>>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
   private Optional<Tag> getTagForObject(String metalake, MetadataObject object, String tagName) {
     try {
       return Optional.ofNullable(tagDispatcher.getTagForMetadataObject(metalake, object, tagName));

@@ -1036,6 +1036,115 @@ public class TestMetadataObjectTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
+<<<<<<< HEAD
+=======
+  @Test
+  public void testAssociateTagValuesForObjectV2() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    TagValue[] tagsToAdd = {TagValue.noValue("pii"), TagValue.of("data_domain", "finance")};
+    TagValue[] tagsToRemove = {TagValue.of("data_domain", "old")};
+    when(tagManager.associateTagValuesForMetadataObject(metalake, catalog, tagsToAdd, tagsToRemove))
+        .thenReturn(new String[] {"pii", "data_domain"});
+
+    TagValuesAssociateRequest request = new TagValuesAssociateRequest(tagsToAdd, tagsToRemove);
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity(request, "application/vnd.gravitino.v2+json"));
+
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
+    Assertions.assertArrayEquals(
+        new String[] {"pii", "data_domain"},
+        response.readEntity(NameListResponse.class).getNames());
+  }
+
+  @Test
+  public void testAssociateTagsForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
+  @Test
+  public void testAssociateTagValuesForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity("null", "application/vnd.gravitino.v2+json"));
+
+    assertNullRequestBodyRejected(response);
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
+  }
+
+  @Test
+  public void testV2ErrorMediaType() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    TagValuesAssociateRequest request = new TagValuesAssociateRequest(null, null);
+
+    Response response =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity(request, "application/vnd.gravitino.v2+json"));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    Assertions.assertEquals(
+        MediaType.valueOf("application/vnd.gravitino.v2+json"), response.getMediaType());
+  }
+
+  @Test
+  public void testAssociateTagsRejectsRequestShapeFromOtherVersion() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+    String v1Json = "{\"tagsToAdd\":[\"data_domain\"]}";
+    String v2Json = "{\"tagsToAdd\":[{\"name\":\"data_domain\",\"value\":\"finance\"}]}";
+
+    Response v1WithV2Shape =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(v2Json, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), v1WithV2Shape.getStatus());
+
+    Response v2WithV1Shape =
+        target(basePath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .path("tags")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v2+json")
+            .post(Entity.entity(v1Json, "application/vnd.gravitino.v2+json"));
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), v2WithV1Shape.getStatus());
+  }
+
+>>>>>>> 364e145c8 ([#12834] fix(server): reject null request bodies in remaining REST operations (#12866))
   private String basePath(String metalake) {
     return "/metalakes/" + metalake + "/objects";
   }
