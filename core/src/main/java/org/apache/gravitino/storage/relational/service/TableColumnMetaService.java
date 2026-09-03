@@ -182,15 +182,18 @@ public class TableColumnMetaService {
       }
     }
 
+    // If the namespace has changed, align existing column records to the new schema_id.
+    // This runs independently of the column diff inserts below: any UPDATE/DELETE column
+    // version rows added afterwards will still be inserted under the new schema_id.
+    if (!newTable.namespace().equals(oldTable.namespace())) {
+      SessionUtils.doWithoutCommit(
+          TableColumnMapper.class,
+          mapper ->
+              mapper.updateSchemaIdByTableId(newTablePO.getTableId(), newTablePO.getSchemaId()));
+    }
+
     // If there is no change, directly return
     if (columnPOsToInsert.isEmpty()) {
-      // If namespace is changed, just update the schema_id of the columns.
-      if (!newTable.namespace().equals(oldTable.namespace())) {
-        SessionUtils.doWithoutCommit(
-            TableColumnMapper.class,
-            mapper ->
-                mapper.updateSchemaIdByTableId(newTablePO.getTableId(), newTablePO.getSchemaId()));
-      }
       return;
     }
 
