@@ -51,7 +51,7 @@ public class WebApplicationExceptionMapper implements ExceptionMapper<WebApplica
             ? HttpStatus.getMessage(status)
             : exception.getMessage();
 
-    return Response.status(status)
+    return Response.fromResponse(exception.getResponse())
         .entity(toErrorResponse(status, message))
         .type(MediaType.APPLICATION_JSON)
         .build();

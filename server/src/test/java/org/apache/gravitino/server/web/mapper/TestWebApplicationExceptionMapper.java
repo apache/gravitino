@@ -40,6 +40,8 @@ public class TestWebApplicationExceptionMapper {
         Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());
     Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, entity.getCode());
     Assertions.assertFalse(entity.getMessage().isEmpty());
+    Assertions.assertTrue(
+        response.getHeaderString("Allow") != null && response.getHeaderString("Allow").contains("GET"));
   }
 
   @Test
