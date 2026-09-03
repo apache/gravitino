@@ -19,7 +19,6 @@
 
 package org.apache.gravitino.hook;
 
-import java.util.Collections;
 import java.util.function.Supplier;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.NameIdentifier;
@@ -129,8 +128,11 @@ public class FunctionHookDispatcher implements FunctionDispatcher {
     if (dropped) {
       NameIdentifier normalizedIdent =
           CapabilityHelpers.applyCaseSensitive(ident, Capability.Scope.FUNCTION, catalogManager);
-      AuthorizationUtils.authorizationPluginRemovePrivileges(
-          normalizedIdent, Entity.EntityType.FUNCTION, Collections.emptyList());
+      // Function privileges are managed by Gravitino. Catalog authorization plugins such as
+      // Ranger HadoopSQL do not support FUNCTION metadata objects, so only invalidate the built-in
+      // authorizer's name-to-ID mapping here.
+      AuthorizationUtils.notifyEntityNameIdMappingChange(
+          normalizedIdent, Entity.EntityType.FUNCTION);
     }
     return dropped;
   }

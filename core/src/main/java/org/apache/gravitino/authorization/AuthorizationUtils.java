@@ -391,8 +391,16 @@ public class AuthorizationUtils {
     }
   }
 
-  private static void notifyEntityNameIdMappingChange(
-      NameIdentifier ident, Entity.EntityType type) {
+  /**
+   * Notifies the built-in authorizer that an entity name may now resolve to a different ID.
+   *
+   * <p>This does not push a metadata change to the catalog authorization plugin. Use it when only
+   * Gravitino's local authorization caches support the entity type.
+   *
+   * @param ident the entity identifier whose mapping changed
+   * @param type the entity type
+   */
+  public static void notifyEntityNameIdMappingChange(NameIdentifier ident, Entity.EntityType type) {
     GravitinoAuthorizer gravitinoAuthorizer = GravitinoEnv.getInstance().gravitinoAuthorizer();
     if (gravitinoAuthorizer == null) {
       return;

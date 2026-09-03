@@ -26,16 +26,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
-import java.util.Collections;
 import org.apache.gravitino.Entity;
+import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
-import org.apache.gravitino.authorization.AuthorizationUtils;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.function.Function;
@@ -176,7 +179,7 @@ public class TestFunctionHookDispatcher {
   }
 
   @Test
-  public void testDropFunctionRemovesPrivilegesWithNormalizedIdentifierAfterSuccessfulDrop()
+  public void testDropFunctionInvalidatesOnlyInternalCacheWithNormalizedIdentifier()
       throws Exception {
     NameIdentifier functionIdentifier =
         NameIdentifier.of("metalake1", "catalog1", "SCHEMA1", "FUNC1");
@@ -188,8 +191,20 @@ public class TestFunctionHookDispatcher {
         .thenThrow(new RuntimeException("Drop failed"));
     CatalogManager catalogManager = catalogManagerWith(new CaseInsensitiveCapability());
 
-    try (MockedStatic<AuthorizationUtils> authorizationUtils =
-        Mockito.mockStatic(AuthorizationUtils.class)) {
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    AuthorizationPlugin catalogAuthorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(catalogAuthorizationPlugin);
+    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.gravitinoAuthorizer()).thenReturn(authorizer);
+    Mockito.when(env.accessControlDispatcher())
+        .thenReturn(Mockito.mock(AccessControlDispatcher.class));
+    Mockito.when(env.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
       FunctionHookDispatcher hookDispatcher =
           new FunctionHookDispatcher(dispatcher, () -> null, catalogManager);
 
@@ -199,11 +214,13 @@ public class TestFunctionHookDispatcher {
           assertThrows(
               RuntimeException.class, () -> hookDispatcher.dropFunction(functionIdentifier));
       assertEquals("Drop failed", thrown.getMessage());
-      authorizationUtils.verify(
-          () ->
-              AuthorizationUtils.authorizationPluginRemovePrivileges(
-                  normalizedIdentifier, Entity.EntityType.FUNCTION, Collections.emptyList()),
-          Mockito.times(1));
+      Mockito.verify(authorizer)
+          .handleEntityNameIdMappingChange(
+              "metalake1", normalizedIdentifier, Entity.EntityType.FUNCTION);
+      // Ranger HadoopSQL is one catalog plugin that rejects FUNCTION metadata. The generic plugin
+      // mock represents that integration boundary and must not receive a removal callback.
+      Mockito.verifyNoInteractions(catalogAuthorizationPlugin);
+      Mockito.verify(catalogManager, Mockito.never()).loadCatalog(any());
       Mockito.verify(catalogManager, Mockito.times(1)).loadCatalogAndWrap(any());
     }
   }

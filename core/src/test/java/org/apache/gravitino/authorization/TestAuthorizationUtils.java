@@ -368,12 +368,12 @@ class TestAuthorizationUtils {
     try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
       envStatic.when(GravitinoEnv::getInstance).thenReturn(envMock);
 
-      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "function");
+      NameIdentifier ident = NameIdentifier.of("metalake", "catalog", "schema", "table");
       AuthorizationUtils.authorizationPluginRemovePrivileges(
-          ident, Entity.EntityType.FUNCTION, Collections.emptyList());
+          ident, Entity.EntityType.TABLE, Collections.emptyList());
 
       Mockito.verify(authorizer)
-          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.FUNCTION);
+          .handleEntityNameIdMappingChange("metalake", ident, Entity.EntityType.TABLE);
     }
   }
 
