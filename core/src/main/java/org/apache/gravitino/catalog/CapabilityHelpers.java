@@ -148,6 +148,20 @@ public class CapabilityHelpers {
     return NameIdentifier.of(namespace, name);
   }
 
+  /**
+   * Loads the catalog capability for {@code ident} and applies its case-sensitivity rules.
+   *
+   * @param ident the identifier to normalize
+   * @param scope the identifier's capability scope
+   * @param catalogManager the catalog manager used to load the capability
+   * @return the case-normalized identifier
+   */
+  public static NameIdentifier applyCaseSensitive(
+      NameIdentifier ident, Capability.Scope scope, CatalogManager catalogManager) {
+    Capability capability = getCapability(ident, catalogManager);
+    return applyCaseSensitive(ident, scope, capability);
+  }
+
   public static Namespace applyCaseSensitive(
       Namespace namespace, Capability.Scope identScope, Capability capabilities) {
     String metalake = namespace.level(0);

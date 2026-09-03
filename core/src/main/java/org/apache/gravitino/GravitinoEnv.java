@@ -873,7 +873,8 @@ public class GravitinoEnv {
         new FunctionNormalizeDispatcher(functionOperationDispatcher, catalogManager);
     FunctionEventDispatcher functionEventDispatcher =
         new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
-    this.functionDispatcher = new FunctionHookDispatcher(functionEventDispatcher);
+    this.functionDispatcher =
+        new FunctionHookDispatcher(functionEventDispatcher, this::ownerDispatcher, catalogManager);
 
     // View operation chain: ViewHookDispatcher -> ViewEventDispatcher -> ViewNormalizeDispatcher
     // -> ViewOperationDispatcher.

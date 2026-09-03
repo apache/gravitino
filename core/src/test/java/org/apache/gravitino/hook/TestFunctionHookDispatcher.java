@@ -19,20 +19,26 @@
 package org.apache.gravitino.hook;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
-import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AccessControlDispatcher;
+import org.apache.gravitino.authorization.GravitinoAuthorizer;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
 import org.apache.gravitino.catalog.FunctionDispatcher;
+import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.connector.authorization.AuthorizationPlugin;
 import org.apache.gravitino.connector.capability.Capability;
 import org.apache.gravitino.connector.capability.CapabilityResult;
 import org.apache.gravitino.function.Function;
@@ -40,16 +46,13 @@ import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestFunctionHookDispatcher {
 
   @Test
   public void testRegisterFunctionSetOwnerAfterRegister() throws Exception {
-    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
-    Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
-
     NameIdentifier functionIdentifier =
         NameIdentifier.of("metalake1", "catalog1", "schema1", "func1");
     FunctionDefinition[] definitions = new FunctionDefinition[] {};
@@ -57,13 +60,7 @@ public class TestFunctionHookDispatcher {
     Function registeredFunction = Mockito.mock(Function.class);
     OwnerDispatcher ownerDispatcher = Mockito.mock(OwnerDispatcher.class);
 
-    // Wire a case-sensitive capability so the un-normalized identifier reaches setOwner unchanged,
-    // while still exercising the normalization codepath in the hook.
-    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper catalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
+    CatalogManager catalogManager = catalogManagerWith(Capability.DEFAULT);
 
     Mockito.when(
             dispatcher.registerFunction(
@@ -74,37 +71,28 @@ public class TestFunctionHookDispatcher {
                 Mockito.eq(definitions)))
         .thenReturn(registeredFunction);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", ownerDispatcher, true);
-    FieldUtils.writeField(gravitinoEnv, "catalogManager", catalogManager, true);
-    try {
-      FunctionHookDispatcher hookDispatcher = new FunctionHookDispatcher(dispatcher);
-      Function result =
-          hookDispatcher.registerFunction(
-              functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
+    FunctionHookDispatcher hookDispatcher =
+        new FunctionHookDispatcher(dispatcher, () -> ownerDispatcher, catalogManager);
+    Function result =
+        hookDispatcher.registerFunction(
+            functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
 
-      assertSame(registeredFunction, result);
+    assertSame(registeredFunction, result);
 
-      ArgumentCaptor<MetadataObject> metadataObjectCaptor =
-          ArgumentCaptor.forClass(MetadataObject.class);
-      Mockito.verify(ownerDispatcher)
-          .setOwner(
-              Mockito.eq("metalake1"),
-              metadataObjectCaptor.capture(),
-              Mockito.eq(AuthConstants.ANONYMOUS_USER),
-              Mockito.eq(Owner.Type.USER));
-      assertEquals(MetadataObject.Type.FUNCTION, metadataObjectCaptor.getValue().type());
-      assertEquals("catalog1.schema1.func1", metadataObjectCaptor.getValue().fullName());
-    } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
-      FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
-    }
+    ArgumentCaptor<MetadataObject> metadataObjectCaptor =
+        ArgumentCaptor.forClass(MetadataObject.class);
+    Mockito.verify(ownerDispatcher)
+        .setOwner(
+            Mockito.eq("metalake1"),
+            metadataObjectCaptor.capture(),
+            Mockito.eq(AuthConstants.ANONYMOUS_USER),
+            Mockito.eq(Owner.Type.USER));
+    assertEquals(MetadataObject.Type.FUNCTION, metadataObjectCaptor.getValue().type());
+    assertEquals("catalog1.schema1.func1", metadataObjectCaptor.getValue().fullName());
   }
 
   @Test
-  public void testRegisterFunctionSucceedsWhenOwnerDispatcherIsDisabled() throws Exception {
-    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
-
+  public void testRegisterFunctionSucceedsWhenOwnerDispatcherIsDisabled() {
     NameIdentifier functionIdentifier =
         NameIdentifier.of("metalake1", "catalog1", "schema1", "func1");
     FunctionDefinition[] definitions = new FunctionDefinition[] {};
@@ -120,33 +108,24 @@ public class TestFunctionHookDispatcher {
                 Mockito.eq(definitions)))
         .thenReturn(registeredFunction);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", null, true);
-    try {
-      FunctionHookDispatcher hookDispatcher = new FunctionHookDispatcher(dispatcher);
-      Function result =
-          hookDispatcher.registerFunction(
-              functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    FunctionHookDispatcher hookDispatcher =
+        new FunctionHookDispatcher(dispatcher, () -> null, catalogManager);
+    Function result =
+        hookDispatcher.registerFunction(
+            functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
 
-      assertSame(registeredFunction, result);
-      Mockito.verify(dispatcher)
-          .registerFunction(functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
-    } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
-    }
+    assertSame(registeredFunction, result);
+    Mockito.verify(dispatcher)
+        .registerFunction(functionIdentifier, "comment", FunctionType.SCALAR, true, definitions);
+    Mockito.verifyNoInteractions(catalogManager);
   }
 
   @Test
   public void testRegisterFunctionSetsOwnerWithNormalizedIdentifier() throws Exception {
     // Verifies the hook applies Capability.Scope.FUNCTION normalization before setOwner, so the
     // owner relation references the same identifier that NormalizeDispatcher persists under.
-    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
-    Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
-
-    CatalogManager mockCatalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper mockWrapper = Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(mockWrapper.capabilities()).thenReturn(new CaseInsensitiveCapability());
-    Mockito.when(mockCatalogManager.loadCatalogAndWrap(any())).thenReturn(mockWrapper);
+    CatalogManager catalogManager = catalogManagerWith(new CaseInsensitiveCapability());
 
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     FunctionDispatcher mockFunctionDispatcher = Mockito.mock(FunctionDispatcher.class);
@@ -157,49 +136,27 @@ public class TestFunctionHookDispatcher {
                 any(), any(), any(), Mockito.anyBoolean(), any()))
         .thenReturn(mockFunction);
 
-    FieldUtils.writeField(gravitinoEnv, "catalogManager", mockCatalogManager, true);
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", mockOwnerDispatcher, true);
+    FunctionHookDispatcher hook =
+        new FunctionHookDispatcher(
+            mockFunctionDispatcher, () -> mockOwnerDispatcher, catalogManager);
+    NameIdentifier ident = NameIdentifier.of("metalake1", "catalog1", "SCHEMA_NORM", "MY_FUNC");
+    hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions);
 
-    try {
-      FunctionHookDispatcher hook = new FunctionHookDispatcher(mockFunctionDispatcher);
-      NameIdentifier ident = NameIdentifier.of("metalake1", "catalog1", "SCHEMA_NORM", "MY_FUNC");
-      hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions);
-
-      ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
-      Mockito.verify(mockOwnerDispatcher)
-          .setOwner(eq("metalake1"), captor.capture(), any(), eq(Owner.Type.USER));
-      assertEquals(
-          "my_func",
-          captor.getValue().name(),
-          "Function name passed to setOwner must be lowercased by Capability.Scope.FUNCTION"
-              + " normalization");
-      assertEquals(
-          "catalog1.schema_norm",
-          captor.getValue().parent(),
-          "Function parent (catalog.schema) must have its schema component lowercased by"
-              + " Capability.Scope.FUNCTION namespace normalization");
-    } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
-      FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
-    }
+    ArgumentCaptor<MetadataObject> captor = ArgumentCaptor.forClass(MetadataObject.class);
+    Mockito.verify(mockOwnerDispatcher)
+        .setOwner(eq("metalake1"), captor.capture(), any(), eq(Owner.Type.USER));
+    assertEquals("my_func", captor.getValue().name());
+    assertEquals("catalog1.schema_norm", captor.getValue().parent());
   }
 
   @Test
   public void testRegisterFunctionThrowsWhenSetOwnerFails() throws Exception {
-    GravitinoEnv gravitinoEnv = GravitinoEnv.getInstance();
-    Object originalOwnerDispatcher = FieldUtils.readField(gravitinoEnv, "ownerDispatcher", true);
-    Object originalCatalogManager = FieldUtils.readField(gravitinoEnv, "catalogManager", true);
-
     OwnerDispatcher mockOwnerDispatcher = Mockito.mock(OwnerDispatcher.class);
     Mockito.doThrow(new RuntimeException("Set owner failed"))
         .when(mockOwnerDispatcher)
         .setOwner(any(), any(), any(), any());
 
-    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
-    CatalogManager.CatalogWrapper catalogWrapper =
-        Mockito.mock(CatalogManager.CatalogWrapper.class);
-    Mockito.when(catalogWrapper.capabilities()).thenReturn(Capability.DEFAULT);
-    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
+    CatalogManager catalogManager = catalogManagerWith(Capability.DEFAULT);
 
     FunctionDispatcher mockFunctionDispatcher = Mockito.mock(FunctionDispatcher.class);
     Function mockFunction = Mockito.mock(Function.class);
@@ -209,23 +166,72 @@ public class TestFunctionHookDispatcher {
                 any(), any(), any(), Mockito.anyBoolean(), any()))
         .thenReturn(mockFunction);
 
-    FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", mockOwnerDispatcher, true);
-    FieldUtils.writeField(gravitinoEnv, "catalogManager", catalogManager, true);
+    FunctionHookDispatcher hook =
+        new FunctionHookDispatcher(
+            mockFunctionDispatcher, () -> mockOwnerDispatcher, catalogManager);
+    NameIdentifier ident =
+        NameIdentifier.of("metalake1", "catalog1", "schema_owner_fail", "func_owner_fail");
+    RuntimeException thrown =
+        assertThrows(
+            RuntimeException.class,
+            () -> hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions));
+    assertEquals("Set owner failed", thrown.getMessage());
+  }
 
-    try {
-      FunctionHookDispatcher hook = new FunctionHookDispatcher(mockFunctionDispatcher);
-      NameIdentifier ident =
-          NameIdentifier.of("metalake1", "catalog1", "schema_owner_fail", "func_owner_fail");
+  @Test
+  public void testDropFunctionInvalidatesOnlyInternalCacheWithNormalizedIdentifier()
+      throws Exception {
+    NameIdentifier functionIdentifier =
+        NameIdentifier.of("metalake1", "catalog1", "SCHEMA1", "FUNC1");
+    NameIdentifier normalizedIdentifier =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "func1");
+    FunctionDispatcher dispatcher = Mockito.mock(FunctionDispatcher.class);
+    Mockito.when(dispatcher.dropFunction(functionIdentifier))
+        .thenReturn(true, false)
+        .thenThrow(new RuntimeException("Drop failed"));
+    CatalogManager catalogManager = catalogManagerWith(new CaseInsensitiveCapability());
+
+    GravitinoAuthorizer authorizer = Mockito.mock(GravitinoAuthorizer.class);
+    AuthorizationPlugin catalogAuthorizationPlugin = Mockito.mock(AuthorizationPlugin.class);
+    BaseCatalog<?> catalog = Mockito.mock(BaseCatalog.class);
+    Mockito.when(catalog.getAuthorizationPlugin()).thenReturn(catalogAuthorizationPlugin);
+    Mockito.when(catalogManager.loadCatalog(any())).thenReturn(catalog);
+
+    GravitinoEnv env = Mockito.mock(GravitinoEnv.class);
+    Mockito.when(env.gravitinoAuthorizer()).thenReturn(authorizer);
+    Mockito.when(env.accessControlDispatcher())
+        .thenReturn(Mockito.mock(AccessControlDispatcher.class));
+    Mockito.when(env.catalogManager()).thenReturn(catalogManager);
+
+    try (MockedStatic<GravitinoEnv> envStatic = Mockito.mockStatic(GravitinoEnv.class)) {
+      envStatic.when(GravitinoEnv::getInstance).thenReturn(env);
+      FunctionHookDispatcher hookDispatcher =
+          new FunctionHookDispatcher(dispatcher, () -> null, catalogManager);
+
+      assertTrue(hookDispatcher.dropFunction(functionIdentifier));
+      assertFalse(hookDispatcher.dropFunction(functionIdentifier));
       RuntimeException thrown =
           assertThrows(
-              RuntimeException.class,
-              () ->
-                  hook.registerFunction(ident, "comment", FunctionType.SCALAR, true, definitions));
-      assertEquals("Set owner failed", thrown.getMessage());
-    } finally {
-      FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
-      FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
+              RuntimeException.class, () -> hookDispatcher.dropFunction(functionIdentifier));
+      assertEquals("Drop failed", thrown.getMessage());
+      Mockito.verify(authorizer)
+          .handleEntityNameIdMappingChange(
+              "metalake1", normalizedIdentifier, Entity.EntityType.FUNCTION);
+      // Ranger HadoopSQL is one catalog plugin that rejects FUNCTION metadata. The generic plugin
+      // mock represents that integration boundary and must not receive a removal callback.
+      Mockito.verifyNoInteractions(catalogAuthorizationPlugin);
+      Mockito.verify(catalogManager, Mockito.never()).loadCatalog(any());
+      Mockito.verify(catalogManager, Mockito.times(1)).loadCatalogAndWrap(any());
     }
+  }
+
+  private static CatalogManager catalogManagerWith(Capability capability) throws Exception {
+    CatalogManager catalogManager = Mockito.mock(CatalogManager.class);
+    CatalogManager.CatalogWrapper catalogWrapper =
+        Mockito.mock(CatalogManager.CatalogWrapper.class);
+    Mockito.when(catalogWrapper.capabilities()).thenReturn(capability);
+    Mockito.when(catalogManager.loadCatalogAndWrap(any())).thenReturn(catalogWrapper);
+    return catalogManager;
   }
 
   private static class CaseInsensitiveCapability implements Capability {
