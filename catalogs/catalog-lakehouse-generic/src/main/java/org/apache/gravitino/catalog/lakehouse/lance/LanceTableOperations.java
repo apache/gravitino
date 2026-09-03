@@ -114,23 +114,31 @@ public class LanceTableOperations extends ManagedTableOperations {
    * </ul>
    *
    * <p><b>Zero-column Lance dataset:</b> when the dataset has no columns, Gravitino records the
-   * checked dataset version ({@code lance.version}) without modifying stored columns. Subsequent
-   * {@code loadTable} calls re-examine the dataset because the stored version alone cannot
-   * distinguish a genuinely empty dataset from incomplete Gravitino column metadata. An unchanged
-   * empty dataset does not trigger another metadata update.
+   * checked dataset version ({@code lance.version}) plus a confirmation marker ({@code
+   * lance.empty-schema-checked-version}) without modifying stored columns. Subsequent {@code
+   * loadTable} calls skip the dataset open while both still agree, so a genuinely empty dataset
+   * costs one dataset read, not one per load.
+   *
+   * <p>The marker exists because {@code lance.version} alone cannot carry that meaning: {@code
+   * alterTable} records the version after every dataset change without reading the schema, so a
+   * table registered with no columns can hold a version whose column metadata was never captured.
+   * Such a table has no marker, is re-examined, and repairs itself. Any path that records a newer
+   * version invalidates the marker automatically.
    */
   public enum SchemaRefreshMode {
     /**
      * Default mode. Refreshes stored columns from the Lance dataset for declared tables ({@code
-     * lance.declared=true}) and for tables whose Gravitino column list is empty. Also repairs
-     * empty-column tables that were registered before their schema was captured.
+     * lance.declared=true}) and for tables whose Gravitino column list is empty and has not been
+     * confirmed empty against the dataset. Also repairs empty-column tables that were registered
+     * before their schema was captured.
      */
     DECLARED_AND_EMPTY,
     /**
      * Opens the Lance dataset on every {@code loadTable}, compares the dataset version with the
      * stored {@code lance.version}, and refreshes columns when the version has changed. The version
-     * gates refreshes when stored columns are present. Empty stored columns are always re-examined
-     * because the version alone does not prove that the empty metadata is complete.
+     * gates refreshes only for metadata that is complete on its own terms: a declared table, or an
+     * empty column list that was never confirmed against the dataset, is refreshed whatever the
+     * version says.
      */
     VERSION_CHECK
   }
@@ -182,9 +190,12 @@ public class LanceTableOperations extends ManagedTableOperations {
     // Gravitino metadata when the stored table is declared-only, empty, or configured to track
     // Lance dataset versions.
     boolean declaredOnly = isDeclaredOnly(table);
-    boolean emptySchema = table.columns().length == 0;
     SchemaRefreshMode refreshMode = schemaRefreshMode();
-    if (!declaredOnly && !emptySchema && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
+    // Whether the stored metadata is incomplete on its own terms, independent of the dataset
+    // version. Both modes share this: DECLARED_AND_EMPTY reads the dataset only when it is true,
+    // VERSION_CHECK additionally reads whenever the dataset version moved.
+    boolean datasetReadNeeded = isDatasetReadNeeded(table);
+    if (!datasetReadNeeded && refreshMode == SchemaRefreshMode.DECLARED_AND_EMPTY) {
       return table;
     }
     String location = table.properties().get(Table.PROPERTY_LOCATION);
@@ -199,8 +210,7 @@ public class LanceTableOperations extends ManagedTableOperations {
     try (Dataset dataset = openDataset(location, storageOptions)) {
       datasetVersion = dataset.version();
       if (refreshMode == SchemaRefreshMode.VERSION_CHECK
-          && !declaredOnly
-          && !emptySchema
+          && !datasetReadNeeded
           && !isDatasetVersionChanged(table, datasetVersion)) {
         return table;
       }
@@ -215,10 +225,12 @@ public class LanceTableOperations extends ManagedTableOperations {
     }
 
     if (columns.length == 0) {
-      // Record a newly checked empty version, but avoid a no-op metadata update when the same empty
-      // dataset is loaded again. Declared tables are excluded because their lance.declared flag is
-      // the authoritative "not yet written" signal.
-      if (!declaredOnly && isDatasetVersionChanged(table, datasetVersion)) {
+      // Confirm the emptiness against the dataset so later loads can trust the empty column list.
+      // Skipped once the table already carries that confirmation for this very version, which is
+      // what stops a genuinely empty dataset from being rewritten on every load. Declared tables
+      // are excluded because their lance.declared flag is the authoritative "not yet written"
+      // signal.
+      if (!declaredOnly && isEmptyConfirmationNeeded(table.properties(), datasetVersion)) {
         return recordCheckedEmptyVersion(ident, datasetVersion);
       }
       return table;
@@ -498,6 +510,78 @@ public class LanceTableOperations extends ManagedTableOperations {
         .orElse(false);
   }
 
+  /**
+   * Returns whether the Lance dataset has to be read to complete this table's stored metadata,
+   * regardless of the dataset version.
+   *
+   * <p>Three cases, in order:
+   *
+   * <ul>
+   *   <li>a declared table always needs the read: {@code lance.declared} is the authoritative "the
+   *       schema was never written to Gravitino" signal;
+   *   <li>a table that already stores columns does not;
+   *   <li>a table with no stored columns needs the read unless that emptiness was confirmed against
+   *       the dataset itself, see {@link #isEmptySchemaConfirmed}.
+   * </ul>
+   *
+   * @param table the stored table
+   * @return true if the dataset schema must be read
+   */
+  private boolean isDatasetReadNeeded(Table table) {
+    if (isDeclaredOnly(table)) {
+      return true;
+    }
+    if (table.columns().length > 0) {
+      return false;
+    }
+    return !isEmptySchemaConfirmed(table.properties());
+  }
+
+  /**
+   * Returns whether an empty stored column list was confirmed by actually reading the dataset
+   * schema at the version the table still records.
+   *
+   * <p>{@code lance.version} alone does not prove it. {@link #alterTable} records that property
+   * after every dataset change without reading the schema, so a table registered with no columns
+   * ends up carrying a version while its column metadata was never captured. Treating that as
+   * "confirmed empty" is what used to leave such a table stuck with no columns forever.
+   *
+   * <p>{@code lance.empty-schema-checked-version} is written only by {@link
+   * #recordCheckedEmptyVersion}, immediately after a schema read returned no columns, and it
+   * carries the version it was observed at. Any later version recorded by another path therefore
+   * invalidates it on its own, with no need for those paths to know about this marker.
+   *
+   * @param properties the stored table properties
+   * @return true if the stored empty column list reflects a real schema read
+   */
+  private boolean isEmptySchemaConfirmed(Map<String, String> properties) {
+    String checkedVersion = properties.get(LanceConstants.LANCE_EMPTY_SCHEMA_CHECKED_VERSION);
+    String currentVersion = properties.get(LanceConstants.LANCE_TABLE_VERSION);
+    if (StringUtils.isBlank(checkedVersion) || StringUtils.isBlank(currentVersion)) {
+      return false;
+    }
+
+    try {
+      return Long.parseLong(checkedVersion) == Long.parseLong(currentVersion);
+    } catch (NumberFormatException e) {
+      // Version metadata we cannot read confirms nothing, the same way isDatasetVersionChanged
+      // treats it as changed. Re-reading the dataset is the safe answer.
+      return false;
+    }
+  }
+
+  /**
+   * Returns whether the confirmed-empty marker has to be written for the given dataset version.
+   *
+   * @param properties the stored table properties
+   * @param datasetVersion the version the dataset was just read at
+   * @return true if the stored metadata does not already record this confirmation
+   */
+  private boolean isEmptyConfirmationNeeded(Map<String, String> properties, long datasetVersion) {
+    return isDatasetVersionChanged(properties, datasetVersion)
+        || !isEmptySchemaConfirmed(properties);
+  }
+
   private boolean isDatasetVersionChanged(Table table, long datasetVersion) {
     return isDatasetVersionChanged(table.properties(), datasetVersion);
   }
@@ -613,12 +697,19 @@ public class LanceTableOperations extends ManagedTableOperations {
           updateTableWithCasRetry(
               ident,
               current -> {
-                if (!isDatasetVersionChanged(current.properties(), datasetVersion)) {
+                // Re-checked under the CAS: another writer may have recorded the same
+                // confirmation between the load and this update.
+                if (!isEmptyConfirmationNeeded(current.properties(), datasetVersion)) {
                   return current;
                 }
                 Map<String, String> updatedProperties = new HashMap<>(current.properties());
                 updatedProperties.put(
                     LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
+                // Mark the empty column list as confirmed against the dataset at this version, so
+                // later loads can trust it instead of re-opening the dataset every time.
+                updatedProperties.put(
+                    LanceConstants.LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
+                    String.valueOf(datasetVersion));
                 // Always use an empty column list: the dataset is confirmed empty at this version.
                 // Using current.columns() would preserve stale columns when the dataset schema was
                 // cleared externally, causing future VERSION_CHECK loads to return stale metadata
@@ -664,6 +755,8 @@ public class LanceTableOperations extends ManagedTableOperations {
     Map<String, String> updatedProperties = new HashMap<>(tableEntity.properties());
     updatedProperties.put(LanceConstants.LANCE_TABLE_VERSION, String.valueOf(datasetVersion));
     updatedProperties.remove(LanceConstants.LANCE_TABLE_DECLARED);
+    // The dataset has columns, so any earlier "confirmed empty" marker is stale.
+    updatedProperties.remove(LanceConstants.LANCE_EMPTY_SCHEMA_CHECKED_VERSION);
 
     AuditInfo columnAuditInfo =
         AuditInfo.builder()

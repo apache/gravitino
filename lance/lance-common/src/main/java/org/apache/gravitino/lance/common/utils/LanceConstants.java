@@ -38,6 +38,11 @@ public class LanceConstants {
   public static final String LANCE_TABLE_REGISTER = "lance.register";
 
   public static final String LANCE_TABLE_VERSION = "lance.version";
+  // Records the dataset version at which Gravitino read the Lance schema and found no columns.
+  // Written only after an actual schema read, so it distinguishes a dataset that is genuinely
+  // empty from a table whose column metadata was never captured. See LanceTableOperations.
+  public static final String LANCE_EMPTY_SCHEMA_CHECKED_VERSION =
+      "lance.empty-schema-checked-version";
   // Mark whether the table is declared only in metadata without creating a Lance dataset.
   public static final String LANCE_TABLE_DECLARED = "lance.declared";
   public static final String LANCE_SCHEMA_REFRESH_MODE = "lance.schema-refresh-mode";

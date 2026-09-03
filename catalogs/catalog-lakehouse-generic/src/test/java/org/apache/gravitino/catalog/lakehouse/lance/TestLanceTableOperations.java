@@ -19,6 +19,7 @@
 package org.apache.gravitino.catalog.lakehouse.lance;
 
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_CREATION_MODE;
+import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_EMPTY_SCHEMA_CHECKED_VERSION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_SCHEMA_REFRESH_MODE;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_STORAGE_OPTIONS_PREFIX;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_DECLARED;
@@ -30,6 +31,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -657,6 +659,8 @@ public class TestLanceTableOperations {
 
     Assertions.assertEquals(0, loaded.columns().length);
     Assertions.assertEquals("3", loaded.properties().get(LANCE_TABLE_VERSION));
+    // The emptiness was confirmed against the dataset, so later loads can trust it.
+    Assertions.assertEquals("3", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
     verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
@@ -697,8 +701,9 @@ public class TestLanceTableOperations {
   }
 
   @Test
-  public void testEmptyDatasetWithRecordedVersionIsRecheckedWithoutMetadataUpdate()
-      throws Exception {
+  public void testEmptyDatasetWithRecordedVersionIsConfirmedOnce() throws Exception {
+    // lance.version on its own is not a confirmation: it is also written by alterTable, which
+    // never reads the schema. The dataset is re-read and the confirmation marker recorded.
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("empty-dataset-recheck").toString();
     TableEntity tableEntity =
@@ -706,18 +711,178 @@ public class TestLanceTableOperations {
             ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "3"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(tableEntity);
+            });
 
     Dataset dataset = mock(Dataset.class);
     when(dataset.getSchema()).thenReturn(new Schema(List.of()));
     when(dataset.version()).thenReturn(3L);
     Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
 
+    Table loaded =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(0, loaded.columns().length);
+    Assertions.assertEquals("3", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
+    verify(dataset).getSchema();
+    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testConfirmedEmptyTableSkipsDatasetOpen() throws Exception {
+    // A table whose empty column list was confirmed against the dataset at the version it still
+    // records costs no dataset read at all. This is what keeps a genuinely empty dataset from
+    // paying a remote open on every single load.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("empty-dataset-confirmed").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_VERSION,
+                "3",
+                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
+                "3"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+
     Table loaded = lanceTableOps.loadTable(ident);
 
     Assertions.assertEquals(0, loaded.columns().length);
-    verify(dataset).getSchema();
+    verify(lanceTableOps, never()).openDataset(anyString(), any());
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testStaleEmptyConfirmationIsInvalidatedByNewerVersion() throws Exception {
+    // An alterTable recorded lance.version=5 after the emptiness was confirmed at version 3. The
+    // marker no longer matches, so the dataset is read again and the real schema is picked up.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("empty-dataset-stale-marker").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_VERSION,
+                "5",
+                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
+                "3"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(idGenerator.nextId()).thenReturn(31L);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(tableEntity);
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.version()).thenReturn(5L);
+    when(dataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("col_a", new ArrowType.Int(64, true)))));
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loaded =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(1, loaded.columns().length);
+    Assertions.assertEquals("col_a", loaded.columns()[0].name());
+    // Real columns retire the confirmation.
+    Assertions.assertNull(loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
+  }
+
+  @Test
+  public void testRepairedTableStopsOpeningDatasetOnNextLoad() throws Exception {
+    // The repair must be a one-off cost: once the columns are stored, DECLARED_AND_EMPTY has no
+    // reason to touch the dataset again.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("repair-then-skip").toString();
+    TableEntity stored =
+        tableEntity(
+            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "3"));
+    AtomicReference<TableEntity> current = new AtomicReference<>(stored);
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenAnswer(invocation -> current.get());
+    when(idGenerator.nextId()).thenReturn(32L);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              TableEntity updated = updater.apply(current.get());
+              current.set(updated);
+              return updated;
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.version()).thenReturn(3L);
+    when(dataset.getSchema())
+        .thenReturn(new Schema(List.of(Field.nullable("col_a", new ArrowType.Int(64, true)))));
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+    Table second =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(1, second.columns().length);
+    verify(lanceTableOps, times(1)).openDataset(eq(location), any());
+    verify(store, times(1))
+        .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
+  }
+
+  @Test
+  public void testMalformedStoredVersionIsTreatedAsChanged() throws Exception {
+    // A version property that is not a number cannot confirm anything: the dataset is read and the
+    // stored metadata is rewritten with a usable version.
+    NameIdentifier ident = NameIdentifier.of("schema", "table");
+    String location = tempDir.resolve("malformed-version").toString();
+    TableEntity tableEntity =
+        tableEntity(
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_VERSION,
+                "not-a-number",
+                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
+                "not-a-number"));
+    when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
+        .thenReturn(tableEntity);
+    when(store.update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any()))
+        .thenAnswer(
+            invocation -> {
+              @SuppressWarnings("unchecked")
+              Function<TableEntity, TableEntity> updater = invocation.getArgument(3);
+              return updater.apply(tableEntity);
+            });
+
+    Dataset dataset = mock(Dataset.class);
+    when(dataset.getSchema()).thenReturn(new Schema(List.of()));
+    when(dataset.version()).thenReturn(4L);
+    Mockito.doReturn(dataset).when(lanceTableOps).openDataset(location, Map.of());
+
+    Table loaded =
+        PrincipalUtils.doAs(new UserPrincipal("tester"), () -> lanceTableOps.loadTable(ident));
+
+    Assertions.assertEquals(0, loaded.columns().length);
+    Assertions.assertEquals("4", loaded.properties().get(LANCE_TABLE_VERSION));
+    Assertions.assertEquals("4", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
+    verify(store).update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
 
   // ---------------------------------------------------------------------------
@@ -773,19 +938,30 @@ public class TestLanceTableOperations {
     Assertions.assertEquals(0, loaded.columns().length);
     // The new dataset version must be persisted so future VERSION_CHECK loads see the match.
     Assertions.assertEquals("9", loaded.properties().get(LANCE_TABLE_VERSION));
+    // The emptiness was observed directly, so it is recorded as confirmed at that version.
+    Assertions.assertEquals("9", loaded.properties().get(LANCE_EMPTY_SCHEMA_CHECKED_VERSION));
   }
 
   @Test
   public void testVersionCheckStaleColumnsAreNotReturnedOnSubsequentLoad() throws Exception {
-    // Once stale columns are cleared and version=9 is recorded, the next loadTable must confirm
-    // that the dataset is still empty without writing the same metadata again.
+    // Once stale columns are cleared and the emptiness is confirmed at version=9, the next
+    // loadTable must return the empty column list without reading the schema again.
     lanceTableOps.setCatalogProperties(Map.of(LANCE_SCHEMA_REFRESH_MODE, "version-check"));
     NameIdentifier ident = NameIdentifier.of("schema", "table");
     String location = tempDir.resolve("subsequent-empty-load").toString();
-    // Simulate the store state after the first load cleared stale columns.
+    // Simulate the store state the previous test leaves behind: columns cleared, version and
+    // confirmation marker both at 9.
     TableEntity tableEntity =
         tableEntity(
-            ident, List.of(), Map.of(Table.PROPERTY_LOCATION, location, LANCE_TABLE_VERSION, "9"));
+            ident,
+            List.of(),
+            Map.of(
+                Table.PROPERTY_LOCATION,
+                location,
+                LANCE_TABLE_VERSION,
+                "9",
+                LANCE_EMPTY_SCHEMA_CHECKED_VERSION,
+                "9"));
     when(store.get(eq(ident), eq(Entity.EntityType.TABLE), eq(TableEntity.class)))
         .thenReturn(tableEntity);
 
@@ -797,7 +973,8 @@ public class TestLanceTableOperations {
     Table loaded = lanceTableOps.loadTable(ident);
 
     Assertions.assertEquals(0, loaded.columns().length);
-    verify(dataset).getSchema();
+    // Version matched and the empty column list is confirmed: no schema read, no metadata write.
+    verify(dataset, never()).getSchema();
     verify(store, never())
         .update(eq(ident), eq(TableEntity.class), eq(Entity.EntityType.TABLE), any());
   }
