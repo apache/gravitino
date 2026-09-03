@@ -230,11 +230,17 @@ public final class CatalogRegistrationState {
       return this;
     }
     // A registration that actually ran stamps its own success time; a poll that found the
-    // catalog unchanged, and every other status, keeps the last one.
-    long successTime =
-        status == Status.REGISTERED && reRegistered
-            ? lastSuccessTimeMs
-            : previous.lastSuccessTimeMs;
+    // catalog unchanged, and every other status, keeps the last one. A catalog observed
+    // registered with no earlier success time to keep, e.g. one whose previous row was a failed
+    // unregistration, stamps this observation rather than reporting none at all.
+    long successTime;
+    if (status != Status.REGISTERED) {
+      successTime = previous.lastSuccessTimeMs;
+    } else if (reRegistered || previous.lastSuccessTimeMs == 0) {
+      successTime = lastSuccessTimeMs;
+    } else {
+      successTime = previous.lastSuccessTimeMs;
+    }
     // Consecutive failures only accumulate while the catalog keeps failing. Any other status
     // interrupts the run, and its own count is already zero.
     long failures = status == Status.FAILED ? previous.failureCount + 1 : failureCount;

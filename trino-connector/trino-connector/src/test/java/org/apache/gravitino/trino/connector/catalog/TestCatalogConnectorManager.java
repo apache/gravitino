@@ -984,6 +984,64 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testUnreachableTrinoDoesNotQuoteStaleMetalakeErrors() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Mockito.doThrow(new RESTException("simulated: listing failed"))
+        .when(fixture.metalake)
+        .listCatalogs();
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+    assertTrue(manager.describeRegistrationFailure("test", "memory").contains("listing failed"));
+
+    when(fixture.catalogRegister.isTrinoReachable()).thenReturn(false);
+    manager.loadMetalakeSync();
+
+    // The stored procedure and the load status table must not describe the same attempt
+    // differently: this one stopped at the reachability check and touched no metalake.
+    assertTrue(manager.getMetalakeErrors().isEmpty());
+    assertFalse(manager.describeRegistrationFailure("test", "memory").contains("listing failed"));
+  }
+
+  @Test
+  public void testCatalogObservedRegisteredAfterAFailureGetsASuccessTime() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    Audit audit = mock(Audit.class);
+    Instant modifiedTime = Instant.ofEpochMilli(1000L);
+    when(audit.createTime()).thenReturn(modifiedTime);
+    when(audit.lastModifiedTime()).thenReturn(modifiedTime);
+    when(catalog.auditInfo()).thenReturn(audit);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    // A live connector whose row is FAILED, e.g. an unregistration that did not go through.
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getMetalake()).thenReturn(fixture.metalake);
+    when(context.getCatalog())
+        .thenReturn(
+            new GravitinoCatalog(
+                "test", "memory", "memory", ImmutableMap.of(), modifiedTime.toEpochMilli()));
+    when(catalog.provider()).thenReturn("unsupported-provider");
+    doThrow(new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Access Denied"))
+        .when(fixture.catalogRegister)
+        .unregisterCatalog(any());
+    manager.loadMetalakeSync();
+    assertEquals(CatalogRegistrationState.Status.FAILED, singleState(manager).getStatus());
+    assertEquals(0, singleState(manager).getLastSuccessTimeMs());
+
+    // The catalog is supported again. Nothing changed, so no re-registration runs, but the
+    // catalog is demonstrably registered and must not report that it never succeeded.
+    when(catalog.provider()).thenReturn("memory");
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, state.getStatus());
+    assertTrue(state.getLastSuccessTimeMs() > 0);
+  }
+
+  @Test
   public void testReloadFailureAfterUnregisterIsRecordedAsFailed() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);

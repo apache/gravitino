@@ -224,7 +224,7 @@ public class CatalogConnectorManager {
         trinoReachable = false;
         // No metalake was touched, so the errors left over from earlier cycles say nothing
         // about this one.
-        recordLoadFailure(message, null, Map.of());
+        recordLoadFailure(message, null, Map.of(), true);
         return;
       }
       trinoReachable = true;
@@ -323,11 +323,20 @@ public class CatalogConnectorManager {
   }
 
   private void recordLoadFailure(String message, Throwable cause) {
-    recordLoadFailure(message, cause, Map.copyOf(metalakeErrors));
+    recordLoadFailure(message, cause, Map.copyOf(metalakeErrors), false);
   }
 
+  /**
+   * @param awaitingTrino whether the attempt stopped at the reachability check, which is the normal
+   *     state during startup and the only failure this reports quietly. Passed in rather than read
+   *     from the field, which outlives the cycle: a plugin failing to load while Trino happens to
+   *     be down is still an error worth an ERROR line and a stack trace.
+   */
   private void recordLoadFailure(
-      String message, Throwable cause, Map<String, String> attemptMetalakeErrors) {
+      String message,
+      Throwable cause,
+      Map<String, String> attemptMetalakeErrors,
+      boolean awaitingTrino) {
     LoadOutcome previous = loadOutcome;
     boolean changed = !Objects.equals(previous.lastError, message);
     loadOutcome =
@@ -337,9 +346,9 @@ public class CatalogConnectorManager {
             message,
             previous.consecutiveFailures + 1,
             attemptMetalakeErrors);
-    if (!trinoReachable) {
-      // A Trino server that is not reachable yet is the normal state during startup, and a
-      // repeat of it is just as normal, so this branch comes before the ones that escalate.
+    if (awaitingTrino) {
+      // Waiting for Trino is the normal state during startup, and a repeat of it is just as
+      // normal, so this branch comes before the ones that escalate.
       LOG.info("%s", message);
     } else if (changed) {
       LOG.error("Failed to load catalogs from the Gravitino server: %s", withCause(message, cause));
@@ -852,7 +861,7 @@ public class CatalogConnectorManager {
    * @return the metalake errors, empty if every metalake was loaded successfully
    */
   public Map<String, String> getMetalakeErrors() {
-    return Map.copyOf(metalakeErrors);
+    return loadOutcome.getMetalakeErrors();
   }
 
   /**
@@ -867,7 +876,10 @@ public class CatalogConnectorManager {
     if (state != null && state.getLastError() != null) {
       return String.format("%s: %s", state.getStatus(), state.getLastError());
     }
-    String metalakeError = metalakeErrors.get(metalake);
+    // Read from the published outcome rather than the live map: an attempt that stopped at the
+    // reachability check touched no metalake, and quoting what an earlier one reported would
+    // contradict what load_status says about the same attempt.
+    String metalakeError = loadOutcome.getMetalakeErrors().get(metalake);
     if (metalakeError != null) {
       return String.format("Metalake %s could not be loaded: %s", metalake, metalakeError);
     }
