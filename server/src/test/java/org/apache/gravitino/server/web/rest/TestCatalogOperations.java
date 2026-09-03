@@ -47,6 +47,7 @@ import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Catalog;
+import org.apache.gravitino.CatalogChange;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
@@ -81,6 +82,7 @@ import org.glassfish.jersey.test.TestProperties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 
 public class TestCatalogOperations extends BaseOperationsTest {
@@ -398,6 +400,46 @@ public class TestCatalogOperations extends BaseOperationsTest {
 
     Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
     Assertions.assertEquals(0, response.readEntity(BaseResponse.class).getCode());
+
+    CatalogUpdatesRequest proposedChanges =
+        new CatalogUpdatesRequest(
+            ImmutableList.of(
+                new CatalogUpdateRequest.RenameCatalogRequest("catalog2"),
+                new CatalogUpdateRequest.UpdateCatalogCommentRequest("new comment"),
+                new CatalogUpdateRequest.SetCatalogPropertyRequest("key", "new value"),
+                new CatalogUpdateRequest.RemoveCatalogPropertyRequest("old-key")));
+    doNothing().when(manager).testConnection(any(NameIdentifier.class), any(CatalogChange[].class));
+    Response changedResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(proposedChanges, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), changedResponse.getStatus());
+    Assertions.assertEquals(0, changedResponse.readEntity(BaseResponse.class).getCode());
+    ArgumentCaptor<CatalogChange[]> changesCaptor = ArgumentCaptor.forClass(CatalogChange[].class);
+    Mockito.verify(manager).testConnection(any(NameIdentifier.class), changesCaptor.capture());
+    Assertions.assertArrayEquals(
+        new CatalogChange[] {
+          CatalogChange.rename("catalog2"),
+          CatalogChange.updateComment("new comment"),
+          CatalogChange.setProperty("key", "new value"),
+          CatalogChange.removeProperty("old-key")
+        },
+        changesCaptor.getValue());
+
+    doThrow(new IllegalArgumentException("invalid proposed change"))
+        .when(manager)
+        .testConnection(any(NameIdentifier.class), any(CatalogChange[].class));
+    Response invalidChangesResponse =
+        target("/metalakes/metalake1/catalogs/catalog1/testConnection")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(proposedChanges, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), invalidChangesResponse.getStatus());
+    ErrorResponse invalidChanges = invalidChangesResponse.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, invalidChanges.getCode());
+    Assertions.assertEquals("invalid proposed change", invalidChanges.getMessage());
+    Assertions.assertNull(invalidChanges.getStack());
 
     doThrow(new ConnectionFailedException("sanitized failure"))
         .when(manager)

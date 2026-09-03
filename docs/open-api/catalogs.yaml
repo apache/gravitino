@@ -151,13 +151,21 @@ paths:
       summary: Test an existing catalog connection
       description: >-
         Runs the provider's smallest meaningful, read-only catalog-level operation using the
-        catalog's stored configuration and effective credentials. This fail-fast preflight
-        surfaces configuration and connectivity failures before regular catalog operations, but
-        does not guarantee that every object-level or mutating operation will succeed. Fileset
-        catalogs test all catalog-level `location` and `location-*` targets. Model and Generic
-        catalogs do not support connection testing. Expected test failures are returned as
-        application error codes in an HTTP 200 response.
+        catalog's stored configuration and effective credentials. Optional proposed catalog
+        changes are applied to a temporary effective configuration for this probe and are not
+        persisted. This fail-fast preflight surfaces configuration and connectivity failures before
+        regular catalog operations, but does not guarantee that every object-level or mutating
+        operation will succeed. Fileset catalogs test all catalog-level `location` and `location-*`
+        targets. Model and Generic catalogs do not support connection testing. Expected test
+        failures are returned as application error codes in an HTTP 200 response.
       operationId: testExistingCatalogConnection
+      requestBody:
+        required: false
+        description: Optional catalog changes to apply only to this connection test
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogUpdatesRequest"
       responses:
         "200":
           description: Connection test completed, including expected test failures
