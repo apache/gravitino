@@ -26,6 +26,7 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 1. [Build](../how-to-build.md) or download the package ([gravitino-spark-connector-runtime-3.3](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.3), [gravitino-spark-connector-runtime-3.4](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.4), [gravitino-spark-connector-runtime-3.5](https://mvnrepository.com/artifact/org.apache.gravitino/gravitino-spark-connector-runtime-3.5)), and place it to the classpath of Spark.
 2. Configure the Spark session to use the Gravitino spark connector.
 
+<<<<<<< HEAD
 | Property                                 | Type   | Default Value | Description                                                                                     | Required |
 |------------------------------------------|--------|---------------|-------------------------------------------------------------------------------------------------|----------|
 | spark.plugins                            | string | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin` | Yes      |
@@ -34,6 +35,27 @@ The Apache Gravitino Spark connector leverages the Spark DataSourceV2 interface 
 | spark.sql.gravitino.enableIcebergSupport | string | `false`       | Set to `true` to use Iceberg catalog.                                                           | No       |
 | spark.sql.gravitino.enablePaimonSupport  | string | `false`       | Set to `true` to use Paimon catalog.                                                            | No       |
 | spark.sql.gravitino.client.              | string | (none)        | The configuration key prefix for the Gravitino client config.                                   | No       |
+=======
+| Property                                         | Type    | Default Value | Description                                                                                                                                                              | Required |
+|--------------------------------------------------|---------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------|
+| spark.plugins                                    | string  | (none)        | Gravitino spark plugin name, `org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin`                                                                          | Yes      |
+| spark.sql.gravitino.metalake                     | string  | (none)        | The metalake name that spark connector used to request to Gravitino.                                                                                                     | Yes      |
+| spark.sql.gravitino.uri                          | string  | (none)        | The uri of Gravitino server address.                                                                                                                                     | Yes      |
+| spark.sql.gravitino.enableIcebergSupport         | string  | `false`       | Set to `true` to use Iceberg catalog.                                                                                                                                    | No       |
+| spark.sql.gravitino.enablePaimonSupport          | string  | `false`       | Set to `true` to use Paimon catalog.                                                                                                                                     | No       |
+| spark.sql.gravitino.client.                      | string  | (none)        | The configuration key prefix for the Gravitino client config.                                                                                                            | No       |
+| spark.sql.gravitino.authType                     | string  | `simple`      | The authentication type, one of `simple`, `basic`, `oauth2`, `kerberos`, `token`.                                                                                        | No       |
+| spark.sql.gravitino.token.value                  | string  | (none)        | The bearer token to present to Gravitino, used when `authType` is `token`.                                                                                               | No       |
+| spark.sql.gravitino.token.file                   | string  | (none)        | Path to a file holding the bearer token. Takes precedence over `token.value` and is re-read per request.                                                                 | No       |
+| spark.sql.gravitino.token.principalFields        | string  | `sub`         | Comma separated, ordered JWT claim names used to identify the caller in `token` mode.                                                                                    | No       |
+| spark.sql.gravitino.clientCacheMaxSize           | int     | `100`         | The maximum number of Gravitino clients cached, one per identity.                                                                                                        | No       |
+| spark.sql.gravitino.clientCacheTtlSec            | long    | `3600`        | Evicts a cached Gravitino client this many seconds after it was last used.                                                                                               | No       |
+| spark.sql.gravitino.catalogCacheTtlSec           | long    | `300`         | Evicts a cached catalog this many seconds after it was loaded.                                                                                                           | No       |
+| spark.sql.gravitino.iceberg.rest-routing-enabled | boolean | `true`        | Whether `hive` and `jdbc` backed Iceberg catalogs must be routed through the Gravitino Iceberg REST server. Set to `false` to retain legacy native backend translation.  | No       |
+| spark.sql.gravitino.iceberg.rest-uri             | string  | (none)        | Overrides the auto-discovered Gravitino Iceberg REST server endpoint. See [Iceberg catalog](spark-catalog-iceberg.md#routing-through-the-gravitino-iceberg-rest-server). | No       |
+| spark.sql.gravitino.iceberg.reuseOAuth2          | boolean | `true`        | Reuses the Gravitino OAuth2 client configuration for routed Iceberg REST catalogs. Explicit IRC OAuth2 properties override individual reused values.                     | No       |
+| spark.sql.gravitino.iceberg.rest.                | string  | (none)        | The configuration key prefix for the Iceberg REST client config (e.g. `rest.auth.type`), applied when a catalog is routed through the Gravitino Iceberg REST server.     | No       |
+>>>>>>> 5b666b322 ([#12709] improvement(spark-connector): Route lakehouse-iceberg catalogs through the Iceberg REST server (#12710))
 
 To configure the Gravitino client, use properties prefixed with `spark.sql.gravitino.client.`. These properties will be passed to the Gravitino client after removing the `spark.sql.` prefix.
 
