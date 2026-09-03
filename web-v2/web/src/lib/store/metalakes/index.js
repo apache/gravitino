@@ -20,6 +20,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 
 import { to, extractPlaceholder, updateTreeData, findInTree } from '@/lib/utils'
+import { isUnsupportedOperationError } from '@/lib/utils/axios/unsupportedOperation'
 import toast from 'react-hot-toast'
 
 import _ from 'lodash-es'
@@ -2250,8 +2251,8 @@ export const fetchViews = createAsyncThunk(
     const [err, res] = await to(getViewsApi({ metalake, catalog, schema }, { errorMessageMode: 'none' }))
 
     if (err || !res) {
-      // Catalog doesn't support views (HTTP 405) — return empty views silently
-      if (err?.response?.status === 405) {
+      // Catalog doesn't support views (HTTP 501) — return empty views silently
+      if (isUnsupportedOperationError(err)) {
         return { views: [], init }
       }
       if (init) {
@@ -2304,8 +2305,8 @@ export const getViewDetails = createAsyncThunk(
     const [err, res] = await to(getViewDetailsApi({ metalake, catalog, schema, view }, { errorMessageMode: 'none' }))
 
     if (err || !res) {
-      // Catalog doesn't support views (HTTP 405) — return empty result silently
-      if (err?.response?.status === 405) {
+      // Catalog doesn't support views (HTTP 501) — return empty result silently
+      if (isUnsupportedOperationError(err)) {
         return { view: null, init }
       }
       throw new Error(err)
