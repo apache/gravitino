@@ -19,12 +19,14 @@
 package org.apache.gravitino.server.web;
 
 /**
- * Determines whether a URI path targets a health check endpoint.
+ * Determines whether a URI path targets a health check or other public endpoint that should bypass
+ * authentication.
  *
  * <p>The base implementation covers the canonical Gravitino health paths ({@code /health}, {@code
- * /health/*}, {@code /health.html}, {@code /api/health}, {@code /api/health/*}). Server-specific
- * subclasses (e.g. {@code IcebergHealthCheckPathMatcher}) extend this class to add additional
- * health endpoints served by their respective REST servers.
+ * /health/*}, {@code /health.html}, {@code /api/health}, {@code /api/health/*}) and the read-only
+ * version endpoint ({@code /api/version}). Server-specific subclasses (e.g. {@code
+ * IcebergHealthCheckPathMatcher}) extend this class to add additional endpoints served by their
+ * respective REST servers.
  *
  * <p>Both {@link org.apache.gravitino.server.authentication.AuthenticationFilter} (to bypass
  * authentication for probe traffic) and {@link HttpAuditFilter} (to skip audit logging for probe
@@ -34,19 +36,26 @@ package org.apache.gravitino.server.web;
 public class HealthCheckPathMatcher {
 
   /**
-   * Returns {@code true} if {@code path} targets a Gravitino health check endpoint.
+   * Returns {@code true} if {@code path} targets a Gravitino public endpoint that should bypass
+   * authentication.
    *
-   * <p>Covers the canonical API path ({@code /api/health} and {@code /api/health/*}) and the
-   * root-level aliases ({@code /health}, {@code /health/*}, {@code /health.html}) that forward to
-   * the canonical paths. During a {@link javax.servlet.RequestDispatcher} forward, {@code
-   * getRequestURI()} returns the original URI rather than the target, so these aliases must be
-   * included here.
+   * <p>Covers:
+   *
+   * <ul>
+   *   <li>Health check paths: {@code /api/health}, {@code /api/health/*}, and the root-level
+   *       aliases {@code /health}, {@code /health/*}, {@code /health.html} that forward to the
+   *       canonical paths. During a {@link javax.servlet.RequestDispatcher} forward, {@code
+   *       getRequestURI()} returns the original URI rather than the target, so these aliases must
+   *       be included here.
+   *   <li>Version endpoint: {@code /api/version} — a read-only, non-sensitive endpoint used by
+   *       operators and tooling to check server version without requiring credentials.
+   * </ul>
    *
    * <p>Subclasses should override this method and call {@code super.isHealthCheckPath(path)} first
    * to preserve the base paths.
    *
    * @param path the URI path to test; may be {@code null}
-   * @return {@code true} if {@code path} is a health check endpoint
+   * @return {@code true} if {@code path} is a public endpoint that bypasses authentication
    */
   public boolean isHealthCheckPath(String path) {
     if (path == null) {
@@ -56,6 +65,7 @@ public class HealthCheckPathMatcher {
         || path.startsWith("/health/")
         || path.equals("/health.html")
         || path.equals("/api/health")
-        || path.startsWith("/api/health/");
+        || path.startsWith("/api/health/")
+        || path.equals("/api/version");
   }
 }
