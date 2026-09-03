@@ -29,37 +29,37 @@ Discussion: [#12619](https://github.com/apache/gravitino/discussions/12619)
 
 ## Summary
 
-An access rule is a `Policy` of type `system_access_control` whose `content` carries an action and
-a role condition. The policy is bound to a tag. Any object carrying that tag becomes subject to
-the rule.
+An access rule is a `Policy` of type `system_access_control` whose `content` carries a set of
+privileges and a role condition. The policy is bound to a tag. Any object carrying that tag
+becomes subject to the rule.
 
 ```json
 POST /api/metalakes/prod/policies
 {
-  "name": "analyst_read_certified",
+  "name": "certified_access",
   "policyType": "system_access_control",
   "enabled": true,
   "content": {
-    "action": "SELECT_TABLE",
-    "role":   { "name": "analyst" }
+    "privileges": ["SELECT_TABLE", "MODIFY_TABLE"],
+    "applicable_roles": ["analyst", "data_engineer"]
   }
 }
 ```
 
 ```
-PUT  /api/metalakes/prod/tags/certified/policies/analyst_read_certified
+PUT  /api/metalakes/prod/tags/certified/policies/certified_access
      { "selector": { "type": "ALL_VALUES" } }
 
 POST /api/metalakes/prod/objects/TABLE/lakehouse.finance.orders/tags
      { "tagsToAdd": [{ "name": "certified" }] }
 ```
 
-Read together: *members of the role `analyst` may `SELECT` any table that carries the tag
-`certified`.*
+Read together: *a caller holding either `analyst` or `data_engineer` may select from and modify
+any table that carries the tag `certified`.* Any listed role satisfies the condition, and every
+listed privilege is conferred to it.
 
-There is exactly one attachment — the policy-to-tag bind. The role condition is a value inside
-`content`, not an association. No new user-facing entity, REST resource or client API is
-introduced.
+Only one thing is attached: the policy to the tag. The roles are values inside `content`, not a
+second link. No new user-facing entity, REST resource or client API is introduced.
 
 ---
 
@@ -75,11 +75,10 @@ models, columns and functions, carry assignment values (see
 Policy-on-tag ([policy-on-tag.md](policy-on-tag.md)) lets governance policies be selected by those
 tags. Authorization does not read tags at all.
 
-The consequence is that intent expressed as classification cannot drive access. An organization
-that already labels tables `certified`, `pii` or `data_domain=finance` must still enumerate grants
-object by object to act on those labels. New objects need new grants, dropped objects leave stale
-ones, and the rule itself is written down nowhere — it exists only as the accumulated set of grants
-someone remembered to issue.
+So a label cannot drive access. An organization that already tags tables `certified`, `pii` or
+`data_domain=finance` must still issue grants object by object to act on those tags. New objects
+need new grants, dropped objects leave stale ones, and the rule itself is written down nowhere — it
+exists only as the pile of grants someone remembered to issue.
 
 ---
 
@@ -100,12 +99,12 @@ someone remembered to issue.
 
 | Excluded | Reason |
 |---|---|
-| `DENY` | Deny that cannot be suppressed by re-tagging a descendant is a separate problem. Allow-only keeps v1 evaluation total and order-independent. |
+| `DENY` | A deny that a descendant tag cannot undo is a separate problem. Allow-only means every rule set has an answer and the order rules are applied in never matters. |
 | Users and groups as the matched condition | The condition schema can gain them later without changing the model. |
 | Row filtering and column masking | Distinct policy types; this design governs whole-object decisions. |
 | Cross-tag conditions | A rule matches one tag. Conditions spanning several tags await the `EXPRESSION` selector type in [policy-on-tag.md](policy-on-tag.md). |
 | Column-level decisions | A tag on a column does not affect decisions about its table. |
-| A `scope` field in `content`, restricting a rule to a subtree | Not a security boundary: creating a policy needs metalake-wide `CREATE_POLICY`, so whoever writes the rule sets its reach. It is also not consulted when a tag is applied, so it filters effect rather than preventing a wrong tag. Tag assignment values with a value-sensitive selector cover the one-tag-different-subtrees case. Additive later — absent has always meant metalake-wide. |
+| A `scope` field in `content`, restricting a rule to a subtree | Not a security boundary: creating a policy already needs metalake-wide `CREATE_POLICY`, so whoever writes the rule chooses its reach anyway. It is also not checked when a tag is applied, so it limits where a rule takes effect rather than stopping a wrong tag. One tag meaning different things in different subtrees is already covered by tag assignment values with a value-sensitive selector. Can be added later, since an absent `scope` has always meant metalake-wide. |
 | Replacing RBAC | Baseline privileges, ownership and traversal are unchanged. See [Composition with RBAC](#composition-with-rbac). |
 
 ---
@@ -119,8 +118,8 @@ someone remembered to issue.
 | Extend RBAC grants with a tag predicate | No new concepts | The grant table is object-identified; a predicate has no object, and every grant read path would change | Rejected |
 | Evaluate tags in an external engine (OPA and similar) | Arbitrary policy language | Moves the decision out of Gravitino, duplicates the tag hierarchy, and cannot use the existing expression path | Rejected |
 
-The consequence of that one con — referential integrity maintained by the server rather than by the
-schema — is addressed in [Lifecycle](#lifecycle).
+That one con means the server keeps the role reference consistent, rather than the database schema
+doing it. [Lifecycle](#lifecycle) covers how.
 
 ---
 
@@ -135,22 +134,22 @@ existing example. `system_access_control` follows the same pattern with a new
 
 | Field | Type | Meaning |
 |---|---|---|
-| `action` | `Privilege.Name` | The privilege the rule confers. Must be one of the permitted names — see [Composition with RBAC](#composition-with-rbac) for the exclusions. |
-| `role` | object with `name` | The **condition**. Matched against the caller's expanded roles. |
+| `privileges` | list of `Privilege.Name` | The privileges the rule confers. Each must be a permitted name — see [Composition with RBAC](#composition-with-rbac) for the exclusions. |
+| `applicable_roles` | list of role names | The **condition**. Satisfied when any listed role is among the caller's expanded roles. |
 
 `validate()` rejects at creation rather than at evaluation:
 
-- `action` parses to a permitted `Privilege.Name`.
-- `role` name is non-blank.
+- `privileges` is non-empty and every entry parses to a permitted `Privilege.Name`.
+- `applicable_roles` is non-empty and every name is non-blank.
 
-Rejecting at write time matters because the alternative failure is silent: a policy naming an
-action that does not parse simply grants nothing, and nothing surfaces until someone notices the
-access they expected is missing.
+Rejecting at write time matters because the alternative failure is silent: a policy naming a
+privilege that does not parse simply grants nothing, and nothing surfaces until someone notices
+the access they expected is missing.
 
 Whether `validate()` also requires the named role to *exist* is part of
 [OQ-3](#oq-3--deleting-a-referenced-role), not a separate decision.
 
-### `role` is a condition, not a principal
+### `applicable_roles` is a condition, not a principal
 
 The rule does not grant anything to `analyst`. It states that *if* the caller holds `analyst`
 among their expanded roles *and* the object carries `certified`, then `SELECT_TABLE` is satisfied
@@ -177,24 +176,23 @@ whether any access rule is satisfied. That requires three things:
 1. the tags effective at the object after nearest-wins resolution
    ([tag-assignment-values.md](tag-assignment-values.md)), including those inherited from ancestors;
 2. the `system_access_control` policies bound to those tags;
-3. for each, whether `role` is among the caller's expanded roles.
+3. for each, whether any of `applicable_roles` is among the caller's expanded roles.
 
 The question is *when* steps 1 and 2 happen. Two options, presented without preference.
 
 ### Option 1 — expand when roles load
 
 When a role's policies are loaded into the authorizer, walk the tags reachable for that role and
-materialise a policy row per (role, object), alongside the rows already produced from RBAC grants.
+write one permission row per (role, object), alongside the rows already produced from RBAC grants.
 
-- Tag-derived permissions become indistinguishable from RBAC ones at decision time. The existing
-  composition — including the deny path, which narrows across all of a caller's roles rather than
-  only the active ones — applies unchanged, with no new expression.
+- At decision time, tag permissions look exactly like RBAC ones. Everything the authorizer already
+  does applies unchanged — including deny, which narrows across all of a caller's roles rather than
+  only the active ones — and no new expression is needed.
 - The decision itself costs nothing extra; the work moves to load time.
-- Expansion runs over *inherited* tags, so the row set for one role depends on the tag state of
-  every ancestor of every object it can reach. That set changes when a tag is applied anywhere in
-  the hierarchy, not only when the role changes.
-- A missed invalidation leaves rows in place that should have been withdrawn. The failure direction
-  is permissive.
+- Because tags are inherited, a role's rows depend on the tags of every ancestor of every object it
+  can reach. Applying a tag anywhere in the hierarchy can change them, not just changing the role.
+- Miss one of those invalidations and stale rows keep granting. The failure leaves people with more
+  access than they should have, not less.
 
 ### Option 2 — evaluate as a second stage at request time
 
@@ -210,10 +208,10 @@ the caller's roles.
   (rbacAllow || tagAllow) && !rbacDeny
   ```
 
-  which makes the interaction with deny a stated rule rather than a property of the row set. See
-  [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
-- A stale cache yields a decision computed from older tag state. The failure direction depends on
-  the cache design rather than on invalidation coverage.
+  so how deny interacts with a tag allow becomes a rule someone writes down, rather than something
+  the row set gives for free. See [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
+- A stale cache decides from older tag state. Whether that errs towards more access or less depends
+  on the cache design, not on invalidation coverage.
 
 ### Freshness
 
@@ -266,12 +264,12 @@ the ability to decide who may enter it, because anyone able to apply a tag could
 **Tag-based access is additive within territory a role already has, not a way to hand out new
 territory.** For `analyst` to read `lakehouse.finance.orders` through `certified`, the role must
 already hold `USE_CATALOG` on `lakehouse` and `USE_SCHEMA` on `finance`. A tag applied to a table in
-a schema the role cannot enter has no effect. `validate()` rejects both names in `action`.
+a schema the role cannot enter has no effect. `validate()` rejects both names in `privileges`.
 
 ### Allow and deny
 
 With `ALLOW` only, two access rules cannot conflict — they union. The interaction that remains is
-between a tag rule that allows and an RBAC grant that denies. See
+between a tag rule that allows and an RBAC grant that denies; the proposal is that the deny wins. See
 [OQ-2](#oq-2--composition-when-a-tag-allows-and-rbac-denies).
 
 ---
@@ -287,9 +285,9 @@ Four write paths can change who has access. Their current authority requirements
 | Bind a policy to a tag | tag-scoped | metalake, or the specific tag |
 | Apply a tag to an object | `METALAKE::OWNER \|\| ((TAG::OWNER \|\| ANY_APPLY_TAG) && CAN_ACCESS_METADATA)` | the specific tag, and only objects the caller can already access |
 
-Creating access policies and creating tags are metalake-wide capabilities with no object scoping,
-so authoring access rules is inherently a central function. It cannot be delegated per-catalog
-without new privileges.
+Creating a policy and creating a tag are both metalake-wide, with no way to scope either to a
+catalog. Authoring access rules is therefore a central function today; delegating it per-catalog
+would need new privileges.
 
 `ANY_APPLY_TAG` above expands to
 `(METALAKE::APPLY_TAG || TAG::APPLY_TAG) && !(METALAKE::DENY_APPLY_TAG || TAG::DENY_APPLY_TAG)`.
@@ -304,7 +302,7 @@ ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_SELECT_TABLE || ANY_MO
 ```
 
 So an applier must already own the object or an ancestor, or hold traversal plus read or write on
-the object itself. They are inside the data's trust boundary before they can tag it.
+the object itself. That bounds which objects they can tag, not what the tag may confer on them.
 
 ### What binding a policy to a tag delegates
 
@@ -318,7 +316,7 @@ Two properties of that delegation are worth recording:
 - `ApplyTag.canBindTo` accepts only `METALAKE` and `TAG`, so the delegation cannot be scoped to a
   subtree — "may apply `certified` within `lakehouse.finance`" is not expressible.
 
-See [OQ-4](#oq-4--object-scoped-apply_tag).
+See [OQ-4](#oq-4--authority-to-confer-access-through-a-tag).
 
 ---
 
@@ -326,20 +324,19 @@ See [OQ-4](#oq-4--object-scoped-apply_tag).
 
 ### Finding the policies that reference a role
 
-The role name lives inside `content`, a JSON column. Answering "which policies reference `analyst`"
+Role names live inside `content`, a JSON column. Answering "which policies reference `analyst`"
 by scanning and parsing every policy in the metalake does not scale, and role deletion needs that
 answer.
 
-The server therefore also writes an indexed join row linking policy to role, in the same shape as
+The server therefore also writes an indexed join row per referenced role, in the same shape as
 the existing `tag_relation_meta` and `policy_relation_meta` tables. The record is **derived** — the
 server computes it from `content` — and **not user-writable**: no endpoint touches it. If it ever
 disagrees with `content`, `content` is authoritative and the record is rebuilt.
 
-Non-writability is the substantive part. If the record could be written directly there would be two
-sources of truth for which role a policy conditions on, and the evaluator would have to choose
-between them.
+The "not user-writable" part is what matters. If the record could be written directly there would
+be two answers to which roles a policy names, and the evaluator would have to pick one.
 
-The record carries the role name, since that is what `content` holds.
+The record carries role names, since that is what `content` holds.
 
 ### Deleting a role
 
@@ -360,56 +357,72 @@ no additional payload. The bind and unbind operations emit the existing policy-t
 
 ## Open questions
 
-None of these are decided in this revision.
+None of these are settled. Where this revision has a preference, the option is marked **Proposed**.
 
-| | Question | Discussed in |
-|---|---|---|
-| OQ-1 | Where tags are evaluated | [Evaluation](#evaluation) |
-| OQ-2 | Composition when a tag allows and RBAC denies | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) |
-| OQ-3 | What happens when a referenced role is deleted | [below](#oq-3--deleting-a-referenced-role) |
-| OQ-4 | Whether object-scoped `APPLY_TAG` ships in v1 | [below](#oq-4--object-scoped-apply_tag) |
+| | Question | Discussed in | Proposal |
+|---|---|---|---|
+| OQ-1 | Where tags are evaluated | [Evaluation](#evaluation) | — |
+| OQ-2 | Composition when a tag allows and RBAC denies | [below](#oq-2--composition-when-a-tag-allows-and-rbac-denies) | Deny wins |
+| OQ-3 | What happens when a referenced role is deleted | [below](#oq-3--deleting-a-referenced-role) | Refuse the deletion |
+| OQ-4 | What authority conferring access through a tag requires | [below](#oq-4--authority-to-confer-access-through-a-tag) | Grant authority on the object, and an explicit tag grant |
 
 ### OQ-1 — where tags are evaluated
 
-Options and their consequences are set out in [Evaluation](#evaluation). The trade is between
-inheriting the existing composition at the cost of an invalidation surface that fails permissive,
-and stating the composition explicitly at the cost of request-path lookups.
+Options and their consequences are set out in [Evaluation](#evaluation). Option 1 reuses the
+existing permission engine, but its cache must be cleared whenever any tag changes anywhere, and a
+missed clear leaves access in place that should have been removed. Option 2 avoids that by checking
+tags on each request, at the cost of extra lookups.
 
 ### OQ-2 — composition when a tag allows and RBAC denies
 
-| Option | Behaviour |
-|---|---|
-| Deny wins | An RBAC deny suppresses a tag allow unconditionally. Predictable, matches the existing deny semantics, and a tag can never be used to escape an explicit deny. Conflicts are invisible unless surfaced separately as diagnostics. |
-| Refuse the overlap | Treat allow-from-tag over deny-from-RBAC as ambiguous and fail closed. Surfaces the conflict at the point it occurs, at the cost of denying requests that either rule alone would have resolved. |
+| | Option | Behaviour |
+|---|---|---|
+| **Proposed** | Deny wins | An RBAC deny suppresses a tag allow unconditionally. Predictable, matches the existing deny semantics, and a tag can never be used to escape an explicit deny. Conflicts are invisible unless surfaced separately as diagnostics. |
+| | Refuse the overlap | Treat allow-from-tag over deny-from-RBAC as ambiguous and fail closed. Surfaces the conflict at the point it occurs, at the cost of denying requests that either rule alone would have resolved. |
 
-Under Option 1 of [Evaluation](#evaluation) this is largely settled by the row set rather than
-stated; under Option 2 it must be written into the composition expression.
+Justification: deny already wins elsewhere in Gravitino, so this is the behaviour users expect.
+Refusing the overlap instead blocks requests that RBAC alone would have allowed, and every such
+request then needs an operator to intervene.
+
+Option 1 of [Evaluation](#evaluation) gets this for free: tag permissions become ordinary
+permission rows, and the existing engine already applies deny to them. Option 2 has to state the
+rule in its own combining logic.
 
 ### OQ-3 — deleting a referenced role
 
 Only the policy is affected; the tag, the bind and the tagged objects are not. This also settles
-whether `validate()` requires the role to exist at creation — refusing a dangling reference at one
-end while allowing it at the other leaves the same state reachable.
+whether `validate()` requires the role to exist at creation, since rejecting a dangling reference
+at one end while allowing it at the other reaches the same state either way.
 
-| Option | Behaviour |
-|---|---|
-| Leave it dangling | Inert until a role of the same name is created, which silently reactivates the rule against a different population. |
-| Refuse the deletion | Consistent with how other in-use references behave; requires the operator to clean up first. |
-| Delete the referencing policies | No dangling state; silently removes rules the operator may not have known existed. |
-| Disable them | Recoverable and visible; reactivation becomes an explicit act. |
+| | Option | Behaviour |
+|---|---|---|
+| **Proposed** | Refuse the deletion | The role cannot be deleted while a policy still references it; the operator clears those references first. No delete in Gravitino is blocked by a reference today, so this would be the first. |
+| | Delete the referencing policies | No dangling state, but it removes rules the operator may not have known existed. Acceptable only as an explicit, confirmed cascade, which is out of scope here. |
+| | Leave it dangling | Inert until a role of the same name is created, which silently reactivates the rule against a different population. |
+| | Disable them | Deleting a role would then also change policy state, conflating two operations that should stay separate. |
 
-### OQ-4 — object-scoped `APPLY_TAG`
+Justification: the operator deleting a role and the operator owning the policies that reference
+it are often not the same person, so the deletion should stop rather than silently change rules
+its author cannot see. Cascade stays available later as an explicit, confirmed act.
 
-`ApplyTag.canBindTo` accepts only `METALAKE` and `TAG`.
+### OQ-4 — authority to confer access through a tag
 
-| Option | Behaviour |
-|---|---|
-| Leave as is | Delegation is per-tag, bounded on the object side by `CAN_ACCESS_METADATA`. A tag carrying access policies must be treated as a privileged object and granted narrowly. |
-| Widen `canBindTo` to `CATALOG` and `SCHEMA` | Allows "may apply tags within `lakehouse.finance`". Introduces two grant dimensions — *which tag* and *where* — whose composition must then be defined, and changes the meaning of existing `APPLY_TAG` grants. |
-| Restrict blanket `APPLY_TAG` for access-carrying tags | A tag with an access policy bound requires an explicit `TAG::APPLY_TAG`; metalake-wide `APPLY_TAG` does not reach it. Prevents grants issued when tags were purely descriptive from widening once tags carry access. |
+Two write paths confer access without going through a grant: applying a tag that carries an access
+policy, and binding an access policy to a tag that is already applied. Neither checks grant
+authority. A user holding only `SELECT_TABLE` can apply a tag that gives another role
+`MODIFY_TABLE` — read access on an object becomes authority over who else can reach it.
 
-This is the only open item that is a code change outside this feature rather than a decision
-internal to it.
+| | Option | Behaviour |
+|---|---|---|
+| **Proposed** | Require grant authority on the object, and an explicit `TAG::APPLY_TAG` | Applying an access-carrying tag also requires `MANAGE_GRANTS` on the object or an ancestor, or ownership of it — the same check `grantPrivilegeToRole` makes today. And a metalake-wide `APPLY_TAG` stops reaching a tag once it confers access, so grants issued when tags were descriptive do not silently widen. |
+| | Leave as is | Reading an object is enough to change who else can reach it. |
+| | Require the applier to hold the privilege the tag confers | SQL `GRANT` semantics. Gravitino's own grant path does not work this way — `MANAGE_GRANTS` lets an operator hand out privileges they do not hold — so tags would become stricter than roles. |
+| | Require policy authority to bind an access policy to a tag | Covers the other write path. Today a tag owner holding no policy privileges can bind one, and everything already carrying the tag gains the access at once. |
+
+Justification: the two requirements cover different halves — one governs who may change access
+on an object, the other who may wield a tag that confers it. Neither adds a new privilege, and
+scoping needs no new mechanism, because grant authority can already be given on a catalog or a
+schema.
 
 ---
 
