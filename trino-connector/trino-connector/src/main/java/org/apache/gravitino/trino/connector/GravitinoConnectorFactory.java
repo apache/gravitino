@@ -155,16 +155,12 @@ public class GravitinoConnectorFactory implements ConnectorFactory {
           catalogConnectorManager.start();
         }
       } catch (Exception e) {
-        if (catalogConnectorManagerStartTriggered) {
-          // Discard the half-started manager instead of keeping it: leaving it published would
-          // let the next create() skip the startup and hand out a connector whose load loop
-          // never started. start() fails inside CatalogRegister.init(), before any catalog is
-          // registered in Trino, so closing it here leaves nothing behind, and the next create()
-          // can start over once the configuration is fixed.
-          catalogConnectorManager.shutdown();
-          catalogConnectorManager = null;
-          catalogConnectorManagerStartTriggered = false;
-        }
+        // Clearing the flag is what stops a later create() from skipping the startup and
+        // handing out a connector whose load loop never started, and it lets a corrected
+        // configuration recover. The manager is deliberately kept: it is shared, and a dynamic
+        // connector created before the static one may already be running against it. start()
+        // releases what it allocated before failing.
+        catalogConnectorManagerStartTriggered = false;
         String message = "Initialization of the GravitinoConnector failed " + e.getMessage();
         LOG.error(e, message);
         throw new TrinoException(GRAVITINO_RUNTIME_ERROR, message, e);

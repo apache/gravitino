@@ -131,11 +131,9 @@ public class TestGravitinoSystemStatusTables {
   @Test
   public void testLoadStatusTableRendersHealthyLoop() {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
-    when(manager.isTrinoStarted()).thenReturn(true);
     when(manager.getLastLoadAttemptTimeMs()).thenReturn(1000L);
     when(manager.getLoadOutcome())
-        .thenReturn(new CatalogConnectorManager.LoadOutcome(1000L, null, 0L));
-    when(manager.getMetalakeErrors()).thenReturn(Map.of());
+        .thenReturn(new CatalogConnectorManager.LoadOutcome(true, 1000L, null, 0L, Map.of()));
 
     Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
 
@@ -151,11 +149,11 @@ public class TestGravitinoSystemStatusTables {
   @Test
   public void testLoadStatusTableRendersUnreachableServer() {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
-    when(manager.isTrinoStarted()).thenReturn(true);
     when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
     when(manager.getLoadOutcome())
-        .thenReturn(new CatalogConnectorManager.LoadOutcome(0L, "Connection refused", 3L));
-    when(manager.getMetalakeErrors()).thenReturn(Map.of("test", "Connection refused"));
+        .thenReturn(
+            new CatalogConnectorManager.LoadOutcome(
+                true, 0L, "Connection refused", 3L, Map.of("test", "Connection refused")));
 
     Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
 
@@ -169,12 +167,15 @@ public class TestGravitinoSystemStatusTables {
   @Test
   public void testLoadStatusTableReportsOnlyItsOwnMetalakeErrors() {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
-    when(manager.isTrinoStarted()).thenReturn(true);
     when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
     when(manager.getLoadOutcome())
-        .thenReturn(new CatalogConnectorManager.LoadOutcome(0L, "1 of 2 metalakes failed", 1L));
-    when(manager.getMetalakeErrors())
-        .thenReturn(Map.of("test", "Connection refused", "dev", "Access Denied"));
+        .thenReturn(
+            new CatalogConnectorManager.LoadOutcome(
+                true,
+                0L,
+                "1 of 2 metalakes failed",
+                1L,
+                Map.of("test", "Connection refused", "dev", "Access Denied")));
 
     Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
 
@@ -187,16 +188,15 @@ public class TestGravitinoSystemStatusTables {
   // A healthy loop and a failing one, with every field distinguishable so that a row combining
   // the two is recognizable on sight.
   private static final CatalogConnectorManager.LoadOutcome HEALTHY_OUTCOME =
-      new CatalogConnectorManager.LoadOutcome(5000L, null, 0L);
+      new CatalogConnectorManager.LoadOutcome(true, 5000L, null, 0L, Map.of());
   private static final CatalogConnectorManager.LoadOutcome FAILING_OUTCOME =
-      new CatalogConnectorManager.LoadOutcome(0L, "Connection refused", 3L);
+      new CatalogConnectorManager.LoadOutcome(
+          false, 0L, "Connection refused", 3L, Map.of("test", "Connection refused"));
 
   @Test
   public void testLoadStatusRowComesFromASingleLoadAttempt() {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
-    when(manager.isTrinoStarted()).thenReturn(true);
     when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
-    when(manager.getMetalakeErrors()).thenReturn(Map.of());
     // Every read reports a different attempt, the way a load loop completing between two reads
     // would. Rendering must therefore read the outcome exactly once.
     AtomicInteger reads = new AtomicInteger();
@@ -213,9 +213,7 @@ public class TestGravitinoSystemStatusTables {
   @Test
   public void testLoadStatusIsConsistentWhileTheLoopFailsAndRecovers() throws Exception {
     CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
-    when(manager.isTrinoStarted()).thenReturn(true);
     when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
-    when(manager.getMetalakeErrors()).thenReturn(Map.of());
     // The load loop keeps flipping between failing and recovering underneath the readers.
     AtomicBoolean failing = new AtomicBoolean();
     when(manager.getLoadOutcome())
@@ -265,12 +263,17 @@ public class TestGravitinoSystemStatusTables {
     assertEquals(1, page.getPositionCount());
     boolean healthy = page.getBlock(4).isNull(0);
     if (healthy) {
+      assertTrue(BOOLEAN.getBoolean(page.getBlock(0), 0));
       assertEquals("1970-01-01T00:00:05Z", varchar(page, 2));
       assertEquals(0, BIGINT.getLong(page.getBlock(3), 0));
+      // No error, so nothing may claim a metalake produced one.
+      assertTrue(page.getBlock(5).isNull(0));
     } else {
+      assertFalse(BOOLEAN.getBoolean(page.getBlock(0), 0));
       assertTrue(page.getBlock(2).isNull(0));
       assertEquals(3, BIGINT.getLong(page.getBlock(3), 0));
       assertEquals("Connection refused", varchar(page, 4));
+      assertEquals("{\"test\":\"Connection refused\"}", varchar(page, 5));
     }
   }
 

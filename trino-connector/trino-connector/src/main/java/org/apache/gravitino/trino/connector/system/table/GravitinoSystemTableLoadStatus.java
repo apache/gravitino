@@ -87,12 +87,12 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
     BlockBuilder lastErrorColumnBuilder = VARCHAR.createBlockBuilder(null, 1);
     BlockBuilder metalakeErrorsColumnBuilder = VARCHAR.createBlockBuilder(null, 1);
 
-    // Read once so the three fields below come from the same attempt: reading them through three
-    // separate calls could otherwise mix a fresh success time with a stale error from a load that
-    // completed in between the calls.
+    // Read once so that every field of the row below comes from the same attempt: reading them
+    // through separate calls could otherwise mix a fresh success time with a stale error from a
+    // load that completed in between the calls.
     LoadOutcome loadOutcome = catalogConnectorManager.getLoadOutcome();
 
-    BOOLEAN.writeBoolean(trinoStartedColumnBuilder, catalogConnectorManager.isTrinoStarted());
+    BOOLEAN.writeBoolean(trinoStartedColumnBuilder, loadOutcome.isTrinoStarted());
     writeTime(lastAttemptTimeColumnBuilder, catalogConnectorManager.getLastLoadAttemptTimeMs());
     writeTime(lastSuccessTimeColumnBuilder, loadOutcome.getLastSuccessTimeMs());
     BIGINT.writeLong(consecutiveFailuresColumnBuilder, loadOutcome.getConsecutiveFailures());
@@ -100,7 +100,7 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
 
     // The load loop itself is shared by every entry catalog, so the columns above are global.
     // Only the per metalake errors are narrowed to the metalake this connector reports on.
-    Map<String, String> allErrors = catalogConnectorManager.getMetalakeErrors();
+    Map<String, String> allErrors = loadOutcome.getMetalakeErrors();
     Map<String, String> metalakeErrors =
         allErrors.containsKey(metalake) ? Map.of(metalake, allErrors.get(metalake)) : Map.of();
     if (metalakeErrors.isEmpty()) {

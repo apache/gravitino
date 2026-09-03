@@ -20,7 +20,6 @@ package org.apache.gravitino.trino.connector;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -52,7 +51,7 @@ public class TestGravitinoConnectorFactoryInit {
   }
 
   @Test
-  public void testFailedStartIsDiscardedAndCanRecover() {
+  public void testFailedStartCanRecover() {
     GravitinoConnectorFactory factory =
         new GravitinoConnectorFactory(mock(GravitinoAdminClient.class));
 
@@ -64,9 +63,8 @@ public class TestGravitinoConnectorFactoryInit {
             factory.create(
                 "gravitino", config("/nonexistent-gravitino-catalog-dir"), mockContext()));
 
-    // The half-started manager must not stay published: a connector handed out afterwards would
-    // run against a load loop that never started.
-    assertNull(factory.getCatalogConnectorManager());
+    // The startup did not complete, so a connector handed out afterwards would run against a
+    // load loop that never started.
     assertFalse(factory.isCatalogConnectorManagerStartTriggered());
 
     // Once the configuration is fixed, the next create() starts over and succeeds.

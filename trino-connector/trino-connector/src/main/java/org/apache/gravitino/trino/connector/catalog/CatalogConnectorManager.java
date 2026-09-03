@@ -92,7 +92,7 @@ public class CatalogConnectorManager {
   // rather than as separate fields. Reading them independently would let a query thread observe
   // a combination from two different load attempts, e.g. a fresh success time next to a stale
   // error that a concurrent recordLoadSuccess() had not cleared yet.
-  private volatile LoadOutcome loadOutcome = new LoadOutcome(0L, null, 0L);
+  private volatile LoadOutcome loadOutcome = new LoadOutcome(false, 0L, null, 0L, Map.of());
 
   private String targetMetalake;
   private final Map<String, GravitinoMetalake> metalakes = new ConcurrentHashMap<>();
@@ -192,7 +192,15 @@ public class CatalogConnectorManager {
    * @throws Exception if the catalog connector manager fails to start
    */
   public void start() throws Exception {
-    catalogRegister.init(config);
+    try {
+      catalogRegister.init(config);
+    } catch (Exception e) {
+      // Release the connection init() may have opened before failing, so that a later attempt
+      // does not leave it behind. The manager itself stays usable: a dynamic connector may
+      // already be running against it.
+      catalogRegister.close();
+      throw e;
+    }
     executorService.scheduleWithFixedDelay(
         this::loadMetalake,
         metadataUpdateIntervalSecond,
@@ -309,14 +317,19 @@ public class CatalogConnectorManager {
     if (loadOutcome.lastError != null) {
       LOG.info("The Gravitino catalog load loop recovered.");
     }
-    loadOutcome = new LoadOutcome(System.currentTimeMillis(), null, 0);
+    loadOutcome = new LoadOutcome(trinoStarted, System.currentTimeMillis(), null, 0, Map.of());
   }
 
   private void recordLoadFailure(String message, Throwable cause) {
     LoadOutcome previous = loadOutcome;
     boolean changed = !Objects.equals(previous.lastError, message);
     loadOutcome =
-        new LoadOutcome(previous.lastSuccessTimeMs, message, previous.consecutiveFailures + 1);
+        new LoadOutcome(
+            trinoStarted,
+            previous.lastSuccessTimeMs,
+            message,
+            previous.consecutiveFailures + 1,
+            Map.copyOf(metalakeErrors));
     if (!changed) {
       LOG.warn("Failed to load catalogs from the Gravitino server: %s", withCause(message, cause));
     } else if (trinoStarted) {
@@ -455,18 +468,25 @@ public class CatalogConnectorManager {
         try {
           unloadCatalog(entry.getValue().getCatalog());
         } catch (Exception e) {
-          // The catalog is gone from Gravitino but is still registered in Trino. Record it, or
-          // the pruning below would drop the row and the table would report nothing at all about
-          // a catalog that still shows up in SHOW CATALOGS.
+          // The catalog is still registered in Trino. Record it, or the pruning below would drop
+          // the row and the table would report nothing at all about a catalog that still shows
+          // up in SHOW CATALOGS. This branch unloads for two different reasons, and saying the
+          // catalog was deleted when it is merely skipped would send its owner looking in the
+          // wrong place: presentTrinoNames still holds the ones Gravitino reports.
           GravitinoCatalog catalog = entry.getValue().getCatalog();
+          String reason =
+              presentTrinoNames.contains(entry.getKey())
+                  ? "The catalog matches gravitino.trino.skip-catalog-patterns but could not be "
+                      + "unregistered from Trino: "
+                  : "The catalog was deleted in Gravitino but could not be unregistered from "
+                      + "Trino: ";
           recordCatalogState(
               CatalogRegistrationState.failed(
                   metalakeName,
                   catalog.getName(),
                   entry.getKey(),
                   catalog.getProvider(),
-                  "The catalog was deleted in Gravitino but could not be unregistered from Trino: "
-                      + toErrorMessage(e)),
+                  reason + toErrorMessage(e)),
               e);
         }
       }
@@ -499,36 +519,31 @@ public class CatalogConnectorManager {
         GravitinoCatalog gravitinoCatalog =
             new GravitinoCatalog(metalakeName, catalog, visibleProps(catalog));
         provider = gravitinoCatalog.getProvider();
-        if (alreadyRegistered) {
-          // Reload catalogs that have been updated in Gravitino server.
-          reloadCatalog(gravitinoCatalog);
-          recordCatalogState(
-              CatalogRegistrationState.succeeded(gravitinoCatalog, trinoCatalogName), null);
-        } else if (catalog.type() != Catalog.Type.RELATIONAL) {
-          recordCatalogState(
-              CatalogRegistrationState.unsupported(
-                  metalakeName,
-                  catalogName,
-                  trinoCatalogName,
-                  gravitinoCatalog.getProvider(),
-                  String.format(
-                      "Only relational catalogs are supported, the catalog type is %s",
-                      catalog.type())),
-              null);
-        } else if (!catalogConnectorFactory
-            .getSupportedCatalogProviders()
-            .contains(gravitinoCatalog.getProvider())) {
+        // Checked before the already-registered path: a catalog can be dropped and recreated
+        // under the same name with a type or provider this connector cannot serve, and treating
+        // it as a refresh would leave Trino serving a catalog that no longer qualifies.
+        String unsupportedReason = unsupportedReason(catalog, gravitinoCatalog);
+        if (unsupportedReason != null) {
+          if (alreadyRegistered) {
+            unloadCatalog(gravitinoCatalog);
+          }
           recordCatalogState(
               CatalogRegistrationState.unsupported(
                   metalakeName,
                   catalogName,
                   trinoCatalogName,
                   gravitinoCatalog.getProvider(),
-                  String.format(
-                      "The catalog provider %s is not supported, the supported providers are %s",
-                      gravitinoCatalog.getProvider(),
-                      catalogConnectorFactory.getSupportedCatalogProviders())),
+                  unsupportedReason),
               null);
+        } else if (alreadyRegistered) {
+          // Reload catalogs that have been updated in Gravitino server. One that was already up
+          // to date keeps the success time of the registration that put it there: advancing it
+          // on every poll would make last_success_time say nothing more than last_attempt_time
+          // already does.
+          if (reloadCatalog(gravitinoCatalog)) {
+            recordCatalogState(
+                CatalogRegistrationState.succeeded(gravitinoCatalog, trinoCatalogName), null);
+          }
         } else {
           loadCatalog(gravitinoCatalog);
           recordCatalogState(
@@ -600,7 +615,33 @@ public class CatalogConnectorManager {
     }
   }
 
-  private void reloadCatalog(GravitinoCatalog catalog) {
+  /**
+   * Why this connector cannot serve the catalog, or null when it can.
+   *
+   * @param catalog the catalog as the Gravitino server reports it
+   * @param gravitinoCatalog the same catalog as it would be registered
+   */
+  @Nullable
+  private String unsupportedReason(Catalog catalog, GravitinoCatalog gravitinoCatalog) {
+    if (catalog.type() != Catalog.Type.RELATIONAL) {
+      return String.format(
+          "Only relational catalogs are supported, the catalog type is %s", catalog.type());
+    }
+    Set<String> supported = catalogConnectorFactory.getSupportedCatalogProviders();
+    if (!supported.contains(gravitinoCatalog.getProvider())) {
+      return String.format(
+          "The catalog provider %s is not supported, the supported providers are %s",
+          gravitinoCatalog.getProvider(), supported);
+    }
+    return null;
+  }
+
+  /**
+   * Re-registers a catalog whose definition changed.
+   *
+   * @return true if the catalog was re-registered, false if it was already up to date
+   */
+  private boolean reloadCatalog(GravitinoCatalog catalog) {
     String catalogFullName = getTrinoCatalogName(catalog);
     GravitinoCatalog oldCatalog = catalogConnectors.get(catalogFullName).getCatalog();
     // The discovered Iceberg REST endpoint is embedded into the catalog independently of
@@ -609,7 +650,7 @@ public class CatalogConnectorManager {
         IcebergConnectorAdapter.hasDiscoveredIcebergRestUriChanged(catalog, oldCatalog, config);
     if (catalog.getLastModifiedTime() <= oldCatalog.getLastModifiedTime()
         && !icebergRestUriChanged) {
-      return;
+      return false;
     }
 
     catalogRegister.unregisterCatalog(catalogFullName);
@@ -617,6 +658,7 @@ public class CatalogConnectorManager {
 
     loadCatalogImpl(catalog);
     LOG.info("Update catalog '%s' in metalake %s successfully.", catalog, catalog.getMetalake());
+    return true;
   }
 
   private void loadCatalog(GravitinoCatalog catalog) {
@@ -940,23 +982,60 @@ public class CatalogConnectorManager {
     String getCatalogName(String metalake, String catalog);
   }
 
-  /** Immutable snapshot of the outcome of the last completed load attempt. */
+  /**
+   * Immutable snapshot of the outcome of the last completed load attempt.
+   *
+   * <p>Everything a load attempt concluded travels together, so that a row built from it cannot
+   * combine facts from two different attempts, e.g. no error next to the metalake that produced
+   * one. The time of the last attempt is deliberately not part of it: it says when the loop last
+   * ran rather than what it concluded, and freezing it until an attempt completes would hide a loop
+   * that hangs half way.
+   */
   public static final class LoadOutcome {
+    private final boolean trinoStarted;
     private final long lastSuccessTimeMs;
     private final String lastError;
     private final long consecutiveFailures;
+    private final Map<String, String> metalakeErrors;
 
     /**
      * Constructs a new LoadOutcome.
      *
+     * @param trinoStarted whether the Trino server was reachable during the attempt
      * @param lastSuccessTimeMs the time of the last successful load, 0 if never successful
      * @param lastError the error that made the last load fail, null if it succeeded
      * @param consecutiveFailures the number of consecutive failed loads, 0 if the last succeeded
+     * @param metalakeErrors the error each metalake reported, empty if none did
      */
-    public LoadOutcome(long lastSuccessTimeMs, String lastError, long consecutiveFailures) {
+    public LoadOutcome(
+        boolean trinoStarted,
+        long lastSuccessTimeMs,
+        String lastError,
+        long consecutiveFailures,
+        Map<String, String> metalakeErrors) {
+      this.trinoStarted = trinoStarted;
       this.lastSuccessTimeMs = lastSuccessTimeMs;
       this.lastError = lastError;
       this.consecutiveFailures = consecutiveFailures;
+      this.metalakeErrors = Map.copyOf(metalakeErrors);
+    }
+
+    /**
+     * Whether the Trino server was reachable during the attempt.
+     *
+     * @return true if the load loop could reach the Trino server
+     */
+    public boolean isTrinoStarted() {
+      return trinoStarted;
+    }
+
+    /**
+     * Retrieves the error each metalake reported during the attempt.
+     *
+     * @return the errors keyed by metalake name, empty if none failed
+     */
+    public Map<String, String> getMetalakeErrors() {
+      return metalakeErrors;
     }
 
     /**

@@ -102,20 +102,20 @@ The result is like:
  gt_files     | UNSUPPORTED| Only relational catalogs are supported, the catalog type is FILESET
 ```
 
-| Column               | Description                                                                                  |
-|----------------------|----------------------------------------------------------------------------------------------|
-| `metalake`           | The metalake the catalog belongs to.                                                           |
-| `catalog_name`       | The name of the catalog in Gravitino.                                                          |
-| `trino_catalog_name` | The name the catalog is registered under in Trino, as it appears in `SHOW CATALOGS`.           |
-| `provider`           | The catalog provider, for example `hive` or `lakehouse-iceberg`.                               |
-| `status`             | One of `REGISTERED`, `FAILED`, `UNSUPPORTED` or `SKIPPED`. See the table below.                |
-| `last_error`         | The reason the catalog is not registered, `NULL` when it is.                                   |
-| `last_attempt_time`  | When the catalog was last processed, as an ISO-8601 UTC timestamp.                             |
+| Column               | Description                                                                                                                            |
+|----------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `metalake`           | The metalake the catalog belongs to.                                                                                                   |
+| `catalog_name`       | The name of the catalog in Gravitino.                                                                                                  |
+| `trino_catalog_name` | The name the catalog is registered under in Trino, as it appears in `SHOW CATALOGS`.                                                   |
+| `provider`           | The catalog provider, for example `hive` or `lakehouse-iceberg`.                                                                       |
+| `status`             | One of `REGISTERED`, `FAILED`, `UNSUPPORTED` or `SKIPPED`. See the table below.                                                        |
+| `last_error`         | The reason the catalog is not registered, `NULL` when it is.                                                                           |
+| `last_attempt_time`  | When the catalog was last processed, as an ISO-8601 UTC timestamp.                                                                     |
 | `last_success_time`  | When the catalog was last registered successfully, `NULL` if it never was. Retained when a catalog later fails or becomes unsupported. |
-| `failure_count`      | The number of consecutive failed attempts, `0` when the last attempt succeeded.                |
+| `failure_count`      | The number of consecutive failed attempts, `0` when the last attempt succeeded.                                                        |
 
-| Status        | Meaning                                                                                       |
-|---------------|-----------------------------------------------------------------------------------------------|
+| Status        | Meaning                                                                                         |
+|---------------|-------------------------------------------------------------------------------------------------|
 | `REGISTERED`  | The catalog is registered in Trino and appears in `SHOW CATALOGS`.                              |
 | `FAILED`      | The last registration attempt failed, `last_error` carries the reason. Retried every refresh.   |
 | `UNSUPPORTED` | The catalog is not relational, or its provider is not supported by the connector.               |
@@ -129,14 +129,14 @@ health of the loop itself, and always has exactly one row.
 select * from gravitino.system.load_status;
 ```
 
-| Column                 | Description                                                                             |
-|------------------------|-------------------------------------------------------------------------------------------|
+| Column                 | Description                                                                                                                                                            |
+|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `trino_started`        | Whether the Trino server has been observed reachable over JDBC. No catalog is registered until it is. Latched: once true it stays true, so it is not a liveness probe. |
-| `last_attempt_time`    | When the loop last ran, as an ISO-8601 UTC timestamp.                                       |
-| `last_success_time`    | When the loop last completed successfully, `NULL` if it never did.                          |
-| `consecutive_failures` | The number of consecutive failed runs, `0` when the last run succeeded.                     |
-| `last_error`           | The reason the last run did not complete, including waiting for Trino to start, `NULL` when it succeeded. |
-| `metalake_errors`      | A JSON map of metalake name to its last error, `NULL` when every metalake loaded. A metalake that fails here also fails the run as a whole. |
+| `last_attempt_time`    | When the loop last ran, as an ISO-8601 UTC timestamp.                                                                                                                  |
+| `last_success_time`    | When the loop last completed successfully, `NULL` if it never did.                                                                                                     |
+| `consecutive_failures` | The number of consecutive failed runs, `0` when the last run succeeded.                                                                                                |
+| `last_error`           | The reason the last run did not complete, including waiting for Trino to start, `NULL` when it succeeded.                                                              |
+| `metalake_errors`      | A JSON map of metalake name to its last error, `NULL` when every metalake loaded. A metalake that fails here also fails the run as a whole.                            |
 
 Both tables are served by the coordinator and reflect the last refresh, which runs every
 `gravitino.metadata.refresh-interval-seconds` seconds (10 by default). A catalog created moments ago
