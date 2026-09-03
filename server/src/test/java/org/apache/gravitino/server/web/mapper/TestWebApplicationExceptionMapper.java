@@ -41,7 +41,8 @@ public class TestWebApplicationExceptionMapper {
     Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, entity.getCode());
     Assertions.assertFalse(entity.getMessage().isEmpty());
     Assertions.assertTrue(
-        response.getHeaderString("Allow") != null && response.getHeaderString("Allow").contains("GET"));
+        response.getHeaderString("Allow") != null
+            && response.getHeaderString("Allow").contains("GET"));
   }
 
   @Test
