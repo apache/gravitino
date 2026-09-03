@@ -19,8 +19,8 @@
 package org.apache.gravitino.client;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
+import static org.apache.hc.core5.http.HttpStatus.SC_CONFLICT;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
-import static org.apache.hc.core5.http.HttpStatus.SC_NOT_IMPLEMENTED;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -184,12 +184,7 @@ public class TestSupportsStatistics extends TestBase {
                 Collections.emptyList()));
     ErrorResponse unmodifiableError = MAPPER.readValue(unmodifiableErrorJson, ErrorResponse.class);
     buildMockResource(
-        Method.PUT,
-        path,
-        Collections.emptyMap(),
-        expectedRequest,
-        unmodifiableError,
-        SC_NOT_IMPLEMENTED);
+        Method.PUT, path, Collections.emptyMap(), expectedRequest, unmodifiableError, SC_CONFLICT);
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,
@@ -246,7 +241,7 @@ public class TestSupportsStatistics extends TestBase {
                 Collections.emptyList()));
     ErrorResponse unmodifiableError = MAPPER.readValue(unmodifiableErrorJson, ErrorResponse.class);
     buildMockResource(
-        Method.POST, path, Collections.emptyMap(), null, unmodifiableError, SC_NOT_IMPLEMENTED);
+        Method.POST, path, Collections.emptyMap(), null, unmodifiableError, SC_CONFLICT);
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,

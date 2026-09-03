@@ -28,8 +28,10 @@ import org.apache.gravitino.server.authorization.NameBindings;
 import org.apache.gravitino.server.web.Utils;
 
 /**
- * AccessControlNotAllowedFilter filters requests related to access control when Apache Gravitino
- * does not enable authorization.
+ * AccessControlNotAllowedFilter is used for filter the requests related to access control if Apache
+ * Gravitino doesn't enable authorization. The filter return 405 error code. You can refer to
+ * https://developer.mozilla.org/en-US/docs/Web/HTTP/Status/405. No methods will be returned in the
+ * allow methods.
  */
 @Provider
 @NameBindings.AccessControlInterfaces
@@ -38,7 +40,7 @@ public class AccessControlNotAllowedFilter implements ContainerRequestFilter {
   @Override
   public void filter(ContainerRequestContext requestContext) throws IOException {
     requestContext.abortWith(
-        Utils.unsupportedOperation(
+        Utils.methodNotAllowed(
             String.format(
                 "You should set '%s' to true in the server side `gravitino.conf`"
                     + " to enable the authorization of the system, otherwise these interfaces can't work.",

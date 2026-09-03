@@ -96,8 +96,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "501":
-          description: Not Implemented - The requested statistics operation is not supported
+        "409":
+          description: Conflict - The specified statistic is unmodifiable
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -105,6 +105,12 @@ paths:
               examples:
                 UnmodifiableStatisticException:
                   $ref: "#/components/examples/UnmodifiableStatisticException"
+        "501":
+          description: Not Implemented - The requested statistics operation is not supported
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -143,8 +149,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "501":
-          description: Not Implemented - The requested statistics operation is not supported
+        "409":
+          description: Conflict - The specified statistic is unmodifiable
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -152,6 +158,12 @@ paths:
               examples:
                 UnmodifiableStatisticException:
                   $ref: "#/components/examples/UnmodifiableStatisticException"
+        "501":
+          description: Not Implemented - The requested statistics operation is not supported
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -236,8 +248,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "501":
-          description: Not Implemented - The requested partition statistics operation is not supported
+        "409":
+          description: Conflict - The specified statistic is unmodifiable
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -245,6 +257,12 @@ paths:
               examples:
                 UnmodifiableStatisticException:
                   $ref: "#/components/examples/UnmodifiableStatisticException"
+        "501":
+          description: Not Implemented - The requested partition statistics operation is not supported
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -283,8 +301,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "501":
-          description: Not Implemented - The requested partition statistics operation is not supported
+        "409":
+          description: Conflict - The specified statistic is unmodifiable
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -292,6 +310,12 @@ paths:
               examples:
                 UnmodifiableStatisticException:
                   $ref: "#/components/examples/UnmodifiableStatisticException"
+        "501":
+          description: Not Implemented - The requested partition statistics operation is not supported
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 

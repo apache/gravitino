@@ -33,6 +33,7 @@ import org.apache.gravitino.audit.InternalClientType;
 import org.apache.gravitino.dto.responses.ErrorConstants;
 import org.apache.gravitino.dto.responses.ErrorResponse;
 import org.apache.gravitino.exceptions.OptimisticLockException;
+import org.apache.gravitino.exceptions.UnmodifiableStatisticException;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -188,6 +189,31 @@ public class TestUtils {
     assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
     ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
     assertEquals("Unsupported operation", errorResponse.getMessage());
+  }
+
+  @Test
+  public void testOperationConflict() {
+    UnmodifiableStatisticException exception =
+        new UnmodifiableStatisticException("Unmodifiable statistic");
+    Response response = Utils.operationConflict(exception.getMessage(), exception);
+
+    assertNotNull(response);
+    assertEquals(Response.Status.CONFLICT.getStatusCode(), response.getStatus());
+    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResponse.getCode());
+    assertEquals(UnmodifiableStatisticException.class.getSimpleName(), errorResponse.getType());
+  }
+
+  @Test
+  public void testMethodNotAllowed() {
+    Response response = Utils.methodNotAllowed("Method not allowed");
+
+    assertNotNull(response);
+    assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());
+    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
+    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
+    assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResponse.getCode());
   }
 
   @Test

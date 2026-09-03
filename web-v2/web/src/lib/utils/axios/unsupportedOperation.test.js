@@ -25,8 +25,12 @@ describe('isUnsupportedOperationError', () => {
     expect(isUnsupportedOperationError({ response: { status: 501 } })).toBe(true)
   })
 
+  it('recognizes the legacy HTTP 405 response by its application error code', () => {
+    expect(isUnsupportedOperationError({ response: { status: 405, data: { code: 1006 } } })).toBe(true)
+  })
+
   it('does not hide an actual HTTP method mismatch', () => {
-    expect(isUnsupportedOperationError({ response: { status: 405 } })).toBe(false)
+    expect(isUnsupportedOperationError({ response: { status: 405, data: { code: 1000 } } })).toBe(false)
   })
 
   it('handles errors without an HTTP response', () => {

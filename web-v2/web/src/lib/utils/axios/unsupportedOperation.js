@@ -17,5 +17,8 @@
  * under the License.
  */
 
+const UNSUPPORTED_OPERATION_CODE = 1006
+
 /** Returns whether an HTTP client error represents an unsupported server operation. */
-export const isUnsupportedOperationError = error => error?.response?.status === 501
+export const isUnsupportedOperationError = error =>
+  error?.response?.data?.code === UNSUPPORTED_OPERATION_CODE || error?.response?.status === 501
