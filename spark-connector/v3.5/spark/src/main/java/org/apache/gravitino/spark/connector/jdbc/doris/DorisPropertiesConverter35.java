@@ -58,11 +58,18 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
           DorisConnectorConstants35.DORIS_SINK_STRICT_MODE,
           DorisConnectorConstants35.DORIS_MAX_FILTER_RATIO,
           DorisConnectorConstants35.DORIS_WRITE_SCHEMALESS,
+          "jdbc-url",
+          "jdbc-driver",
+          "jdbc-user",
+          "jdbc-password",
+          "doris-fenodes",
+          "doris-query-port",
           "url",
           "driver",
           "user",
           "password",
-          "dbtable");
+          "dbtable",
+          "query");
 
   private static final DorisPropertiesConverter35 INSTANCE = new DorisPropertiesConverter35();
 
@@ -75,6 +82,8 @@ final class DorisPropertiesConverter35 implements PropertiesConverter {
   @Override
   public Map<String, String> toSparkCatalogProperties(
       CaseInsensitiveStringMap options, Map<String, String> properties) {
+    // JDBC user and password are intentionally omitted here. The specialized Doris path accepts
+    // them only from applyJdbcCredential() so Spark catalog options cannot replace vended secrets.
     Map<String, String> result = toSparkCatalogProperties(properties);
     if (properties != null) {
       properties.forEach(

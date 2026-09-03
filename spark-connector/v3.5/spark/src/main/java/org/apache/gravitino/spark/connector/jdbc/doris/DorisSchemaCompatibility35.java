@@ -37,6 +37,8 @@ import org.apache.spark.sql.types.StructField;
 final class DorisSchemaCompatibility35 {
 
   private static final int MAX_CATALYST_DECIMAL_PRECISION = 38;
+  private static final int MIN_DORIS_DATETIME_PRECISION = 0;
+  private static final int MAX_DORIS_DATETIME_PRECISION = 6;
 
   private DorisSchemaCompatibility35() {}
 
@@ -179,9 +181,14 @@ final class DorisSchemaCompatibility35 {
     if (logicalType instanceof Types.TimestampType) {
       Types.TimestampType timestampType = (Types.TimestampType) logicalType;
       int logicalPrecision = timestampType.hasPrecisionSet() ? timestampType.precision() : 0;
+      int physicalPrecision = datetimePrecision(rawTypeName);
       if (!timestampType.hasTimeZone()
           && (typeName.equals("datetime") || typeName.equals("datetimev2"))
-          && logicalPrecision == datetimePrecision(rawTypeName)) {
+          && logicalPrecision >= MIN_DORIS_DATETIME_PRECISION
+          && logicalPrecision <= MAX_DORIS_DATETIME_PRECISION
+          && physicalPrecision >= MIN_DORIS_DATETIME_PRECISION
+          && physicalPrecision <= MAX_DORIS_DATETIME_PRECISION
+          && logicalPrecision == physicalPrecision) {
         return;
       }
     }

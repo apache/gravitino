@@ -43,6 +43,8 @@ final class DorisCapabilityPolicy35 {
     if (!writePolicy.enabled()) {
       return readOnly();
     }
+    // Keep the specialized Doris surface narrower than generic JDBC: every write capability is
+    // explicitly enabled by the catalog policy instead of being inherited from the delegate.
     EnumSet<TableCapability> capabilities =
         EnumSet.of(TableCapability.BATCH_READ, TableCapability.BATCH_WRITE);
     if (writePolicy.allowsTruncate()) {

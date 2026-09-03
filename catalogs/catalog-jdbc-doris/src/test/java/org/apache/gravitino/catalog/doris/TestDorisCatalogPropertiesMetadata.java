@@ -22,6 +22,11 @@ import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.
 import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.DORIS_QUERY_PORT;
 import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.DORIS_WRITE_MODE;
 import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.DORIS_WRITE_OVERWRITE_MODE;
+import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.JDBC_FETCH_SIZE;
+import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.JDBC_LOWER_BOUND;
+import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.JDBC_NUM_PARTITIONS;
+import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.JDBC_PARTITION_COLUMN;
+import static org.apache.gravitino.catalog.doris.DorisCatalogPropertiesMetadata.JDBC_UPPER_BOUND;
 import static org.apache.gravitino.catalog.jdbc.config.JdbcConfig.JDBC_URL;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -44,9 +49,16 @@ public class TestDorisCatalogPropertiesMetadata {
     assertTrue(metadata.propertyEntries().containsKey(DORIS_QUERY_PORT));
     assertTrue(metadata.propertyEntries().containsKey(DORIS_WRITE_MODE));
     assertTrue(metadata.propertyEntries().containsKey(DORIS_WRITE_OVERWRITE_MODE));
+    assertTrue(metadata.propertyEntries().containsKey(JDBC_PARTITION_COLUMN));
+    assertTrue(metadata.propertyEntries().containsKey(JDBC_LOWER_BOUND));
+    assertTrue(metadata.propertyEntries().containsKey(JDBC_UPPER_BOUND));
+    assertTrue(metadata.propertyEntries().containsKey(JDBC_NUM_PARTITIONS));
+    assertTrue(metadata.propertyEntries().containsKey(JDBC_FETCH_SIZE));
     PropertyEntry<?> queryPort = metadata.propertyEntries().get(DORIS_QUERY_PORT);
     assertEquals(Integer.class, queryPort.getJavaType());
     assertTrue(queryPort.isImmutable());
+    assertEquals(Integer.class, metadata.propertyEntries().get(JDBC_NUM_PARTITIONS).getJavaType());
+    assertEquals(Integer.class, metadata.propertyEntries().get(JDBC_FETCH_SIZE).getJavaType());
   }
 
   @Test
@@ -64,7 +76,17 @@ public class TestDorisCatalogPropertiesMetadata {
                 DORIS_WRITE_MODE,
                 DorisCatalogPropertiesMetadata.WRITE_BATCH,
                 DORIS_WRITE_OVERWRITE_MODE,
-                DorisCatalogPropertiesMetadata.WRITE_OVERWRITE_TRUNCATE));
+                DorisCatalogPropertiesMetadata.WRITE_OVERWRITE_TRUNCATE,
+                JDBC_PARTITION_COLUMN,
+                "id",
+                JDBC_LOWER_BOUND,
+                "1",
+                JDBC_UPPER_BOUND,
+                "100",
+                JDBC_NUM_PARTITIONS,
+                "4",
+                JDBC_FETCH_SIZE,
+                "500"));
 
     Map<String, String> transformed = metadata.transformProperties(properties);
 
@@ -75,6 +97,11 @@ public class TestDorisCatalogPropertiesMetadata {
     assertEquals(
         DorisCatalogPropertiesMetadata.WRITE_OVERWRITE_TRUNCATE,
         transformed.get(DORIS_WRITE_OVERWRITE_MODE));
+    assertEquals("id", transformed.get(JDBC_PARTITION_COLUMN));
+    assertEquals("1", transformed.get(JDBC_LOWER_BOUND));
+    assertEquals("100", transformed.get(JDBC_UPPER_BOUND));
+    assertEquals("4", transformed.get(JDBC_NUM_PARTITIONS));
+    assertEquals("500", transformed.get(JDBC_FETCH_SIZE));
   }
 
   @Test
@@ -105,5 +132,17 @@ public class TestDorisCatalogPropertiesMetadata {
                     DorisCatalogPropertiesMetadata.WRITE_DISABLED,
                     DORIS_WRITE_OVERWRITE_MODE,
                     DorisCatalogPropertiesMetadata.WRITE_OVERWRITE_TRUNCATE)));
+  }
+
+  @Test
+  void testInvalidSqlLanePropertiesFailClosed() {
+    DorisCatalogPropertiesMetadata metadata = new DorisCatalogPropertiesMetadata();
+    Map<String, String> invalidPartitions = Map.of(JDBC_NUM_PARTITIONS, "0");
+    assertThrows(
+        IllegalArgumentException.class, () -> metadata.transformProperties(invalidPartitions));
+
+    Map<String, String> invalidFetchSize = Map.of(JDBC_FETCH_SIZE, "not-a-number");
+    assertThrows(
+        IllegalArgumentException.class, () -> metadata.transformProperties(invalidFetchSize));
   }
 }

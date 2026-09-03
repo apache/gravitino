@@ -45,6 +45,9 @@ import org.apache.gravitino.spark.connector.integration.test.SparkEnvIT;
 import org.apache.gravitino.spark.connector.jdbc.doris.GravitinoDorisCatalogSpark35;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkException;
+import org.apache.spark.sql.Dataset;
+import org.apache.spark.sql.Row;
+import org.apache.spark.sql.functions;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -58,6 +61,7 @@ public class SparkJdbcDorisLoadPrivilegeIT35 extends SparkEnvIT {
   private static final String TABLE_NAME = "write_denied";
   private static final String NO_DROP_CATALOG_NAME = "jdbc_doris_no_drop";
   private static final String NO_DROP_TABLE_NAME = "write_no_drop";
+  private static final String NO_DROP_OVERWRITE_TABLE_NAME = "write_no_drop_overwrite";
   private static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
   private static final String READ_ONLY_USER = "gravitino_spark_read_only";
   private static final String NO_DROP_USER = "gravitino_spark_no_drop";
@@ -131,6 +135,20 @@ public class SparkJdbcDorisLoadPrivilegeIT35 extends SparkEnvIT {
           "INSERT INTO " + DATABASE_NAME + "." + TABLE_NAME + " VALUES (1, 'preserved')");
       statement.execute(
           "INSERT INTO " + DATABASE_NAME + "." + NO_DROP_TABLE_NAME + " VALUES (1, 'preserved')");
+      statement.execute(
+          "DROP TABLE IF EXISTS " + DATABASE_NAME + "." + NO_DROP_OVERWRITE_TABLE_NAME);
+      statement.execute(
+          "CREATE TABLE "
+              + DATABASE_NAME
+              + "."
+              + NO_DROP_OVERWRITE_TABLE_NAME
+              + " (id INT, name VARCHAR(64)) DISTRIBUTED BY HASH(id) BUCKETS 1");
+      statement.execute(
+          "INSERT INTO "
+              + DATABASE_NAME
+              + "."
+              + NO_DROP_OVERWRITE_TABLE_NAME
+              + " VALUES (1, 'preserved')");
       statement.execute("DROP USER IF EXISTS '" + READ_ONLY_USER + "'");
       statement.execute(
           "CREATE USER '" + READ_ONLY_USER + "' IDENTIFIED BY '" + readOnlyPassword + "'");
@@ -179,6 +197,22 @@ public class SparkJdbcDorisLoadPrivilegeIT35 extends SparkEnvIT {
     await()
         .atMost(Duration.ofMinutes(1))
         .untilAsserted(() -> Assertions.assertEquals(List.of(1, 2), ids(NO_DROP_TABLE_NAME)));
+  }
+
+  @Test
+  void testTruncateOverwriteUsesDorisNativePrivilegeModel() throws Exception {
+    ensureNoDropCatalog();
+    String table = NO_DROP_CATALOG_NAME + "." + DATABASE_NAME + "." + NO_DROP_OVERWRITE_TABLE_NAME;
+    Dataset<Row> input =
+        getSparkSession()
+            .range(1)
+            .selectExpr("CAST(3 AS INT) AS id", "CAST('overwrite-denied' AS STRING) AS name");
+
+    input.writeTo(table).overwrite(functions.lit(true));
+    await()
+        .atMost(Duration.ofMinutes(1))
+        .untilAsserted(
+            () -> Assertions.assertEquals(List.of(3), ids(NO_DROP_OVERWRITE_TABLE_NAME)));
   }
 
   private void ensureNoDropCatalog() {

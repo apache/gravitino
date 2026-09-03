@@ -27,6 +27,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.spark.sql.util.CaseInsensitiveStringMap;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,32 @@ public class TestDorisPropertiesConverter35 {
     assertEquals("9030", options.get(DorisConnectorConstants35.DORIS_QUERY_PORT));
     assertEquals("jdbc:mysql://fe-1:9030", options.get("url"));
     assertEquals("1000", options.get("doris.batch.size"));
+  }
+
+  @Test
+  void testConfiguredJdbcCredentialsAreNotMappedWithoutVending() {
+    String configuredPassword = "configured-" + UUID.randomUUID();
+    Map<String, String> options =
+        DorisPropertiesConverter35.getInstance()
+            .toSparkCatalogProperties(
+                ImmutableMap.of(
+                    DorisConnectorConstants35.JDBC_URL,
+                    "jdbc:mysql://fe-1:9030",
+                    DorisConnectorConstants35.JDBC_DRIVER,
+                    "com.mysql.cj.jdbc.Driver",
+                    "jdbc-user",
+                    "configured-user",
+                    "jdbc-password",
+                    configuredPassword));
+
+    assertFalse(options.containsKey("user"));
+    assertFalse(options.containsKey("password"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoDorisCatalogSpark35.requireProperty(options, "user"));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> GravitinoDorisCatalogSpark35.requireProperty(options, "password"));
   }
 
   @Test
@@ -196,6 +223,28 @@ public class TestDorisPropertiesConverter35 {
                   DorisPropertiesConverter35.validateWriteOptions(
                       new CaseInsensitiveStringMap(ImmutableMap.of(option, secret))));
       assertFalse(writeFailure.getMessage().contains(secret));
+    }
+  }
+
+  @Test
+  void testConnectionAndCatalogKeysAreRejectedForWrites() {
+    for (String option :
+        ImmutableList.of(
+            "jdbc-url",
+            "jdbc-driver",
+            "jdbc-user",
+            "jdbc-password",
+            "doris-fenodes",
+            "doris-query-port",
+            "query")) {
+      String secret = "secret-value-for-" + option;
+      IllegalArgumentException failure =
+          assertThrows(
+              IllegalArgumentException.class,
+              () ->
+                  DorisPropertiesConverter35.validateWriteOptions(
+                      new CaseInsensitiveStringMap(ImmutableMap.of(option, secret))));
+      assertFalse(failure.getMessage().contains(secret));
     }
   }
 
