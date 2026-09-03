@@ -101,6 +101,10 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
               GravitinoErrorCode.GRAVITINO_CATALOG_NOT_EXISTS,
               "Catalog " + NameIdentifier.of(metalake, catalogName) + " not exists.");
         }
+        // Refresh before returning: the catalog left a state row behind when its registration
+        // failed, and catalog_status would keep reporting a catalog that no longer exists until
+        // the next poll of the load loop.
+        catalogConnectorManager.loadMetalakeSync();
         LOG.info(
             "Drop catalog %s in metalake %s from server (no local connector) successfully.",
             catalogName, metalake);

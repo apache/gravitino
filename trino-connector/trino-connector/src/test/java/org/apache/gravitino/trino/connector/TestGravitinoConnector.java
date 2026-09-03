@@ -340,6 +340,50 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
   }
 
   @Test
+  public void testStatusSystemTablesWithNoProjectedColumns() throws Exception {
+    // count(*) projects no column at all, so the page is built with zero channels and only its
+    // position count carries the answer. A table that sized its page from the projected columns
+    // would report no rows here while returning them for every other query.
+    assertEquals(computeScalar("select count(*) from gravitino.system.catalog_status"), 1L);
+    assertEquals(computeScalar("select count(*) from gravitino.system.load_status"), 1L);
+    assertEquals(computeScalar("select count(*) from gravitino.system.catalog"), 1L);
+  }
+
+  @Test
+  public void testCatalogStatusReportsARegistrationFailure() throws Exception {
+    // An unknown bypass key makes the inner connector reject its configuration, so the catalog
+    // exists in Gravitino but its CREATE CATALOG in Trino fails: a real registration failure
+    // rather than a simulated state.
+    assertQueryFails(
+        "call gravitino.system.create_catalog("
+            + "catalog=>'memory_failed', provider=>'memory',"
+            + " properties => Map(array['trino.bypass.unknown-direct-key'], array['10']))",
+        "(?s)Create catalog failed. Create catalog failed due to the loading process fails\\..*");
+    assertThat(computeActual("show catalogs").getOnlyColumnAsSet()).doesNotContain("memory_failed");
+
+    MaterializedResult result =
+        computeActual(
+            "select status, last_error, failure_count from gravitino.system.catalog_status"
+                + " where catalog_name = 'memory_failed'");
+    assertEquals(result.getRowCount(), 1);
+    MaterializedRow row = result.getMaterializedRows().get(0);
+    assertEquals(row.getField(0), "FAILED");
+    assertThat((String) row.getField(1)).contains("unknown-direct-key");
+    assertEquals(row.getField(2), 1L);
+
+    // Leave the shared query runner as it was found, or the load loop keeps retrying this catalog
+    // and the other status table tests see an extra row.
+    assertUpdate(
+        "call gravitino.system.drop_catalog(catalog => 'memory_failed', ignore_not_exist => true)");
+    assertEquals(
+        computeActual(
+                "select 1 from gravitino.system.catalog_status"
+                    + " where catalog_name = 'memory_failed'")
+            .getRowCount(),
+        0);
+  }
+
+  @Test
   public void testLoadStatusSystemTable() throws Exception {
     MaterializedResult result =
         computeActual(
