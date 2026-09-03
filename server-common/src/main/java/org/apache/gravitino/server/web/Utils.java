@@ -213,19 +213,6 @@ public class Utils {
         .build();
   }
 
-  /**
-   * Returns an HTTP 405 response when the target resource does not allow the request method.
-   *
-   * @param message the error message
-   * @return the HTTP response
-   */
-  public static Response methodNotAllowed(String message) {
-    return Response.status(Response.Status.METHOD_NOT_ALLOWED)
-        .entity(ErrorResponse.unsupportedOperation(message))
-        .type(MediaType.APPLICATION_JSON)
-        .build();
-  }
-
   public static Response forbidden(String message, Throwable throwable) {
     return Response.status(Response.Status.FORBIDDEN)
         .entity(ErrorResponse.forbidden(message, throwable))

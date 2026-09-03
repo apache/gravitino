@@ -1163,6 +1163,11 @@ public class ExceptionHandlers {
         return Utils.optimisticLockConflict(errorMsg, e);
       }
 
+      if (e instanceof UnsupportedOperationException) {
+        LOG.warn(errorMsg, e);
+        return Utils.unsupportedOperation(errorMsg, e);
+      }
+
       LOG.error(errorMsg, e);
       return Utils.internalError(errorMsg, e);
     }

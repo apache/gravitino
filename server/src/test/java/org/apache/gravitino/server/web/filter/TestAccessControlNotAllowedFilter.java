@@ -37,6 +37,6 @@ public class TestAccessControlNotAllowedFilter {
     ArgumentCaptor<Response> responseCaptor = ArgumentCaptor.forClass(Response.class);
     verify(requestContext).abortWith(responseCaptor.capture());
     assertEquals(
-        Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), responseCaptor.getValue().getStatus());
+        Response.Status.NOT_IMPLEMENTED.getStatusCode(), responseCaptor.getValue().getStatus());
   }
 }

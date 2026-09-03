@@ -190,17 +190,6 @@ public class TestUtils {
     assertEquals("Unsupported operation", errorResponse.getMessage());
   }
 
-  /** Tests the response used when an HTTP method is not allowed for a resource. */
-  @Test
-  public void testMethodNotAllowed() {
-    Response response = Utils.methodNotAllowed("Method not allowed");
-    assertNotNull(response);
-    assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), response.getStatus());
-    assertEquals(MediaType.APPLICATION_JSON, response.getMediaType().toString());
-    ErrorResponse errorResponse = (ErrorResponse) response.getEntity();
-    assertEquals("Method not allowed", errorResponse.getMessage());
-  }
-
   @Test
   public void testFilterFilesetAuditHeaders() {
     // test invalid internal client type

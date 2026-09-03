@@ -228,7 +228,7 @@ public class IdpRESTApiIT extends BaseIT {
         putMembership(GROUP1, new GroupMembershipChangeRequest(new String[] {USER1, USER2}, null));
     Assertions.assertEquals(Set.of(USER1, USER2), Set.copyOf(group.getGroup().users()));
 
-    assertError(405, deleteGroupResponse(GROUP1, false), ErrorConstants.UNSUPPORTED_OPERATION_CODE);
+    assertError(409, deleteGroupResponse(GROUP1, false), ErrorConstants.NON_EMPTY_CODE);
 
     group =
         putMembership(GROUP1, new GroupMembershipChangeRequest(null, new String[] {USER1, USER2}));
