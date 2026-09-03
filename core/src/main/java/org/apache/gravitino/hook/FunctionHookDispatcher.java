@@ -19,10 +19,12 @@
 
 package org.apache.gravitino.hook;
 
+import java.util.Collections;
 import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CapabilityHelpers;
@@ -108,6 +110,11 @@ public class FunctionHookDispatcher implements FunctionDispatcher {
 
   @Override
   public boolean dropFunction(NameIdentifier ident) {
-    return dispatcher.dropFunction(ident);
+    boolean dropped = dispatcher.dropFunction(ident);
+    if (dropped) {
+      AuthorizationUtils.authorizationPluginRemovePrivileges(
+          ident, Entity.EntityType.FUNCTION, Collections.emptyList());
+    }
+    return dropped;
   }
 }

@@ -331,6 +331,7 @@ public class AuthorizationUtils {
     // If we enable authorization, we should remove the privileges about the entity in the
     // authorization plugin.
     if (GravitinoEnv.getInstance().accessControlDispatcher() != null) {
+      notifyEntityNameIdMappingChange(ident, type);
       MetadataObject metadataObject = NameIdentifierUtil.toMetadataObject(ident, type);
       String metalake =
           type == Entity.EntityType.METALAKE ? ident.name() : ident.namespace().level(0);

@@ -19,16 +19,21 @@
 package org.apache.gravitino.hook;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
+import java.util.Collections;
 import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.gravitino.Entity;
 import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.OwnerDispatcher;
 import org.apache.gravitino.catalog.CatalogManager;
@@ -40,6 +45,7 @@ import org.apache.gravitino.function.FunctionDefinition;
 import org.apache.gravitino.function.FunctionType;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
 public class TestFunctionHookDispatcher {
@@ -225,6 +231,27 @@ public class TestFunctionHookDispatcher {
     } finally {
       FieldUtils.writeField(gravitinoEnv, "ownerDispatcher", originalOwnerDispatcher, true);
       FieldUtils.writeField(gravitinoEnv, "catalogManager", originalCatalogManager, true);
+    }
+  }
+
+  @Test
+  public void testDropFunctionRemovesPrivilegesOnlyAfterSuccessfulDrop() {
+    NameIdentifier functionIdentifier =
+        NameIdentifier.of("metalake1", "catalog1", "schema1", "func1");
+    FunctionDispatcher dispatcher = Mockito.mock(FunctionDispatcher.class);
+    Mockito.when(dispatcher.dropFunction(functionIdentifier)).thenReturn(true, false);
+
+    try (MockedStatic<AuthorizationUtils> authorizationUtils =
+        Mockito.mockStatic(AuthorizationUtils.class)) {
+      FunctionHookDispatcher hookDispatcher = new FunctionHookDispatcher(dispatcher);
+
+      assertTrue(hookDispatcher.dropFunction(functionIdentifier));
+      assertFalse(hookDispatcher.dropFunction(functionIdentifier));
+      authorizationUtils.verify(
+          () ->
+              AuthorizationUtils.authorizationPluginRemovePrivileges(
+                  functionIdentifier, Entity.EntityType.FUNCTION, Collections.emptyList()),
+          Mockito.times(1));
     }
   }
 
