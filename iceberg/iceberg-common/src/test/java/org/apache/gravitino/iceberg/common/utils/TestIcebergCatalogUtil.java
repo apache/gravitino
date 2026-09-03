@@ -268,4 +268,74 @@ public class TestIcebergCatalogUtil {
     Assertions.assertEquals(
         "6789", properties.get(IcebergConstants.ICEBERG_REST_CLIENT_SOCKET_TIMEOUT_MS));
   }
+<<<<<<< HEAD
+=======
+
+  @Test
+  void testIsConcurrentViewMigrationConflictAcrossDatabases() {
+    // The duplicate `iceberg_type` column error wording differs per backend database; each of these
+    // means another Iceberg JDBC catalog on the same `uri` already ran the V1 view migration.
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isConcurrentViewMigrationConflict(
+            migrationError("Duplicate column name 'iceberg_type'")),
+        "MySQL duplicate-column error should be treated as a concurrent view-migration conflict");
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isConcurrentViewMigrationConflict(
+            migrationError(
+                "ERROR: column \"iceberg_type\" of relation \"iceberg_tables\" already exists")),
+        "PostgreSQL duplicate-column error should be treated as a conflict");
+    Assertions.assertTrue(
+        IcebergCatalogUtil.isConcurrentViewMigrationConflict(
+            migrationError("duplicate column name: iceberg_type")),
+        "SQLite duplicate-column error should be treated as a conflict");
+  }
+
+  @Test
+  void testIsConcurrentViewMigrationConflictRejectsUnrelatedErrors() {
+    // A duplicate-column error on a different column is not the view migration.
+    Assertions.assertFalse(
+        IcebergCatalogUtil.isConcurrentViewMigrationConflict(
+            migrationError("Duplicate column name 'some_other_column'")));
+    // An `iceberg_type` mention without a duplicate/already-exists signal is not this conflict.
+    Assertions.assertFalse(
+        IcebergCatalogUtil.isConcurrentViewMigrationConflict(
+            migrationError("Unknown column 'iceberg_type' in 'field list'")));
+    // A non-SQL cause is never this conflict.
+    Assertions.assertFalse(
+        IcebergCatalogUtil.isConcurrentViewMigrationConflict(
+            new UncheckedSQLException(
+                new RuntimeException("Duplicate column name 'iceberg_type'"), "boom")));
+    // A null cause message must not throw.
+    Assertions.assertFalse(
+        IcebergCatalogUtil.isConcurrentViewMigrationConflict(
+            new UncheckedSQLException(new SQLException((String) null), "boom")));
+  }
+
+  private static UncheckedSQLException migrationError(String causeMessage) {
+    return new UncheckedSQLException(
+        new SQLSyntaxErrorException(causeMessage), "Cannot check and eventually update SQL schema");
+  }
+
+  @Test
+  void testJdbcRetryableStatusCodes() {
+    Map<String, String> properties = new HashMap<>();
+    properties.put(CatalogProperties.URI, "jdbc:sqlite::memory:");
+    properties.put(CatalogProperties.WAREHOUSE_LOCATION, "test");
+    properties.put(IcebergConstants.GRAVITINO_JDBC_DRIVER, "org.sqlite.JDBC");
+    properties.put(IcebergConstants.ICEBERG_JDBC_USER, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_PASSWORD, "test");
+    properties.put(IcebergConstants.ICEBERG_JDBC_INITIALIZE, "true");
+
+    Catalog catalog =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog);
+
+    // Verify that calling loadCatalogBackend again does not throw
+    Catalog catalog2 =
+        IcebergCatalogUtil.loadCatalogBackend(
+            IcebergCatalogBackend.JDBC, new IcebergConfig(properties));
+    Assertions.assertInstanceOf(ClosableJdbcCatalog.class, catalog2);
+  }
+>>>>>>> 91a596605 ([#12589] fix(iceberg-catalog): Fix JDBC CommunicationsException after idle timeout for MySQL backend (#12662))
 }
