@@ -212,7 +212,7 @@ allprojects {
 
       // Gravitino CI Docker image
       param.environment("GRAVITINO_CI_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:hive-0.1.20")
-      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.6")
+      param.environment("GRAVITINO_CI_KERBEROS_HIVE_DOCKER_IMAGE", "apache/gravitino-ci:kerberos-hive-0.1.7")
       param.environment("GRAVITINO_CI_DORIS_DOCKER_IMAGE", "apache/gravitino-ci:doris-0.1.5")
       param.environment("GRAVITINO_CI_DORIS_FE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_FE_IMAGE") ?: "")
       param.environment("GRAVITINO_CI_DORIS_BE_IMAGE", System.getenv("GRAVITINO_CI_DORIS_BE_IMAGE") ?: "")
@@ -433,16 +433,7 @@ subprojects {
 
   java {
     toolchain {
-      // Some JDK vendors like Homebrew installed OpenJDK 17 have problems in building trino-connector:
-      // It will cause tests of Trino-connector hanging forever on macOS, to avoid this issue and
-      // other vendor-related problems, Gravitino will use the specified AMAZON OpenJDK 17 to build
-      // Trino-connector on macOS.
-      if (project.name == "trino-connector") {
-        if (OperatingSystem.current().isMacOsX) {
-          vendor.set(JvmVendorSpec.AMAZON)
-        }
-        languageVersion.set(JavaLanguageVersion.of(17))
-      } else if (compatibleWithJDK8(project)) {
+      if (compatibleWithJDK8(project)) {
         languageVersion.set(JavaLanguageVersion.of(17))
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8

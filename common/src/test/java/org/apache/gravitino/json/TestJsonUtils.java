@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.module.SimpleModule;
@@ -36,6 +37,7 @@ import org.apache.gravitino.dto.rel.partitions.IdentityPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.ListPartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.PartitionDTO;
 import org.apache.gravitino.dto.rel.partitions.RangePartitionDTO;
+import org.apache.gravitino.dto.requests.StatisticsUpdateRequest;
 import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.rel.types.Type;
 import org.apache.gravitino.rel.types.Types;
@@ -46,6 +48,11 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 public class TestJsonUtils {
+
+  private static final String INTEGRAL_RANGE_MESSAGE =
+      "out of the range of a 64-bit signed integer";
+  private static final String FLOATING_RANGE_MESSAGE =
+      "out of the range of a 64-bit floating point number";
 
   private static ObjectMapper objectMapper;
 
@@ -519,5 +526,91 @@ public class TestJsonUtils {
     Assertions.assertEquals(
         objectMapper.readValue(expectJson, StatisticValue.class),
         objectMapper.readValue(objectValue, StatisticValue.class));
+  }
+
+  @Test
+  void testStatisticValueRejectsOutOfRangeIntegral() throws JsonProcessingException {
+    // The 64-bit boundaries themselves must still be accepted.
+    Assertions.assertEquals(
+        StatisticValues.longValue(Long.MAX_VALUE),
+        objectMapper.readValue("9223372036854775807", StatisticValue.class));
+    Assertions.assertEquals(
+        StatisticValues.longValue(Long.MIN_VALUE),
+        objectMapper.readValue("-9223372036854775808", StatisticValue.class));
+
+    // Anything past a boundary has no lossless long representation and must be rejected rather
+    // than wrapped around.
+    assertRejected("9223372036854775808", INTEGRAL_RANGE_MESSAGE);
+    assertRejected("-9223372036854775809", INTEGRAL_RANGE_MESSAGE);
+    assertRejected("123456789012345678901234567890", INTEGRAL_RANGE_MESSAGE);
+    assertRejected("-123456789012345678901234567890", INTEGRAL_RANGE_MESSAGE);
+
+    // The deserializer reads the whole tree and recurses in plain Java, so an element nested in a
+    // list or an object is rejected at the same level as a scalar. This covers those two branches,
+    // not Jackson's own nesting - see testStatisticsUpdateRequestRejectsOutOfRangeValue for that.
+    assertRejected("[1,123456789012345678901234567890]", INTEGRAL_RANGE_MESSAGE);
+    assertRejected("{\"key\":123456789012345678901234567890}", INTEGRAL_RANGE_MESSAGE);
+  }
+
+  @Test
+  void testStatisticValueRejectsNonFiniteFloatingPoint() {
+    // A magnitude beyond the double range is only representable as an infinity, which the
+    // serializer writes back out as the JSON string "Infinity" - the value would come back as a
+    // string on the next round trip. The message reports the parsed double rather than echoing the
+    // literal, because the node Jackson hands us already holds the infinity; assert it in full so
+    // that stays visible.
+    assertRejected(
+        "1.5E400", FLOATING_RANGE_MESSAGE + ", the literal parsed to " + Double.POSITIVE_INFINITY);
+    assertRejected(
+        "-1.5E400", FLOATING_RANGE_MESSAGE + ", the literal parsed to " + Double.NEGATIVE_INFINITY);
+  }
+
+  @Test
+  void testStatisticsUpdateRequestRejectsOutOfRangeValue() {
+    // The shape the REST layer actually deserializes: the value is Map content, so Jackson wraps
+    // the rejection into a JsonMappingException, which the server maps to 400. Use a bare mapper
+    // rather than the shared one, because setUp registers a StatisticValue deserializer onto that
+    // singleton and the assertion would then hold even without the DTO's @JsonDeserialize
+    // annotation. The server's ObjectMapperProvider registers no such module, so the annotation is
+    // what has to carry the deserializer here.
+    ObjectMapper mapper = new ObjectMapper();
+    JsonMappingException e =
+        Assertions.assertThrows(
+            JsonMappingException.class,
+            () ->
+                mapper.readValue(
+                    "{\"updates\":{\"rowCount\":9223372036854775808}}",
+                    StatisticsUpdateRequest.class));
+
+    Assertions.assertInstanceOf(IllegalArgumentException.class, e.getCause());
+    Assertions.assertTrue(e.getCause().getMessage().contains(INTEGRAL_RANGE_MESSAGE));
+  }
+
+  @Test
+  void testStatisticValueRejectsUnsupportedNodeType() {
+    // A BINARY node cannot come from JSON text, but convertValue reaches the terminal branch
+    // through an embedded-object token. Note that convertValue itself wraps any IOException the
+    // deserializer throws into an IllegalArgumentException carrying the same message, so the cause
+    // is what distinguishes our own rejection from a laundered checked exception.
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.convertValue(new byte[] {1, 2}, StatisticValue.class));
+
+    Assertions.assertTrue(
+        e.getMessage().contains("Don't support json node type BINARY"),
+        () -> "Unexpected rejection reason: " + e.getMessage());
+    Assertions.assertNull(e.getCause());
+  }
+
+  private static void assertRejected(String json, String expectedMessagePart) {
+    IllegalArgumentException e =
+        Assertions.assertThrows(
+            IllegalArgumentException.class,
+            () -> objectMapper.readValue(json, StatisticValue.class));
+
+    Assertions.assertTrue(
+        e.getMessage().contains(expectedMessagePart),
+        () -> "Unexpected rejection reason: " + e.getMessage());
   }
 }
