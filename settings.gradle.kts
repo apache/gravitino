@@ -38,6 +38,7 @@ include("catalogs:catalog-lakehouse-generic")
 include(
   "catalogs:catalog-jdbc-common",
   "catalogs:catalog-jdbc-doris",
+  "catalogs:catalog-jdbc-generic",
   "catalogs:catalog-jdbc-mysql",
   "catalogs:catalog-jdbc-postgresql",
   "catalogs:catalog-jdbc-starrocks"
