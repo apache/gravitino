@@ -21,6 +21,8 @@ package org.apache.gravitino.catalog.doris.integration.test;
 import static org.apache.gravitino.integration.test.util.ITUtils.assertPartition;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.common.collect.Maps;
 import java.io.IOException;
@@ -189,6 +191,23 @@ public class CatalogDoris4xIT extends BaseIT {
         hashDist(),
         null,
         null);
+
+    IllegalArgumentException exception =
+        assertThrows(
+            IllegalArgumentException.class,
+            () ->
+                tc.alterTable(
+                    tid,
+                    TableChange.addIndex(
+                        Index.IndexType.INVERTED,
+                        "idx_invalid",
+                        new String[][] {{colName1}, {colName2}})));
+    assertTrue(
+        exception
+            .getMessage()
+            .contains(
+                "Index 'idx_invalid' supports exactly one top-level field in Doris, but got 2"));
+    assertEquals(0, tc.loadTable(tid).index().length);
 
     // Add INVERTED index
     tc.alterTable(
