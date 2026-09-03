@@ -30,13 +30,14 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration test verifying that a malformed typed path parameter on the metadata API (e.g. a
- * non-numeric model version) returns the same structured JSON {@link ErrorResponse} used by every
- * other error on the API, instead of Jetty's default HTML error page.
+ * Integration test verifying that requests Jersey rejects before reaching a resource method
+ * (malformed typed parameters, unmatched routes, wrong HTTP methods) return the same structured
+ * JSON {@link ErrorResponse} used by every other error on the API, instead of Jetty's default HTML
+ * error page.
  *
- * <p>Jersey fails to convert the path segment into the resource method's typed {@code @PathParam}
- * before any resource method runs, so the metalake/catalog/schema/model in the URL need not
- * actually exist for this failure to occur.
+ * <p>Jersey handles these cases itself — converting a typed {@code @PathParam}/{@code @QueryParam},
+ * matching a route, matching an HTTP method to a resource — before any resource method runs, so the
+ * metalake/catalog/schema/model in the URL need not actually exist for these failures to occur.
  */
 public class JsonErrorHandlerIT extends BaseIT {
 
@@ -45,42 +46,52 @@ public class JsonErrorHandlerIT extends BaseIT {
   @Test
   public void testMalformedModelVersionReturnsJsonErrorBody() throws Exception {
     HttpResponse<String> response =
-        sendGet("/api/metalakes/m/catalogs/c/schemas/s/models/mo/versions/abc");
+        sendRequest("GET", "/api/metalakes/m/catalogs/c/schemas/s/models/mo/versions/abc");
 
     Assertions.assertEquals(404, response.statusCode());
-    assertJsonNotFoundBody(response, "PathParamException");
+    assertJsonErrorBody(response, ErrorConstants.NOT_FOUND_CODE, "PathParamException");
   }
 
   @Test
   public void testMalformedModelVersionUriReturnsJsonErrorBody() throws Exception {
     HttpResponse<String> response =
-        sendGet("/api/metalakes/m/catalogs/c/schemas/s/models/mo/versions/abc/uri");
+        sendRequest("GET", "/api/metalakes/m/catalogs/c/schemas/s/models/mo/versions/abc/uri");
 
     Assertions.assertEquals(404, response.statusCode());
-    assertJsonNotFoundBody(response, "PathParamException");
+    assertJsonErrorBody(response, ErrorConstants.NOT_FOUND_CODE, "PathParamException");
   }
 
   @Test
   public void testUnknownApiRouteStillReturnsJsonErrorBody() throws Exception {
     // A route that Jersey cannot match at all is a different failure (no @PathParam conversion
     // is even attempted), but it must be covered by the same fix.
-    HttpResponse<String> response = sendGet("/api/v99/nonexistent/route");
+    HttpResponse<String> response = sendRequest("GET", "/api/v99/nonexistent/route");
 
     Assertions.assertEquals(404, response.statusCode());
-    assertJsonNotFoundBody(response, "NotFoundException");
+    assertJsonErrorBody(response, ErrorConstants.NOT_FOUND_CODE, "NotFoundException");
   }
 
-  private HttpResponse<String> sendGet(String path) throws Exception {
+  @Test
+  public void testWrongHttpMethodReturnsJsonErrorBody() throws Exception {
+    // /api/version only supports GET; POSTing to it never reaches a resource method either.
+    HttpResponse<String> response = sendRequest("POST", "/api/version");
+
+    Assertions.assertEquals(405, response.statusCode());
+    assertJsonErrorBody(
+        response, ErrorConstants.UNSUPPORTED_OPERATION_CODE, "UnsupportedOperationException");
+  }
+
+  private HttpResponse<String> sendRequest(String method, String path) throws Exception {
     HttpRequest request =
         HttpRequest.newBuilder()
             .uri(new URI("http://localhost:" + getGravitinoServerPort() + path))
-            .GET()
+            .method(method, HttpRequest.BodyPublishers.noBody())
             .build();
     return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
   }
 
-  private void assertJsonNotFoundBody(HttpResponse<String> response, String expectedType)
-      throws Exception {
+  private void assertJsonErrorBody(
+      HttpResponse<String> response, int expectedCode, String expectedType) throws Exception {
     String contentType = response.headers().firstValue("Content-Type").orElse("");
     Assertions.assertTrue(
         contentType.contains("application/json"),
@@ -90,7 +101,7 @@ public class JsonErrorHandlerIT extends BaseIT {
 
     ErrorResponse errorResponse =
         ObjectMapperProvider.objectMapper().readValue(response.body(), ErrorResponse.class);
-    Assertions.assertEquals(ErrorConstants.NOT_FOUND_CODE, errorResponse.getCode());
+    Assertions.assertEquals(expectedCode, errorResponse.getCode());
     Assertions.assertEquals(expectedType, errorResponse.getType());
     Assertions.assertFalse(errorResponse.getMessage().isEmpty());
   }
