@@ -128,4 +128,19 @@ public class IcebergConstants {
   public static final String SCAN_PLAN_CACHE_IMPL = "scan-plan-cache-impl";
   public static final String SCAN_PLAN_CACHE_CAPACITY = "scan-plan-cache-capacity";
   public static final String SCAN_PLAN_CACHE_EXPIRE_MINUTES = "scan-plan-cache-expire-minutes";
+
+  /** Whether the Iceberg REST server honors the {@code Idempotency-Key} header. */
+  public static final String ICEBERG_IDEMPOTENCY_ENABLED = "idempotency-enabled";
+
+  /** Client reuse window for an idempotency key, as an ISO-8601 duration. */
+  public static final String ICEBERG_IDEMPOTENCY_KEY_LIFETIME = "idempotency-key-lifetime";
+
+  /** Storage backend holding idempotency records. */
+  public static final String ICEBERG_IDEMPOTENCY_STORE_TYPE = "idempotency-store-type";
+
+  /** Short name of the node-local idempotency store. */
+  public static final String ICEBERG_IDEMPOTENCY_STORE_IN_MEMORY = "in-memory";
+
+  /** Capacity of the in-memory idempotency store. */
+  public static final String ICEBERG_IDEMPOTENCY_MAX_ENTRIES = "idempotency-max-entries";
 }

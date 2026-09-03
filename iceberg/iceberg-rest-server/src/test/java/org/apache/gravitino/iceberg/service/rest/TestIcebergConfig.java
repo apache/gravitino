@@ -50,6 +50,15 @@ public class TestIcebergConfig extends IcebergTestBase {
   }
 
   @Test
+  public void testConfigOmitsIdempotencyKeyLifetimeWhenDisabled() {
+    // Idempotency is disabled by default, and per the Iceberg REST spec the absence of
+    // `idempotency-key-lifetime` tells clients the server does not support Idempotency-Key.
+    Response resp = getConfigClientBuilder().get();
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), resp.getStatus());
+    Assertions.assertNull(resp.readEntity(ConfigResponse.class).idempotencyKeyLifetime());
+  }
+
+  @Test
   public void testConfigWithEmptyWarehouse() {
     Map<String, String> queryParams = ImmutableMap.of("warehouse", "");
     Response resp =
