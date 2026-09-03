@@ -41,6 +41,7 @@ import scala.Tuple2;
 import scala.collection.immutable.Map$;
 
 /** Spark 3.5 bridge around the official Doris table catalog and Spark JDBC V2. */
+// The Doris catalog base is compiled from Scala and exposes deprecated Spark bridge overrides.
 @SuppressWarnings("overrides")
 final class DorisTableCatalog35 extends DorisTableCatalog {
 

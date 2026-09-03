@@ -57,6 +57,21 @@ public class DorisCatalogPropertiesMetadata extends JdbcCatalogPropertiesMetadat
   /** The opt-in non-atomic truncate-then-load overwrite mode. */
   public static final String WRITE_OVERWRITE_TRUNCATE = "truncate";
 
+  /** The Doris Spark SQL-lane partition column. */
+  public static final String JDBC_PARTITION_COLUMN = "doris-jdbc-partition-column";
+
+  /** The Doris Spark SQL-lane lower bound. */
+  public static final String JDBC_LOWER_BOUND = "doris-jdbc-lower-bound";
+
+  /** The Doris Spark SQL-lane upper bound. */
+  public static final String JDBC_UPPER_BOUND = "doris-jdbc-upper-bound";
+
+  /** The Doris Spark SQL-lane partition count. */
+  public static final String JDBC_NUM_PARTITIONS = "doris-jdbc-num-partitions";
+
+  /** The Doris Spark SQL-lane fetch size. */
+  public static final String JDBC_FETCH_SIZE = "doris-jdbc-fetch-size";
+
   private static final Pattern FE_ENDPOINT = Pattern.compile("[A-Za-z0-9._-]+:(\\d+)");
 
   private static final Map<String, PropertyEntry<?>> PROPERTIES_METADATA =
@@ -95,6 +110,46 @@ public class DorisCatalogPropertiesMetadata extends JdbcCatalogPropertiesMetadat
                   WRITE_OVERWRITE_REJECT,
                   false /* hidden */,
                   false /* reserved */))
+          .put(
+              JDBC_PARTITION_COLUMN,
+              stringOptionalPropertyEntry(
+                  JDBC_PARTITION_COLUMN,
+                  "Spark JDBC partition column for the Doris SQL read lane",
+                  true /* immutable */,
+                  null,
+                  false /* hidden */))
+          .put(
+              JDBC_LOWER_BOUND,
+              stringOptionalPropertyEntry(
+                  JDBC_LOWER_BOUND,
+                  "Spark JDBC lower bound for the Doris SQL read lane",
+                  true /* immutable */,
+                  null,
+                  false /* hidden */))
+          .put(
+              JDBC_UPPER_BOUND,
+              stringOptionalPropertyEntry(
+                  JDBC_UPPER_BOUND,
+                  "Spark JDBC upper bound for the Doris SQL read lane",
+                  true /* immutable */,
+                  null,
+                  false /* hidden */))
+          .put(
+              JDBC_NUM_PARTITIONS,
+              integerOptionalPropertyEntry(
+                  JDBC_NUM_PARTITIONS,
+                  "Spark JDBC number of partitions for the Doris SQL read lane",
+                  true /* immutable */,
+                  null,
+                  false /* hidden */))
+          .put(
+              JDBC_FETCH_SIZE,
+              integerOptionalPropertyEntry(
+                  JDBC_FETCH_SIZE,
+                  "Spark JDBC fetch size for the Doris SQL read lane",
+                  true /* immutable */,
+                  null,
+                  false /* hidden */))
           .build();
 
   /**
@@ -133,13 +188,40 @@ public class DorisCatalogPropertiesMetadata extends JdbcCatalogPropertiesMetadat
       throw new IllegalArgumentException(
           DORIS_WRITE_OVERWRITE_MODE + "=truncate requires " + DORIS_WRITE_MODE + "=batch");
     }
+    validatePositiveIfPresent(properties, JDBC_NUM_PARTITIONS);
+    validatePositiveIfPresent(properties, JDBC_FETCH_SIZE);
     if (properties.containsKey(DORIS_WRITE_MODE)) {
       result.put(DORIS_WRITE_MODE, writeMode);
     }
     if (properties.containsKey(DORIS_WRITE_OVERWRITE_MODE)) {
       result.put(DORIS_WRITE_OVERWRITE_MODE, overwriteMode);
     }
+    putIfPresent(result, JDBC_PARTITION_COLUMN, properties.get(JDBC_PARTITION_COLUMN));
+    putIfPresent(result, JDBC_LOWER_BOUND, properties.get(JDBC_LOWER_BOUND));
+    putIfPresent(result, JDBC_UPPER_BOUND, properties.get(JDBC_UPPER_BOUND));
+    putIfPresent(result, JDBC_NUM_PARTITIONS, properties.get(JDBC_NUM_PARTITIONS));
+    putIfPresent(result, JDBC_FETCH_SIZE, properties.get(JDBC_FETCH_SIZE));
     return result;
+  }
+
+  private static void putIfPresent(Map<String, String> properties, String key, String value) {
+    if (value != null) {
+      properties.put(key, value);
+    }
+  }
+
+  private static void validatePositiveIfPresent(Map<String, String> properties, String key) {
+    String value = properties.get(key);
+    if (value == null) {
+      return;
+    }
+    try {
+      if (Integer.parseInt(value) < 1) {
+        throw new NumberFormatException("value is not positive");
+      }
+    } catch (NumberFormatException e) {
+      throw new IllegalArgumentException(key + " must be a positive integer");
+    }
   }
 
   static String normalizeFeNodes(String value) {

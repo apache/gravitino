@@ -18,12 +18,16 @@ the current specialized support declaration.
 
 ## Support matrix
 
-| Spark | Scala | Doris Spark Connector | Specialized Doris adapter |
-|---|---|---|---|
-| 3.5.3 | 2.12 | `org.apache.doris:spark-doris-connector-spark-3.5:26.0.0` | Certified lower bound: batch read; opt-in batch append and truncate overwrite |
-| 3.5.9 | 2.12 | `org.apache.doris:spark-doris-connector-spark-3.5:26.0.0` | Certified full-matrix point: batch read; opt-in batch append and truncate overwrite |
-| Other 3.5.3+ patches | 2.12 | Same artifact | Accepted by the compatibility gate; not individually certified |
-| Other Spark versions | Corresponding version | Not certified by this adapter | Not supported by this adapter |
+| Spark | Scala | Doris | Doris Spark Connector | Specialized Doris adapter |
+|---|---|---|---|---|
+| 3.5.3 | 2.12 | 3.0.6.2 | `org.apache.doris:spark-doris-connector-spark-3.5:26.0.0` | Certified lower-bound embedded matrix: batch read; opt-in batch append and truncate overwrite |
+| 3.5.3 | 2.12 | 4.0.6 | Same artifact | Targeted smoke only; not individually certified |
+| 3.5.9 | 2.12 | 4.0.6 | Same artifact | Certified upper-bound embedded matrix: batch read; opt-in batch append and truncate overwrite |
+| 3.5.9 | 2.12 | 3.0.6.2 | Same artifact | Certified standalone two-worker external-classpath matrix |
+| Other 3.5.3+ patches | 2.12 | 3.0.6.2 or 4.0.6 | Same artifact | Accepted by the compatibility gate; not individually certified |
+| 3.5.0–3.5.2 | 2.12 | Any | Same artifact | Outside the specialized build and support contract |
+| 3.5.x | 2.13 | Any | No compatible 26.0.0 artifact | Generic JDBC remains available; specialized adapter is not supported |
+| Other Spark versions | Corresponding version | Any | Version-specific artifacts may exist, but no Gravitino specialized adapter is provided in this scope | Generic JDBC remains available where supported |
 
 Spark 3.5.0 through 3.5.2 are below the current Gravitino Spark 3.5 build baseline because the
 shared catalog implementation uses the write-aware API introduced in Spark 3.5.3. The existing
@@ -34,7 +38,9 @@ executors. They are not bundled into the Gravitino Spark runtime artifact.
 ## Preparation
 
 1. Configure a `jdbc-doris` catalog in Gravitino. The server catalog documentation describes the
-   JDBC properties and the Doris-specific `doris-fenodes` and `doris-query-port` properties.
+   JDBC properties and the Doris-specific `doris-fenodes`, `doris-query-port`, write-policy, and
+   SQL-lane properties. The Gravitino Server must have MySQL Connector/J and JDBC network access to
+   Doris for server-side metadata operations.
 2. For the specialized Spark adapter, set both `doris-fenodes` and `doris-query-port` on the catalog.
    Use a comma-separated list such as `fe-1:8030,fe-2:8030`; URI-form endpoints and IPv6 literals
    are rejected.
@@ -72,6 +78,10 @@ runtime as a local JAR:
 The default value of `spark.sql.gravitino.enableDorisSupport` is `false`. With the default value,
 `jdbc-doris` continues to use the existing generic JDBC adapter. When the flag is enabled, the
 catalog-managed endpoints and vended JDBC credentials cannot be overridden by Spark options.
+Unlike the generic JDBC adapter, the specialized Doris adapter does not map catalog
+`jdbc-user`/`jdbc-password` values into Spark; it requires a vended `JdbcCredential` for the Spark
+driver and executors. This is an intentional stricter credential boundary for the dual Doris
+native/JDBC data paths.
 Per-read options are rejected instead of being merged into the JDBC lane, and protected
 catalog/bypass/per-write options fail closed without exposing their values.
 
@@ -81,6 +91,23 @@ Governed writes use catalog-level settings:
 |---|---|---|
 | `doris-write-mode` | `disabled` | Set to `batch` to expose governed batch append. |
 | `doris-write-overwrite-mode` | `reject` | Set to `truncate` with batch mode to expose non-atomic full-table truncate overwrite. |
+
+The specialized SQL read lane maps the following catalog properties to Spark JDBC options:
+
+| Catalog property | Spark JDBC option |
+|---|---|
+| `doris-jdbc-partition-column` | `partitionColumn` |
+| `doris-jdbc-lower-bound` | `lowerBound` |
+| `doris-jdbc-upper-bound` | `upperBound` |
+| `doris-jdbc-num-partitions` | `numPartitions` |
+| `doris-jdbc-fetch-size` | `fetchsize` |
+
+The four partition properties must be present together. `numPartitions` and `fetchsize` must be
+positive integers. The allowed Doris Connector catalog-initialization options are
+`doris.request.retries`, `doris.request.connect.timeout.ms`, `doris.request.read.timeout.ms`,
+`doris.request.query.timeout.s`, `doris.request.tablet.size`, `doris.batch.size`,
+`doris.exec.mem.limit`, `doris.filter.query.in.max.count`, and
+`doris.thrift.max.message.size`. Unknown, protected, and `spark.bypass.*` options fail closed.
 
 ## Read behavior
 
@@ -103,12 +130,13 @@ Governed writes use catalog-level settings:
   Doris write delegate or performing Doris write I/O.
 - Gravitino authorization does not replace Doris authorization. The vended Doris account requires
   Doris `SELECT_PRIV` to inspect and read the table and `LOAD_PRIV` for governed Stream Load writes.
-  The official connector implements full-table overwrite with SQL `TRUNCATE TABLE`, so the
-  separately enabled truncate path additionally requires `DROP_PRIV`. The certified truncate
-  account receives `SELECT_PRIV`, `LOAD_PRIV`, and `DROP_PRIV`, but not `ALTER_PRIV`; append is also
-  tested with `SELECT_PRIV` and `LOAD_PRIV` only. Some Doris 3.x deployments may permit truncate
-  through broader legacy `LOAD_PRIV` semantics, but portable deployments must follow the official
-  `DROP_PRIV` contract.
+  The official connector implements full-table overwrite with SQL `TRUNCATE TABLE`, but exact
+  native privilege requirements remain Doris-version and deployment dependent; the Gravitino
+  adapter delegates that decision to Doris and does not introspect or synthesize grants. The Doris
+  3.0.6.2 and 4.0.6 test images both permit this operation with `SELECT_PRIV` and `LOAD_PRIV`
+  without `DROP_PRIV`; deployments whose Doris policy requires `DROP_PRIV` must grant it. The
+  tested path does not require `ALTER_PRIV`; append is also tested with `SELECT_PRIV` and `LOAD_PRIV`
+  only.
 - Batch append delegates to the official Doris Stream Load writer. The adapter forces Stream Load
   mode, 2PC, strict mode, zero filter tolerance, schemaless mode off, and automatic redirect off.
   Spark catalog, bypass, and per-write options cannot override these settings, endpoints, or
@@ -154,7 +182,9 @@ The specialized adapter currently does not support:
 - strict native TLS identity verification claims;
 - performance guarantees or release-level benchmarks; or
 - Spark versions earlier than 3.5.3 or outside Spark 3.5 / Scala 2.12; only 3.5.3 and 3.5.9 are
-  individually certified.
+  individually certified. Doris 1.2.x and other unlisted Doris releases are not certified and do
+  not automatically fall back when specialized mode is enabled; keep the feature flag disabled to
+  use generic JDBC for those releases.
 
 ## Troubleshooting
 
@@ -169,7 +199,9 @@ The specialized adapter currently does not support:
   3.5.3 or newer with the specialized adapter enabled; validate unlisted patches in your
   environment because they are not individually certified.
 - **Truncate overwrite is rejected:** additionally set `doris-write-overwrite-mode=truncate` and
-  ensure the Doris account has `DROP_PRIV` as well as the read and Stream Load privileges above.
+  verify that the Doris account has `SELECT_PRIV` and `LOAD_PRIV`. Grant any additional privilege
+  required by the deployment's native Doris policy; the tested Doris 3.0.6.2 and 4.0.6 paths do not
+  require `DROP_PRIV`.
 - **An unsupported Spark version is reported:** the current specialized stage intentionally covers
   only the Spark 3.5 line from 3.5.3 onward with Scala 2.12. Spark 3.5.3 and 3.5.9 are the certified
   points; do not treat generic JDBC behavior or an untested patch as certified specialized support.

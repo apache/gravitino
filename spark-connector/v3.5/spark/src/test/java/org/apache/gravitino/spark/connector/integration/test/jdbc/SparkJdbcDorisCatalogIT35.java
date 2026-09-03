@@ -25,6 +25,7 @@ import static org.apache.gravitino.spark.connector.jdbc.JdbcPropertiesConstants.
 import static org.awaitility.Awaitility.await;
 
 import com.google.common.collect.ImmutableSet;
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -59,6 +60,7 @@ import org.apache.spark.sql.connector.catalog.TableWritePrivilege;
 import org.apache.spark.sql.functions;
 import org.apache.spark.sql.types.DataTypes;
 import org.apache.spark.sql.types.StructType;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Tag;
@@ -95,6 +97,7 @@ public class SparkJdbcDorisCatalogIT35 extends SparkEnvIT {
   private String jdbcUser;
   private String jdbcPassword;
   private int feHttpPort;
+  private RecordingDorisHttpProxy dorisHttpProxy;
 
   @Override
   protected String getCatalogName() {
@@ -134,7 +137,15 @@ public class SparkJdbcDorisCatalogIT35 extends SparkEnvIT {
     jdbcUrl =
         String.format(
             "jdbc:mysql://%s:%d/", container.getContainerIpAddress(), container.getFeMysqlPort());
-    feHttpPort = container.getFeHttpPort();
+    if (getSparkMaster().startsWith("spark://")) {
+      // Executors cannot reach a proxy bound to the driver's loopback interface.
+      feHttpPort = container.getFeHttpPort();
+    } else {
+      dorisHttpProxy =
+          RecordingDorisHttpProxy.start(
+              String.format("%s:%d", container.getContainerIpAddress(), container.getFeHttpPort()));
+      feHttpPort = dorisHttpProxy.port();
+    }
     jdbcUser = WRITER_USER;
     jdbcPassword = "it-" + UUID.randomUUID().toString().replace("-", "");
     try (Connection connection =
@@ -256,6 +267,18 @@ public class SparkJdbcDorisCatalogIT35 extends SparkEnvIT {
     }
   }
 
+  @AfterAll
+  @Override
+  protected void stop() throws IOException, InterruptedException {
+    try {
+      super.stop();
+    } finally {
+      if (dorisHttpProxy != null) {
+        dorisHttpProxy.close();
+      }
+    }
+  }
+
   @Test
   void testCatalogClassName() {
     String className =
@@ -304,8 +327,14 @@ public class SparkJdbcDorisCatalogIT35 extends SparkEnvIT {
             .selectExpr("CAST(id AS INT) AS id", "CAST(CONCAT('row-', id) AS STRING) AS name");
     String table = CATALOG_NAME + "." + DATABASE_NAME + "." + BULK_TABLE_NAME;
 
+    if (dorisHttpProxy != null) {
+      dorisHttpProxy.reset();
+    }
     input.limit(0).writeTo(table).append();
     Assertions.assertEquals(0, rowCount(BULK_TABLE_NAME));
+    if (dorisHttpProxy != null) {
+      Assertions.assertEquals(0, dorisHttpProxy.requestCount("PUT", "_stream_load"));
+    }
 
     input.writeTo(table).append();
     await()
@@ -442,6 +471,23 @@ public class SparkJdbcDorisCatalogIT35 extends SparkEnvIT {
               Assertions.assertEquals(1, rowCount(TRUNCATE_TABLE_NAME));
               Assertions.assertEquals(9, singleId(TRUNCATE_TABLE_NAME));
             });
+  }
+
+  @Test
+  void testEmptyTruncateOverwriteClearsTable() throws Exception {
+    Dataset<Row> emptyInput =
+        getSparkSession()
+            .range(1)
+            .selectExpr("CAST(id AS INT) AS id", "CAST(CONCAT('row-', id) AS STRING) AS name")
+            .limit(0);
+
+    emptyInput
+        .writeTo(CATALOG_NAME + "." + DATABASE_NAME + "." + TRUNCATE_TABLE_NAME)
+        .overwrite(functions.lit(true));
+
+    await()
+        .atMost(Duration.ofMinutes(1))
+        .untilAsserted(() -> Assertions.assertEquals(0, rowCount(TRUNCATE_TABLE_NAME)));
   }
 
   @Test

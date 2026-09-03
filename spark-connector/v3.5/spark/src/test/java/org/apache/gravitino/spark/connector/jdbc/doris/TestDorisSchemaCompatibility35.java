@@ -121,6 +121,27 @@ public class TestDorisSchemaCompatibility35 {
   }
 
   @Test
+  void testDatetimePrecisionOutsideDorisRangeFailsClosed() {
+    Table logicalTable = mock(Table.class);
+    when(logicalTable.columns())
+        .thenReturn(new Column[] {Column.of("event_time", Types.TimestampType.withoutTimeZone(7))});
+    StructType physicalSchema =
+        DataTypes.createStructType(
+            new StructField[] {
+              DataTypes.createStructField("event_time", DataTypes.TimestampType, true)
+            });
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () ->
+            DorisSchemaCompatibility35.plan(
+                Identifier.of(new String[] {"db"}, "t"),
+                logicalTable,
+                new DorisPhysicalSchema35(physicalSchema, Arrays.asList("DATETIME(7)")),
+                new DorisSparkTypeConverter35()));
+  }
+
+  @Test
   void testDirectTypeMismatchFailsClosed() {
     Table logicalTable = mock(Table.class);
     when(logicalTable.columns())

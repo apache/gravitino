@@ -36,6 +36,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -48,7 +51,11 @@ import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
 import org.apache.gravitino.client.GravitinoMetalake;
+import org.apache.gravitino.credential.JdbcCredential;
 import org.apache.gravitino.exceptions.ForbiddenException;
+import org.apache.gravitino.integration.test.container.ContainerSuite;
+import org.apache.gravitino.integration.test.container.DorisContainer;
+import org.apache.gravitino.integration.test.container.DorisImageName;
 import org.apache.gravitino.integration.test.util.BaseIT;
 import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.plugin.GravitinoSparkPlugin;
@@ -58,9 +65,11 @@ import org.apache.spark.sql.connector.catalog.CatalogManager;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** Verifies that Gravitino denies Doris writes before any configured physical endpoint is used. */
+/** Verifies that denied Doris writes do not enter the Spark physical write path. */
+@Tag("gravitino-docker-test")
 public class SparkJdbcDorisAuthorizationIT35 extends BaseIT {
 
   private static final String METALAKE = "doris_authorization";
@@ -71,18 +80,22 @@ public class SparkJdbcDorisAuthorizationIT35 extends BaseIT {
   private static final String DENIED_USER = "doris_authorization_denied";
   private static final String ROLE = "doris_authorization_role";
   private static final String JDBC_DRIVER = "com.mysql.cj.jdbc.Driver";
+  private static final String DORIS_USER = "gravitino_doris_authorization";
+  private static final DorisImageName DORIS_IMAGE = dorisImage();
 
   private CountingHttpEndpoint httpEndpoint;
   private CountingTcpEndpoint tcpEndpoint;
   private SparkSession spark;
-  private String unusedPassword;
+  private String jdbcUrl;
+  private String dorisPassword;
 
   @BeforeAll
   @Override
   public void startIntegrationTest() throws Exception {
+    dorisPassword = "it-" + UUID.randomUUID().toString().replace("-", "");
+    createDorisTable();
     httpEndpoint = CountingHttpEndpoint.start();
     tcpEndpoint = CountingTcpEndpoint.start();
-    unusedPassword = "it-" + UUID.randomUUID().toString().replace("-", "");
     customConfigs.putAll(
         ImmutableMap.of(
             "SimpleAuthUserName",
@@ -137,7 +150,7 @@ public class SparkJdbcDorisAuthorizationIT35 extends BaseIT {
   }
 
   @Test
-  void testModifyDenialPrecedesAllConfiguredDorisEndpoints() {
+  void testModifyDenialPrecedesSpecializedPhysicalAccess() {
     httpEndpoint.reset();
     tcpEndpoint.reset();
     SparkSession deniedSession = spark.newSession();
@@ -157,7 +170,7 @@ public class SparkJdbcDorisAuthorizationIT35 extends BaseIT {
                               + TABLE
                               + " VALUES (1, 'denied')")
                       .collectAsList());
-      assertSecretNotExposed(failure, unusedPassword);
+      assertSecretNotExposed(failure, dorisPassword);
       await()
           .during(Duration.ofSeconds(1))
           .atMost(Duration.ofSeconds(3))
@@ -176,10 +189,11 @@ public class SparkJdbcDorisAuthorizationIT35 extends BaseIT {
     GravitinoMetalake metalake = client.loadMetalake(METALAKE);
     metalake.addUser(DENIED_USER);
     Map<String, String> properties = new HashMap<>();
-    properties.put(GRAVITINO_JDBC_URL, "jdbc:mysql://127.0.0.1:" + tcpEndpoint.port() + "/");
-    properties.put(GRAVITINO_JDBC_USER, "unused-user");
-    properties.put(GRAVITINO_JDBC_PASSWORD, unusedPassword);
+    properties.put(GRAVITINO_JDBC_URL, jdbcUrl);
+    properties.put(GRAVITINO_JDBC_USER, DORIS_USER);
+    properties.put(GRAVITINO_JDBC_PASSWORD, dorisPassword);
     properties.put(GRAVITINO_JDBC_DRIVER, JDBC_DRIVER);
+    properties.put("credential-providers", JdbcCredential.JDBC_CREDENTIAL_TYPE);
     properties.put("doris-fenodes", "127.0.0.1:" + httpEndpoint.port());
     properties.put("doris-query-port", Integer.toString(tcpEndpoint.port()));
     properties.put("doris-write-mode", "batch");
@@ -192,9 +206,47 @@ public class SparkJdbcDorisAuthorizationIT35 extends BaseIT {
                 Privileges.UseCatalog.allow(),
                 Privileges.UseSchema.allow(),
                 Privileges.SelectTable.allow(),
+                Privileges.ProbeTableLike.deny(),
                 Privileges.ModifyTable.deny()));
     metalake.createRole(ROLE, new HashMap<>(), ImmutableList.of(catalogObject));
     return metalake;
+  }
+
+  private void createDorisTable() throws Exception {
+    ContainerSuite containerSuite = ContainerSuite.getInstance();
+    containerSuite.startDorisContainer(DORIS_IMAGE);
+    DorisContainer dorisContainer = containerSuite.getDorisContainer(DORIS_IMAGE);
+    jdbcUrl =
+        String.format(
+            "jdbc:mysql://%s:%d/",
+            dorisContainer.getContainerIpAddress(), dorisContainer.getFeMysqlPort());
+    try (Connection connection =
+            DriverManager.getConnection(
+                jdbcUrl, DorisContainer.USER_NAME, DorisContainer.PASSWORD);
+        Statement statement = connection.createStatement()) {
+      statement.execute("CREATE DATABASE IF NOT EXISTS " + DATABASE);
+      statement.execute("DROP TABLE IF EXISTS " + DATABASE + "." + TABLE);
+      statement.execute(
+          "CREATE TABLE "
+              + DATABASE
+              + "."
+              + TABLE
+              + " (id INT, name VARCHAR(64)) DISTRIBUTED BY HASH(id) BUCKETS 1");
+      statement.execute("DROP USER IF EXISTS '" + DORIS_USER + "'");
+      statement.execute("CREATE USER '" + DORIS_USER + "' IDENTIFIED BY '" + dorisPassword + "'");
+      statement.execute("GRANT SELECT_PRIV ON `" + DATABASE + "`.* TO '" + DORIS_USER + "'");
+    }
+  }
+
+  private static DorisImageName dorisImage() {
+    String version = System.getenv().getOrDefault("GRAVITINO_TEST_DORIS_VERSION", "3.0.6.2");
+    if ("4.0.6".equals(version)) {
+      return DorisImageName.VERSION_4_0;
+    }
+    if ("3.0.6.2".equals(version)) {
+      return DorisImageName.VERSION_3_0;
+    }
+    throw new IllegalArgumentException("Unsupported Doris integration-test version: " + version);
   }
 
   private static void assertSecretNotExposed(Throwable failure, String secret) {
