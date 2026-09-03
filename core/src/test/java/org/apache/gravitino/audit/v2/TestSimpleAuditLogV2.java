@@ -19,12 +19,14 @@
 
 package org.apache.gravitino.audit.v2;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.listener.api.event.Event;
 import org.apache.gravitino.listener.api.event.EventSource;
+import org.apache.gravitino.listener.api.event.GrantUserRolesFailureEvent;
 import org.apache.gravitino.listener.api.event.ListCatalogEvent;
 import org.apache.gravitino.listener.api.event.ListMetalakeEvent;
 import org.apache.gravitino.listener.api.event.ListSchemaEvent;
@@ -66,6 +68,20 @@ public class TestSimpleAuditLogV2 {
     String[] fields = output.split("\t", -1);
     Assertions.assertEquals(8, fields.length);
     Assertions.assertEquals("", fields[7], "Last field should be empty when customInfo is absent");
+  }
+
+  @Test
+  public void testRoleAssignmentIncludesRoleNames() {
+    GrantUserRolesFailureEvent event =
+        new GrantUserRolesFailureEvent(
+            "admin",
+            "metalake",
+            new RuntimeException("failed"),
+            "alice",
+            ImmutableList.of("reader", "admin"));
+
+    String customInfo = new SimpleAuditLogV2(event).toString().split("\\t", -1)[7];
+    Assertions.assertEquals("{roleNames=reader,admin}", customInfo);
   }
 
   @Test

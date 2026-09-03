@@ -544,6 +544,8 @@ public class TestGroupEvent {
     GrantGroupRolesEvent grantGroupRolesEvent = (GrantGroupRolesEvent) event;
     Assertions.assertEquals(
         NameIdentifierUtil.ofGroup(METALAKE, groupName), grantGroupRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantGroupRolesEvent.customInfo().get("roleNames"));
     GroupInfo groupInfo = grantGroupRolesEvent.grantedGroupInfo();
 
     validateGroup(groupInfo, group);
@@ -566,6 +568,8 @@ public class TestGroupEvent {
         NameIdentifierUtil.ofGroup(METALAKE, groupName), grantGroupRolesFailureEvent.identifier());
     Assertions.assertEquals(groupName, grantGroupRolesFailureEvent.groupName());
     Assertions.assertEquals(grantedRoles, grantGroupRolesFailureEvent.roles());
+    Assertions.assertEquals(
+        String.join(",", grantedRoles), grantGroupRolesFailureEvent.customInfo().get("roleNames"));
   }
 
   @Test
@@ -600,6 +604,8 @@ public class TestGroupEvent {
     RevokeGroupRolesEvent revokeGroupRolesEvent = (RevokeGroupRolesEvent) event;
     Assertions.assertEquals(
         NameIdentifierUtil.ofGroup(METALAKE, otherGroupName), revokeGroupRolesEvent.identifier());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeGroupRolesEvent.customInfo().get("roleNames"));
     GroupInfo groupInfo = revokeGroupRolesEvent.revokedGroupInfo();
 
     validateGroup(groupInfo, otherGroup);
@@ -624,6 +630,8 @@ public class TestGroupEvent {
         revokeGroupRolesFailureEvent.identifier());
     Assertions.assertEquals(otherGroupName, revokeGroupRolesFailureEvent.groupName());
     Assertions.assertEquals(revokedRoles, revokeGroupRolesFailureEvent.roles());
+    Assertions.assertEquals(
+        String.join(",", revokedRoles), revokeGroupRolesFailureEvent.customInfo().get("roleNames"));
   }
 
   @Test
