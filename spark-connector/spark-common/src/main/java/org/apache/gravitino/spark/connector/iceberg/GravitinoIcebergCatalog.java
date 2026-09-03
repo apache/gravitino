@@ -21,20 +21,32 @@ package org.apache.gravitino.spark.connector.iceberg;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
+import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergPropertiesUtils;
+import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
 import org.apache.gravitino.rel.Table;
+import org.apache.gravitino.spark.connector.GravitinoSparkConfig;
 import org.apache.gravitino.spark.connector.PropertiesConverter;
 import org.apache.gravitino.spark.connector.SparkTransformConverter;
 import org.apache.gravitino.spark.connector.SparkTypeConverter;
 import org.apache.gravitino.spark.connector.catalog.BaseCatalog;
+import org.apache.gravitino.spark.connector.catalog.GravitinoCatalogManager;
 import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.spark.SparkCatalog;
 import org.apache.iceberg.spark.source.HasIcebergCatalog;
 import org.apache.iceberg.spark.source.SparkTable;
+import org.apache.spark.SparkConf;
+import org.apache.spark.sql.SparkSession;
 import org.apache.spark.sql.catalyst.analysis.NoSuchFunctionException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchNamespaceException;
 import org.apache.spark.sql.catalyst.analysis.NoSuchTableException;
@@ -73,13 +85,147 @@ public class GravitinoIcebergCatalog extends BaseCatalog
       }
     }
     String catalogBackendName = IcebergPropertiesUtils.getCatalogBackendName(properties);
-    Map<String, String> all =
-        getPropertiesConverter().toSparkCatalogProperties(options, properties);
-    CredentialPropertyUtils.applyIcebergCredentials(
-        CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
+    SparkConf sparkConf = SparkSession.active().sparkContext().conf();
+    Optional<String> icebergRestUri =
+        resolveIcebergRestUri(
+            properties,
+            key -> sparkConf.get(key, null),
+            () -> GravitinoCatalogManager.get().getIcebergRestUri());
+    Map<String, String> all;
+    if (icebergRestUri.isPresent()) {
+      all =
+          buildAutoRoutedIcebergRestProperties(
+              name, options, properties, icebergRestUri.get(), sparkConf);
+    } else {
+      all = getPropertiesConverter().toSparkCatalogProperties(options, properties);
+      CredentialPropertyUtils.applyIcebergCredentials(
+          CredentialPropertyUtils.getCredentials(gravitinoCatalogClient), all);
+    }
     TableCatalog icebergCatalog = new SparkCatalog();
     icebergCatalog.initialize(catalogBackendName, new CaseInsensitiveStringMap(all));
     return icebergCatalog;
+  }
+
+  /**
+   * Resolves the Iceberg REST server endpoint to route this catalog through, if any. Only hive/jdbc
+   * backed catalogs are eligible; a catalog already configured with {@code catalog-backend=rest} or
+   * {@code custom} is left untouched, and so is a catalog with no {@code catalog-backend} property
+   * at all.
+   *
+   * <p>An eligible catalog whose warehouse has a native Iceberg FileIO (s3/gs/abfs-family schemes)
+   * fails immediately unless {@code credential-providers} is configured: routing replaces any
+   * static storage credentials for that FileIO with vended ones, so such a catalog would silently
+   * lose storage access once routed. A warehouse scheme with no native FileIO (e.g. {@code
+   * hdfs://}, {@code file://}) carries no such risk and is unaffected.
+   */
+  static Optional<String> resolveIcebergRestUri(
+      Map<String, String> properties,
+      UnaryOperator<String> sessionConfig,
+      Supplier<Optional<String>> endpointDiscovery) {
+    String backend = properties.get(IcebergConstants.CATALOG_BACKEND);
+    if (backend == null) {
+      return Optional.empty();
+    }
+    String normalizedBackend = backend.toLowerCase(Locale.ROOT);
+    boolean eligible =
+        IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_HIVE.equals(normalizedBackend)
+            || IcebergPropertiesConstants.GRAVITINO_ICEBERG_CATALOG_BACKEND_JDBC.equals(
+                normalizedBackend);
+    if (!eligible) {
+      return Optional.empty();
+    }
+
+    String routingEnabled =
+        sessionConfig.apply(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED);
+    if (StringUtils.isNotBlank(routingEnabled)
+        && !"true".equalsIgnoreCase(routingEnabled)
+        && !"false".equalsIgnoreCase(routingEnabled)) {
+      throw new IllegalArgumentException(
+          GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
+              + " must be true or false, but was: "
+              + routingEnabled);
+    }
+    if ("false".equalsIgnoreCase(routingEnabled)) {
+      return Optional.empty();
+    }
+
+    boolean warehouseHasNativeFileIo =
+        IcebergPropertiesConverter.deriveFileIoImpl(properties.get(IcebergConstants.WAREHOUSE))
+            != null;
+    if (warehouseHasNativeFileIo
+        && StringUtils.isBlank(properties.get(CredentialConstants.CREDENTIAL_PROVIDERS))) {
+      throw new IllegalStateException(
+          "Catalog's warehouse has a native Iceberg FileIO but no credential-providers "
+              + "configured; routing through the Iceberg REST server replaces any static storage "
+              + "credentials for that FileIO with vended ones, so this catalog would lose storage "
+              + "access once routed. Configure credential-providers on the catalog, or set "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
+              + "=false to use legacy Hive/JDBC backend translation.");
+    }
+
+    String manualUri = sessionConfig.apply(GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI);
+    if (StringUtils.isNotBlank(manualUri)) {
+      return Optional.of(manualUri);
+    }
+
+    Optional<String> discoveredUri;
+    try {
+      discoveredUri = endpointDiscovery.get();
+    } catch (RuntimeException e) {
+      // endpointDiscovery can throw for reasons other than connectivity (e.g. a bug in client
+      // bootstrapping), so the exception's own type is included rather than assuming it is
+      // always a reachability/config problem.
+      throw new IllegalStateException(
+          "Failed to discover the Iceberg REST endpoint ("
+              + e.getClass().getSimpleName()
+              + "). Configure "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI
+              + ", use a Gravitino server that supports /api/system/iceberg-rest, or set "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
+              + "=false to use legacy Hive/JDBC backend translation.",
+          e);
+    }
+    if (!discoveredUri.isPresent()) {
+      throw new IllegalStateException(
+          "No Iceberg REST endpoint is available. Configure "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_URI
+              + ", use a Gravitino server that supports /api/system/iceberg-rest, or set "
+              + GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_ROUTING_ENABLED
+              + "=false to use legacy Hive/JDBC backend translation.");
+    }
+    return discoveredUri;
+  }
+
+  private Map<String, String> buildAutoRoutedIcebergRestProperties(
+      String gravitinoCatalogName,
+      CaseInsensitiveStringMap options,
+      Map<String, String> properties,
+      String restUri,
+      SparkConf sparkConf) {
+    IcebergPropertiesConverter converter = (IcebergPropertiesConverter) getPropertiesConverter();
+    Map<String, String> all =
+        new HashMap<>(
+            converter.buildIcebergRestProperties(
+                gravitinoCatalogName,
+                restUri,
+                properties,
+                getAutoRoutedIcebergRestClientConfig(sparkConf)));
+    if (options != null) {
+      all.putAll(options);
+      // options can re-introduce a reserved routing key (e.g. a Spark-level `uri`/`prefix`
+      // catalog option); re-derive them so options can never redirect a routed catalog.
+      converter.reapplyReservedRestProperties(gravitinoCatalogName, restUri, all);
+    }
+    return all;
+  }
+
+  static Map<String, String> getAutoRoutedIcebergRestClientConfig(SparkConf sparkConf) {
+    Map<String, String> explicitRestConfig =
+        Stream.of(
+                sparkConf.getAllWithPrefix(
+                    GravitinoSparkConfig.GRAVITINO_ICEBERG_REST_CONFIG_PREFIX))
+            .collect(Collectors.toMap(t -> t._1, t -> t._2, (oldVal, newVal) -> newVal));
+    return IcebergRestOAuthConfig.resolve(sparkConf, explicitRestConfig);
   }
 
   @Override

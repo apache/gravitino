@@ -25,9 +25,9 @@ jobs:
   start-runner:
     name: JDK${{ inputs.java-version }}-${{ inputs.test-mode }}-Scala${{ inputs.scala-version }}
     runs-on: ubuntu-latest
-    # Two Spark lines, each running the whole suite, so the budget is roughly double the
-    # single-version job's.
-    timeout-minutes: 90
+    # This job runs the integration suite once per supported Spark line, so its cost grows with the
+    # matrix rather than with the number of jobs.
+    timeout-minutes: 120
     env:
       PLATFORM: ${{ inputs.architecture }}
     steps:

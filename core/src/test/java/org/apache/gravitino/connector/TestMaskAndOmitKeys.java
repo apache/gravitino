@@ -16,29 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.connector;
 
-package org.apache.gravitino.listener.api.event;
+import java.util.Set;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.authorization.AuthorizationUtils;
+public class TestMaskAndOmitKeys {
 
-/** Represents an event triggered before retrieving a group by external id. */
-@DeveloperApi
-public class GetGroupByExternalIdPreEvent extends GroupPreEvent {
-  private final String externalId;
+  @Test
+  void testOfAndEmpty() {
+    Assertions.assertSame(MaskAndOmitKeys.empty(), MaskAndOmitKeys.of(null, null));
+    Assertions.assertSame(MaskAndOmitKeys.empty(), MaskAndOmitKeys.of(Set.of(), Set.of()));
 
-  public GetGroupByExternalIdPreEvent(String initiator, String metalake, String externalId) {
-    super(initiator, AuthorizationUtils.ofGroupExternalId(metalake, externalId));
-    this.externalId = externalId;
-  }
-
-  /** Returns the external identifier of the group being retrieved. */
-  public String externalId() {
-    return externalId;
-  }
-
-  @Override
-  public OperationType operationType() {
-    return OperationType.GET_GROUP_BY_EXTERNAL_ID;
+    MaskAndOmitKeys keys = MaskAndOmitKeys.of(Set.of("password"), Set.of("gravitino.identifier"));
+    Assertions.assertEquals(Set.of("password"), keys.keysToMask());
+    Assertions.assertEquals(Set.of("gravitino.identifier"), keys.keysToOmit());
   }
 }

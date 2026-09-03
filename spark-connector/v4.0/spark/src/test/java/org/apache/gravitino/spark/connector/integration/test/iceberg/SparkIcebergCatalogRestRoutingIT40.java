@@ -16,29 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+package org.apache.gravitino.spark.connector.integration.test.iceberg;
 
-package org.apache.gravitino.listener.api.event;
+import org.apache.gravitino.spark.connector.integration.test.util.SparkMetadataColumnInfo;
+import org.junit.jupiter.api.condition.DisabledIf;
 
-import org.apache.gravitino.annotation.DeveloperApi;
-import org.apache.gravitino.authorization.AuthorizationUtils;
-
-/** Represents an event triggered before removing a group by external id. */
-@DeveloperApi
-public class RemoveGroupByExternalIdPreEvent extends GroupPreEvent {
-  private final String externalId;
-
-  public RemoveGroupByExternalIdPreEvent(String initiator, String metalake, String externalId) {
-    super(initiator, AuthorizationUtils.ofGroupExternalId(metalake, externalId));
-    this.externalId = externalId;
-  }
-
-  /** Returns the external identifier of the group being removed. */
-  public String externalId() {
-    return externalId;
-  }
+/**
+ * Runs the shared Iceberg suite against a Hive-backed catalog routed through the Iceberg REST
+ * server on Spark 4.0. The base is disabled in embedded mode; repeating the condition here matches
+ * what the 3.5 subclass does.
+ */
+@DisabledIf("org.apache.gravitino.integration.test.util.ITUtils#isEmbedded")
+public class SparkIcebergCatalogRestRoutingIT40 extends SparkIcebergCatalogRestRoutingIT {
 
   @Override
-  public OperationType operationType() {
-    return OperationType.REMOVE_GROUP_BY_EXTERNAL_ID;
+  protected SparkMetadataColumnInfo[] getIcebergMetadataColumns() {
+    return IcebergMetadataColumnsSpark40.newMetadataColumns();
   }
 }
