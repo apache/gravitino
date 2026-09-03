@@ -82,26 +82,32 @@ public class CatalogRegister {
           Pattern.CASE_INSENSITIVE);
 
   private Connection connection;
-  private boolean isStarted = false;
   private volatile String lastConnectionError;
   private String catalogStoreDirectory;
   private GravitinoConfig config;
 
-  boolean isTrinoStarted() {
-    if (isStarted) {
-      return true;
-    }
-
+  /**
+   * Whether the Trino server currently answers over the connector's own JDBC connection.
+   *
+   * <p>Probed on every call rather than latched once: this gates a load cycle, and the connection
+   * is created lazily, so a coordinator that was reachable when the connector started can be gone
+   * by the next cycle. Answering from a past probe would keep the loop issuing statements over a
+   * connection that no longer works, and would report each catalog failing separately instead of
+   * the one reason they all did.
+   *
+   * @return true if the Trino server answered
+   */
+  boolean isTrinoReachable() {
     String command = "SELECT 1";
     try (Statement statement = connection.createStatement()) {
-      isStarted = statement.execute(command);
+      boolean reachable = statement.execute(command);
       lastConnectionError = null;
-      return isStarted;
+      return reachable;
     } catch (Exception e) {
       // Keep the reason: wrong credentials, a wrong port and a coordinator that is still booting
       // are indistinguishable to the caller otherwise, and only the first two are actionable.
       lastConnectionError = e.getMessage() == null ? e.getClass().getName() : e.getMessage();
-      LOG.warn("Trino server is not started: %s", lastConnectionError);
+      LOG.warn("The Trino server is not reachable: %s", lastConnectionError);
       return false;
     }
   }

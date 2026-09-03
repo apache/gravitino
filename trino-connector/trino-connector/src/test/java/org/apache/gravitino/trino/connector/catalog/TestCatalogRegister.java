@@ -622,6 +622,27 @@ public class TestCatalogRegister {
     assertTrue(described.contains("CIRCULAR REFERENCE"));
   }
 
+  @Test
+  public void testReachabilityIsProbedOnEveryCall() throws Exception {
+    Statement statement = mock(Statement.class);
+    when(statement.execute("SELECT 1"))
+        .thenReturn(true)
+        .thenThrow(new SQLException("Connection reset"));
+    Connection connection = mock(Connection.class);
+    when(connection.createStatement()).thenReturn(statement);
+
+    CatalogRegister catalogRegister = new CatalogRegister();
+    setPrivateField(catalogRegister, "connection", connection);
+
+    // A reachability latched on the first success would keep the load loop issuing statements
+    // over a connection that stopped working, and report every catalog failing separately
+    // instead of the one reason they all did.
+    assertTrue(catalogRegister.isTrinoReachable());
+    assertNull(catalogRegister.getLastConnectionError());
+    assertFalse(catalogRegister.isTrinoReachable());
+    assertEquals("Connection reset", catalogRegister.getLastConnectionError());
+  }
+
   private static void setPrivateField(Object target, String fieldName, Object value)
       throws Exception {
     Field field = CatalogRegister.class.getDeclaredField(fieldName);

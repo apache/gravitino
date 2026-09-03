@@ -56,7 +56,7 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
       new ConnectorTableMetadata(
           TABLE_NAME,
           List.of(
-              ColumnMetadata.builder().setName("trino_started").setType(BOOLEAN).build(),
+              ColumnMetadata.builder().setName("trino_reachable").setType(BOOLEAN).build(),
               ColumnMetadata.builder().setName("last_attempt_time").setType(VARCHAR).build(),
               ColumnMetadata.builder().setName("last_success_time").setType(VARCHAR).build(),
               ColumnMetadata.builder().setName("consecutive_failures").setType(BIGINT).build(),
@@ -80,7 +80,7 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
 
   @Override
   public Page loadPageData() {
-    BlockBuilder trinoStartedColumnBuilder = BOOLEAN.createBlockBuilder(null, 1);
+    BlockBuilder trinoReachableColumnBuilder = BOOLEAN.createBlockBuilder(null, 1);
     BlockBuilder lastAttemptTimeColumnBuilder = VARCHAR.createBlockBuilder(null, 1);
     BlockBuilder lastSuccessTimeColumnBuilder = VARCHAR.createBlockBuilder(null, 1);
     BlockBuilder consecutiveFailuresColumnBuilder = BIGINT.createBlockBuilder(null, 1);
@@ -92,7 +92,7 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
     // load that completed in between the calls.
     LoadOutcome loadOutcome = catalogConnectorManager.getLoadOutcome();
 
-    BOOLEAN.writeBoolean(trinoStartedColumnBuilder, loadOutcome.isTrinoStarted());
+    BOOLEAN.writeBoolean(trinoReachableColumnBuilder, loadOutcome.isTrinoReachable());
     writeTime(lastAttemptTimeColumnBuilder, catalogConnectorManager.getLastLoadAttemptTimeMs());
     writeTime(lastSuccessTimeColumnBuilder, loadOutcome.getLastSuccessTimeMs());
     BIGINT.writeLong(consecutiveFailuresColumnBuilder, loadOutcome.getConsecutiveFailures());
@@ -120,7 +120,7 @@ public class GravitinoSystemTableLoadStatus extends GravitinoSystemTable {
 
     return new Page(
         1,
-        trinoStartedColumnBuilder.build(),
+        trinoReachableColumnBuilder.build(),
         lastAttemptTimeColumnBuilder.build(),
         lastSuccessTimeColumnBuilder.build(),
         consecutiveFailuresColumnBuilder.build(),

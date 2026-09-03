@@ -129,14 +129,14 @@ health of the loop itself, and always has exactly one row.
 select * from gravitino.system.load_status;
 ```
 
-| Column                 | Description                                                                                                                                                            |
-|------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `trino_started`        | Whether the Trino server has been observed reachable over JDBC. No catalog is registered until it is. Latched: once true it stays true, so it is not a liveness probe. |
-| `last_attempt_time`    | When the loop last ran, as an ISO-8601 UTC timestamp.                                                                                                                  |
-| `last_success_time`    | When the loop last completed successfully, `NULL` if it never did.                                                                                                     |
-| `consecutive_failures` | The number of consecutive failed runs, `0` when the last run succeeded.                                                                                                |
-| `last_error`           | The reason the last run did not complete, including waiting for Trino to start, `NULL` when it succeeded.                                                              |
-| `metalake_errors`      | A JSON map of metalake name to its last error, `NULL` when every metalake loaded. A metalake that fails here also fails the run as a whole.                            |
+| Column                 | Description                                                                                                                                                                   |
+|------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `trino_reachable`      | Whether the Trino server answered the last time the load loop probed it over JDBC. No catalog is registered while it does not, and `last_error` carries the connection error. |
+| `last_attempt_time`    | When the loop last ran, as an ISO-8601 UTC timestamp.                                                                                                                         |
+| `last_success_time`    | When the loop last completed successfully, `NULL` if it never did.                                                                                                            |
+| `consecutive_failures` | The number of consecutive failed runs, `0` when the last run succeeded.                                                                                                       |
+| `last_error`           | The reason the last run did not complete, including the Trino server being unreachable, `NULL` when it succeeded.                                                             |
+| `metalake_errors`      | A JSON map of metalake name to its last error, `NULL` when every metalake loaded. A metalake that fails here also fails the run as a whole.                                   |
 
 Both tables are served by the coordinator and reflect the last refresh, which runs every
 `gravitino.metadata.refresh-interval-seconds` seconds (10 by default). A catalog created moments ago
@@ -257,7 +257,7 @@ Registration happens in the background, so a catalog that fails to register simp
 | `status = UNSUPPORTED`                                               | The catalog is not relational, or its provider is outside the supported list. `last_error` names the supported providers |
 | `status = SKIPPED`                                                   | The catalog matches `gravitino.trino.skip-catalog-patterns`                                                         |
 | The catalog has no row in `catalog_status` at all                    | The load loop never reached it. Check `gravitino.system.load_status`                                                |
-| `load_status.trino_started = false`                                  | The connector cannot reach Trino over JDBC. `last_error` carries the connection error. Check `discovery.uri`, `trino.jdbc.user` and `trino.jdbc.password` |
+| `load_status.trino_reachable = false`                                  | The connector cannot reach Trino over JDBC. `last_error` carries the connection error. Check `discovery.uri`, `trino.jdbc.user` and `trino.jdbc.password` |
 | `load_status.last_error` mentions connection refused                 | The Gravitino server is unreachable. Check `gravitino.uri`                                                          |
 | `load_status.metalake_errors` names a metalake                       | That metalake could not be listed, the other metalakes are unaffected                                               |
 | Querying `gravitino.system.catalog_status` itself fails              | The entry catalog did not initialise. The error is reported when the entry catalog is created, check the Trino server log at startup |

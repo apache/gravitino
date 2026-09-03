@@ -387,7 +387,7 @@ public abstract class TestGravitinoConnector extends AbstractGravitinoConnectorT
   public void testLoadStatusSystemTable() throws Exception {
     MaterializedResult result =
         computeActual(
-            "select trino_started, consecutive_failures, last_error, metalake_errors"
+            "select trino_reachable, consecutive_failures, last_error, metalake_errors"
                 + " from gravitino.system.load_status");
     assertEquals(result.getRowCount(), 1);
     MaterializedRow row = result.getMaterializedRows().get(0);

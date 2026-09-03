@@ -178,7 +178,7 @@ public class TestCatalogConnectorManager {
     assertEquals(0, state.getFailureCount());
     assertTrue(state.getLastSuccessTimeMs() > 0);
 
-    assertTrue(manager.isTrinoStarted());
+    assertTrue(manager.isTrinoReachable());
     assertNull(manager.getLoadOutcome().getLastError());
     assertEquals(0, manager.getLoadOutcome().getConsecutiveFailures());
     assertTrue(manager.getMetalakeErrors().isEmpty());
@@ -349,17 +349,17 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
-  public void testTrinoNotStartedIsRecordedInLoadStatus() throws Exception {
+  public void testUnreachableTrinoIsRecordedInLoadStatus() throws Exception {
     LoadFixture fixture = new LoadFixture();
-    when(fixture.catalogRegister.isTrinoStarted()).thenReturn(false);
+    when(fixture.catalogRegister.isTrinoReachable()).thenReturn(false);
 
     CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
     manager.loadMetalakeSync();
 
-    assertFalse(manager.isTrinoStarted());
+    assertFalse(manager.isTrinoReachable());
     String lastError = manager.getLoadOutcome().getLastError();
     assertNotNull(lastError);
-    assertTrue(lastError.contains("Waiting for the Trino server"));
+    assertTrue(lastError.contains("The Trino server is not reachable"));
     assertTrue(manager.getCatalogRegistrationStates().isEmpty());
   }
 
@@ -377,7 +377,7 @@ public class TestCatalogConnectorManager {
 
     // The underlying problem is fixed; the row must not stay stuck on FAILED.
     Mockito.reset(fixture.catalogRegister);
-    when(fixture.catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(fixture.catalogRegister.isTrinoReachable()).thenReturn(true);
     manager.loadMetalakeSync();
 
     CatalogRegistrationState state = singleState(manager);
@@ -766,9 +766,9 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
-  public void testRepeatedWaitingForTrinoKeepsItsOwnMessage() throws Exception {
+  public void testRepeatedUnreachableTrinoKeepsItsOwnMessage() throws Exception {
     LoadFixture fixture = new LoadFixture();
-    when(fixture.catalogRegister.isTrinoStarted()).thenReturn(false);
+    when(fixture.catalogRegister.isTrinoReachable()).thenReturn(false);
     CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
 
     // The second attempt reports the same message as the first, which is the branch that logs a
@@ -777,7 +777,7 @@ public class TestCatalogConnectorManager {
     manager.loadMetalakeSync();
 
     CatalogConnectorManager.LoadOutcome outcome = manager.getLoadOutcome();
-    assertTrue(outcome.getLastError().contains("Waiting for the Trino server"));
+    assertTrue(outcome.getLastError().contains("The Trino server is not reachable"));
     assertEquals(2, outcome.getConsecutiveFailures());
   }
 
@@ -910,6 +910,28 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testTrinoBecomingUnreachableIsReported() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+    assertTrue(manager.isTrinoReachable());
+
+    // The coordinator restarted, or the connection behind the register died. A reachability that
+    // was latched on the first success would keep the loop issuing statements over it and report
+    // every catalog failing separately instead of the one reason they all did.
+    when(fixture.catalogRegister.isTrinoReachable()).thenReturn(false);
+    when(fixture.catalogRegister.getLastConnectionError()).thenReturn("Connection reset");
+    manager.loadMetalakeSync();
+
+    assertFalse(manager.isTrinoReachable());
+    CatalogConnectorManager.LoadOutcome outcome = manager.getLoadOutcome();
+    assertFalse(outcome.isTrinoReachable());
+    assertTrue(outcome.getLastError().contains("The Trino server is not reachable"));
+    assertTrue(outcome.getLastError().contains("Connection reset"));
+  }
+
+  @Test
   public void testReloadFailureAfterUnregisterIsRecordedAsFailed() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
@@ -947,7 +969,7 @@ public class TestCatalogConnectorManager {
   @Test
   public void testTrinoConnectionErrorIsReported() throws Exception {
     LoadFixture fixture = new LoadFixture();
-    when(fixture.catalogRegister.isTrinoStarted()).thenReturn(false);
+    when(fixture.catalogRegister.isTrinoReachable()).thenReturn(false);
     when(fixture.catalogRegister.getLastConnectionError())
         .thenReturn("Authentication failed: Access Denied");
 
@@ -955,7 +977,7 @@ public class TestCatalogConnectorManager {
     manager.loadMetalakeSync();
 
     // "Waiting for Trino" alone would read the same for a misconfiguration that never resolves.
-    assertFalse(manager.isTrinoStarted());
+    assertFalse(manager.isTrinoReachable());
     CatalogConnectorManager.LoadOutcome loadOutcome = manager.getLoadOutcome();
     assertTrue(loadOutcome.getLastError().contains("Authentication failed"));
     assertEquals(1, loadOutcome.getConsecutiveFailures());
@@ -1001,7 +1023,7 @@ public class TestCatalogConnectorManager {
   public void testRefreshIcebergRestUriCachesDiscoveredUri() throws Exception {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
-    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(catalogRegister.isTrinoReachable()).thenReturn(true);
     when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
     when(client.icebergRestServiceUri("test"))
         .thenReturn(Optional.of("http://irc-host:9001/iceberg"));
@@ -1026,7 +1048,7 @@ public class TestCatalogConnectorManager {
       throws Exception {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
-    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(catalogRegister.isTrinoReachable()).thenReturn(true);
     when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
     when(client.icebergRestServiceUri("test"))
         .thenThrow(new RESTException("simulated: endpoint not found on an older server"));
@@ -1069,7 +1091,7 @@ public class TestCatalogConnectorManager {
   public void testIcebergRestRoutingDisabledSkipsDiscovery() throws Exception {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
-    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(catalogRegister.isTrinoReachable()).thenReturn(true);
     when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
 
     CatalogConnectorManager manager =
@@ -1092,7 +1114,7 @@ public class TestCatalogConnectorManager {
   public void testConfiguredIcebergRestUriSkipsDiscovery() throws Exception {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
-    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(catalogRegister.isTrinoReachable()).thenReturn(true);
     when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
 
     CatalogConnectorManager manager =
@@ -1115,7 +1137,7 @@ public class TestCatalogConnectorManager {
   public void testIcebergRestDiscoveryRetriesAndRecovers() throws Exception {
     GravitinoAdminClient client = mock(GravitinoAdminClient.class);
     CatalogRegister catalogRegister = mock(CatalogRegister.class);
-    when(catalogRegister.isTrinoStarted()).thenReturn(true);
+    when(catalogRegister.isTrinoReachable()).thenReturn(true);
     when(client.loadMetalake("test")).thenReturn(mock(GravitinoMetalake.class));
     when(client.icebergRestServiceUri("test"))
         .thenThrow(new RESTException("simulated discovery failure"))
@@ -1296,7 +1318,7 @@ public class TestCatalogConnectorManager {
     private final CatalogConnectorFactory catalogFactory = mock(CatalogConnectorFactory.class);
 
     LoadFixture() throws Exception {
-      when(catalogRegister.isTrinoStarted()).thenReturn(true);
+      when(catalogRegister.isTrinoReachable()).thenReturn(true);
       when(metalake.name()).thenReturn("test");
       when(client.loadMetalake(any())).thenReturn(metalake);
       Mockito.doReturn(new GravitinoMetalake[] {metalake}).when(client).listMetalakes();

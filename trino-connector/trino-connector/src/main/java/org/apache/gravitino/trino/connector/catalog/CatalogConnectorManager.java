@@ -85,7 +85,7 @@ public class CatalogConnectorManager {
   // The last error reported by each metalake, keyed by the metalake name.
   private final ConcurrentHashMap<String, String> metalakeErrors = new ConcurrentHashMap<>();
 
-  private volatile boolean trinoStarted = false;
+  private volatile boolean trinoReachable = false;
   private volatile long lastLoadAttemptTimeMs = 0L;
   // The outcome of the last completed load attempt: its success time, error and consecutive
   // failure count always change together, so they are published through one volatile reference
@@ -212,20 +212,20 @@ public class CatalogConnectorManager {
   private void loadMetalake() {
     lastLoadAttemptTimeMs = System.currentTimeMillis();
     try {
-      if (!catalogRegister.isTrinoStarted()) {
-        // Report why the connection failed. "Waiting for Trino" alone reads the same for a
-        // coordinator that is seconds from ready and for credentials that will never work.
+      if (!catalogRegister.isTrinoReachable()) {
+        // Report why the connection failed. "The Trino server is not reachable" alone reads the
+        // same for a coordinator that is seconds from ready and for credentials that will never
+        // work.
         String cause = catalogRegister.getLastConnectionError();
         String message =
             cause == null
-                ? "Waiting for the Trino server to start"
-                : "Waiting for the Trino server to start, the last connection attempt failed: "
-                    + cause;
-        trinoStarted = false;
+                ? "The Trino server is not reachable"
+                : "The Trino server is not reachable, the last connection attempt failed: " + cause;
+        trinoReachable = false;
         recordLoadFailure(message, null);
         return;
       }
-      trinoStarted = true;
+      trinoReachable = true;
 
       Set<String> usedMetalakes = new HashSet<>();
       if (config.singleMetalakeMode()) {
@@ -317,7 +317,7 @@ public class CatalogConnectorManager {
     if (loadOutcome.lastError != null) {
       LOG.info("The Gravitino catalog load loop recovered.");
     }
-    loadOutcome = new LoadOutcome(trinoStarted, System.currentTimeMillis(), null, 0, Map.of());
+    loadOutcome = new LoadOutcome(trinoReachable, System.currentTimeMillis(), null, 0, Map.of());
   }
 
   private void recordLoadFailure(String message, Throwable cause) {
@@ -325,14 +325,14 @@ public class CatalogConnectorManager {
     boolean changed = !Objects.equals(previous.lastError, message);
     loadOutcome =
         new LoadOutcome(
-            trinoStarted,
+            trinoReachable,
             previous.lastSuccessTimeMs,
             message,
             previous.consecutiveFailures + 1,
             Map.copyOf(metalakeErrors));
     if (!changed) {
       LOG.warn("Failed to load catalogs from the Gravitino server: %s", withCause(message, cause));
-    } else if (trinoStarted) {
+    } else if (trinoReachable) {
       LOG.error("Failed to load catalogs from the Gravitino server: %s", withCause(message, cause));
     } else {
       // Trino not being up yet is the normal state during startup, not an error.
@@ -786,13 +786,13 @@ public class CatalogConnectorManager {
   }
 
   /**
-   * Checks whether the Trino server has become reachable over JDBC. No catalog can be registered
-   * before it does.
+   * Checks whether the Trino server answered the last time the load loop probed it. No catalog can
+   * be registered while it does not.
    *
    * @return true if the Trino server is started, false otherwise
    */
-  public boolean isTrinoStarted() {
-    return trinoStarted;
+  public boolean isTrinoReachable() {
+    return trinoReachable;
   }
 
   /**
@@ -992,7 +992,7 @@ public class CatalogConnectorManager {
    * that hangs half way.
    */
   public static final class LoadOutcome {
-    private final boolean trinoStarted;
+    private final boolean trinoReachable;
     private final long lastSuccessTimeMs;
     private final String lastError;
     private final long consecutiveFailures;
@@ -1001,19 +1001,19 @@ public class CatalogConnectorManager {
     /**
      * Constructs a new LoadOutcome.
      *
-     * @param trinoStarted whether the Trino server was reachable during the attempt
+     * @param trinoReachable whether the Trino server answered during the attempt
      * @param lastSuccessTimeMs the time of the last successful load, 0 if never successful
      * @param lastError the error that made the last load fail, null if it succeeded
      * @param consecutiveFailures the number of consecutive failed loads, 0 if the last succeeded
      * @param metalakeErrors the error each metalake reported, empty if none did
      */
     public LoadOutcome(
-        boolean trinoStarted,
+        boolean trinoReachable,
         long lastSuccessTimeMs,
         String lastError,
         long consecutiveFailures,
         Map<String, String> metalakeErrors) {
-      this.trinoStarted = trinoStarted;
+      this.trinoReachable = trinoReachable;
       this.lastSuccessTimeMs = lastSuccessTimeMs;
       this.lastError = lastError;
       this.consecutiveFailures = consecutiveFailures;
@@ -1021,12 +1021,12 @@ public class CatalogConnectorManager {
     }
 
     /**
-     * Whether the Trino server was reachable during the attempt.
+     * Whether the Trino server answered during the attempt.
      *
-     * @return true if the load loop could reach the Trino server
+     * @return true if the load loop reached the Trino server
      */
-    public boolean isTrinoStarted() {
-      return trinoStarted;
+    public boolean isTrinoReachable() {
+      return trinoReachable;
     }
 
     /**
