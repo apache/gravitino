@@ -167,9 +167,9 @@ public class CatalogMysqlCredentialIT extends BaseIT {
     Map<String, String> props = catalog.properties();
 
     Assertions.assertEquals(
-        org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
+        mysqlContainer.getUsername(),
         props.get(JdbcConfig.USERNAME.getKey()),
-        "jdbc-user must be masked in catalog properties");
+        "jdbc-user should be returned in plaintext");
     Assertions.assertEquals(
         org.apache.gravitino.connector.HiddenPropertyMaskUtils.MASKED_VALUE,
         props.get(JdbcConfig.PASSWORD.getKey()),

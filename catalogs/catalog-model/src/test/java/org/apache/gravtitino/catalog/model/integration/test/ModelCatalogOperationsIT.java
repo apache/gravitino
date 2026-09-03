@@ -32,7 +32,6 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.Schema;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.client.GravitinoMetalake;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.exceptions.ModelAlreadyExistsException;
 import org.apache.gravitino.exceptions.ModelVersionAliasesAlreadyExistException;
 import org.apache.gravitino.exceptions.NoSuchModelException;
@@ -1262,12 +1261,8 @@ public class ModelCatalogOperationsIT extends BaseIT {
 
   private static void assertPropertiesEqual(
       Map<String, String> expectedUserProps, Map<String, String> actual) {
-    Assertions.assertTrue(
-        !actual.containsKey(StringIdentifier.ID_KEY)
-            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(actual.get(StringIdentifier.ID_KEY)));
-    Map<String, String> actualWithoutId = Maps.newHashMap(actual);
-    actualWithoutId.remove(StringIdentifier.ID_KEY);
-    Assertions.assertEquals(expectedUserProps, actualWithoutId);
+    Assertions.assertFalse(actual.containsKey(StringIdentifier.ID_KEY));
+    Assertions.assertEquals(expectedUserProps, actual);
   }
 
   private void createMetalake() {

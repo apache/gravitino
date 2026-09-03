@@ -18,21 +18,27 @@
  */
 package org.apache.gravitino.catalog.fileset;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import java.time.Instant;
 import java.util.Map;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.Namespace;
+import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.credential.COSSecretKeyCredential;
 import org.apache.gravitino.credential.CredentialConstants;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.CatalogEntity;
+import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.COSProperties;
+import org.apache.gravitino.storage.OSSProperties;
+import org.apache.gravitino.storage.S3Properties;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Verifies that the fileset catalog enables the internal S3 location-prefix flag so a
- * directory-root {@code getFileStatus} HEAD returns 404 instead of 403, regardless of any
- * user-provided value.
+ * Verifies fileset catalog credential behavior, including hidden cloud credential properties (issue
+ * #11642) and S3 location-prefix defaults.
  */
 public class TestFilesetCatalogCredential {
 
@@ -73,5 +79,58 @@ public class TestFilesetCatalogCredential {
         catalog
             .propertiesWithCredentialProviders()
             .get(CredentialConstants.S3_CREDENTIAL_LIST_LOCATION_PREFIX));
+  }
+
+  @Test
+  void testCatalogPropertiesMaskCloudCredentials() {
+    Map<String, String> properties =
+        ImmutableMap.<String, String>builder()
+            .put(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID, "s3-ak")
+            .put(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY, "s3-sk")
+            .put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID, "oss-ak")
+            .put(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET, "oss-sk")
+            .put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME, "abs-account")
+            .put(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY, "abs-key")
+            .put(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID, "cos-ak")
+            .put(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET, "cos-sk")
+            .build();
+    FilesetCatalogImpl catalog = newCatalog(properties);
+
+    Map<String, String> masked = catalog.properties();
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE, masked.get(S3Properties.GRAVITINO_S3_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(S3Properties.GRAVITINO_S3_SECRET_ACCESS_KEY));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(OSSProperties.GRAVITINO_OSS_ACCESS_KEY_SECRET));
+    Assertions.assertEquals(
+        "abs-account", masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID));
+    Assertions.assertEquals(
+        HiddenPropertyMaskUtils.MASKED_VALUE,
+        masked.get(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET));
+  }
+
+  @Test
+  void testCosCredentialProviderAutoDetected() {
+    Map<String, String> properties = Maps.newHashMap();
+    properties.put(COSProperties.GRAVITINO_COS_ACCESS_KEY_ID, "cos-ak");
+    properties.put(COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET, "cos-sk");
+    FilesetCatalogImpl catalog = newCatalog(properties);
+    Assertions.assertTrue(
+        catalog
+            .propertiesWithCredentialProviders()
+            .get(CredentialConstants.CREDENTIAL_PROVIDERS)
+            .contains(COSSecretKeyCredential.COS_SECRET_KEY_CREDENTIAL_TYPE));
   }
 }

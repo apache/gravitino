@@ -110,7 +110,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
     // Currently we only support maintaining the Fileset in the Gravitino's store.
     return EntityCombinedFileset.of(fileset)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 fileset.properties()));
@@ -205,7 +205,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
                       FilesetAlreadyExistsException.class));
       return EntityCombinedFileset.of(createdFileset)
           .withHiddenProperties(
-              getHiddenPropertyNames(
+              getMaskAndOmitKeys(
                   catalogIdent,
                   HasPropertyMetadata::filesetPropertiesMetadata,
                   createdFileset.properties()));
@@ -248,7 +248,7 @@ public class FilesetOperationDispatcher extends OperationDispatcher implements F
 
     return EntityCombinedFileset.of(alteredFileset)
         .withHiddenProperties(
-            getHiddenPropertyNames(
+            getMaskAndOmitKeys(
                 catalogIdent,
                 HasPropertyMetadata::filesetPropertiesMetadata,
                 alteredFileset.properties()));

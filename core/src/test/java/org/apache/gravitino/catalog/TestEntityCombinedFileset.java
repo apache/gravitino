@@ -23,7 +23,9 @@ import static org.apache.gravitino.file.Fileset.LOCATION_NAME_UNKNOWN;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import java.util.Map;
+import java.util.Set;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.file.Fileset;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.FilesetEntity;
@@ -80,7 +82,8 @@ public class TestEntityCombinedFileset {
     Mockito.when(fileset.properties()).thenReturn(properties);
 
     EntityCombinedFileset entityCombinedFileset =
-        EntityCombinedFileset.of(fileset).withHiddenProperties(ImmutableSet.of("hiddenProp"));
+        EntityCombinedFileset.of(fileset)
+            .withHiddenProperties(MaskAndOmitKeys.of(ImmutableSet.of("hiddenProp"), Set.of()));
 
     Map<String, String> result = entityCombinedFileset.properties();
 
@@ -90,7 +93,7 @@ public class TestEntityCombinedFileset {
     Assertions.assertEquals(HiddenPropertyMaskUtils.MASKED_VALUE, result.get("hiddenProp"));
   }
 
-  /** Test that withHiddenProperties() method handles null input correctly. */
+  /** Null classification must not NPE and must leave properties unchanged. */
   @Test
   void testWithHiddenPropertiesNull() {
     Fileset fileset = Mockito.mock(Fileset.class);

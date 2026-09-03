@@ -53,7 +53,6 @@ import org.apache.gravitino.GravitinoEnv;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.TestCatalog;
-import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
 import org.apache.gravitino.connector.TestCatalogOperations;
 import org.apache.gravitino.exceptions.GravitinoRuntimeException;
 import org.apache.gravitino.exceptions.NoSuchEntityException;
@@ -491,9 +490,7 @@ public class TestViewOperationDispatcher extends TestOperationDispatcher {
         "comment",
         "gravitino.identifier");
 
-    Assertions.assertTrue(
-        !created.properties().containsKey(ID_KEY)
-            || HiddenPropertyMaskUtils.MASKED_VALUE.equals(created.properties().get(ID_KEY)));
+    Assertions.assertFalse(created.properties().containsKey(ID_KEY));
   }
 
   @Test

@@ -480,7 +480,7 @@ Bundle jars on Maven Central:
 
 ## Upgrading From a Release Earlier Than 1.3.0
 
-Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, `jdbc-user`, and `jdbc-password` are excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response. Retrieve secret-manager-backed properties (including those keys when stored as secret URNs) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The credentials API (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery. Clients written against earlier releases that read those properties directly from the default load lose access to them.
+Sensitive catalog properties such as `s3-access-key-id`, `s3-secret-access-key`, and `jdbc-password` are masked or excluded from the default `GET /api/metalakes/{metalake}/catalogs/{catalog}` response (`jdbc-user` and `azure-storage-account-name` are returned in plaintext). Retrieve secret-manager-backed properties (including those keys when stored as secret URNs) via `getSecrets` / `GET .../objects/{type}/{fullName}/secrets`. The credentials API (`getCredentials` / `JdbcCredential`) remains available for typed credential delivery. Clients written against earlier releases that read those properties directly from the default load lose access to them.
 
 For a zero-downtime migration, set the following in `gravitino.conf`:
 

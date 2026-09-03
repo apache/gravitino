@@ -24,6 +24,7 @@ import java.util.Set;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.StringIdentifier;
 import org.apache.gravitino.connector.HiddenPropertyMaskUtils;
+import org.apache.gravitino.connector.MaskAndOmitKeys;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.rel.Column;
@@ -44,8 +45,10 @@ public final class EntityCombinedTable implements Table {
 
   private final TableEntity tableEntity;
 
-  // Property keys whose values are masked in API responses.
-  private Set<String> hiddenProperties = Collections.emptySet();
+  // Editable hidden/secret keys are masked; reserved+hidden keys are omitted.
+  private Set<String> keysToMask = Collections.emptySet();
+
+  private Set<String> keysToOmit = Collections.emptySet();
 
   // Field "imported" is used to indicate whether the entity has been imported to Gravitino
   // managed storage backend. If "imported" is true, it means that storage backend have stored
@@ -68,8 +71,10 @@ public final class EntityCombinedTable implements Table {
     return new EntityCombinedTable(table, null);
   }
 
-  public EntityCombinedTable withHiddenProperties(Set<String> hiddenProperties) {
-    this.hiddenProperties = hiddenProperties == null ? Collections.emptySet() : hiddenProperties;
+  public EntityCombinedTable withHiddenProperties(MaskAndOmitKeys keys) {
+    MaskAndOmitKeys classification = keys == null ? MaskAndOmitKeys.empty() : keys;
+    this.keysToMask = classification.keysToMask();
+    this.keysToOmit = classification.keysToOmit();
     return this;
   }
 
@@ -95,7 +100,7 @@ public final class EntityCombinedTable implements Table {
 
   @Override
   public Map<String, String> properties() {
-    return HiddenPropertyMaskUtils.maskHiddenProperties(table.properties(), hiddenProperties);
+    return HiddenPropertyMaskUtils.maskHiddenProperties(table.properties(), keysToMask, keysToOmit);
   }
 
   @Override

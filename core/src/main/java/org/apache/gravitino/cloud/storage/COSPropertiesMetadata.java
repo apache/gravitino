@@ -23,30 +23,32 @@ import static org.apache.gravitino.connector.PropertyEntry.stringOptionalPropert
 import com.google.common.collect.ImmutableMap;
 import java.util.Map;
 import org.apache.gravitino.connector.PropertyEntry;
-import org.apache.gravitino.storage.AzureProperties;
+import org.apache.gravitino.storage.COSProperties;
 
-/** Shared Azure credential {@link PropertyEntry} definitions for catalog properties metadata. */
-public class AzurePropertiesMetadata {
+/**
+ * Shared Tencent COS credential {@link PropertyEntry} definitions for catalog properties metadata.
+ */
+public class COSPropertiesMetadata {
 
   public static final Map<String, PropertyEntry<?>> PROPERTY_ENTRIES =
       ImmutableMap.<String, PropertyEntry<?>>builder()
           .put(
-              AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
+              COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
               stringOptionalPropertyEntry(
-                  AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_NAME,
-                  "Azure storage account name",
+                  COSProperties.GRAVITINO_COS_ACCESS_KEY_ID,
+                  "COS access key ID (Tencent Cloud SecretId)",
                   false /* immutable */,
                   null /* defaultValue */,
-                  false /* hidden */))
+                  true /* hidden */))
           .put(
-              AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
+              COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
               stringOptionalPropertyEntry(
-                  AzureProperties.GRAVITINO_AZURE_STORAGE_ACCOUNT_KEY,
-                  "Azure storage account key",
+                  COSProperties.GRAVITINO_COS_ACCESS_KEY_SECRET,
+                  "COS secret access key (Tencent Cloud SecretKey)",
                   false /* immutable */,
                   null /* defaultValue */,
                   true /* hidden */))
           .build();
 
-  private AzurePropertiesMetadata() {}
+  private COSPropertiesMetadata() {}
 }
