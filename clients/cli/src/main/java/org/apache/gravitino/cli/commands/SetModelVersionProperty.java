@@ -32,86 +32,93 @@ import org.apache.gravitino.model.ModelVersionChange;
 
 /** Set or update a property of a model version. */
 public class SetModelVersionProperty extends Command {
-  private final String metalake;
-  private final String catalog;
-  private final String schema;
-  private final String model;
-  private final Integer version;
-  private final String alias;
-  private final String property;
-  private final String value;
+    private final String metalake;
+    private final String catalog;
+    private final String schema;
+    private final String model;
+    private final Integer version;
+    private final String alias;
+    private final String property;
+    private final String value;
 
-  /**
-   * Constructs a new {@link SetModelVersionProperty} instance.
-   *
-   * @param context The command context.
-   * @param metalake The metalake name.
-   * @param catalog The catalog name.
-   * @param schema The schema name.
-   * @param model The model name.
-   * @param version The model version, if specified, otherwise null.
-   * @param alias The model alias, if specified, otherwise null.
-   * @param property The property name.
-   * @param value The property value.
-   */
-  public SetModelVersionProperty(
-      CommandContext context,
-      String metalake,
-      String catalog,
-      String schema,
-      String model,
-      Integer version,
-      String alias,
-      String property,
-      String value) {
-    super(context);
-    this.metalake = metalake;
-    this.catalog = catalog;
-    this.schema = schema;
-    this.model = model;
-    this.version = version;
-    this.alias = alias;
-    this.property = property;
-    this.value = value;
-  }
-
-  /** Set or update a property of a model version. */
-  @Override
-  public void handle() {
-    try {
-      NameIdentifier name = NameIdentifier.of(schema, model);
-      GravitinoClient client = buildClient(metalake);
-      ModelVersionChange change = ModelVersionChange.setProperty(property, value);
-      if (version != null) {
-        client.loadCatalog(catalog).asModelCatalog().alterModelVersion(name, version, change);
-      } else {
-        client.loadCatalog(catalog).asModelCatalog().alterModelVersion(name, alias, change);
-      }
-    } catch (NoSuchMetalakeException err) {
-      exitWithError(ErrorMessages.UNKNOWN_METALAKE);
-    } catch (NoSuchCatalogException err) {
-      exitWithError(ErrorMessages.UNKNOWN_CATALOG);
-    } catch (NoSuchSchemaException err) {
-      exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
-    } catch (NoSuchModelException err) {
-      exitWithError(ErrorMessages.UNKNOWN_MODEL);
-    } catch (NoSuchModelVersionException err) {
-      exitWithError(ErrorMessages.UNKNOWN_MODEL_VERSION);
-    } catch (Exception exp) {
-      exitWithError(exp.getMessage());
+    /**
+     * Constructs a new {@link SetModelVersionProperty} instance.
+     *
+     * @param context  The command context.
+     * @param metalake The metalake name.
+     * @param catalog  The catalog name.
+     * @param schema   The schema name.
+     * @param model    The model name.
+     * @param version  The model version, if specified, otherwise null.
+     * @param alias    The model alias, if specified, otherwise null.
+     * @param property The property name.
+     * @param value    The property value.
+     */
+    public SetModelVersionProperty(
+            CommandContext context,
+            String metalake,
+            String catalog,
+            String schema,
+            String model,
+            Integer version,
+            String alias,
+            String property,
+            String value) {
+        super(context);
+        this.metalake = metalake;
+        this.catalog = catalog;
+        this.schema = schema;
+        this.model = model;
+        this.version = version;
+        this.alias = alias;
+        this.property = property;
+        this.value = value;
     }
 
-    if (alias != null) {
-      printInformation(model + " version " + alias + " property set.");
-    } else {
-      printInformation(model + " version " + version + " property set.");
-    }
-  }
+    /**
+     * Set or update a property of a model version.
+     */
+    @Override
+    public void handle() {
+        try {
+            NameIdentifier name = NameIdentifier.of(schema, model);
+            GravitinoClient client = buildClient(metalake);
+            ModelVersionChange change = ModelVersionChange.setProperty(property, value);
+            if (version != null) {
+                client.loadCatalog(catalog).asModelCatalog().alterModelVersion(name, version, change);
+            } else {
+                client.loadCatalog(catalog).asModelCatalog().alterModelVersion(name, alias, change);
+            }
+        } catch (NoSuchMetalakeException err) {
+            exitWithError(ErrorMessages.UNKNOWN_METALAKE);
+        } catch (NoSuchCatalogException err) {
+            exitWithError(ErrorMessages.UNKNOWN_CATALOG);
+        } catch (NoSuchSchemaException err) {
+            exitWithError(ErrorMessages.UNKNOWN_SCHEMA);
+        } catch (NoSuchModelException err) {
+            exitWithError(ErrorMessages.UNKNOWN_MODEL);
+        } catch (NoSuchModelVersionException err) {
+            exitWithError(ErrorMessages.UNKNOWN_MODEL_VERSION);
+        } catch (Exception exp) {
+            exitWithError(exp.getMessage());
+        }
 
-  /** {@inheritDoc} */
-  @Override
-  public Command validate() {
-    validatePropertyAndValue(property, value);
-    return super.validate();
-  }
+        if (alias != null) {
+            printInformation(model + " version " + alias + " property set.");
+        } else {
+            printInformation(model + " version " + version + " property set.");
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public Command validate() {
+        validatePropertyAndValue(property, value);
+        if ((alias != null && version != null) || (alias == null && version == null))
+            throw new RuntimeException("Either alias or version must be provided, but not both.");
+        return super.validate();
+    }
 }
+
