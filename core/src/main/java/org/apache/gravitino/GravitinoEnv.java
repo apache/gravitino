@@ -68,6 +68,7 @@ import org.apache.gravitino.hook.SchemaHookDispatcher;
 import org.apache.gravitino.hook.TableHookDispatcher;
 import org.apache.gravitino.hook.TagHookDispatcher;
 import org.apache.gravitino.hook.TopicHookDispatcher;
+import org.apache.gravitino.hook.ViewHookDispatcher;
 import org.apache.gravitino.job.BuiltInJobTemplateEventListener;
 import org.apache.gravitino.job.JobManager;
 import org.apache.gravitino.job.JobOperationDispatcher;
@@ -769,10 +770,8 @@ public class GravitinoEnv {
         new FunctionEventDispatcher(eventBus, functionNormalizeDispatcher);
     this.functionDispatcher = new FunctionHookDispatcher(functionEventDispatcher);
 
-    // View operation chain: ViewEventDispatcher -> ViewNormalizeDispatcher ->
-    // ViewOperationDispatcher.
-    // TODO(#11007): Add ViewHookDispatcher for view ownership and privilege hooks when view
-    // privilege support is finalized.
+    // View operation chain: ViewHookDispatcher -> ViewEventDispatcher -> ViewNormalizeDispatcher
+    // -> ViewOperationDispatcher.
     ViewOperationDispatcher viewOperationDispatcher =
         new ViewOperationDispatcher(catalogManager, entityStore, idGenerator);
     this.internalViewDispatcher = viewOperationDispatcher;
@@ -785,7 +784,8 @@ public class GravitinoEnv {
         new ViewNormalizeDispatcher(internalViewOperationDispatcher, catalogManager);
     ViewEventDispatcher viewEventDispatcher =
         new ViewEventDispatcher(eventBus, viewNormalizeDispatcher);
-    this.viewDispatcher = viewEventDispatcher;
+    this.viewDispatcher =
+        new ViewHookDispatcher(viewEventDispatcher, this::ownerDispatcher, catalogManager);
 
     this.statisticDispatcher =
         new StatisticEventDispatcher(
