@@ -222,7 +222,9 @@ public class CatalogConnectorManager {
                 ? "The Trino server is not reachable"
                 : "The Trino server is not reachable, the last connection attempt failed: " + cause;
         trinoReachable = false;
-        recordLoadFailure(message, null);
+        // No metalake was touched, so the errors left over from earlier cycles say nothing
+        // about this one.
+        recordLoadFailure(message, null, Map.of());
         return;
       }
       trinoReachable = true;
@@ -321,6 +323,11 @@ public class CatalogConnectorManager {
   }
 
   private void recordLoadFailure(String message, Throwable cause) {
+    recordLoadFailure(message, cause, Map.copyOf(metalakeErrors));
+  }
+
+  private void recordLoadFailure(
+      String message, Throwable cause, Map<String, String> attemptMetalakeErrors) {
     LoadOutcome previous = loadOutcome;
     boolean changed = !Objects.equals(previous.lastError, message);
     loadOutcome =
@@ -329,14 +336,15 @@ public class CatalogConnectorManager {
             previous.lastSuccessTimeMs,
             message,
             previous.consecutiveFailures + 1,
-            Map.copyOf(metalakeErrors));
-    if (!changed) {
-      LOG.warn("Failed to load catalogs from the Gravitino server: %s", withCause(message, cause));
-    } else if (trinoReachable) {
+            attemptMetalakeErrors);
+    if (!trinoReachable) {
+      // A Trino server that is not reachable yet is the normal state during startup, and a
+      // repeat of it is just as normal, so this branch comes before the ones that escalate.
+      LOG.info("%s", message);
+    } else if (changed) {
       LOG.error("Failed to load catalogs from the Gravitino server: %s", withCause(message, cause));
     } else {
-      // Trino not being up yet is the normal state during startup, not an error.
-      LOG.info("%s", message);
+      LOG.warn("Failed to load catalogs from the Gravitino server: %s", withCause(message, cause));
     }
   }
 
@@ -524,8 +532,10 @@ public class CatalogConnectorManager {
         // it as a refresh would leave Trino serving a catalog that no longer qualifies.
         String unsupportedReason = unsupportedReason(catalog, gravitinoCatalog);
         if (unsupportedReason != null) {
-          if (alreadyRegistered) {
-            unloadCatalog(gravitinoCatalog);
+          if (alreadyRegistered && !unloadUnsupported(gravitinoCatalog, trinoCatalogName)) {
+            // Still live in Trino, so reporting it as merely unsupported would hide that it is
+            // also still being served.
+            continue;
           }
           recordCatalogState(
               CatalogRegistrationState.unsupported(
@@ -536,14 +546,14 @@ public class CatalogConnectorManager {
                   unsupportedReason),
               null);
         } else if (alreadyRegistered) {
-          // Reload catalogs that have been updated in Gravitino server. One that was already up
-          // to date keeps the success time of the registration that put it there: advancing it
-          // on every poll would make last_success_time say nothing more than last_attempt_time
-          // already does.
-          if (reloadCatalog(gravitinoCatalog)) {
-            recordCatalogState(
-                CatalogRegistrationState.succeeded(gravitinoCatalog, trinoCatalogName), null);
-          }
+          // Reload catalogs that have been updated in Gravitino server. The state is recorded
+          // either way, so that last_attempt_time keeps saying when the catalog was last looked
+          // at; only a reload that actually re-registered stamps a new success time.
+          recordCatalogState(
+              reloadCatalog(gravitinoCatalog)
+                  ? CatalogRegistrationState.succeeded(gravitinoCatalog, trinoCatalogName)
+                  : CatalogRegistrationState.unchanged(gravitinoCatalog, trinoCatalogName),
+              null);
         } else {
           loadCatalog(gravitinoCatalog);
           recordCatalogState(
@@ -568,10 +578,8 @@ public class CatalogConnectorManager {
           // The catalog is still registered and visible via SHOW CATALOGS; a transient failure to
           // refresh it must not flip it to FAILED and hide that it is still usable.
           LOG.warn(
-              e,
               "Failed to refresh already-registered catalog %s: %s",
-              trinoCatalogName,
-              toErrorMessage(e));
+              trinoCatalogName, withCause(toErrorMessage(e), e));
         } else {
           recordCatalogState(
               CatalogRegistrationState.failed(
@@ -612,6 +620,29 @@ public class CatalogConnectorManager {
       LOG.warn(
           "Catalog %s is not registered in Trino (%s): %s",
           state.getTrinoCatalogName(), state.getStatus(), state.getLastError());
+    }
+  }
+
+  /**
+   * Unregisters a catalog that is live in Trino but no longer eligible.
+   *
+   * @return true if it is gone from Trino, false if it is still there and was reported as failed
+   */
+  private boolean unloadUnsupported(GravitinoCatalog catalog, String trinoCatalogName) {
+    try {
+      unloadCatalog(catalog);
+      return true;
+    } catch (Exception e) {
+      recordCatalogState(
+          CatalogRegistrationState.failed(
+              catalog.getMetalake(),
+              catalog.getName(),
+              trinoCatalogName,
+              catalog.getProvider(),
+              "The catalog is no longer supported but could not be unregistered from Trino: "
+                  + toErrorMessage(e)),
+          e);
+      return false;
     }
   }
 
@@ -963,8 +994,19 @@ public class CatalogConnectorManager {
    */
   private GravitinoCatalog withResolvedSecrets(
       GravitinoCatalog catalog, GravitinoMetalake metalake) {
-    Map<String, String> secrets =
-        metalake.loadCatalog(catalog.getName()).supportsSecrets().getSecrets();
+    Map<String, String> secrets;
+    try {
+      secrets = metalake.loadCatalog(catalog.getName()).supportsSecrets().getSecrets();
+    } catch (Exception e) {
+      // Named explicitly: the caller's message only says the connector could not be created, and
+      // this step is the one that needs the Gravitino server reachable from this node.
+      throw new TrinoException(
+          GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
+          String.format(
+              "Failed to resolve the secrets of catalog %s in metalake %s: %s",
+              catalog.getName(), catalog.getMetalake(), toErrorMessage(e)),
+          e);
+    }
     if (secrets.isEmpty()) {
       return catalog;
     }

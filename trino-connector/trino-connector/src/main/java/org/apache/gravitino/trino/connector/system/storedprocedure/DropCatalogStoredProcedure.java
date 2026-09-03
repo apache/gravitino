@@ -33,6 +33,7 @@ import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorContext;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
 
 /**
@@ -103,8 +104,16 @@ public class DropCatalogStoredProcedure extends GravitinoStoredProcedure {
         }
         // Refresh before returning: the catalog left a state row behind when its registration
         // failed, and catalog_status would keep reporting a catalog that no longer exists until
-        // the next poll of the load loop.
-        catalogConnectorManager.loadMetalakeSync();
+        // the next poll of the load loop. The drop itself has already succeeded, so a refresh
+        // that does not complete must not be reported as its failure; the scheduled poll will
+        // catch up.
+        try {
+          catalogConnectorManager.loadMetalakeSync();
+        } catch (Exception e) {
+          LOG.warn(
+              "Dropped catalog %s in metalake %s, but refreshing the registration state failed: %s",
+              catalogName, metalake, CatalogRegister.describe(e));
+        }
         LOG.info(
             "Drop catalog %s in metalake %s from server (no local connector) successfully.",
             catalogName, metalake);

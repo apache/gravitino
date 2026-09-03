@@ -51,6 +51,10 @@ public final class CatalogRegistrationState {
   private final long lastAttemptTimeMs;
   private final long lastSuccessTimeMs;
   private final long failureCount;
+  // Whether this state comes from a registration that actually ran. A poll that found the catalog
+  // already up to date is still REGISTERED, but it did not register anything, so it must not
+  // stamp a new success time.
+  private final boolean reRegistered;
 
   private CatalogRegistrationState(
       String metalake,
@@ -61,7 +65,8 @@ public final class CatalogRegistrationState {
       String lastError,
       long lastAttemptTimeMs,
       long lastSuccessTimeMs,
-      long failureCount) {
+      long failureCount,
+      boolean reRegistered) {
     this.metalake = metalake;
     this.catalogName = catalogName;
     this.trinoCatalogName = trinoCatalogName;
@@ -71,6 +76,7 @@ public final class CatalogRegistrationState {
     this.lastAttemptTimeMs = lastAttemptTimeMs;
     this.lastSuccessTimeMs = lastSuccessTimeMs;
     this.failureCount = failureCount;
+    this.reRegistered = reRegistered;
   }
 
   /**
@@ -88,7 +94,32 @@ public final class CatalogRegistrationState {
         trinoCatalogName,
         catalog.getProvider(),
         Status.REGISTERED,
-        null);
+        null,
+        true);
+  }
+
+  /**
+   * Creates a state for a catalog that a load attempt found already registered and up to date.
+   *
+   * <p>Reported the same way a fresh registration is, but it keeps the success time of the
+   * registration that put the catalog there: a poll that had nothing to do is not a new success,
+   * and advancing it every time would make last_success_time say nothing more than
+   * last_attempt_time already does.
+   *
+   * @param catalog the Gravitino catalog
+   * @param trinoCatalogName the name the catalog is registered under in Trino
+   * @return the registration state
+   */
+  public static CatalogRegistrationState unchanged(
+      GravitinoCatalog catalog, String trinoCatalogName) {
+    return of(
+        catalog.getMetalake(),
+        catalog.getName(),
+        trinoCatalogName,
+        catalog.getProvider(),
+        Status.REGISTERED,
+        null,
+        false);
   }
 
   /**
@@ -154,6 +185,17 @@ public final class CatalogRegistrationState {
       @Nullable String provider,
       Status status,
       @Nullable String lastError) {
+    return of(metalake, catalogName, trinoCatalogName, provider, status, lastError, true);
+  }
+
+  private static CatalogRegistrationState of(
+      String metalake,
+      String catalogName,
+      String trinoCatalogName,
+      @Nullable String provider,
+      Status status,
+      @Nullable String lastError,
+      boolean reRegistered) {
     Preconditions.checkArgument(metalake != null, "metalake must not be null");
     Preconditions.checkArgument(catalogName != null, "catalogName must not be null");
     Preconditions.checkArgument(trinoCatalogName != null, "trinoCatalogName must not be null");
@@ -171,7 +213,8 @@ public final class CatalogRegistrationState {
         lastError,
         now,
         status == Status.REGISTERED ? now : 0,
-        status == Status.FAILED ? 1 : 0);
+        status == Status.FAILED ? 1 : 0,
+        reRegistered);
   }
 
   /**
@@ -186,8 +229,12 @@ public final class CatalogRegistrationState {
     if (previous == null) {
       return this;
     }
-    // A registered catalog stamps its own success time; every other status keeps the last one.
-    long successTime = status == Status.REGISTERED ? lastSuccessTimeMs : previous.lastSuccessTimeMs;
+    // A registration that actually ran stamps its own success time; a poll that found the
+    // catalog unchanged, and every other status, keeps the last one.
+    long successTime =
+        status == Status.REGISTERED && reRegistered
+            ? lastSuccessTimeMs
+            : previous.lastSuccessTimeMs;
     // Consecutive failures only accumulate while the catalog keeps failing. Any other status
     // interrupts the run, and its own count is already zero.
     long failures = status == Status.FAILED ? previous.failureCount + 1 : failureCount;
@@ -208,7 +255,8 @@ public final class CatalogRegistrationState {
         lastError,
         lastAttemptTimeMs,
         successTime,
-        failures);
+        failures,
+        reRegistered);
   }
 
   /**

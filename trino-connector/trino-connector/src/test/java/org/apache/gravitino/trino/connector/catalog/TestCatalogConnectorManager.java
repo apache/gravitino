@@ -906,7 +906,11 @@ public class TestCatalogConnectorManager {
 
     // A poll that found nothing to do is not a new registration: advancing the time here would
     // make last_success_time say nothing more than last_attempt_time already does.
-    assertEquals(registeredAt, singleState(manager).getLastSuccessTimeMs());
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(registeredAt, state.getLastSuccessTimeMs());
+    // The poll still happened, so the row must not look like a catalog the loop stopped visiting.
+    assertTrue(state.getLastAttemptTimeMs() > registeredAt);
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, state.getStatus());
   }
 
   @Test
@@ -929,6 +933,54 @@ public class TestCatalogConnectorManager {
     assertFalse(outcome.isTrinoReachable());
     assertTrue(outcome.getLastError().contains("The Trino server is not reachable"));
     assertTrue(outcome.getLastError().contains("Connection reset"));
+  }
+
+  @Test
+  public void testUnsupportedUnregisterFailureKeepsTheCatalogVisible() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getMetalake()).thenReturn(fixture.metalake);
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L));
+
+    when(catalog.provider()).thenReturn("unsupported-provider");
+    doThrow(new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Access Denied"))
+        .when(fixture.catalogRegister)
+        .unregisterCatalog(any());
+    manager.loadMetalakeSync();
+
+    // Reporting it as merely UNSUPPORTED would hide that Trino is still serving it.
+    assertTrue(manager.catalogConnectorExist("memory"));
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.FAILED, state.getStatus());
+    assertTrue(state.getLastError().contains("could not be unregistered"));
+  }
+
+  @Test
+  public void testUnreachableTrinoReportsNoMetalakeErrors() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Mockito.doThrow(new RESTException("simulated: listing failed"))
+        .when(fixture.metalake)
+        .listCatalogs();
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+    assertFalse(manager.getLoadOutcome().getMetalakeErrors().isEmpty());
+
+    // Trino goes away. This cycle touches no metalake at all, so the errors left over from the
+    // previous one say nothing about it.
+    when(fixture.catalogRegister.isTrinoReachable()).thenReturn(false);
+    manager.loadMetalakeSync();
+
+    CatalogConnectorManager.LoadOutcome outcome = manager.getLoadOutcome();
+    assertFalse(outcome.isTrinoReachable());
+    assertTrue(outcome.getMetalakeErrors().isEmpty());
   }
 
   @Test
