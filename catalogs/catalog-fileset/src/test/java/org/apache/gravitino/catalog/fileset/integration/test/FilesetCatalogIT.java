@@ -1252,6 +1252,7 @@ public class FilesetCatalogIT extends BaseIT {
                 ImmutableMap.of("k1", "v1"));
     Assertions.assertEquals(
         hdfsLocation + "/local_schema/local_fileset", localFileset.storageLocation());
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(localCatalogName));
 
     // Delete schema
     localCatalog.asSchemas().dropSchema(localSchema.name(), true);

@@ -214,4 +214,16 @@ public interface SupportsCatalogs {
       String comment,
       Map<String, String> properties)
       throws Exception;
+
+  /**
+   * Test the connection of an existing catalog using its stored configuration.
+   *
+   * @param catalogName the name of the existing catalog.
+   * @throws NoSuchCatalogException if the catalog does not exist.
+   * @throws Exception if the test failed.
+   */
+  default void testConnection(String catalogName) throws Exception {
+    throw new UnsupportedOperationException(
+        String.format("Catalog %s does not support connection testing", catalogName));
+  }
 }

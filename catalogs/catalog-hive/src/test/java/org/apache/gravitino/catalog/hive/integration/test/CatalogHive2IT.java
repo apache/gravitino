@@ -306,6 +306,11 @@ public class CatalogHive2IT extends BaseIT {
     catalog = metalake.loadCatalog(catalogName);
   }
 
+  @Test
+  void testExistingCatalogConnection() {
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
+  }
+
   private void createSchema() throws TException, InterruptedException {
     Map<String, String> schemaProperties = createSchemaProperties();
     String comment = "comment";

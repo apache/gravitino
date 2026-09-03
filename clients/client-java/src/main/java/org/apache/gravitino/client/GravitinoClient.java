@@ -543,6 +543,11 @@ public class GravitinoClient extends GravitinoClientBase
   }
 
   @Override
+  public void testConnection(String catalogName) throws Exception {
+    getMetalake().testConnection(catalogName);
+  }
+
+  @Override
   public String[] listTags() throws NoSuchMetalakeException {
     return getMetalake().listTags();
   }

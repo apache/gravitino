@@ -172,6 +172,7 @@ public class HudiCatalogHMSIT extends BaseIT {
     Map<String, String> expectedProperties = new HashMap<>(properties);
     expectedProperties.put(PROPERTY_IN_USE, "true");
     Assertions.assertEquals(expectedProperties, catalog.properties());
+    Assertions.assertDoesNotThrow(() -> metalake.testConnection(catalogName));
 
     // test list
     String[] catalogs = metalake.listCatalogs();
