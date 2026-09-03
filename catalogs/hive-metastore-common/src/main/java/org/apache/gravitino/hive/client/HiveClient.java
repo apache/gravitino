@@ -70,6 +70,16 @@ public interface HiveClient extends AutoCloseable {
   List<HivePartition> listPartitions(
       HiveTable table, List<String> filterPartitionValueList, short pageSize);
 
+  /**
+   * Lists partitions of a table by given partition names. Used for batched partition-level
+   * statistics aggregation.
+   *
+   * @param table the Hive table
+   * @param partitionNames the partition name list to fetch
+   * @return list of HivePartitions corresponding to the given names
+   */
+  List<HivePartition> listPartitionsByNames(HiveTable table, List<String> partitionNames);
+
   HivePartition getPartition(HiveTable table, String partitionName);
 
   HivePartition addPartition(HiveTable table, HivePartition partition);
