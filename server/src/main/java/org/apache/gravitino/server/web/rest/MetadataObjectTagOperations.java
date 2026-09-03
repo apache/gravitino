@@ -260,6 +260,14 @@ public class MetadataObjectTagOperations {
       @PathParam("fullName") @AuthorizationFullName String fullName,
       @AuthorizationRequest(type = AuthorizationRequest.RequestType.ASSOCIATE_TAG)
           TagsAssociateRequest request) {
+    if (request == null) {
+      return ExceptionHandlers.handleTagException(
+          OperationType.ASSOCIATE,
+          "",
+          fullName,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
     LOG.info(
         "Received associate tags request for object type: {}, full name: {} under metalake: {}",
         type,

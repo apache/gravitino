@@ -672,6 +672,19 @@ public class TestPolicyOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testSetPolicyWithNullRequest() {
+    Response resp =
+        target(policyPath(metalake))
+            .path("policy1")
+            .property(HttpUrlConnectorProvider.SET_METHOD_WORKAROUND, true)
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .method("PATCH", Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testDeletePolicy() {
     when(policyManager.deletePolicy(metalake, "policy1")).thenReturn(true);
 

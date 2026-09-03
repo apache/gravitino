@@ -1131,6 +1131,22 @@ public class TestTagOperations extends BaseOperationsTest {
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse1.getType());
   }
 
+  @Test
+  public void testAssociateTagsForObjectWithNullRequest() {
+    MetadataObject catalog = MetadataObjects.parse("object1", MetadataObject.Type.CATALOG);
+
+    // The deprecated route delegates to MetadataObjectTagOperations, so it inherits the same guard.
+    Response response =
+        target(tagPath(metalake))
+            .path(catalog.type().toString())
+            .path(catalog.fullName())
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(response);
+  }
+
   private String tagPath(String metalake) {
     return "/metalakes/" + metalake + "/tags";
   }

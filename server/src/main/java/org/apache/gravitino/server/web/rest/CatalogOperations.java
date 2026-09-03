@@ -188,6 +188,13 @@ public class CatalogOperations {
       @PathParam("metalake") @AuthorizationMetadata(type = Entity.EntityType.METALAKE)
           String metalake,
       CatalogCreateRequest request) {
+    if (request == null) {
+      // Unlike a failed connection test, which handleTestConnectionException() reports inside an
+      // HTTP 200 response by design, a missing request body never reaches the connection test, so
+      // it is rejected with a regular HTTP 400.
+      return Utils.illegalArguments("Request body cannot be null");
+    }
+
     LOG.info("Received test connection request for catalog: {}.{}", metalake, request.getName());
     try {
       return Utils.doAs(
@@ -227,8 +234,15 @@ public class CatalogOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG)
           String catalogName,
       CatalogSetRequest request) {
-    LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
+    if (request == null) {
+      return ExceptionHandlers.handleCatalogException(
+          OperationType.SET,
+          catalogName,
+          metalake,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
 
+    LOG.info("Received set request for catalog: {}.{}", metalake, catalogName);
     OperationType op = request.isInUse() ? OperationType.ENABLE : OperationType.DISABLE;
 
     try {
