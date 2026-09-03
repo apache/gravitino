@@ -45,6 +45,7 @@ import org.apache.paimon.types.TimestampType;
 import org.apache.paimon.types.TinyIntType;
 import org.apache.paimon.types.VarBinaryType;
 import org.apache.paimon.types.VarCharType;
+import org.apache.paimon.types.VariantType;
 
 // Referred to org/apache/paimon/spark/SparkTypeUtils.java
 /** Utilities of {@link Type} to support type conversion. */
@@ -137,6 +138,11 @@ public class TypeUtils {
     @Override
     public Type visit(LocalZonedTimestampType localZonedTimestampType) {
       return Types.TimestampType.withTimeZone(localZonedTimestampType.getPrecision());
+    }
+
+    @Override
+    public Type visit(VariantType variantType) {
+      return Types.VariantType.get();
     }
 
     @Override
@@ -234,14 +240,7 @@ public class TypeUtils {
               timeType.hasPrecisionSet() ? timeType.precision() : PRECISION_SECOND;
           return DataTypes.TIME(timeTypePrecision);
         case TIMESTAMP:
-          Types.TimestampType timestampType = (Types.TimestampType) type;
-          int timestampTypePrecision =
-              timestampType.hasPrecisionSet() ? timestampType.precision() : PRECISION_MICROSECOND;
-          if (timestampType.hasTimeZone()) {
-            return DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(timestampTypePrecision);
-          } else {
-            return DataTypes.TIMESTAMP(timestampTypePrecision);
-          }
+          return toPaimonTimestampType((Types.TimestampType) type);
         case STRING:
           return DataTypes.STRING();
         case VARCHAR:
@@ -253,6 +252,12 @@ public class TypeUtils {
           return DataTypes.BINARY(fixedType.length());
         case BINARY:
           return DataTypes.VARBINARY(VarBinaryType.MAX_LENGTH);
+        case VARIANT:
+          return DataTypes.VARIANT();
+        case GEOMETRY:
+        case GEOGRAPHY:
+        case NULL:
+          throw unsupportedType(type);
         case LIST:
           Types.ListType listType = (Types.ListType) type;
           DataType elementType = visit(listType.elementType());
@@ -294,6 +299,25 @@ public class TypeUtils {
               String.format(
                   "Paimon does not support Gravitino %s data type.", type.simpleString()));
       }
+    }
+
+    private static DataType toPaimonTimestampType(Types.TimestampType timestampType) {
+      int precision =
+          timestampType.hasPrecisionSet() ? timestampType.precision() : PRECISION_MICROSECOND;
+      if (precision < TimestampType.MIN_PRECISION || precision > TimestampType.MAX_PRECISION) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Paimon supports Gravitino timestamp precision from %d to %d, but got: %d.",
+                TimestampType.MIN_PRECISION, TimestampType.MAX_PRECISION, precision));
+      }
+      return timestampType.hasTimeZone()
+          ? DataTypes.TIMESTAMP_WITH_LOCAL_TIME_ZONE(precision)
+          : DataTypes.TIMESTAMP(precision);
+    }
+
+    private static IllegalArgumentException unsupportedType(Type type) {
+      return new IllegalArgumentException(
+          String.format("Paimon does not support Gravitino %s data type.", type.simpleString()));
     }
   }
 }
