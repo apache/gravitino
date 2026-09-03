@@ -66,3 +66,96 @@ class TestViewTool(unittest.TestCase):
                 )
 
         asyncio.run(_test_load_view(self.mcp))
+
+    def test_create_view(self):
+        async def _test(mcp_server):
+            representations = [
+                {"type": "sql", "dialect": "spark", "sql": "SELECT 1"}
+            ]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_view",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "name": "v",
+                        "comment": "c",
+                        "columns": [{"name": "id", "type": "integer"}],
+                        "representations": representations,
+                        "properties": {"k": "v"},
+                    },
+                )
+                self.assertEqual(
+                    f"mock_view_created: cat.sch.v "
+                    f"with representations {representations}, "
+                    "default_catalog=None",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_create_view_with_defaults(self):
+        async def _test(mcp_server):
+            representations = [
+                {"type": "sql", "dialect": "spark", "sql": "SELECT 1"}
+            ]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "create_view",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "name": "v",
+                        "comment": "c",
+                        "columns": [],
+                        "representations": representations,
+                        "properties": {},
+                        "default_catalog": "dc",
+                        "default_schema": "ds",
+                    },
+                )
+                self.assertEqual(
+                    f"mock_view_created: cat.sch.v "
+                    f"with representations {representations}, "
+                    "default_catalog=dc",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_alter_view(self):
+        async def _test(mcp_server):
+            updates = [{"@type": "rename", "newName": "renamed"}]
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "alter_view",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "view_name": "v",
+                        "updates": updates,
+                    },
+                )
+                self.assertEqual(
+                    f"mock_view_altered: cat.sch.v with updates {updates}",
+                    result.content[0].text,
+                )
+
+        asyncio.run(_test(self.mcp))
+
+    def test_drop_view(self):
+        async def _test(mcp_server):
+            async with Client(mcp_server) as client:
+                result = await client.call_tool(
+                    "drop_view",
+                    {
+                        "catalog_name": "cat",
+                        "schema_name": "sch",
+                        "view_name": "v",
+                    },
+                )
+                self.assertEqual(
+                    "mock_view_dropped: cat.sch.v", result.content[0].text
+                )
+
+        asyncio.run(_test(self.mcp))
