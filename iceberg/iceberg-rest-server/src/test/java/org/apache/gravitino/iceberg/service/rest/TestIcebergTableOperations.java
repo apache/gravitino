@@ -37,6 +37,7 @@ import javax.ws.rs.core.Response;
 import javax.ws.rs.core.Response.Status;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.credential.Credential;
+import org.apache.gravitino.iceberg.service.IcebergIdempotencyManager;
 import org.apache.gravitino.iceberg.service.IcebergRESTUtils;
 import org.apache.gravitino.iceberg.service.extension.DummyCredentialProvider;
 import org.apache.gravitino.listener.api.event.Event;
@@ -152,6 +153,39 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
 
     verifyCreateTableFail(namespace, "create_foo1", 409);
     verifyCreateTableFail(namespace, "", 400);
+  }
+
+  @Test
+  void testCreateTableWithIdempotencyKey() {
+    Namespace namespace = Namespace.of("idempotent_table_ns");
+    verifyCreateNamespaceSucc(namespace);
+
+    dummyEventListener.clearEvent();
+    String idempotencyKey = "018f4f74-7e58-7cc2-a2f0-6f53123abcde";
+
+    Response firstResponse =
+        doCreateTableWithIdempotencyKey(namespace, "idempotent_table_foo1", idempotencyKey);
+    Assertions.assertEquals(Status.OK.getStatusCode(), firstResponse.getStatus());
+
+    Response secondResponse =
+        doCreateTableWithIdempotencyKey(namespace, "idempotent_table_foo1", idempotencyKey);
+    Assertions.assertEquals(Status.OK.getStatusCode(), secondResponse.getStatus());
+
+    Assertions.assertTrue(dummyEventListener.popPreEvent() instanceof IcebergCreateTablePreEvent);
+    Assertions.assertTrue(dummyEventListener.popPostEvent() instanceof IcebergCreateTableEvent);
+    Assertions.assertThrows(AssertionError.class, () -> dummyEventListener.popPreEvent());
+    Assertions.assertThrows(AssertionError.class, () -> dummyEventListener.popPostEvent());
+
+    verifyLoadTableSucc(namespace, "idempotent_table_foo1");
+  }
+
+  @Test
+  void testCreateTableRejectsInvalidIdempotencyKey() {
+    Namespace namespace = Namespace.of("invalid_idempotency_table_ns");
+    verifyCreateNamespaceSucc(namespace);
+
+    Response response = doCreateTableWithIdempotencyKey(namespace, "invalid_key_table", "bad");
+    Assertions.assertEquals(Status.BAD_REQUEST.getStatusCode(), response.getStatus());
   }
 
   @ParameterizedTest
@@ -506,6 +540,15 @@ public class TestIcebergTableOperations extends IcebergNamespaceTestBase {
     }
     CreateTableRequest createTableRequest = builder.build();
     return getTableClientBuilder(ns, Optional.empty())
+        .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
+  }
+
+  private Response doCreateTableWithIdempotencyKey(
+      Namespace ns, String name, String idempotencyKey) {
+    CreateTableRequest createTableRequest =
+        CreateTableRequest.builder().withName(name).withSchema(tableSchema).build();
+    return getTableClientBuilder(ns, Optional.empty())
+        .header(IcebergIdempotencyManager.IDEMPOTENCY_KEY_HEADER, idempotencyKey)
         .post(Entity.entity(createTableRequest, MediaType.APPLICATION_JSON_TYPE));
   }
 
