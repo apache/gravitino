@@ -317,6 +317,17 @@ class TestOwnerOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testSetOwnerForObjectWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/owners/metalake/metalake1")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testRoleObject() {
     MetadataObject role = MetadataObjects.of(null, "role", MetadataObject.Type.ROLE);
     when(accessControlDispatcher.getRole(any(), any())).thenReturn(mock(Role.class));

@@ -812,4 +812,81 @@ public class TestPermissionOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResponse2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResponse2.getType());
   }
+
+  @Test
+  public void testGrantRolesToUserWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/users/user1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testGrantRolesToGroupWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/groups/group1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRevokeRolesFromUserWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/users/user1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRevokeRolesFromGroupWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/groups/group1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testGrantPrivilegeToRoleWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/grant")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testRevokePrivilegeFromRoleWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/metalake/metalake1/revoke")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity("null", MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
+  public void testOverrideRolePrivilegesWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/permissions/roles/role1/")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
 }
