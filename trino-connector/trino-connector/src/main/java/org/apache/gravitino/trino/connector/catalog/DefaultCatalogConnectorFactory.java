@@ -71,7 +71,7 @@ public class DefaultCatalogConnectorFactory implements CatalogConnectorFactory {
         new CatalogConnectorContext.Builder(new MemoryConnectorAdapter()));
     catalogBuilders.put(
         ICEBERG_CONNECTOR_PROVIDER_NAME,
-        new CatalogConnectorContext.Builder(new IcebergConnectorAdapter()));
+        new CatalogConnectorContext.Builder(new IcebergConnectorAdapter(config)));
     catalogBuilders.put(
         MYSQL_CONNECTOR_PROVIDER_NAME,
         new CatalogConnectorContext.Builder(new MySQLConnectorAdapter()));

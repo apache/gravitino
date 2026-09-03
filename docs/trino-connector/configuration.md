@@ -29,12 +29,26 @@ license: "This software is licensed under the Apache License version 2."
 | gravitino.client.                           | string  | (none)                | The configuration key prefix for the Gravitino client config.                                                                                                                                                                                                                                                                                    | No       |
 | gravitino.trino.skip-catalog-patterns       | string  | (none)                | The `gravitino.trino.skip-catalog-patterns` defines a comma-separated list of catalog name regex patterns that should be excluded from loading. For example, `test_.*, .*_tmp` excludes all catalogs starting with `test_` or ending with `_tmp`.                                                                                                | No       |
 | gravitino.use-single-metalake               | boolean | true                  | If `true`, only one metalake is used and catalogs are identified by `<catalog_name>`. If `false`, multi-metalake mode is enabled and catalogs are identified by `<metalake_name>.<catalog_name>`.                                                                                                                                                | No       |
+| gravitino.iceberg.rest-routing-enabled      | boolean | true                  | Whether non-REST `lakehouse-iceberg` catalogs must be routed through the Gravitino Iceberg REST server. When enabled, a catalog is not registered until discovery succeeds or `gravitino.iceberg.rest-uri` is configured. Set this to `false` to retain legacy `catalog-backend` translation and skip discovery. | No       |
+| gravitino.iceberg.rest-uri                  | string  | (none)                | The endpoint of the Gravitino Iceberg REST server (IRC). It is discovered automatically from the Gravitino server for this connector's metalake; set this only to override the discovered value. When available, eligible `lakehouse-iceberg` catalogs are loaded through IRC, enabling credential vending.                                               | No       |
+| gravitino.iceberg.rest-catalog.             | string  | (none)                | Prefix for properties passed to the internal Trino Iceberg REST catalog. The prefix is rewritten to `iceberg.rest-catalog.`. The `uri`, `warehouse`, and `prefix` keys are reserved and derived by the connector.                                                                                                                               | No       |
 
 To configure the Gravitino client, use properties prefixed with `gravitino.client.`. These properties will directly passed to the Gravitino client.
 
 **Note:** Invalid configuration properties will result in exceptions. Please see [Gravitino Java client configurations](../how-to-use-gravitino-client.md#java-client-configuration) for more support client configuration.
 
+When upgrading a deployment that does not provide an Iceberg REST endpoint, either configure
+`gravitino.iceberg.rest-uri` or set `gravitino.iceberg.rest-routing-enabled=false` to retain the
+legacy `catalog-backend` translation. Otherwise, non-REST `lakehouse-iceberg` catalogs remain
+unregistered until discovery succeeds. See
+[Iceberg catalog](./catalog-iceberg.md#how-trino-reaches-the-catalog).
+
 Multi-metalake mode (`gravitino.use-single-metalake=false`) is supported on Trino connector versions 435-445 and 469-478. On versions 446-468, a warning is logged and the connector initializes, but the mode is not fully supported and some operations may fail.
+
+**Note:** In multi-metalake mode, `gravitino.iceberg.rest-uri` is only honored when scoped to a
+metalake, as `gravitino.iceberg.rest-uri.<metalake_name>` — the unscoped form is ignored, since a
+single Iceberg REST server serves exactly one metalake and applying it to every metalake would
+misroute the others. The unscoped form remains valid in single-metalake mode.
 
 ## Connecting to a TLS-enabled coordinator
 
