@@ -20,7 +20,7 @@ package org.apache.gravitino.client;
 
 import static org.apache.hc.core5.http.HttpStatus.SC_BAD_REQUEST;
 import static org.apache.hc.core5.http.HttpStatus.SC_INTERNAL_SERVER_ERROR;
-import static org.apache.hc.core5.http.HttpStatus.SC_METHOD_NOT_ALLOWED;
+import static org.apache.hc.core5.http.HttpStatus.SC_NOT_IMPLEMENTED;
 import static org.apache.hc.core5.http.HttpStatus.SC_OK;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -189,7 +189,7 @@ public class TestSupportsStatistics extends TestBase {
         Collections.emptyMap(),
         expectedRequest,
         unmodifiableError,
-        SC_METHOD_NOT_ALLOWED);
+        SC_NOT_IMPLEMENTED);
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,
@@ -246,7 +246,7 @@ public class TestSupportsStatistics extends TestBase {
                 Collections.emptyList()));
     ErrorResponse unmodifiableError = MAPPER.readValue(unmodifiableErrorJson, ErrorResponse.class);
     buildMockResource(
-        Method.POST, path, Collections.emptyMap(), null, unmodifiableError, SC_METHOD_NOT_ALLOWED);
+        Method.POST, path, Collections.emptyMap(), null, unmodifiableError, SC_NOT_IMPLEMENTED);
 
     Assertions.assertThrows(
         UnmodifiableStatisticException.class,

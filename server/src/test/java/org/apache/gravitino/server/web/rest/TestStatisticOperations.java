@@ -235,6 +235,53 @@ public class TestStatisticOperations extends JerseyTest {
     ErrorResponse errorResp2 = resp2.readEntity(ErrorResponse.class);
     Assertions.assertEquals(ErrorConstants.INTERNAL_ERROR_CODE, errorResp2.getCode());
     Assertions.assertEquals(RuntimeException.class.getSimpleName(), errorResp2.getType());
+
+    // Test throw UnsupportedOperationException
+    doThrow(new UnsupportedOperationException("mock error"))
+        .when(manager)
+        .listStatistics(any(), any());
+    Response resp3 =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp3.getStatus());
+    ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp3.getCode());
+    Assertions.assertEquals(
+        UnsupportedOperationException.class.getSimpleName(), errorResp3.getType());
+  }
+
+  /** Tests that statistics reject non-table object types as invalid request arguments. */
+  @Test
+  public void testListStatisticsRejectsNonTableObject() {
+    MetadataObject catalogObject = MetadataObjects.parse(catalog, MetadataObject.Type.CATALOG);
+    Response response =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + catalogObject.type()
+                    + "/"
+                    + catalogObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .get();
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalArgumentException.class.getSimpleName(), errorResponse.getType());
   }
 
   @Test
@@ -362,7 +409,7 @@ public class TestStatisticOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp4.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
 
     ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
@@ -493,7 +540,7 @@ public class TestStatisticOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp3.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
 
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);
@@ -752,7 +799,7 @@ public class TestStatisticOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .put(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp4.getStatus());
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp4.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp4.getMediaType());
 
     ErrorResponse errorResp4 = resp4.readEntity(ErrorResponse.class);
@@ -924,7 +971,7 @@ public class TestStatisticOperations extends JerseyTest {
             .accept("application/vnd.gravitino.v1+json")
             .post(entity(req, MediaType.APPLICATION_JSON_TYPE));
 
-    Assertions.assertEquals(Response.Status.METHOD_NOT_ALLOWED.getStatusCode(), resp3.getStatus());
+    Assertions.assertEquals(Response.Status.NOT_IMPLEMENTED.getStatusCode(), resp3.getStatus());
     Assertions.assertEquals(MediaType.APPLICATION_JSON_TYPE, resp3.getMediaType());
 
     ErrorResponse errorResp3 = resp3.readEntity(ErrorResponse.class);

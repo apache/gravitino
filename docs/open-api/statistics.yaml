@@ -41,6 +41,8 @@ paths:
                 examples:
                   StatisticListResponse:
                     $ref: "#/components/examples/StatisticListResponse"
+        "400":
+          $ref: "./openapi.yaml#/components/responses/BadRequestErrorResponse"
         "404":
           description: Not Found - The specified metadata object doesn't exist
           content:
@@ -50,6 +52,12 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "501":
+          description: Not Implemented - Statistics are not supported for the specified object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -71,7 +79,7 @@ paths:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
-          description: Bad Request - The request contains illegal statistic names
+          description: Bad Request - The object type or statistic names are invalid
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -88,8 +96,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "405":
-          description: Method Not Allowed - The specified statistic is unmodifiable
+        "501":
+          description: Not Implemented - The requested statistics operation is not supported
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -118,7 +126,7 @@ paths:
         "200":
           $ref: "./openapi.yaml#/components/responses/BaseResponse"
         "400":
-          description: Bad Request - The request contains illegal statistic names
+          description: Bad Request - The object type or statistic names are invalid
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -135,8 +143,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "405":
-          description: Method Not Allowed - The specified statistic is unmodifiable
+        "501":
+          description: Not Implemented - The requested statistics operation is not supported
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -184,6 +192,12 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
+        "501":
+          description: Not Implemented - Partition statistics are not supported for the specified object
+          content:
+            application/vnd.gravitino.v1+json:
+              schema:
+                $ref: "./openapi.yaml#/components/schemas/ErrorModel"
         "5xx":
           $ref: "./openapi.yaml#/components/responses/ServerErrorResponse"
 
@@ -205,7 +219,7 @@ paths:
         "200":
           $ref: "./openapi.yaml#/components/responses/DropResponse"
         "400":
-          description: Bad Request - The request contains illegal statistic names
+          description: Bad Request - The object type or statistic names are invalid
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -222,8 +236,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "405":
-          description: Method Not Allowed - The specified statistic is unmodifiable
+        "501":
+          description: Not Implemented - The requested partition statistics operation is not supported
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -252,7 +266,7 @@ paths:
         "200":
           $ref: "./openapi.yaml#/components/responses/BaseResponse"
         "400":
-          description: Bad Request - The request contains illegal statistic names
+          description: Bad Request - The object type or statistic names are invalid
           content:
             application/vnd.gravitino.v1+json:
               schema:
@@ -269,8 +283,8 @@ paths:
               examples:
                 NoSuchMetadataObjectException:
                   $ref: "#/components/examples/NoSuchMetadataObjectException"
-        "405":
-          description: Method Not Allowed - The specified statistic is unmodifiable
+        "501":
+          description: Not Implemented - The requested partition statistics operation is not supported
           content:
             application/vnd.gravitino.v1+json:
               schema:

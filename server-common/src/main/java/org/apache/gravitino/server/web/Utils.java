@@ -189,13 +189,39 @@ public class Utils {
         .build();
   }
 
+  /**
+   * Returns an HTTP 501 response for functionality that the server does not implement.
+   *
+   * @param message the error message
+   * @return the HTTP response
+   */
   public static Response unsupportedOperation(String message) {
     return unsupportedOperation(message, null);
   }
 
+  /**
+   * Returns an HTTP 501 response for functionality that the server does not implement.
+   *
+   * @param message the error message
+   * @param throwable the exception that caused the error
+   * @return the HTTP response
+   */
   public static Response unsupportedOperation(String message, Throwable throwable) {
-    return Response.status(Response.Status.METHOD_NOT_ALLOWED)
+    return Response.status(Response.Status.NOT_IMPLEMENTED)
         .entity(ErrorResponse.unsupportedOperation(message, throwable))
+        .type(MediaType.APPLICATION_JSON)
+        .build();
+  }
+
+  /**
+   * Returns an HTTP 405 response when the target resource does not allow the request method.
+   *
+   * @param message the error message
+   * @return the HTTP response
+   */
+  public static Response methodNotAllowed(String message) {
+    return Response.status(Response.Status.METHOD_NOT_ALLOWED)
+        .entity(ErrorResponse.unsupportedOperation(message))
         .type(MediaType.APPLICATION_JSON)
         .build();
   }
