@@ -25,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.startsWith;
@@ -41,6 +42,7 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -581,6 +583,43 @@ public class TestCatalogRegister {
       }
     }
     assertTrue(deepCauseSurvived, "the deep cause must reach the caller");
+  }
+
+  @Test
+  public void testDescribeMasksSecretsThroughTheWholeCauseChain() {
+    // What a Jackson parse failure on the catalog JSON looks like: the source it echoes is the
+    // very payload that carries the resolved secrets.
+    RuntimeException deepCause =
+        new RuntimeException(
+            "Unexpected end-of-input at [Source: (String)\"{\"properties\":"
+                + "{\"jdbc-password\":\"hunter2\"}}\"; line: 1]");
+    Exception failure =
+        new IllegalStateException("Failed on \"trino.bypass.password\"='letmein'", deepCause);
+
+    String described = CatalogRegister.describe(failure);
+
+    assertFalse(described.contains("hunter2"));
+    assertFalse(described.contains("letmein"));
+    assertTrue(described.contains("\"jdbc-password\":\"***\""));
+    assertTrue(described.contains("\"trino.bypass.password\"='***'"));
+    // The rendering keeps what makes it useful: the types, the chain and the frames.
+    assertTrue(described.contains("IllegalStateException"));
+    assertTrue(described.contains("Caused by"));
+    assertTrue(described.contains("testDescribeMasksSecretsThroughTheWholeCauseChain"));
+  }
+
+  @Test
+  public void testDescribeTerminatesOnACauseCycle() {
+    // Java permits A -> B -> A. The JDK's own stack trace printer stops at the repeated node,
+    // which is why rendering the throwable needs no cycle guard of its own.
+    Exception first = new IllegalStateException("first");
+    Exception second = new IllegalStateException("second", first);
+    first.initCause(second);
+
+    String described =
+        assertTimeoutPreemptively(Duration.ofSeconds(10), () -> CatalogRegister.describe(first));
+
+    assertTrue(described.contains("CIRCULAR REFERENCE"));
   }
 
   private static void setPrivateField(Object target, String fieldName, Object value)

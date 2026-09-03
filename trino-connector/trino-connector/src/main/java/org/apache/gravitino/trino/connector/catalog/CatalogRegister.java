@@ -22,6 +22,7 @@ import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYN
 import static org.apache.gravitino.trino.connector.GravitinoConfig.GRAVITINO_DYNAMIC_CONNECTOR_CATALOG_CONFIG;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableSet;
 import io.airlift.log.Logger;
 import io.trino.jdbc.TrinoDriver;
@@ -358,6 +359,21 @@ public class CatalogRegister {
   }
 
   /**
+   * Renders a throwable, stack trace and cause chain included, with every secret it carries masked.
+   *
+   * <p>Logging a throwable directly would print the driver's own message, which for a failed CREATE
+   * CATALOG can hold the credentials the statement embedded. Rendering it here first is what makes
+   * that impossible, and it leaves the exception itself untouched. Cause cycles are handled by the
+   * JDK's own stack trace printer.
+   *
+   * @param e the throwable to render
+   * @return the rendered throwable with every secret value replaced
+   */
+  public static String describe(Throwable e) {
+    return redactSecrets(Throwables.getStackTraceAsString(e));
+  }
+
+  /**
    * Masks the values of the secret bearing properties of a CREATE CATALOG statement, in both its
    * SQL assignments and the catalog JSON it carries.
    *
@@ -367,7 +383,7 @@ public class CatalogRegister {
    * @param createCatalogCommand the text to redact
    * @return the text with every secret value replaced
    */
-  static String redactSecrets(String createCatalogCommand) {
+  public static String redactSecrets(String createCatalogCommand) {
     return redactJsonSecrets(redactSqlSecrets(createCatalogCommand));
   }
 
@@ -438,7 +454,7 @@ public class CatalogRegister {
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     } catch (Exception e) {
       String message = String.format("Failed to register catalog %s", name);
-      LOG.error(e, message);
+      LOG.error("%s%n%s", message, describe(e));
       throw new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, message, e);
     }
   }
@@ -497,7 +513,7 @@ public class CatalogRegister {
           throw e;
         } catch (Exception e) {
           failedException = e;
-          LOG.warn(e, "Failed to execute command: %s", redactSecrets(sql));
+          LOG.warn("Failed to execute command: %s%n%s", redactSecrets(sql), describe(e));
           Thread.sleep(EXECUTE_QUERY_BACKOFF_TIME_SECOND * 1000);
         }
       }
