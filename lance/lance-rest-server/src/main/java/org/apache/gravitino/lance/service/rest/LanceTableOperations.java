@@ -22,6 +22,7 @@ import static org.apache.gravitino.lance.common.ops.NamespaceWrapper.NAMESPACE_D
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_LOCATION;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_LOCATION_HEADER;
 import static org.apache.gravitino.lance.common.utils.LanceConstants.LANCE_TABLE_PROPERTIES_PREFIX_HEADER;
+import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.CREATE_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.PROBE_TABLE_AUTHORIZATION_EXPRESSION;
 import static org.apache.gravitino.lance.service.authorization.LanceAuthorizationExpressions.READ_TABLE_AUTHORIZATION_EXPRESSION;
 
@@ -121,6 +122,7 @@ public class LanceTableOperations {
   @Produces("application/json")
   @Timed(name = "create-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "create-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response createTable(
       @PathParam("id") String tableId,
       @QueryParam("mode") @DefaultValue("create") String mode, // create, exist_ok, overwrite
@@ -160,6 +162,7 @@ public class LanceTableOperations {
   @Produces("application/json")
   @Timed(name = "declare-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "declare-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response declareTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue(NAMESPACE_DELIMITER_DEFAULT) String delimiter,
@@ -188,6 +191,7 @@ public class LanceTableOperations {
   @Path("/register")
   @Timed(name = "register-table." + MetricNames.HTTP_PROCESS_DURATION, absolute = true)
   @ResponseMetered(name = "register-table", absolute = true)
+  @AuthorizationExpression(expression = CREATE_TABLE_AUTHORIZATION_EXPRESSION)
   public Response registerTable(
       @PathParam("id") String tableId,
       @QueryParam("delimiter") @DefaultValue("$") String delimiter,

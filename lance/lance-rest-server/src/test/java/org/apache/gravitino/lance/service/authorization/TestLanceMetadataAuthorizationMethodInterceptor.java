@@ -49,9 +49,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.lance.namespace.model.CreateNamespaceRequest;
+import org.lance.namespace.model.DeclareTableRequest;
 import org.lance.namespace.model.DescribeTableRequest;
 import org.lance.namespace.model.DropNamespaceRequest;
 import org.lance.namespace.model.ErrorResponse;
+import org.lance.namespace.model.RegisterTableRequest;
 import org.lance.namespace.model.TableExistsRequest;
 import org.mockito.MockedStatic;
 
@@ -314,6 +316,107 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
         interceptor.invoke(listTablesInvocation(tableId())), Response.Status.BAD_REQUEST);
 
     assertEquals(PROCEEDED, interceptor.invoke(listTablesInvocation(CATALOG + "$" + SCHEMA)));
+  }
+
+  @Test
+  void testTableCreationRequiresCreateTablePrivilege() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "create")));
+    assertEquals(PROCEEDED, interceptor.invoke(declareTableInvocation(tableId())));
+    assertEquals(PROCEEDED, interceptor.invoke(registerTableInvocation(tableId(), "create")));
+
+    // Reading a table is not creating one.
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.SELECT_TABLE);
+    MethodInvocation create = createTableInvocation(tableId(), "create");
+    assertErrorResponse(interceptor.invoke(create), Response.Status.FORBIDDEN);
+    verify(create, never()).proceed();
+    assertErrorResponse(
+        interceptor.invoke(declareTableInvocation(tableId())), Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(registerTableInvocation(tableId(), "create")),
+        Response.Status.FORBIDDEN);
+  }
+
+  @Test
+  void testCreateTablePrivilegeCannotOverwriteAnExistingTable() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.CREATE_TABLE);
+
+    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "exist_ok")));
+    MethodInvocation overwrite = createTableInvocation(tableId(), "overwrite");
+    assertErrorResponse(interceptor.invoke(overwrite), Response.Status.FORBIDDEN);
+    verify(overwrite, never()).proceed();
+    assertErrorResponse(
+        interceptor.invoke(registerTableInvocation(tableId(), "OVERWRITE")),
+        Response.Status.FORBIDDEN);
+  }
+
+  @Test
+  void testTableOverwriteRejectsIdentifiersOfTheWrongDepth() throws Throwable {
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.values());
+
+    // Overwrite authorization must retain the table operation's target type. Deriving the
+    // expression from the identifier depth would authorize these as catalog or schema overwrites.
+    assertErrorResponse(
+        interceptor.invoke(createTableInvocation(CATALOG, "overwrite")), Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(createTableInvocation(CATALOG + "$" + SCHEMA, "overwrite")),
+        Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(registerTableInvocation(CATALOG, "overwrite")),
+        Response.Status.FORBIDDEN);
+    assertErrorResponse(
+        interceptor.invoke(registerTableInvocation(CATALOG + "$" + SCHEMA, "overwrite")),
+        Response.Status.FORBIDDEN);
+  }
+
+  @Test
+  void testModifyTablePrivilegeAndOwnershipAuthorizeOverwrite() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA, Privilege.Name.MODIFY_TABLE);
+    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "overwrite")));
+    assertEquals(PROCEEDED, interceptor.invoke(registerTableInvocation(tableId(), "overwrite")));
+
+    when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
+    assertEquals(PROCEEDED, interceptor.invoke(createTableInvocation(tableId(), "overwrite")));
+  }
+
+  private MethodInvocation createTableInvocation(String tableId, String mode) throws Throwable {
+    Method method =
+        LanceTableOperations.class.getMethod(
+            "createTable",
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            String.class,
+            HttpHeaders.class,
+            byte[].class);
+    return invocation(method, tableId, mode, "$", null, null, null, new byte[0]);
+  }
+
+  private MethodInvocation declareTableInvocation(String tableId) throws Throwable {
+    Method method =
+        LanceTableOperations.class.getMethod(
+            "declareTable",
+            String.class,
+            String.class,
+            DeclareTableRequest.class,
+            HttpHeaders.class);
+    return invocation(method, tableId, "$", new DeclareTableRequest(), null);
+  }
+
+  private MethodInvocation registerTableInvocation(String tableId, String mode) throws Throwable {
+    Method method =
+        LanceTableOperations.class.getMethod(
+            "registerTable",
+            String.class,
+            String.class,
+            HttpHeaders.class,
+            RegisterTableRequest.class);
+    RegisterTableRequest request = new RegisterTableRequest();
+    request.setMode(mode);
+    return invocation(method, tableId, "$", null, request);
   }
 
   private String tableId() {
