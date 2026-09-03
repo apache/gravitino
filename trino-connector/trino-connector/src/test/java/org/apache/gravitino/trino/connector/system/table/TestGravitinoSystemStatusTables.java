@@ -25,15 +25,25 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.google.common.collect.ImmutableMap;
 import io.trino.spi.Page;
 import io.trino.spi.block.Block;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.gravitino.Audit;
 import org.apache.gravitino.Catalog;
 import org.apache.gravitino.client.GravitinoMetalake;
@@ -172,6 +182,96 @@ public class TestGravitinoSystemStatusTables {
     // metalake this entry catalog reports on.
     assertEquals("1 of 2 metalakes failed", varchar(page, 4));
     assertEquals("{\"test\":\"Connection refused\"}", varchar(page, 5));
+  }
+
+  // A healthy loop and a failing one, with every field distinguishable so that a row combining
+  // the two is recognizable on sight.
+  private static final CatalogConnectorManager.LoadOutcome HEALTHY_OUTCOME =
+      new CatalogConnectorManager.LoadOutcome(5000L, null, 0L);
+  private static final CatalogConnectorManager.LoadOutcome FAILING_OUTCOME =
+      new CatalogConnectorManager.LoadOutcome(0L, "Connection refused", 3L);
+
+  @Test
+  public void testLoadStatusRowComesFromASingleLoadAttempt() {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    when(manager.isTrinoStarted()).thenReturn(true);
+    when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
+    when(manager.getMetalakeErrors()).thenReturn(Map.of());
+    // Every read reports a different attempt, the way a load loop completing between two reads
+    // would. Rendering must therefore read the outcome exactly once.
+    AtomicInteger reads = new AtomicInteger();
+    when(manager.getLoadOutcome())
+        .thenAnswer(
+            invocation -> reads.getAndIncrement() % 2 == 0 ? HEALTHY_OUTCOME : FAILING_OUTCOME);
+
+    Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
+
+    verify(manager, times(1)).getLoadOutcome();
+    assertConsistentLoadStatusRow(page);
+  }
+
+  @Test
+  public void testLoadStatusIsConsistentWhileTheLoopFailsAndRecovers() throws Exception {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    when(manager.isTrinoStarted()).thenReturn(true);
+    when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
+    when(manager.getMetalakeErrors()).thenReturn(Map.of());
+    // The load loop keeps flipping between failing and recovering underneath the readers.
+    AtomicBoolean failing = new AtomicBoolean();
+    when(manager.getLoadOutcome())
+        .thenAnswer(invocation -> failing.get() ? FAILING_OUTCOME : HEALTHY_OUTCOME);
+
+    GravitinoSystemTableLoadStatus table = new GravitinoSystemTableLoadStatus(manager, "test");
+    int readerCount = 4;
+    int rendersPerReader = 200;
+    ExecutorService executor = Executors.newFixedThreadPool(readerCount + 1);
+    CountDownLatch start = new CountDownLatch(1);
+    AtomicBoolean stop = new AtomicBoolean();
+    try {
+      executor.submit(
+          () -> {
+            start.await();
+            while (!stop.get()) {
+              failing.set(!failing.get());
+            }
+            return null;
+          });
+
+      List<Future<?>> readers = new ArrayList<>();
+      for (int i = 0; i < readerCount; i++) {
+        readers.add(
+            executor.submit(
+                () -> {
+                  start.await();
+                  for (int render = 0; render < rendersPerReader; render++) {
+                    assertConsistentLoadStatusRow(table.loadPageData());
+                  }
+                  return null;
+                }));
+      }
+
+      start.countDown();
+      for (Future<?> reader : readers) {
+        reader.get(60, TimeUnit.SECONDS);
+      }
+    } finally {
+      stop.set(true);
+      executor.shutdownNow();
+    }
+  }
+
+  /** Asserts that the row describes one load attempt rather than fields taken from two. */
+  private static void assertConsistentLoadStatusRow(Page page) {
+    assertEquals(1, page.getPositionCount());
+    boolean healthy = page.getBlock(4).isNull(0);
+    if (healthy) {
+      assertEquals("1970-01-01T00:00:05Z", varchar(page, 2));
+      assertEquals(0, BIGINT.getLong(page.getBlock(3), 0));
+    } else {
+      assertTrue(page.getBlock(2).isNull(0));
+      assertEquals(3, BIGINT.getLong(page.getBlock(3), 0));
+      assertEquals("Connection refused", varchar(page, 4));
+    }
   }
 
   @Test
