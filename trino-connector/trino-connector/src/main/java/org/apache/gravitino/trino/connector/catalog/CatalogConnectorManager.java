@@ -292,7 +292,15 @@ public class CatalogConnectorManager {
       }
     }
 
-    catalogStates.values().removeIf(state -> !usedMetalakes.contains(state.getMetalake()));
+    // A catalog whose connector could not be removed from Trino keeps its state, the same way the
+    // per-catalog pruning in loadCatalogs() does, so the failure recorded just above stays visible
+    // for as long as the connector still shows up in SHOW CATALOGS.
+    catalogStates
+        .values()
+        .removeIf(
+            state ->
+                !usedMetalakes.contains(state.getMetalake())
+                    && !catalogConnectors.containsKey(state.getTrinoCatalogName()));
     metalakeErrors.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
     metalakes.keySet().removeIf(metalakeName -> !usedMetalakes.contains(metalakeName));
   }

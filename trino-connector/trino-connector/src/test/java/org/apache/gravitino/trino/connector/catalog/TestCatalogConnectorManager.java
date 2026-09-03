@@ -494,6 +494,37 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testUnloadFailureKeepsStateWhenMetalakeVanishes() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager =
+        fixture.createManager(ImmutableMap.of("gravitino.use-single-metalake", "false"));
+    manager.loadMetalakeSync();
+
+    // Trino has the connector, so the manager will try to unload it when the metalake disappears.
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getMetalake()).thenReturn(fixture.metalake);
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L));
+    doThrow(new TrinoException(GravitinoErrorCode.GRAVITINO_RUNTIME_ERROR, "Access Denied"))
+        .when(fixture.catalogRegister)
+        .unregisterCatalog(any());
+    Mockito.doReturn(new GravitinoMetalake[0]).when(fixture.client).listMetalakes();
+
+    manager.loadMetalakeSync();
+
+    // The whole metalake is gone but the catalog is still registered in Trino: pruning the
+    // metalake's state must not take the failure it just recorded with it.
+    assertTrue(manager.catalogConnectorExist("memory"));
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.FAILED, state.getStatus());
+    assertTrue(state.getLastError().contains("The metalake was removed"));
+  }
+
+  @Test
   public void testReloadFailureAfterUnregisterIsRecordedAsFailed() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
