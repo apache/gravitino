@@ -27,6 +27,12 @@ import org.apache.gravitino.Namespace;
 import org.apache.gravitino.meta.BaseMetalake;
 import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.meta.FilesetEntity;
+<<<<<<< HEAD
+=======
+import org.apache.gravitino.meta.FunctionEntity;
+import org.apache.gravitino.meta.JobEntity;
+import org.apache.gravitino.meta.JobTemplateEntity;
+>>>>>>> 37f9d23c8 ([#12871] fix(authz): Invalidate function grants after drop (#12873))
 import org.apache.gravitino.meta.ModelEntity;
 import org.apache.gravitino.meta.SchemaEntity;
 import org.apache.gravitino.meta.TableEntity;
@@ -191,6 +197,91 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
   }
 
   @TestTemplate
+<<<<<<< HEAD
+=======
+  void testEntityAndChangeLogRollbackTogether() throws IOException {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    long maxIdBeforeUpdate = maxEntityChangeId();
+
+    SessionUtils.beginTransaction();
+    try {
+      backend.update(
+          catalog.nameIdentifier(),
+          Entity.EntityType.CATALOG,
+          entity ->
+              createCatalog(
+                  catalog.id(), catalog.namespace(), CATALOG_NAME + "_rolled_back", AUDIT_INFO));
+    } finally {
+      SessionUtils.rollbackTransaction();
+    }
+
+    CatalogEntity persistedCatalog =
+        backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertEquals(CATALOG_NAME, persistedCatalog.name());
+    Assertions.assertEquals(maxIdBeforeUpdate, maxEntityChangeId());
+  }
+
+  @TestTemplate
+  void testEntityMutationsRollBackWhenChangeLogInsertFails() throws Exception {
+    createAndInsertMakeLake(METALAKE_NAME);
+    CatalogEntity catalog = createAndInsertCatalog(METALAKE_NAME, CATALOG_NAME);
+    createAndInsertSchema(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function_rolled_back",
+            AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    long maxIdBeforeUpdate = maxEntityChangeId();
+
+    // Take the change-log table away so that each metadata mutation succeeds first and its
+    // change-log insert then fails inside the same transaction.
+    renameTable("entity_change_log", "entity_change_log_bak");
+    try {
+      Assertions.assertThrows(
+          Exception.class,
+          () ->
+              backend.update(
+                  catalog.nameIdentifier(),
+                  Entity.EntityType.CATALOG,
+                  entity ->
+                      createCatalog(
+                          catalog.id(),
+                          catalog.namespace(),
+                          CATALOG_NAME + "_rolled_back",
+                          AUDIT_INFO)));
+      Assertions.assertThrows(
+          Exception.class,
+          () ->
+              backend.delete(
+                  function.nameIdentifier(), Entity.EntityType.FUNCTION, false /* cascade */));
+    } finally {
+      renameTable("entity_change_log_bak", "entity_change_log");
+    }
+
+    // Neither mutation may survive a failed change-log write.
+    CatalogEntity persistedCatalog =
+        backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
+    Assertions.assertEquals(CATALOG_NAME, persistedCatalog.name());
+    FunctionEntity persistedFunction =
+        FunctionMetaService.getInstance().getFunctionByIdentifier(function.nameIdentifier());
+    Assertions.assertEquals(function.id(), persistedFunction.id());
+    Assertions.assertEquals(maxIdBeforeUpdate, maxEntityChangeId());
+  }
+
+  private void renameTable(String from, String to) throws SQLException {
+    try (SqlSession session =
+            SqlSessionFactoryHelper.getInstance().getSqlSessionFactory().openSession(true);
+        Connection connection = session.getConnection();
+        Statement statement = connection.createStatement()) {
+      statement.execute(String.format("ALTER TABLE %s RENAME TO %s", from, to));
+    }
+  }
+
+  @TestTemplate
+>>>>>>> 37f9d23c8 ([#12871] fix(authz): Invalidate function grants after drop (#12873))
   void testLeafEntityChangeLogOnRenameAndDrop() throws IOException {
     createParentEntities(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, AUDIT_INFO);
     Namespace namespace = Namespace.of(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME);
@@ -360,6 +451,24 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
         METALAKE_NAME,
         Entity.EntityType.MODEL,
         NameIdentifierUtil.ofModel(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "model2").toString(),
+        OperateType.DROP);
+
+    FunctionEntity function =
+        createFunctionEntity(
+            RandomIdGenerator.INSTANCE.nextId(),
+            NamespaceUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME),
+            "function1",
+            AUDIT_INFO);
+    FunctionMetaService.getInstance().insertFunction(function, false);
+    long maxIdBeforeFunctionDrop = maxEntityChangeId();
+    Assertions.assertTrue(
+        backend.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION, false /* cascade */));
+    assertEntityChange(
+        maxIdBeforeFunctionDrop,
+        METALAKE_NAME,
+        Entity.EntityType.FUNCTION,
+        NameIdentifierUtil.ofFunction(METALAKE_NAME, CATALOG_NAME, SCHEMA_NAME, "function1")
+            .toString(),
         OperateType.DROP);
   }
 }
