@@ -152,16 +152,21 @@ public class TestGravitinoConnectorFactoryStart {
   }
 
   @Test
-  public void testStartIsAttemptedOnlyOnce() {
+  public void testFailedStartIsDiscardedAndCanRecover() {
     CoordinatorFactory factory = newFactory();
 
     Map<String, String> brokenConfig = staticConfig();
     brokenConfig.put("catalog.config-dir", "/not/exists/catalog");
     assertThrows(Exception.class, () -> factory.create("gravitino", brokenConfig, mockContext()));
 
-    // Everything that makes start() fail is a configuration error, so the next create() must not
-    // try again: a second init() would open another connection and abandon the first one.
-    assertNotNull(factory.create("gravitino", brokenConfig, mockContext()));
+    // The half-started manager is dropped along with its JDBC connection and executor, so the
+    // next create() neither hands out a connector without a load loop nor leaks the first
+    // attempt's resources.
+    assertNull(factory.getCatalogConnectorManager());
+    assertFalse(factory.isCatalogConnectorManagerStartTriggered());
+
+    // The failure is a configuration error, so it is the fixed configuration that recovers it.
+    assertNotNull(factory.create("gravitino", staticConfig(), mockContext()));
     assertTrue(factory.isCatalogConnectorManagerStartTriggered());
   }
 

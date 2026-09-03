@@ -18,7 +18,9 @@
  */
 package org.apache.gravitino.trino.connector;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -30,30 +32,45 @@ import io.trino.spi.Node;
 import io.trino.spi.NodeManager;
 import io.trino.spi.TrinoException;
 import io.trino.spi.connector.ConnectorContext;
+import java.nio.file.Path;
 import java.util.Map;
 import org.apache.gravitino.client.GravitinoAdminClient;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 public class TestGravitinoConnectorFactoryInit {
 
+  @TempDir private static Path catalogStoreDir;
+
+  private static Map<String, String> config(String catalogStoreDirectory) {
+    return ImmutableMap.of(
+        "gravitino.uri", "http://127.0.0.1:8090",
+        "gravitino.metalake", "test",
+        "gravitino.trino.skip-version-validation", "true",
+        "catalog.config-dir", catalogStoreDirectory,
+        "discovery.uri", "http://127.0.0.1:8080");
+  }
+
   @Test
-  public void testFailedStartIsNotRetriedOnTheNextCreate() {
+  public void testFailedStartIsDiscardedAndCanRecover() {
     GravitinoConnectorFactory factory =
         new GravitinoConnectorFactory(mock(GravitinoAdminClient.class));
-    Map<String, String> config =
-        ImmutableMap.of(
-            "gravitino.uri", "http://127.0.0.1:8090",
-            "gravitino.metalake", "test",
-            "gravitino.trino.skip-version-validation", "true",
-            // Makes CatalogRegister.init() fail, so the whole initialization fails.
-            "catalog.config-dir", "/nonexistent-gravitino-catalog-dir",
-            "discovery.uri", "http://127.0.0.1:8080");
 
-    assertThrows(TrinoException.class, () -> factory.create("gravitino", config, mockContext()));
+    // A catalog store directory that does not exist makes CatalogRegister.init() fail, so the
+    // whole initialization fails.
+    assertThrows(
+        TrinoException.class,
+        () ->
+            factory.create(
+                "gravitino", config("/nonexistent-gravitino-catalog-dir"), mockContext()));
 
-    // Everything that makes start() fail is a configuration error, so the next create() must not
-    // try again: a second init() would open another connection and abandon the first one.
-    assertDoesNotThrow(() -> factory.create("gravitino", config, mockContext()));
+    // The half-started manager must not stay published: a connector handed out afterwards would
+    // run against a load loop that never started.
+    assertNull(factory.getCatalogConnectorManager());
+    assertFalse(factory.isCatalogConnectorManagerStartTriggered());
+
+    // Once the configuration is fixed, the next create() starts over and succeeds.
+    assertNotNull(factory.create("gravitino", config(catalogStoreDir.toString()), mockContext()));
     assertTrue(factory.isCatalogConnectorManagerStartTriggered());
   }
 
