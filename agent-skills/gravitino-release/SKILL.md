@@ -341,6 +341,18 @@ export MOCK_STAGE_DELAY=180   # stage sleeps 3 minutes before completing
 
 ---
 
+### OpenAPI bundles
+
+Stage 1 automatically regenerates `docs/open-api/default/openapi.json` and `openapi.yaml` after
+updating the OpenAPI source to the release version and before creating the release commit and tag.
+This ensures that the tagged bundles contain the same version and content as the tagged OpenAPI
+source.
+
+When preparing a tag without the release script, run `./gradlew :docs:bundleOpenApi` after setting
+the release version, then commit both generated files with the source changes.
+
+---
+
 ### Stage 1: tag
 
 **Command:**
@@ -353,6 +365,7 @@ export MOCK_STAGE_DELAY=180   # stage sleeps 3 minutes before completing
 **What it does:**
 - Clones the repo from gitbox.apache.org
 - Updates version in: `gradle.properties`, `clients/client-python/setup.py`, `clients/filesystem-fuse/Cargo.toml`, all three Helm charts (`Chart.yaml` + `values.yaml`), `mcp-server/pyproject.toml`
+- Regenerates both committed OpenAPI bundles after updating the OpenAPI source version
 - Commits and creates git tag `v{VERSION}-rc{RC}`
 - Bumps all files to next SNAPSHOT version, commits and pushes both
 
