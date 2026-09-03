@@ -31,6 +31,8 @@ import org.apache.gravitino.rel.types.Types.DecimalType;
 import org.apache.gravitino.rel.types.Types.DoubleType;
 import org.apache.gravitino.rel.types.Types.FixedCharType;
 import org.apache.gravitino.rel.types.Types.FloatType;
+import org.apache.gravitino.rel.types.Types.GeographyType;
+import org.apache.gravitino.rel.types.Types.GeometryType;
 import org.apache.gravitino.rel.types.Types.IntegerType;
 import org.apache.gravitino.rel.types.Types.ListType;
 import org.apache.gravitino.rel.types.Types.LongType;
@@ -42,6 +44,7 @@ import org.apache.gravitino.rel.types.Types.StructType;
 import org.apache.gravitino.rel.types.Types.TimestampType;
 import org.apache.gravitino.rel.types.Types.UUIDType;
 import org.apache.gravitino.rel.types.Types.VarCharType;
+import org.apache.gravitino.rel.types.Types.VariantType;
 import org.apache.spark.sql.types.CharType;
 import org.apache.spark.sql.types.DataType;
 import org.apache.spark.sql.types.DataTypes;
@@ -84,8 +87,6 @@ public class TestSparkTypeConverter {
         MapType.of(IntegerType.get(), StringType.get(), true),
         DataTypes.createMapType(DataTypes.IntegerType, DataTypes.StringType));
     gravitinoToSparkTypeMapper.put(createGravitinoStructType(), createSparkStructType());
-    gravitinoToSparkTypeMapper.put(NullType.get(), DataTypes.NullType);
-
     this.sparkTypeConverter = new SparkTypeConverter();
   }
 
@@ -115,6 +116,68 @@ public class TestSparkTypeConverter {
             Assertions.assertThrowsExactly(
                 UnsupportedOperationException.class,
                 () -> sparkTypeConverter.toGravitinoType(sparkType)));
+  }
+
+  @Test
+  void testRejectNanosecondTimestampWithTimeZone() {
+    Assertions.assertEquals(
+        DataTypes.TimestampType, sparkTypeConverter.toSparkType(TimestampType.withTimeZone()));
+    Assertions.assertEquals(
+        DataTypes.TimestampType, sparkTypeConverter.toSparkType(TimestampType.withTimeZone(6)));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> sparkTypeConverter.toSparkType(TimestampType.withTimeZone(9)));
+    Assertions.assertTrue(exception.getMessage().contains("timestamp_tz(9)"));
+  }
+
+  @Test
+  void testRejectVariant() {
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> sparkTypeConverter.toSparkType(VariantType.get()));
+    Assertions.assertTrue(exception.getMessage().contains("variant"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> sparkTypeConverter.toSparkType(ListType.of(VariantType.get(), true)));
+  }
+
+  @Test
+  void testRejectUnknownWithoutVersionSpecificIcebergSupport() {
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class, () -> sparkTypeConverter.toSparkType(NullType.get()));
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> sparkTypeConverter.toGravitinoType(DataTypes.NullType));
+  }
+
+  @Test
+  void testRejectGeometry() {
+    GeometryType geometry = GeometryType.of("EPSG:3857");
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class, () -> sparkTypeConverter.toSparkType(geometry));
+    Assertions.assertTrue(exception.getMessage().contains("geometry"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> sparkTypeConverter.toSparkType(ListType.of(geometry, true)));
+  }
+
+  @Test
+  void testRejectGeography() {
+    GeographyType geography = GeographyType.of("EPSG:4326", "karney");
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class, () -> sparkTypeConverter.toSparkType(geography));
+    Assertions.assertTrue(exception.getMessage().contains("geography"));
+
+    Assertions.assertThrowsExactly(
+        IllegalArgumentException.class,
+        () -> sparkTypeConverter.toSparkType(ListType.of(geography, true)));
   }
 
   /** Create a Gravitino StructType for testing. */

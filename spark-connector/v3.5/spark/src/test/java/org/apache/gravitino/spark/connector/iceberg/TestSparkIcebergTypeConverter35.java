@@ -18,19 +18,22 @@
  */
 package org.apache.gravitino.spark.connector.iceberg;
 
-import org.apache.gravitino.spark.connector.SparkTableChangeConverter;
-import org.apache.gravitino.spark.connector.SparkTableChangeConverter34;
-import org.apache.gravitino.spark.connector.SparkTypeConverter;
+import org.apache.gravitino.rel.types.Types.NullType;
+import org.apache.iceberg.spark.SparkSchemaUtil;
+import org.apache.iceberg.types.Types.UnknownType;
+import org.apache.spark.sql.types.DataTypes;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Test;
 
-public class GravitinoIcebergCatalogSpark34 extends GravitinoIcebergCatalog {
-  @Override
-  protected SparkTypeConverter getSparkTypeConverter() {
-    return new SparkIcebergTypeConverter34();
-  }
+public class TestSparkIcebergTypeConverter35 {
 
-  @Override
-  protected SparkTableChangeConverter getSparkTableChangeConverter(
-      SparkTypeConverter sparkTypeConverter) {
-    return new SparkTableChangeConverter34(sparkTypeConverter);
+  @Test
+  void testPinnedIcebergUnknownTypeRoundTrip() {
+    SparkIcebergTypeConverter34 converter = new SparkIcebergTypeConverter34();
+    Assertions.assertEquals(DataTypes.NullType, converter.toSparkType(NullType.get()));
+    Assertions.assertEquals(NullType.get(), converter.toGravitinoType(DataTypes.NullType));
+
+    Assertions.assertInstanceOf(UnknownType.class, SparkSchemaUtil.convert(DataTypes.NullType));
+    Assertions.assertEquals(DataTypes.NullType, SparkSchemaUtil.convert(UnknownType.get()));
   }
 }

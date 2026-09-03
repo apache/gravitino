@@ -20,6 +20,7 @@ package org.apache.gravitino.spark.connector;
 
 import com.google.common.base.Preconditions;
 import org.apache.spark.sql.connector.catalog.TableChange;
+import org.apache.spark.sql.types.NullType;
 
 public class SparkTableChangeConverter {
   private SparkTypeConverter sparkTypeConverter;
@@ -45,6 +46,12 @@ public class SparkTableChangeConverter {
       return org.apache.gravitino.rel.TableChange.removeProperty(removeProperty.property());
     } else if (change instanceof TableChange.AddColumn) {
       TableChange.AddColumn addColumn = (TableChange.AddColumn) change;
+      if (addColumn.dataType() instanceof NullType && !addColumn.isNullable()) {
+        throw new IllegalArgumentException(
+            String.format(
+                "Spark NullType column '%s' must be nullable",
+                String.join(".", addColumn.fieldNames())));
+      }
       return org.apache.gravitino.rel.TableChange.addColumn(
           addColumn.fieldNames(),
           sparkTypeConverter.toGravitinoType(addColumn.dataType()),

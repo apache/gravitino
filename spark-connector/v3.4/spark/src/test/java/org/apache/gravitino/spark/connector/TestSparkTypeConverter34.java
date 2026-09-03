@@ -38,4 +38,17 @@ public class TestSparkTypeConverter34 {
         DataTypes.TimestampNTZType,
         sparkTypeConverter.toSparkType(TimestampType.withoutTimeZone()));
   }
+
+  @Test
+  void testRejectNanosecondTimestampWithoutTimeZone() {
+    Assertions.assertEquals(
+        DataTypes.TimestampNTZType,
+        sparkTypeConverter.toSparkType(TimestampType.withoutTimeZone(6)));
+
+    IllegalArgumentException exception =
+        Assertions.assertThrowsExactly(
+            IllegalArgumentException.class,
+            () -> sparkTypeConverter.toSparkType(TimestampType.withoutTimeZone(9)));
+    Assertions.assertTrue(exception.getMessage().contains("timestamp(9)"));
+  }
 }
