@@ -244,10 +244,12 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
    * <p>The {@code warehouse} query parameter is forwarded when configured, so a remote serving
    * several warehouses returns the endpoint set for the one this catalog federates.
    *
+   * <p>{@code RESTCatalog} already fetched this at init but keeps the endpoint set private, so it
+   * has to be re-fetched here.
+   *
    * @return the remote catalog's config response.
    */
-  @VisibleForTesting
-  ConfigResponse fetchRemoteConfig() {
+  private ConfigResponse fetchRemoteConfig() {
     RESTCatalog restCatalog = (RESTCatalog) getCatalog();
     String warehouse = restCatalog.properties().get(CatalogProperties.WAREHOUSE_LOCATION);
     Map<String, String> queryParams =
