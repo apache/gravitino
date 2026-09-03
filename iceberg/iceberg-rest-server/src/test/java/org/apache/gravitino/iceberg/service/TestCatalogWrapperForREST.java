@@ -36,6 +36,7 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -73,6 +74,7 @@ import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.io.ResolvingFileIO;
 import org.apache.iceberg.io.StorageCredential;
 import org.apache.iceberg.io.SupportsStorageCredentials;
+import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.PlanStatus;
 import org.apache.iceberg.rest.RESTCatalog;
 import org.apache.iceberg.rest.auth.AuthProperties;
@@ -82,6 +84,8 @@ import org.apache.iceberg.rest.requests.ImmutableRegisterTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ConfigResponse;
+import org.apache.iceberg.rest.responses.ConfigResponseParser;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
@@ -1187,6 +1191,197 @@ public class TestCatalogWrapperForREST {
     Assertions.assertTrue(
         FederatedCatalogWrapper.shouldApplyMetadataUpdateAfterBuilder(
             new MetadataUpdate.AssignUUID(UUID.randomUUID().toString())));
+  }
+
+  @Test
+  void testScanPlanSupportedForNonRESTBackend() {
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+
+    // Gravitino plans the scan locally for non-REST backends, so it always supports the endpoint.
+    CatalogWrapperForREST wrapper = new CatalogWrapperForREST("local-catalog", config);
+    Assertions.assertTrue(wrapper.supportsScanPlanOperations());
+  }
+
+  @Test
+  void testScanPlanSupportedWhenRemoteAdvertisesEndpoint() throws Exception {
+    ConfigResponse remoteConfig =
+        ConfigResponse.builder()
+            .withEndpoints(
+                Arrays.asList(Endpoint.V1_LOAD_TABLE, Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN))
+            .build();
+
+    withRemoteConfigServer(
+        remoteConfig,
+        (wrapper, requests) -> Assertions.assertTrue(wrapper.supportsScanPlanOperations()));
+  }
+
+  @Test
+  void testScanPlanUnsupportedWhenRemoteOmitsEndpoint() throws Exception {
+    ConfigResponse remoteConfig =
+        ConfigResponse.builder()
+            .withEndpoints(Arrays.asList(Endpoint.V1_LOAD_TABLE, Endpoint.V1_LIST_TABLES))
+            .build();
+
+    withRemoteConfigServer(
+        remoteConfig,
+        (wrapper, requests) -> Assertions.assertFalse(wrapper.supportsScanPlanOperations()));
+  }
+
+  @Test
+  void testScanPlanUnsupportedWhenRemoteAdvertisesNoEndpoints() throws Exception {
+    // A remote that omits "endpoints" is treated the same way the Iceberg client treats it: as a
+    // catalog whose endpoint set predates scan planning.
+    withRemoteConfigServer(
+        ConfigResponse.builder().build(),
+        (wrapper, requests) -> Assertions.assertFalse(wrapper.supportsScanPlanOperations()));
+  }
+
+  @Test
+  void testScanPlanSupportQueriesRemoteOnlyOnce() throws Exception {
+    ConfigResponse remoteConfig =
+        ConfigResponse.builder()
+            .withEndpoints(Collections.singletonList(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN))
+            .build();
+
+    withRemoteConfigServer(
+        remoteConfig,
+        (wrapper, requests) -> {
+          Assertions.assertTrue(wrapper.supportsScanPlanOperations());
+          Assertions.assertTrue(wrapper.supportsScanPlanOperations());
+          Assertions.assertTrue(wrapper.supportsScanPlanOperations());
+          Assertions.assertEquals(
+              1, requests.size(), "The remote config should be fetched once and then cached");
+        });
+  }
+
+  @Test
+  void testScanPlanSupportForwardsWarehouseToRemote() throws Exception {
+    ConfigResponse remoteConfig =
+        ConfigResponse.builder()
+            .withEndpoints(Collections.singletonList(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN))
+            .build();
+
+    withRemoteConfigServer(
+        remoteConfig,
+        ImmutableMap.of(CatalogProperties.WAREHOUSE_LOCATION, "s3://remote/warehouse"),
+        (wrapper, requests) -> {
+          Assertions.assertTrue(wrapper.supportsScanPlanOperations());
+          Assertions.assertEquals(1, requests.size());
+          Assertions.assertEquals("/v1/config", requests.get(0).path);
+          Assertions.assertEquals(
+              "warehouse=s3%3A%2F%2Fremote%2Fwarehouse", requests.get(0).rawQuery);
+        });
+  }
+
+  @Test
+  void testScanPlanSupportLookupFailureIsNotCached() throws Exception {
+    List<RecordedRequest> requests = Collections.synchronizedList(new ArrayList<>());
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requests.add(
+              new RecordedRequest(
+                  exchange.getRequestURI().getPath(), exchange.getRequestURI().getRawQuery()));
+          // 400 rather than a retryable status, so each lookup is exactly one request and the
+          // assertion below counts lookups rather than the REST client's retry attempts.
+          exchange.sendResponseHeaders(400, -1);
+          exchange.close();
+        });
+    server.start();
+    try {
+      CatalogWrapperForREST wrapper = federatedWrapperFor(server, Collections.emptyMap());
+
+      // A failed lookup must not be cached, so a later call can resolve it once the remote is back.
+      Assertions.assertFalse(wrapper.supportsScanPlanOperations());
+      Assertions.assertFalse(wrapper.supportsScanPlanOperations());
+      Assertions.assertEquals(2, requests.size());
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  private void withRemoteConfigServer(ConfigResponse remoteConfig, RemoteConfigAssertion assertion)
+      throws Exception {
+    withRemoteConfigServer(remoteConfig, Collections.emptyMap(), assertion);
+  }
+
+  /**
+   * Serves {@code remoteConfig} from an embedded {@code /v1/config} endpoint and hands the test a
+   * federated wrapper pointed at it, along with the requests the wrapper made.
+   */
+  private void withRemoteConfigServer(
+      ConfigResponse remoteConfig,
+      Map<String, String> extraCatalogProperties,
+      RemoteConfigAssertion assertion)
+      throws Exception {
+    String responseJson = ConfigResponseParser.toJson(remoteConfig);
+    List<RecordedRequest> requests = Collections.synchronizedList(new ArrayList<>());
+
+    HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
+    server.createContext(
+        "/",
+        exchange -> {
+          requests.add(
+              new RecordedRequest(
+                  exchange.getRequestURI().getPath(), exchange.getRequestURI().getRawQuery()));
+          byte[] body = responseJson.getBytes(StandardCharsets.UTF_8);
+          exchange.getResponseHeaders().add("Content-Type", "application/json");
+          exchange.sendResponseHeaders(200, body.length);
+          try (OutputStream os = exchange.getResponseBody()) {
+            os.write(body);
+          }
+        });
+    server.start();
+    try {
+      assertion.accept(federatedWrapperFor(server, extraCatalogProperties), requests);
+    } finally {
+      server.stop(0);
+    }
+  }
+
+  private CatalogWrapperForREST federatedWrapperFor(
+      HttpServer server, Map<String, String> extraCatalogProperties) {
+    String uri = "http://127.0.0.1:" + server.getAddress().getPort();
+    RESTCatalog restCatalog = mock(RESTCatalog.class);
+    when(restCatalog.name()).thenReturn("upstream");
+    when(restCatalog.properties())
+        .thenReturn(
+            ImmutableMap.<String, String>builder()
+                .put(CatalogProperties.URI, uri)
+                .put(AuthProperties.AUTH_TYPE, AuthProperties.AUTH_TYPE_NONE)
+                .putAll(extraCatalogProperties)
+                .build());
+
+    IcebergConfig config =
+        new IcebergConfig(
+            ImmutableMap.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.WAREHOUSE,
+                "/tmp/warehouse"));
+    return new StaticCatalogWrapperForREST("local", config, restCatalog);
+  }
+
+  @FunctionalInterface
+  private interface RemoteConfigAssertion {
+    void accept(CatalogWrapperForREST wrapper, List<RecordedRequest> requests);
+  }
+
+  private static class RecordedRequest {
+    private final String path;
+    private final String rawQuery;
+
+    RecordedRequest(String path, String rawQuery) {
+      this.path = path;
+      this.rawQuery = rawQuery;
+    }
   }
 
   @Test
