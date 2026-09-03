@@ -57,7 +57,6 @@ import org.apache.iceberg.Table;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.TableProperties;
 import org.apache.iceberg.TableScan;
-import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.ServiceUnavailableException;
@@ -110,14 +109,6 @@ public class CatalogWrapperForREST extends IcebergCatalogWrapper {
   public CatalogWrapperForREST(String catalogName, IcebergConfig config) {
     super(config);
     // To be compatible with old properties
-    Map<String, String> catalogProperties =
-        checkForCompatibility(config.getAllConfig(), deprecatedProperties);
-    this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);
-    this.scanPlanCache = loadScanPlanCache(config);
-  }
-
-  CatalogWrapperForREST(String catalogName, IcebergConfig config, Catalog catalog) {
-    super(config, catalog);
     Map<String, String> catalogProperties =
         checkForCompatibility(config.getAllConfig(), deprecatedProperties);
     this.catalogCredentialManager = new CatalogCredentialManager(catalogName, catalogProperties);

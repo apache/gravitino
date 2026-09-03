@@ -45,6 +45,7 @@ import org.apache.gravitino.exceptions.NoSuchCatalogException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.service.authorization.IcebergRESTServerContext;
+import org.apache.gravitino.meta.CatalogEntity;
 import org.apache.gravitino.secret.SecretBinding;
 import org.apache.gravitino.secret.SecretManager;
 import org.apache.gravitino.secret.SecretMaterial;
@@ -760,8 +761,11 @@ public class TestDynamicIcebergConfigProvider {
 
       @SuppressWarnings("unchecked")
       BaseCatalog<?> baseCatalog = Mockito.mock(BaseCatalog.class);
+      CatalogEntity catalogEntity = Mockito.mock(CatalogEntity.class);
       Mockito.when(baseCatalog.provider()).thenReturn("lakehouse-iceberg");
       Mockito.when(baseCatalog.propertiesWithCredentialProviders()).thenReturn(entityProps);
+      Mockito.when(baseCatalog.entity()).thenReturn(catalogEntity);
+      Mockito.when(catalogEntity.id()).thenReturn(9L);
 
       FieldUtils.writeField(GravitinoEnv.getInstance(), "secretManager", sm, true);
 
@@ -781,6 +785,8 @@ public class TestDynamicIcebergConfigProvider {
       Assertions.assertEquals(
           "root",
           config.get().getIcebergCatalogProperties().get(IcebergConstants.GRAVITINO_JDBC_USER));
+      Assertions.assertEquals(
+          "9", config.get().getIcebergCatalogProperties().get(IcebergConstants.CATALOG_UUID));
     }
   }
 

@@ -16,17 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package org.apache.gravitino.iceberg.common.ops;
+package org.apache.gravitino.connector;
 
-import org.apache.iceberg.catalog.Catalog;
+import org.apache.gravitino.annotation.Evolving;
 
-/** Provides access to the Iceberg catalog backend owned by a Gravitino catalog. */
-public interface IcebergCatalogBackendProvider {
+/** Supports cleanup that must run only when a catalog is permanently dropped. */
+@Evolving
+public interface CatalogDropAware {
 
-  /**
-   * Returns the Iceberg catalog backend used by the Gravitino catalog.
-   *
-   * @return the Iceberg catalog backend
-   */
-  Catalog icebergCatalogBackend();
+  /** Performs cleanup after the catalog metadata has been permanently dropped. */
+  void onCatalogDropped();
 }

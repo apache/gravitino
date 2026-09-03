@@ -30,13 +30,15 @@ import org.apache.gravitino.catalog.lakehouse.iceberg.IcebergConstants;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.cache.SupportsMetadataLocation;
 import org.apache.gravitino.iceberg.common.cache.TableMetadataCache;
+import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.iceberg.TableMetadata;
 import org.apache.iceberg.catalog.Catalog;
+import org.apache.iceberg.catalog.Namespace;
 import org.apache.iceberg.catalog.TableIdentifier;
+import org.apache.iceberg.rest.requests.CreateNamespaceRequest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import org.mockito.Mockito;
 
 public class TestIcebergCatalogWrapper {
 
@@ -60,14 +62,26 @@ public class TestIcebergCatalogWrapper {
   }
 
   @Test
-  public void testCloseShouldNotCloseExternallyManagedCatalog() throws Exception {
-    Catalog catalog =
-        Mockito.mock(Catalog.class, Mockito.withSettings().extraInterfaces(AutoCloseable.class));
-    IcebergCatalogWrapper wrapper = new IcebergCatalogWrapper(new IcebergConfig(Map.of()), catalog);
+  public void testMemoryCatalogSurvivesWrapperClose() throws Exception {
+    String catalogUuid = "catalog-1";
+    IcebergConfig config =
+        new IcebergConfig(
+            Map.of(
+                IcebergConstants.CATALOG_BACKEND,
+                "memory",
+                IcebergConstants.CATALOG_UUID,
+                catalogUuid));
+    IcebergCatalogWrapper firstWrapper = new IcebergCatalogWrapper(config);
+    Catalog firstCatalog = firstWrapper.getCatalog();
+    Namespace namespace = Namespace.of("preserved");
+    firstWrapper.createNamespace(CreateNamespaceRequest.builder().withNamespace(namespace).build());
 
-    wrapper.close();
+    firstWrapper.close();
+    IcebergCatalogWrapper secondWrapper = new IcebergCatalogWrapper(config);
 
-    Mockito.verify((AutoCloseable) catalog, Mockito.never()).close();
+    Assertions.assertSame(firstCatalog, secondWrapper.getCatalog());
+    Assertions.assertTrue(secondWrapper.namespaceExists(namespace));
+    IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
   }
 
   @Test

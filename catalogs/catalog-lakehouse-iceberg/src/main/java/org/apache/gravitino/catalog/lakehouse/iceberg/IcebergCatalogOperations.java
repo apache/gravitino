@@ -31,12 +31,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.Namespace;
 import org.apache.gravitino.SchemaChange;
 import org.apache.gravitino.catalog.lakehouse.iceberg.ops.IcebergCatalogWrapperHelper;
+import org.apache.gravitino.connector.CatalogDropAware;
 import org.apache.gravitino.connector.CatalogInfo;
 import org.apache.gravitino.connector.CatalogOperations;
 import org.apache.gravitino.connector.HasPropertyMetadata;
@@ -53,10 +55,10 @@ import org.apache.gravitino.exceptions.ViewAlreadyExistsException;
 import org.apache.gravitino.iceberg.common.IcebergConfig;
 import org.apache.gravitino.iceberg.common.authentication.AuthenticationConfig;
 import org.apache.gravitino.iceberg.common.authentication.SupportsKerberos;
-import org.apache.gravitino.iceberg.common.ops.IcebergCatalogBackendProvider;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper;
 import org.apache.gravitino.iceberg.common.ops.IcebergCatalogWrapper.IcebergTableChange;
 import org.apache.gravitino.iceberg.common.ops.KerberosAwareIcebergCatalogProxy;
+import org.apache.gravitino.iceberg.common.utils.IcebergCatalogUtil;
 import org.apache.gravitino.iceberg.common.utils.IcebergIdentifierUtils;
 import org.apache.gravitino.meta.AuditInfo;
 import org.apache.gravitino.rel.Column;
@@ -75,7 +77,6 @@ import org.apache.gravitino.rel.indexes.Index;
 import org.apache.gravitino.utils.HierarchicalSchemaUtil;
 import org.apache.gravitino.utils.MapUtils;
 import org.apache.gravitino.utils.PrincipalUtils;
-import org.apache.iceberg.catalog.Catalog;
 import org.apache.iceberg.catalog.TableIdentifier;
 import org.apache.iceberg.exceptions.AlreadyExistsException;
 import org.apache.iceberg.exceptions.NamespaceNotEmptyException;
@@ -94,11 +95,7 @@ import org.slf4j.LoggerFactory;
 
 /** Operations for interacting with an Apache Iceberg catalog in Apache Gravitino. */
 public class IcebergCatalogOperations
-    implements CatalogOperations,
-        SupportsSchemas,
-        TableCatalog,
-        ViewCatalog,
-        IcebergCatalogBackendProvider {
+    implements CatalogOperations, SupportsSchemas, TableCatalog, ViewCatalog, CatalogDropAware {
 
   private static final String ICEBERG_TABLE_DOES_NOT_EXIST_MSG = "Iceberg table does not exist: %s";
 
@@ -106,6 +103,7 @@ public class IcebergCatalogOperations
 
   @VisibleForTesting IcebergCatalogWrapper icebergCatalogWrapper;
 
+  @VisibleForTesting @Nullable String catalogUuid;
   private IcebergCatalogWrapperHelper icebergCatalogWrapperHelper;
   private IcebergViewCatalogOperations icebergViewCatalogOperations;
 
@@ -130,7 +128,8 @@ public class IcebergCatalogOperations
 
     Map<String, String> resultConf = Maps.newHashMap(prefixMap);
     resultConf.putAll(gravitinoConfig);
-    resultConf.put("catalog_uuid", info.id().toString());
+    this.catalogUuid = info.id().toString();
+    resultConf.put(IcebergConstants.CATALOG_UUID, catalogUuid);
     IcebergConfig icebergConfig = new IcebergConfig(resultConf);
 
     IcebergCatalogWrapper rawWrapper = new IcebergCatalogWrapper(icebergConfig);
@@ -161,8 +160,10 @@ public class IcebergCatalogOperations
   }
 
   @Override
-  public Catalog icebergCatalogBackend() {
-    return icebergCatalogWrapper.getCatalog();
+  public void onCatalogDropped() {
+    if (catalogUuid != null) {
+      IcebergCatalogUtil.removeMemoryCatalog(catalogUuid);
+    }
   }
 
   // Maps an Iceberg REST-client exception into Gravitino's taxonomy
