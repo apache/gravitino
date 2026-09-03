@@ -265,6 +265,53 @@ public class AuthorizationExpressionConstants {
               ANY_WRITE_FILESET
                   """;
 
+  /**
+   * Semantic Model list and load. Only Semantic Models the caller can select, modify, or owns are
+   * returned; a metalake or catalog owner, or a schema owner holding USE_CATALOG, sees them all.
+   */
+  public static final String LOAD_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (SEMANTIC_MODEL::OWNER || ANY_SELECT_SEMANTIC_MODEL || ANY_MODIFY_SEMANTIC_MODEL)
+                  """;
+
+  /** Semantic Model creation under a schema. */
+  public static final String CREATE_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && ANY_CREATE_SEMANTIC_MODEL
+                  """;
+
+  /** Semantic Model rename and definition or metadata alteration. */
+  public static final String MODIFY_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA &&
+                  (SEMANTIC_MODEL::OWNER || ANY_MODIFY_SEMANTIC_MODEL)
+                  """;
+
+  /**
+   * Semantic Model drop. Unlike alter, MODIFY_SEMANTIC_MODEL is not enough: a caller who is neither
+   * a metalake, catalog, nor schema owner must own the Semantic Model itself.
+   */
+  public static final String DROP_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && SEMANTIC_MODEL::OWNER
+                  """;
+
+  public static final String FILTER_SEMANTIC_MODEL_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG, SCHEMA, SEMANTIC_MODEL) ||
+                  ANY_SELECT_SEMANTIC_MODEL ||
+                  ANY_MODIFY_SEMANTIC_MODEL
+                  """;
+
   public static final String LOAD_ROLE_AUTHORIZATION_EXPRESSION =
       """
           METALAKE::OWNER || METALAKE::MANAGE_GRANTS

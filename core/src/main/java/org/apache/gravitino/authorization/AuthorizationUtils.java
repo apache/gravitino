@@ -96,7 +96,10 @@ public class AuthorizationUtils {
           MetadataObject.Type.JOB_TEMPLATE,
           MetadataObject.Type.TAG,
           MetadataObject.Type.POLICY,
-          MetadataObject.Type.VIEW);
+          MetadataObject.Type.VIEW,
+          // Semantic models live only in Gravitino, underlying connectors know nothing about
+          // them, so there is no privilege to push down to an authorization plugin.
+          MetadataObject.Type.SEMANTIC_MODEL);
 
   private static final Set<Privilege.Name> FILESET_PRIVILEGES =
       Sets.immutableEnumSet(
@@ -116,6 +119,12 @@ public class AuthorizationUtils {
           Privilege.Name.REGISTER_MODEL,
           Privilege.Name.USE_MODEL,
           Privilege.Name.LINK_MODEL_VERSION);
+
+  private static final Set<Privilege.Name> SEMANTIC_MODEL_PRIVILEGES =
+      Sets.immutableEnumSet(
+          Privilege.Name.CREATE_SEMANTIC_MODEL,
+          Privilege.Name.SELECT_SEMANTIC_MODEL,
+          Privilege.Name.MODIFY_SEMANTIC_MODEL);
 
   private AuthorizationUtils() {}
 
@@ -318,6 +327,10 @@ public class AuthorizationUtils {
 
         if (MODEL_PRIVILEGES.contains(privilege.name())) {
           checkCatalogType(catalogIdent, Catalog.Type.MODEL, privilege);
+        }
+
+        if (SEMANTIC_MODEL_PRIVILEGES.contains(privilege.name())) {
+          checkCatalogType(catalogIdent, Catalog.Type.RELATIONAL, privilege);
         }
       } catch (NoSuchCatalogException ne) {
         throw new NoSuchMetadataObjectException(

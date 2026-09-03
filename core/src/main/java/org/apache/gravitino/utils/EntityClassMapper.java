@@ -35,6 +35,7 @@ import org.apache.gravitino.meta.ModelVersionEntity;
 import org.apache.gravitino.meta.PolicyEntity;
 import org.apache.gravitino.meta.RoleEntity;
 import org.apache.gravitino.meta.SchemaEntity;
+import org.apache.gravitino.meta.SemanticModelEntity;
 import org.apache.gravitino.meta.TableEntity;
 import org.apache.gravitino.meta.TagEntity;
 import org.apache.gravitino.meta.TopicEntity;
@@ -64,6 +65,7 @@ public class EntityClassMapper {
           .put(Entity.EntityType.POLICY, PolicyEntity.class)
           .put(Entity.EntityType.JOB_TEMPLATE, JobTemplateEntity.class)
           .put(Entity.EntityType.JOB, JobEntity.class)
+          .put(Entity.EntityType.SEMANTIC_MODEL, SemanticModelEntity.class)
           .build();
 
   private EntityClassMapper() {}

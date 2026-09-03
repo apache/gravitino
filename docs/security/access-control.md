@@ -88,7 +88,8 @@ Metalake (top level)
 │       ├── Topic
 │       ├── Fileset
 │       ├── Model
-│       └── Function
+│       ├── Function
+│       └── Semantic Model
 ├── Tag
 ├── Policy
 ├── Job Template
@@ -189,6 +190,9 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema              | Register functions in any schema in scope                          |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function    | Read the metadata of, and execute, any function in scope           |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function    | Alter or drop any function in scope                                |
+| `CREATE_SEMANTIC_MODEL` | Metalake, Catalog, Schema           | Create semantic models in any schema in scope                      |
+| `SELECT_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Discover and load the definition of any semantic model in scope |
+| `MODIFY_SEMANTIC_MODEL` | Metalake, Catalog, Schema, Semantic Model | Rename, and alter the definition and metadata of, any semantic model in scope |
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata, and the same pairing
 holds for views, topics, and filesets.
@@ -250,6 +254,7 @@ metalake owner is all of them.
 | Fileset  | `CREATE_FILESET`    | `READ_FILESET` or `WRITE_FILESET`    | `WRITE_FILESET`   | Owner |
 | Model    | `REGISTER_MODEL`    | `USE_MODEL`                          | Owner             | Owner |
 | Function | `REGISTER_FUNCTION` | `EXECUTE_FUNCTION` or `MODIFY_FUNCTION` | `MODIFY_FUNCTION` | Owner |
+| Semantic Model | `CREATE_SEMANTIC_MODEL` | `SELECT_SEMANTIC_MODEL` or `MODIFY_SEMANTIC_MODEL` | `MODIFY_SEMANTIC_MODEL` | Owner |
 
 Table statistics follow the table itself: reading them takes `SELECT_TABLE` or `MODIFY_TABLE`,
 writing them takes `MODIFY_TABLE`. Model versions follow the model: `USE_MODEL` to read, owner to
