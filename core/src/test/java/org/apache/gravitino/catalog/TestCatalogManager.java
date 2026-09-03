@@ -785,7 +785,7 @@ public class TestCatalogManager {
     Mockito.doReturn("cache_race_test_renamed").when(freshCatalogInfo).name();
     Mockito.doReturn(freshCatalog).when(freshWrapper).catalog();
     Mockito.doReturn(true).when(freshWrapper).tryAcquire();
-    Mockito.doReturn(freshCatalogInfo).when(freshWrapper).doWithCredentialOps(any());
+    Mockito.doReturn(freshCatalogInfo).when(freshWrapper).doWithCatalog(any());
 
     AtomicBoolean staleInserted = new AtomicBoolean(false);
     Answer<CatalogManager.CatalogWrapper> insertStaleWrapper =
@@ -1465,6 +1465,9 @@ public class TestCatalogManager {
     ExecutorService executor = Executors.newFixedThreadPool(2);
 
     Mockito.doReturn(wrapper).when(catalogManager).loadCatalogAndWrap(ident);
+    Mockito.doAnswer(invocation -> CatalogTestUtils.unmanagedLease(wrapper))
+        .when(catalogManager)
+        .acquireCatalogLease(ident);
     Mockito.doReturn(catalog).when(wrapper).catalog();
     Mockito.doAnswer(
             invocation -> {

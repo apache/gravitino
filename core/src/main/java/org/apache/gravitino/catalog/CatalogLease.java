@@ -22,15 +22,15 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.gravitino.NameIdentifier;
 import org.apache.gravitino.catalog.CatalogManager.CatalogWrapper;
 import org.apache.gravitino.connector.BaseCatalog;
+import org.apache.gravitino.utils.IsolatedClassLoader;
 
 /**
  * A lease on a {@link CatalogWrapper} held for the duration of one catalog operation.
  *
- * <p>While the lease is held, the wrapper's catalog instance and its {@link
- * org.apache.gravitino.utils.IsolatedClassLoader} stay alive even if the catalog cache evicts the
- * wrapper concurrently (expiry, explicit invalidation, or remote change-log invalidation). The
- * resources are released once the wrapper is retired and its last lease is closed, so an operation
- * can never observe a half-closed catalog.
+ * <p>While the lease is held, the wrapper's catalog instance and its {@link IsolatedClassLoader}
+ * stay alive even if the catalog cache evicts the wrapper concurrently (expiry, explicit
+ * invalidation, or remote change-log invalidation). The resources are released once the wrapper is
+ * retired and its last lease is closed, so an operation can never observe a half-closed catalog.
  *
  * <p>Leases are obtained from {@link CatalogManager#acquireCatalogLease(NameIdentifier)} and must
  * be closed exactly once, ideally with try-with-resources:

@@ -431,6 +431,42 @@ public class TestCatalogWrapperLease {
         0, pool.size(), "a failing close must still release the pooled ClassLoader");
   }
 
+  @Test
+  public void testWrapperCachedWhileClosingIsRetiredByItsCacher() {
+    NameIdentifier ident = createCatalog("cached_while_closing");
+    catalogManager.close();
+
+    // close() snapshots the cache after raising the closed flag, so a wrapper cached by a thread
+    // that was already past that point is invisible to it and must be cleaned up by that thread.
+    CatalogWrapper straggler = Mockito.mock(CatalogWrapper.class);
+    catalogManager.getCatalogCache().put(ident, straggler);
+
+    Assertions.assertThrows(
+        IllegalStateException.class,
+        () -> catalogManager.retireIfClosedConcurrently(ident, straggler));
+
+    Mockito.verify(straggler).retire();
+    Assertions.assertNull(catalogManager.getCatalogCache().getIfPresent(ident));
+  }
+
+  @Test
+  public void testManagerCloseReleasesThePoolEvenIfRetiringAWrapperFails() throws Exception {
+    createCatalog("failing_retire");
+    ClassLoaderPool pool =
+        (ClassLoaderPool) FieldUtils.readField(catalogManager, "classLoaderPool", true);
+
+    CatalogWrapper failingWrapper = Mockito.mock(CatalogWrapper.class);
+    Mockito.doThrow(new RuntimeException("retire failed")).when(failingWrapper).retire();
+    catalogManager.getCatalogCache().put(NameIdentifier.of(METALAKE, "failing"), failingWrapper);
+
+    Assertions.assertDoesNotThrow(() -> catalogManager.close());
+
+    // The cache's removal listener retires the wrapper as well, asynchronously.
+    Mockito.verify(failingWrapper, Mockito.atLeastOnce()).retire();
+    Assertions.assertEquals(
+        0, pool.size(), "a failing retirement must not keep the ClassLoader pool open");
+  }
+
   private NameIdentifier createCatalog(String name) {
     NameIdentifier ident = NameIdentifier.of(METALAKE, name);
     catalogManager.createCatalog(ident, Catalog.Type.RELATIONAL, PROVIDER, "comment", PROPS);

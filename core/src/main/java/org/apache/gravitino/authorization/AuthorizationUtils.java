@@ -25,6 +25,7 @@ import com.google.common.collect.Sets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiConsumer;
@@ -457,15 +458,10 @@ public class AuthorizationUtils {
       Consumer<AuthorizationPlugin> consumer,
       CatalogManager catalogManager,
       NameIdentifier catalogIdent) {
-    catalogManager.doWithCatalog(
-        catalogIdent,
-        catalog -> {
-          AuthorizationPlugin authorizationPlugin = catalog.getAuthorizationPlugin();
-          if (authorizationPlugin != null) {
-            consumer.accept(authorizationPlugin);
-          }
-          return null;
-        });
+    callAuthorizationPluginImpl(
+        (authorizationPlugin, catalogName) -> consumer.accept(authorizationPlugin),
+        catalogManager,
+        catalogIdent);
   }
 
   private static void checkCatalogType(
@@ -482,18 +478,17 @@ public class AuthorizationUtils {
   private static List<NameIdentifier> getMetadataObjectCatalogs(
       String metalake, MetadataObject metadataObject) {
     CatalogManager catalogManager = GravitinoEnv.getInstance().catalogManager();
-    List<NameIdentifier> catalogIdents = Lists.newArrayList();
     if (needApplyAuthorizationPluginAllCatalogs(metadataObject.type())) {
-      NameIdentifier[] catalogs = catalogManager.listCatalogs(Namespace.of(metalake));
-      catalogIdents.addAll(Arrays.asList(catalogs));
-    } else if (needApplyAuthorization(metadataObject.type())) {
-      NameIdentifier catalogIdent =
-          NameIdentifierUtil.getCatalogIdentifier(
-              MetadataObjectUtil.toEntityIdent(metalake, metadataObject));
-      catalogIdents.add(catalogIdent);
+      return Arrays.asList(catalogManager.listCatalogs(Namespace.of(metalake)));
     }
 
-    return catalogIdents;
+    if (needApplyAuthorization(metadataObject.type())) {
+      return Collections.singletonList(
+          NameIdentifierUtil.getCatalogIdentifier(
+              MetadataObjectUtil.toEntityIdent(metalake, metadataObject)));
+    }
+
+    return Collections.emptyList();
   }
 
   // The Hive default schema location is Hive warehouse directory
