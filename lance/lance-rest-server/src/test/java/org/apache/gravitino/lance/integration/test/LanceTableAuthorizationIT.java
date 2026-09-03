@@ -32,7 +32,10 @@ import org.apache.arrow.vector.types.pojo.ArrowType;
 import org.apache.arrow.vector.types.pojo.Field;
 import org.apache.arrow.vector.types.pojo.Schema;
 import org.apache.gravitino.Configs;
+import org.apache.gravitino.MetadataObject;
+import org.apache.gravitino.MetadataObjects;
 import org.apache.gravitino.auth.AuthConstants;
+import org.apache.gravitino.authorization.Owner;
 import org.apache.gravitino.authorization.Privileges;
 import org.apache.gravitino.authorization.SecurableObject;
 import org.apache.gravitino.authorization.SecurableObjects;
@@ -60,11 +63,16 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String READER = "lance_table_authz_reader";
   private static final String PROBER = "lance_table_authz_prober";
   private static final String MUTATOR = "lance_table_authz_mutator";
+  private static final String SCHEMA_OWNER = "lance_table_authz_schema_owner";
+  private static final String LONE_OWNER = "lance_table_authz_lone_owner";
   private static final String CATALOG = "lance_table_authz_catalog";
   private static final String SCHEMA = "lance_table_authz_schema";
   // Tables created by the write tests live in their own schema, so the listing tests keep asserting
   // the exact contents of the read schema whatever order the tests run in.
   private static final String WRITE_SCHEMA = "lance_table_authz_write_schema";
+  // Two schemas owned by users who created nothing in them, to exercise ancestor ownership.
+  private static final String OWNED_SCHEMA = "lance_table_authz_owned_schema";
+  private static final String LONE_SCHEMA = "lance_table_authz_lone_schema";
 
   // The hidden table sorts first so that a listing filtered after pagination rather than before it
   // would return an empty first page instead of the visible table.
@@ -75,6 +83,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
   private static final String MUTABLE_TABLE = "e_mutable_table";
   private static final String DEREGISTER_TABLE = "f_deregister_table";
   private static final String DROP_TABLE = "g_drop_table";
+  private static final String OWNED_SCHEMA_TABLE = "h_owned_schema_table";
+  private static final String LONE_SCHEMA_TABLE = "i_lone_schema_table";
   private static final String DELIMITER = ".";
 
   @TempDir private static Path tempDir;
@@ -96,13 +106,24 @@ public class LanceTableAuthorizationIT extends BaseIT {
     metalake.addUser(READER);
     metalake.addUser(PROBER);
     metalake.addUser(MUTATOR);
+    metalake.addUser(SCHEMA_OWNER);
+    metalake.addUser(LONE_OWNER);
 
     createNamespace(CATALOG);
     createNamespace(id(CATALOG, SCHEMA));
     createNamespace(id(CATALOG, WRITE_SCHEMA));
+    createNamespace(id(CATALOG, OWNED_SCHEMA));
+    createNamespace(id(CATALOG, LONE_SCHEMA));
     registerTable(VISIBLE_TABLE);
     registerTable(HIDDEN_TABLE);
     createTable(WRITE_SCHEMA, MUTABLE_TABLE);
+    // Registered by the admin, so neither owner below owns the table itself.
+    assertStatus(
+        200, register(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, null, location(OWNED_SCHEMA_TABLE)));
+    assertStatus(
+        200, register(ADMIN, LONE_SCHEMA, LONE_SCHEMA_TABLE, null, location(LONE_SCHEMA_TABLE)));
+    setSchemaOwner(metalake, OWNED_SCHEMA, SCHEMA_OWNER);
+    setSchemaOwner(metalake, LONE_SCHEMA, LONE_OWNER);
 
     SecurableObject catalogScope = SecurableObjects.ofCatalog(CATALOG, new ArrayList<>());
     SecurableObject schemaScope =
@@ -141,6 +162,17 @@ public class LanceTableAuthorizationIT extends BaseIT {
                 WRITE_SCHEMA,
                 new ArrayList<>(
                     List.of(Privileges.UseSchema.allow(), Privileges.CreateTable.allow())))));
+
+    // The schema owner holds USE_CATALOG and nothing else: everything below the catalog has to
+    // come from owning the schema. The lone owner holds no role at all, so it owns a schema it
+    // cannot reach.
+    grant(
+        metalake,
+        "lance_table_authz_schema_owner_role",
+        SCHEMA_OWNER,
+        List.of(
+            SecurableObjects.ofCatalog(
+                CATALOG, new ArrayList<>(List.of(Privileges.UseCatalog.allow())))));
 
     // The mutator may change tables it does not own, which must not let it remove them.
     grant(
@@ -269,6 +301,23 @@ public class LanceTableAuthorizationIT extends BaseIT {
   }
 
   @Test
+  public void testSchemaOwnershipRemovesTablesTheOwnerDidNotCreate() throws Exception {
+    // SCHEMA_OWNER_WITH_USE_CATALOG: the admin registered this table, so the only thing the caller
+    // has is ownership of the schema holding it, plus USE_CATALOG.
+    assertStatus(200, table(SCHEMA_OWNER, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, "drop"));
+    assertStatus(404, table(ADMIN, OWNED_SCHEMA, OWNED_SCHEMA_TABLE, "describe"));
+  }
+
+  @Test
+  public void testSchemaOwnershipWithoutUseCatalogRemovesNothing() throws Exception {
+    // Ownership of the schema alone is not enough, the expression also requires USE_CATALOG.
+    assertStatus(403, table(LONE_OWNER, LONE_SCHEMA, LONE_SCHEMA_TABLE, "drop"));
+    assertStatus(403, table(LONE_OWNER, LONE_SCHEMA, LONE_SCHEMA_TABLE, "deregister"));
+    assertStatus(403, dropColumns(LONE_OWNER, LONE_SCHEMA, LONE_SCHEMA_TABLE, "value"));
+    assertStatus(200, table(ADMIN, LONE_SCHEMA, LONE_SCHEMA_TABLE, "describe"));
+  }
+
+  @Test
   public void testMutationConcealsTablesTheCallerMayNotSee() throws Exception {
     // Both are forbidden for the reader, so the endpoint cannot be used to probe for existence.
     HttpResponse<String> denied = table(READER, HIDDEN_TABLE, "deregister");
@@ -281,15 +330,23 @@ public class LanceTableAuthorizationIT extends BaseIT {
 
   private HttpResponse<String> dropColumns(String user, String tableName, String column)
       throws Exception {
+    return dropColumns(user, WRITE_SCHEMA, tableName, column);
+  }
+
+  private HttpResponse<String> dropColumns(
+      String user, String schema, String tableName, String column) throws Exception {
     AlterTableDropColumnsRequest body = new AlterTableDropColumnsRequest();
     body.setColumns(List.of(column));
-    return send(user, "/v1/table/" + id(CATALOG, WRITE_SCHEMA, tableName) + "/drop_columns", body);
+    return send(user, "/v1/table/" + id(CATALOG, schema, tableName) + "/drop_columns", body);
   }
 
   private HttpResponse<String> alterColumns(
       String user, String tableName, String column, String renamedColumn) throws Exception {
     // Sent as raw JSON because the generated request model serializes the rename field in a shape
-    // the server does not accept, which would fail before authorization runs.
+    // the server does not accept, which would fail with a 400 before authorization runs.
+    // TODO: switch back to AlterTableAlterColumnsRequest once the lance-namespace models
+    // serialize `rename` as a plain string, otherwise this test silently stops exercising the
+    // request shape the models produce.
     return sendRaw(
         user,
         "/v1/table/" + id(CATALOG, WRITE_SCHEMA, tableName) + "/alter_columns",
@@ -310,6 +367,12 @@ public class LanceTableAuthorizationIT extends BaseIT {
                 .getTables());
     tables.sort(String::compareTo);
     return tables;
+  }
+
+  private void setSchemaOwner(GravitinoMetalake metalake, String schemaName, String user) {
+    MetadataObject schemaObject =
+        MetadataObjects.of(List.of(CATALOG, schemaName), MetadataObject.Type.SCHEMA);
+    metalake.setOwner(schemaObject, user, Owner.Type.USER);
   }
 
   private void grant(

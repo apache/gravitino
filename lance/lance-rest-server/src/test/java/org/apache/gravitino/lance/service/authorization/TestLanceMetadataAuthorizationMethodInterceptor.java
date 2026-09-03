@@ -35,6 +35,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.HttpHeaders;
 import javax.ws.rs.core.Response;
 import org.aopalliance.intercept.MethodInvocation;
+import org.apache.gravitino.MetadataObject;
 import org.apache.gravitino.UserPrincipal;
 import org.apache.gravitino.authorization.AuthorizationUtils;
 import org.apache.gravitino.authorization.GravitinoAuthorizer;
@@ -439,6 +440,44 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
   }
 
   @Test
+  void testAncestorOwnershipAuthorizesRemoval() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
+
+    // SCHEMA_OWNER_WITH_USE_CATALOG: owning the schema removes tables inside it.
+    ownerOf(MetadataObject.Type.SCHEMA);
+    assertEquals(PROCEEDED, interceptor.invoke(dropTableInvocation(tableId())));
+    assertEquals(PROCEEDED, interceptor.invoke(deregisterTableInvocation(tableId())));
+
+    // ANY(OWNER, METALAKE, CATALOG): owning an ancestor above the schema is enough on its own.
+    ownerOf(MetadataObject.Type.CATALOG);
+    assertEquals(PROCEEDED, interceptor.invoke(dropTableInvocation(tableId())));
+    ownerOf(MetadataObject.Type.METALAKE);
+    assertEquals(PROCEEDED, interceptor.invoke(deregisterTableInvocation(tableId())));
+  }
+
+  @Test
+  void testSchemaOwnershipWithoutUseCatalogCannotRemoveATable() throws Throwable {
+    // SCHEMA::OWNER only counts through SCHEMA_OWNER_WITH_USE_CATALOG, which also requires
+    // USE_CATALOG. Losing access to the catalog therefore withdraws the removal too.
+    allow(Privilege.Name.USE_SCHEMA);
+    ownerOf(MetadataObject.Type.SCHEMA);
+
+    MethodInvocation drop = dropTableInvocation(tableId());
+    assertErrorResponse(interceptor.invoke(drop), Response.Status.FORBIDDEN);
+    verify(drop, never()).proceed();
+  }
+
+  @Test
+  void testAncestorOwnershipAuthorizesColumnMutation() throws Throwable {
+    allow(Privilege.Name.USE_CATALOG, Privilege.Name.USE_SCHEMA);
+
+    ownerOf(MetadataObject.Type.SCHEMA);
+    assertEquals(PROCEEDED, interceptor.invoke(dropColumnsInvocation(tableId())));
+    ownerOf(MetadataObject.Type.CATALOG);
+    assertEquals(PROCEEDED, interceptor.invoke(alterColumnsInvocation(tableId())));
+  }
+
+  @Test
   void testMutationExpressionsRejectIdentifiersOfTheWrongDepth() throws Throwable {
     when(authorizer.isOwner(any(), any(), any(), any())).thenReturn(true);
     allow(Privilege.Name.values());
@@ -568,6 +607,18 @@ class TestLanceMetadataAuthorizationMethodInterceptor {
         LanceNamespaceOperations.class.getMethod(
             "dropNamespace", String.class, String.class, DropNamespaceRequest.class);
     return invocation(method, namespaceId, delimiter, new DropNamespaceRequest());
+  }
+
+  /** Makes the caller the owner of exactly the given metadata levels, and of nothing else. */
+  private void ownerOf(MetadataObject.Type... types) {
+    Set<MetadataObject.Type> owned = Set.of(types);
+    doAnswer(
+            invocation -> {
+              MetadataObject metadataObject = invocation.getArgument(2);
+              return metadataObject != null && owned.contains(metadataObject.type());
+            })
+        .when(authorizer)
+        .isOwner(any(), any(), any(), any());
   }
 
   private void allow(Privilege.Name... privileges) {
