@@ -157,6 +157,24 @@ public class TestGravitinoSystemStatusTables {
   }
 
   @Test
+  public void testLoadStatusTableReportsOnlyItsOwnMetalakeErrors() {
+    CatalogConnectorManager manager = mock(CatalogConnectorManager.class);
+    when(manager.isTrinoStarted()).thenReturn(true);
+    when(manager.getLastLoadAttemptTimeMs()).thenReturn(2000L);
+    when(manager.getLoadOutcome())
+        .thenReturn(new CatalogConnectorManager.LoadOutcome(0L, "1 of 2 metalakes failed", 1L));
+    when(manager.getMetalakeErrors())
+        .thenReturn(Map.of("test", "Connection refused", "dev", "Access Denied"));
+
+    Page page = new GravitinoSystemTableLoadStatus(manager, "test").loadPageData();
+
+    // The loop-wide fields describe the shared load loop, but metalake_errors is narrowed to the
+    // metalake this entry catalog reports on.
+    assertEquals("1 of 2 metalakes failed", varchar(page, 4));
+    assertEquals("{\"test\":\"Connection refused\"}", varchar(page, 5));
+  }
+
+  @Test
   public void testEachFactoryOwnsItsTables() {
     // The registry used to be static, so a second connector in the same JVM took it over and the
     // system tables reported another manager's state. Each factory must now stand alone.

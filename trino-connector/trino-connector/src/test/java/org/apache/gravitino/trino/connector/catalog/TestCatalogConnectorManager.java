@@ -525,6 +525,223 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testRefreshFailureKeepsRegisteredCatalogRegistered() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    // Trino loaded the catalog Gravitino registered, so it is live from now on.
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L));
+
+    Mockito.doThrow(new RESTException("simulated: the server rejected the load"))
+        .when(fixture.metalake)
+        .loadCatalog("memory");
+    manager.loadMetalakeSync();
+
+    // The catalog is still registered and queryable, so a failed refresh must not flip it to
+    // FAILED and hide that it is usable.
+    assertTrue(manager.catalogConnectorExist("memory"));
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, state.getStatus());
+    assertNull(state.getLastError());
+  }
+
+  @Test
+  public void testUnknownCatalogTypeIsRecordedAsUnsupported() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    // The client library cannot map this catalog's type, e.g. DTOConverters.toCatalog throwing
+    // for a type it does not know. That is a "not supported", not a registration failure.
+    Mockito.doThrow(new UnsupportedOperationException("Unsupported catalog type: UNKNOWN"))
+        .when(fixture.metalake)
+        .loadCatalog("memory");
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.UNSUPPORTED, state.getStatus());
+    assertTrue(state.getLastError().contains("Unsupported catalog type"));
+    assertFalse(manager.catalogConnectorExist("memory"));
+  }
+
+  @Test
+  public void testUnchangedCatalogIsNotReRegistered() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    Audit audit = mock(Audit.class);
+    Instant modifiedTime = Instant.ofEpochMilli(1000L);
+    when(audit.createTime()).thenReturn(modifiedTime);
+    when(audit.lastModifiedTime()).thenReturn(modifiedTime);
+    when(catalog.auditInfo()).thenReturn(audit);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    // Trino holds a connector built from the very same version the server reports.
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getCatalog())
+        .thenReturn(
+            new GravitinoCatalog(
+                "test", "memory", "memory", ImmutableMap.of(), modifiedTime.toEpochMilli()));
+    Mockito.clearInvocations(fixture.catalogRegister);
+
+    manager.loadMetalakeSync();
+
+    // Nothing changed, so the connector must be left alone rather than dropped and rebuilt.
+    verify(fixture.catalogRegister, never()).unregisterCatalog(any());
+    verify(fixture.catalogRegister, never()).registerCatalog(any(), any());
+    assertTrue(manager.catalogConnectorExist("memory"));
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, singleState(manager).getStatus());
+  }
+
+  @Test
+  public void testUpdatedCatalogIsReRegistered() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    // Trino holds a connector built from an older version than the one the server reports.
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L));
+    Mockito.clearInvocations(fixture.catalogRegister);
+
+    manager.loadMetalakeSync();
+
+    // The old connector is dropped and the new definition registered in its place.
+    verify(fixture.catalogRegister, times(1)).unregisterCatalog("memory");
+    verify(fixture.catalogRegister, times(1)).registerCatalog(Mockito.eq("memory"), any());
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.REGISTERED, state.getStatus());
+    assertNull(state.getLastError());
+  }
+
+  @Test
+  public void testDeletedCatalogWithConnectorIsRemoved() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+    manager.loadMetalakeSync();
+
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getMetalake()).thenReturn(fixture.metalake);
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L));
+
+    // The catalog is deleted in Gravitino and unregisters cleanly from Trino.
+    Mockito.doReturn(new String[0]).when(fixture.metalake).listCatalogs();
+    manager.loadMetalakeSync();
+
+    verify(fixture.catalogRegister, times(1)).unregisterCatalog("memory");
+    assertFalse(manager.catalogConnectorExist("memory"));
+    assertTrue(manager.getCatalogRegistrationStates().isEmpty());
+    assertNull(manager.getLoadOutcome().getLastError());
+  }
+
+  @Test
+  public void testVanishedMetalakeCleansUpItsConnectors() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
+    fixture.withCatalogs(catalog);
+    CatalogConnectorManager manager =
+        fixture.createManager(ImmutableMap.of("gravitino.use-single-metalake", "false"));
+    manager.loadMetalakeSync();
+
+    CatalogConnectorContext context =
+        manager.createCatalogConnectorContext(
+            "memory", createConnectorConfig(catalogConfigJson("test", "memory")), mockContext());
+    when(context.getMetalake()).thenReturn(fixture.metalake);
+    when(context.getCatalog())
+        .thenReturn(new GravitinoCatalog("test", "memory", "memory", ImmutableMap.of(), 0L));
+    assertTrue(manager.getUsedMetalakes().contains("test"));
+
+    // The metalake is deleted in Gravitino and its catalog unregisters cleanly from Trino.
+    Mockito.doReturn(new GravitinoMetalake[0]).when(fixture.client).listMetalakes();
+    manager.loadMetalakeSync();
+
+    verify(fixture.catalogRegister, times(1)).unregisterCatalog("memory");
+    assertFalse(manager.catalogConnectorExist("memory"));
+    assertTrue(manager.getCatalogRegistrationStates().isEmpty());
+    assertTrue(manager.getMetalakeErrors().isEmpty());
+    // getUsedMetalakes() reads the cached metalake handles, so an empty set is what proves the
+    // deleted metalake was dropped from the cache too.
+    assertTrue(manager.getUsedMetalakes().isEmpty());
+  }
+
+  @Test
+  public void testCatalogStatesAreFilteredPerMetalake() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+
+    // A second metalake loaded by the same manager, which every entry catalog shares.
+    GravitinoMetalake devMetalake = mock(GravitinoMetalake.class);
+    when(devMetalake.name()).thenReturn("dev");
+    Catalog devCatalog = mockCatalog("sandbox", "memory", Catalog.Type.RELATIONAL);
+    Mockito.doReturn(new String[] {"sandbox"}).when(devMetalake).listCatalogs();
+    Mockito.doReturn(devCatalog).when(devMetalake).loadCatalog("sandbox");
+    Mockito.doReturn(new GravitinoMetalake[] {fixture.metalake, devMetalake})
+        .when(fixture.client)
+        .listMetalakes();
+
+    CatalogConnectorManager manager =
+        fixture.createManager(ImmutableMap.of("gravitino.use-single-metalake", "false"));
+    manager.loadMetalakeSync();
+
+    assertEquals(2, manager.getCatalogRegistrationStates().size());
+
+    // Each entry catalog's system tables read through this filter, so it must not leak the other
+    // metalake's rows.
+    List<CatalogRegistrationState> testStates = manager.getCatalogRegistrationStates("test");
+    assertEquals(1, testStates.size());
+    assertEquals("memory", testStates.get(0).getCatalogName());
+    List<CatalogRegistrationState> devStates = manager.getCatalogRegistrationStates("dev");
+    assertEquals(1, devStates.size());
+    assertEquals("sandbox", devStates.get(0).getCatalogName());
+  }
+
+  @Test
+  public void testSkipPatternMatchesQualifiedCatalogName() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    fixture.withCatalogs(mockCatalog("memory", "memory", Catalog.Type.RELATIONAL));
+
+    // In multi metalake mode the catalog is registered under its qualified Trino name, and that
+    // is the name the skip patterns are matched against.
+    CatalogConnectorManager manager =
+        fixture.createManager(
+            ImmutableMap.of(
+                "gravitino.use-single-metalake",
+                "false",
+                "gravitino.trino.skip-catalog-patterns",
+                ".*test\\.memory.*"),
+            // The qualified name Trino sees in multi metalake mode, quotes included.
+            (metalakeName, catalog) -> "\"" + metalakeName + "." + catalog + "\"");
+    assertTrue(manager.skipCatalog(manager.getTrinoCatalogName("test", "memory")));
+
+    manager.loadMetalakeSync();
+
+    CatalogRegistrationState state = singleState(manager);
+    assertEquals(CatalogRegistrationState.Status.SKIPPED, state.getStatus());
+    assertTrue(state.getLastError().contains("skip-catalog-patterns"));
+    verify(fixture.catalogRegister, never()).registerCatalog(any(), any());
+  }
+
+  @Test
   public void testReloadFailureAfterUnregisterIsRecordedAsFailed() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
@@ -890,6 +1107,12 @@ public class TestCatalogConnectorManager {
     }
 
     CatalogConnectorManager createManager(Map<String, String> extraConfig) {
+      return createManager(extraConfig, (metalakeName, catalog) -> catalog);
+    }
+
+    CatalogConnectorManager createManager(
+        Map<String, String> extraConfig,
+        CatalogConnectorManager.TrinoCatalogNameHandler nameHandler) {
       Map<String, String> defaults = new HashMap<>();
       defaults.put("gravitino.uri", "http://127.0.0.1:8090");
       defaults.put("gravitino.metalake", "test");
@@ -897,8 +1120,7 @@ public class TestCatalogConnectorManager {
       defaults.putAll(extraConfig);
       ImmutableMap<String, String> configMap = ImmutableMap.copyOf(defaults);
       CatalogConnectorManager manager =
-          new CatalogConnectorManager(
-              catalogRegister, catalogFactory, (metalakeName, catalog) -> catalog);
+          new CatalogConnectorManager(catalogRegister, catalogFactory, nameHandler);
       manager.config(new GravitinoConfig(configMap), client);
       return manager;
     }
