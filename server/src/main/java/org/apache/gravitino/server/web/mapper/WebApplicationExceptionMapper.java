@@ -39,6 +39,11 @@ import org.eclipse.jetty.http.HttpStatus;
  * ParamExceptionMapper}, {@link NotFoundExceptionMapper}); JAX-RS always prefers the mapper
  * registered for the nearest type in the exception's class hierarchy, so this mapper only applies
  * to every other case in the family.
+ *
+ * <p>Whatever entity {@code exception.getResponse()} may already carry is deliberately not
+ * preserved: every error under {@code /api/*} must be the same {@link ErrorResponse} JSON shape, so
+ * an exception that needs to convey more than a status code should do so through {@link
+ * WebApplicationException#getMessage()}, which this mapper does read.
  */
 @Priority(1)
 public class WebApplicationExceptionMapper implements ExceptionMapper<WebApplicationException> {

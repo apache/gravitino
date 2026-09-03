@@ -30,13 +30,15 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
 /**
- * Integration test verifying that requests Jersey rejects before reaching a resource method
- * (malformed typed parameters, unmatched routes, wrong HTTP methods) return the same structured
- * JSON {@link ErrorResponse} used by every other error on the API, instead of Jetty's default HTML
- * error page.
+ * Integration test verifying that requests rejected before reaching a resource method (malformed
+ * typed parameters, unmatched routes, wrong HTTP methods, an unsupported API version) return the
+ * same structured JSON {@link ErrorResponse} used by every other error on the API, instead of
+ * Jetty's default HTML error page.
  *
- * <p>Jersey handles these cases itself — converting a typed {@code @PathParam}/{@code @QueryParam},
- * matching a route, matching an HTTP method to a resource — before any resource method runs, so the
+ * <p>Most of these cases are handled by Jersey itself — converting a typed
+ * {@code @PathParam}/{@code @QueryParam}, matching a route, matching an HTTP method to a resource —
+ * before any resource method runs. The unsupported-API-version case is rejected earlier still, by
+ * {@code VersioningFilter} before the request ever reaches Jersey. Either way, the
  * metalake/catalog/schema/model in the URL need not actually exist for these failures to occur.
  */
 public class JsonErrorHandlerIT extends BaseIT {
@@ -79,6 +81,23 @@ public class JsonErrorHandlerIT extends BaseIT {
     Assertions.assertEquals(405, response.statusCode());
     assertJsonErrorBody(
         response, ErrorConstants.UNSUPPORTED_OPERATION_CODE, "UnsupportedOperationException");
+  }
+
+  @Test
+  public void testUnsupportedApiVersionReturnsJsonErrorBody() throws Exception {
+    // VersioningFilter rejects an unrecognized API version before the request ever reaches
+    // Jersey, so this is not covered by any JAX-RS ExceptionMapper.
+    HttpRequest request =
+        HttpRequest.newBuilder()
+            .uri(new URI("http://localhost:" + getGravitinoServerPort() + "/api/version"))
+            .header("Accept", "application/vnd.gravitino.v99+json")
+            .GET()
+            .build();
+    HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    Assertions.assertEquals(406, response.statusCode());
+    assertJsonErrorBody(
+        response, ErrorConstants.ILLEGAL_ARGUMENTS_CODE, "IllegalArgumentException");
   }
 
   private HttpResponse<String> sendRequest(String method, String path) throws Exception {
