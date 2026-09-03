@@ -69,6 +69,7 @@ import org.apache.gravitino.listener.FunctionEventDispatcher;
 import org.apache.gravitino.listener.ModelEventDispatcher;
 import org.apache.gravitino.listener.PartitionEventDispatcher;
 import org.apache.gravitino.listener.SchemaEventDispatcher;
+import org.apache.gravitino.listener.SemanticModelEventDispatcher;
 import org.apache.gravitino.listener.StatisticEventDispatcher;
 import org.apache.gravitino.listener.TableEventDispatcher;
 import org.apache.gravitino.listener.TopicEventDispatcher;
@@ -279,6 +280,7 @@ class TestGravitinoEnvMetadataComponents {
           SemanticModelOperationDispatcher.class);
       assertDispatcherChain(
           env.semanticModelDispatcher(),
+          SemanticModelEventDispatcher.class,
           SemanticModelNormalizeDispatcher.class,
           SemanticModelHookDispatcher.class,
           SemanticModelOperationDispatcher.class);
