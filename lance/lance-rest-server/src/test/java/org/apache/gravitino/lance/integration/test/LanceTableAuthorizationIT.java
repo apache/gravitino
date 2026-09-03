@@ -128,6 +128,8 @@ public class LanceTableAuthorizationIT extends BaseIT {
     SecurableObject catalogScope = SecurableObjects.ofCatalog(CATALOG, new ArrayList<>());
     SecurableObject schemaScope =
         SecurableObjects.ofSchema(catalogScope, SCHEMA, new ArrayList<>());
+    SecurableObject writeSchemaScope =
+        SecurableObjects.ofSchema(catalogScope, WRITE_SCHEMA, new ArrayList<>());
 
     // The reader may select exactly one table, so the other one must stay invisible even though
     // the reader can reach the schema holding it.
@@ -143,6 +145,15 @@ public class LanceTableAuthorizationIT extends BaseIT {
             SecurableObjects.ofTable(
                 schemaScope,
                 VISIBLE_TABLE,
+                new ArrayList<>(List.of(Privileges.SelectTable.allow()))),
+            // Read access to the mutable table as well, so that denying a column change to the
+            // reader can only be explained by the missing MODIFY_TABLE and not by the reader
+            // being unable to reach the table at all.
+            SecurableObjects.ofSchema(
+                catalogScope, WRITE_SCHEMA, new ArrayList<>(List.of(Privileges.UseSchema.allow()))),
+            SecurableObjects.ofTable(
+                writeSchemaScope,
+                MUTABLE_TABLE,
                 new ArrayList<>(List.of(Privileges.SelectTable.allow())))));
 
     grant(
@@ -267,7 +278,11 @@ public class LanceTableAuthorizationIT extends BaseIT {
 
   @Test
   public void testColumnMutationRequiresModifyTable() throws Exception {
-    // Selecting a table does not authorize changing its columns.
+    // The reader holds USE_CATALOG, USE_SCHEMA and SELECT_TABLE on this exact table, so it can
+    // read the table. Asserting that first is what makes the denials below evidence that
+    // SELECT_TABLE does not authorize a column change, rather than evidence that the reader
+    // cannot reach the table.
+    assertStatus(200, table(READER, WRITE_SCHEMA, MUTABLE_TABLE, "describe"));
     assertStatus(403, dropColumns(READER, MUTABLE_TABLE, "value"));
     assertStatus(403, alterColumns(READER, MUTABLE_TABLE, "value", "renamed"));
     Assertions.assertEquals(List.of("id", "value"), describedColumns(MUTABLE_TABLE));
