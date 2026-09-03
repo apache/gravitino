@@ -219,6 +219,12 @@ paths:
   /bulk/metalakes/{metalake}/groups/remove:
     $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1groups~1remove"
 
+  /bulk/metalakes/{metalake}/roles/add:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1roles~1add"
+
+  /bulk/metalakes/{metalake}/roles/remove:
+    $ref: "./bulk.yaml#/paths/~1bulk~1metalakes~1%7Bmetalake%7D~1roles~1remove"
+
   /metalakes/{metalake}/owners/{metadataObjectType}/{metadataObjectFullName}:
     $ref: "./owners.yaml#/paths/~1metalakes~1%7Bmetalake%7D~1owners~1%7BmetadataObjectType%7D~1%7BmetadataObjectFullName%7D"
 
