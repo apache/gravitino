@@ -37,6 +37,7 @@ import org.apache.gravitino.exceptions.CatalogAlreadyExistsException;
 import org.apache.gravitino.exceptions.NoSuchMetalakeException;
 import org.apache.gravitino.trino.connector.GravitinoErrorCode;
 import org.apache.gravitino.trino.connector.catalog.CatalogConnectorManager;
+import org.apache.gravitino.trino.connector.catalog.CatalogRegister;
 import org.apache.gravitino.trino.connector.system.table.GravitinoSystemTable;
 
 /**
@@ -114,11 +115,12 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
               catalogName, Catalog.Type.RELATIONAL, provider, "Trino created", properties);
 
       catalogConnectorManager.loadMetalakeSync();
-      if (!catalogConnectorManager.catalogConnectorExist(
-          catalogConnectorManager.getTrinoCatalogName(metalake, catalogName))) {
+      String trinoCatalogName = catalogConnectorManager.getTrinoCatalogName(metalake, catalogName);
+      if (!catalogConnectorManager.catalogConnectorExist(trinoCatalogName)) {
         throw new TrinoException(
             GravitinoErrorCode.GRAVITINO_OPERATION_FAILED,
-            "Create catalog failed due to the loading process fails");
+            "Create catalog failed due to the loading process fails. "
+                + catalogConnectorManager.describeRegistrationFailure(metalake, trinoCatalogName));
       }
 
       LOG.info("Create catalog %s in metalake %s successfully.", catalogName, metalake);
@@ -132,9 +134,14 @@ public class CreateCatalogStoredProcedure extends GravitinoStoredProcedure {
           GravitinoErrorCode.GRAVITINO_CATALOG_ALREADY_EXISTS,
           "Catalog " + NameIdentifier.of(metalake, catalogName) + " already exists in the server.");
     } catch (Exception e) {
+      // The failure can come from a CREATE CATALOG the load loop ran, whose message may carry the
+      // credentials the statement embedded, so it is masked before reaching the caller.
       throw new TrinoException(
           GravitinoErrorCode.GRAVITINO_UNSUPPORTED_OPERATION,
-          "Create catalog failed. " + (StringUtils.isEmpty(e.getMessage()) ? "" : e.getMessage()),
+          "Create catalog failed. "
+              + (StringUtils.isEmpty(e.getMessage())
+                  ? ""
+                  : CatalogRegister.redactSecrets(e.getMessage())),
           e);
     }
   }
