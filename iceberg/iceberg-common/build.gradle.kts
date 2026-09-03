@@ -110,10 +110,14 @@ dependencies {
   compileOnly(libs.lombok)
 
   testImplementation(project(":server-common"))
+  testImplementation(project(":integration-test-common", "testArtifacts"))
   testImplementation(libs.junit.jupiter.api)
   testImplementation(libs.junit.jupiter.params)
   testImplementation(libs.mockito.core)
   testImplementation(libs.sqlite.jdbc)
+  testImplementation(libs.postgresql.driver)
+  testImplementation(libs.testcontainers)
+  testImplementation(libs.testcontainers.postgresql)
 
   testRuntimeOnly(libs.junit.jupiter.engine)
 }
