@@ -24,6 +24,10 @@ Choose the package by your Trino server version first.
 | 452-468              | `trino-connector-452-468` |
 | 469-472              | `trino-connector-469-472` |
 | 473-478              | `trino-connector-473-478` |
+| 479-479              | `trino-connector-479-479` |
+| 480-480              | `trino-connector-480-480` |
+| 481-481              | `trino-connector-481-481` |
+| 482-483              | `trino-connector-482-483` |
 
 For Trino `469`, choose the `trino-connector-469-472` package.
 

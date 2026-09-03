@@ -27,8 +27,12 @@ import io.trino.spi.connector.ConnectorTableHandle;
 import io.trino.spi.connector.ConnectorTransactionHandle;
 import io.trino.spi.connector.DynamicFilter;
 import java.util.List;
+import org.apache.gravitino.trino.connector.util.SpiVersionCompat;
 
 /** This class provides a ConnectorPageSource for Trino read data from internal connector. */
+// Trino 481 deprecates the split-based createPageSource for removal; it is still the only variant
+// available on 435-481. Trino 482 removes it and is handled by a separate version-segment module.
+@SuppressWarnings("removal")
 public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider {
 
   ConnectorPageSourceProvider internalPageSourceProvider;
@@ -42,7 +46,10 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
     this.internalPageSourceProvider = pageSourceProvider;
   }
 
-  @Override
+  // Not annotated @Override: this split-based createPageSource is the SPI method up to Trino 481.
+  // Trino 482 removed it; the 482-483 module supplies the credential/MemoryContext variant instead.
+  // Kept so Trino 435-480 keep reading tables. The outbound call is dispatched reflectively so this
+  // shared source still compiles against the Trino 482 SPI, where the method is never invoked.
   public ConnectorPageSource createPageSource(
       ConnectorTransactionHandle transaction,
       ConnectorSession session,
@@ -50,12 +57,23 @@ public class GravitinoDataSourceProvider implements ConnectorPageSourceProvider 
       ConnectorTableHandle table,
       List<ColumnHandle> columns,
       DynamicFilter dynamicFilter) {
-    return internalPageSourceProvider.createPageSource(
-        GravitinoHandle.unWrap(transaction),
-        session,
-        GravitinoHandle.unWrap(split),
-        GravitinoHandle.unWrap(table),
-        GravitinoHandle.unWrap(columns),
-        new GravitinoDynamicFilter(dynamicFilter));
+    return (ConnectorPageSource)
+        SpiVersionCompat.invoke(
+            internalPageSourceProvider,
+            "createPageSource",
+            new Class<?>[] {
+              ConnectorTransactionHandle.class,
+              ConnectorSession.class,
+              ConnectorSplit.class,
+              ConnectorTableHandle.class,
+              List.class,
+              DynamicFilter.class
+            },
+            GravitinoHandle.unWrap(transaction),
+            session,
+            GravitinoHandle.unWrap(split),
+            GravitinoHandle.unWrap(table),
+            GravitinoHandle.unWrap(columns),
+            new GravitinoDynamicFilter(dynamicFilter));
   }
 }

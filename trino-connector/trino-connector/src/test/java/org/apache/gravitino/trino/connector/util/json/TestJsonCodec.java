@@ -21,7 +21,14 @@ package org.apache.gravitino.trino.connector.util.json;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.trino.FeaturesConfig;
+import io.trino.spi.block.Block;
+import io.trino.spi.block.BlockBuilder;
+import io.trino.spi.block.BlockEncodingSerde;
+import io.trino.spi.type.BigintType;
+import io.trino.spi.type.TypeManager;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -101,5 +108,41 @@ class TestJsonCodec {
             () ->
                 JsonCodec.instantiateBlockEncodingManager(UnresolvableManager.class, CLASS_LOADER))
         .isInstanceOf(NoSuchMethodException.class);
+  }
+
+  /**
+   * Round-trips a Trino {@link Block} (including a null position) through {@link BlockJsonSerde} so
+   * the full serde path is exercised against the real Trino runtime of whichever version-segment
+   * module runs this shared test: the reflective BlockEncodingManager construction, the {@code
+   * BlockSerdeUtil} write/read reflection, and the block null representation. This guards against
+   * silent breakage of the block wire format across supported Trino versions (e.g. Trino 482-483).
+   */
+  @Test
+  void testBlockJsonSerdeRoundTripsBlockWithNull() throws Exception {
+    TypeManager typeManager = JsonCodec.createTypeManager(CLASS_LOADER);
+    BlockEncodingSerde blockEncodingSerde = JsonCodec.createBlockEncodingSerde(typeManager);
+
+    SimpleModule module = new SimpleModule();
+    module.addSerializer(Block.class, new BlockJsonSerde.Serializer(blockEncodingSerde));
+    module.addDeserializer(Block.class, new BlockJsonSerde.Deserializer(blockEncodingSerde));
+    ObjectMapper mapper = new ObjectMapper().registerModule(module);
+
+    // positions: 1, null, 42. Built via the type block builder (portable across Trino versions)
+    // rather than a concrete block constructor, whose null representation changed in Trino 483.
+    BlockBuilder builder = BigintType.BIGINT.createBlockBuilder(null, 3);
+    BigintType.BIGINT.writeLong(builder, 1L);
+    builder.appendNull();
+    BigintType.BIGINT.writeLong(builder, 42L);
+    Block block = builder.build();
+
+    String json = mapper.writeValueAsString(block);
+    Block roundTripped = mapper.readValue(json, Block.class);
+
+    assertThat(roundTripped.getPositionCount()).isEqualTo(3);
+    assertThat(roundTripped.isNull(0)).isFalse();
+    assertThat(roundTripped.isNull(1)).isTrue();
+    assertThat(roundTripped.isNull(2)).isFalse();
+    assertThat(BigintType.BIGINT.getLong(roundTripped, 0)).isEqualTo(1L);
+    assertThat(BigintType.BIGINT.getLong(roundTripped, 2)).isEqualTo(42L);
   }
 }
