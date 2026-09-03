@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.apache.gravitino.credential.CredentialPrivilege;
 import org.apache.gravitino.credential.CredentialPropertyUtils;
@@ -56,6 +57,7 @@ import org.apache.iceberg.exceptions.NoSuchTableException;
 import org.apache.iceberg.inmemory.InMemoryFileIO;
 import org.apache.iceberg.io.FileIO;
 import org.apache.iceberg.rest.CatalogHandlers;
+import org.apache.iceberg.rest.Endpoint;
 import org.apache.iceberg.rest.ErrorHandlers;
 import org.apache.iceberg.rest.HTTPClient;
 import org.apache.iceberg.rest.ParserContext;
@@ -71,6 +73,7 @@ import org.apache.iceberg.rest.requests.CreateTableRequest;
 import org.apache.iceberg.rest.requests.PlanTableScanRequest;
 import org.apache.iceberg.rest.requests.RegisterTableRequest;
 import org.apache.iceberg.rest.requests.UpdateTableRequest;
+import org.apache.iceberg.rest.responses.ConfigResponse;
 import org.apache.iceberg.rest.responses.LoadCredentialsResponse;
 import org.apache.iceberg.rest.responses.LoadTableResponse;
 import org.apache.iceberg.rest.responses.PlanTableScanResponse;
@@ -93,6 +96,13 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
 
   private static final String FORMAT_VERSION = "format-version";
   private static final Schema EMPTY_SCHEMA = new Schema();
+
+  /**
+   * Caches whether the remote catalog advertises the scan-plan endpoint. Only successful lookups
+   * are cached, so a failure to reach the remote can be retried. Races just repeat an idempotent
+   * lookup.
+   */
+  private volatile Boolean remoteSupportsScanPlan;
 
   /**
    * Creates a federated wrapper.
@@ -188,11 +198,110 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
         catalogCredentialManager.catalogName(), tableIdentifier, response);
   }
 
+  /**
+   * Reports whether the remote catalog advertises the scan-plan endpoint, since {@link
+   * #planTableScan} delegates planning to it rather than planning locally.
+   *
+   * <p>The answer comes from the remote catalog's own {@code /v1/config} response and is cached for
+   * the lifetime of this wrapper, so the remote is queried at most once rather than on every local
+   * {@code /v1/config} call.
+   *
+   * <p>A remote that omits {@code endpoints} is treated as not supporting scan planning. That
+   * matches the Iceberg client, which falls back to a default endpoint set that predates scan
+   * planning when the field is absent.
+   *
+   * <p>If the remote cannot be reached the result is not cached and the endpoint is not advertised,
+   * so a later call can still resolve it once the remote recovers. Not advertising is the safe
+   * direction here: the endpoint would fail anyway while the remote is unreachable.
+   *
+   * @return {@code true} if the remote catalog advertises {@code V1_SUBMIT_TABLE_SCAN_PLAN}.
+   */
+  @Override
+  public boolean supportsScanPlanOperations() {
+    Boolean cached = remoteSupportsScanPlan;
+    if (cached != null) {
+      return cached;
+    }
+
+    try {
+      boolean supported =
+          fetchRemoteConfig().endpoints().contains(Endpoint.V1_SUBMIT_TABLE_SCAN_PLAN);
+      remoteSupportsScanPlan = supported;
+      return supported;
+    } catch (Exception e) {
+      LOG.warn(
+          "Failed to read the endpoints advertised by the remote catalog of {}; not advertising the"
+              + " scan plan endpoint",
+          catalogCredentialManager.catalogName(),
+          e);
+      return false;
+    }
+  }
+
+  /**
+   * Fetches the remote catalog's {@code /v1/config} response.
+   *
+   * <p>The {@code warehouse} query parameter is forwarded when configured, so a remote serving
+   * several warehouses returns the endpoint set for the one this catalog federates.
+   *
+   * <p>{@code RESTCatalog} already fetched this at init but keeps the endpoint set private, so it
+   * has to be re-fetched here.
+   *
+   * @return the remote catalog's config response.
+   */
+  private ConfigResponse fetchRemoteConfig() {
+    RESTCatalog restCatalog = (RESTCatalog) getCatalog();
+    String warehouse = restCatalog.properties().get(CatalogProperties.WAREHOUSE_LOCATION);
+    Map<String, String> queryParams =
+        warehouse == null || warehouse.isEmpty()
+            ? Collections.emptyMap()
+            : ImmutableMap.of(CatalogProperties.WAREHOUSE_LOCATION, warehouse);
+
+    return callRemoteCatalog(
+        restCatalog,
+        "reading the remote catalog config",
+        client ->
+            client.get(
+                ResourcePaths.config(),
+                queryParams,
+                ConfigResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.configErrorHandler()));
+  }
+
   private static LoadCredentialsResponse getRESTTableCredentials(
       RESTCatalog restCatalog, TableIdentifier identifier) {
     Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
     String credentialsPath =
         ResourcePaths.forCatalogProperties(properties).table(identifier) + "/credentials";
+
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("loading credentials for table: %s", identifier),
+        client ->
+            client.get(
+                credentialsPath,
+                LoadCredentialsResponse.class,
+                Collections.emptyMap(),
+                ErrorHandlers.tableErrorHandler()));
+  }
+
+  /**
+   * Runs an action against the remote REST catalog through a short-lived authenticated client.
+   *
+   * <p>Centralizes the auth manager, HTTP client and auth session lifecycle shared by the federated
+   * credential, scan-plan and config requests. Resources are closed in reverse order of creation,
+   * and a close failure on one does not prevent the others from being closed.
+   *
+   * @param restCatalog the underlying REST catalog whose properties supply the URI and auth config.
+   * @param description what the action is doing, used in close-failure log messages.
+   * @param action invoked with a client bound to an authenticated session.
+   * @param <T> the action's result type.
+   * @return the action's result.
+   */
+  private static <T> T callRemoteCatalog(
+      RESTCatalog restCatalog, String description, Function<RESTClient, T> action) {
+    Map<String, String> properties = Maps.newHashMap(restCatalog.properties());
 
     AuthManager authManager = null;
     RESTClient client = null;
@@ -205,40 +314,24 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
               .withHeaders(RESTUtil.configHeaders(properties))
               .build();
       authSession = authManager.catalogSession(client, properties);
-      return client
-          .withAuthSession(authSession)
-          .get(
-              credentialsPath,
-              LoadCredentialsResponse.class,
-              Collections.emptyMap(),
-              ErrorHandlers.tableErrorHandler());
+      return action.apply(client.withAuthSession(authSession));
     } finally {
-      if (authSession != null) {
-        try {
-          authSession.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth session when loading credentials for table: {}", identifier, e);
-        }
-      }
+      closeQuietly(authSession, "auth session", description);
+      closeQuietly(client, "REST client", description);
+      closeQuietly(authManager, "auth manager", description);
+    }
+  }
 
-      if (client != null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close REST client when loading credentials for table: {}", identifier, e);
-        }
-      }
+  private static void closeQuietly(
+      AutoCloseable closeable, String resourceName, String description) {
+    if (closeable == null) {
+      return;
+    }
 
-      if (authManager != null) {
-        try {
-          authManager.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth manager when loading credentials for table: {}", identifier, e);
-        }
-      }
+    try {
+      closeable.close();
+    } catch (Exception e) {
+      LOG.warn("Failed to close {} when {}", resourceName, description, e);
     }
   }
 
@@ -280,55 +373,18 @@ public class FederatedCatalogWrapper extends CatalogWrapperForREST {
             .add("caseSensitive", scanRequest.caseSensitive())
             .build();
 
-    AuthManager authManager = null;
-    RESTClient client = null;
-    AuthSession authSession = null;
-    try {
-      authManager = AuthManagers.loadAuthManager(restCatalog.name(), properties);
-      client =
-          HTTPClient.builder(properties)
-              .uri(properties.get(CatalogProperties.URI))
-              .withHeaders(RESTUtil.configHeaders(properties))
-              .build();
-      authSession = authManager.catalogSession(client, properties);
-      return client
-          .withAuthSession(authSession)
-          .post(
-              planPath,
-              scanRequest,
-              PlanTableScanResponse.class,
-              headers,
-              ErrorHandlers.planErrorHandler(),
-              ignored -> {},
-              parserContext);
-    } finally {
-      if (authSession != null) {
-        try {
-          authSession.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth session when planning table scan for table: {}", identifier, e);
-        }
-      }
-
-      if (client != null) {
-        try {
-          client.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close REST client when planning table scan for table: {}", identifier, e);
-        }
-      }
-
-      if (authManager != null) {
-        try {
-          authManager.close();
-        } catch (Exception e) {
-          LOG.warn(
-              "Failed to close auth manager when planning table scan for table: {}", identifier, e);
-        }
-      }
-    }
+    return callRemoteCatalog(
+        restCatalog,
+        String.format("planning table scan for table: %s", identifier),
+        client ->
+            client.post(
+                planPath,
+                scanRequest,
+                PlanTableScanResponse.class,
+                headers,
+                ErrorHandlers.planErrorHandler(),
+                ignored -> {},
+                parserContext));
   }
 
   /**
