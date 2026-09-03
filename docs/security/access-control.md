@@ -165,7 +165,6 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 
 ### Data Object Privileges
 
-<<<<<<< HEAD
 | Privilege            | Grantable On                        | What It Allows                                                     |
 |----------------------|-------------------------------------|--------------------------------------------------------------------|
 | `CREATE_CATALOG`     | Metalake                            | Create catalogs                                                    |
@@ -176,7 +175,7 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `SELECT_TABLE`       | Metalake, Catalog, Schema, Table    | Read any table in scope                                            |
 | `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table    | Read and write to, and alter the schema of, any table in scope     |
 | `CREATE_VIEW`        | Metalake, Catalog, Schema           | Create views in any schema in scope                                |
-| `SELECT_VIEW`        | Metalake, Catalog, Schema, View     | Read any view in scope                                             |
+| `SELECT_VIEW`        | Metalake, Catalog, Schema, View     | Read view metadata in scope                                        |
 | `CREATE_TOPIC`       | Metalake, Catalog, Schema           | Create topics in any schema in scope                               |
 | `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic    | Consume from any topic in scope                                    |
 | `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic    | Consume from, produce to, and alter any topic in scope             |
@@ -189,32 +188,6 @@ sets the scope of the grant. Binding a privilege to a type not listed for it is 
 | `REGISTER_FUNCTION`  | Metalake, Catalog, Schema           | Register functions in any schema in scope                          |
 | `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function | Read the metadata of, and execute, any function in scope           |
 | `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function | Alter or drop any function in scope                                |
-=======
-| Privilege            | Grantable On                           | What It Allows                                                     |
-|----------------------|----------------------------------------|--------------------------------------------------------------------|
-| `CREATE_CATALOG`     | Metalake                               | Create catalogs                                                    |
-| `USE_CATALOG`        | Metalake, Catalog                      | Use any catalog in scope, and reach the objects inside it          |
-| `CREATE_SCHEMA`      | Metalake, Catalog, Schema              | Create schemas or nested schemas in scope                          |
-| `USE_SCHEMA`         | Metalake, Catalog, Schema              | Use any schema in scope, and reach the objects inside it           |
-| `CREATE_TABLE`       | Metalake, Catalog, Schema              | Create tables in any schema in scope                               |
-| `PROBE_TABLE_LIKE`   | Metalake, Catalog, Schema, Table, View | Probe whether a table-like object exists without reading its data  |
-| `SELECT_TABLE`       | Metalake, Catalog, Schema, Table       | Read any table in scope                                            |
-| `MODIFY_TABLE`       | Metalake, Catalog, Schema, Table       | Read and write to, and alter the schema of, any table in scope     |
-| `CREATE_VIEW`        | Metalake, Catalog, Schema              | Create views in any schema in scope                                |
-| `SELECT_VIEW`        | Metalake, Catalog, Schema, View        | Read view metadata in scope                                        |
-| `CREATE_TOPIC`       | Metalake, Catalog, Schema              | Create topics in any schema in scope                               |
-| `CONSUME_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from any topic in scope                                    |
-| `PRODUCE_TOPIC`      | Metalake, Catalog, Schema, Topic       | Consume from, produce to, and alter any topic in scope             |
-| `CREATE_FILESET`     | Metalake, Catalog, Schema              | Create filesets in any schema in scope                             |
-| `READ_FILESET`       | Metalake, Catalog, Schema, Fileset     | Read any fileset in scope                                          |
-| `WRITE_FILESET`      | Metalake, Catalog, Schema, Fileset     | Read, write, and alter any fileset in scope                        |
-| `REGISTER_MODEL`     | Metalake, Catalog, Schema              | Register models in any schema in scope                             |
-| `LINK_MODEL_VERSION` | Metalake, Catalog, Schema, Model       | Link versions to any model in scope                                |
-| `USE_MODEL`          | Metalake, Catalog, Schema, Model       | Read the metadata of, and download versions of, any model in scope |
-| `REGISTER_FUNCTION`  | Metalake, Catalog, Schema              | Register functions in any schema in scope                          |
-| `EXECUTE_FUNCTION`   | Metalake, Catalog, Schema, Function    | Read the metadata of, and execute, any function in scope           |
-| `MODIFY_FUNCTION`    | Metalake, Catalog, Schema, Function    | Alter or drop any function in scope                                |
->>>>>>> 7da9b6fe6 ([#12729] fix(authz): Authorize generic view operations (#12797))
 
 Either `SELECT_TABLE` or `MODIFY_TABLE` is enough to load a table's metadata. Topics and filesets
 have similar read/write privilege pairs. Views do not have a modify privilege: `SELECT_VIEW` reads
