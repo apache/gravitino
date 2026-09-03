@@ -273,13 +273,14 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
                           AUDIT_INFO)));
       Assertions.assertThrows(
           Exception.class,
-          () -> FunctionMetaService.getInstance().deleteFunction(function.nameIdentifier()));
+          () ->
+              backend.delete(
+                  function.nameIdentifier(), Entity.EntityType.FUNCTION, false /* cascade */));
     } finally {
       renameTable("entity_change_log_bak", "entity_change_log");
     }
 
-    // Neither the Entity Store mutation nor the manually logged function mutation may survive a
-    // failed change-log write.
+    // Neither mutation may survive a failed change-log write.
     CatalogEntity persistedCatalog =
         backend.get(catalog.nameIdentifier(), Entity.EntityType.CATALOG);
     Assertions.assertEquals(CATALOG_NAME, persistedCatalog.name());
@@ -488,7 +489,7 @@ public class TestEntityChangeLogService extends TestJDBCBackend {
     FunctionMetaService.getInstance().insertFunction(function, false);
     long maxIdBeforeFunctionDrop = maxEntityChangeId();
     Assertions.assertTrue(
-        FunctionMetaService.getInstance().deleteFunction(function.nameIdentifier()));
+        backend.delete(function.nameIdentifier(), Entity.EntityType.FUNCTION, false /* cascade */));
     assertEntityChange(
         maxIdBeforeFunctionDrop,
         METALAKE_NAME,
