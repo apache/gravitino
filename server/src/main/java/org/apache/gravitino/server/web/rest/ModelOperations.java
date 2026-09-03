@@ -172,12 +172,17 @@ public class ModelOperations {
       @PathParam("catalog") @AuthorizationMetadata(type = Entity.EntityType.CATALOG) String catalog,
       @PathParam("schema") @AuthorizationMetadata(type = Entity.EntityType.SCHEMA) String schema,
       ModelRegisterRequest request) {
-    LOG.info(
-        "Received register model request: {}.{}.{}.{}",
-        metalake,
-        catalog,
-        schema,
-        request.getName());
+    if (request == null) {
+      LOG.warn("Received register model request with null request body");
+      return ExceptionHandlers.handleModelException(
+          OperationType.REGISTER,
+          "",
+          schema,
+          new IllegalArgumentException("Request body cannot be null"));
+    }
+
+    String modelName = request.getName();
+    LOG.info("Received register model request: {}.{}.{}.{}", metalake, catalog, schema, modelName);
 
     try {
       return Utils.doAs(
@@ -194,8 +199,7 @@ public class ModelOperations {
           });
 
     } catch (Exception e) {
-      return ExceptionHandlers.handleModelException(
-          OperationType.REGISTER, request.getName(), schema, e);
+      return ExceptionHandlers.handleModelException(OperationType.REGISTER, modelName, schema, e);
     }
   }
 

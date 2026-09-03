@@ -119,6 +119,17 @@ public class TestUserOperations extends BaseOperationsTest {
   }
 
   @Test
+  public void testAddUserWithNullRequest() {
+    Response resp =
+        target("/metalakes/metalake1/users")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .post(Entity.entity(new byte[0], MediaType.APPLICATION_JSON_TYPE));
+
+    assertNullRequestBodyRejected(resp);
+  }
+
+  @Test
   public void testAddUser() throws IOException {
     UserAddRequest req = new UserAddRequest("user1");
     User user = buildUser("user1");
