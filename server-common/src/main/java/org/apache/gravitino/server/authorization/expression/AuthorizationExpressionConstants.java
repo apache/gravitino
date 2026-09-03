@@ -100,6 +100,18 @@ public class AuthorizationExpressionConstants {
                   ANY_USE_CATALOG && ANY_USE_SCHEMA && (TABLE::OWNER || ANY_MODIFY_TABLE)
                   """;
 
+  /**
+   * Authorizes removing a table, whether the stored data is deleted with it or only the Gravitino
+   * metadata is. Removal requires ownership of the table or of one of its ancestors: MODIFY_TABLE
+   * alters a table but never removes it.
+   */
+  public static final String DROP_TABLE_AUTHORIZATION_EXPRESSION =
+      """
+                  ANY(OWNER, METALAKE, CATALOG) ||
+                  SCHEMA_OWNER_WITH_USE_CATALOG ||
+                  ANY_USE_CATALOG && ANY_USE_SCHEMA && TABLE::OWNER
+                  """;
+
   public static final String LOAD_TOPICS_AUTHORIZATION_EXPRESSION =
       """
           ANY(OWNER, METALAKE, CATALOG) ||
