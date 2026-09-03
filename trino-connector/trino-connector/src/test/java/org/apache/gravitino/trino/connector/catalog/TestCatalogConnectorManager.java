@@ -766,6 +766,39 @@ public class TestCatalogConnectorManager {
   }
 
   @Test
+  public void testRepeatedWaitingForTrinoKeepsItsOwnMessage() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    when(fixture.catalogRegister.isTrinoStarted()).thenReturn(false);
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    // The second attempt reports the same message as the first, which is the branch that logs a
+    // repeated failure. It carries no cause, and rendering one anyway would fail there.
+    manager.loadMetalakeSync();
+    manager.loadMetalakeSync();
+
+    CatalogConnectorManager.LoadOutcome outcome = manager.getLoadOutcome();
+    assertTrue(outcome.getLastError().contains("Waiting for the Trino server"));
+    assertEquals(2, outcome.getConsecutiveFailures());
+  }
+
+  @Test
+  public void testMetalakeFailureAggregationKeepsItsOwnMessage() throws Exception {
+    LoadFixture fixture = new LoadFixture();
+    Mockito.doThrow(new RESTException("simulated: listing failed"))
+        .when(fixture.metalake)
+        .listCatalogs();
+    CatalogConnectorManager manager = fixture.createManager(ImmutableMap.of());
+
+    manager.loadMetalakeSync();
+
+    // The aggregated failure has no single cause of its own, and load_status must report it
+    // rather than whatever went wrong while trying to log it.
+    CatalogConnectorManager.LoadOutcome outcome = manager.getLoadOutcome();
+    assertTrue(outcome.getLastError().contains("1 of 1 metalakes failed"));
+    assertTrue(outcome.getLastError().contains("simulated: listing failed"));
+  }
+
+  @Test
   public void testReloadFailureAfterUnregisterIsRecordedAsFailed() throws Exception {
     LoadFixture fixture = new LoadFixture();
     Catalog catalog = mockCatalog("memory", "memory", Catalog.Type.RELATIONAL);
