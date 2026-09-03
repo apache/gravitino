@@ -38,6 +38,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.reflect.FieldUtils;
 import org.apache.gravitino.Config;
 import org.apache.gravitino.GravitinoEnv;
@@ -368,6 +369,63 @@ public class TestStatisticOperations extends BaseOperationsTest {
     Assertions.assertEquals(ErrorConstants.UNSUPPORTED_OPERATION_CODE, errorResp4.getCode());
     Assertions.assertEquals(
         UnmodifiableStatisticException.class.getSimpleName(), errorResp4.getType());
+  }
+
+  @Test
+  public void testUpdateTableStatisticsNameLength() {
+    String maximumLengthName =
+        Statistic.CUSTOM_PREFIX
+            + StringUtils.repeat("x", Statistic.MAX_NAME_LENGTH - Statistic.CUSTOM_PREFIX.length());
+    StatisticsUpdateRequest validRequest =
+        new StatisticsUpdateRequest(Map.of(maximumLengthName, StatisticValues.longValue(1L)));
+    MetadataObject tableObject =
+        MetadataObjects.parse(
+            String.format("%s.%s.%s", catalog, schema, table), MetadataObject.Type.TABLE);
+    when(tableDispatcher.tableExists(any())).thenReturn(true);
+
+    Response validResponse =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(validRequest, MediaType.APPLICATION_JSON_TYPE));
+    Assertions.assertEquals(Response.Status.OK.getStatusCode(), validResponse.getStatus());
+
+    String longName = maximumLengthName + "x";
+    StatisticsUpdateRequest request =
+        new StatisticsUpdateRequest(Map.of(longName, StatisticValues.longValue(1L)));
+
+    Response response =
+        target(
+                "/metalakes/"
+                    + metalake
+                    + "/objects/"
+                    + tableObject.type()
+                    + "/"
+                    + tableObject.fullName()
+                    + "/statistics")
+            .request(MediaType.APPLICATION_JSON_TYPE)
+            .accept("application/vnd.gravitino.v1+json")
+            .put(entity(request, MediaType.APPLICATION_JSON_TYPE));
+
+    Assertions.assertEquals(Response.Status.BAD_REQUEST.getStatusCode(), response.getStatus());
+    ErrorResponse errorResponse = response.readEntity(ErrorResponse.class);
+    Assertions.assertEquals(ErrorConstants.ILLEGAL_ARGUMENTS_CODE, errorResponse.getCode());
+    Assertions.assertEquals(
+        IllegalStatisticNameException.class.getSimpleName(), errorResponse.getType());
+    Assertions.assertTrue(
+        errorResponse
+            .getMessage()
+            .contains(
+                String.format(
+                    "Statistic name must not exceed %d characters", Statistic.MAX_NAME_LENGTH)));
+    Assertions.assertFalse(errorResponse.getMessage().contains(longName));
   }
 
   @Test
